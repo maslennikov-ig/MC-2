@@ -1,45 +1,44 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-19
-Current working branch: `codex/career-playbook-e2e-smoke`
-Base branch: `codex/career-playbook-jd-bridge` stacked on PR #36
-Current PR: #37 `codex/career-playbook-e2e-smoke` -> `codex/career-playbook-jd-bridge`
+Updated: 2026-05-20
+Current working branch: `develop`
+Base branch: `develop`
+Current PR: none
 
 ## Current state
 
-- Repo shape: single pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
-- Delivery truth: `develop` is dev delivery, `master` is staging, and direct pushes to protected branches remain forbidden.
-- Career Playbook PR stack is still open and stacked; avoid retargeting dependent work to `develop` until upstream PRs land.
-- `mc2-db696.9` JD bridge is included with its review fixes.
-- `mc2-db696.11` partial delivery is implemented on this branch: configurable Career Playbook Playwright harness, read-only backend smoke preflight, runtime docs, and review fixes for env-scoped probes, sanitization, and external `PLAYWRIGHT_BASE_URL`.
-- `mc2-db696.11` remains open/in_progress because live staging mutation smoke, cost dashboard evidence, and 10-concurrent load test are blocked/tracked separately.
-- No billing or payment scope is part of Career Playbook MVP work.
+- This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
+- `.codex/orchestrator.toml` is the machine-readable contract; `.codex/handoff.md` is current-state only; `.codex/project-index.md` is the navigation map.
+- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`.
+- Career Playbook PR #24 through #37 and the PR #38 handoff/CI follow-up have landed in `develop`.
+- PR #37 delivered the `mc2-db696.11` smoke/preflight foundation: configurable Career Playbook Playwright harness, read-only backend smoke preflight, runtime docs, and review fixes for env-scoped probes, sanitization, and external `PLAYWRIGHT_BASE_URL`.
+- No billing or payment scope is part of the Career Playbook MVP work.
 
 ## Latest relevant stage
 
 - Latest relevant Career Playbook stage: `mc2-db696.11` - tests/smoke/staging verification foundation.
 - Stage summary: [`.codex/stages/mc2-db696.11/summary.md`](./stages/mc2-db696.11/summary.md)
 - Review artifacts: [`.codex/stages/mc2-db696.11/artifacts`](./stages/mc2-db696.11/artifacts)
-- Key verification: backend smoke unit 12 passed, web config unit 6 passed, Playwright unauth smoke on isolated port 3101 passed, no-env preflight blocked as expected, `pnpm type-check`, `pnpm lint`, `pnpm build`, artifact validation, and process verification passed.
+- PR #36 JD bridge landed in `develop` before PR #37; PR #35 generation worker completion and polling transport already landed.
+- PDF/export stage landed via PR #34, Library/share via PR #33, Viewer/editor via PR #30, and Marketing landing via PR #31.
 
 ## Next recommended
 
-Next delivery action: resolve the lower Career Playbook PR stack before advancing #36/#37. First actionable PR is #24; #25 lacks GitHub checks, and #26-#35 remain draft.
-
 Next stage id: `mc2-db696.11`
-Recommended action: keep #37 open behind the stack; do not start more dependent implementation until #24/#25/#26+ readiness is resolved. Live smoke remains gated on staging schema/auth/queue/cleanup/cost readiness.
+Recommended action: continue live-staging and evidence work under Phase 11. The first ready P1 is `mc2-db696.11.5`, but live mutation smoke remains gated on staging schema, auth/TOKEN, disposable fixtures, dedicated `BULLMQ_QUEUE_NAME`, exact cleanup scope, and accepted LLM/API cost budget.
 
-- If upstream stacked PRs land first, rebase/retarget before more dependent work.
+If those gates are not satisfied, collect/prepare the missing staging readiness evidence before running any live mutation. Keep `mc2-db696.16` as the tracked P2 defer for future upload quota/dedupe reuse in the JD bridge.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.11/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth, verify the stacked PR status, and avoid dependent work on develop unless upstream PRs have merged.
+Use $orchestrator-stage to continue Career Playbook delivery. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.11/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#37 and PR #38 have landed in develop; continue Phase 11 smoke and verification work under mc2-db696.11. Do not run live staging mutations until staging schema/auth/TOKEN, disposable fixtures, dedicated queue, cleanup scope, and cost budget gates are explicit. Keep billing/payment out of MVP scope.
 ```
 
 ## Explicit defers
 
-- Pre-course user upload in the JD bridge modal remains deferred; current upload flow requires an existing course ID.
-- Full live Supabase/Redis/staging mutation E2E remains open under `mc2-db696.11.5`; remote Supabase currently lacks `public.career_playbooks`, and live mutation requires explicit approval, disposable fixtures, dedicated queue, cleanup, auth token, and API cost budget.
+- Real Supabase RLS/staging smoke and authenticated browser e2e share/PDF/worker flow remain tracked under `mc2-db696.11.5` until live-smoke gates are satisfied.
 - Cost dashboard evidence and 10-concurrent load test remain open under `mc2-db696.11.4` and `mc2-db696.11.6`.
+- SSE/subscription status streaming remains deferred; PR #35 intentionally uses polling over the existing tRPC/httpBatchLink transport.
+- Pre-course user upload in the JD bridge modal remains deferred; current upload flow requires an existing course ID.
 - Reusing the full Stage 1 upload service for trusted generated markdown remains deferred; the direct `file_catalog` pending-source path is documented and covered by tests for MVP.

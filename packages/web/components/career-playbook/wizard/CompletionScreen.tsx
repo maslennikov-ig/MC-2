@@ -1,11 +1,16 @@
 'use client'
 
-import { AlertCircle, CheckCircle2, Info, Loader2, Pencil, WandSparkles } from 'lucide-react'
-import type {
-  CareerPlaybookFixedAnswer,
-  CareerPlaybookFollowupAnswer,
-  CareerPlaybookPlaybookStatus,
-} from '@megacampus/shared-types'
+import Link from 'next/link'
+import {
+  AlertCircle,
+  BookOpen,
+  CheckCircle2,
+  Info,
+  Loader2,
+  Pencil,
+  WandSparkles,
+} from 'lucide-react'
+import type { CareerPlaybookPlaybookStatus } from '@megacampus/shared-types'
 
 import { Button } from '@/components/ui/button'
 
@@ -28,12 +33,13 @@ export interface CompletionScreenCopy {
   generationFailedDescription?: string
   generationStarting?: string
   generationErrorTitle?: string
+  viewGenerated?: string
   empty?: string
 }
 
 interface CompletionScreenProps {
-  fixedAnswers: CareerPlaybookFixedAnswer[]
-  followupAnswers: CareerPlaybookFollowupAnswer[]
+  fixedAnswers: CompletionSummaryAnswer[]
+  followupAnswers: CompletionSummaryAnswer[]
   freeformNotes: string[]
   onEditFixedAnswer: (questionKey: string) => void
   onEditFollowupAnswer: (questionId: string) => void
@@ -44,7 +50,15 @@ interface CompletionScreenProps {
   generationError?: string | null
   isGenerationStarting?: boolean
   isEditingDisabled?: boolean
+  viewGeneratedHref?: string
   copy?: CompletionScreenCopy
+}
+
+export interface CompletionSummaryAnswer {
+  id: string
+  title: string
+  value: string
+  skipped?: boolean
 }
 
 const defaultCopy: Required<CompletionScreenCopy> = {
@@ -67,6 +81,7 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   generationFailedDescription: 'Проверьте собранный контекст и попробуйте снова.',
   generationStarting: 'Запускаем генерацию...',
   generationErrorTitle: 'Не удалось запустить генерацию',
+  viewGenerated: 'Открыть Role Guide',
   empty: 'Пока нет данных',
 }
 
@@ -83,6 +98,7 @@ export function CompletionScreen({
   generationError = null,
   isGenerationStarting = false,
   isEditingDisabled = false,
+  viewGeneratedHref,
   copy,
 }: CompletionScreenProps) {
   const labels = { ...defaultCopy, ...copy }
@@ -147,30 +163,40 @@ export function CompletionScreen({
             </div>
           ) : null}
         </div>
-        <Button
-          type="button"
-          onClick={onGenerate}
-          disabled={isGenerationStarting || isGenerating || isCompleted}
-          className="min-w-52"
-        >
-          {isGenerationStarting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-          ) : (
-            <WandSparkles className="mr-2 h-4 w-4" aria-hidden />
-          )}
-          {isGenerationStarting ? labels.generationStarting : labels.generate}
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-stretch">
+          <Button
+            type="button"
+            onClick={onGenerate}
+            disabled={isGenerationStarting || isGenerating || isCompleted}
+            className="min-w-52"
+          >
+            {isGenerationStarting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <WandSparkles className="mr-2 h-4 w-4" aria-hidden />
+            )}
+            {isGenerationStarting ? labels.generationStarting : labels.generate}
+          </Button>
+          {isCompleted && viewGeneratedHref ? (
+            <Button asChild variant="secondary" className="min-w-52">
+              <Link href={viewGeneratedHref}>
+                <BookOpen className="mr-2 h-4 w-4" aria-hidden />
+                {labels.viewGenerated}
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <SummarySection title={labels.fixedTitle} empty={labels.empty}>
         {fixedAnswers.map((answer) => (
           <SummaryRow
-            key={answer.question_key}
-            title={answer.question_key}
-            value={formatValue(answer.value)}
-            editLabel={`${labels.edit} ${answer.question_key}`}
+            key={answer.id}
+            title={answer.title}
+            value={answer.value}
+            editLabel={`${labels.edit} ${answer.title}`}
+            onEdit={() => onEditFixedAnswer(answer.id)}
             isEditDisabled={isEditingDisabled}
-            onEdit={() => onEditFixedAnswer(answer.question_key)}
           />
         ))}
       </SummarySection>
@@ -178,12 +204,12 @@ export function CompletionScreen({
       <SummarySection title={labels.followupsTitle} empty={labels.empty}>
         {followupAnswers.map((answer) => (
           <SummaryRow
-            key={answer.question_id}
-            title={answer.question_text}
-            value={answer.skipped ? labels.skipped : formatValue(answer.value)}
-            editLabel={`${labels.edit} ${answer.question_text}`}
+            key={answer.id}
+            title={answer.title}
+            value={answer.skipped ? labels.skipped : answer.value}
+            editLabel={`${labels.edit} ${answer.title}`}
+            onEdit={() => onEditFollowupAnswer(answer.id)}
             isEditDisabled={isEditingDisabled}
-            onEdit={() => onEditFollowupAnswer(answer.question_id)}
           />
         ))}
       </SummarySection>
@@ -192,7 +218,7 @@ export function CompletionScreen({
         {freeformNotes.map((note, index) => (
           <div
             key={`${note}-${index}`}
-            className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 break-words whitespace-pre-wrap text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
           >
             {note}
           </div>
@@ -242,7 +268,7 @@ function SummaryRow({
     <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_auto] sm:items-start dark:border-slate-800 dark:bg-slate-900">
       <div className="min-w-0 space-y-1">
         <p className="text-xs font-medium text-slate-500 uppercase dark:text-slate-400">{title}</p>
-        <p className="text-sm leading-6 whitespace-pre-wrap text-slate-900 dark:text-slate-100">
+        <p className="text-sm leading-6 break-words whitespace-pre-wrap text-slate-900 dark:text-slate-100">
           {value}
         </p>
       </div>
@@ -258,11 +284,4 @@ function SummaryRow({
       </Button>
     </div>
   )
-}
-
-function formatValue(
-  value: CareerPlaybookFixedAnswer['value'] | CareerPlaybookFollowupAnswer['value']
-) {
-  if (Array.isArray(value)) return value.join(', ')
-  return value ?? ''
 }

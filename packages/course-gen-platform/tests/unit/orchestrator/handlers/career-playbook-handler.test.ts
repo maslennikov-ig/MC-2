@@ -1,10 +1,11 @@
 import type { Job } from 'bullmq';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  CareerPlaybookBlockState,
-  CareerPlaybookRoleProfileSpec,
+import {
+  JobType,
+  type CareerPlaybookBlockState,
+  type CareerPlaybookJobData,
+  type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
-import { JobType } from '@megacampus/shared-types';
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
@@ -31,10 +32,7 @@ vi.mock('@/stages/stage-career-playbook/graph', () => ({
 }));
 
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
-import {
-  CareerPlaybookHandler,
-  type CareerPlaybookJobData,
-} from '@/orchestrator/handlers/career-playbook-handler';
+import { CareerPlaybookHandler } from '@/orchestrator/handlers/career-playbook-handler';
 
 const getCareerPlaybookGraphMock = vi.mocked(getCareerPlaybookGraph);
 const playbookId = '00000000-0000-4000-8000-000000000001';

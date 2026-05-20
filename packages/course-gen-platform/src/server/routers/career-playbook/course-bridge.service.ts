@@ -2,11 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { TRPCError } from '@trpc/server';
-import {
-  type CareerPlaybookQAData,
-  type Json,
-  type Language,
-} from '@megacampus/shared-types';
+import { type CareerPlaybookQAData, type Json, type Language } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
@@ -83,7 +79,8 @@ function requireUser(ctx: Context): UserContext {
 }
 
 function assertPlaybookAccess(playbook: CareerPlaybookRow, user: UserContext): void {
-  if (user.role === 'superadmin' || playbook.user_id === user.id) return;
+  if (user.role === 'superadmin') return;
+  if (playbook.user_id === user.id && playbook.organization_id === user.organizationId) return;
 
   throw new TRPCError({ code: 'FORBIDDEN', message: 'Career Playbook access denied' });
 }
@@ -97,7 +94,10 @@ function assertCompleted(playbook: CareerPlaybookRow): void {
   });
 }
 
-async function loadOwnedPlaybook(playbookId: string, user: UserContext): Promise<CareerPlaybookRow> {
+async function loadOwnedPlaybook(
+  playbookId: string,
+  user: UserContext
+): Promise<CareerPlaybookRow> {
   const supabase = getSupabaseAdmin() as unknown as CareerPlaybookSupabase;
   const { data, error } = await supabase
     .from('career_playbooks')

@@ -1,4 +1,154 @@
 {
+  "landing": {
+    "metadataTitle": "Рабочее руководство роли от MC2",
+    "metadataDescription": "Соберите структурированное руководство роли для найма и онбординга, с контекстом для будущих сценариев MC2.",
+    "heroEyebrow": "Career Playbook",
+    "heroTitle": "Превратите контекст роли в рабочее руководство",
+    "heroSubtitle": "Соберите контекст роли, запросите руководство из 26 блоков и проверьте редактируемый черновик для найма и онбординга.",
+    "ctaPrimary": "Создать руководство роли",
+    "ctaSecondary": "Посмотреть пример",
+    "heroMetricOneValue": "26",
+    "heroMetricOneLabel": "операционных блоков",
+    "heroMetricTwoValue": "5",
+    "heroMetricTwoLabel": "управленческих систем",
+    "heroMetricThreeValue": "1",
+    "heroMetricThreeLabel": "черновик роли",
+    "methodologyEyebrow": "Методология",
+    "methodologyTitle": "Собрано из управленческих систем сильных команд",
+    "methodologySubtitle": "Каждый источник превращается в конкретные разделы Role Guide: зачем роль нужна, где у неё автономия, как устроена рутина, качество и взаимодействие.",
+    "methodologyBlocksTitle": "Карта 26 блоков",
+    "selectedBlocksLabel": "Выбранные блоки",
+    "methodologies": {
+      "netflix": {
+        "title": "Netflix Context over Control",
+        "description": "Даёт роли стратегический контекст, понятные границы и право действовать без микроменеджмента."
+      },
+      "amazon": {
+        "title": "Amazon Leadership Principles",
+        "description": "Переводит культуру в правила решений, входные метрики, контрметрики и клиентское мышление."
+      },
+      "toyota": {
+        "title": "Toyota Standardized Work",
+        "description": "Фиксирует лучший известный способ работы через чеклисты, исключения и критерии качества."
+      },
+      "spotify": {
+        "title": "Spotify Squad Model",
+        "description": "Показывает роль в реальном потоке работы: зависимости, команды, зоны влияния и траекторию роста."
+      },
+      "bridgewater": {
+        "title": "Bridgewater Baseball Cards",
+        "description": "Документирует сильные стороны, стиль коммуникации, энергию, риски и профиль кандидата."
+      }
+    },
+    "blockMap": {
+      "groups": {
+        "foundation": {
+          "title": "Основа"
+        },
+        "operations": {
+          "title": "Операции"
+        },
+        "people": {
+          "title": "Люди"
+        },
+        "growth": {
+          "title": "Рост"
+        },
+        "system": {
+          "title": "Система"
+        },
+        "wrap": {
+          "title": "Итог"
+        }
+      },
+      "blocks": {
+        "block1": "1. Миссия/KR",
+        "block2": "2. Анти-цели",
+        "block3": "3. Зоны ответственности",
+        "block4": "4. Обязанности",
+        "block5": "5. Матрица решений",
+        "block6": "6. KPI",
+        "block7": "7. Компетенции",
+        "block8": "8. Инструменты",
+        "block9": "9. Human-AI",
+        "block10": "10. Зависимости",
+        "block11": "11. Карьерный рост",
+        "block12": "12. Профиль кандидата",
+        "block13": "13. День в роли",
+        "block14": "14. Онбординг",
+        "block15": "15. Мотивация",
+        "block16": "16. Процессы",
+        "block17": "17. Красные флаги",
+        "block18": "18. FAQ",
+        "block19": "19. Контекст индустрии",
+        "block20": "20. Бизнес-цели",
+        "block21": "21. Сценарии сбоев",
+        "block22": "22. README роли",
+        "block23": "23. Протокол преемственности",
+        "block24": "24. Карта роли",
+        "block25": "25. Ритм пересмотра",
+        "block26": "26. Чеклист внедрения"
+      }
+    },
+    "demoEyebrow": "Интерактивное демо",
+    "demoTitle": "Аннотированный пример руководства для B2B-продаж",
+    "demoSubtitle": "Посмотрите компактный пример на основе руководства для менеджера B2B-продаж. Каждая аннотация объясняет, зачем нужен блок.",
+    "demoPreviewTitle": "Руководство роли: B2B-продажи",
+    "demoSections": {
+      "mission": {
+        "title": "Миссия и ключевые результаты",
+        "excerpt": "Роль превращает B2B-воронку в прогнозируемую выручку: квалифицирует возможности, двигает сделки и держит воронку здоровой.",
+        "annotation": "Миссия связывает смысл роли с измеримыми результатами и даёт руководителю быстрый критерий качества.",
+        "blockLabel": "Блок 1"
+      },
+      "decisions": {
+        "title": "Матрица решений",
+        "excerpt": "Небольшие скидки можно решать быстро; крупные скидки и нестандартные условия договора требуют коммерческого согласования.",
+        "annotation": "Правила решений превращают автономию в понятные ограничения по принципу обратимых и необратимых решений.",
+        "blockLabel": "Блок 5"
+      },
+      "kpi": {
+        "title": "KPI и контрметрики",
+        "excerpt": "Квалифицированная воронка, доля выигранных сделок, цикл сделки и удержание первого года идут парами, чтобы не провоцировать игру с метриками.",
+        "annotation": "Контрметрики не дают роли оптимизировать одну цифру ценой бизнес-результата.",
+        "blockLabel": "Блок 6"
+      }
+    },
+    "valueEyebrow": "Почему это работает",
+    "valueTitle": "Структурированное руководство из реального контекста роли",
+    "valueProps": {
+      "0": {
+        "title": "Готово для руководителя",
+        "description": "На выходе получается практическое руководство роли, а не короткая вакансия или демонстрация промпта."
+      },
+      "1": {
+        "title": "Контекст для обучения",
+        "description": "Компетенции, инструменты и процессы фиксируются так, чтобы руководители и команды обучения могли их проверить."
+      },
+      "2": {
+        "title": "Редактируется после генерации",
+        "description": "Команда может проверять и уточнять отдельные блоки, не перезапуская весь сбор контекста."
+      }
+    },
+    "faqTitle": "Вопросы",
+    "faq": {
+      "0": {
+        "question": "Кому стоит попробовать первым?",
+        "answer": "HR-лидам, основателям, руководителям отделов и командам обучения, которым нужна ясность роли перед наймом, онбордингом или обучением."
+      },
+      "1": {
+        "question": "Можно ли редактировать готовое руководство?",
+        "answer": "Да. Текущая версия поддерживает проверку и уточнение отдельных блоков, поэтому команда может доработать конкретные разделы без повторного сбора контекста."
+      },
+      "2": {
+        "question": "Что подготовить перед стартом?",
+        "answer": "Достаточно должностной инструкции, заметок о роли, контекста команды или чернового списка обязанностей. Конструктор задаст уточняющие вопросы там, где контекста мало."
+      }
+    },
+    "finalCtaTitle": "Соберите первый Role Guide для команды",
+    "finalCtaDescription": "Начните с конструктора, ответьте на вопросы о роли и сохраняйте итоговый черновик полезным по мере обучения команды.",
+    "finalCtaButton": "Создать руководство роли"
+  },
   "wizard": {
     "eyebrow": "Career Playbook",
     "title": "Конструктор Role Guide",
@@ -43,7 +193,7 @@
     "editLabel": "Редактировать",
     "generateCta": "Сгенерировать Role Guide",
     "generationHandoffTitle": "Генерация запущена",
-    "generationHandoffDescription": "Backend начал генерацию Role Guide.",
+    "generationHandoffDescription": "Генерация Role Guide запущена.",
     "generationInProgressTitle": "Генерация выполняется",
     "generationInProgressDescription": "Role Guide собирается из сохранённого контекста.",
     "generationCompletedTitle": "Генерация завершена",
@@ -52,11 +202,49 @@
     "generationFailedDescription": "Проверьте собранный контекст и попробуйте снова.",
     "generationStarting": "Запускаем генерацию...",
     "generationErrorTitle": "Не удалось запустить генерацию",
+    "viewGenerated": "Открыть Role Guide",
     "emptySummary": "Пока нет данных"
   },
+  "viewer": {
+    "productLabel": "Career Playbook",
+    "contents": "Содержание",
+    "pdf": "PDF",
+    "share": "Поделиться",
+    "createCourse": "Создать курс",
+    "delete": "Удалить",
+    "editBlock": "Редактировать {title}",
+    "regenerateBlock": "Перегенерировать {title}",
+    "collapseBlock": "Свернуть {title}",
+    "expandBlock": "Развернуть {title}",
+    "waitingBlock": "Этот блок ожидает генерации.",
+    "editorTitle": "Редактировать блок",
+    "editorDescription": "Отредактируйте markdown напрямую или задайте инструкцию для точечной перегенерации.",
+    "blockMarkdown": "Markdown блока",
+    "saveChanges": "Сохранить изменения",
+    "regenerationInstruction": "Инструкция для перегенерации",
+    "regenerationPlaceholder": "Сделай блок конкретнее для enterprise sales.",
+    "regenerateBlockButton": "Перегенерировать блок",
+    "loading": "Загружаем Career Playbook...",
+    "unavailableTitle": "Career Playbook недоступен",
+    "unavailableDescription": "Не удалось загрузить viewer.",
+    "retry": "Повторить",
+    "viewerBackendPending": "Viewer backend пока недоступен; показываем локальное превью до подключения интеграции.",
+    "localPreviewTitle": "Превью Role Guide",
+    "localPreviewContent": "# Превью Role Guide\n\nBackend viewer transport ещё не подключён.",
+    "sharePending": "Публичные ссылки будут доступны после подключения backend action",
+    "coursePending": "Создание курса будет доступно после подключения backend action",
+    "deletePending": "Удаление будет доступно после подключения backend action",
+    "pdfPending": "Не удалось экспортировать PDF. Повторите попытку.",
+    "editLocal": "Изменение блока сохранено локально до подключения backend action",
+    "regenerateLocal": "Блок перегенерирован локально до подключения backend action",
+    "generatingTitle": "Генерируем {title}",
+    "blocksReady": "Готово блоков: {ready} из {total}",
+    "thinkingStream": "Показать thinking stream",
+    "streamingBlockPending": "Этот блок генерируется."
+  },
   "library": {
-    "title": "Библиотека Role Guide",
-    "subtitle": "Ваши сгенерированные и опубликованные Role Guide",
+    "title": "Библиотека руководств ролей",
+    "subtitle": "Ваши сгенерированные и опубликованные руководства ролей",
     "searchPlaceholder": "Поиск по названию роли",
     "filters": {
       "all": "Все статусы",
@@ -69,10 +257,10 @@
       "levelAll": "Все уровни"
     },
     "createNew": "Создать новый",
-    "emptyTitle": "Пока нет Role Guide",
+    "emptyTitle": "Пока нет руководств ролей",
     "emptyDescription": "Создайте первый Career Playbook, чтобы собрать библиотеку.",
     "errorTitle": "Библиотека временно недоступна",
-    "errorDescription": "Повторите позже или начните новый guide.",
+    "errorDescription": "Повторите позже или начните новое руководство.",
     "selectedCount": "Выбрано: {count}",
     "bulkDelete": "Удалить выбранные",
     "deleting": "Удаляем...",
@@ -81,7 +269,27 @@
     "card": {
       "createCourse": "Создать курс",
       "publicBadge": "Публичный",
-      "privateBadge": "Приватный"
+      "privateBadge": "Приватный",
+      "makePublic": "Опубликовать",
+      "makePrivate": "Сделать приватным",
+      "publicLink": "Публичная ссылка",
+      "open": "Открыть"
+    },
+    "statusLabels": {
+      "draft": "Черновик",
+      "answering_fixed": "Ответы на основные вопросы",
+      "awaiting_followups": "Ожидает уточнений",
+      "answering_followups": "Ответы на уточнения",
+      "ready_to_generate": "Готово к генерации",
+      "generating": "Генерируется",
+      "completed": "Готово",
+      "failed": "Ошибка"
+    },
+    "deleteDialog": {
+      "title": "Удалить выбранные руководства?",
+      "description": "Будет удалено выбранных руководств: {count}.",
+      "cancel": "Отмена",
+      "confirm": "Удалить руководства"
     },
     "createCourseDialog": {
       "title": "Создать курс из Role Guide",
@@ -95,6 +303,6 @@
   },
   "share": {
     "fallbackTitle": "Публичный Career Playbook",
-    "fallbackDescription": "Откройте публичный Role Guide, созданный на MC2."
+    "fallbackDescription": "Откройте публичное руководство роли, созданное на MC2."
   }
 }

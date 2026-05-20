@@ -73,11 +73,31 @@ function completedPlaybook(overrides: Partial<CareerPlaybookRow> = {}): CareerPl
       content_language: 'en',
     },
     generated_blocks: {
-      block_6: { content: 'Mission: own platform product outcomes.', status: 'generated', attempt: 1 },
-      block_7: { content: 'KPIs: activation, retention, adoption.', status: 'generated', attempt: 1 },
-      block_8: { content: 'Competencies: discovery, prioritization, stakeholder management.', status: 'generated', attempt: 1 },
-      block_14: { content: 'First 30 days: map users and rituals.', status: 'generated', attempt: 1 },
-      block_21: { content: 'Career path: senior lead to product director.', status: 'generated', attempt: 1 },
+      block_6: {
+        content: 'Mission: own platform product outcomes.',
+        status: 'generated',
+        attempt: 1,
+      },
+      block_7: {
+        content: 'KPIs: activation, retention, adoption.',
+        status: 'generated',
+        attempt: 1,
+      },
+      block_8: {
+        content: 'Competencies: discovery, prioritization, stakeholder management.',
+        status: 'generated',
+        attempt: 1,
+      },
+      block_14: {
+        content: 'First 30 days: map users and rituals.',
+        status: 'generated',
+        attempt: 1,
+      },
+      block_21: {
+        content: 'Career path: senior lead to product director.',
+        status: 'generated',
+        attempt: 1,
+      },
     },
     final_markdown: '# Product Lead\n\nComplete role guide.',
     web_research: null,
@@ -301,6 +321,24 @@ describe('course bridge service', () => {
     await expect(
       createCourseFromPlaybook(instructorContext, { playbookId }, dependencies)
     ).rejects.toBeInstanceOf(TRPCError);
+
+    expect(dependencies.insertCourse).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-superadmin users when the playbook belongs to another organization', async () => {
+    const { dependencies } = createDependencies({
+      loadPlaybook: vi.fn(async () =>
+        completedPlaybook({
+          organization_id: '99999999-9999-4999-8999-999999999999',
+        })
+      ),
+    });
+
+    await expect(
+      createCourseFromPlaybook(instructorContext, { playbookId }, dependencies)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
 
     expect(dependencies.insertCourse).not.toHaveBeenCalled();
   });

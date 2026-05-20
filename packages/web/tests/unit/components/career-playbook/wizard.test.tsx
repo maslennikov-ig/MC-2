@@ -2,9 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type {
-  CareerPlaybookFixedAnswer,
   CareerPlaybookFixedQuestion,
-  CareerPlaybookFollowupAnswer,
   CareerPlaybookFollowupQuestion,
 } from '@megacampus/shared-types'
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
@@ -35,6 +33,14 @@ const fixedSingleChoiceQuestion: CareerPlaybookFixedQuestion = {
     { value: 'engineering', label: 'Инженерия / IT' },
   ],
   is_required: true,
+}
+
+const optionalSingleChoiceQuestion: CareerPlaybookFixedQuestion = {
+  ...fixedSingleChoiceQuestion,
+  position: 3,
+  question_key: 'company_stage',
+  question_text: 'Какая стадия компании / продукта?',
+  is_required: false,
 }
 
 const followupMultiChoiceQuestion: CareerPlaybookFollowupQuestion = {
@@ -175,6 +181,55 @@ describe('Wizard', () => {
     await user.click(screen.getByRole('button', { name: 'Далее' }))
     expect(handleNext).toHaveBeenCalledTimes(1)
   })
+
+  it('allows optional questions to be skipped without an answer', async () => {
+    const user = userEvent.setup()
+    const handleNext = vi.fn()
+
+    render(
+      <Wizard
+        questions={[optionalSingleChoiceQuestion]}
+        answers={{}}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={handleNext}
+        onPrevious={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Завершить' }))
+
+    expect(handleNext).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens saved free-form draft for review and resubmits edited text', async () => {
+    const user = userEvent.setup()
+    const handleFreeformSubmit = vi.fn()
+
+    render(
+      <Wizard
+        questions={[fixedOpenQuestion]}
+        answers={{ position: 'CPO' }}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+        freeformDraft="Existing context"
+        onFreeformSubmit={handleFreeformSubmit}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Свободный ответ' }))
+    const textarea = screen.getByRole('textbox', { name: 'Расскажите свободно' })
+
+    expect(textarea).toHaveValue('Existing context')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Edited context')
+    await user.click(screen.getByRole('button', { name: 'Сохранить текст' }))
+
+    expect(handleFreeformSubmit).toHaveBeenCalledWith('Edited context')
+  })
 })
 
 describe('FollowupPhase', () => {
@@ -222,8 +277,7 @@ describe('FollowupPhase', () => {
     const handlePrevious = vi.fn()
     const handleNext = vi.fn()
     const handleSkip = vi.fn()
-
-    render(
+    const { rerender } = render(
       <FollowupPhase
         questions={[followupOpenQuestion, followupMultiChoiceQuestion]}
         answers={{ [followupOpenQuestion.question_id]: 'Ответ' }}
@@ -237,8 +291,27 @@ describe('FollowupPhase', () => {
       />
     )
 
+    expect(screen.getByRole('button', { name: 'Назад' })).toBeDisabled()
+
     await user.click(screen.getByRole('button', { name: 'Пропустить' }))
     expect(handleSkip).toHaveBeenCalledWith(followupOpenQuestion.question_id)
+
+    rerender(
+      <FollowupPhase
+        questions={[followupOpenQuestion, followupMultiChoiceQuestion]}
+        answers={{
+          [followupOpenQuestion.question_id]: 'Ответ',
+          [followupMultiChoiceQuestion.question_id]: ['risk-map'],
+        }}
+        currentIndex={1}
+        completenessScore={0.82}
+        onAnswerChange={vi.fn()}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        onSkip={handleSkip}
+        onForceGenerate={vi.fn()}
+      />
+    )
 
     await user.click(screen.getByRole('button', { name: 'Назад' }))
     expect(handlePrevious).toHaveBeenCalledTimes(1)
@@ -302,6 +375,24 @@ describe('FreeFormInput', () => {
     expect(handleSubmit).toHaveBeenCalledWith('Роль строит RevOps контур')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('opens the saved free-form draft for editing', async () => {
+    const user = userEvent.setup()
+    const handleSubmit = vi.fn()
+
+    render(<FreeFormInput freeformDraft="Старый контекст" onSubmit={handleSubmit} />)
+
+    await user.click(screen.getByRole('button', { name: 'Я расскажу свободно' }))
+    const textarea = screen.getByLabelText('Свободный ответ')
+
+    expect(textarea).toHaveValue('Старый контекст')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Обновлённый контекст')
+    await user.click(screen.getByRole('button', { name: 'Сохранить текст' }))
+
+    expect(handleSubmit).toHaveBeenCalledWith('Обновлённый контекст')
+  })
 })
 
 describe('CompletionScreen', () => {
@@ -310,24 +401,29 @@ describe('CompletionScreen', () => {
     const handleEditFixed = vi.fn()
     const handleEditFollowup = vi.fn()
     const handleGenerate = vi.fn()
-    const fixedAnswers: CareerPlaybookFixedAnswer[] = [
+    const fixedAnswers = [
       {
-        question_key: 'position',
+        id: 'position',
+        title: 'Какую должность вы хотите оформить?',
         value: 'Head of Sales',
       },
-    ]
-    const followupAnswers: CareerPlaybookFollowupAnswer[] = [
       {
-        question_id: followupOpenQuestion.question_id,
-        question_text: followupOpenQuestion.question_text,
-        question_type: 'open',
+        id: 'department',
+        title: 'Отдел или функциональная область',
+        value: 'Продажи / Sales',
+      },
+    ]
+    const followupAnswers = [
+      {
+        id: followupOpenQuestion.question_id,
+        title: followupOpenQuestion.question_text,
         value: 'Потеря hiring bar',
         skipped: false,
       },
       {
-        question_id: followupMultiChoiceQuestion.question_id,
-        question_text: followupMultiChoiceQuestion.question_text,
-        question_type: 'multi_choice',
+        id: followupMultiChoiceQuestion.question_id,
+        title: followupMultiChoiceQuestion.question_text,
+        value: '',
         skipped: true,
       },
     ]
@@ -345,14 +441,19 @@ describe('CompletionScreen', () => {
 
     expect(screen.getByText('Готовы создать?')).toBeInTheDocument()
     expect(screen.getByText('Фиксированные ответы')).toBeInTheDocument()
+    expect(screen.getByText('Какую должность вы хотите оформить?')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
+    expect(screen.getByText('Отдел или функциональная область')).toBeInTheDocument()
+    expect(screen.getByText('Продажи / Sales')).toBeInTheDocument()
     expect(screen.getByText('Уточнения')).toBeInTheDocument()
     expect(screen.getByText('Потеря hiring bar')).toBeInTheDocument()
     expect(screen.getByText('Пропущено')).toBeInTheDocument()
     expect(screen.getByText('Свободные заметки')).toBeInTheDocument()
     expect(screen.getByText('Роль строит RevOps контур')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Редактировать position' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Редактировать Какую должность вы хотите оформить?' })
+    )
     expect(handleEditFixed).toHaveBeenCalledWith('position')
 
     await user.click(
@@ -362,5 +463,36 @@ describe('CompletionScreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Сгенерировать Role Guide' }))
     expect(handleGenerate).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a completed viewer link and wraps long summary text', () => {
+    const longAnswer =
+      'https://example.com/role-guides/product-lead/very-long-reference-without-natural-breaks'
+
+    render(
+      <CompletionScreen
+        fixedAnswers={[
+          {
+            id: 'position',
+            title: 'Role source',
+            value: longAnswer,
+          },
+        ]}
+        followupAnswers={[]}
+        freeformNotes={[longAnswer]}
+        onEditFixedAnswer={vi.fn()}
+        onEditFollowupAnswer={vi.fn()}
+        onGenerate={vi.fn()}
+        generationStatus="completed"
+        viewGeneratedHref="/career-playbook/123"
+        copy={{ viewGenerated: 'Open Role Guide' }}
+      />
+    )
+
+    expect(screen.getByRole('link', { name: 'Open Role Guide' })).toHaveAttribute(
+      'href',
+      '/career-playbook/123'
+    )
+    expect(screen.getAllByText(longAnswer)[0]).toHaveClass('break-words')
   })
 })
