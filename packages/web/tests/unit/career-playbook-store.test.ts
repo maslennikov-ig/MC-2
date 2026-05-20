@@ -5,6 +5,7 @@ const trpcMocks = vi.hoisted(() => ({
   requestFollowupsMutate: vi.fn(),
   approveAndGenerateMutate: vi.fn(),
   submitAnswerMutate: vi.fn(),
+  exportPdfQuery: vi.fn(),
 }))
 
 vi.mock('@/lib/trpc/browser-client', () => ({
@@ -12,6 +13,9 @@ vi.mock('@/lib/trpc/browser-client', () => ({
 }))
 
 import {
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  type CareerPlaybookBlockId,
+  type CareerPlaybookViewerSnapshot,
   getCareerPlaybookCurrentQuestion,
   getCareerPlaybookProgress,
   getCareerPlaybookVisibleQuestions,
@@ -28,9 +32,11 @@ function resetStore() {
   trpcMocks.requestFollowupsMutate.mockReset()
   trpcMocks.approveAndGenerateMutate.mockReset()
   trpcMocks.submitAnswerMutate.mockReset()
+  trpcMocks.exportPdfQuery.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReturnValue({
     careerPlaybook: {
+      exportPdf: { query: trpcMocks.exportPdfQuery },
       session: {
         start: { mutate: vi.fn() },
         getDraft: { query: vi.fn() },
@@ -134,6 +140,7 @@ describe('useCareerPlaybookStore', () => {
     useCareerPlaybookStore
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-1')
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Sales Manager')
     useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('We sell B2B SaaS.')
 
@@ -145,6 +152,7 @@ describe('useCareerPlaybookStore', () => {
       playbookId: null,
       phase: 'fixed',
       status: 'answering_fixed',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       fixedAnswers: {
@@ -155,6 +163,47 @@ describe('useCareerPlaybookStore', () => {
     expect(persisted.state.fixedQuestions).toBeUndefined()
     expect(persisted.state.autosaveError).toBeUndefined()
     expect(persisted.state.isAutosaving).toBeUndefined()
+  })
+
+  it('invalidates a persisted draft when the browser user changes', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-1')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Sales Manager')
+    useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('Private context')
+
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-2')
+
+    expect(useCareerPlaybookStore.getState().ownerUserId).toBe('user-2')
+    expect(useCareerPlaybookStore.getState().playbookId).toBeNull()
+    expect(useCareerPlaybookStore.getState().fixedAnswers.position).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('')
+  })
+
+  it('removes answers for questions hidden by a changed branch answer', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '51-200')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('company_stage', 'growth')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.company_stage?.value).toBe('growth')
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).toContain('company_stage')
+
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '201-1000')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.company_stage).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().dirtyFixedQuestionKeys).not.toContain('company_stage')
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).not.toContain('company_stage')
   })
 
   it('flushes autosave through an injectable client and keeps local draft when remote submit rejects', async () => {
@@ -962,6 +1011,266 @@ describe('useCareerPlaybookStore', () => {
     ).toContain('company_stage')
     expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
       'reporting'
+    )
+  })
+
+  it('loads a viewer snapshot with ordered header plus 26 role guide blocks', async () => {
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+      status: 'answering_fixed',
+      contentLanguage: 'ru',
+    })
+    const snapshot: CareerPlaybookViewerSnapshot = {
+      playbookId: '00000000-0000-4000-8000-000000001001',
+      title: 'Head of Sales',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      blocks: Object.fromEntries(
+        CAREER_PLAYBOOK_BLOCK_CATALOG.map((block, index) => [
+          block.blockId,
+          {
+            content: `## ${index}. ${block.title}\n\nInitial content for ${block.blockId}.`,
+            status: 'generated',
+            attempt: 0,
+          },
+        ])
+      ) as Record<
+        CareerPlaybookBlockId,
+        CareerPlaybookViewerSnapshot['blocks'][CareerPlaybookBlockId]
+      >,
+    }
+    const getViewer = vi
+      .fn<NonNullable<CareerPlaybookClient['getViewer']>>()
+      .mockResolvedValue(snapshot)
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    await expect(
+      useCareerPlaybookStore
+        .getState()
+        .loadCareerPlaybookViewer('00000000-0000-4000-8000-000000001001')
+    ).resolves.toEqual({ ok: true })
+
+    expect(getViewer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000001001',
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.title).toBe('Head of Sales')
+    expect(useCareerPlaybookStore.getState().viewerBlocks).toHaveLength(27)
+    expect(useCareerPlaybookStore.getState().viewerBlocks[0]?.blockId).toBe('header')
+    expect(useCareerPlaybookStore.getState().viewerBlocks.at(-1)?.blockId).toBe('block_26')
+    expect(useCareerPlaybookStore.getState().playbookId).toBe(
+      '00000000-0000-4000-8000-000000000777'
+    )
+    expect(useCareerPlaybookStore.getState().status).toBe('answering_fixed')
+    expect(useCareerPlaybookStore.getState().contentLanguage).toBe('ru')
+  })
+
+  it('clears stale viewer data when loading a different playbook and marks only skeleton backend errors as pending', async () => {
+    const getViewer = vi
+      .fn<NonNullable<CareerPlaybookClient['getViewer']>>()
+      .mockRejectedValueOnce(new Error('METHOD_NOT_SUPPORTED'))
+      .mockRejectedValueOnce(new Error('FORBIDDEN'))
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+      playbookId: '00000000-0000-4000-8000-000000001010',
+      title: 'Old playbook',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      blocks: {
+        header: {
+          content: '# Old playbook',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+
+    await expect(
+      useCareerPlaybookStore
+        .getState()
+        .loadCareerPlaybookViewer('00000000-0000-4000-8000-000000001011')
+    ).resolves.toEqual({
+      ok: false,
+      error: 'METHOD_NOT_SUPPORTED',
+      backendPending: true,
+    })
+    expect(useCareerPlaybookStore.getState().viewer).toBeNull()
+    expect(useCareerPlaybookStore.getState().viewerBlocks).toEqual([])
+
+    await expect(
+      useCareerPlaybookStore
+        .getState()
+        .loadCareerPlaybookViewer('00000000-0000-4000-8000-000000001012')
+    ).resolves.toEqual({
+      ok: false,
+      error: 'FORBIDDEN',
+      backendPending: false,
+    })
+    expect(useCareerPlaybookStore.getState().viewer).toBeNull()
+  })
+
+  it('edits and regenerates viewer blocks through the injectable client seam', async () => {
+    const editBlock = vi.fn<NonNullable<CareerPlaybookClient['editBlock']>>().mockResolvedValue({
+      blockId: 'block_1',
+      content: 'Edited mission',
+      status: 'generated',
+      attempt: 0,
+    })
+    const regenerateBlock = vi
+      .fn<NonNullable<CareerPlaybookClient['regenerateBlock']>>()
+      .mockResolvedValue({
+        blockId: 'block_1',
+        content: 'Regenerated mission',
+        status: 'generated',
+        attempt: 1,
+      })
+    setCareerPlaybookClientForTests({ editBlock, regenerateBlock, submitAnswer: vi.fn() })
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+      playbookId: '00000000-0000-4000-8000-000000001002',
+      title: 'Revenue Lead',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      blocks: {
+        block_1: {
+          content: 'Original mission',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().editCareerPlaybookViewerBlock('block_1', 'Edited mission')
+    ).resolves.toEqual({ ok: true })
+    expect(editBlock).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000001002',
+      blockId: 'block_1',
+      content: 'Edited mission',
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe('Edited mission')
+
+    await expect(
+      useCareerPlaybookStore
+        .getState()
+        .regenerateCareerPlaybookViewerBlock('block_1', 'Make it more specific')
+    ).resolves.toEqual({ ok: true })
+    expect(regenerateBlock).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000001002',
+      blockId: 'block_1',
+      instruction: 'Make it more specific',
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
+      'Regenerated mission'
+    )
+  })
+
+  it('surfaces missing viewer status for PDF export without mutating data', async () => {
+    setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
+
+    await expect(useCareerPlaybookStore.getState().requestCareerPlaybookPdf()).resolves.toEqual({
+      ok: false,
+      error: 'Career Playbook viewer is not loaded',
+    })
+
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBeNull()
+  })
+
+  it('downloads a backend PDF export for the loaded viewer', async () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:career-pdf')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const appendChild = vi.spyOn(document.body, 'appendChild')
+    const removeChild = vi.spyOn(document.body, 'removeChild')
+
+    trpcMocks.exportPdfQuery.mockResolvedValue({
+      pdfBase64: btoa('%PDF mocked career playbook'),
+      fileName: 'career-playbook-product-lead.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 27,
+    })
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+      playbookId: '00000000-0000-4000-8000-000000001005',
+      title: 'Product Lead',
+      department: 'Product',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      blocks: {
+        block_1: {
+          content: 'Original mission',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+
+    await expect(useCareerPlaybookStore.getState().requestCareerPlaybookPdf()).resolves.toEqual({
+      ok: true,
+    })
+
+    expect(trpcMocks.exportPdfQuery).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000001005',
+    })
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(appendChild).toHaveBeenCalledWith(
+      expect.objectContaining({ download: 'career-playbook-product-lead.pdf' })
+    )
+    expect(removeChild).toHaveBeenCalled()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:career-pdf')
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBeNull()
+
+    createObjectURL.mockRestore()
+    revokeObjectURL.mockRestore()
+    click.mockRestore()
+    appendChild.mockRestore()
+    removeChild.mockRestore()
+  })
+
+  it('keeps viewer edit and regenerate usable as explicit local fallbacks while backend actions are pending', async () => {
+    setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+      playbookId: '00000000-0000-4000-8000-000000001004',
+      title: 'Operations Lead',
+      department: 'Operations',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      blocks: {
+        block_1: {
+          content: 'Original mission',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().editCareerPlaybookViewerBlock('block_1', 'Local edit')
+    ).resolves.toEqual({ ok: true })
+
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe('Local edit')
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBe(
+      'Block edit saved locally until the backend action is connected'
+    )
+
+    await expect(
+      useCareerPlaybookStore
+        .getState()
+        .regenerateCareerPlaybookViewerBlock('block_1', 'Make it measurable')
+    ).resolves.toEqual({ ok: true })
+
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toContain(
+      'Make it measurable'
+    )
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.attempt).toBe(1)
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBe(
+      'Block regenerated locally until the backend action is connected'
     )
   })
 })

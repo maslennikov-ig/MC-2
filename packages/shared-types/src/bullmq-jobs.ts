@@ -13,6 +13,12 @@ import { z } from 'zod';
 import { languageSchema } from './common-enums';
 import { CourseStyleSchema } from './style-prompts';
 import { courseSizeSchema } from './course-size';
+import {
+  CareerPlaybookBlockIdSchema,
+  CareerPlaybookBlockStateSchema,
+  CareerPlaybookQADataSchema,
+  CareerPlaybookRoleProfileSpecSchema,
+} from './career-playbook';
 
 // ============================================================================
 // Job Type Enum
@@ -49,6 +55,9 @@ export enum JobType {
 
   // Enrichment generation (Stage 7+)
   ENRICHMENT_GENERATION = 'enrichment_generation',
+
+  // Career Playbook Role Guide generation
+  CAREER_PLAYBOOK = 'career_playbook',
 
   // Block regeneration (cascade dependency update)
   BLOCK_REGENERATION = 'block_regeneration',
@@ -335,6 +344,99 @@ export const EnrichmentGenerationJobDataSchema = BaseJobDataSchema.extend({
 export type EnrichmentGenerationJobData = z.infer<typeof EnrichmentGenerationJobDataSchema>;
 
 // ============================================================================
+// Career Playbook Job Schema
+// ============================================================================
+
+export const CareerPlaybookJobActionSchema = z.enum([
+  'GENERATE_FOLLOWUPS',
+  'GENERATE_PLAYBOOK',
+  'REGENERATE_BLOCK',
+]);
+
+const CareerPlaybookBaseJobDataSchema = BaseJobDataSchema.extend({
+  jobType: z.literal(JobType.CAREER_PLAYBOOK),
+  playbookId: z.string().uuid(),
+  language: languageSchema.default('ru'),
+});
+
+export const CareerPlaybookGenerateFollowupsJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  action: z.literal('GENERATE_FOLLOWUPS'),
+  qaData: CareerPlaybookQADataSchema,
+});
+
+export const CareerPlaybookGeneratePlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  action: z.literal('GENERATE_PLAYBOOK'),
+  qaData: CareerPlaybookQADataSchema,
+});
+
+export const CareerPlaybookRegenerateBlockJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  action: z.literal('REGENERATE_BLOCK'),
+  blockId: CareerPlaybookBlockIdSchema,
+  instruction: z.string().min(1).max(1000),
+  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema,
+  originalBlock: CareerPlaybookBlockStateSchema,
+  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
+});
+
+export const CareerPlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  action: CareerPlaybookJobActionSchema,
+  qaData: CareerPlaybookQADataSchema.optional(),
+  blockId: CareerPlaybookBlockIdSchema.optional(),
+  instruction: z.string().min(1).max(1000).optional(),
+  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema.optional(),
+  originalBlock: CareerPlaybookBlockStateSchema.optional(),
+  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
+}).superRefine((data, ctx) => {
+  if (
+    (data.action === 'GENERATE_FOLLOWUPS' || data.action === 'GENERATE_PLAYBOOK') &&
+    !data.qaData
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['qaData'],
+      message: 'qaData is required for Career Playbook generation actions',
+    });
+  }
+
+  if (data.action === 'REGENERATE_BLOCK' && !data.blockId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['blockId'],
+      message: 'blockId is required for Career Playbook block regeneration',
+    });
+  }
+
+  if (data.action === 'REGENERATE_BLOCK' && !data.instruction) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['instruction'],
+      message: 'instruction is required for Career Playbook block regeneration',
+    });
+  }
+
+  if (data.action === 'REGENERATE_BLOCK' && !data.roleProfileSpec) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['roleProfileSpec'],
+      message: 'roleProfileSpec is required for Career Playbook block regeneration',
+    });
+  }
+
+  if (data.action === 'REGENERATE_BLOCK' && !data.originalBlock) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['originalBlock'],
+      message: 'originalBlock is required for Career Playbook block regeneration',
+    });
+  }
+});
+
+export type CareerPlaybookJobData =
+  | z.infer<typeof CareerPlaybookGenerateFollowupsJobDataSchema>
+  | z.infer<typeof CareerPlaybookGeneratePlaybookJobDataSchema>
+  | z.infer<typeof CareerPlaybookRegenerateBlockJobDataSchema>;
+
+// ============================================================================
 // Block Regeneration Job Schema (Cascade Dependency Update)
 // ============================================================================
 
@@ -376,13 +478,14 @@ export type JobData =
   | TextGenerationJobData
   | LessonContentJobData
   | EnrichmentGenerationJobData
+  | CareerPlaybookJobData
   | BlockRegenerationJobData
   | FinalizationJobData;
 
 /**
  * Zod schema for validating any job data
  */
-export const JobDataSchema = z.discriminatedUnion('jobType', [
+export const JobDataSchema = z.union([
   TestJobDataSchema,
   DocumentProcessingJobDataSchema,
   SummaryGenerationJobDataSchema,
@@ -392,6 +495,7 @@ export const JobDataSchema = z.discriminatedUnion('jobType', [
   TextGenerationJobDataSchema,
   LessonContentJobDataSchema,
   EnrichmentGenerationJobDataSchema,
+  CareerPlaybookJobDataSchema,
   BlockRegenerationJobDataSchema,
   FinalizationJobDataSchema,
 ]);
@@ -510,6 +614,14 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnComplete: 100,
     removeOnFail: false,
     priority: 5, // Medium priority
+  },
+  [JobType.CAREER_PLAYBOOK]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    timeout: 600000, // 10 minutes for multi-call role guide generation
+    removeOnComplete: 100,
+    removeOnFail: false,
+    priority: 5,
   },
   [JobType.BLOCK_REGENERATION]: {
     attempts: 5,

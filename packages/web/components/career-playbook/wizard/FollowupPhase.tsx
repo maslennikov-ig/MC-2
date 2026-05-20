@@ -107,7 +107,13 @@ export function FollowupPhase({
       </div>
 
       <div className="flex min-h-11 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Button type="button" variant="outline" onClick={onPrevious} className="min-w-28">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onPrevious}
+          disabled={safeIndex === 0}
+          className="min-w-28"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
           {labels.back}
         </Button>

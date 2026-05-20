@@ -1,42 +1,43 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-19
-Current working branch: `feature/career-playbook-pdf`
-Base branch: `feature/career-playbook-library-share` stacked on PR #33
+Updated: 2026-05-20
+Current working branch: `codex/pr34-pdf-develop`
+Current PR: #34 `feature/career-playbook-pdf` -> `develop`
 
 ## Current state
 
-- Repo shape: single pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
-- Delivery truth: `develop` is dev delivery, `master` is staging, and direct pushes to protected branches remain forbidden.
-- Career Playbook PR stack is still open: #24 base orchestration, #25 Phase 1, #26 backend stage 2, #27 backend stage 3, #28 Phase A frontend, #29 Phase B frontend, #32 Phase B transport, #33 Phase 10 library/share.
-- `mc2-db696.8` is ready for stacked PR delivery on this branch after review-and-fix pass `mc2-db696.14` and authenticated E2E follow-up `mc2-db696.15`: backend PDF service, Mermaid inline SVG rendering, protected and rate-limited `careerPlaybook.exportPdf`, Docker Chromium runtime, PDF smoke verification, and TOKEN-backed Career Playbook wizard E2E are implemented/verified.
-- No billing or payment scope is part of Career Playbook MVP work.
+- This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
+- `.codex/orchestrator.toml` is the machine-readable contract; `.codex/handoff.md` is current-state only; `.codex/project-index.md` is the navigation map.
+- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`.
+- Career Playbook PR #24, #25, #26, #27, #28, #29, #30, #31, #32, and #33 have landed in `develop`.
+- Career Playbook PDF export work from PR #34 is being retargeted to `develop`.
+- `mc2-db696.8` adds backend PDF service, Mermaid inline SVG rendering, protected `careerPlaybook.exportPdf`, Docker Chromium runtime, PDF smoke verification, and TOKEN-backed Career Playbook wizard E2E.
+- No billing or payment scope is part of the Career Playbook MVP work in this branch.
 
 ## Latest relevant stage
 
-- Latest relevant Career Playbook stage: `mc2-db696.15` - TOKEN-backed Career Playbook E2E auth setup.
+- Latest relevant Career Playbook stage: `mc2-db696.8` - PDF export.
 - Stage summary: [`.codex/stages/mc2-db696.8/summary.md`](./stages/mc2-db696.8/summary.md)
 - Review summary: [`.codex/stages/mc2-db696.14/summary.md`](./stages/mc2-db696.14/summary.md)
 - Auth E2E summary: [`.codex/stages/mc2-db696.15/summary.md`](./stages/mc2-db696.15/summary.md)
-- Artifacts: original Phase 8 context/review under [`.codex/stages/mc2-db696.8/artifacts`](./stages/mc2-db696.8/artifacts) and review pass artifacts under [`.codex/stages/mc2-db696.14/artifacts`](./stages/mc2-db696.14/artifacts).
+- Transport stage already landed: `mc2-db696.12` - Phase B real follow-up/generation-start transport.
+- Viewer/editor stage already landed: `mc2-db696.6` via PR #30.
+- Marketing landing stage already landed: `mc2-db696.7` via PR #31.
+- Library/share stage already landed: `mc2-db696.10` via PR #33.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.9`
-Recommended action: push the `feature/career-playbook-pdf` review fixes to PR #34 after Beads closeout, then start JD to Course bridge on a new stacked branch from `feature/career-playbook-pdf`. `mc2-db696.11` remains blocked until `mc2-db696.8` and `mc2-db696.9` are both closed.
-
-- If PR #24/#25/#26/#27/#28/#29/#32/#33 land first, rebase/retarget before more dependent work.
-- Independent marketing work may proceed separately if its base branch decision is explicit.
+Next stage id: `mc2-db696.11.7.7.8`
+Recommended action: finish PR #34 readiness against `develop`, preserving landed Phase B/viewer/landing/library-share behavior while adding protected PDF export. Do not add billing/payment or broaden public share exposure; merge only after review fixes, local verification, and acceptable GitHub CI/no-check status.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth, verify PR #24/#25/#26/#27/#28/#29/#32/#33 status, and avoid dependent work on develop unless the stacked PRs have merged.
+Use $orchestrator-stage to continue Career Playbook PR-stack readiness. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#33 have landed in develop; continue PR #34 PDF export readiness against develop, verify Playwright PDF/runtime behavior, and do not merge until CI is green or explicitly absent with local verification.
 ```
 
 ## Explicit defers
 
-- Frontend PDF action wiring remains deferred in `mc2-db696.8.3` because the current branch has no private Career Playbook viewer/actions surface; this blocks full browser PDF-download E2E, but the TOKEN-backed Phase A wizard E2E now passes.
-- Real Supabase RLS/staging smoke and browser e2e share/PDF flow remain in `mc2-db696.11`.
-- Queue worker completion and live SSE/subscription status streaming remain separate Career Playbook integration work tracked as `mc2-db696.13`.
-- JD bridge and broader end-to-end smoke work remain later Beads tasks under epic `mc2-db696`.
+- Real Supabase RLS/staging smoke and authenticated browser e2e share/PDF flow remain tracked under `mc2-db696.11` unless credentials are available.
+- JD/course bridge remains tracked as `mc2-db696.9` and PR #36.
+- Queue worker completion and live SSE/subscription status streaming remain separate Career Playbook integration work tracked after `mc2-db696.12`.

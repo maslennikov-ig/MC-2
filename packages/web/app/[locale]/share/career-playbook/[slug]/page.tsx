@@ -37,6 +37,22 @@ export default async function SharedCareerPlaybookPage({ params }: PageProps) {
     notFound()
   }
 
+  if (result.status === 'unavailable') {
+    const t = await getTranslations({ locale, namespace: 'career-playbook.share' })
+    return (
+      <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+        <section className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-12 md:px-6">
+          <div className="rounded-md border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h1 className="text-2xl font-semibold">{t('fallbackTitle')}</h1>
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              {t('fallbackDescription')}
+            </p>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   if (!result.playbook) {
     notFound()
   }

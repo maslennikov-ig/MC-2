@@ -84,6 +84,7 @@ export const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEXT_GENERATION]: null, // Stage 6 — uses lesson-level progress tracking
   [JobType.LESSON_CONTENT]: null, // Stage 6 — uses lesson-level progress tracking
   [JobType.ENRICHMENT_GENERATION]: null, // Stage 7 enrichments (no course progress step)
+  [JobType.CAREER_PLAYBOOK]: null, // Career Playbook has dedicated playbook progress tracking
   [JobType.BLOCK_REGENERATION]: null, // Cascade regeneration (no course progress step)
   [JobType.FINALIZATION]: 6, // Finalization → RPC step 6
 };
