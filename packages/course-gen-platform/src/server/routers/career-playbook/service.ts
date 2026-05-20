@@ -501,7 +501,7 @@ export async function approveCareerPlaybookGeneration(
     });
   } catch (enqueueError) {
     const message = errorMessageFrom(enqueueError);
-    await supabase
+    const compensation = await supabase
       .from('career_playbooks')
       .update({
         status: 'failed',
@@ -513,6 +513,17 @@ export async function approveCareerPlaybookGeneration(
       .eq('id', input.playbookId)
       .select('*')
       .single();
+
+    if (compensation.error || !compensation.data) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to enqueue Career Playbook generation and mark playbook failed',
+        cause: {
+          enqueueError,
+          compensationError: compensation.error,
+        },
+      });
+    }
 
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',

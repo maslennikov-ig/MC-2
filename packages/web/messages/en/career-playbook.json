@@ -1,4 +1,154 @@
 {
+  "landing": {
+    "metadataTitle": "Career Playbook by MC2",
+    "metadataDescription": "Build a structured role manual for hiring, onboarding, and team review.",
+    "heroEyebrow": "Career Playbook",
+    "heroTitle": "Turn role context into a structured operating manual",
+    "heroSubtitle": "Collect role context, request a 26-block Role Guide, and review an editable draft for hiring and onboarding.",
+    "ctaPrimary": "Create your Career Playbook",
+    "ctaSecondary": "View sample guide",
+    "heroMetricOneValue": "26",
+    "heroMetricOneLabel": "operational blocks",
+    "heroMetricTwoValue": "5",
+    "heroMetricTwoLabel": "management systems",
+    "heroMetricThreeValue": "1",
+    "heroMetricThreeLabel": "role clarity draft",
+    "methodologyEyebrow": "Methodology",
+    "methodologyTitle": "Built from operating systems used by serious teams",
+    "methodologySubtitle": "Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
+    "methodologyBlocksTitle": "26-block map",
+    "selectedBlocksLabel": "Selected blocks",
+    "methodologies": {
+      "netflix": {
+        "title": "Netflix Context over Control",
+        "description": "Gives the role strategic context, clear boundaries, and room to act without micromanagement."
+      },
+      "amazon": {
+        "title": "Amazon Leadership Principles",
+        "description": "Turns culture into decision rules, input metrics, counter-metrics, and customer-oriented judgment."
+      },
+      "toyota": {
+        "title": "Toyota Standardized Work",
+        "description": "Captures the best-known way of working through checklists, exceptions, and quality criteria."
+      },
+      "spotify": {
+        "title": "Spotify Squad Model",
+        "description": "Shows how the role fits into real work streams, dependencies, squads, and growth paths."
+      },
+      "bridgewater": {
+        "title": "Bridgewater Baseball Cards",
+        "description": "Documents strengths, communication style, energy patterns, risks, and candidate fit."
+      }
+    },
+    "blockMap": {
+      "groups": {
+        "foundation": {
+          "title": "Foundation"
+        },
+        "operations": {
+          "title": "Operations"
+        },
+        "people": {
+          "title": "People"
+        },
+        "growth": {
+          "title": "Growth"
+        },
+        "system": {
+          "title": "System"
+        },
+        "wrap": {
+          "title": "Wrap"
+        }
+      },
+      "blocks": {
+        "block1": "1. Mission/KR",
+        "block2": "2. Anti-goals",
+        "block3": "3. Responsibilities",
+        "block4": "4. Duties",
+        "block5": "5. Decision matrix",
+        "block6": "6. KPI",
+        "block7": "7. Competencies",
+        "block8": "8. Tools",
+        "block9": "9. Human-AI",
+        "block10": "10. Dependencies",
+        "block11": "11. Career path",
+        "block12": "12. Candidate profile",
+        "block13": "13. Day in role",
+        "block14": "14. Onboarding",
+        "block15": "15. Motivation",
+        "block16": "16. Processes",
+        "block17": "17. Red flags",
+        "block18": "18. FAQ",
+        "block19": "19. Industry",
+        "block20": "20. Business goals",
+        "block21": "21. Failure modes",
+        "block22": "22. Role README",
+        "block23": "23. Continuity",
+        "block24": "24. Role canvas",
+        "block25": "25. Revision cadence",
+        "block26": "26. Implementation checklist"
+      }
+    },
+    "demoEyebrow": "Interactive demo",
+    "demoTitle": "Annotated B2B sales Role Guide preview",
+    "demoSubtitle": "Explore a compact preview inspired by the sample B2B sales manager playbook. Each annotation explains why that block matters.",
+    "demoPreviewTitle": "B2B Sales Role Guide",
+    "demoSections": {
+      "mission": {
+        "title": "Mission and key results",
+        "excerpt": "The role turns B2B pipeline into predictable revenue: it qualifies opportunities, moves deals forward, and keeps the funnel healthy.",
+        "annotation": "Mission connects the role purpose to measurable outcomes and gives managers a fast quality check.",
+        "blockLabel": "Block 1"
+      },
+      "decisions": {
+        "title": "Decision matrix",
+        "excerpt": "Small discounts can move quickly; larger discounts and unusual contract terms require commercial approval.",
+        "annotation": "Decision rules turn autonomy into visible guardrails, using the Amazon one-way/two-way door pattern.",
+        "blockLabel": "Block 5"
+      },
+      "kpi": {
+        "title": "KPI and counter-metrics",
+        "excerpt": "Qualified pipeline, win rate, sales cycle, and first-year retention are paired to prevent metric gaming.",
+        "annotation": "Counter-metrics keep the role from optimizing one number while damaging the business outcome.",
+        "blockLabel": "Block 6"
+      }
+    },
+    "valueEyebrow": "Why it works",
+    "valueTitle": "A structured guide built from real role context",
+    "valueProps": {
+      "0": {
+        "title": "Executive-ready output",
+        "description": "The result is a practical operating manual, not a thin job post or lightweight outline."
+      },
+      "1": {
+        "title": "Training-ready context",
+        "description": "Competencies, tools, and workflows are captured clearly enough for managers and enablement teams to review."
+      },
+      "2": {
+        "title": "Editable after generation",
+        "description": "Teams can review and refine individual blocks without restarting the whole role discovery flow."
+      }
+    },
+    "faqTitle": "Questions",
+    "faq": {
+      "0": {
+        "question": "Who should use this first?",
+        "answer": "HR leaders, founders, department heads, and enablement teams that need role clarity before hiring, onboarding, or training."
+      },
+      "1": {
+        "question": "Can the generated guide be refined?",
+        "answer": "Yes. The current version supports block-level review and refinement, so a team can tighten specific sections without restarting discovery."
+      },
+      "2": {
+        "question": "What should I prepare before starting?",
+        "answer": "A job description, role notes, team context, or a rough list of responsibilities is enough. The constructor asks follow-up questions where context is thin."
+      }
+    },
+    "finalCtaTitle": "Build the first Role Guide for your team",
+    "finalCtaDescription": "Start with the constructor, answer the role questions, and keep the resulting draft useful as the team learns.",
+    "finalCtaButton": "Create your Career Playbook"
+  },
   "wizard": {
     "eyebrow": "Career Playbook",
     "title": "Role Guide constructor",
@@ -43,7 +193,7 @@
     "editLabel": "Edit",
     "generateCta": "Generate Role Guide",
     "generationHandoffTitle": "Generation started",
-    "generationHandoffDescription": "Backend generation has started.",
+    "generationHandoffDescription": "Generation has started.",
     "generationInProgressTitle": "Generation in progress",
     "generationInProgressDescription": "The Role Guide is being assembled.",
     "generationCompletedTitle": "Generation completed",
@@ -52,7 +202,45 @@
     "generationFailedDescription": "Try again after checking the collected context.",
     "generationStarting": "Starting generation...",
     "generationErrorTitle": "Generation could not start",
+    "viewGenerated": "Open Role Guide",
     "emptySummary": "No data yet"
+  },
+  "viewer": {
+    "productLabel": "Career Playbook",
+    "contents": "Contents",
+    "pdf": "PDF",
+    "share": "Share",
+    "createCourse": "Create course",
+    "delete": "Delete",
+    "editBlock": "Edit {title}",
+    "regenerateBlock": "Regenerate {title}",
+    "collapseBlock": "Collapse {title}",
+    "expandBlock": "Expand {title}",
+    "waitingBlock": "This block is waiting for generation.",
+    "editorTitle": "Edit block",
+    "editorDescription": "Edit the markdown directly, or ask the backend regenerator for a focused rewrite.",
+    "blockMarkdown": "Block markdown",
+    "saveChanges": "Save changes",
+    "regenerationInstruction": "Regeneration instruction",
+    "regenerationPlaceholder": "Make this block more specific to enterprise sales.",
+    "regenerateBlockButton": "Regenerate block",
+    "loading": "Loading Career Playbook...",
+    "unavailableTitle": "Career Playbook is unavailable",
+    "unavailableDescription": "The viewer could not be loaded.",
+    "retry": "Retry",
+    "viewerBackendPending": "Viewer backend is unavailable; showing a local preview until integration lands.",
+    "localPreviewTitle": "Role Guide preview",
+    "localPreviewContent": "# Role Guide preview\n\nBackend viewer transport is not connected yet.",
+    "sharePending": "Share links are unavailable until the backend action is connected",
+    "coursePending": "Course creation is unavailable until the backend action is connected",
+    "deletePending": "Delete is unavailable until the backend action is connected",
+    "pdfPending": "PDF export failed. Try again.",
+    "editLocal": "Block edit saved locally until the backend action is connected",
+    "regenerateLocal": "Block regenerated locally until the backend action is connected",
+    "generatingTitle": "Generating {title}",
+    "blocksReady": "{ready} of {total} blocks ready",
+    "thinkingStream": "Show thinking stream",
+    "streamingBlockPending": "This block is being generated."
   },
   "library": {
     "title": "Role Guide library",
@@ -80,7 +268,27 @@
     "loadingMore": "Loading...",
     "card": {
       "publicBadge": "Public",
-      "privateBadge": "Private"
+      "privateBadge": "Private",
+      "makePublic": "Make public",
+      "makePrivate": "Make private",
+      "publicLink": "Public link",
+      "open": "Open"
+    },
+    "statusLabels": {
+      "draft": "Draft",
+      "answering_fixed": "Answering fixed questions",
+      "awaiting_followups": "Awaiting follow-ups",
+      "answering_followups": "Answering follow-ups",
+      "ready_to_generate": "Ready to generate",
+      "generating": "Generating",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "deleteDialog": {
+      "title": "Delete selected guides?",
+      "description": "This will delete {count} selected guides.",
+      "cancel": "Cancel",
+      "confirm": "Delete guides"
     }
   },
   "share": {

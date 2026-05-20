@@ -139,13 +139,24 @@ const jobHandlers: Record<string, JobHandler> = {
       return processStage6JobAsJobResult(job, token);
     },
   }),
-  [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
   [JobType.CAREER_PLAYBOOK]: adaptHandler(careerPlaybookHandler),
+  [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
 };
 
 export function isJobTypeRegistered(jobType: string): boolean {
   return Boolean(jobHandlers[jobType]);
 }
+
+const requiredJobHandlerTypes = [
+  JobType.TEST_JOB,
+  JobType.DOCUMENT_PROCESSING,
+  JobType.DOCUMENT_CLASSIFICATION,
+  JobType.STRUCTURE_ANALYSIS,
+  JobType.STRUCTURE_GENERATION,
+  JobType.LESSON_CONTENT,
+  JobType.CAREER_PLAYBOOK,
+  JobType.BLOCK_REGENERATION,
+] as const;
 
 /**
  * Health check for processor environment
@@ -165,6 +176,12 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
   }
 
   // Validate all handlers are loadable and callable
+  for (const jobType of requiredJobHandlerTypes) {
+    if (!jobHandlers[jobType]) {
+      errors.push(`Handler for ${jobType} is missing from processor registry`);
+    }
+  }
+
   for (const [jobType, handler] of Object.entries(jobHandlers)) {
     if (!handler) {
       errors.push(`Handler for ${jobType} is null/undefined`);

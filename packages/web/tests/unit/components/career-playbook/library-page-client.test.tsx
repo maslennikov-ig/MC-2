@@ -7,6 +7,7 @@ import CareerPlaybookLibraryPageClient from '@/app/[locale]/career-playbook/libr
 
 const deleteMany = vi.fn()
 const fetchPage = vi.fn()
+const toggleShare = vi.fn()
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
   deleteCareerPlaybookMany: (...args: unknown[]) =>
@@ -22,6 +23,8 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
         },
       ])
     ),
+  toggleCareerPlaybookShare: (...args: unknown[]) =>
+    toggleShare(...(args as [playbookId: string, isPublic: boolean, locale: string])),
 }))
 
 const messages = {
@@ -53,6 +56,26 @@ const messages = {
       card: {
         publicBadge: 'Public',
         privateBadge: 'Private',
+        makePublic: 'Make public',
+        makePrivate: 'Make private',
+        publicLink: 'Public link',
+        open: 'Open',
+      },
+      statusLabels: {
+        draft: 'Draft',
+        answering_fixed: 'Answering fixed questions',
+        awaiting_followups: 'Awaiting follow-ups',
+        answering_followups: 'Answering follow-ups',
+        ready_to_generate: 'Ready to generate',
+        generating: 'Generating',
+        completed: 'Completed',
+        failed: 'Failed',
+      },
+      deleteDialog: {
+        title: 'Delete selected guides?',
+        description: 'This will delete {count} selected guides.',
+        cancel: 'Cancel',
+        confirm: 'Delete guides',
       },
     },
   },
@@ -74,6 +97,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
   beforeEach(() => {
     deleteMany.mockReset()
     fetchPage.mockReset()
+    toggleShare.mockReset()
   })
 
   it('renders cards, filters by search/status, and shows create CTA', async () => {
@@ -112,6 +136,10 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByRole('link', { name: 'Create new' })).toHaveAttribute(
       'href',
       '/en/career-playbook/new'
+    )
+    expect(screen.getByRole('link', { name: 'Open Head of Sales' })).toHaveAttribute(
+      'href',
+      '/en/career-playbook/pb-1'
     )
 
     await user.type(screen.getByPlaceholderText('Search by role title'), 'sales')
@@ -164,11 +192,52 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByText('2 selected')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Delete selected' }))
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByText('This will delete 2 selected guides.')).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: 'Delete guides' }))
     expect(deleteMany).toHaveBeenCalledWith(['pb-1', 'pb-2'], 'en')
     expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
     expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
     expect(screen.getByText('No role guides yet')).toBeInTheDocument()
+  })
+
+  it('toggles public sharing and exposes the public link from the card', async () => {
+    const user = userEvent.setup()
+    toggleShare.mockResolvedValue({
+      playbookId: 'pb-1',
+      isPublic: true,
+      shareSlug: 'head-of-sales',
+    })
+
+    renderPage({
+      initialData: {
+        items: [
+          {
+            id: 'pb-1',
+            title: 'Head of Sales',
+            department: 'sales',
+            level: 'lead',
+            status: 'completed',
+            createdAt: '2026-05-14T10:00:00.000Z',
+            isPublic: false,
+            shareSlug: null,
+          },
+        ],
+        nextCursor: null,
+        error: null,
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Make public' }))
+
+    expect(toggleShare).toHaveBeenCalledWith('pb-1', true, 'en')
+    expect(screen.getByText('Public')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Public link' })).toHaveAttribute(
+      'href',
+      '/en/share/career-playbook/head-of-sales'
+    )
   })
 
   it('filters by department and level', async () => {
@@ -211,6 +280,46 @@ describe('CareerPlaybookLibraryPageClient', () => {
     await user.selectOptions(screen.getByLabelText('Level'), 'lead')
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
     expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
+  })
+
+  it('renders localized labels and filters every library status', async () => {
+    const user = userEvent.setup()
+
+    renderPage({
+      initialData: {
+        items: [
+          {
+            id: 'pb-1',
+            title: 'Draft Role',
+            department: 'sales',
+            level: 'lead',
+            status: 'answering_followups',
+            createdAt: '2026-05-14T10:00:00.000Z',
+            isPublic: false,
+            shareSlug: null,
+          },
+          {
+            id: 'pb-2',
+            title: 'Ready Role',
+            department: 'engineering',
+            level: 'senior',
+            status: 'ready_to_generate',
+            createdAt: '2026-05-12T10:00:00.000Z',
+            isPublic: false,
+            shareSlug: null,
+          },
+        ],
+        nextCursor: null,
+        error: null,
+      },
+    })
+
+    expect(screen.getAllByText('Answering follow-ups').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ready to generate').length).toBeGreaterThan(0)
+
+    await user.selectOptions(screen.getByLabelText('All statuses'), 'ready_to_generate')
+    expect(screen.queryByText('Draft Role')).not.toBeInTheDocument()
+    expect(screen.getByText('Ready Role')).toBeInTheDocument()
   })
 
   it('loads the next library page when nextCursor is present', async () => {

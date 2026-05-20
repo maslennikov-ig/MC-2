@@ -92,6 +92,23 @@ describe('SharedCareerPlaybookPage', () => {
     ).rejects.toThrow('NEXT_NOT_FOUND')
     expect(notFound).toHaveBeenCalledTimes(2)
   })
+
+  it('renders fallback copy when public share transport is unavailable', async () => {
+    mockedGetPublicCareerPlaybookBySlug.mockResolvedValue({
+      status: 'unavailable',
+      playbook: null,
+    })
+
+    render(
+      await SharedCareerPlaybookPage({
+        params: Promise.resolve({ locale: 'en', slug: 'temporarily-unavailable' }),
+      })
+    )
+
+    expect(screen.getByRole('heading', { name: 'fallbackTitle' })).toBeInTheDocument()
+    expect(screen.getByText('fallbackDescription')).toBeInTheDocument()
+    expect(notFound).not.toHaveBeenCalled()
+  })
 })
 
 describe('generateMetadata for shared career playbook', () => {

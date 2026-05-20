@@ -72,6 +72,37 @@ describe('Career Playbook follow-up questions helper', () => {
     expect(parsed.stop_recommendation).toBe('ready_to_generate');
   });
 
+  it('normalizes missing or invalid LLM follow-up question ids', () => {
+    const parsed = parseFollowupResponseFromLLM(
+      JSON.stringify({
+        questions: [
+          {
+            question_id: 'not-a-uuid',
+            question_text: 'Which revenue motion matters most?',
+            question_type: 'open',
+            options: null,
+            rationale: 'Needed for role guide focus.',
+          },
+          {
+            question_text: 'Which segment owns the pipeline?',
+            question_type: 'open',
+            options: null,
+            rationale: 'Needed for scope.',
+          },
+        ],
+        completeness_score: 0.7,
+        stop_recommendation: 'ask_more',
+      })
+    );
+
+    expect(parsed.questions).toHaveLength(2);
+    for (const question of parsed.questions) {
+      expect(question.question_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      );
+    }
+  });
+
   it('renders the follow-up prompt, invokes runtime, and returns parsed response with cost', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
