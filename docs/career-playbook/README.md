@@ -34,6 +34,6 @@ Career Playbook per-node cost evidence is available to admins at `/admin/generat
 
 ## Current Live Readiness
 
-Supabase MCP read access is available for project `diqooqbuchsliypgwksu`, but the remote database currently does not expose `public.career_playbooks`. Treat this as a staging readiness blocker until the approved migration flow applies the Career Playbook migration.
+As of 2026-05-20, the Career Playbook migration has been applied to the Supabase project and read-only staging preflight passes when a dedicated non-default queue name is provided. Full mutation smoke is still intentionally gated on disposable staging fixtures, auth token/storage state, queue alignment between enqueuer and worker, cleanup scope, and an accepted numeric LLM/API cost budget.
 
 See [architecture.md](./architecture.md) for the system map and staging smoke plan.

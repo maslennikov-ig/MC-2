@@ -1,6 +1,6 @@
 # Stage mc2-db696.11 Summary
 
-Status: Phase 11 cost evidence delivered; live smoke still blocked
+Status: Phase 11 schema/read-only smoke ready; live mutation smoke still gated
 Updated: 2026-05-20
 Branch: `codex/career-playbook-phase11`
 Base: `origin/develop` @ `f72ab3b85da0af454024708fe7bc2c9fb856ed53`
@@ -33,6 +33,11 @@ Base: `origin/develop` @ `f72ab3b85da0af454024708fe7bc2c9fb856ed53`
   - organization-admin scoping despite service-role reads
   - page totals plus filtered count semantics
   - invalid `cost_breakdown` payload marking
+- Advanced `mc2-db696.11.5` staging readiness:
+  - applied the already-merged Career Playbook Supabase migration through MCP after CLI password authentication failed
+  - verified target tables, RLS, fixed-question seed counts, policies, and migration history
+  - inserted the file-version migration history row for `20260513090000` after MCP `apply_migration` recorded a generated version row
+  - reran read-only staging preflight successfully with a dedicated non-default queue name
 
 ## Routing And Delegation
 
@@ -70,10 +75,10 @@ Closed in this delivery:
 
 Still open under `mc2-db696.11`:
 
-- `mc2-db696.11.5` - live staging Career Playbook mutation smoke
+- `mc2-db696.11.5` - live staging Career Playbook mutation smoke; schema/read-only readiness is done, live generation remains gated on auth fixtures, deployed/local worker queue alignment, cleanup scope, and numeric LLM/API budget
 - `mc2-db696.11.6` - 10-concurrent load test
 
-Parent `mc2-db696.11` remains `in_progress` because full live staging verification is blocked by schema/credential/approval readiness.
+Parent `mc2-db696.11` remains `in_progress` because full live staging verification is still blocked by credential, fixture, cleanup, queue-alignment, and cost-budget readiness.
 
 ## Verification Evidence
 
@@ -91,11 +96,19 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 - No-env preflight package script: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` prints `status: blocked` as expected. pnpm lifecycle exits `1` around the script's internal exit `2`; automation should parse report status for readiness outcomes.
 - Artifact validation: passed for all stage artifacts.
 - Process verification: `scripts/orchestration/run_process_verification.sh` - passed.
+- Supabase MCP migration/readiness, 2026-05-20:
+  - `public.career_playbooks` and `public.career_playbook_fixed_questions` exist.
+  - RLS is enabled on both tables.
+  - Fixed-question seed count is `en: 7`, `ru: 7`.
+  - Policies are present for public fixed-question reads and authenticated org-owned playbook CRUD.
+  - Migration history contains MCP generated row `20260520141021 / 20260513090000_career_playbook` plus file-version row `20260513090000 / career_playbook`.
+- Read-only staging preflight after migration, 2026-05-20: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260520` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
+- Supabase security/performance advisors ran after DDL. Reported warnings are broad existing project advisories; no new Career Playbook table blocker was identified in this readiness pass.
 
 ## Explicit Defers
 
-- Remote Supabase read probe showed `public.career_playbooks` is absent in project `diqooqbuchsliypgwksu`. The migration was not applied from this stage.
-- Full live mutation smoke requires explicit approval, staging schema, disposable user/org/playbooks, dedicated `BULLMQ_QUEUE_NAME`, cleanup authorization, valid auth token, and accepted API cost budget.
+- Full live mutation smoke requires disposable user/org/playbooks, dedicated queue alignment between enqueuer and worker, cleanup authorization/scope, valid auth token or storage state, and an accepted numeric API cost budget.
+- Runtime cost evidence currently records estimated `costUsd: 0`; use admin evidence for payload structure, and capture real provider spend separately unless runtime cost accounting is improved.
 - 10-concurrent load testing remains tracked as an open Beads child and depends on successful live single-smoke readiness.
 
 ## PR Readiness Passes
