@@ -122,7 +122,7 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 
 ## PR Readiness Passes
 
-- PR #40 delivers `mc2-db696.11.5` staging schema/read-only/model-routing readiness into `develop`; it does not close live mutation smoke.
+- PR #40 delivered `mc2-db696.11.5` staging schema/read-only/model-routing readiness into `develop`; it does not close live mutation smoke.
 
 - `mc2-db696.11.7` mapped the original stacked PR delivery path after #37 was opened.
 - PR #24 through #36 and PR #38 have since landed in `develop`; PR #37 is the remaining Phase 11 smoke/preflight delivery PR.
