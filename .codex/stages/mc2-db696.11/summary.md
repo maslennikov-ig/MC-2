@@ -39,6 +39,7 @@ Base: `origin/develop` @ `d92c8c28be3e0a3504a0fb9622d7f3da6229ed6e`
   - inserted the file-version migration history row for `20260513090000` after MCP `apply_migration` recorded a generated version row
   - reran read-only staging preflight successfully with a dedicated non-default queue name
   - configured minimal Career Playbook model routing: MiniMax M2.7 for spec/judge and DeepSeek V4 Flash for follow-up, groups, and regenerator
+  - encoded the minimal model routing in migration `20260521101000_allow_career_playbook_model_phases` so future database rebuilds do not depend on manual Supabase rows
 
 ## Routing And Delegation
 
@@ -105,10 +106,12 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
   - Migration history contains MCP generated row `20260520141021 / 20260513090000_career_playbook` plus file-version row `20260513090000 / career_playbook`.
 - Supabase MCP model routing, 2026-05-21:
   - constraint migration `20260521101000_allow_career_playbook_model_phases` applied and file-version row `20260521101000 / allow_career_playbook_model_phases` inserted.
+  - the git migration now includes idempotent insert/update rows for all 10 active `stage_career_playbook%` configs.
   - active global `llm_model_config` rows exist for all `stage_career_playbook%` phases.
   - runtime resolution returns `minimax/minimax-m2.7` for `stage_career_playbook_spec` and `stage_career_playbook_judge`; all other Career Playbook phases return `deepseek/deepseek-v4-flash`.
 - Read-only staging preflight after migration, 2026-05-20: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260520` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
 - Read-only staging preflight after model routing, 2026-05-21: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260521-model-routing` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
+- PR-readiness preflight after migration reproducibility update, 2026-05-21: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260521-pr-ready` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
 - Supabase security/performance advisors ran after DDL. Reported warnings are broad existing project advisories; no new Career Playbook table blocker was identified in this readiness pass.
 
 ## Explicit Defers

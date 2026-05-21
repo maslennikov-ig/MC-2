@@ -79,3 +79,70 @@ CHECK (
     ]
   )
 );
+
+INSERT INTO public.llm_model_config (
+  config_type,
+  phase_name,
+  model_id,
+  fallback_model_id,
+  temperature,
+  max_tokens,
+  max_context_tokens,
+  is_active,
+  language,
+  context_tier,
+  stage_number,
+  max_retries,
+  timeout_ms
+)
+SELECT v.*
+FROM (
+  VALUES
+    ('global', 'stage_career_playbook_followup', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.40, 4000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_spec', 'minimax/minimax-m2.7', 'deepseek/deepseek-v4-flash', 0.30, 8000, 205000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_group_1', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_group_2', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_group_3', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_group_4', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_group_5', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_group_6', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_judge', 'minimax/minimax-m2.7', 'deepseek/deepseek-v4-flash', 0.20, 4000, 205000, true, 'any', 'standard', NULL::integer, 3, 300000),
+    ('global', 'stage_career_playbook_regenerator', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.40, 6000, 1000000, true, 'any', 'standard', NULL::integer, 3, 300000)
+) AS v(config_type, phase_name, model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, is_active, language, context_tier, stage_number, max_retries, timeout_ms)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.llm_model_config m
+  WHERE m.config_type = v.config_type
+    AND m.phase_name = v.phase_name
+    AND m.language = v.language
+    AND m.context_tier = v.context_tier
+    AND m.is_active = true
+);
+
+UPDATE public.llm_model_config AS m
+SET
+  model_id = v.model_id,
+  fallback_model_id = v.fallback_model_id,
+  temperature = v.temperature,
+  max_tokens = v.max_tokens,
+  max_context_tokens = v.max_context_tokens,
+  max_retries = v.max_retries,
+  timeout_ms = v.timeout_ms
+FROM (
+  VALUES
+    ('stage_career_playbook_followup', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.40, 4000, 1000000, 3, 300000),
+    ('stage_career_playbook_spec', 'minimax/minimax-m2.7', 'deepseek/deepseek-v4-flash', 0.30, 8000, 205000, 3, 300000),
+    ('stage_career_playbook_group_1', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, 3, 300000),
+    ('stage_career_playbook_group_2', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, 3, 300000),
+    ('stage_career_playbook_group_3', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, 3, 300000),
+    ('stage_career_playbook_group_4', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, 3, 300000),
+    ('stage_career_playbook_group_5', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, 3, 300000),
+    ('stage_career_playbook_group_6', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.70, 14000, 1000000, 3, 300000),
+    ('stage_career_playbook_judge', 'minimax/minimax-m2.7', 'deepseek/deepseek-v4-flash', 0.20, 4000, 205000, 3, 300000),
+    ('stage_career_playbook_regenerator', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m2.7', 0.40, 6000, 1000000, 3, 300000)
+) AS v(phase_name, model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, max_retries, timeout_ms)
+WHERE m.config_type = 'global'
+  AND m.phase_name = v.phase_name
+  AND m.language = 'any'
+  AND m.context_tier = 'standard'
+  AND m.is_active = true;
