@@ -1,9 +1,9 @@
 # Stage mc2-db696.11 Summary
 
-Status: Phase 11 cost evidence delivered; live smoke still blocked
-Updated: 2026-05-20
-Branch: `codex/career-playbook-phase11`
-Base: `origin/develop` @ `f72ab3b85da0af454024708fe7bc2c9fb856ed53`
+Status: Phase 11 schema/read-only smoke ready; live mutation smoke still gated
+Updated: 2026-05-21
+Branch: `codex/career-playbook-staging-smoke`
+Base: `origin/develop` @ `d92c8c28be3e0a3504a0fb9622d7f3da6229ed6e`
 
 ## Scope Delivered
 
@@ -33,6 +33,13 @@ Base: `origin/develop` @ `f72ab3b85da0af454024708fe7bc2c9fb856ed53`
   - organization-admin scoping despite service-role reads
   - page totals plus filtered count semantics
   - invalid `cost_breakdown` payload marking
+- Advanced `mc2-db696.11.5` staging readiness:
+  - applied the already-merged Career Playbook Supabase migration through MCP after CLI password authentication failed
+  - verified target tables, RLS, fixed-question seed counts, policies, and migration history
+  - inserted the file-version migration history row for `20260513090000` after MCP `apply_migration` recorded a generated version row
+  - reran read-only staging preflight successfully with a dedicated non-default queue name
+  - configured minimal Career Playbook model routing: MiniMax M2.7 for spec/judge and DeepSeek V4 Flash for follow-up, groups, and regenerator
+  - encoded the minimal model routing in migration `20260521101000_allow_career_playbook_model_phases` so future database rebuilds do not depend on manual Supabase rows
 
 ## Routing And Delegation
 
@@ -70,10 +77,10 @@ Closed in this delivery:
 
 Still open under `mc2-db696.11`:
 
-- `mc2-db696.11.5` - live staging Career Playbook mutation smoke
+- `mc2-db696.11.5` - live staging Career Playbook mutation smoke; schema/read-only readiness is done, live generation remains gated on auth fixtures, deployed/local worker queue alignment, cleanup scope, and numeric LLM/API budget
 - `mc2-db696.11.6` - 10-concurrent load test
 
-Parent `mc2-db696.11` remains `in_progress` because full live staging verification is blocked by schema/credential/approval readiness.
+Parent `mc2-db696.11` remains `in_progress` because full live staging verification is still blocked by credential, fixture, cleanup, queue-alignment, and cost-budget readiness.
 
 ## Verification Evidence
 
@@ -91,14 +98,31 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 - No-env preflight package script: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` prints `status: blocked` as expected. pnpm lifecycle exits `1` around the script's internal exit `2`; automation should parse report status for readiness outcomes.
 - Artifact validation: passed for all stage artifacts.
 - Process verification: `scripts/orchestration/run_process_verification.sh` - passed.
+- Supabase MCP migration/readiness, 2026-05-20:
+  - `public.career_playbooks` and `public.career_playbook_fixed_questions` exist.
+  - RLS is enabled on both tables.
+  - Fixed-question seed count is `en: 7`, `ru: 7`.
+  - Policies are present for public fixed-question reads and authenticated org-owned playbook CRUD.
+  - Migration history contains MCP generated row `20260520141021 / 20260513090000_career_playbook` plus file-version row `20260513090000 / career_playbook`.
+- Supabase MCP model routing, 2026-05-21:
+  - constraint migration `20260521101000_allow_career_playbook_model_phases` applied and file-version row `20260521101000 / allow_career_playbook_model_phases` inserted.
+  - the git migration now includes idempotent insert/update rows for all 10 active `stage_career_playbook%` configs.
+  - active global `llm_model_config` rows exist for all `stage_career_playbook%` phases.
+  - runtime resolution returns `minimax/minimax-m2.7` for `stage_career_playbook_spec` and `stage_career_playbook_judge`; all other Career Playbook phases return `deepseek/deepseek-v4-flash`.
+- Read-only staging preflight after migration, 2026-05-20: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260520` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
+- Read-only staging preflight after model routing, 2026-05-21: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260521-model-routing` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
+- PR-readiness preflight after migration reproducibility update, 2026-05-21: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260521-pr-ready` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
+- Supabase security/performance advisors ran after DDL. Reported warnings are broad existing project advisories; no new Career Playbook table blocker was identified in this readiness pass.
 
 ## Explicit Defers
 
-- Remote Supabase read probe showed `public.career_playbooks` is absent in project `diqooqbuchsliypgwksu`. The migration was not applied from this stage.
-- Full live mutation smoke requires explicit approval, staging schema, disposable user/org/playbooks, dedicated `BULLMQ_QUEUE_NAME`, cleanup authorization, valid auth token, and accepted API cost budget.
+- Full live mutation smoke requires disposable user/org/playbooks, dedicated queue alignment between enqueuer and worker, cleanup authorization/scope, valid auth token or storage state, and an accepted numeric API cost budget.
+- Runtime cost evidence currently records estimated `costUsd: 0`; use admin evidence for payload structure, and capture real provider spend separately unless runtime cost accounting is improved.
 - 10-concurrent load testing remains tracked as an open Beads child and depends on successful live single-smoke readiness.
 
 ## PR Readiness Passes
+
+- PR #40 delivered `mc2-db696.11.5` staging schema/read-only/model-routing readiness into `develop`; it does not close live mutation smoke.
 
 - `mc2-db696.11.7` mapped the original stacked PR delivery path after #37 was opened.
 - PR #24 through #36 and PR #38 have since landed in `develop`; PR #37 is the remaining Phase 11 smoke/preflight delivery PR.
