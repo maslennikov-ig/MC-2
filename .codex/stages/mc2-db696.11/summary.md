@@ -1,9 +1,9 @@
 # Stage mc2-db696.11 Summary
 
-Status: Phase 11 schema/read-only smoke ready; live mutation smoke still gated
+Status: Phase 11 gated live runner ready; live mutation smoke still gated
 Updated: 2026-05-21
-Branch: `codex/career-playbook-staging-smoke`
-Base: `origin/develop` @ `d92c8c28be3e0a3504a0fb9622d7f3da6229ed6e`
+Branch: `codex/career-playbook-live-smoke`
+Base: `origin/develop` @ `cdbe0e8c`
 
 ## Scope Delivered
 
@@ -40,10 +40,18 @@ Base: `origin/develop` @ `d92c8c28be3e0a3504a0fb9622d7f3da6229ed6e`
   - reran read-only staging preflight successfully with a dedicated non-default queue name
   - configured minimal Career Playbook model routing: MiniMax M2.7 for spec/judge and DeepSeek V4 Flash for follow-up, groups, and regenerator
   - encoded the minimal model routing in migration `20260521101000_allow_career_playbook_model_phases` so future database rebuilds do not depend on manual Supabase rows
+- Prepared gated live-smoke execution for `mc2-db696.11.5`:
+  - added `smoke:career-playbook:live` with default non-mutating plan mode
+  - gated mutation mode behind token, expected disposable user/org, tRPC URL, dedicated queue, cleanup scope, positive budget, and explicit confirmation
+  - kept the runner on product tRPC flow instead of direct Supabase row writes
+  - added deterministic evidence validation for 27 generated blocks, Mermaid coverage, anti-goals, decision rows, failure modes, PDF, public share, and optional course bridge
+  - added exact dry-run cleanup manifest entries for auth user, organization, playbook, BullMQ job, job_status, share slug, bridge course, source documents, and upload paths
+  - documented safe usage in Career Playbook runtime docs and a Superpowers implementation plan
 
 ## Routing And Delegation
 
 - Context7 checked Playwright, Supabase, and Next.js behavior.
+- Context7 checked tRPC v11 and BullMQ v5 behavior for the live runner design.
 - Visible read-only explorers:
   - Raman: web E2E/auth mapping
   - Lagrange: backend/Supabase/Redis smoke mapping
@@ -59,6 +67,8 @@ Base: `origin/develop` @ `d92c8c28be3e0a3504a0fb9622d7f3da6229ed6e`
   - Lovelace: Phase 11 cost-surface map for `mc2-db696.11.4`
   - Helmholtz: Phase 11 live-smoke blocker map for `mc2-db696.11.5`
   - Schrodinger: Phase 11 admin cost evidence endpoint/UI review
+  - Boyle: tRPC/backend runner path and hard-stop gates for `mc2-db696.11.5`
+  - Aquinas: cleanup/evidence map for live-smoke validation and cleanup manifest
 
 The orchestrator did not accept reports blindly. It found and fixed two backend preflight issues before review, then accepted/fixed all review must-fix findings.
 
@@ -77,7 +87,7 @@ Closed in this delivery:
 
 Still open under `mc2-db696.11`:
 
-- `mc2-db696.11.5` - live staging Career Playbook mutation smoke; schema/read-only readiness is done, live generation remains gated on auth fixtures, deployed/local worker queue alignment, cleanup scope, and numeric LLM/API budget
+- `mc2-db696.11.5` - live staging Career Playbook mutation smoke; schema/read-only/model readiness and gated runner are done, live generation remains gated on auth fixtures, deployed/local worker queue alignment, cleanup scope, and numeric LLM/API budget
 - `mc2-db696.11.6` - 10-concurrent load test
 
 Parent `mc2-db696.11` remains `in_progress` because full live staging verification is still blocked by credential, fixture, cleanup, queue-alignment, and cost-budget readiness.
@@ -90,6 +100,13 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 - Web config unit: `pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts` - 6 passed.
 - Web cost evidence unit: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/admin-cost-evidence.test.tsx` - 3 passed.
 - Backend type-check: `pnpm --filter @megacampus/course-gen-platform type-check` - passed.
+- Backend smoke units including live runner: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --dir packages/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts tests/unit/smoke/career-playbook-live-smoke.test.ts` - 21 passed.
+- Backend type-check after live-runner changes: `pnpm --filter @megacampus/course-gen-platform type-check` - passed.
+- Live runner blocked plan check: direct `tsx scripts/career-playbook-live-smoke.ts --target staging --json` with a dedicated queue printed `status: blocked`, `mutates: false`, and missing live gates as expected.
+- Live runner all-gates plan check: `pnpm --dir packages/course-gen-platform smoke:career-playbook:live --target staging --trpc-url http://127.0.0.1:3001/trpc --expected-user-id ... --expected-organization-id ... --cleanup-scope playbook-and-course --max-cost-usd 3 --confirm-live-mutation --json` with token supplied by env printed `status: pass`, `mutates: false`, and did not expose the token.
+- Full repo type-check after live-runner changes: `pnpm type-check` - passed.
+- Full repo lint after live-runner changes: `pnpm lint` - passed with existing warnings.
+- Full repo build after live-runner changes: `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm build` - passed with existing Next/Supabase Edge Runtime warnings.
 - Web type-check: `pnpm --filter @megacampus/web type-check` - passed.
 - Full repo type-check: `pnpm type-check` - passed.
 - Full repo lint: `pnpm lint` - passed with existing warnings only.
@@ -117,12 +134,14 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 ## Explicit Defers
 
 - Full live mutation smoke requires disposable user/org/playbooks, dedicated queue alignment between enqueuer and worker, cleanup authorization/scope, valid auth token or storage state, and an accepted numeric API cost budget.
+- The live runner emits cleanup targets but does not delete data; operator cleanup execution remains a separate explicit step after evidence capture.
 - Runtime cost evidence currently records estimated `costUsd: 0`; use admin evidence for payload structure, and capture real provider spend separately unless runtime cost accounting is improved.
 - 10-concurrent load testing remains tracked as an open Beads child and depends on successful live single-smoke readiness.
 
 ## PR Readiness Passes
 
 - PR #40 delivered `mc2-db696.11.5` staging schema/read-only/model-routing readiness into `develop`; it does not close live mutation smoke.
+- PR #41 is open from `codex/career-playbook-live-smoke` to `develop` for the gated live-smoke runner; it does not run or close live mutation smoke.
 
 - `mc2-db696.11.7` mapped the original stacked PR delivery path after #37 was opened.
 - PR #24 through #36 and PR #38 have since landed in `develop`; PR #37 is the remaining Phase 11 smoke/preflight delivery PR.

@@ -57,6 +57,19 @@ Daily staging smoke should run only after staging has the Career Playbook migrat
 
 Staging/prod mutation smoke is blocked unless the current task explicitly approves mutations, cleanup, and expected API cost.
 
+`packages/course-gen-platform/scripts/career-playbook-live-smoke.ts` is the gated live-runner entrypoint. Its default `plan` mode is read-only in practice: it only evaluates gates and prints a report. `mutation-smoke` mode uses real tRPC calls with a disposable bearer token and follows the product flow instead of writing rows directly:
+
+1. `careerPlaybook.session.start`
+2. `careerPlaybook.session.submitAnswer` for fixed sales-manager-b2b answers
+3. `careerPlaybook.generation.requestFollowups`
+4. `careerPlaybook.session.submitAnswer` for follow-up answers/skips
+5. `careerPlaybook.generation.approveAndGenerate`
+6. `careerPlaybook.generation.getStatus` polling until terminal state
+7. `careerPlaybook.library.get`, `exportPdf`, `share.shareToggle`, and `share.getPublicBySlug`
+8. optional `careerPlaybook.courseBridge.createCourseFromPlaybook` only with `--include-course-bridge`
+
+The runner refuses production targets, refuses shared/default `course-generation` for staging, and requires a bearer token, expected disposable user/org IDs, cleanup scope, numeric budget, tRPC URL, and `--confirm-live-mutation`. It emits a dry-run cleanup manifest with exact playbook, BullMQ job, job_status, share slug, course, source document, and upload-path targets; it does not delete anything itself.
+
 ## Cost And Performance Checks
 
 Career Playbook generation records per-node cost in `cost_breakdown` on `career_playbooks`. The admin evidence surface is:
