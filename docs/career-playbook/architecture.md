@@ -70,6 +70,8 @@ Operator evidence should include a screenshot or exported trace from `/admin/gen
 
 Current runtime cost accounting estimates Career Playbook node costs as `0`, so the admin page proves `cost_breakdown` shape and access control but does not prove real OpenRouter spend. Operator evidence should include provider-side spend or improved runtime cost accounting when the acceptance criterion needs actual cost evidence.
 
+Staging model routing for the first live smoke uses the minimal two-tier setup: `minimax/minimax-m2.7` for `stage_career_playbook_spec` and `stage_career_playbook_judge`; `deepseek/deepseek-v4-flash` for follow-up generation, groups 1-6, and block regeneration.
+
 The 10-concurrent-generation load test should run against isolated staging resources:
 
 - dedicated test users and organization
