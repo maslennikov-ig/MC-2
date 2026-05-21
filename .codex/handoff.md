@@ -3,7 +3,7 @@
 Updated: 2026-05-21
 Current working branch: `develop` delivery state; local primary worktree may differ
 Base branch: `develop`
-Current PR: pending for `codex/career-playbook-staging-smoke`
+Current PR: [#40](https://github.com/maslennikov-ig/MC-2/pull/40)
 
 ## Current state
 
