@@ -150,8 +150,10 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getByText('Выбранные блоки')).toBeInTheDocument()
     expect(screen.getAllByText('1. Миссия/KR').length).toBeGreaterThan(0)
     expect(screen.getAllByText('22. README роли').length).toBeGreaterThan(0)
-    expect(screen.getByText('Руководство роли: B2B-продажи')).toBeInTheDocument()
-    expect(screen.getByText('Превратите контекст роли в рабочее руководство')).toBeInTheDocument()
+    expect(screen.getByText('Должностная инструкция: B2B-продажи')).toBeInTheDocument()
+    expect(
+      screen.getByText('Превратите контекст роли в понятную должностную инструкцию')
+    ).toBeInTheDocument()
     expect(screen.queryByText(/operating manual/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Foundation')).not.toBeInTheDocument()

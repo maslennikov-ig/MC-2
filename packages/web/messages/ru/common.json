@@ -147,10 +147,12 @@
   },
   "nav": {
     "catalog": "Каталог",
+    "createRoleDescription": "Создать описание роли",
     "createCourse": "Создать курс",
     "exampleCourses": "Примеры курсов",
     "examples": "Примеры",
     "catalogAria": "Просмотреть доступные курсы",
+    "createRoleDescriptionAria": "Создать описание роли",
     "createCourseAria": "Создать новый курс",
     "examplesAria": "Просмотреть примеры курсов",
     "home": "Главная",

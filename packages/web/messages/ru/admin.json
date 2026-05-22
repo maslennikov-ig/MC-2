@@ -138,7 +138,7 @@
     "actions": {
       "openWorkflow": "Открыть Workflow",
       "adminPanel": "Панель администратора",
-      "careerPlaybookCosts": "Затраты Career Playbook"
+      "careerPlaybookCosts": "Затраты должностных инструкций"
     },
     "empty": {
       "title": "Генерации не найдены",
@@ -151,13 +151,13 @@
     }
   },
   "careerPlaybookCosts": {
-    "title": "Подтверждение затрат Career Playbook",
-    "description": "Просмотр затрат генерации Career Playbook по плейбуку, этапу, узлу, модели, токенам и сумме в USD.",
-    "empty": "Затраты Career Playbook не найдены",
+    "title": "Подтверждение затрат на должностные инструкции",
+    "description": "Просмотр затрат генерации должностных инструкций по инструкции, этапу, узлу, модели, токенам и сумме в USD.",
+    "empty": "Затраты должностных инструкций не найдены",
     "labels": {
-      "playbooks": "Плейбуки",
-      "playbookSingular": "плейбук",
-      "playbookPlural": "плейбуков",
+      "playbooks": "Инструкции",
+      "playbookSingular": "инструкция",
+      "playbookPlural": "инструкций",
       "totalCost": "Общие затраты",
       "tokens": "Токены",
       "inputOutput": "Вход / выход",

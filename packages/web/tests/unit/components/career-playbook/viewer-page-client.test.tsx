@@ -59,12 +59,13 @@ const ruMessages = {
       ...messages['career-playbook'].viewer,
       contents: 'Содержание',
       share: 'Поделиться',
-      createCourse: 'Создать курс',
+      createCourse: 'Создать курс из инструкции',
       delete: 'Удалить',
-      localPreviewTitle: 'Превью Role Guide',
-      localPreviewContent: '# Превью Role Guide\n\nBackend viewer transport ещё не подключён.',
+      localPreviewTitle: 'Превью должностной инструкции',
+      localPreviewContent:
+        '# Превью должностной инструкции\n\nСерверный просмотр ещё не подключён.',
       viewerBackendPending:
-        'Viewer backend пока недоступен; показываем локальное превью до подключения интеграции.',
+        'Серверный просмотр пока недоступен; показываем локальное превью до подключения интеграции.',
     },
   },
 }
@@ -113,7 +114,9 @@ describe('CareerPlaybookViewerPageClient', () => {
 
     renderPage({ locale: 'ru' })
 
-    expect(await screen.findAllByRole('heading', { name: 'Превью Role Guide' })).not.toHaveLength(0)
+    expect(
+      await screen.findAllByRole('heading', { name: 'Превью должностной инструкции' })
+    ).not.toHaveLength(0)
     expect(screen.getByRole('button', { name: 'Поделиться' })).toBeInTheDocument()
     expect(
       screen.getByRole('navigation', { name: 'Playbook table of contents' })
