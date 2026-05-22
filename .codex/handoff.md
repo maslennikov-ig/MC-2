@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-22
-Current working branch: `codex/primary-worktree-cleanup`
+Current working branch: `develop`
 Base branch: `origin/develop`
 Base head: `7c459700` (PR #41 merged)
 
@@ -10,7 +10,7 @@ Base head: `7c459700` (PR #41 merged)
 - This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
 - Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`; do not push directly to `develop` or `master`.
 - Career Playbook PR #24 through #41 have landed in `develop`.
-- Primary worktree `/home/me/code/mc2` is clean on `codex/primary-worktree-cleanup`, based on `origin/develop` at `7c459700`; the only delivered delta in this cleanup branch is this handoff correction.
+- Primary worktree `/home/me/code/mc2` is clean on `develop`, with the cleanup handoff correction delivered through PR #42.
 - The stale dirty primary branch `feature/career-playbook-library-share` was triaged on 2026-05-22. Its local `mc2-db696.13` worker/status transport patch was an early, unaccepted version of work now present in `origin/develop` through the accepted/review-fixed PR #35 implementation and later PR #41 state.
 - Before cleanup, the stale primary diff was preserved at `/tmp/mc2-primary-dirty-20260522-tracked.patch`, `/tmp/mc2-primary-dirty-20260522-untracked.tar.gz`, and `/tmp/mc2-primary-dirty-20260522-status.z`.
 - The remaining local superpowers worktree `career-playbook-live-smoke` and merged local Career Playbook branches were removed after verifying they were clean and ancestors of `origin/develop`; remote branches were not deleted.
@@ -34,7 +34,7 @@ If those gates are not satisfied, collect or prepare the missing staging readine
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook delivery. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/project-index.md, .codex/stages/mc2-db696.11/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#41 have landed in develop. Primary worktree /home/me/code/mc2 is clean on codex/primary-worktree-cleanup, based on origin/develop at 7c459700, with only this handoff correction ahead. The stale dirty feature/career-playbook-library-share primary patch was backed up to /tmp and dropped because origin/develop already contains the accepted/review-fixed mc2-db696.13 implementation. Continue live mutation smoke only after auth/TOKEN or storage-state, disposable fixtures, enqueuer/worker queue alignment, cleanup scope, and numeric cost budget gates are explicit. Keep billing/payment out of MVP scope.
+Use $orchestrator-stage to continue Career Playbook delivery. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/project-index.md, .codex/stages/mc2-db696.11/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#42 have landed in develop. Primary worktree /home/me/code/mc2 is clean on develop. The stale dirty feature/career-playbook-library-share primary patch was backed up to /tmp and dropped because origin/develop already contains the accepted/review-fixed mc2-db696.13 implementation. Continue live mutation smoke only after auth/TOKEN or storage-state, disposable fixtures, enqueuer/worker queue alignment, cleanup scope, and numeric cost budget gates are explicit. Keep billing/payment out of MVP scope.
 ```
 
 ## Explicit defers
