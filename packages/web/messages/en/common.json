@@ -147,10 +147,12 @@
   },
   "nav": {
     "catalog": "Catalog",
+    "createRoleDescription": "Create Role Guide",
     "createCourse": "Create Course",
     "exampleCourses": "Example Courses",
     "examples": "Examples",
     "catalogAria": "View available courses",
+    "createRoleDescriptionAria": "Create a Role Guide",
     "createCourseAria": "Create a new course",
     "examplesAria": "View example courses",
     "home": "Home",

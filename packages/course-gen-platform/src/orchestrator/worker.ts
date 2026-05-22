@@ -22,7 +22,12 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Worker, Job } from 'bullmq';
 import { getRedisClient, REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
-import { JobData, JobType, type Json } from '@megacampus/shared-types';
+import {
+  CareerPlaybookOperationJobDataSchema,
+  JobType,
+  type JobData,
+  type Json,
+} from '@megacampus/shared-types';
 import logger from '../shared/logger';
 import { logger as baseLogger } from '@megacampus/shared-logger';
 import { QUEUE_NAME } from './queue';
@@ -30,6 +35,7 @@ import { handleJobFailure } from './handlers/error-handler';
 import type { JobResult } from './handlers/base-handler';
 import { JOB_TYPE_TO_STEP } from './handlers/base-handler';
 import { getSupabaseAdmin } from '../shared/supabase/admin';
+import type { CareerPlaybookSupabase } from '../server/routers/career-playbook/service-mappers';
 import { getTranslator, type Locale } from '../shared/i18n';
 import {
   createJobStatus,
@@ -41,6 +47,7 @@ import {
 import { JobCancelledError } from '../server/errors/typed-errors';
 import { costTracker } from '../shared/metrics/cost-tracker';
 import { stageMetricsCollector } from '../shared/metrics/stage-metrics';
+import { getJobCourseId } from './job-data-fields';
 
 /**
  * Get the processor file path for sandboxed processing
@@ -130,6 +137,7 @@ const registeredJobTypes = [
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
   JobType.BLOCK_REGENERATION,
+  JobType.CAREER_PLAYBOOK,
 ];
 
 /**
@@ -144,7 +152,7 @@ const registeredJobTypes = [
  * 3. First line of stack trace
  * 4. Descriptive fallback
  */
-function extractErrorMessage(job: Job<JobData>, error: Error): string {
+function extractErrorMessage(job: Pick<Job<JobData>, 'data'>, error: Error): string {
   // 1. Try BullMQ error message
   if (error?.message && error.message !== 'Error' && error.message.trim() !== '') {
     return error.message;
@@ -177,6 +185,88 @@ function extractErrorMessage(job: Job<JobData>, error: Error): string {
 
   // 4. Fallback
   return 'Worker thread crashed (error details lost in sandbox serialization)';
+}
+
+function isFinalFailedAttempt(job: Pick<Job<JobData>, 'attemptsMade' | 'opts'>): boolean {
+  const maxAttempts =
+    typeof job.opts?.attempts === 'number' && job.opts.attempts > 0 ? job.opts.attempts : 1;
+  return job.attemptsMade >= maxAttempts;
+}
+
+function toCareerPlaybookFailureQAData(
+  storedQAData: unknown,
+  fallbackQAData: unknown,
+  errorMessage: string
+): Json {
+  const base =
+    storedQAData && typeof storedQAData === 'object' && !Array.isArray(storedQAData)
+      ? (storedQAData as Record<string, unknown>)
+      : fallbackQAData && typeof fallbackQAData === 'object' && !Array.isArray(fallbackQAData)
+        ? (fallbackQAData as Record<string, unknown>)
+        : {};
+
+  return {
+    ...base,
+    generation_error: errorMessage,
+  } as Json;
+}
+
+function unknownErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function markCareerPlaybookGenerationFailedAfterWorkerFailure(
+  job: Pick<Job<JobData>, 'data' | 'attemptsMade' | 'opts' | 'name' | 'id'>,
+  error: Error
+): Promise<boolean> {
+  const parsedJobData = CareerPlaybookOperationJobDataSchema.safeParse(job.data);
+  if (!parsedJobData.success) return false;
+
+  const jobData = parsedJobData.data;
+  if (
+    String(job.name) !== String(JobType.CAREER_PLAYBOOK) ||
+    jobData.operation !== 'GENERATE_PLAYBOOK'
+  ) {
+    return false;
+  }
+
+  if (!isFinalFailedAttempt(job)) return false;
+
+  const errorMessage = extractErrorMessage(job, error);
+  const supabase = getSupabaseAdmin() as unknown as CareerPlaybookSupabase;
+  const { data: currentRow, error: loadError } = await supabase
+    .from('career_playbooks')
+    .select('status,q_a_data')
+    .eq('id', jobData.playbookId)
+    .maybeSingle();
+
+  if (loadError) {
+    throw new Error(
+      `Failed to load Career Playbook generation status after worker failure: ${unknownErrorMessage(loadError)}`
+    );
+  }
+
+  const row = currentRow as { status?: string; q_a_data?: unknown } | null;
+  if (row && row.status !== 'generating') return false;
+
+  const { data: updatedRow, error: updateError } = await supabase
+    .from('career_playbooks')
+    .update({
+      status: 'failed',
+      q_a_data: toCareerPlaybookFailureQAData(row?.q_a_data, jobData.qaData, errorMessage),
+    })
+    .eq('id', jobData.playbookId)
+    .eq('status', 'generating')
+    .select('id')
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(
+      `Failed to mark Career Playbook generation failed after worker failure: ${unknownErrorMessage(updateError)}`
+    );
+  }
+
+  return Boolean(updatedRow);
 }
 
 /**
@@ -351,7 +441,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         }
 
         // Clean up in-memory metrics for completed course
-        const courseId = job.data?.courseId;
+        const courseId = getJobCourseId(job.data);
         if (courseId) {
           costTracker.clearCourse(courseId);
           stageMetricsCollector.clearCourse(courseId);
@@ -406,7 +496,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
           }
 
           // Clean up in-memory metrics for cancelled course
-          const cancelledCourseId = job.data?.courseId;
+          const cancelledCourseId = getJobCourseId(job.data);
           if (cancelledCourseId) {
             costTracker.clearCourse(cancelledCourseId);
             stageMetricsCollector.clearCourse(cancelledCourseId);
@@ -431,7 +521,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Safety net: update course generation_status when sandbox crashes.
         // BaseJobHandler.process() runs in child thread — if it crashes,
         // generation_status is never updated. This catches that gap.
-        const courseId = job.data?.courseId;
+        const courseId = getJobCourseId(job.data);
         const jobType = job.name as JobType;
         const stepId = JOB_TYPE_TO_STEP[jobType];
 
@@ -481,6 +571,26 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
               'Safety net: failed to update course progress'
             );
           }
+        }
+
+        try {
+          const careerPlaybookMarkedFailed =
+            await markCareerPlaybookGenerationFailedAfterWorkerFailure(job, enrichedError);
+          if (careerPlaybookMarkedFailed) {
+            logger.info(
+              { jobId: job.id, jobType: job.name },
+              'Safety net: marked Career Playbook generation failed after worker failure'
+            );
+          }
+        } catch (careerPlaybookError) {
+          const errMsg =
+            careerPlaybookError instanceof Error
+              ? careerPlaybookError.message
+              : String(careerPlaybookError);
+          logger.error(
+            { jobId: job.id, err: errMsg },
+            'Safety net: failed to mark Career Playbook generation failed'
+          );
         }
 
         if (isTestEnvironment) {
@@ -537,7 +647,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             jobType: job.name,
             // organizationId may not exist for all job types (e.g., LESSON_CONTENT)
             organizationId: 'organizationId' in job.data ? job.data.organizationId : undefined,
-            courseId: job.data.courseId,
+            courseId: getJobCourseId(job.data),
           },
           'Worker picked up job'
         );

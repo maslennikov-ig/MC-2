@@ -1,6 +1,30 @@
 {
-  "plansDirectory": "./docs/plans",
   "env": {
     "ENABLE_TOOL_SEARCH": "auto:5"
-  }
+  },
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "bd prime",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bd prime",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  },
+  "plansDirectory": "./docs/plans"
 }

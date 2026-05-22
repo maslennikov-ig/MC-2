@@ -137,7 +137,8 @@
     },
     "actions": {
       "openWorkflow": "Открыть Workflow",
-      "adminPanel": "Панель администратора"
+      "adminPanel": "Панель администратора",
+      "careerPlaybookCosts": "Затраты должностных инструкций"
     },
     "empty": {
       "title": "Генерации не найдены",
@@ -147,6 +148,27 @@
       "showing": "Показано {from} - {to} из {total} результатов",
       "previous": "Назад",
       "next": "Вперёд"
+    }
+  },
+  "careerPlaybookCosts": {
+    "title": "Подтверждение затрат на должностные инструкции",
+    "description": "Просмотр затрат генерации должностных инструкций по инструкции, этапу, узлу, модели, токенам и сумме в USD.",
+    "empty": "Затраты должностных инструкций не найдены",
+    "labels": {
+      "playbooks": "Инструкции",
+      "playbookSingular": "инструкция",
+      "playbookPlural": "инструкций",
+      "totalCost": "Общие затраты",
+      "tokens": "Токены",
+      "inputOutput": "Вход / выход",
+      "stage": "Этап",
+      "node": "Узел",
+      "model": "Модель",
+      "input": "Вход",
+      "output": "Выход",
+      "cost": "Затраты",
+      "created": "Создан",
+      "invalidCostBreakdown": "Некорректные данные затрат"
     }
   },
   "pipeline": {

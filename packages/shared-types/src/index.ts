@@ -101,6 +101,9 @@ export * from './course-size';
 // Clarifying Questions (Stage 4 Clarifying Flow)
 export * from './clarifying-questions';
 
+// Career Playbook (Role Guide lead magnet track)
+export * from './career-playbook';
+
 // Course Event Types (Cross-component communication)
 export * from './course-events';
 

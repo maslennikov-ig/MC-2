@@ -8,7 +8,13 @@
  */
 
 import { Job } from 'bullmq';
-import { JobData, JobType, Database, type Json } from '@megacampus/shared-types';
+import {
+  JobData,
+  JobType,
+  Database,
+  type CareerPlaybookJobData,
+  type Json,
+} from '@megacampus/shared-types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Logger } from 'pino';
 import logger from '../../shared/logger';
@@ -85,6 +91,7 @@ export const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.LESSON_CONTENT]: null, // Stage 6 — uses lesson-level progress tracking
   [JobType.ENRICHMENT_GENERATION]: null, // Stage 7 enrichments (no course progress step)
   [JobType.BLOCK_REGENERATION]: null, // Cascade regeneration (no course progress step)
+  [JobType.CAREER_PLAYBOOK]: null, // Career Playbook uses career_playbooks status, not course progress
   [JobType.FINALIZATION]: 6, // Finalization → RPC step 6
 };
 
@@ -103,7 +110,9 @@ export const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
  *
  * @abstract
  */
-export abstract class BaseJobHandler<T extends JobData = JobData> {
+type CourseJobData = Exclude<JobData, CareerPlaybookJobData>;
+
+export abstract class BaseJobHandler<T extends CourseJobData = CourseJobData> {
   protected readonly jobType: JobType;
 
   /**

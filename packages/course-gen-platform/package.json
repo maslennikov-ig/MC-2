@@ -47,7 +47,9 @@
     "lint": "eslint src --max-warnings=95",
     "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc --noEmit",
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
-    "benchmark-llm": "tsx scripts/benchmark-llm/index.ts"
+    "benchmark-llm": "tsx scripts/benchmark-llm/index.ts",
+    "smoke:career-playbook:preflight": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-smoke-preflight.ts",
+    "smoke:career-playbook:live": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-live-smoke.ts"
   },
   "dependencies": {
     "@bull-board/api": "^5.14.0",
@@ -91,6 +93,7 @@
     "p-limit": "^7.2.0",
     "pdf-parse": "^2.4.5",
     "pino": "^9.6.0",
+    "playwright": "^1.57.0",
     "sharp": "^0.34.5",
     "snowball-stemmers": "^0.6.0",
     "strip-ansi": "^7.1.2",

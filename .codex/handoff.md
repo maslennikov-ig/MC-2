@@ -1,36 +1,46 @@
 # Orchestrator Handoff
 
-Updated: 2026-04-06
-Current baseline branch: `develop`
-Current baseline commit: `8cb1b502f2809223cac73fe630951e2945be0ccd`
+Updated: 2026-05-22
+Current working branch: `develop`
+Base branch: `origin/develop`
+Base head: `7c459700` (PR #41 merged)
 
 ## Current state
 
 - This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
-- `.codex/orchestrator.toml` is the machine-readable contract; `.codex/handoff.md` is current-state only.
-- Tracked stage history now lives under `.codex/stages/`; `.codex/agent-reports/` remains the legacy local-only archive.
-- The primary worktree still carries local Beads/runtime noise plus an unrelated local change in `.claude/scripts/push-dev.sh`, so prefer isolated worktrees for delegated or parallel execution.
-- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`.
+- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`; do not push directly to `develop` or `master`.
+- Career Playbook PR #24 through #41 have landed in `develop`.
+- Primary worktree `/home/me/code/mc2` is clean on `develop`, with the cleanup handoff correction delivered through PR #42.
+- Career Playbook Russian UI naming/nav follow-up `mc2-db696.17` is implemented: Russian user-facing surfaces use `Должностная инструкция`, and the header action is `Создать описание роли`.
+- The stale dirty primary branch `feature/career-playbook-library-share` was triaged on 2026-05-22. Its local `mc2-db696.13` worker/status transport patch was an early, unaccepted version of work now present in `origin/develop` through the accepted/review-fixed PR #35 implementation and later PR #41 state.
+- Before cleanup, the stale primary diff was preserved at `/tmp/mc2-primary-dirty-20260522-tracked.patch`, `/tmp/mc2-primary-dirty-20260522-untracked.tar.gz`, and `/tmp/mc2-primary-dirty-20260522-status.z`.
+- The remaining local superpowers worktree `career-playbook-live-smoke` and merged local Career Playbook branches were removed after verifying they were clean and ancestors of `origin/develop`; remote branches were not deleted.
+- `mc2-1mmop` remains open for the repeatable/scripted cleanup documentation path. Manual cleanup is done.
+- `mc2-db696.11.5` staging schema/read-only/model readiness is advanced through PR #40, and the gated live-smoke runner is merged through PR #41. Live mutation smoke has not run.
+- Career Playbook minimal model routing is configured in Supabase and encoded in migration `20260521101000_allow_career_playbook_model_phases`: `minimax/minimax-m2.7` for `stage_career_playbook_spec` and `stage_career_playbook_judge`; `deepseek/deepseek-v4-flash` for follow-up, groups 1-6, and regenerator.
+- Do not trigger LLM-backed generation until disposable fixtures, token/storage state, cleanup scope, queue alignment between enqueuer and worker, and a numeric API cost budget are explicit.
+- No billing or payment scope is part of the Career Playbook MVP work.
 
 ## Latest relevant stage
 
-- Latest relevant Stage 6 UI slice: `mc2-ux7aq` — surface `review_required` lessons explicitly in the generation graph.
-- Stage summary: [`.codex/stages/mc2-ux7aq/summary.md`](./stages/mc2-ux7aq/summary.md)
-- Latest tracked artifact: [`.codex/stages/mc2-ux7aq/artifacts/mc2-ux7aq.md`](./stages/mc2-ux7aq/artifacts/mc2-ux7aq.md)
-- Follow-up `mc2-dqbw1` remains separate for latest-usable-content and blank Lesson Inspector loading behavior.
+- Latest relevant Career Playbook stage: `mc2-db696.11` - tests/smoke/staging verification foundation; summary and artifacts are under [`.codex/stages/mc2-db696.11`](./stages/mc2-db696.11/summary.md).
 
 ## Next recommended
 
-- Next stage id: `mc2-dqbw1`
-- Recommended action: use `mc2-dqbw1` for Lesson Inspector loading and latest-usable-content resolution, keep it separate from the completed review-state visibility slice, and treat Beads lock contention as a separate operational follow-up.
+Next stage id: `mc2-db696.11`
+Recommended action: continue `mc2-db696.11.5` only when live mutation gates are explicit. Schema, read-only preflight, model routing, and the gated runner are ready; paid generation remains gated on auth/TOKEN or storage-state, disposable fixtures, queue alignment, exact cleanup scope, and accepted numeric LLM/API cost budget.
+
+If those gates are not satisfied, collect or prepare the missing staging readiness evidence before running any live mutation. Keep `mc2-db696.16` as the tracked P2 defer for future upload quota/dedupe reuse in the JD bridge.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $stage-orchestrator to continue with stage `mc2-dqbw1` in this repository. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, and the linked stage summary/artifact first. Then confirm current develop-baseline truth, keep Beads lock contention out of the product stage, and prepare the next execution step for Lesson Inspector loading and latest-usable-content resolution.
+Use $orchestrator-stage to continue Career Playbook delivery. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/project-index.md, .codex/stages/mc2-db696.11/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#42 have landed in develop. Primary worktree /home/me/code/mc2 is clean on develop. The stale dirty feature/career-playbook-library-share primary patch was backed up to /tmp and dropped because origin/develop already contains the accepted/review-fixed mc2-db696.13 implementation. Continue live mutation smoke only after auth/TOKEN or storage-state, disposable fixtures, enqueuer/worker queue alignment, cleanup scope, and numeric cost budget gates are explicit. Keep billing/payment out of MVP scope.
 ```
 
 ## Explicit defers
 
-- `mc2-dqbw1` remains the explicit product follow-up for Lesson Inspector loading and latest-usable-content resolution.
-- Beads lock contention remains a separate operational follow-up; do not hide it inside unrelated product-stage completion claims.
+- Real Supabase RLS/staging smoke and authenticated browser e2e share/PDF/worker flow remain tracked under `mc2-db696.11.5` until live-smoke gates are satisfied; the runner does not perform cleanup, it only emits an exact dry-run cleanup manifest.
+- 10-concurrent load test remains open under `mc2-db696.11.6`.
+- SSE/subscription status streaming remains deferred; PR #35 intentionally uses polling over the existing tRPC/httpBatchLink transport.
+- Repeatable cleanup automation/documentation remains tracked as `mc2-1mmop`.

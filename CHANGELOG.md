@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **career-playbook**: add configurable Playwright E2E harness, read-only backend smoke preflight, and Phase 11 verification docs.
+
 ## [0.31.40] - 2026-04-10
 
 ### Added

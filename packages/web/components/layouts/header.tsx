@@ -2,7 +2,7 @@
 
 import { Link } from '@/src/i18n/navigation'
 
-import { BookOpen, Plus } from 'lucide-react'
+import { BookOpen, FileText, Plus } from 'lucide-react'
 import Logo from '@/components/common/logo'
 import AuthButton from '@/components/common/auth-button'
 import { LanguageSwitcher } from '@/components/common/language-switcher'
@@ -18,6 +18,12 @@ export default function Header({ darkMode = false }: HeaderProps = {}) {
   const { session, isLoading } = useSupabase()
   const isAuthenticated = !!session
   const t = useTranslations('common.nav')
+  const roleDescriptionLinkClass = darkMode
+    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-teal-400/20 bg-teal-400/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-teal-400/35 hover:bg-teal-400/10 hover:text-teal-300 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
+    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-2.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-teal-300 hover:bg-teal-100 hover:text-teal-700 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-teal-400/20 dark:bg-teal-400/5 dark:text-gray-300 dark:hover:border-teal-400/35 dark:hover:bg-teal-400/10 dark:hover:text-teal-300'
+  const roleDescriptionIconClass = darkMode
+    ? 'h-4 w-4 text-teal-300 transition-colors group-hover:text-teal-200'
+    : 'h-4 w-4 text-teal-700 transition-colors group-hover:text-teal-800 dark:text-teal-300 dark:group-hover:text-teal-200'
 
   return (
     <header className="relative z-20 flex items-center justify-between p-4 sm:p-6 lg:p-8">
@@ -56,6 +62,14 @@ export default function Header({ darkMode = false }: HeaderProps = {}) {
                   aria-hidden="true"
                 />
                 <span className="hidden sm:inline">{t('catalog')}</span>
+              </Link>
+              <Link
+                href="/career-playbook/new"
+                className={roleDescriptionLinkClass}
+                aria-label={t('createRoleDescriptionAria')}
+              >
+                <FileText className={roleDescriptionIconClass} aria-hidden="true" />
+                <span className="hidden lg:inline">{t('createRoleDescription')}</span>
               </Link>
               <Link
                 href="/create"
@@ -98,6 +112,14 @@ export default function Header({ darkMode = false }: HeaderProps = {}) {
                 />
                 <span className="xs:inline hidden sm:hidden">{t('examples')}</span>
                 <span className="hidden sm:inline">{t('exampleCourses')}</span>
+              </Link>
+              <Link
+                href="/career-playbook"
+                className={roleDescriptionLinkClass}
+                aria-label={t('createRoleDescriptionAria')}
+              >
+                <FileText className={roleDescriptionIconClass} aria-hidden="true" />
+                <span className="hidden lg:inline">{t('createRoleDescription')}</span>
               </Link>
             </>
           ))}

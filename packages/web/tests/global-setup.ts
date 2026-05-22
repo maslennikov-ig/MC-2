@@ -7,12 +7,28 @@
 import { chromium, type FullConfig } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const dirname = path.dirname(fileURLToPath(import.meta.url))
+const LEGACY_SUPABASE_AUTH_COOKIE = 'sb-diqooqbuchsliypgwksu-auth-token'
+
+function encodeSupabaseSessionCookie(session: unknown) {
+  return `base64-${Buffer.from(JSON.stringify(session)).toString('base64url')}`
+}
+
+function getSupabaseAuthCookieNames() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321'
+  const hostname = new URL(supabaseUrl).hostname
+  const derivedProjectRef = hostname.split('.')[0] || 'localhost'
+
+  return [...new Set([`sb-${derivedProjectRef}-auth-token`, LEGACY_SUPABASE_AUTH_COOKIE])]
+}
 
 async function globalSetup(config: FullConfig) {
   console.log('[Global Setup] Starting...')
 
   // Ensure .auth directory exists
-  const authDir = path.join(__dirname, '.auth')
+  const authDir = path.join(dirname, '.auth')
   if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true })
   }
@@ -36,18 +52,38 @@ async function globalSetup(config: FullConfig) {
 
   try {
     // Set up authentication in localStorage
-    await page.addInitScript((authToken) => {
-      localStorage.setItem(
-        'sb-diqooqbuchsliypgwksu-auth-token',
-        JSON.stringify({
-          access_token: authToken,
-          token_type: 'bearer',
-        })
-      )
-    }, token)
+    const session = {
+      access_token: token,
+      refresh_token: token,
+      token_type: 'bearer',
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
+      expires_in: 60 * 60,
+    }
+
+    const baseURL = config.projects[0].use.baseURL || 'http://localhost:3000'
+    const cookieValue = encodeSupabaseSessionCookie(session)
+    const authCookies = getSupabaseAuthCookieNames()
+
+    await context.addCookies(
+      authCookies.map((name) => ({
+        name,
+        value: cookieValue,
+        url: baseURL,
+        sameSite: 'Lax' as const,
+        expires: session.expires_at,
+      }))
+    )
+
+    await page.addInitScript(
+      ({ authCookies, authSession }) => {
+        for (const authCookie of authCookies) {
+          localStorage.setItem(authCookie, JSON.stringify(authSession))
+        }
+      },
+      { authCookies, authSession: session }
+    )
 
     // Navigate to ensure localStorage is set
-    const baseURL = config.projects[0].use.baseURL || 'http://localhost:3000'
     await page.goto(baseURL)
 
     // Wait for page to load

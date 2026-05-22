@@ -10,6 +10,7 @@ import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { cancelStage6InputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getQueue } from '../../../../orchestrator/queue';
+import { getJobCourseId } from '../../../../orchestrator/job-data-fields';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { JobType } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
@@ -74,7 +75,7 @@ export const cancelStage6 = protectedProcedure
       const pendingJobs = await queue.getJobs(['waiting', 'delayed']);
 
       // Filter jobs by courseId
-      const courseJobs = pendingJobs.filter(job => job.data?.courseId === courseId);
+      const courseJobs = pendingJobs.filter(job => getJobCourseId(job.data) === courseId);
 
       logger.info(
         {

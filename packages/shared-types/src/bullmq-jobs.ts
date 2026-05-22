@@ -13,6 +13,12 @@ import { z } from 'zod';
 import { languageSchema } from './common-enums';
 import { CourseStyleSchema } from './style-prompts';
 import { courseSizeSchema } from './course-size';
+import {
+  CareerPlaybookBlockIdSchema,
+  CareerPlaybookBlockStateSchema,
+  CareerPlaybookQADataSchema,
+  CareerPlaybookRoleProfileSpecSchema,
+} from './career-playbook';
 
 // ============================================================================
 // Job Type Enum
@@ -52,6 +58,9 @@ export enum JobType {
 
   // Block regeneration (cascade dependency update)
   BLOCK_REGENERATION = 'block_regeneration',
+
+  // Career Playbook generation (role guide lead magnet)
+  CAREER_PLAYBOOK = 'career_playbook',
 
   // Finalization (Stage 5+)
   FINALIZATION = 'finalization',
@@ -360,6 +369,67 @@ export const BlockRegenerationJobDataSchema = BaseJobDataSchema.extend({
 export type BlockRegenerationJobData = z.infer<typeof BlockRegenerationJobDataSchema>;
 
 // ============================================================================
+// Career Playbook Job Schema
+// ============================================================================
+
+export const CareerPlaybookJobOperationSchema = z.enum([
+  'GENERATE_FOLLOWUPS',
+  'GENERATE_PLAYBOOK',
+  'REGENERATE_BLOCK',
+]);
+export type CareerPlaybookJobOperation = z.infer<typeof CareerPlaybookJobOperationSchema>;
+
+const CareerPlaybookBaseJobDataSchema = z.object({
+  jobType: z.literal(JobType.CAREER_PLAYBOOK),
+  operation: CareerPlaybookJobOperationSchema,
+  playbookId: z.string().uuid(),
+  userId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  language: languageSchema.default('ru'),
+  locale: z.enum(['ru', 'en']).default('ru'),
+  createdAt: z.string().datetime(),
+});
+
+export const CareerPlaybookGenerateFollowupsJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('GENERATE_FOLLOWUPS'),
+  qaData: CareerPlaybookQADataSchema,
+});
+
+export type CareerPlaybookGenerateFollowupsJobData = z.infer<
+  typeof CareerPlaybookGenerateFollowupsJobDataSchema
+>;
+
+export const CareerPlaybookGeneratePlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('GENERATE_PLAYBOOK'),
+  qaData: CareerPlaybookQADataSchema,
+});
+
+export type CareerPlaybookGeneratePlaybookJobData = z.infer<
+  typeof CareerPlaybookGeneratePlaybookJobDataSchema
+>;
+
+export const CareerPlaybookRegenerateBlockJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('REGENERATE_BLOCK'),
+  blockId: CareerPlaybookBlockIdSchema,
+  instruction: z.string().min(1).max(1000),
+  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema,
+  originalBlock: CareerPlaybookBlockStateSchema,
+  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
+});
+
+export type CareerPlaybookRegenerateBlockJobData = z.infer<
+  typeof CareerPlaybookRegenerateBlockJobDataSchema
+>;
+
+export const CareerPlaybookOperationJobDataSchema = z.discriminatedUnion('operation', [
+  CareerPlaybookGenerateFollowupsJobDataSchema,
+  CareerPlaybookGeneratePlaybookJobDataSchema,
+  CareerPlaybookRegenerateBlockJobDataSchema,
+]);
+
+export type CareerPlaybookJobData = z.infer<typeof CareerPlaybookOperationJobDataSchema>;
+
+// ============================================================================
 // Union Type for All Jobs
 // ============================================================================
 
@@ -377,12 +447,13 @@ export type JobData =
   | LessonContentJobData
   | EnrichmentGenerationJobData
   | BlockRegenerationJobData
+  | CareerPlaybookJobData
   | FinalizationJobData;
 
 /**
  * Zod schema for validating any job data
  */
-export const JobDataSchema = z.discriminatedUnion('jobType', [
+export const JobDataSchema = z.union([
   TestJobDataSchema,
   DocumentProcessingJobDataSchema,
   SummaryGenerationJobDataSchema,
@@ -393,6 +464,7 @@ export const JobDataSchema = z.discriminatedUnion('jobType', [
   LessonContentJobDataSchema,
   EnrichmentGenerationJobDataSchema,
   BlockRegenerationJobDataSchema,
+  CareerPlaybookOperationJobDataSchema,
   FinalizationJobDataSchema,
 ]);
 
@@ -517,6 +589,14 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     timeout: 180000, // 3 minutes (LLM calls can be slow)
     removeOnComplete: 100,
     removeOnFail: false,
+  },
+  [JobType.CAREER_PLAYBOOK]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    timeout: 2700000, // 45 minutes for the full 26-block graph
+    removeOnComplete: 100,
+    removeOnFail: false,
+    priority: 5,
   },
   [JobType.FINALIZATION]: {
     attempts: 3,

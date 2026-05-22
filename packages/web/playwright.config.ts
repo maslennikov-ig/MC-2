@@ -1,4 +1,111 @@
 import { defineConfig, devices } from '@playwright/test'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'test-anon-key'
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'test-service-role-key'
+
+type PlaywrightWebServerEnv = NodeJS.ProcessEnv | Record<string, string | undefined>
+
+type PlaywrightWebServer = {
+  url: string
+  isManaged: boolean
+  port?: string
+  env: {
+    PORT?: string
+    NEXT_PUBLIC_APP_URL: string
+  }
+}
+
+function normalizePlaywrightBaseUrl(rawUrl: string) {
+  const url = new URL(rawUrl)
+
+  if (url.pathname === '/' && !url.search && !url.hash) {
+    return url.href.replace(/\/$/, '')
+  }
+
+  return url.href
+}
+
+function getPortFromBaseUrl(baseUrl: string) {
+  const url = new URL(baseUrl)
+
+  if (url.port) {
+    return url.port
+  }
+
+  return url.protocol === 'https:' ? '443' : '80'
+}
+
+function isManagedLocalUrl(baseUrl: string) {
+  const { hostname } = new URL(baseUrl)
+  return ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'].includes(hostname)
+}
+
+export function resolvePlaywrightWebServer(
+  env: PlaywrightWebServerEnv = process.env
+): PlaywrightWebServer {
+  const explicitBaseUrl = env.PLAYWRIGHT_BASE_URL?.trim()
+
+  if (explicitBaseUrl) {
+    const url = normalizePlaywrightBaseUrl(explicitBaseUrl)
+    if (!isManagedLocalUrl(url)) {
+      return {
+        url,
+        isManaged: false,
+        env: {
+          NEXT_PUBLIC_APP_URL: url,
+        },
+      }
+    }
+
+    const port = getPortFromBaseUrl(url)
+
+    return {
+      url,
+      isManaged: true,
+      port,
+      env: {
+        PORT: port,
+        NEXT_PUBLIC_APP_URL: url,
+      },
+    }
+  }
+
+  const port = env.PLAYWRIGHT_PORT?.trim() || env.PORT?.trim() || '3000'
+  const url = `http://localhost:${port}`
+
+  return {
+    url,
+    isManaged: true,
+    port,
+    env: {
+      PORT: port,
+      NEXT_PUBLIC_APP_URL: url,
+    },
+  }
+}
+
+const webServer = resolvePlaywrightWebServer()
+const managedWebServer = webServer.isManaged
+  ? {
+      command: 'pnpm run dev',
+      url: webServer.url,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+      env: {
+        NODE_ENV: 'test',
+        PORT: webServer.env.PORT ?? webServer.port ?? '3000',
+        NEXT_PRIVATE_SKIP_CACHE: '1',
+        SKIP_ENV_VALIDATION: 'true',
+        NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
+        NEXT_PUBLIC_APP_URL: webServer.env.NEXT_PUBLIC_APP_URL,
+        SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey,
+      },
+    }
+  : undefined
 
 export default defineConfig({
   testDir: './tests',
@@ -17,7 +124,7 @@ export default defineConfig({
 
   // Global test settings
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    baseURL: webServer.url,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -118,17 +225,7 @@ export default defineConfig({
     },
   ],
 
-  // Development server configuration
-  webServer: {
-    command: 'pnpm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-    env: {
-      NODE_ENV: 'test',
-      NEXT_PRIVATE_SKIP_CACHE: '1',
-    },
-  },
+  ...(managedWebServer ? { webServer: managedWebServer } : {}),
 
   // Output and artifacts
   outputDir: 'test-results/',
