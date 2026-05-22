@@ -461,7 +461,7 @@ describe('CompletionScreen', () => {
     )
     expect(handleEditFollowup).toHaveBeenCalledWith(followupOpenQuestion.question_id)
 
-    await user.click(screen.getByRole('button', { name: 'Сгенерировать Role Guide' }))
+    await user.click(screen.getByRole('button', { name: 'Сгенерировать должностную инструкцию' }))
     expect(handleGenerate).toHaveBeenCalledTimes(1)
   })
 

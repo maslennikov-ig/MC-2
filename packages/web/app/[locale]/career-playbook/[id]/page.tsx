@@ -33,10 +33,10 @@ export async function generateMetadata({ params }: Props) {
   const { locale } = await params
 
   return {
-    title: locale === 'ru' ? 'Career Playbook' : 'Career Playbook',
+    title: locale === 'ru' ? 'Должностная инструкция' : 'Career Playbook',
     description:
       locale === 'ru'
-        ? 'Просмотр и редактирование сгенерированного Role Guide.'
+        ? 'Просмотр и редактирование сгенерированной должностной инструкции.'
         : 'View and edit a generated Role Guide.',
   }
 }

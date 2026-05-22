@@ -63,25 +63,25 @@ export interface CompletionSummaryAnswer {
 
 const defaultCopy: Required<CompletionScreenCopy> = {
   title: 'Готовы создать?',
-  description: 'Проверьте собранный контекст перед генерацией Role Guide.',
+  description: 'Проверьте собранный контекст перед генерацией должностной инструкции.',
   fixedTitle: 'Фиксированные ответы',
   followupsTitle: 'Уточнения',
   freeformTitle: 'Свободные заметки',
   skipped: 'Пропущено',
   edit: 'Редактировать',
-  generate: 'Сгенерировать Role Guide',
+  generate: 'Сгенерировать должностную инструкцию',
   generationHandoffTitle: 'Черновик готов к генерации',
   generationHandoffDescription:
-    'Контекст сохранён. Генерация продолжится после подключения backend-обработчика.',
+    'Контекст сохранён. Генерация продолжится после подключения серверного обработчика.',
   generationInProgressTitle: 'Генерация выполняется',
-  generationInProgressDescription: 'Role Guide собирается из сохранённого контекста.',
+  generationInProgressDescription: 'Должностная инструкция собирается из сохранённого контекста.',
   generationCompletedTitle: 'Генерация завершена',
-  generationCompletedDescription: 'Role Guide готов.',
+  generationCompletedDescription: 'Должностная инструкция готова.',
   generationFailedTitle: 'Генерация не завершилась',
   generationFailedDescription: 'Проверьте собранный контекст и попробуйте снова.',
   generationStarting: 'Запускаем генерацию...',
   generationErrorTitle: 'Не удалось запустить генерацию',
-  viewGenerated: 'Открыть Role Guide',
+  viewGenerated: 'Открыть должностную инструкцию',
   empty: 'Пока нет данных',
 }
 
