@@ -3,7 +3,7 @@ stage_id: mc2-db696.29
 task_id: mc2-db696.29
 branch: codex/career-playbook-ui-polish
 base_branch: develop
-status: in_review
+status: pr_open
 ---
 
 # Career Playbook Constructor UI Polish
@@ -30,3 +30,7 @@ status: in_review
 - `PLAYWRIGHT_PORT=3192 pnpm --filter @megacampus/web test:e2e:career-playbook` passed 3 and skipped 2 authenticated tests because `TOKEN` is unset.
 - `pnpm build` passed with existing Browserslist and `url.parse()` warnings.
 - Code review report `docs/reports/code-reviews/2026-05/CR-2026-05-23-career-playbook-ui-polish.md` recorded PASS with no blocking findings.
+
+## Delivery
+
+- PR #48 opened to `develop`: https://github.com/maslennikov-ig/MC-2/pull/48.

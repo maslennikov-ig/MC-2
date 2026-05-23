@@ -7,7 +7,7 @@ Base: `origin/develop`
 ## Current State
 
 - PR #47 was merged into `develop` and deployed to Dev via run `26335235464`; Dev health returned `{"status":"ok"}`.
-- Current branch fixes `mc2-db696.29`: Career Playbook constructor completion-state bug and UI polish.
+- Current branch fixes `mc2-db696.29`; PR #48 is open to `develop`: https://github.com/maslennikov-ig/MC-2/pull/48.
 - Related task `mc2-db696.30` tracks shared header standardization; this branch includes the first narrow header fix.
 - No direct push to `develop`/`master`; no billing/payment scope; no live taxonomy or large dataset import.
 
@@ -32,7 +32,7 @@ Base: `origin/develop`
 ## Next recommended
 
 Next stage id: `mc2-db696.29`
-Recommended action: create PR from `codex/career-playbook-ui-polish` to `develop`, then use the normal PR/dev delivery flow after review.
+Recommended action: review/merge PR #48, then use the normal PR/dev delivery flow.
 
 ## Starter prompt for next orchestrator
 
