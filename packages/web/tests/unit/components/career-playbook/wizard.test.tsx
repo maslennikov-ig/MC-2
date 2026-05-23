@@ -22,6 +22,13 @@ const fixedOpenQuestion: CareerPlaybookFixedQuestion = {
   is_required: true,
 }
 
+const fixedOpenQuestionEn: CareerPlaybookFixedQuestion = {
+  ...fixedOpenQuestion,
+  language: 'en',
+  question_text: 'Which role are you documenting?',
+  helper_text: 'For example: Product Manager',
+}
+
 const fixedSingleChoiceQuestion: CareerPlaybookFixedQuestion = {
   language: 'ru',
   position: 2,
@@ -102,20 +109,26 @@ describe('QuestionRenderer', () => {
           openPlaceholder: 'Введите ответ',
           roleSuggestionsLabel: 'Подходящие роли',
           roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+          roleSuggestionsPopularLabel: 'Популярные роли',
+          roleSuggestionsMatchLabel: 'Название роли',
         }}
       />
     )
 
     await user.click(screen.getByLabelText('Какую должность вы хотите оформить?'))
-    expect(screen.queryByText('Подходящие роли')).not.toBeInTheDocument()
+    expect(screen.getByText('Популярные роли')).toBeInTheDocument()
+    expect(screen.getAllByRole('option', { name: /Product Manager/ })[0]).toBeInTheDocument()
+    expect(handleValueChange).not.toHaveBeenCalled()
 
     await user.type(screen.getByLabelText('Какую должность вы хотите оформить?'), 'prod')
 
     expect(handleValueChange).toHaveBeenLastCalledWith('prod')
     expect(screen.getByText('Подходящие роли')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Product Manager/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('option', { name: /Product Manager/ })[0]).toBeInTheDocument()
+    expect(screen.getByText('Продукт')).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Продукт' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('option', { name: /Product Manager/ }))
+    await user.click(screen.getAllByRole('option', { name: /Product Manager/ })[0])
 
     expect(handleValueChange).toHaveBeenLastCalledWith('Product Manager')
     expect(screen.getByLabelText('Какую должность вы хотите оформить?')).toHaveValue(
@@ -136,6 +149,7 @@ describe('QuestionRenderer', () => {
           openPlaceholder: 'Введите ответ',
           roleSuggestionsLabel: 'Подходящие роли',
           roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+          roleSuggestionsMatchLabel: 'Название роли',
         }}
       />
     )
@@ -144,6 +158,63 @@ describe('QuestionRenderer', () => {
     await user.keyboard('{Enter}')
 
     expect(handleValueChange).toHaveBeenLastCalledWith('Product Manager')
+  })
+
+  it('keeps an unmatched typed role as manual entry', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={fixedOpenQuestion}
+        value=""
+        onValueChange={handleValueChange}
+        copy={{
+          openPlaceholder: 'Введите ответ',
+          roleSuggestionsLabel: 'Подходящие роли',
+          roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+          roleSuggestionsNoResultsLabel: 'Нет точного совпадения',
+          roleSuggestionsManualTemplate: 'Использовать "{value}"',
+        }}
+      />
+    )
+
+    await user.type(
+      screen.getByLabelText('Какую должность вы хотите оформить?'),
+      'Chief Meme Officer'
+    )
+
+    expect(screen.getByText('Нет точного совпадения')).toBeInTheDocument()
+    expect(screen.getByText('Использовать "Chief Meme Officer"')).toBeInTheDocument()
+
+    await user.keyboard('{Enter}')
+
+    expect(handleValueChange).toHaveBeenLastCalledWith('Chief Meme Officer')
+  })
+
+  it('renders English role suggestion chrome for English questions', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <QuestionRenderer
+        question={fixedOpenQuestionEn}
+        value=""
+        onValueChange={vi.fn()}
+        copy={{
+          openPlaceholder: 'Type your answer',
+          roleSuggestionsLabel: 'Suggested roles',
+          roleSuggestionsPopularLabel: 'Popular roles',
+          roleSuggestionsHint: 'Pick a close role, or keep your own title.',
+          roleSuggestionsMatchLabel: 'Role title',
+        }}
+      />
+    )
+
+    await user.click(screen.getByLabelText('Which role are you documenting?'))
+
+    expect(screen.getByText('Popular roles')).toBeInTheDocument()
+    expect(screen.getByText('Product')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Product Manager/ })).toBeInTheDocument()
   })
 
   it('renders an open fixed question and emits a string answer', async () => {

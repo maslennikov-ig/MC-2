@@ -84,6 +84,8 @@ Use a curated static seed list of modern knowledge-work roles, not a large impor
 
 Recommended seed size for this stage: roughly 80-120 roles. The implementation can land a smaller but meaningfully broader first curated set if the data shape supports expansion.
 
+Implementation note: the first production-grade version uses 75 curated role records. That is intentionally below a full taxonomy, but broad enough to cover common product, engineering, data, design, sales, marketing, support, operations, HR, finance, and legal roles while keeping the bundle small and reviewable.
+
 Each role should support:
 
 - stable `id`

@@ -42,6 +42,14 @@ const defaultCopy: Required<QuestionRendererCopy> = {
   chooseManyLabel: 'Можно выбрать несколько',
   roleSuggestionsLabel: 'Подходящие роли',
   roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+  roleSuggestionsPopularLabel: 'Популярные роли',
+  roleSuggestionsNoResultsLabel: 'Нет точного совпадения',
+  roleSuggestionsManualTemplate: 'Использовать "{value}"',
+  roleSuggestionsMatchPopular: 'Популярная роль',
+  roleSuggestionsMatchLabel: 'Название роли',
+  roleSuggestionsMatchAlias: 'Синоним',
+  roleSuggestionsMatchAcronym: 'Сокращение',
+  roleSuggestionsMatchKeyword: 'Связанный запрос',
 }
 
 const typeIcon = {

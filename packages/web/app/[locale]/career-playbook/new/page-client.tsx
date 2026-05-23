@@ -202,6 +202,14 @@ export default function CareerPlaybookNewPageClient({
     ofLabel: t('ofLabel'),
     roleSuggestionsLabel: t('roleSuggestionsLabel'),
     roleSuggestionsHint: t('roleSuggestionsHint'),
+    roleSuggestionsPopularLabel: t('roleSuggestionsPopularLabel'),
+    roleSuggestionsNoResultsLabel: t('roleSuggestionsNoResultsLabel'),
+    roleSuggestionsManualTemplate: t('roleSuggestionsManualTemplate'),
+    roleSuggestionsMatchPopular: t('roleSuggestionsMatchPopular'),
+    roleSuggestionsMatchLabel: t('roleSuggestionsMatchLabel'),
+    roleSuggestionsMatchAlias: t('roleSuggestionsMatchAlias'),
+    roleSuggestionsMatchAcronym: t('roleSuggestionsMatchAcronym'),
+    roleSuggestionsMatchKeyword: t('roleSuggestionsMatchKeyword'),
   }
   const followupCopy = {
     title: t('followupTitle'),
