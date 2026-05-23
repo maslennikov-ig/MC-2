@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CareerPlaybookLibraryPageClient from '@/app/[locale]/career-playbook/library/page-client'
 
+vi.mock('@/components/layouts/header', () => ({
+  default: () => <header data-testid="shared-header" />,
+}))
+
 const deleteMany = vi.fn()
 const fetchPage = vi.fn()
 const createCourseFromPlaybook = vi.fn()

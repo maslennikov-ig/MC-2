@@ -7,6 +7,7 @@ import type { CareerPlaybookViewerSnapshot } from '@megacampus/shared-types'
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
+import Header from '@/components/layouts/header'
 import { Button } from '@/components/ui/button'
 import type { Locale } from '@/src/i18n/config'
 import {
@@ -105,27 +106,33 @@ export default function CareerPlaybookViewerPageClient({
 
   if (state.isLoadingViewer && !state.viewer) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-        <p className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-          {t('loading')}
-        </p>
-      </main>
+      <>
+        <Header sticky surface="glass" />
+        <main className="flex min-h-[calc(100vh-73px)] items-center justify-center bg-slate-100 px-4 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+          <p className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+            {t('loading')}
+          </p>
+        </main>
+      </>
     )
   }
 
   if (!state.viewer) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-        <div className="grid max-w-lg gap-3 rounded-md border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <h1 className="text-xl font-semibold">{t('unavailableTitle')}</h1>
-          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-            {state.viewerError ?? t('unavailableDescription')}
-          </p>
-          <Button type="button" onClick={() => void state.loadCareerPlaybookViewer(playbookId)}>
-            {t('retry')}
-          </Button>
-        </div>
-      </main>
+      <>
+        <Header sticky surface="glass" />
+        <main className="flex min-h-[calc(100vh-73px)] items-center justify-center bg-slate-100 px-4 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+          <div className="grid max-w-lg gap-3 rounded-md border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <h1 className="text-xl font-semibold">{t('unavailableTitle')}</h1>
+            <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {state.viewerError ?? t('unavailableDescription')}
+            </p>
+            <Button type="button" onClick={() => void state.loadCareerPlaybookViewer(playbookId)}>
+              {t('retry')}
+            </Button>
+          </div>
+        </main>
+      </>
     )
   }
 
@@ -166,6 +173,7 @@ export default function CareerPlaybookViewerPageClient({
   if (state.viewer.status === 'generating') {
     return (
       <>
+        <Header sticky surface="glass" />
         <StreamingView
           snapshot={state.viewer}
           blocks={state.viewerBlocks}
@@ -180,6 +188,7 @@ export default function CareerPlaybookViewerPageClient({
 
   return (
     <>
+      <Header sticky surface="glass" />
       <PlaybookViewer
         snapshot={state.viewer}
         blocks={state.viewerBlocks}

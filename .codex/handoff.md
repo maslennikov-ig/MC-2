@@ -7,39 +7,38 @@ Base: `origin/develop`
 ## Current State
 
 - PR #47 was merged into `develop` and deployed to Dev via run `26335235464`; Dev health returned `{"status":"ok"}`.
-- Current branch fixes `mc2-db696.29`; PR #48 is open to `develop`: https://github.com/maslennikov-ig/MC-2/pull/48.
-- Related task `mc2-db696.30` tracks shared header standardization; this branch includes the first narrow header fix.
+- PR #48 is open to `develop`: https://github.com/maslennikov-ig/MC-2/pull/48.
+- `mc2-db696.29` is closed; `mc2-db696.30` is the active header standardization follow-up.
 - No direct push to `develop`/`master`; no billing/payment scope; no live taxonomy or large dataset import.
 
 ## Changes In This Branch
 
-- Fixed completed fixed-question state: when all visible base questions are answered, the primary action can finish from any selected question.
-- Left rail questions are clickable buttons for review/edit instead of static completed rows.
-- Constructor header is slimmer, removes the extra product/phase badges, and keeps the title as the top signal.
-- Wizard columns, question text, side summaries, choice rows, and role input use larger, more readable sizing.
-- Role search icon is vertically centered with the input text.
-- Shared `Header` role-description action now uses the same purple primary visual family as `Создать курс`.
-- `/create` and `/courses` now render the shared `Header` wrappers instead of maintaining separate local header implementations.
+- Constructor state/UI polish from `mc2-db696.29`: completed base answers can finish from any selected question, left rail is clickable, and the workbench is wider/readable.
+- Shared `Header` role-description action is purple-system aligned; `/create`, `/courses`, and `/profile` now use shared-header wrappers.
+- Shared `Header` now supports `sticky` and `glass` variants for app pages.
+- Career Playbook constructor, library, viewer, and auth-required states now show the shared app header above local page/document headers.
+- Admin keeps its custom admin nav, but quick actions are localized and include “Создать описание роли”.
+- Mobile header overflow risk was reduced with an icon logo and narrower signed-out auth controls.
 
 ## Verification
 
-- `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/layouts/header.test.tsx` passed: 37 tests.
+- Header audit unit set passed: 25 tests; extended Career Playbook/header unit set passed: 82 tests.
 - `pnpm --filter @megacampus/web lint` passed with 7 existing warnings outside this scope.
 - `pnpm type-check`, `git diff --check`, and `pnpm build` passed.
-- `PLAYWRIGHT_PORT=3192 pnpm --filter @megacampus/web test:e2e:career-playbook` passed 3, skipped 2 authenticated tests because `TOKEN` is unset.
-- Code review report passed with no blocking findings; browser screenshots were checked locally for public Career Playbook landing and Courses shared header.
+- Career Playbook E2E passed 3, skipped 2 authenticated tests because `TOKEN` is unset.
+- Playwright screenshots/overflow checks passed for `/career-playbook/new`, `/career-playbook/library`, `/courses`, `/profile` at 390px and 1440px.
+- Code review reports for `mc2-db696.29` and `mc2-db696.30` recorded PASS with no blocking findings.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.29`
-Recommended action: review/merge PR #48, then use the normal PR/dev delivery flow.
+Next stage id: `mc2-db696.30`
+Recommended action: commit/push audit changes, update PR #48, merge through normal flow, then deploy to Dev as requested.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" UI polish in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.29/summary.md`, and Beads state for `mc2-db696.29`, `mc2-db696.30`, and `mc2-db696.28`. Current branch is `codex/career-playbook-ui-polish`; do not push directly to `develop`/`master`.
+Use $orchestrator-stage to continue Career Playbook / “Должностная инструкция” UI polish in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.30/summary.md`, PR #48, and Beads state for `mc2-db696.30` and `mc2-db696.28`. Current branch is `codex/career-playbook-ui-polish`; do not push directly to `develop`/`master`.
 
 ## Explicit defers
 
 - `mc2-db696.28`: ESCO import subset / normalized role-source pipeline.
-- `mc2-db696.30`: broader audit of remaining non-shared page/admin headers beyond the narrow fixes in this branch.
-- Authenticated constructor screenshots require `TOKEN` or storage state.
+- Authenticated constructor/profile screenshots require `TOKEN` or storage state.

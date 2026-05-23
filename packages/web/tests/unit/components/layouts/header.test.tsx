@@ -88,4 +88,17 @@ describe('Header', () => {
       '/career-playbook'
     )
   })
+
+  it('supports the shared sticky glass app header surface', () => {
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: { user: { id: 'user-1' } },
+    })
+
+    render(<Header sticky surface="glass" />)
+
+    const header = screen.getByRole('banner')
+    expect(header.className).toContain('sticky')
+    expect(header.className).toContain('backdrop-blur-sm')
+  })
 })

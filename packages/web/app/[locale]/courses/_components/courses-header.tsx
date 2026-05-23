@@ -3,5 +3,5 @@
 import Header from '@/components/layouts/header'
 
 export function CoursesHeader() {
-  return <Header />
+  return <Header sticky surface="glass" />
 }
