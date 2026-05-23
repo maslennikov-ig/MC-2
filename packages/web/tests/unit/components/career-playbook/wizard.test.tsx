@@ -476,6 +476,43 @@ describe('Wizard', () => {
 
     expect(screen.queryByRole('button', { name: 'Свободный ответ' })).not.toBeInTheDocument()
   })
+
+  it('lets users reopen answered questions from the left rail', async () => {
+    const user = userEvent.setup()
+    const handleQuestionSelect = vi.fn()
+
+    render(
+      <Wizard
+        questions={[fixedOpenQuestion, fixedSingleChoiceQuestion]}
+        answers={{ position: 'CPO', department: 'sales' }}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+        onQuestionSelect={handleQuestionSelect}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Отдел или функциональная область' }))
+
+    expect(handleQuestionSelect).toHaveBeenCalledWith('department')
+  })
+
+  it('shows the finish action when all required questions are already answered', () => {
+    render(
+      <Wizard
+        questions={[fixedOpenQuestion, fixedSingleChoiceQuestion]}
+        answers={{ position: 'CPO', department: 'sales' }}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Завершить' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Далее' })).not.toBeInTheDocument()
+  })
 })
 
 describe('FollowupPhase', () => {

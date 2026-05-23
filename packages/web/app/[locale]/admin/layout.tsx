@@ -7,10 +7,20 @@ import { LanguageSwitcher } from '@/components/common/language-switcher'
 import { AdminUserMenu } from './components/admin-user-menu'
 import { AdminNav } from './components/admin-nav'
 import Logo from '@/components/common/logo'
-import { BookOpen, Plus } from 'lucide-react'
+import { BookOpen, FileText, Plus } from 'lucide-react'
 
 // Messages type for admin navigation (passed as props)
 interface AdminMessages {
+  common?: {
+    nav?: {
+      catalog?: string
+      createCourse?: string
+      createRoleDescription?: string
+      catalogAria?: string
+      createCourseAria?: string
+      createRoleDescriptionAria?: string
+    }
+  }
   admin?: {
     dashboard?: string
     navigation?: {
@@ -45,6 +55,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
 
   const messages = (await getMessages()) as AdminMessages
+  const nav = messages.common?.nav
 
   return (
     <div className="admin-bg-grid min-h-screen bg-gray-50 dark:bg-transparent">
@@ -58,17 +69,27 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <div className="hidden items-center gap-2 sm:flex">
               <Link
                 href="/courses"
+                aria-label={nav?.catalogAria || 'Просмотреть доступные курсы'}
                 className="group flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-400"
               >
                 <BookOpen className="h-4 w-4" />
-                <span>Каталог</span>
+                <span>{nav?.catalog || 'Каталог'}</span>
+              </Link>
+              <Link
+                href="/career-playbook/new"
+                aria-label={nav?.createRoleDescriptionAria || 'Создать описание роли'}
+                className="group flex items-center gap-1.5 rounded-full border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400"
+              >
+                <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <span>{nav?.createRoleDescription || 'Создать описание роли'}</span>
               </Link>
               <Link
                 href="/create"
+                aria-label={nav?.createCourseAria || 'Создать новый курс'}
                 className="group flex items-center gap-1.5 rounded-full border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400"
               >
                 <Plus className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                <span>Создать курс</span>
+                <span>{nav?.createCourse || 'Создать курс'}</span>
               </Link>
             </div>
 

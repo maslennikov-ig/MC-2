@@ -9,6 +9,10 @@ import {
   type CareerPlaybookClient,
 } from '@/stores/use-career-playbook-store'
 
+vi.mock('@/components/layouts/header', () => ({
+  default: () => <header data-testid="shared-header" />,
+}))
+
 const messages = {
   'career-playbook': {
     viewer: {

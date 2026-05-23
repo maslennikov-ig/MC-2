@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { AlertCircle, BriefcaseBusiness, Clock3, Loader2, ShieldCheck } from 'lucide-react'
+import { AlertCircle, Clock3, Loader2 } from 'lucide-react'
 
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
 import { FollowupPhase } from '@/components/career-playbook/wizard/FollowupPhase'
 import { Wizard, type WizardProps } from '@/components/career-playbook/wizard/Wizard'
-import { Badge } from '@/components/ui/badge'
+import Header from '@/components/layouts/header'
 import { Button } from '@/components/ui/button'
 import type { Locale } from '@/src/i18n/config'
 import type { CareerPlaybookOption } from '@megacampus/shared-types'
@@ -264,12 +264,9 @@ export default function CareerPlaybookNewPageClient({
     : state.isAutosaving
       ? t('draftSaving')
       : t('draftSaved')
-  const phaseBadge =
-    state.phase === 'fixed'
-      ? t('phaseABadge')
-      : state.phase === 'followups'
-        ? t('phaseBBadge')
-        : t('reviewBadge')
+  const allVisibleFixedQuestionsAnswered = visibleQuestions.every((question) =>
+    hasAnswerValue(answers[question.question_key])
+  )
 
   const advanceAfterFollowup = async () => {
     await useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
@@ -306,6 +303,22 @@ export default function CareerPlaybookNewPageClient({
     }
   }
 
+  const handleFixedNext = () => {
+    const snapshot = useCareerPlaybookStore.getState()
+    const latestVisibleQuestions = getCareerPlaybookVisibleQuestions(snapshot)
+    const isLastQuestion = snapshot.currentFixedIndex >= latestVisibleQuestions.length - 1
+    const allVisibleAnswered = latestVisibleQuestions.every((question) =>
+      hasAnswerValue(snapshot.fixedAnswers[question.question_key]?.value)
+    )
+
+    if (isLastQuestion || allVisibleAnswered) {
+      void startFollowupsAfterFixedPhase()
+      return
+    }
+
+    snapshot.goToNextCareerPlaybookQuestion()
+  }
+
   const handleGenerate = () => {
     void useCareerPlaybookStore
       .getState()
@@ -320,125 +333,115 @@ export default function CareerPlaybookNewPageClient({
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <section className="border-b border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
-        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md">
-                <BriefcaseBusiness className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                {t('eyebrow')}
-              </Badge>
-              <Badge variant="outline" className="rounded-md">
-                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                {phaseBadge}
-              </Badge>
-            </div>
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="text-xl font-semibold tracking-normal md:text-2xl">{t('title')}</h1>
-              <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+    <>
+      <Header sticky surface="glass" />
+      <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+        <section className="border-b border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
+          <div className="mx-auto flex max-w-[1540px] flex-col gap-2 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl leading-8 font-semibold tracking-normal md:text-[28px]">
+                {t('title')}
+              </h1>
+              <p className="mt-1 max-w-4xl text-[15px] leading-6 text-slate-600 dark:text-slate-300">
                 {t('subtitle')}
               </p>
             </div>
+            <div className="flex min-h-9 shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-[13px] leading-5 text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+              <Clock3 className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
+              {draftStatus}
+            </div>
           </div>
-          <div className="flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-            <Clock3 className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
-            {draftStatus}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section
-        data-testid="career-playbook-workspace"
-        className="mx-auto max-w-[1480px] px-4 py-5 md:px-6"
-      >
-        {state.phase === 'fixed' ? (
-          <Wizard
-            questions={visibleQuestions}
-            answers={answers}
-            currentIndex={state.currentFixedIndex}
-            onAnswerChange={(questionKey, value) =>
-              state.answerCareerPlaybookFixedQuestion(questionKey, value)
-            }
-            onNext={() => {
-              const isLastQuestion = state.currentFixedIndex >= visibleQuestions.length - 1
-              if (isLastQuestion) {
-                void startFollowupsAfterFixedPhase()
-                return
+        <section
+          data-testid="career-playbook-workspace"
+          className="mx-auto max-w-[1540px] px-4 py-5 md:px-6"
+        >
+          {state.phase === 'fixed' ? (
+            <Wizard
+              questions={visibleQuestions}
+              answers={answers}
+              currentIndex={state.currentFixedIndex}
+              onAnswerChange={(questionKey, value) =>
+                state.answerCareerPlaybookFixedQuestion(questionKey, value)
               }
-              state.goToNextCareerPlaybookQuestion()
-            }}
-            onPrevious={state.goToPreviousCareerPlaybookQuestion}
-            isSaving={state.isAutosaving}
-            copy={copy}
-          />
-        ) : null}
+              onNext={handleFixedNext}
+              onPrevious={state.goToPreviousCareerPlaybookQuestion}
+              onQuestionSelect={state.editCareerPlaybookFixedAnswer}
+              isSaving={state.isAutosaving}
+              copy={{
+                ...copy,
+                finish: allVisibleFixedQuestionsAnswered ? t('finish') : copy.finish,
+              }}
+            />
+          ) : null}
 
-        {state.phase === 'followups' && state.isGeneratingFollowups ? (
-          <PhaseBStatus
-            icon="loading"
-            title={t('followupsLoadingTitle')}
-            description={t('followupsLoadingDescription')}
-          />
-        ) : null}
+          {state.phase === 'followups' && state.isGeneratingFollowups ? (
+            <PhaseBStatus
+              icon="loading"
+              title={t('followupsLoadingTitle')}
+              description={t('followupsLoadingDescription')}
+            />
+          ) : null}
 
-        {state.phase === 'followups' &&
-        !state.isGeneratingFollowups &&
-        state.followupQuestions.length === 0 ? (
-          <PhaseBStatus
-            icon="warning"
-            title={t('followupsUnavailableTitle')}
-            description={t('followupsUnavailableDescription')}
-            actionLabel={t('enoughGenerate')}
-            onAction={state.completeCareerPlaybookFollowups}
-          />
-        ) : null}
+          {state.phase === 'followups' &&
+          !state.isGeneratingFollowups &&
+          state.followupQuestions.length === 0 ? (
+            <PhaseBStatus
+              icon="warning"
+              title={t('followupsUnavailableTitle')}
+              description={t('followupsUnavailableDescription')}
+              actionLabel={t('enoughGenerate')}
+              onAction={state.completeCareerPlaybookFollowups}
+            />
+          ) : null}
 
-        {state.phase === 'followups' &&
-        !state.isGeneratingFollowups &&
-        state.followupQuestions.length > 0 ? (
-          <FollowupPhase
-            questions={state.followupQuestions}
-            answers={followupAnswers}
-            currentIndex={state.currentFollowupIndex}
-            completenessScore={state.completenessScore}
-            onAnswerChange={state.answerCareerPlaybookFollowupQuestion}
-            onNext={() => void advanceAfterFollowup()}
-            onPrevious={state.goToPreviousCareerPlaybookFollowup}
-            onSkip={(questionId) => {
-              state.skipCareerPlaybookFollowupQuestion(questionId)
-              void advanceAfterFollowup()
-            }}
-            onForceGenerate={state.completeCareerPlaybookFollowups}
-            handledQuestionIds={handledFollowupQuestionIds}
-            copy={followupCopy}
-          />
-        ) : null}
+          {state.phase === 'followups' &&
+          !state.isGeneratingFollowups &&
+          state.followupQuestions.length > 0 ? (
+            <FollowupPhase
+              questions={state.followupQuestions}
+              answers={followupAnswers}
+              currentIndex={state.currentFollowupIndex}
+              completenessScore={state.completenessScore}
+              onAnswerChange={state.answerCareerPlaybookFollowupQuestion}
+              onNext={() => void advanceAfterFollowup()}
+              onPrevious={state.goToPreviousCareerPlaybookFollowup}
+              onSkip={(questionId) => {
+                state.skipCareerPlaybookFollowupQuestion(questionId)
+                void advanceAfterFollowup()
+              }}
+              onForceGenerate={state.completeCareerPlaybookFollowups}
+              handledQuestionIds={handledFollowupQuestionIds}
+              copy={followupCopy}
+            />
+          ) : null}
 
-        {state.phase === 'completion' ? (
-          <CompletionScreen
-            fixedAnswers={fixedAnswerSummary}
-            followupAnswers={followupAnswerSummary}
-            freeformNotes={freeformNotes}
-            onEditFixedAnswer={state.editCareerPlaybookFixedAnswer}
-            onEditFollowupAnswer={state.editCareerPlaybookFollowupAnswer}
-            onGenerate={handleGenerate}
-            generationHandoffVisible={
-              generationHandoffVisible ||
-              state.status === 'generating' ||
-              state.status === 'completed'
-            }
-            generationStatus={state.status}
-            generationProgress={state.generationProgress}
-            generationError={state.generationStatusError ?? state.generationStartError}
-            isGenerationStarting={state.isStartingGeneration || state.isAutosaving}
-            isEditingDisabled={state.status === 'generating'}
-            viewGeneratedHref={completedViewerHref}
-            copy={completionCopy}
-          />
-        ) : null}
-      </section>
-    </main>
+          {state.phase === 'completion' ? (
+            <CompletionScreen
+              fixedAnswers={fixedAnswerSummary}
+              followupAnswers={followupAnswerSummary}
+              freeformNotes={freeformNotes}
+              onEditFixedAnswer={state.editCareerPlaybookFixedAnswer}
+              onEditFollowupAnswer={state.editCareerPlaybookFollowupAnswer}
+              onGenerate={handleGenerate}
+              generationHandoffVisible={
+                generationHandoffVisible ||
+                state.status === 'generating' ||
+                state.status === 'completed'
+              }
+              generationStatus={state.status}
+              generationProgress={state.generationProgress}
+              generationError={state.generationStatusError ?? state.generationStartError}
+              isGenerationStarting={state.isStartingGeneration || state.isAutosaving}
+              isEditingDisabled={state.status === 'generating'}
+              viewGeneratedHref={completedViewerHref}
+              copy={completionCopy}
+            />
+          ) : null}
+        </section>
+      </main>
+    </>
   )
 }
 
@@ -504,4 +507,12 @@ function formatSummaryValue(
 
 function optionLabel(value: string, options?: CareerPlaybookOption[] | null) {
   return options?.find((option) => option.value === value)?.label ?? value
+}
+
+function hasAnswerValue(value: CareerPlaybookAnswerValue | undefined) {
+  if (Array.isArray(value)) {
+    return value.some((item) => item.trim().length > 0)
+  }
+
+  return typeof value === 'string' && value.trim().length > 0
 }

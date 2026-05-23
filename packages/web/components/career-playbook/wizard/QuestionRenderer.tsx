@@ -149,17 +149,17 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
   ])
 
   return (
-    <fieldset className="min-h-[320px] space-y-5">
+    <fieldset className="min-h-[300px] space-y-5">
       <legend className="space-y-2">
-        <span className="flex items-start gap-3 text-xl leading-7 font-semibold text-slate-950 dark:text-slate-50">
+        <span className="flex items-start gap-3 text-2xl leading-8 font-semibold text-slate-950 dark:text-slate-50">
           <TypeIcon
-            className="mt-1 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300"
+            className="mt-1.5 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300"
             aria-hidden
           />
           {question.question_text}
         </span>
         {helperText ? (
-          <span className="block max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <span className="block max-w-3xl text-[15px] leading-6 text-slate-600 dark:text-slate-300">
             {helperText}
           </span>
         ) : null}
@@ -190,7 +190,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
             onValueChange(event.target.value)
           }}
           placeholder={labels.openPlaceholder}
-          className="min-h-36 resize-y text-base"
+          className="min-h-36 resize-y text-[16px] leading-6"
         />
       ) : null}
 
@@ -233,7 +233,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                             onValueChange(event.target.value)
                           }}
                           placeholder={labels.otherOptionPlaceholder}
-                          className="mt-2 h-10 text-sm"
+                          className="mt-2 h-11 text-[15px]"
                         />
                       ) : null
                     }
@@ -283,7 +283,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                           onValueChange(nextValues)
                         }}
                         placeholder={labels.otherOptionPlaceholder}
-                        className="mt-2 h-10 text-sm"
+                        className="mt-2 h-11 text-[15px]"
                       />
                     ) : null
                   }
@@ -388,7 +388,7 @@ function OptionRow({
   return (
     <div
       className={cn(
-        'grid min-h-[56px] grid-cols-[auto_1fr] gap-3 rounded-md border p-3 transition-colors',
+        'grid min-h-[58px] grid-cols-[auto_1fr] gap-3 rounded-md border p-3 transition-colors',
         selected
           ? 'border-teal-600 bg-teal-50 dark:border-teal-400 dark:bg-teal-950/30'
           : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
@@ -398,11 +398,11 @@ function OptionRow({
       <div className="min-w-0">
         <Label
           htmlFor={`${questionKey}-${option.value}`}
-          className="cursor-pointer text-sm leading-6 font-medium text-slate-900 dark:text-slate-100"
+          className="cursor-pointer text-[15px] leading-6 font-medium text-slate-900 dark:text-slate-100"
         >
           {option.label}
           {option.helper ? (
-            <span className="block text-xs leading-5 font-normal text-slate-500 dark:text-slate-400">
+            <span className="block text-[13px] leading-5 font-normal text-slate-500 dark:text-slate-400">
               {option.helper}
             </span>
           ) : null}

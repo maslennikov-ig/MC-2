@@ -9,6 +9,10 @@ import {
   useCareerPlaybookStore,
 } from '@/stores/use-career-playbook-store'
 
+vi.mock('@/components/layouts/header', () => ({
+  default: () => <header data-testid="shared-header" />,
+}))
+
 const messages = {
   'career-playbook': {
     wizard: {
@@ -158,7 +162,7 @@ describe('CareerPlaybookNewPageClient', () => {
       await screen.findByRole('heading', { name: 'Role Guide constructor' })
     ).toBeInTheDocument()
     expect(await screen.findByLabelText('Which role do you want to define?')).toBeInTheDocument()
-    expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1480px]')
+    expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1540px]')
     expect(screen.getByText('Question 1 of 7')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Which role do you want to define?'), 'Head of Sales')
@@ -166,6 +170,59 @@ describe('CareerPlaybookNewPageClient', () => {
 
     expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
     expect(screen.getByText('Draft saved locally')).toBeInTheDocument()
+  })
+
+  it('continues to follow-ups from any fixed question when all fixed answers are already present', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000831',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'fixed',
+      status: 'answering_fixed',
+      currentFixedIndex: 0,
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Sales Manager',
+        },
+        department: {
+          question_key: 'department',
+          value: 'sales',
+        },
+        level: {
+          question_key: 'level',
+          value: 'middle',
+        },
+        reporting: {
+          question_key: 'reporting',
+          value: 'Reports to Head of Sales.',
+        },
+        team_size: {
+          question_key: 'team_size',
+          value: '1-10',
+        },
+        company_stage: {
+          question_key: 'company_stage',
+          value: 'growth',
+        },
+        content_language: {
+          question_key: 'content_language',
+          value: 'en',
+        },
+      },
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Question 1 of 7')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
+
+    expect(requestFollowups).toHaveBeenCalled()
+    expect(await screen.findByText('AI follow-up 1 of 1')).toBeInTheDocument()
   })
 
   it('continues from Phase A into adaptive follow-ups and completion review', async () => {
