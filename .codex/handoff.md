@@ -10,7 +10,7 @@ Base head: `c79053a9` (PR #43 merged; PR #44 promoted develop to master)
 - This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
 - Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`; do not push directly to `develop` or `master`.
 - Career Playbook PR #24 through #43 have landed in `develop`; PR #44 promoted `develop` to `master`.
-- Primary worktree `/home/me/code/mc2` is on `codex/career-playbook-v4-pro-routing` for `mc2-db696.19`; PR #45 is open against `develop`.
+- Primary worktree `/home/me/code/mc2` is on `codex/career-playbook-v4-pro-routing` for `mc2-db696.19`; PR #45 is the delivery PR against `develop`.
 - Career Playbook Russian UI naming/nav follow-up `mc2-db696.17` is implemented: Russian user-facing surfaces use `Должностная инструкция`, and the header action is `Создать описание роли`.
 - The stale dirty primary branch `feature/career-playbook-library-share` was triaged on 2026-05-22. Its local `mc2-db696.13` worker/status transport patch was an early, unaccepted version of work now present in `origin/develop` through the accepted/review-fixed PR #35 implementation and later PR #41 state.
 - Before cleanup, the stale primary diff was preserved at `/tmp/mc2-primary-dirty-20260522-tracked.patch`, `/tmp/mc2-primary-dirty-20260522-untracked.tar.gz`, and `/tmp/mc2-primary-dirty-20260522-status.z`.
