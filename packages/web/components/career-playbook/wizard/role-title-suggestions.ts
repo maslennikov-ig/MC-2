@@ -37,6 +37,14 @@ export type RoleSeniority = 'individual_contributor' | 'lead' | 'manager' | 'hea
 
 export type RoleMatchKind = 'popular' | 'label' | 'alias' | 'acronym' | 'keyword'
 
+export type RoleTitleSuggestionSource = 'esco' | 'onet' | 'okz' | 'mc2_overlay'
+
+export interface RoleTitleSourceReferences {
+  escoUri?: string
+  onetSocCode?: string
+  okzCode?: string
+}
+
 export interface RoleTitleSuggestion {
   id: string
   department: RoleDepartment
@@ -48,7 +56,8 @@ export interface RoleTitleSuggestion {
   keywords?: Record<RoleTitleSuggestionLocale, string[]>
   popularityRank: number
   localePriority?: Partial<Record<RoleTitleSuggestionLocale, number>>
-  source: 'curated'
+  source: RoleTitleSuggestionSource
+  sourceReferences?: RoleTitleSourceReferences
 }
 
 export interface LocalizedRoleTitleSuggestion {
@@ -75,19 +84,19 @@ const departmentLabels: Record<RoleDepartment, Record<RoleTitleSuggestionLocale,
   sales: { ru: 'Продажи', en: 'Sales' },
   marketing: { ru: 'Маркетинг', en: 'Marketing' },
   product: { ru: 'Продукт', en: 'Product' },
-  engineering: { ru: 'Инженерия', en: 'Engineering' },
+  engineering: { ru: 'Разработка и инженерия', en: 'Engineering' },
   design: { ru: 'Дизайн', en: 'Design' },
-  data: { ru: 'Данные', en: 'Data' },
+  data: { ru: 'Аналитика и данные', en: 'Data' },
   operations: { ru: 'Операции', en: 'Operations' },
-  hr: { ru: 'Люди и HR', en: 'People and HR' },
+  hr: { ru: 'Персонал', en: 'People and HR' },
   finance: { ru: 'Финансы', en: 'Finance' },
-  support: { ru: 'Клиентский опыт', en: 'Customer Experience' },
-  legal: { ru: 'Право и комплаенс', en: 'Legal and Compliance' },
+  support: { ru: 'Поддержка и работа с клиентами', en: 'Customer Experience' },
+  legal: { ru: 'Право и соблюдение требований', en: 'Legal and Compliance' },
 }
 
 const role = (suggestion: Omit<RoleTitleSuggestion, 'source'>): RoleTitleSuggestion => ({
   ...suggestion,
-  source: 'curated',
+  source: 'mc2_overlay',
 })
 
 export const roleTitleSuggestions: RoleTitleSuggestion[] = [
@@ -96,8 +105,8 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'product',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Product Manager', en: 'Product Manager' },
-    aliases: { ru: ['продакт', 'менеджер продукта'], en: ['product lead'] },
+    labels: { ru: 'Менеджер продукта', en: 'Product Manager' },
+    aliases: { ru: ['продакт', 'менеджер продукта', 'product manager'], en: ['product lead'] },
     acronyms: ['PM'],
     keywords: { ru: ['продукт', 'роадмап', 'гипотезы'], en: ['roadmap', 'discovery'] },
     popularityRank: 1,
@@ -108,7 +117,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'product',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Product Owner', en: 'Product Owner' },
+    labels: { ru: 'Владелец продукта', en: 'Product Owner' },
     aliases: { ru: ['владелец продукта'], en: ['po', 'scrum product owner'] },
     acronyms: ['PO'],
     keywords: { ru: ['бэклог', 'спринт'], en: ['backlog', 'scrum'] },
@@ -120,7 +129,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'product',
     group: 'product-leadership',
     seniority: 'head',
-    labels: { ru: 'Head of Product', en: 'Head of Product' },
+    labels: { ru: 'Руководитель продукта', en: 'Head of Product' },
     aliases: { ru: ['руководитель продукта'], en: ['product lead'] },
     keywords: { ru: ['портфель продуктов'], en: ['product portfolio'] },
     popularityRank: 17,
@@ -131,7 +140,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'product',
     group: 'product-leadership',
     seniority: 'executive',
-    labels: { ru: 'Chief Product Officer', en: 'Chief Product Officer' },
+    labels: { ru: 'Директор по продукту', en: 'Chief Product Officer' },
     aliases: { ru: ['cpo', 'директор по продукту'], en: ['cpo', 'vp product'] },
     acronyms: ['CPO'],
     keywords: { ru: ['продуктовая стратегия'], en: ['product strategy'] },
@@ -143,7 +152,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'product',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Technical Product Manager', en: 'Technical Product Manager' },
+    labels: { ru: 'Технический менеджер продукта', en: 'Technical Product Manager' },
     aliases: { ru: ['технический продакт'], en: ['technical pm', 'platform product manager'] },
     acronyms: ['TPM'],
     keywords: { ru: ['api', 'платформа'], en: ['api', 'platform'] },
@@ -155,7 +164,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'product',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Growth Product Manager', en: 'Growth Product Manager' },
+    labels: { ru: 'Менеджер продукта по росту', en: 'Growth Product Manager' },
     aliases: { ru: ['growth pm', 'продуктовый менеджер роста'], en: ['growth pm'] },
     acronyms: ['GPM'],
     keywords: { ru: ['активация', 'retention'], en: ['activation', 'retention'] },
@@ -178,7 +187,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'content-brand',
     seniority: 'manager',
-    labels: { ru: 'Product Marketing Manager', en: 'Product Marketing Manager' },
+    labels: { ru: 'Менеджер продуктового маркетинга', en: 'Product Marketing Manager' },
     aliases: { ru: ['pmm', 'маркетолог продукта'], en: ['pmm', 'go-to-market manager'] },
     acronyms: ['PMM'],
     keywords: { ru: ['позиционирование', 'gtm'], en: ['positioning', 'gtm'] },
@@ -190,7 +199,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'software-engineering',
     seniority: 'individual_contributor',
-    labels: { ru: 'Software Engineer', en: 'Software Engineer' },
+    labels: { ru: 'Инженер-программист', en: 'Software Engineer' },
     aliases: {
       ru: ['разработчик', 'программист', 'инженер-программист'],
       en: ['developer', 'programmer'],
@@ -204,7 +213,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'software-engineering',
     seniority: 'individual_contributor',
-    labels: { ru: 'Frontend Developer', en: 'Frontend Developer' },
+    labels: { ru: 'Фронтенд-разработчик', en: 'Frontend Developer' },
     aliases: {
       ru: ['фронтенд-разработчик', 'frontend engineer', 'разработчик интерфейсов'],
       en: ['frontend engineer', 'front-end developer'],
@@ -218,7 +227,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'software-engineering',
     seniority: 'individual_contributor',
-    labels: { ru: 'Backend Developer', en: 'Backend Developer' },
+    labels: { ru: 'Бэкенд-разработчик', en: 'Backend Developer' },
     aliases: {
       ru: ['бэкенд-разработчик', 'backend engineer', 'серверный разработчик'],
       en: ['backend engineer', 'server-side developer'],
@@ -232,7 +241,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'software-engineering',
     seniority: 'individual_contributor',
-    labels: { ru: 'Fullstack Developer', en: 'Fullstack Developer' },
+    labels: { ru: 'Фулстек-разработчик', en: 'Fullstack Developer' },
     aliases: {
       ru: ['фулстек-разработчик', 'full-stack engineer'],
       en: ['full-stack engineer', 'full stack developer'],
@@ -246,7 +255,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'software-engineering',
     seniority: 'individual_contributor',
-    labels: { ru: 'Mobile Developer', en: 'Mobile Developer' },
+    labels: { ru: 'Мобильный разработчик', en: 'Mobile Developer' },
     aliases: {
       ru: ['мобильный разработчик', 'ios developer', 'android developer'],
       en: ['ios developer', 'android developer'],
@@ -260,7 +269,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'software-engineering',
     seniority: 'individual_contributor',
-    labels: { ru: 'QA Engineer', en: 'QA Engineer' },
+    labels: { ru: 'Инженер по тестированию', en: 'QA Engineer' },
     aliases: {
       ru: ['тестировщик', 'инженер по качеству'],
       en: ['quality assurance engineer', 'tester'],
@@ -290,7 +299,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'data-platform',
     seniority: 'individual_contributor',
-    labels: { ru: 'Platform Engineer', en: 'Platform Engineer' },
+    labels: { ru: 'Инженер платформы', en: 'Platform Engineer' },
     aliases: {
       ru: ['инженер платформы', 'devops'],
       en: ['devops engineer', 'infrastructure engineer'],
@@ -304,7 +313,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'engineering-leadership',
     seniority: 'manager',
-    labels: { ru: 'Engineering Manager', en: 'Engineering Manager' },
+    labels: { ru: 'Руководитель инженерной команды', en: 'Engineering Manager' },
     aliases: {
       ru: ['руководитель разработки', 'менеджер инженеров'],
       en: ['software development manager'],
@@ -318,7 +327,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'engineering-leadership',
     seniority: 'lead',
-    labels: { ru: 'Tech Lead', en: 'Tech Lead' },
+    labels: { ru: 'Технический лидер', en: 'Tech Lead' },
     aliases: { ru: ['техлид', 'technical lead'], en: ['technical lead'] },
     keywords: { ru: ['архитектура', 'ревью кода'], en: ['architecture', 'code review'] },
     popularityRank: 19,
@@ -329,7 +338,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'engineering-leadership',
     seniority: 'lead',
-    labels: { ru: 'Solution Architect', en: 'Solution Architect' },
+    labels: { ru: 'Архитектор решений', en: 'Solution Architect' },
     aliases: { ru: ['архитектор решений', 'системный архитектор'], en: ['systems architect'] },
     keywords: { ru: ['архитектура решений'], en: ['solution design'] },
     popularityRank: 42,
@@ -340,7 +349,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'engineering',
     group: 'data-platform',
     seniority: 'individual_contributor',
-    labels: { ru: 'Security Engineer', en: 'Security Engineer' },
+    labels: { ru: 'Инженер по безопасности', en: 'Security Engineer' },
     aliases: {
       ru: ['инженер по безопасности', 'appsec'],
       en: ['appsec engineer', 'cybersecurity engineer'],
@@ -354,7 +363,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'analytics',
     seniority: 'individual_contributor',
-    labels: { ru: 'Data Analyst', en: 'Data Analyst' },
+    labels: { ru: 'Аналитик данных', en: 'Data Analyst' },
     aliases: { ru: ['аналитик данных', 'bi analyst'], en: ['bi analyst', 'analytics analyst'] },
     keywords: { ru: ['дашборд', 'метрики'], en: ['dashboard', 'metrics'] },
     popularityRank: 8,
@@ -365,7 +374,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'analytics',
     seniority: 'individual_contributor',
-    labels: { ru: 'BI Analyst', en: 'BI Analyst' },
+    labels: { ru: 'Аналитик бизнес-данных (BI)', en: 'BI Analyst' },
     aliases: {
       ru: ['бизнес-аналитик данных', 'аналитик bi'],
       en: ['business intelligence analyst'],
@@ -380,7 +389,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'analytics',
     seniority: 'individual_contributor',
-    labels: { ru: 'Data Scientist', en: 'Data Scientist' },
+    labels: { ru: 'Специалист по анализу данных', en: 'Data Scientist' },
     aliases: {
       ru: ['специалист по данным', 'ml researcher'],
       en: ['machine learning scientist', 'ml scientist'],
@@ -395,7 +404,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'data-platform',
     seniority: 'individual_contributor',
-    labels: { ru: 'Data Engineer', en: 'Data Engineer' },
+    labels: { ru: 'Инженер данных', en: 'Data Engineer' },
     aliases: { ru: ['инженер данных', 'etl engineer'], en: ['etl engineer', 'analytics engineer'] },
     keywords: { ru: ['etl', 'пайплайн данных'], en: ['etl', 'data pipeline'] },
     popularityRank: 21,
@@ -406,7 +415,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'data-platform',
     seniority: 'individual_contributor',
-    labels: { ru: 'Machine Learning Engineer', en: 'Machine Learning Engineer' },
+    labels: { ru: 'Инженер машинного обучения', en: 'Machine Learning Engineer' },
     aliases: {
       ru: ['ml engineer', 'инженер машинного обучения'],
       en: ['ml engineer', 'ai engineer'],
@@ -421,7 +430,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'analytics',
     seniority: 'individual_contributor',
-    labels: { ru: 'Analytics Engineer', en: 'Analytics Engineer' },
+    labels: { ru: 'Инженер аналитики', en: 'Analytics Engineer' },
     aliases: {
       ru: ['инженер аналитики', 'dbt analyst'],
       en: ['dbt developer', 'data modeling engineer'],
@@ -435,7 +444,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'data',
     group: 'data-platform',
     seniority: 'head',
-    labels: { ru: 'Head of Data', en: 'Head of Data' },
+    labels: { ru: 'Руководитель направления данных', en: 'Head of Data' },
     aliases: { ru: ['руководитель данных', 'директор по данным'], en: ['data director'] },
     keywords: { ru: ['data strategy'], en: ['data strategy'] },
     popularityRank: 55,
@@ -446,7 +455,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'design',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'UX/UI Designer', en: 'UX/UI Designer' },
+    labels: { ru: 'Дизайнер интерфейсов (UX/UI)', en: 'UX/UI Designer' },
     aliases: { ru: ['дизайнер интерфейсов', 'ui ux designer'], en: ['ui designer', 'ux designer'] },
     keywords: { ru: ['интерфейс', 'макет'], en: ['interface', 'wireframe'] },
     popularityRank: 11,
@@ -457,7 +466,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'design',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Product Designer', en: 'Product Designer' },
+    labels: { ru: 'Продуктовый дизайнер', en: 'Product Designer' },
     aliases: { ru: ['продуктовый дизайнер', 'дизайнер продукта'], en: ['ux ui designer'] },
     keywords: { ru: ['прототип', 'ux'], en: ['prototype', 'ux'] },
     popularityRank: 22,
@@ -468,7 +477,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'design',
     group: 'product-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'UX Researcher', en: 'UX Researcher' },
+    labels: { ru: 'Исследователь пользовательского опыта (UX)', en: 'UX Researcher' },
     aliases: { ru: ['исследователь пользователей', 'ux researcher'], en: ['user researcher'] },
     keywords: { ru: ['интервью', 'исследования'], en: ['interviews', 'research'] },
     popularityRank: 45,
@@ -479,7 +488,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'design',
     group: 'content-brand',
     seniority: 'individual_contributor',
-    labels: { ru: 'Brand Designer', en: 'Brand Designer' },
+    labels: { ru: 'Бренд-дизайнер', en: 'Brand Designer' },
     aliases: { ru: ['бренд-дизайнер', 'графический дизайнер'], en: ['graphic designer'] },
     keywords: { ru: ['бренд', 'айдентика'], en: ['brand', 'identity'] },
     popularityRank: 52,
@@ -490,7 +499,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'design',
     group: 'content-brand',
     seniority: 'individual_contributor',
-    labels: { ru: 'Motion Designer', en: 'Motion Designer' },
+    labels: { ru: 'Моушн-дизайнер', en: 'Motion Designer' },
     aliases: { ru: ['моушн-дизайнер', 'аниматор'], en: ['animator'] },
     keywords: { ru: ['анимация', 'видео'], en: ['animation', 'video'] },
     popularityRank: 67,
@@ -501,25 +510,76 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'design',
     group: 'design-leadership',
     seniority: 'lead',
-    labels: { ru: 'Design Lead', en: 'Design Lead' },
+    labels: { ru: 'Руководитель дизайна', en: 'Design Lead' },
     aliases: { ru: ['ведущий дизайнер', 'руководитель дизайна'], en: ['lead designer'] },
     keywords: { ru: ['дизайн-система'], en: ['design system'] },
     popularityRank: 46,
     localePriority: { ru: 35, en: 35 },
   }),
   role({
+    id: 'sales-manager',
+    department: 'sales',
+    group: 'account-management',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер по продажам', en: 'Sales Manager' },
+    aliases: {
+      ru: ['sales manager', 'менеджер продаж', 'специалист по продажам'],
+      en: ['sales lead', 'sales team manager'],
+    },
+    keywords: {
+      ru: ['продажи', 'выручка', 'клиенты', 'воронка продаж'],
+      en: ['sales', 'revenue', 'customers', 'sales pipeline'],
+    },
+    popularityRank: 3,
+    localePriority: { ru: 2, en: 3 },
+    sourceReferences: {
+      escoUri: 'http://data.europa.eu/esco/occupation/a7594892-ff23-4e2a-aedf-2f967ebca15c',
+    },
+  }),
+  role({
     id: 'b2b-sales-manager',
     department: 'sales',
     group: 'account-management',
     seniority: 'manager',
-    labels: { ru: 'Менеджер по продажам B2B', en: 'B2B Sales Manager' },
+    labels: { ru: 'Менеджер по корпоративным продажам (B2B)', en: 'B2B Sales Manager' },
     aliases: {
-      ru: ['sales manager', 'менеджер b2b продаж'],
-      en: ['sales manager', 'b2b account manager'],
+      ru: ['sales manager b2b', 'менеджер b2b продаж', 'менеджер по продажам для бизнеса'],
+      en: ['b2b account manager', 'business sales manager'],
     },
     keywords: { ru: ['воронка продаж', 'сделки'], en: ['sales pipeline', 'deals'] },
-    popularityRank: 3,
-    localePriority: { ru: 2, en: 3 },
+    popularityRank: 4,
+    localePriority: { ru: 4, en: 4 },
+  }),
+  role({
+    id: 'b2c-sales-manager',
+    department: 'sales',
+    group: 'account-management',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер по продажам частным клиентам (B2C)', en: 'B2C Sales Manager' },
+    aliases: {
+      ru: ['sales manager b2c', 'менеджер b2c продаж', 'менеджер по продажам частным клиентам'],
+      en: ['consumer sales manager', 'direct sales manager'],
+    },
+    keywords: {
+      ru: ['b2c', 'частные клиенты', 'розница', 'прямые продажи'],
+      en: ['b2c', 'consumer sales', 'direct sales'],
+    },
+    popularityRank: 21,
+    localePriority: { ru: 5, en: 20 },
+  }),
+  role({
+    id: 'retail-sales-manager',
+    department: 'sales',
+    group: 'account-management',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер розничных продаж', en: 'Retail Sales Manager' },
+    aliases: {
+      ru: ['retail sales manager', 'менеджер по продажам в рознице', 'менеджер розницы'],
+      en: ['retail manager', 'shop sales manager'],
+    },
+    keywords: { ru: ['розница', 'магазин', 'b2c'], en: ['retail', 'store', 'b2c'] },
+    popularityRank: 22,
+    localePriority: { ru: 6, en: 21 },
   }),
   role({
     id: 'head-of-sales',
@@ -540,7 +600,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'sales',
     group: 'account-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Account Executive', en: 'Account Executive' },
+    labels: { ru: 'Менеджер по клиентским сделкам', en: 'Account Executive' },
     aliases: { ru: ['ae', 'менеджер по ключевым клиентам'], en: ['ae', 'sales executive'] },
     acronyms: ['AE'],
     keywords: { ru: ['клиенты', 'выручка'], en: ['customers', 'revenue'] },
@@ -552,7 +612,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'sales',
     group: 'account-management',
     seniority: 'individual_contributor',
-    labels: { ru: 'Sales Development Representative', en: 'Sales Development Representative' },
+    labels: { ru: 'Специалист по развитию продаж', en: 'Sales Development Representative' },
     aliases: { ru: ['sdr', 'специалист лидогенерации'], en: ['sdr', 'lead generation specialist'] },
     acronyms: ['SDR'],
     keywords: { ru: ['лиды', 'исходящие продажи'], en: ['leads', 'outbound'] },
@@ -564,7 +624,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'sales',
     group: 'account-management',
     seniority: 'manager',
-    labels: { ru: 'Key Account Manager', en: 'Key Account Manager' },
+    labels: { ru: 'Менеджер по ключевым клиентам', en: 'Key Account Manager' },
     aliases: {
       ru: ['кам', 'менеджер ключевых клиентов'],
       en: ['kam', 'strategic account manager'],
@@ -579,7 +639,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'sales',
     group: 'business-operations',
     seniority: 'manager',
-    labels: { ru: 'Sales Operations Manager', en: 'Sales Operations Manager' },
+    labels: { ru: 'Менеджер операционных процессов продаж', en: 'Sales Operations Manager' },
     aliases: {
       ru: ['sales ops', 'менеджер операционной поддержки продаж'],
       en: ['sales ops manager'],
@@ -593,8 +653,11 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'sales',
     group: 'account-management',
     seniority: 'manager',
-    labels: { ru: 'Channel Sales Manager', en: 'Channel Sales Manager' },
-    aliases: { ru: ['партнерские продажи', 'channel manager'], en: ['partner sales manager'] },
+    labels: { ru: 'Менеджер партнёрских продаж', en: 'Channel Sales Manager' },
+    aliases: {
+      ru: ['партнерские продажи', 'channel manager', 'менеджер по продажам через партнеров'],
+      en: ['partner sales manager', 'channel manager'],
+    },
     keywords: { ru: ['партнеры', 'каналы'], en: ['partners', 'channels'] },
     popularityRank: 57,
     localePriority: { ru: 42, en: 42 },
@@ -604,7 +667,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'sales',
     group: 'business-operations',
     seniority: 'manager',
-    labels: { ru: 'Revenue Operations Manager', en: 'Revenue Operations Manager' },
+    labels: { ru: 'Менеджер операций выручки (RevOps)', en: 'Revenue Operations Manager' },
     aliases: { ru: ['revops', 'менеджер revenue operations'], en: ['revops manager'] },
     acronyms: ['RevOps'],
     keywords: { ru: ['выручка', 'операции продаж'], en: ['revenue', 'go-to-market operations'] },
@@ -616,7 +679,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'growth-marketing',
     seniority: 'manager',
-    labels: { ru: 'Маркетинг-менеджер', en: 'Marketing Manager' },
+    labels: { ru: 'Менеджер маркетинга', en: 'Marketing Manager' },
     aliases: { ru: ['marketing manager', 'менеджер маркетинга'], en: ['growth marketing manager'] },
     keywords: { ru: ['кампании', 'лиды'], en: ['campaigns', 'leads'] },
     popularityRank: 9,
@@ -627,7 +690,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'growth-marketing',
     seniority: 'manager',
-    labels: { ru: 'Performance Marketing Manager', en: 'Performance Marketing Manager' },
+    labels: { ru: 'Менеджер по результативной рекламе', en: 'Performance Marketing Manager' },
     aliases: {
       ru: ['перформанс-маркетолог', 'paid ads'],
       en: ['paid marketing manager', 'ppc manager'],
@@ -641,7 +704,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'content-brand',
     seniority: 'manager',
-    labels: { ru: 'Content Marketing Manager', en: 'Content Marketing Manager' },
+    labels: { ru: 'Менеджер контент-маркетинга', en: 'Content Marketing Manager' },
     aliases: { ru: ['контент-маркетолог', 'content manager'], en: ['content manager'] },
     keywords: { ru: ['контент', 'редакция'], en: ['content', 'editorial'] },
     popularityRank: 30,
@@ -652,7 +715,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'content-brand',
     seniority: 'manager',
-    labels: { ru: 'Brand Manager', en: 'Brand Manager' },
+    labels: { ru: 'Бренд-менеджер', en: 'Brand Manager' },
     aliases: { ru: ['бренд-менеджер'], en: ['brand lead'] },
     keywords: { ru: ['бренд', 'позиционирование'], en: ['brand', 'positioning'] },
     popularityRank: 40,
@@ -663,7 +726,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'growth-marketing',
     seniority: 'individual_contributor',
-    labels: { ru: 'Growth Marketer', en: 'Growth Marketer' },
+    labels: { ru: 'Маркетолог роста', en: 'Growth Marketer' },
     aliases: { ru: ['маркетолог роста', 'growth manager'], en: ['growth manager'] },
     keywords: { ru: ['эксперименты', 'активация'], en: ['experiments', 'activation'] },
     popularityRank: 33,
@@ -674,7 +737,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'growth-marketing',
     seniority: 'individual_contributor',
-    labels: { ru: 'SEO Specialist', en: 'SEO Specialist' },
+    labels: { ru: 'SEO-специалист', en: 'SEO Specialist' },
     aliases: { ru: ['seo-специалист', 'специалист по seo'], en: ['seo manager'] },
     acronyms: ['SEO'],
     keywords: { ru: ['органический трафик', 'поиск'], en: ['organic traffic', 'search'] },
@@ -686,7 +749,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'growth-marketing',
     seniority: 'manager',
-    labels: { ru: 'CRM Marketing Manager', en: 'CRM Marketing Manager' },
+    labels: { ru: 'Менеджер CRM-маркетинга', en: 'CRM Marketing Manager' },
     aliases: {
       ru: ['crm-маркетолог', 'email marketing manager'],
       en: ['email marketing manager', 'lifecycle marketer'],
@@ -701,7 +764,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'marketing',
     group: 'business-operations',
     seniority: 'manager',
-    labels: { ru: 'Marketing Operations Manager', en: 'Marketing Operations Manager' },
+    labels: { ru: 'Менеджер маркетинговых операций', en: 'Marketing Operations Manager' },
     aliases: { ru: ['marketing ops', 'операции маркетинга'], en: ['marketing ops manager'] },
     keywords: { ru: ['маркетинг-стек', 'атрибуция'], en: ['marketing stack', 'attribution'] },
     popularityRank: 53,
@@ -712,7 +775,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'support',
     group: 'customer-implementation',
     seniority: 'manager',
-    labels: { ru: 'Customer Success Manager', en: 'Customer Success Manager' },
+    labels: { ru: 'Менеджер по развитию клиентов', en: 'Customer Success Manager' },
     aliases: { ru: ['csm', 'менеджер по успеху клиентов'], en: ['csm', 'client success manager'] },
     acronyms: ['CSM'],
     keywords: { ru: ['удержание клиентов', 'аккаунты'], en: ['retention', 'accounts'] },
@@ -746,7 +809,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'support',
     group: 'customer-implementation',
     seniority: 'manager',
-    labels: { ru: 'Implementation Manager', en: 'Implementation Manager' },
+    labels: { ru: 'Менеджер внедрения', en: 'Implementation Manager' },
     aliases: { ru: ['менеджер внедрения', 'onboarding manager'], en: ['onboarding manager'] },
     keywords: {
       ru: ['внедрение', 'онбординг клиента'],
@@ -760,7 +823,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'support',
     group: 'customer-implementation',
     seniority: 'manager',
-    labels: { ru: 'Technical Account Manager', en: 'Technical Account Manager' },
+    labels: { ru: 'Технический менеджер по клиентам', en: 'Technical Account Manager' },
     aliases: { ru: ['tam', 'технический аккаунт-менеджер'], en: ['tam'] },
     acronyms: ['TAM'],
     keywords: { ru: ['техническая поддержка клиента'], en: ['technical customer success'] },
@@ -772,7 +835,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'operations',
     group: 'business-operations',
     seniority: 'manager',
-    labels: { ru: 'Project Manager', en: 'Project Manager' },
+    labels: { ru: 'Руководитель проекта', en: 'Project Manager' },
     aliases: { ru: ['менеджер проекта', 'руководитель проекта'], en: ['project lead'] },
     acronyms: ['PM'],
     keywords: { ru: ['сроки', 'план проекта'], en: ['timeline', 'project plan'] },
@@ -784,7 +847,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'operations',
     group: 'business-operations',
     seniority: 'manager',
-    labels: { ru: 'Program Manager', en: 'Program Manager' },
+    labels: { ru: 'Руководитель программы', en: 'Program Manager' },
     aliases: { ru: ['менеджер программы', 'руководитель программы'], en: ['program lead'] },
     acronyms: ['PM'],
     keywords: { ru: ['портфель проектов'], en: ['program portfolio'] },
@@ -818,7 +881,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'operations',
     group: 'business-operations',
     seniority: 'executive',
-    labels: { ru: 'Chief Operating Officer', en: 'Chief Operating Officer' },
+    labels: { ru: 'Операционный директор', en: 'Chief Operating Officer' },
     aliases: { ru: ['coo', 'операционный директор'], en: ['coo', 'operations director'] },
     acronyms: ['COO'],
     keywords: { ru: ['операционная система'], en: ['operating model'] },
@@ -830,7 +893,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'operations',
     group: 'business-operations',
     seniority: 'manager',
-    labels: { ru: 'Process Manager', en: 'Process Manager' },
+    labels: { ru: 'Менеджер процессов', en: 'Process Manager' },
     aliases: { ru: ['менеджер процессов', 'process owner'], en: ['process owner'] },
     keywords: { ru: ['регламенты', 'процессы'], en: ['process improvement'] },
     popularityRank: 58,
@@ -841,7 +904,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'hr',
     group: 'people-operations',
     seniority: 'manager',
-    labels: { ru: 'HR Business Partner', en: 'HR Business Partner' },
+    labels: { ru: 'Партнёр по персоналу', en: 'HR Business Partner' },
     aliases: {
       ru: ['hrbp', 'people partner', 'эйчар бизнес партнер'],
       en: ['hrbp', 'people partner'],
@@ -884,7 +947,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'hr',
     group: 'people-operations',
     seniority: 'manager',
-    labels: { ru: 'People Operations Manager', en: 'People Operations Manager' },
+    labels: { ru: 'Менеджер процессов персонала', en: 'People Operations Manager' },
     aliases: {
       ru: ['people ops', 'менеджер hr-операций'],
       en: ['people ops manager', 'hr operations manager'],
@@ -898,7 +961,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'hr',
     group: 'people-operations',
     seniority: 'manager',
-    labels: { ru: 'Learning and Development Manager', en: 'Learning and Development Manager' },
+    labels: { ru: 'Менеджер по обучению и развитию', en: 'Learning and Development Manager' },
     aliases: { ru: ['l&d manager', 'менеджер обучения'], en: ['l&d manager', 'training manager'] },
     acronyms: ['L&D'],
     keywords: { ru: ['обучение', 'развитие'], en: ['learning', 'development'] },
@@ -943,7 +1006,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'finance',
     group: 'finance-control',
     seniority: 'manager',
-    labels: { ru: 'FP&A Manager', en: 'FP&A Manager' },
+    labels: { ru: 'Менеджер финансового планирования и анализа (FP&A)', en: 'FP&A Manager' },
     aliases: {
       ru: ['финансовое планирование', 'financial planning manager'],
       en: ['financial planning manager'],
@@ -958,7 +1021,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'finance',
     group: 'finance-control',
     seniority: 'executive',
-    labels: { ru: 'Chief Financial Officer', en: 'Chief Financial Officer' },
+    labels: { ru: 'Финансовый директор', en: 'Chief Financial Officer' },
     aliases: { ru: ['cfo', 'финансовый директор'], en: ['cfo', 'finance director'] },
     acronyms: ['CFO'],
     keywords: { ru: ['финансовая стратегия'], en: ['financial strategy'] },
@@ -981,7 +1044,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'legal',
     group: 'legal-compliance',
     seniority: 'manager',
-    labels: { ru: 'Compliance Manager', en: 'Compliance Manager' },
+    labels: { ru: 'Менеджер по соблюдению требований', en: 'Compliance Manager' },
     aliases: { ru: ['комплаенс-менеджер', 'compliance officer'], en: ['compliance officer'] },
     keywords: { ru: ['регуляторика', 'комплаенс'], en: ['regulation', 'compliance'] },
     popularityRank: 64,
@@ -992,7 +1055,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'legal',
     group: 'legal-compliance',
     seniority: 'manager',
-    labels: { ru: 'Contract Manager', en: 'Contract Manager' },
+    labels: { ru: 'Менеджер договоров', en: 'Contract Manager' },
     aliases: { ru: ['менеджер договоров', 'специалист по договорам'], en: ['contracts manager'] },
     keywords: { ru: ['договоры', 'согласование'], en: ['contracts', 'review'] },
     popularityRank: 66,
@@ -1003,7 +1066,7 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     department: 'legal',
     group: 'legal-compliance',
     seniority: 'lead',
-    labels: { ru: 'Data Protection Officer', en: 'Data Protection Officer' },
+    labels: { ru: 'Ответственный за защиту данных', en: 'Data Protection Officer' },
     aliases: { ru: ['dpo', 'специалист по персональным данным'], en: ['dpo', 'privacy officer'] },
     acronyms: ['DPO'],
     keywords: { ru: ['персональные данные', 'privacy'], en: ['privacy', 'personal data'] },
@@ -1086,11 +1149,59 @@ export function getRoleTitleSuggestionGroups(
   return groups
 }
 
+export function inferRoleDepartmentFromTitle(title: string, locale: string): RoleDepartment | null {
+  const normalizedLocale = normalizeLocale(locale)
+  const normalizedTitle = normalizeSearchText(title)
+  if (normalizedTitle.length < 2) return null
+
+  const matchedSuggestion = searchRoleTitleSuggestions(title, normalizedLocale, 1)[0]
+  if (matchedSuggestion) {
+    return matchedSuggestion.department
+  }
+
+  const inferredRule = departmentInferenceRules.find((rule) =>
+    rule.terms.some((term) => normalizedTitle.includes(term))
+  )
+
+  return inferredRule?.department ?? null
+}
+
 interface RoleMatchScore {
   matchKind: RoleMatchKind
   matchLabel: string
   score: number
 }
+
+const departmentInferenceRules: Array<{ department: RoleDepartment; terms: string[] }> = [
+  {
+    department: 'sales',
+    terms: [
+      'продаж',
+      'sales',
+      'account',
+      'выручк',
+      'b2b',
+      'b2c',
+      'retail',
+      'розниц',
+      'клиент',
+      'партнерск',
+    ],
+  },
+  { department: 'marketing', terms: ['маркет', 'marketing', 'brand', 'бренд', 'seo', 'crm'] },
+  { department: 'product', terms: ['product', 'продукт', 'продакт'] },
+  {
+    department: 'engineering',
+    terms: ['engineer', 'developer', 'devops', 'разработ', 'инженер', 'программист', 'sre'],
+  },
+  { department: 'design', terms: ['design', 'дизайн', 'ux', 'ui'] },
+  { department: 'data', terms: ['data', 'аналитик', 'analytics', 'machine learning', 'bi'] },
+  { department: 'operations', terms: ['operations', 'операц', 'project', 'program', 'process'] },
+  { department: 'hr', terms: ['hr', 'people', 'talent', 'recruit', 'персонал', 'рекрут'] },
+  { department: 'finance', terms: ['finance', 'финанс', 'accountant', 'бухгалтер', 'cfo'] },
+  { department: 'support', terms: ['support', 'customer success', 'поддерж', 'implementation'] },
+  { department: 'legal', terms: ['legal', 'юрист', 'lawyer', 'compliance', 'комплаенс'] },
+]
 
 function scoreSuggestion(
   suggestion: RoleTitleSuggestion,

@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
+import { inferRoleDepartmentFromTitle } from '@/components/career-playbook/wizard/role-title-suggestions'
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import { CAREER_PLAYBOOK_BLOCK_CATALOG, languageSchema } from '@megacampus/shared-types'
 import type {
@@ -187,21 +188,19 @@ interface CareerPlaybookStoreState {
 
 export type CareerPlaybookStore = CareerPlaybookStoreState
 
-const branchableStartupTeamSizes = new Set(['1-10', '11-50', '51-200'])
-
 const departmentOptions = {
   ru: [
-    ['sales', 'Продажи / Sales'],
+    ['sales', 'Продажи'],
     ['marketing', 'Маркетинг'],
-    ['product', 'Продукт / Product'],
-    ['engineering', 'Инженерия / IT'],
-    ['design', 'Дизайн / UX'],
-    ['data', 'Аналитика / Data'],
-    ['operations', 'Операционка / Operations'],
-    ['hr', 'HR / People'],
+    ['product', 'Продукт'],
+    ['engineering', 'Разработка и инженерия'],
+    ['design', 'Дизайн и пользовательский опыт (UX)'],
+    ['data', 'Аналитика и данные'],
+    ['operations', 'Операции'],
+    ['hr', 'Персонал'],
     ['finance', 'Финансы'],
-    ['support', 'Поддержка / Customer Success'],
-    ['legal', 'Юридический'],
+    ['support', 'Поддержка и работа с клиентами'],
+    ['legal', 'Право и соблюдение требований'],
     ['other', 'Другое'],
   ],
   en: [
@@ -241,7 +240,8 @@ const fixedQuestionSeed: Record<
       question_key: 'position',
       question_type: 'open',
       question_text: 'Какую должность вы хотите оформить?',
-      helper_text: 'Например: Менеджер по продажам B2B, DevOps-инженер, Product Manager',
+      helper_text:
+        'Например: менеджер по корпоративным продажам, инженер DevOps, менеджер продукта',
       is_required: true,
     },
     {
@@ -260,12 +260,15 @@ const fixedQuestionSeed: Record<
       question_type: 'single_choice',
       question_text: 'Уровень должности',
       options: [
-        { value: 'junior', label: 'Junior (до 2 лет опыта)' },
-        { value: 'middle', label: 'Middle (2-5 лет)' },
-        { value: 'senior', label: 'Senior (5+ лет, эксперт)' },
-        { value: 'lead', label: 'Lead / Team Lead (ведёт команду)' },
-        { value: 'director', label: 'Director / Head (руководит направлением)' },
-        { value: 'c-level', label: 'C-level (CEO, CTO, CFO ...)' },
+        { value: 'junior', label: 'Младший специалист (до 2 лет опыта)' },
+        { value: 'middle', label: 'Специалист среднего уровня (2-5 лет)' },
+        { value: 'senior', label: 'Старший специалист (5+ лет, эксперт)' },
+        { value: 'lead', label: 'Ведущий специалист / руководитель группы' },
+        { value: 'director', label: 'Руководитель направления' },
+        {
+          value: 'c-level',
+          label: 'Топ-руководитель (генеральный, технический, финансовый директор)',
+        },
       ],
       is_required: true,
     },
@@ -275,7 +278,8 @@ const fixedQuestionSeed: Record<
       question_key: 'reporting',
       question_type: 'open',
       question_text: 'Кому подчиняется и есть ли подчинённые?',
-      helper_text: 'Например: Подчиняется CRO. В подчинении 3 SDR + 2 AE.',
+      helper_text:
+        'Например: подчиняется коммерческому директору. В подчинении 3 специалиста по поиску клиентов и 2 менеджера по продажам.',
       is_required: true,
     },
     {
@@ -285,11 +289,11 @@ const fixedQuestionSeed: Record<
       question_type: 'single_choice',
       question_text: 'Размер компании',
       options: [
-        { value: '1-10', label: '1-10 человек (early-stage стартап)' },
-        { value: '11-50', label: '11-50 человек (растущий стартап)' },
-        { value: '51-200', label: '51-200 человек (Scale-up)' },
-        { value: '201-1000', label: '201-1000 человек (Established)' },
-        { value: '1000+', label: '1000+ человек (Enterprise)' },
+        { value: '1-10', label: '1-10 человек (ранняя стадия)' },
+        { value: '11-50', label: '11-50 человек (стадия роста)' },
+        { value: '51-200', label: '51-200 человек (масштабирование)' },
+        { value: '201-1000', label: '201-1000 человек (устойчивая компания)' },
+        { value: '1000+', label: '1000+ человек (крупная компания)' },
       ],
       is_required: true,
     },
@@ -300,15 +304,12 @@ const fixedQuestionSeed: Record<
       question_type: 'single_choice',
       question_text: 'Какая стадия компании / продукта?',
       options: [
-        { value: 'pre-pmf', label: 'Pre-PMF (ищем product-market fit)' },
-        { value: 'growth', label: 'Growth (PMF найден, масштабируем)' },
-        { value: 'scale', label: 'Scale (отлаженная машина, расширяем рынки)' },
-        { value: 'mature', label: 'Mature (стабильный бизнес, оптимизация)' },
+        { value: 'pre-pmf', label: 'Проверяем спрос и ценность продукта' },
+        { value: 'growth', label: 'Спрос подтверждён, масштабируем продажи и продукт' },
+        { value: 'scale', label: 'Рост: отлаживаем процессы и расширяем рынки' },
+        { value: 'mature', label: 'Зрелая компания: оптимизация и устойчивость' },
       ],
       is_required: false,
-      branching_rules: {
-        when: { question_key: 'team_size', value_in: ['1-10', '11-50', '51-200'] },
-      },
     },
     {
       language: 'ru',
@@ -317,7 +318,7 @@ const fixedQuestionSeed: Record<
       question_type: 'single_choice',
       question_text: 'На каком языке сгенерировать должностную инструкцию?',
       helper_text:
-        'Если документ будет использоваться в международной компании, выберите English. По умолчанию совпадает с языком интерфейса.',
+        'Если документ будет использоваться в международной компании, выберите английский. По умолчанию совпадает с языком интерфейса.',
       options: languageOptions.map(([value, label]) => ({ value, label })),
       is_required: true,
     },
@@ -394,9 +395,6 @@ const fixedQuestionSeed: Record<
         { value: 'mature', label: 'Mature (stable business, optimization)' },
       ],
       is_required: false,
-      branching_rules: {
-        when: { question_key: 'team_size', value_in: ['1-10', '11-50', '51-200'] },
-      },
     },
     {
       language: 'en',
@@ -583,6 +581,32 @@ function answerValuesEqual(
   return left === right
 }
 
+function hasSubmittableAnswerValue(value: CareerPlaybookAnswerValue | undefined) {
+  if (Array.isArray(value)) {
+    return value.some((item) => item.trim().length > 0)
+  }
+
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function submittableFixedAnswers(
+  fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
+): Record<string, CareerPlaybookFixedAnswer> {
+  return Object.fromEntries(
+    Object.entries(fixedAnswers).filter(([, answer]) => hasSubmittableAnswerValue(answer.value))
+  )
+}
+
+function submittableFollowupAnswers(
+  followupAnswers: Record<string, CareerPlaybookFollowupAnswer>
+): Record<string, CareerPlaybookFollowupAnswer> {
+  return Object.fromEntries(
+    Object.entries(followupAnswers).filter(
+      ([, answer]) => answer.skipped || hasSubmittableAnswerValue(answer.value)
+    )
+  )
+}
+
 function emptyViewerBlockState(): CareerPlaybookBlockState {
   return {
     content: '',
@@ -695,7 +719,7 @@ function visibleQuestionsFromState(
     const answerValue = state.fixedAnswers[branchingRules.when.question_key]?.value
     if (branchingRules.when.value) return answerValue === branchingRules.when.value
     if (branchingRules.when.value_in) {
-      return typeof answerValue === 'string' && branchableStartupTeamSizes.has(answerValue)
+      return typeof answerValue === 'string' && branchingRules.when.value_in.includes(answerValue)
     }
 
     return true
@@ -739,6 +763,14 @@ function markDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
   }
 }
 
+function unmarkDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
+  state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter((key) => key !== questionKey)
+}
+
+function unmarkDirtyFollowupId(state: CareerPlaybookStoreState, questionId: string) {
+  state.dirtyFollowupQuestionIds = state.dirtyFollowupQuestionIds.filter((id) => id !== questionId)
+}
+
 function clearDependentFollowupContext(state: CareerPlaybookStoreState) {
   state.followupQuestions = []
   state.followupAnswers = {}
@@ -766,6 +798,22 @@ function followupAnswersEqual(
 
 function getFollowupQuestion(state: CareerPlaybookStoreState, questionId: string) {
   return state.followupQuestions.find((question) => question.question_id === questionId)
+}
+
+function markUnansweredFollowupsSkipped(state: CareerPlaybookStoreState) {
+  for (const question of state.followupQuestions) {
+    const answer = state.followupAnswers[question.question_id]
+    if (answer?.skipped || hasSubmittableAnswerValue(answer?.value)) continue
+
+    state.followupAnswers[question.question_id] = {
+      question_id: question.question_id,
+      question_text: question.question_text,
+      question_type: question.question_type,
+      skipped: true,
+      answered_at: nowIso(),
+    }
+    markDirtyFollowupId(state, question.question_id)
+  }
 }
 
 export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
@@ -1134,20 +1182,47 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       answerCareerPlaybookFixedQuestion: (questionKey, value) =>
         set((state) => {
           const previousValue = state.fixedAnswers[questionKey]?.value
-          const fixedContextChanged = !answerValuesEqual(previousValue, value)
+          const nextValue = hasSubmittableAnswerValue(value) ? value : undefined
+          const fixedContextChanged = !answerValuesEqual(previousValue, nextValue)
+
+          if (nextValue === undefined) {
+            delete state.fixedAnswers[questionKey]
+            unmarkDirtyKey(state, questionKey)
+            if (fixedContextChanged) {
+              clearDependentFollowupContext(state)
+            }
+            removeHiddenFixedAnswers(state)
+            clampCurrentFixedIndex(state)
+            return
+          }
 
           state.fixedAnswers[questionKey] = {
             question_key: questionKey,
-            value,
+            value: nextValue,
             answered_at: nowIso(),
           }
-          if (questionKey === 'content_language' && typeof value === 'string') {
-            state.contentLanguage = value
+          markDirtyKey(state, questionKey)
+          if (questionKey === 'content_language' && typeof nextValue === 'string') {
+            state.contentLanguage = nextValue
+          }
+          if (
+            questionKey === 'position' &&
+            typeof nextValue === 'string' &&
+            !state.fixedAnswers.department
+          ) {
+            const inferredDepartment = inferRoleDepartmentFromTitle(nextValue, state.uiLanguage)
+            if (inferredDepartment) {
+              state.fixedAnswers.department = {
+                question_key: 'department',
+                value: inferredDepartment,
+                answered_at: nowIso(),
+              }
+              markDirtyKey(state, 'department')
+            }
           }
           if (fixedContextChanged) {
             clearDependentFollowupContext(state)
           }
-          markDirtyKey(state, questionKey)
           removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
@@ -1185,8 +1260,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
           const response = await client.requestFollowups({
             playbookId: snapshot.playbookId,
-            fixedAnswers: snapshot.fixedAnswers,
-            followupAnswers: snapshot.followupAnswers,
+            fixedAnswers: submittableFixedAnswers(snapshot.fixedAnswers),
+            followupAnswers: submittableFollowupAnswers(snapshot.followupAnswers),
             contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
           })
 
@@ -1230,6 +1305,12 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           const question = getFollowupQuestion(state, questionId)
           if (!question) return
 
+          if (!hasSubmittableAnswerValue(value)) {
+            delete state.followupAnswers[questionId]
+            unmarkDirtyFollowupId(state, questionId)
+            return
+          }
+
           state.followupAnswers[questionId] = {
             question_id: question.question_id,
             question_text: question.question_text,
@@ -1271,6 +1352,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
       completeCareerPlaybookFollowups: () =>
         set((state) => {
+          markUnansweredFollowupsSkipped(state)
           state.phase = 'completion'
           state.status = 'ready_to_generate'
         }),
@@ -1558,6 +1640,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           for (const questionKey of dirtyFixedQuestionKeys) {
             const answer = snapshot.fixedAnswers[questionKey]
             if (!answer) continue
+            if (!hasSubmittableAnswerValue(answer.value)) continue
 
             await client.submitAnswer({
               playbookId: snapshot.playbookId,
@@ -1572,6 +1655,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           for (const questionId of dirtyFollowupQuestionIds) {
             const answer = snapshot.followupAnswers[questionId]
             if (!answer) continue
+            if (!answer.skipped && !hasSubmittableAnswerValue(answer.value)) continue
 
             await client.submitAnswer({
               playbookId: snapshot.playbookId,
@@ -1677,15 +1761,16 @@ export function getCareerPlaybookProgress(
   state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers' | 'currentFixedIndex'>
 ) {
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
-  const answered = visibleQuestions.filter(
-    (question) => state.fixedAnswers[question.question_key]?.value
-  ).length
   const total = visibleQuestions.length
+  const current = total === 0 ? 0 : Math.min(Math.max(state.currentFixedIndex + 1, 1), total)
+  const answered = visibleQuestions.filter((question) =>
+    hasSubmittableAnswerValue(state.fixedAnswers[question.question_key]?.value)
+  ).length
 
   return {
-    current: Math.min(state.currentFixedIndex + 1, total),
+    current,
     total,
     answered,
-    percent: total === 0 ? 0 : Math.round((answered / total) * 100),
+    percent: total === 0 ? 0 : Math.round((current / total) * 100),
   }
 }

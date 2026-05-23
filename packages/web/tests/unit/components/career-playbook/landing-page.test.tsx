@@ -148,9 +148,9 @@ describe('CareerPlaybookLandingPageClient', () => {
 
     expect(screen.getByText('Основа')).toBeInTheDocument()
     expect(screen.getByText('Выбранные блоки')).toBeInTheDocument()
-    expect(screen.getAllByText('1. Миссия/KR').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('22. README роли').length).toBeGreaterThan(0)
-    expect(screen.getByText('Должностная инструкция: B2B-продажи')).toBeInTheDocument()
+    expect(screen.getAllByText('1. Миссия и ключевые результаты').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('22. Памятка роли').length).toBeGreaterThan(0)
+    expect(screen.getByText('Должностная инструкция: корпоративные продажи')).toBeInTheDocument()
     expect(
       screen.getByText('Превратите контекст роли в понятную должностную инструкцию')
     ).toBeInTheDocument()
