@@ -84,13 +84,13 @@ const followupOpenQuestion: CareerPlaybookFollowupQuestion = {
 }
 
 describe('ProgressIndicator', () => {
-  it('renders fixed total progress with answered count and percent', () => {
-    render(<ProgressIndicator answeredCount={3} currentIndex={2} totalCount={7} />)
+  it('uses the current question for percent while showing answered count separately', () => {
+    render(<ProgressIndicator answeredCount={5} currentIndex={3} totalCount={6} />)
 
-    expect(screen.getByText('Вопрос 3 из 7')).toBeInTheDocument()
-    expect(screen.getByText('Отвечено: 3')).toBeInTheDocument()
-    expect(screen.getByText('43%')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '43')
+    expect(screen.getByText('Вопрос 4 из 6')).toBeInTheDocument()
+    expect(screen.getByText('Отвечено: 5')).toBeInTheDocument()
+    expect(screen.getByText('67%')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
   })
 
   it('supports localized question separators', () => {

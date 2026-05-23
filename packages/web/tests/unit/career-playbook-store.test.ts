@@ -119,7 +119,7 @@ describe('useCareerPlaybookStore', () => {
       current: 2,
       total: 6,
       answered: 4,
-      percent: 67,
+      percent: 33,
     })
 
     useCareerPlaybookStore.getState().goToPreviousCareerPlaybookQuestion()

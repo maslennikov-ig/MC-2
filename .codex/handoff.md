@@ -15,6 +15,7 @@ Base head: `a1a82bd317268fa8f507416bf17b62c03691147e`
 - The current stage removes the global `Свободный ответ` action from fixed/follow-up flows.
 - Choice questions now expose contextual `Другое` / `Other` with inline custom entry; `content_language` intentionally does not.
 - Empty custom choices are kept as local UI draft until the user types, but are not stored, autosaved, or submitted as answers.
+- Follow-up bug `mc2-db696.23` fixes fixed-question progress percent so it follows the current step, while `Отвечено` remains a separate count.
 - Role suggestions now use source-aware `mc2_overlay` records with source references instead of claiming a generic `curated` source.
 - Generic `Менеджер по продажам` now suggests broad Sales Manager plus B2C, retail, channel/account, and B2B variants.
 - Selecting or typing a recognizable role infers the likely department when the department answer is still empty.

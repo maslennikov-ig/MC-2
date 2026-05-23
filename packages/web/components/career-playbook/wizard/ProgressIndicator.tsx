@@ -31,8 +31,8 @@ export function ProgressIndicator({
   const labels = { ...defaultCopy, ...copy }
   const safeTotal = Math.max(totalCount, 0)
   const boundedAnswered = Math.min(Math.max(answeredCount, 0), safeTotal)
-  const percent = safeTotal > 0 ? Math.round((boundedAnswered / safeTotal) * 100) : 0
-  const displayIndex = safeTotal > 0 ? Math.min(currentIndex + 1, safeTotal) : 0
+  const displayIndex = safeTotal > 0 ? Math.min(Math.max(currentIndex + 1, 1), safeTotal) : 0
+  const percent = safeTotal > 0 ? Math.round((displayIndex / safeTotal) * 100) : 0
 
   return (
     <section aria-label="Wizard progress" className="min-h-[72px] space-y-3">
@@ -40,14 +40,14 @@ export function ProgressIndicator({
         <span className="whitespace-nowrap">
           {labels.questionLabel} {displayIndex} {labels.ofLabel} {safeTotal}
         </span>
-        <span className="flex items-center gap-1.5 whitespace-nowrap font-medium text-slate-800 dark:text-slate-100">
+        <span className="flex items-center gap-1.5 font-medium whitespace-nowrap text-slate-800 dark:text-slate-100">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
           {labels.answeredLabel}: {boundedAnswered}
         </span>
       </div>
       <div className="grid min-h-7 grid-cols-[1fr_auto] items-center gap-3">
         <Progress value={percent} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} />
-        <span className="w-10 text-right text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+        <span className="w-10 text-right text-sm font-semibold text-slate-800 tabular-nums dark:text-slate-100">
           {percent}%
         </span>
       </div>

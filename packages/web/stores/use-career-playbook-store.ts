@@ -1747,15 +1747,16 @@ export function getCareerPlaybookProgress(
   state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers' | 'currentFixedIndex'>
 ) {
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
+  const total = visibleQuestions.length
+  const current = total === 0 ? 0 : Math.min(Math.max(state.currentFixedIndex + 1, 1), total)
   const answered = visibleQuestions.filter((question) =>
     hasSubmittableAnswerValue(state.fixedAnswers[question.question_key]?.value)
   ).length
-  const total = visibleQuestions.length
 
   return {
-    current: Math.min(state.currentFixedIndex + 1, total),
+    current,
     total,
     answered,
-    percent: total === 0 ? 0 : Math.round((answered / total) * 100),
+    percent: total === 0 ? 0 : Math.round((current / total) * 100),
   }
 }
