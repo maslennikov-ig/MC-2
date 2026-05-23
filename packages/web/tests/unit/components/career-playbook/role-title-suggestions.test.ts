@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  inferRoleDepartmentFromTitle,
   getPopularRoleTitleSuggestions,
   getRoleTitleSuggestionGroups,
   roleTitleSuggestions,
@@ -8,12 +9,17 @@ import {
 } from '@/components/career-playbook/wizard/role-title-suggestions'
 
 describe('role title suggestions', () => {
-  it('returns a broad curated seed list with stable ids', () => {
+  it('returns a broad source-aware local index with stable ids', () => {
     const uniqueIds = new Set(roleTitleSuggestions.map((suggestion) => suggestion.id))
 
     expect(roleTitleSuggestions.length).toBeGreaterThanOrEqual(60)
     expect(uniqueIds.size).toBe(roleTitleSuggestions.length)
-    expect(roleTitleSuggestions.every((suggestion) => suggestion.source === 'curated')).toBe(true)
+    expect(
+      roleTitleSuggestions.every((suggestion) => (suggestion.source as string) !== 'curated')
+    ).toBe(true)
+    expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'mc2_overlay')).toBe(
+      true
+    )
   })
 
   it('orders popular roles by locale-aware priority and popularity rank', () => {
@@ -56,5 +62,26 @@ describe('role title suggestions', () => {
         results.filter((suggestion) => suggestion.department === group.department)
       )
     })
+  })
+
+  it('does not over-normalize generic Russian sales manager queries to only B2B', () => {
+    const results = searchRoleTitleSuggestions('менеджер по продажам', 'ru', 10)
+    const ids = results.map((suggestion) => suggestion.id)
+
+    expect(ids[0]).toBe('sales-manager')
+    expect(ids).toContain('b2c-sales-manager')
+    expect(ids).toContain('retail-sales-manager')
+    expect(ids).toContain('channel-sales-manager')
+    expect(ids).toContain('b2b-sales-manager')
+    expect(
+      results.filter((suggestion) => suggestion.department === 'sales').length
+    ).toBeGreaterThan(4)
+  })
+
+  it('infers a likely department from selected or typed role titles', () => {
+    expect(inferRoleDepartmentFromTitle('Менеджер по продажам', 'ru')).toBe('sales')
+    expect(inferRoleDepartmentFromTitle('B2C Sales Manager', 'en')).toBe('sales')
+    expect(inferRoleDepartmentFromTitle('DevOps Engineer', 'en')).toBe('engineering')
+    expect(inferRoleDepartmentFromTitle('Completely unknown title', 'en')).toBeNull()
   })
 })

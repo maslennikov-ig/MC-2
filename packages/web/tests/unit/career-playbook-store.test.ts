@@ -118,14 +118,36 @@ describe('useCareerPlaybookStore', () => {
     expect(getCareerPlaybookProgress(useCareerPlaybookStore.getState())).toEqual({
       current: 2,
       total: 6,
-      answered: 3,
-      percent: 50,
+      answered: 4,
+      percent: 67,
     })
 
     useCareerPlaybookStore.getState().goToPreviousCareerPlaybookQuestion()
     expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
       'position'
     )
+  })
+
+  it('infers the department from the role title when department is still unanswered', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'ru', contentLanguage: 'ru' })
+
+    useCareerPlaybookStore
+      .getState()
+      .answerCareerPlaybookFixedQuestion('position', 'Менеджер по продажам')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.department?.value).toBe('sales')
+    expect(useCareerPlaybookStore.getState().dirtyFixedQuestionKeys).toEqual(
+      expect.arrayContaining(['position', 'department'])
+    )
+
+    useCareerPlaybookStore.getState().goToNextCareerPlaybookQuestion()
+
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'department'
+    )
+    expect(getCareerPlaybookProgress(useCareerPlaybookStore.getState()).answered).toBe(3)
   })
 
   it('moves from fixed questions into follow-ups once Phase A is complete', () => {
@@ -251,6 +273,45 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().fixedAnswers.position?.value).toBe('DevOps Engineer')
     expect(useCareerPlaybookStore.getState().freeformDraft).toBe('Kubernetes, SRE, on-call.')
     expect(useCareerPlaybookStore.getState().autosaveError).toBe('offline')
+  })
+
+  it('does not autosave empty custom answers before the user types a value', async () => {
+    const submitAnswer = vi.fn<CareerPlaybookClient['submitAnswer']>().mockResolvedValue({})
+    setCareerPlaybookClientForTests({ submitAnswer })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000015',
+      uiLanguage: 'ru',
+      contentLanguage: 'ru',
+      fixedAnswers: [],
+      freeformDraft: '',
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000415',
+          question_text: 'Что еще важно учесть?',
+          question_type: 'single_choice',
+          options: [{ value: 'known', label: 'Известный вариант' }],
+          rationale: 'Custom option can be typed inline.',
+        },
+      ],
+    })
+
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('department', '')
+    useCareerPlaybookStore
+      .getState()
+      .answerCareerPlaybookFollowupQuestion('00000000-0000-4000-8000-000000000415', '')
+
+    await expect(useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()).resolves.toEqual({
+      ok: true,
+    })
+
+    expect(submitAnswer).not.toHaveBeenCalled()
+    expect(useCareerPlaybookStore.getState().fixedAnswers.department).toBeUndefined()
+    expect(
+      useCareerPlaybookStore.getState().followupAnswers['00000000-0000-4000-8000-000000000415']
+    ).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().dirtyFixedQuestionKeys).toEqual([])
+    expect(useCareerPlaybookStore.getState().dirtyFollowupQuestionIds).toEqual([])
   })
 
   it('starts a remote session best-effort while preserving local answers when backend is unavailable', async () => {
@@ -482,6 +543,65 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().completenessScore).toBe(0.62)
     expect(useCareerPlaybookStore.getState().followupGenerationCount).toBe(1)
     expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(false)
+  })
+
+  it('filters legacy empty answers before requesting follow-up questions', async () => {
+    const requestFollowups = vi
+      .fn<NonNullable<CareerPlaybookClient['requestFollowups']>>()
+      .mockResolvedValue({
+        questions: [],
+        completeness_score: 0.7,
+        stop_recommendation: 'ready_to_generate',
+      })
+    setCareerPlaybookClientForTests({
+      requestFollowups,
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000016',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [{ question_key: 'position', value: 'Sales Manager' }],
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000416',
+          question_text: 'Which tools should this role own?',
+          question_type: 'open',
+          options: null,
+          rationale: 'Tools clarify operating expectations.',
+        },
+      ],
+      phase: 'followups',
+      status: 'awaiting_followups',
+    })
+    useCareerPlaybookStore.setState({
+      fixedAnswers: {
+        position: { question_key: 'position', value: 'Sales Manager' },
+        department: { question_key: 'department', value: '' },
+      },
+      followupAnswers: {
+        '00000000-0000-4000-8000-000000000416': {
+          question_id: '00000000-0000-4000-8000-000000000416',
+          question_text: 'Which tools should this role own?',
+          question_type: 'open',
+          value: '',
+          skipped: false,
+        },
+      },
+    } as never)
+
+    await expect(
+      useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
+    ).resolves.toEqual({
+      ok: true,
+    })
+
+    const input = requestFollowups.mock.calls[0]?.[0]
+
+    expect(input?.fixedAnswers.position?.value).toBe('Sales Manager')
+    expect(input?.fixedAnswers.department).toBeUndefined()
+    expect(input?.followupAnswers['00000000-0000-4000-8000-000000000416']).toBeUndefined()
   })
 
   it('requests follow-up questions through the production tRPC generation transport', async () => {

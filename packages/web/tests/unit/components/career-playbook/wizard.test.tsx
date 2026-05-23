@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -7,7 +8,6 @@ import type {
 } from '@megacampus/shared-types'
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
 import { FollowupPhase } from '@/components/career-playbook/wizard/FollowupPhase'
-import { FreeFormInput } from '@/components/career-playbook/wizard/FreeFormInput'
 import { ProgressIndicator } from '@/components/career-playbook/wizard/ProgressIndicator'
 import { QuestionRenderer } from '@/components/career-playbook/wizard/QuestionRenderer'
 import { Wizard } from '@/components/career-playbook/wizard/Wizard'
@@ -48,6 +48,19 @@ const optionalSingleChoiceQuestion: CareerPlaybookFixedQuestion = {
   question_key: 'company_stage',
   question_text: 'Какая стадия компании / продукта?',
   is_required: false,
+}
+
+const contentLanguageQuestion: CareerPlaybookFixedQuestion = {
+  language: 'ru',
+  position: 6,
+  question_key: 'content_language',
+  question_type: 'single_choice',
+  question_text: 'На каком языке сгенерировать должностную инструкцию?',
+  options: [
+    { value: 'ru', label: 'Русский' },
+    { value: 'en', label: 'English' },
+  ],
+  is_required: true,
 }
 
 const followupMultiChoiceQuestion: CareerPlaybookFollowupQuestion = {
@@ -253,6 +266,72 @@ describe('QuestionRenderer', () => {
     expect(handleValueChange).toHaveBeenCalledWith('engineering')
   })
 
+  it('lets single-choice questions save a custom Other value inline', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={fixedSingleChoiceQuestion}
+        value=""
+        onValueChange={handleValueChange}
+        copy={{
+          otherOptionLabel: 'Другое',
+          otherOptionPlaceholder: 'Введите свой вариант',
+        }}
+      />
+    )
+
+    await user.click(screen.getByRole('radio', { name: 'Другое' }))
+    expect(handleValueChange).toHaveBeenLastCalledWith('')
+
+    await user.type(screen.getByPlaceholderText('Введите свой вариант'), 'Коммерция')
+
+    expect(handleValueChange).toHaveBeenLastCalledWith('Коммерция')
+  })
+
+  it('keeps the single-choice Other input visible when the parent owns the value', async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const [value, setValue] = useState('')
+
+      return (
+        <QuestionRenderer
+          question={fixedSingleChoiceQuestion}
+          value={value}
+          onValueChange={setValue}
+          copy={{
+            otherOptionLabel: 'Другое',
+            otherOptionPlaceholder: 'Введите свой вариант',
+          }}
+        />
+      )
+    }
+
+    render(<Harness />)
+
+    await user.click(screen.getByRole('radio', { name: 'Другое' }))
+    expect(screen.getByPlaceholderText('Введите свой вариант')).toBeInTheDocument()
+
+    await user.type(screen.getByPlaceholderText('Введите свой вариант'), 'Коммерция')
+
+    expect(screen.getByPlaceholderText('Введите свой вариант')).toHaveValue('Коммерция')
+  })
+
+  it('does not add Other to constrained content language choices', () => {
+    render(
+      <QuestionRenderer
+        question={contentLanguageQuestion}
+        value=""
+        onValueChange={vi.fn()}
+        copy={{ otherOptionLabel: 'Другое' }}
+      />
+    )
+
+    expect(screen.queryByRole('radio', { name: 'Другое' })).not.toBeInTheDocument()
+  })
+
   it('renders a multi-choice follow-up question and emits string array values', async () => {
     const user = userEvent.setup()
     const handleValueChange = vi.fn()
@@ -270,6 +349,57 @@ describe('QuestionRenderer', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Найм' }))
     expect(handleValueChange).toHaveBeenLastCalledWith(['budgeting'])
+  })
+
+  it('lets multi-choice questions include a custom Other value inline', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={followupMultiChoiceQuestion}
+        value={['hiring']}
+        onValueChange={handleValueChange}
+        copy={{
+          otherOptionLabel: 'Другое',
+          otherOptionPlaceholder: 'Введите свой вариант',
+        }}
+      />
+    )
+
+    await user.click(screen.getByRole('checkbox', { name: 'Другое' }))
+    await user.type(screen.getByPlaceholderText('Введите свой вариант'), 'Планирование смен')
+
+    expect(handleValueChange).toHaveBeenLastCalledWith(['hiring', 'Планирование смен'])
+  })
+
+  it('keeps the multi-choice Other input visible when the parent owns the value', async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const [value, setValue] = useState<string[]>(['hiring'])
+
+      return (
+        <QuestionRenderer
+          question={followupMultiChoiceQuestion}
+          value={value}
+          onValueChange={setValue}
+          copy={{
+            otherOptionLabel: 'Другое',
+            otherOptionPlaceholder: 'Введите свой вариант',
+          }}
+        />
+      )
+    }
+
+    render(<Harness />)
+
+    await user.click(screen.getByRole('checkbox', { name: 'Другое' }))
+    expect(screen.getByPlaceholderText('Введите свой вариант')).toBeInTheDocument()
+
+    await user.type(screen.getByPlaceholderText('Введите свой вариант'), 'Планирование смен')
+
+    expect(screen.getByPlaceholderText('Введите свой вариант')).toHaveValue('Планирование смен')
   })
 })
 
@@ -330,10 +460,7 @@ describe('Wizard', () => {
     expect(handleNext).toHaveBeenCalledTimes(1)
   })
 
-  it('opens saved free-form draft for review and resubmits edited text', async () => {
-    const user = userEvent.setup()
-    const handleFreeformSubmit = vi.fn()
-
+  it('does not render a separate free-form action next to primary navigation', () => {
     render(
       <Wizard
         questions={[fixedOpenQuestion]}
@@ -342,21 +469,10 @@ describe('Wizard', () => {
         onAnswerChange={vi.fn()}
         onNext={vi.fn()}
         onPrevious={vi.fn()}
-        freeformDraft="Existing context"
-        onFreeformSubmit={handleFreeformSubmit}
       />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Свободный ответ' }))
-    const textarea = screen.getByRole('textbox', { name: 'Расскажите свободно' })
-
-    expect(textarea).toHaveValue('Existing context')
-
-    await user.clear(textarea)
-    await user.type(textarea, 'Edited context')
-    await user.click(screen.getByRole('button', { name: 'Сохранить текст' }))
-
-    expect(handleFreeformSubmit).toHaveBeenCalledWith('Edited context')
+    expect(screen.queryByRole('button', { name: 'Свободный ответ' })).not.toBeInTheDocument()
   })
 })
 
@@ -483,43 +599,6 @@ describe('FollowupPhase', () => {
 
     await user.click(screen.getByRole('button', { name: 'Далее' }))
     expect(handleNext).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('FreeFormInput', () => {
-  it('opens a textarea dialog and submits trimmed text only when text exists', async () => {
-    const user = userEvent.setup()
-    const handleSubmit = vi.fn()
-
-    render(<FreeFormInput onSubmit={handleSubmit} />)
-
-    await user.click(screen.getByRole('button', { name: 'Я расскажу свободно' }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Сохранить текст' })).toBeDisabled()
-
-    await user.type(screen.getByLabelText('Свободный ответ'), '  Роль строит RevOps контур  ')
-    await user.click(screen.getByRole('button', { name: 'Сохранить текст' }))
-
-    expect(handleSubmit).toHaveBeenCalledWith('Роль строит RevOps контур')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('opens the saved free-form draft for editing', async () => {
-    const user = userEvent.setup()
-    const handleSubmit = vi.fn()
-
-    render(<FreeFormInput freeformDraft="Старый контекст" onSubmit={handleSubmit} />)
-
-    await user.click(screen.getByRole('button', { name: 'Я расскажу свободно' }))
-    const textarea = screen.getByLabelText('Свободный ответ')
-
-    expect(textarea).toHaveValue('Старый контекст')
-
-    await user.clear(textarea)
-    await user.type(textarea, 'Обновлённый контекст')
-    await user.click(screen.getByRole('button', { name: 'Сохранить текст' }))
-
-    expect(handleSubmit).toHaveBeenCalledWith('Обновлённый контекст')
   })
 })
 

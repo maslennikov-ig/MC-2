@@ -6,7 +6,6 @@ import { AlertCircle, BriefcaseBusiness, Clock3, Loader2, ShieldCheck } from 'lu
 
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
 import { FollowupPhase } from '@/components/career-playbook/wizard/FollowupPhase'
-import { FreeFormInput } from '@/components/career-playbook/wizard/FreeFormInput'
 import { Wizard, type WizardProps } from '@/components/career-playbook/wizard/Wizard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -189,14 +188,12 @@ export default function CareerPlaybookNewPageClient({
     back: t('back'),
     next: t('next'),
     finish: t('finish'),
-    freeform: t('freeform'),
-    freeformTitle: t('freeformTitle'),
-    freeformPlaceholder: t('freeformPlaceholder'),
-    saveFreeform: t('saveFreeform'),
     draftSaved: t('draftSaving'),
     openPlaceholder: t('openPlaceholder'),
     chooseOneLabel: t('chooseOneLabel'),
     chooseManyLabel: t('chooseManyLabel'),
+    otherOptionLabel: t('otherOptionLabel'),
+    otherOptionPlaceholder: t('otherOptionPlaceholder'),
     questionLabel: t('questionLabel'),
     answeredLabel: t('answeredLabel'),
     ofLabel: t('ofLabel'),
@@ -204,7 +201,7 @@ export default function CareerPlaybookNewPageClient({
     roleSuggestionsHint: t('roleSuggestionsHint'),
     roleSuggestionsPopularLabel: t('roleSuggestionsPopularLabel'),
     roleSuggestionsNoResultsLabel: t('roleSuggestionsNoResultsLabel'),
-    roleSuggestionsManualTemplate: t('roleSuggestionsManualTemplate'),
+    roleSuggestionsManualTemplate: t.raw('roleSuggestionsManualTemplate') as string,
     roleSuggestionsMatchPopular: t('roleSuggestionsMatchPopular'),
     roleSuggestionsMatchLabel: t('roleSuggestionsMatchLabel'),
     roleSuggestionsMatchAlias: t('roleSuggestionsMatchAlias'),
@@ -225,13 +222,8 @@ export default function CareerPlaybookNewPageClient({
     openPlaceholder: t('openPlaceholder'),
     chooseOneLabel: t('chooseOneLabel'),
     chooseManyLabel: t('chooseManyLabel'),
-  }
-  const freeformCopy = {
-    trigger: t('freeform'),
-    title: t('freeformTitle'),
-    label: t('freeformTitle'),
-    placeholder: t('freeformPlaceholder'),
-    submit: t('saveFreeform'),
+    otherOptionLabel: t('otherOptionLabel'),
+    otherOptionPlaceholder: t('otherOptionPlaceholder'),
   }
   const completionCopy = {
     title: t('completionTitle'),
@@ -368,8 +360,6 @@ export default function CareerPlaybookNewPageClient({
               state.goToNextCareerPlaybookQuestion()
             }}
             onPrevious={state.goToPreviousCareerPlaybookQuestion}
-            freeformDraft={state.freeformDraft}
-            onFreeformSubmit={state.saveCareerPlaybookFreeformDraft}
             isSaving={state.isAutosaving}
             copy={copy}
           />
@@ -398,30 +388,21 @@ export default function CareerPlaybookNewPageClient({
         {state.phase === 'followups' &&
         !state.isGeneratingFollowups &&
         state.followupQuestions.length > 0 ? (
-          <>
-            <FollowupPhase
-              questions={state.followupQuestions}
-              answers={followupAnswers}
-              currentIndex={state.currentFollowupIndex}
-              completenessScore={state.completenessScore}
-              onAnswerChange={state.answerCareerPlaybookFollowupQuestion}
-              onNext={() => void advanceAfterFollowup()}
-              onPrevious={state.goToPreviousCareerPlaybookFollowup}
-              onSkip={(questionId) => {
-                state.skipCareerPlaybookFollowupQuestion(questionId)
-                void advanceAfterFollowup()
-              }}
-              onForceGenerate={state.completeCareerPlaybookFollowups}
-              copy={followupCopy}
-            />
-            <div className="mx-auto w-full max-w-4xl px-4">
-              <FreeFormInput
-                freeformDraft={state.freeformDraft}
-                onSubmit={state.saveCareerPlaybookFreeformDraft}
-                copy={freeformCopy}
-              />
-            </div>
-          </>
+          <FollowupPhase
+            questions={state.followupQuestions}
+            answers={followupAnswers}
+            currentIndex={state.currentFollowupIndex}
+            completenessScore={state.completenessScore}
+            onAnswerChange={state.answerCareerPlaybookFollowupQuestion}
+            onNext={() => void advanceAfterFollowup()}
+            onPrevious={state.goToPreviousCareerPlaybookFollowup}
+            onSkip={(questionId) => {
+              state.skipCareerPlaybookFollowupQuestion(questionId)
+              void advanceAfterFollowup()
+            }}
+            onForceGenerate={state.completeCareerPlaybookFollowups}
+            copy={followupCopy}
+          />
         ) : null}
 
         {state.phase === 'completion' ? (

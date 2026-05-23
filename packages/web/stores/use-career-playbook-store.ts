@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
+import { inferRoleDepartmentFromTitle } from '@/components/career-playbook/wizard/role-title-suggestions'
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import { CAREER_PLAYBOOK_BLOCK_CATALOG, languageSchema } from '@megacampus/shared-types'
 import type {
@@ -583,6 +584,32 @@ function answerValuesEqual(
   return left === right
 }
 
+function hasSubmittableAnswerValue(value: CareerPlaybookAnswerValue | undefined) {
+  if (Array.isArray(value)) {
+    return value.some((item) => item.trim().length > 0)
+  }
+
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function submittableFixedAnswers(
+  fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
+): Record<string, CareerPlaybookFixedAnswer> {
+  return Object.fromEntries(
+    Object.entries(fixedAnswers).filter(([, answer]) => hasSubmittableAnswerValue(answer.value))
+  )
+}
+
+function submittableFollowupAnswers(
+  followupAnswers: Record<string, CareerPlaybookFollowupAnswer>
+): Record<string, CareerPlaybookFollowupAnswer> {
+  return Object.fromEntries(
+    Object.entries(followupAnswers).filter(
+      ([, answer]) => answer.skipped || hasSubmittableAnswerValue(answer.value)
+    )
+  )
+}
+
 function emptyViewerBlockState(): CareerPlaybookBlockState {
   return {
     content: '',
@@ -737,6 +764,14 @@ function markDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
   if (!state.dirtyFixedQuestionKeys.includes(questionKey)) {
     state.dirtyFixedQuestionKeys.push(questionKey)
   }
+}
+
+function unmarkDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
+  state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter((key) => key !== questionKey)
+}
+
+function unmarkDirtyFollowupId(state: CareerPlaybookStoreState, questionId: string) {
+  state.dirtyFollowupQuestionIds = state.dirtyFollowupQuestionIds.filter((id) => id !== questionId)
 }
 
 function clearDependentFollowupContext(state: CareerPlaybookStoreState) {
@@ -1134,20 +1169,47 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       answerCareerPlaybookFixedQuestion: (questionKey, value) =>
         set((state) => {
           const previousValue = state.fixedAnswers[questionKey]?.value
-          const fixedContextChanged = !answerValuesEqual(previousValue, value)
+          const nextValue = hasSubmittableAnswerValue(value) ? value : undefined
+          const fixedContextChanged = !answerValuesEqual(previousValue, nextValue)
+
+          if (nextValue === undefined) {
+            delete state.fixedAnswers[questionKey]
+            unmarkDirtyKey(state, questionKey)
+            if (fixedContextChanged) {
+              clearDependentFollowupContext(state)
+            }
+            removeHiddenFixedAnswers(state)
+            clampCurrentFixedIndex(state)
+            return
+          }
 
           state.fixedAnswers[questionKey] = {
             question_key: questionKey,
-            value,
+            value: nextValue,
             answered_at: nowIso(),
           }
-          if (questionKey === 'content_language' && typeof value === 'string') {
-            state.contentLanguage = value
+          markDirtyKey(state, questionKey)
+          if (questionKey === 'content_language' && typeof nextValue === 'string') {
+            state.contentLanguage = nextValue
+          }
+          if (
+            questionKey === 'position' &&
+            typeof nextValue === 'string' &&
+            !state.fixedAnswers.department
+          ) {
+            const inferredDepartment = inferRoleDepartmentFromTitle(nextValue, state.uiLanguage)
+            if (inferredDepartment) {
+              state.fixedAnswers.department = {
+                question_key: 'department',
+                value: inferredDepartment,
+                answered_at: nowIso(),
+              }
+              markDirtyKey(state, 'department')
+            }
           }
           if (fixedContextChanged) {
             clearDependentFollowupContext(state)
           }
-          markDirtyKey(state, questionKey)
           removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
@@ -1185,8 +1247,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
           const response = await client.requestFollowups({
             playbookId: snapshot.playbookId,
-            fixedAnswers: snapshot.fixedAnswers,
-            followupAnswers: snapshot.followupAnswers,
+            fixedAnswers: submittableFixedAnswers(snapshot.fixedAnswers),
+            followupAnswers: submittableFollowupAnswers(snapshot.followupAnswers),
             contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
           })
 
@@ -1229,6 +1291,12 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         set((state) => {
           const question = getFollowupQuestion(state, questionId)
           if (!question) return
+
+          if (!hasSubmittableAnswerValue(value)) {
+            delete state.followupAnswers[questionId]
+            unmarkDirtyFollowupId(state, questionId)
+            return
+          }
 
           state.followupAnswers[questionId] = {
             question_id: question.question_id,
@@ -1558,6 +1626,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           for (const questionKey of dirtyFixedQuestionKeys) {
             const answer = snapshot.fixedAnswers[questionKey]
             if (!answer) continue
+            if (!hasSubmittableAnswerValue(answer.value)) continue
 
             await client.submitAnswer({
               playbookId: snapshot.playbookId,
@@ -1572,6 +1641,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           for (const questionId of dirtyFollowupQuestionIds) {
             const answer = snapshot.followupAnswers[questionId]
             if (!answer) continue
+            if (!answer.skipped && !hasSubmittableAnswerValue(answer.value)) continue
 
             await client.submitAnswer({
               playbookId: snapshot.playbookId,
@@ -1677,8 +1747,8 @@ export function getCareerPlaybookProgress(
   state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers' | 'currentFixedIndex'>
 ) {
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
-  const answered = visibleQuestions.filter(
-    (question) => state.fixedAnswers[question.question_key]?.value
+  const answered = visibleQuestions.filter((question) =>
+    hasSubmittableAnswerValue(state.fixedAnswers[question.question_key]?.value)
   ).length
   const total = visibleQuestions.length
 

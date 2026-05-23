@@ -37,6 +37,14 @@ export type RoleSeniority = 'individual_contributor' | 'lead' | 'manager' | 'hea
 
 export type RoleMatchKind = 'popular' | 'label' | 'alias' | 'acronym' | 'keyword'
 
+export type RoleTitleSuggestionSource = 'esco' | 'onet' | 'okz' | 'mc2_overlay'
+
+export interface RoleTitleSourceReferences {
+  escoUri?: string
+  onetSocCode?: string
+  okzCode?: string
+}
+
 export interface RoleTitleSuggestion {
   id: string
   department: RoleDepartment
@@ -48,7 +56,8 @@ export interface RoleTitleSuggestion {
   keywords?: Record<RoleTitleSuggestionLocale, string[]>
   popularityRank: number
   localePriority?: Partial<Record<RoleTitleSuggestionLocale, number>>
-  source: 'curated'
+  source: RoleTitleSuggestionSource
+  sourceReferences?: RoleTitleSourceReferences
 }
 
 export interface LocalizedRoleTitleSuggestion {
@@ -87,7 +96,7 @@ const departmentLabels: Record<RoleDepartment, Record<RoleTitleSuggestionLocale,
 
 const role = (suggestion: Omit<RoleTitleSuggestion, 'source'>): RoleTitleSuggestion => ({
   ...suggestion,
-  source: 'curated',
+  source: 'mc2_overlay',
 })
 
 export const roleTitleSuggestions: RoleTitleSuggestion[] = [
@@ -508,18 +517,69 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     localePriority: { ru: 35, en: 35 },
   }),
   role({
+    id: 'sales-manager',
+    department: 'sales',
+    group: 'account-management',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер по продажам', en: 'Sales Manager' },
+    aliases: {
+      ru: ['sales manager', 'менеджер продаж', 'специалист по продажам'],
+      en: ['sales lead', 'sales team manager'],
+    },
+    keywords: {
+      ru: ['продажи', 'выручка', 'клиенты', 'воронка продаж'],
+      en: ['sales', 'revenue', 'customers', 'sales pipeline'],
+    },
+    popularityRank: 3,
+    localePriority: { ru: 2, en: 3 },
+    sourceReferences: {
+      escoUri: 'http://data.europa.eu/esco/occupation/a7594892-ff23-4e2a-aedf-2f967ebca15c',
+    },
+  }),
+  role({
     id: 'b2b-sales-manager',
     department: 'sales',
     group: 'account-management',
     seniority: 'manager',
     labels: { ru: 'Менеджер по продажам B2B', en: 'B2B Sales Manager' },
     aliases: {
-      ru: ['sales manager', 'менеджер b2b продаж'],
-      en: ['sales manager', 'b2b account manager'],
+      ru: ['sales manager b2b', 'менеджер b2b продаж', 'менеджер по продажам для бизнеса'],
+      en: ['b2b account manager', 'business sales manager'],
     },
     keywords: { ru: ['воронка продаж', 'сделки'], en: ['sales pipeline', 'deals'] },
-    popularityRank: 3,
-    localePriority: { ru: 2, en: 3 },
+    popularityRank: 4,
+    localePriority: { ru: 4, en: 4 },
+  }),
+  role({
+    id: 'b2c-sales-manager',
+    department: 'sales',
+    group: 'account-management',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер по продажам B2C', en: 'B2C Sales Manager' },
+    aliases: {
+      ru: ['sales manager b2c', 'менеджер b2c продаж', 'менеджер по продажам частным клиентам'],
+      en: ['consumer sales manager', 'direct sales manager'],
+    },
+    keywords: {
+      ru: ['b2c', 'частные клиенты', 'розница', 'прямые продажи'],
+      en: ['b2c', 'consumer sales', 'direct sales'],
+    },
+    popularityRank: 21,
+    localePriority: { ru: 5, en: 20 },
+  }),
+  role({
+    id: 'retail-sales-manager',
+    department: 'sales',
+    group: 'account-management',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер розничных продаж', en: 'Retail Sales Manager' },
+    aliases: {
+      ru: ['retail sales manager', 'менеджер по продажам в рознице', 'менеджер розницы'],
+      en: ['retail manager', 'shop sales manager'],
+    },
+    keywords: { ru: ['розница', 'магазин', 'b2c'], en: ['retail', 'store', 'b2c'] },
+    popularityRank: 22,
+    localePriority: { ru: 6, en: 21 },
   }),
   role({
     id: 'head-of-sales',
@@ -594,7 +654,10 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = [
     group: 'account-management',
     seniority: 'manager',
     labels: { ru: 'Channel Sales Manager', en: 'Channel Sales Manager' },
-    aliases: { ru: ['партнерские продажи', 'channel manager'], en: ['partner sales manager'] },
+    aliases: {
+      ru: ['партнерские продажи', 'channel manager', 'менеджер по продажам через партнеров'],
+      en: ['partner sales manager', 'channel manager'],
+    },
     keywords: { ru: ['партнеры', 'каналы'], en: ['partners', 'channels'] },
     popularityRank: 57,
     localePriority: { ru: 42, en: 42 },
@@ -1086,11 +1149,59 @@ export function getRoleTitleSuggestionGroups(
   return groups
 }
 
+export function inferRoleDepartmentFromTitle(title: string, locale: string): RoleDepartment | null {
+  const normalizedLocale = normalizeLocale(locale)
+  const normalizedTitle = normalizeSearchText(title)
+  if (normalizedTitle.length < 2) return null
+
+  const matchedSuggestion = searchRoleTitleSuggestions(title, normalizedLocale, 1)[0]
+  if (matchedSuggestion) {
+    return matchedSuggestion.department
+  }
+
+  const inferredRule = departmentInferenceRules.find((rule) =>
+    rule.terms.some((term) => normalizedTitle.includes(term))
+  )
+
+  return inferredRule?.department ?? null
+}
+
 interface RoleMatchScore {
   matchKind: RoleMatchKind
   matchLabel: string
   score: number
 }
+
+const departmentInferenceRules: Array<{ department: RoleDepartment; terms: string[] }> = [
+  {
+    department: 'sales',
+    terms: [
+      'продаж',
+      'sales',
+      'account',
+      'выручк',
+      'b2b',
+      'b2c',
+      'retail',
+      'розниц',
+      'клиент',
+      'партнерск',
+    ],
+  },
+  { department: 'marketing', terms: ['маркет', 'marketing', 'brand', 'бренд', 'seo', 'crm'] },
+  { department: 'product', terms: ['product', 'продукт', 'продакт'] },
+  {
+    department: 'engineering',
+    terms: ['engineer', 'developer', 'devops', 'разработ', 'инженер', 'программист', 'sre'],
+  },
+  { department: 'design', terms: ['design', 'дизайн', 'ux', 'ui'] },
+  { department: 'data', terms: ['data', 'аналитик', 'analytics', 'machine learning', 'bi'] },
+  { department: 'operations', terms: ['operations', 'операц', 'project', 'program', 'process'] },
+  { department: 'hr', terms: ['hr', 'people', 'talent', 'recruit', 'персонал', 'рекрут'] },
+  { department: 'finance', terms: ['finance', 'финанс', 'accountant', 'бухгалтер', 'cfo'] },
+  { department: 'support', terms: ['support', 'customer success', 'поддерж', 'implementation'] },
+  { department: 'legal', terms: ['legal', 'юрист', 'lawyer', 'compliance', 'комплаенс'] },
+]
 
 function scoreSuggestion(
   suggestion: RoleTitleSuggestion,

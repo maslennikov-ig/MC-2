@@ -51,6 +51,8 @@ const defaultCopy: Required<FollowupPhaseCopy> = {
   openPlaceholder: 'Введите ответ',
   chooseOneLabel: 'Выберите один вариант',
   chooseManyLabel: 'Можно выбрать несколько',
+  otherOptionLabel: 'Другое',
+  otherOptionPlaceholder: 'Введите свой вариант',
   roleSuggestionsLabel: 'Подходящие роли',
   roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
   roleSuggestionsPopularLabel: 'Популярные роли',
@@ -146,7 +148,7 @@ export function FollowupPhase({
 }
 
 function hasAnswer(value: CareerPlaybookWizardValue | undefined) {
-  if (Array.isArray(value)) return value.length > 0
+  if (Array.isArray(value)) return value.some((item) => item.trim().length > 0)
   return typeof value === 'string' && value.trim().length > 0
 }
 

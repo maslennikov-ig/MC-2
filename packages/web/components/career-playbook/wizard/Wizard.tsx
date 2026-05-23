@@ -1,17 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, FileText } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import { ProgressIndicator } from './ProgressIndicator'
 import {
   getQuestionKey,
@@ -25,10 +15,6 @@ interface WizardCopy extends QuestionRendererCopy {
   back?: string
   next?: string
   finish?: string
-  freeform?: string
-  freeformTitle?: string
-  freeformPlaceholder?: string
-  saveFreeform?: string
   draftSaved?: string
   questionLabel?: string
   answeredLabel?: string
@@ -42,8 +28,6 @@ export interface WizardProps {
   onAnswerChange: (questionKey: string, value: CareerPlaybookWizardValue) => void
   onNext: () => void
   onPrevious: () => void
-  freeformDraft?: string
-  onFreeformSubmit?: (text: string) => void
   isSaving?: boolean
   copy?: WizardCopy
 }
@@ -52,10 +36,6 @@ const defaultCopy: Required<WizardCopy> = {
   back: 'Назад',
   next: 'Далее',
   finish: 'Завершить',
-  freeform: 'Свободный ответ',
-  freeformTitle: 'Расскажите свободно',
-  freeformPlaceholder: 'Опишите роль, контекст компании и важные ожидания одним текстом.',
-  saveFreeform: 'Сохранить текст',
   draftSaved: 'Черновик сохраняется',
   questionLabel: 'Вопрос',
   answeredLabel: 'Отвечено',
@@ -63,6 +43,8 @@ const defaultCopy: Required<WizardCopy> = {
   openPlaceholder: 'Введите ответ',
   chooseOneLabel: 'Выберите один вариант',
   chooseManyLabel: 'Можно выбрать несколько',
+  otherOptionLabel: 'Другое',
+  otherOptionPlaceholder: 'Введите свой вариант',
   roleSuggestionsLabel: 'Подходящие роли',
   roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
   roleSuggestionsPopularLabel: 'Популярные роли',
@@ -82,14 +64,10 @@ export function Wizard({
   onAnswerChange,
   onNext,
   onPrevious,
-  freeformDraft = '',
-  onFreeformSubmit,
   isSaving = false,
   copy,
 }: WizardProps) {
   const labels = { ...defaultCopy, ...copy }
-  const [freeformOpen, setFreeformOpen] = useState(false)
-  const [freeformText, setFreeformText] = useState('')
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(questions.length - 1, 0))
   const currentQuestion = questions[safeIndex]
   const currentQuestionKey = currentQuestion ? getQuestionKey(currentQuestion) : ''
@@ -101,12 +79,6 @@ export function Wizard({
     ? !isQuestionRequired(currentQuestion) || hasAnswer(currentValue)
     : false
   const isLastQuestion = safeIndex === questions.length - 1
-
-  useEffect(() => {
-    if (freeformOpen) {
-      setFreeformText(freeformDraft)
-    }
-  }, [freeformDraft, freeformOpen])
 
   if (!currentQuestion) {
     return null
@@ -143,39 +115,6 @@ export function Wizard({
         </Button>
 
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <Dialog open={freeformOpen} onOpenChange={setFreeformOpen}>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" className="w-full sm:w-auto">
-                <FileText className="mr-2 h-4 w-4" aria-hidden />
-                {labels.freeform}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{labels.freeformTitle}</DialogTitle>
-              </DialogHeader>
-              <Textarea
-                aria-label={labels.freeformTitle}
-                value={freeformText}
-                onChange={(event) => setFreeformText(event.target.value)}
-                placeholder={labels.freeformPlaceholder}
-                className="min-h-40"
-              />
-              <DialogFooter>
-                <Button
-                  type="button"
-                  disabled={!freeformText.trim()}
-                  onClick={() => {
-                    onFreeformSubmit?.(freeformText.trim())
-                    setFreeformOpen(false)
-                  }}
-                >
-                  {labels.saveFreeform}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
           <Button
             type="button"
             onClick={onNext}
@@ -199,7 +138,7 @@ export function Wizard({
 
 function hasAnswer(value: CareerPlaybookWizardValue | undefined) {
   if (Array.isArray(value)) {
-    return value.length > 0
+    return value.some((item) => item.trim().length > 0)
   }
 
   return typeof value === 'string' && value.trim().length > 0

@@ -18,16 +18,24 @@ const messages = {
       back: 'Back',
       next: 'Next',
       finish: 'Finish Phase A',
-      freeform: 'Free-form',
-      freeformTitle: 'Tell freely',
-      freeformPlaceholder: 'Describe the role in your own words.',
-      saveFreeform: 'Save text',
       draftSaving: 'Saving draft...',
       draftSaved: 'Draft saved locally',
       draftUnsynced: 'Local draft saved. Server sync is pending.',
       openPlaceholder: 'Type your answer',
       chooseOneLabel: 'Choose one',
       chooseManyLabel: 'Choose several',
+      otherOptionLabel: 'Other',
+      otherOptionPlaceholder: 'Type your option',
+      roleSuggestionsLabel: 'Suggested roles',
+      roleSuggestionsHint: 'Pick a close role or keep your own title.',
+      roleSuggestionsPopularLabel: 'Popular roles',
+      roleSuggestionsNoResultsLabel: 'No exact match',
+      roleSuggestionsManualTemplate: 'Use "{value}"',
+      roleSuggestionsMatchPopular: 'Popular role',
+      roleSuggestionsMatchLabel: 'Role title',
+      roleSuggestionsMatchAlias: 'Alias',
+      roleSuggestionsMatchAcronym: 'Acronym',
+      roleSuggestionsMatchKeyword: 'Related query',
       questionLabel: 'Question',
       answeredLabel: 'Answered',
       ofLabel: 'of',
@@ -291,51 +299,6 @@ describe('CareerPlaybookNewPageClient', () => {
 
     expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
     expect(screen.getByText('Win rate')).toBeInTheDocument()
-  })
-
-  it('opens and edits the saved Phase B free-form draft', async () => {
-    const user = userEvent.setup()
-
-    useCareerPlaybookStore.setState({
-      playbookId: '00000000-0000-4000-8000-000000000821',
-      ownerUserId: 'user-1',
-      uiLanguage: 'en',
-      contentLanguage: 'en',
-      phase: 'followups',
-      status: 'answering_followups',
-      fixedQuestions: [],
-      fixedAnswers: {
-        position: {
-          question_key: 'position',
-          value: 'Head of Sales',
-        },
-      },
-      followupQuestions: [
-        {
-          question_id: '00000000-0000-4000-8000-000000000822',
-          question_text: 'Which KPIs define success in this role?',
-          question_type: 'open',
-          options: null,
-          rationale: 'KPI specificity improves the role guide.',
-        },
-      ],
-      currentFollowupIndex: 0,
-      completenessScore: 0.8,
-      freeformDraft: 'Existing operating context',
-    })
-
-    renderPage()
-
-    await user.click(await screen.findByRole('button', { name: 'Free-form' }))
-    const textarea = screen.getByRole('textbox', { name: 'Tell freely' })
-
-    expect(textarea).toHaveValue('Existing operating context')
-
-    await user.clear(textarea)
-    await user.type(textarea, 'Updated operating context')
-    await user.click(screen.getByRole('button', { name: 'Save text' }))
-
-    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('Updated operating context')
   })
 
   it('shows a generation handoff state after clicking the generate CTA', async () => {
