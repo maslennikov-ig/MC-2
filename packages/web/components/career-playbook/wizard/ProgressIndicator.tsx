@@ -38,7 +38,7 @@ export function ProgressIndicator({
     <section aria-label="Wizard progress" className="min-h-[72px] space-y-3">
       <div className="flex min-h-6 items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
         <span className="whitespace-nowrap">
-          {labels.questionLabel} {displayIndex} {labels.ofLabel} {safeTotal}
+          {labels.questionLabel} {displayIndex}
         </span>
         <span className="flex items-center gap-1.5 font-medium whitespace-nowrap text-slate-800 dark:text-slate-100">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />

@@ -94,7 +94,7 @@ export function FollowupPhase({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
             <Sparkles className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
-            {labels.title} {safeIndex + 1} {labels.ofLabel} {questions.length}
+            {labels.title} {safeIndex + 1}
           </div>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 tabular-nums dark:text-slate-50">
             <Gauge className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />

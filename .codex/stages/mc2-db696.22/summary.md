@@ -13,6 +13,7 @@ Base: `origin/develop` at `a1a82bd317268fa8f507416bf17b62c03691147e`
 - Added contextual `Другое` / `Other` inline custom entry for single-choice and multi-choice questions.
 - Guarded autosave so an empty custom value selected through `Другое` is not submitted as an invalid answer.
 - Fixed the fixed-question progress bar so the percentage follows the current step instead of answered-count side effects from inferred answers.
+- Removed visible unstable `из N` totals from fixed and adaptive follow-up headers; these flows can have conditional or generated questions, so the UI now shows the current step without pretending the total is stable.
 - Changed role suggestion source labeling away from `curated` to `mc2_overlay`, added a broad `Менеджер по продажам` result, and added B2C/retail sales variants.
 - Added role-to-department inference so sales/product/engineering/etc. role titles pre-fill the likely department when that answer is still empty.
 - Kept manual role entry and existing fixed-answer state; no backend schema change, billing/payment scope, live taxonomy API, or large dataset import.
@@ -45,6 +46,8 @@ Base: `origin/develop` at `a1a82bd317268fa8f507416bf17b62c03691147e`
 - `git diff --check` - passed.
 - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/career-playbook-store.test.ts` - follow-up progress fix passed, 63 tests.
 - `pnpm type-check` - follow-up progress fix passed.
+- `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/career-playbook-store.test.ts` - follow-up unstable totals fix passed, 63 tests.
+- `pnpm type-check` - follow-up unstable totals fix passed.
 - `python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-db696.22/artifacts/lookup-role-library-source.md .codex/stages/mc2-db696.22/artifacts/sartre-code-review.md` - passed.
 - `python3 scripts/orchestration/check_stage_ready.py mc2-db696.22` - passed.
 - `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.22` - passed; repeated `pnpm type-check`, `pnpm build`, and process verification. Existing build warnings included Browserslist, `url.parse()`, and sometimes the known Supabase Edge Runtime trace.

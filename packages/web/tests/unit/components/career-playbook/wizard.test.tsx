@@ -87,7 +87,8 @@ describe('ProgressIndicator', () => {
   it('uses the current question for percent while showing answered count separately', () => {
     render(<ProgressIndicator answeredCount={5} currentIndex={3} totalCount={6} />)
 
-    expect(screen.getByText('Вопрос 4 из 6')).toBeInTheDocument()
+    expect(screen.getByText('Вопрос 4')).toBeInTheDocument()
+    expect(screen.queryByText('Вопрос 4 из 6')).not.toBeInTheDocument()
     expect(screen.getByText('Отвечено: 5')).toBeInTheDocument()
     expect(screen.getByText('67%')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
@@ -103,7 +104,8 @@ describe('ProgressIndicator', () => {
       />
     )
 
-    expect(screen.getByText('Question 2 of 7')).toBeInTheDocument()
+    expect(screen.getByText('Question 2')).toBeInTheDocument()
+    expect(screen.queryByText('Question 2 of 7')).not.toBeInTheDocument()
     expect(screen.getByText('Answered: 2')).toBeInTheDocument()
   })
 })
@@ -496,7 +498,8 @@ describe('FollowupPhase', () => {
       />
     )
 
-    expect(screen.getByText('ИИ-уточнение 1 из 2')).toBeInTheDocument()
+    expect(screen.getByText('ИИ-уточнение 1')).toBeInTheDocument()
+    expect(screen.queryByText('ИИ-уточнение 1 из 2')).not.toBeInTheDocument()
     expect(screen.getByText('60%')).toBeInTheDocument()
     expect(screen.getByText('Можно собрать основу')).toBeInTheDocument()
     expect(screen.getByText('80%')).toBeInTheDocument()
