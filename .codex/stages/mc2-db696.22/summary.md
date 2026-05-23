@@ -1,6 +1,6 @@
 # Stage mc2-db696.22 Summary
 
-Status: PR-ready on `codex/career-playbook-authoritative-roles-flow`
+Status: PR #47 open on `codex/career-playbook-authoritative-roles-flow`
 Updated: 2026-05-23
 Branch: `codex/career-playbook-authoritative-roles-flow`
 Base: `origin/develop` at `a1a82bd317268fa8f507416bf17b62c03691147e`

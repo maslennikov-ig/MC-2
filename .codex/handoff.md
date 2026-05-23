@@ -9,7 +9,7 @@ Base head: `a1a82bd317268fa8f507416bf17b62c03691147e`
 
 - Primary worktree `/home/me/code/mc2` is on `codex/career-playbook-authoritative-roles-flow`.
 - Active Beads task: `mc2-db696.22` (`Career Playbook: replace curated role suggestions with authoritative occupation source`).
-- This stage is PR-ready for `develop`; it has not been merged to `develop` and has not been deployed.
+- This stage is open as PR #47 (`codex/career-playbook-authoritative-roles-flow` -> `develop`); it has not been merged to `develop` and has not been deployed.
 - Previous PR #46 remains the latest delivered baseline: role suggestions were delivered to Dev and staging/production route before this new correction stage.
 - Career Playbook Russian naming remains `Должностная инструкция`; header action remains `Создать описание роли`; do not regress to unclear wording such as `руководство роли`.
 - The current stage removes the global `Свободный ответ` action from fixed/follow-up flows.
@@ -28,7 +28,7 @@ Base head: `a1a82bd317268fa8f507416bf17b62c03691147e`
 ## Next recommended
 
 Next stage id: `mc2-db696.22`
-Recommended action: open/merge PR to `develop`, then use the normal `/push-dev` delivery path if Dev deployment is needed. Do not push directly to `develop` or `master`.
+Recommended action: review/merge PR #47 to `develop`, then use the normal `/push-dev` delivery path if Dev deployment is needed. Do not push directly to `develop` or `master`.
 
 ## Starter prompt for next orchestrator
 
