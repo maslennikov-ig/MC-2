@@ -18,7 +18,7 @@ const fixedOpenQuestion: CareerPlaybookFixedQuestion = {
   question_key: 'position',
   question_type: 'open',
   question_text: 'Какую должность вы хотите оформить?',
-  helper_text: 'Например: Product Manager',
+  helper_text: 'Например: менеджер продукта',
   is_required: true,
 }
 
@@ -132,22 +132,24 @@ describe('QuestionRenderer', () => {
 
     await user.click(screen.getByLabelText('Какую должность вы хотите оформить?'))
     expect(screen.getByText('Популярные роли')).toBeInTheDocument()
-    expect(screen.getAllByRole('option', { name: /Product Manager/ })[0]).toBeInTheDocument()
+    expect(screen.getAllByRole('option', { name: /Менеджер продукта/ })[0]).toBeInTheDocument()
+    expect(screen.queryByText('Product Manager')).not.toBeInTheDocument()
     expect(handleValueChange).not.toHaveBeenCalled()
 
     await user.type(screen.getByLabelText('Какую должность вы хотите оформить?'), 'prod')
 
     expect(handleValueChange).toHaveBeenLastCalledWith('prod')
     expect(screen.getByText('Подходящие роли')).toBeInTheDocument()
-    expect(screen.getAllByRole('option', { name: /Product Manager/ })[0]).toBeInTheDocument()
+    expect(screen.getAllByRole('option', { name: /Менеджер продукта/ })[0]).toBeInTheDocument()
+    expect(screen.getByText('Product Manager')).toBeInTheDocument()
     expect(screen.getByText('Продукт')).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Продукт' })).not.toBeInTheDocument()
 
-    await user.click(screen.getAllByRole('option', { name: /Product Manager/ })[0])
+    await user.click(screen.getAllByRole('option', { name: /Менеджер продукта/ })[0])
 
-    expect(handleValueChange).toHaveBeenLastCalledWith('Product Manager')
+    expect(handleValueChange).toHaveBeenLastCalledWith('Менеджер продукта')
     expect(screen.getByLabelText('Какую должность вы хотите оформить?')).toHaveValue(
-      'Product Manager'
+      'Менеджер продукта'
     )
   })
 
@@ -172,7 +174,7 @@ describe('QuestionRenderer', () => {
     await user.type(screen.getByLabelText('Какую должность вы хотите оформить?'), 'prod')
     await user.keyboard('{Enter}')
 
-    expect(handleValueChange).toHaveBeenLastCalledWith('Product Manager')
+    expect(handleValueChange).toHaveBeenLastCalledWith('Менеджер продукта')
   })
 
   it('keeps an unmatched typed role as manual entry', async () => {
@@ -248,7 +250,7 @@ describe('QuestionRenderer', () => {
     await user.type(screen.getByLabelText('Какую должность вы хотите оформить?'), 'Head of Sales')
 
     expect(handleValueChange).toHaveBeenLastCalledWith('Head of Sales')
-    expect(screen.getByText('Например: Product Manager')).toBeInTheDocument()
+    expect(screen.getByText('Например: менеджер продукта')).toBeInTheDocument()
   })
 
   it('renders a single-choice fixed question and emits the selected value', async () => {

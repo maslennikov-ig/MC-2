@@ -8,7 +8,7 @@ Base head: `a1a82bd317268fa8f507416bf17b62c03691147e`
 ## Current state
 
 - Primary worktree `/home/me/code/mc2` is on `codex/career-playbook-authoritative-roles-flow`.
-- Active Beads task: `mc2-db696.22` (`Career Playbook: replace curated role suggestions with authoritative occupation source`).
+- No active Beads task is currently claimed for this stage; latest follow-up task `mc2-db696.25` is closed.
 - This stage is open as PR #47 (`codex/career-playbook-authoritative-roles-flow` -> `develop`); it has not been merged to `develop` and has not been deployed.
 - Previous PR #46 remains the latest delivered baseline: role suggestions were delivered to Dev and staging/production route before this new correction stage.
 - Career Playbook Russian naming remains `Должностная инструкция`; header action remains `Создать описание роли`; do not regress to unclear wording such as `руководство роли`.
@@ -20,6 +20,8 @@ Base head: `a1a82bd317268fa8f507416bf17b62c03691147e`
 - Role suggestions now use source-aware `mc2_overlay` records with source references instead of claiming a generic `curated` source.
 - Generic `Менеджер по продажам` now suggests broad Sales Manager plus B2C, retail, channel/account, and B2B variants.
 - Selecting or typing a recognizable role infers the likely department when the department answer is still empty.
+- Russian UI copy was simplified in `mc2-db696.25`: unexplained `PMF`, `Phase A/B`, `KPI`, `FAQ`, `README`, and English-heavy role/department labels were replaced or clarified.
+- Russian role suggestions use localized labels by default and show alternate-language labels only when the user searches in the other script.
 - No backend schema change, billing/payment scope, live taxonomy API, large dataset import, or paid runtime dependency was added.
 
 ## Latest relevant stage

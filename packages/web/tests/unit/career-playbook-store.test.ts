@@ -99,6 +99,24 @@ describe('useCareerPlaybookStore', () => {
     )
   })
 
+  it('uses understandable Russian labels for product stage options', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'ru', contentLanguage: 'ru' })
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '51-200')
+
+    const companyStageQuestion = getCareerPlaybookVisibleQuestions(
+      useCareerPlaybookStore.getState()
+    ).find((question) => question.question_key === 'company_stage')
+
+    expect(companyStageQuestion?.options?.map((option) => option.label)).toEqual([
+      'Проверяем спрос и ценность продукта',
+      'Спрос подтверждён, масштабируем продажи и продукт',
+      'Рост: отлаживаем процессы и расширяем рынки',
+      'Зрелая компания: оптимизация и устойчивость',
+    ])
+  })
+
   it('records fixed answers, advances through visible questions, and reports deterministic progress', () => {
     useCareerPlaybookStore
       .getState()

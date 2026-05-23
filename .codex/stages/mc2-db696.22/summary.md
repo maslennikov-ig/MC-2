@@ -16,6 +16,8 @@ Base: `origin/develop` at `a1a82bd317268fa8f507416bf17b62c03691147e`
 - Removed visible unstable `из N` totals from fixed and adaptive follow-up headers; these flows can have conditional or generated questions, so the UI now shows the current step without pretending the total is stable.
 - Changed role suggestion source labeling away from `curated` to `mc2_overlay`, added a broad `Менеджер по продажам` result, and added B2C/retail sales variants.
 - Added role-to-department inference so sales/product/engineering/etc. role titles pre-fill the likely department when that answer is still empty.
+- Follow-up bug `mc2-db696.25` simplified the Russian product language: `PMF`, `Phase A/B`, `KPI`, `FAQ`, `README`, unexplained role labels, and department labels were replaced or clarified while English UI content stayed intact.
+- Russian role suggestions now prefer localized labels and show the alternate-language label only when the user searches in the other script, so normal Cyrillic searches do not surface English subtitles by default.
 - Kept manual role entry and existing fixed-answer state; no backend schema change, billing/payment scope, live taxonomy API, or large dataset import.
 
 ## Routing
@@ -43,6 +45,10 @@ Base: `origin/develop` at `a1a82bd317268fa8f507416bf17b62c03691147e`
 - `pnpm type-check` - passed.
 - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm build` - passed with existing Browserslist and `url.parse()` warnings.
 - `PLAYWRIGHT_PORT=3104 pnpm --dir packages/web exec playwright test tests/e2e/career-playbook/wizard-phase-a.spec.ts --project=chromium --reporter=list` - unauthenticated guard passed; authenticated flow skipped because `TOKEN` is not set.
+- `pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/role-title-suggestions.test.ts tests/unit/components/career-playbook/landing-page.test.tsx tests/unit/components/career-playbook/wizard.test.tsx` - follow-up Russian language cleanup passed, 75 tests.
+- `pnpm --filter @megacampus/web lint` - follow-up Russian language cleanup passed with 7 existing warnings outside this scope.
+- `pnpm type-check` - follow-up Russian language cleanup passed.
+- `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build` - follow-up Russian language cleanup passed after network access was allowed for Google Fonts; existing Browserslist and `url.parse()` warnings remained.
 - `git diff --check` - passed.
 - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/career-playbook-store.test.ts` - follow-up progress fix passed, 63 tests.
 - `pnpm type-check` - follow-up progress fix passed.

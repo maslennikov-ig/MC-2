@@ -27,6 +27,7 @@ describe('role title suggestions', () => {
     const popularEn = getPopularRoleTitleSuggestions('en', 5)
 
     expect(popularRu.map((suggestion) => suggestion.id)).toContain('product-manager')
+    expect(popularRu[0]?.label).toBe('Менеджер продукта')
     expect(popularEn[0]?.label).toBe('Product Manager')
     expect(popularRu[0]?.departmentLabel).toBe('Продукт')
     expect(popularEn[0]?.departmentLabel).toBe('Product')
@@ -46,7 +47,7 @@ describe('role title suggestions', () => {
     const results = searchRoleTitleSuggestions('product owner', 'ru', 4)
 
     expect(results[0]?.id).toBe('product-owner')
-    expect(results[0]?.label).toBe('Product Owner')
+    expect(results[0]?.label).toBe('Владелец продукта')
     expect(results[0]?.departmentLabel).toBe('Продукт')
     expect(results[0]?.alternateLabel).toBe('Product Owner')
   })

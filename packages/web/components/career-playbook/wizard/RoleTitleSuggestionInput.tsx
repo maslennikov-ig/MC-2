@@ -177,6 +177,9 @@ export function RoleTitleSuggestionInput({
                   const selected = suggestion.label === value
                   const active = index === activeIndex
                   const matchLabel = getMatchLabel(suggestion.matchKind, labels)
+                  const showAlternateLabel =
+                    suggestion.alternateLabel !== suggestion.label &&
+                    shouldShowAlternateLabel(locale, trimmedValue)
 
                   return (
                     <div
@@ -206,7 +209,7 @@ export function RoleTitleSuggestionInput({
                         <span className="block text-sm leading-5 font-medium break-words">
                           {suggestion.label}
                         </span>
-                        {suggestion.alternateLabel !== suggestion.label ? (
+                        {showAlternateLabel ? (
                           <span className="mt-0.5 block text-xs leading-5 break-words text-slate-500 dark:text-slate-400">
                             {suggestion.alternateLabel}
                           </span>
@@ -256,4 +259,13 @@ function getMatchLabel(matchKind: RoleMatchKind, labels: Required<RoleTitleSugge
   }
 
   return matchLabels[matchKind]
+}
+
+function shouldShowAlternateLabel(locale: string, query: string) {
+  if (!query.trim()) return false
+
+  const usesLatin = /\p{Script=Latin}/u.test(query)
+  const usesCyrillic = /\p{Script=Cyrillic}/u.test(query)
+
+  return locale === 'en' ? usesCyrillic : usesLatin
 }
