@@ -1,44 +1,45 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-23
-Branch: `codex/career-playbook-authoritative-roles-flow`
+Branch: `codex/career-playbook-ui-polish`
 Base: `origin/develop`
 
-## Current state
+## Current State
 
-- PR #47 is active for `develop`; not merged and not deployed.
-- Working tree implements `mc2-db696.27` LazyWeb redesign and `mc2-db696.26` readiness fix.
-- Follow-up `mc2-db696.28` tracks ESCO role-title import subset.
-- Product naming remains `Должностная инструкция`; header action remains `Создать описание роли`.
-- No billing/payment scope, live taxonomy API, large dataset import, or protected-branch push was added.
+- PR #47 was merged into `develop` and deployed to Dev via run `26335235464`; Dev health returned `{"status":"ok"}`.
+- Current branch fixes `mc2-db696.29`: Career Playbook constructor completion-state bug and UI polish.
+- Related task `mc2-db696.30` tracks shared header standardization; this branch includes the first narrow header fix.
+- No direct push to `develop`/`master`; no billing/payment scope; no live taxonomy or large dataset import.
 
-## Changes
+## Changes In This Branch
 
-- Plan added: `docs/plans/career-playbook/2026-05-23-lazyweb-generation-flow-redesign.md`.
-- `/career-playbook/new` is now a wide workbench: compact header, left rail, center work area, right context/readiness/generation panel.
-- Global `Свободный ответ` is gone; custom answers use contextual `Другое` / `Other`.
-- Company/product stage is a stable optional base question.
-- Progress percent follows current step; `Отвечено` remains separate.
-- Generation fix: unanswered follow-ups are skipped before review; fixed-only fallback works when no follow-up questions were stored; backend does not require stored `content_language`.
-- Skipped follow-ups appear handled in the rail.
+- Fixed completed fixed-question state: when all visible base questions are answered, the primary action can finish from any selected question.
+- Left rail questions are clickable buttons for review/edit instead of static completed rows.
+- Constructor header is slimmer, removes the extra product/phase badges, and keeps the title as the top signal.
+- Wizard columns, question text, side summaries, choice rows, and role input use larger, more readable sizing.
+- Role search icon is vertically centered with the input text.
+- Shared `Header` role-description action now uses the same purple primary visual family as `Создать курс`.
+- `/create` and `/courses` now render the shared `Header` wrappers instead of maintaining separate local header implementations.
 
 ## Verification
 
-- Web focused Vitest 75 passed; backend router Vitest 38 passed.
-- `pnpm type-check`, `pnpm --filter @megacampus/web lint`, `pnpm build`, and `git diff --check` passed.
-- `PLAYWRIGHT_PORT=3187 pnpm --filter @megacampus/web test:e2e:career-playbook` passed 3 and skipped 2 authenticated tests because `TOKEN` is unset.
-- Visible reviewer `Leibniz` found no remaining blockers after recheck.
+- `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/layouts/header.test.tsx` passed: 37 tests.
+- `pnpm --filter @megacampus/web lint` passed with 7 existing warnings outside this scope.
+- `pnpm type-check`, `git diff --check`, and `pnpm build` passed.
+- `PLAYWRIGHT_PORT=3192 pnpm --filter @megacampus/web test:e2e:career-playbook` passed 3, skipped 2 authenticated tests because `TOKEN` is unset.
+- Code review report passed with no blocking findings; browser screenshots were checked locally for public Career Playbook landing and Courses shared header.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.27`
-Recommended action: commit and push this branch to update PR #47; after review/merge, use the normal dev delivery path if Dev deployment is needed.
+Next stage id: `mc2-db696.29`
+Recommended action: create PR from `codex/career-playbook-ui-polish` to `develop`, then use the normal PR/dev delivery flow after review.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" work in /home/me/code/mc2. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.27/summary.md, docs/plans/career-playbook/2026-05-23-lazyweb-generation-flow-redesign.md, and Beads state for mc2-db696.26/.27/.28. Current branch is codex/career-playbook-authoritative-roles-flow; do not push directly to develop/master.
+Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" UI polish in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.29/summary.md`, and Beads state for `mc2-db696.29`, `mc2-db696.30`, and `mc2-db696.28`. Current branch is `codex/career-playbook-ui-polish`; do not push directly to `develop`/`master`.
 
 ## Explicit defers
 
 - `mc2-db696.28`: ESCO import subset / normalized role-source pipeline.
-- Authenticated screenshots/flow require `TOKEN` or storage state.
+- `mc2-db696.30`: broader audit of remaining non-shared page/admin headers beyond the narrow fixes in this branch.
+- Authenticated constructor screenshots require `TOKEN` or storage state.

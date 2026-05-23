@@ -19,14 +19,14 @@ export default function Header({ darkMode = false }: HeaderProps = {}) {
   const isAuthenticated = !!session
   const t = useTranslations('common.nav')
   const roleDescriptionLinkClass = darkMode
-    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-teal-400/20 bg-teal-400/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-teal-400/35 hover:bg-teal-400/10 hover:text-teal-300 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
-    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-2.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-teal-300 hover:bg-teal-100 hover:text-teal-700 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-teal-400/20 dark:bg-teal-400/5 dark:text-gray-300 dark:hover:border-teal-400/35 dark:hover:bg-teal-400/10 dark:hover:text-teal-300'
+    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-purple-500/20 bg-gradient-to-r from-purple-500/5 to-blue-500/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-purple-500/30 hover:from-purple-500/10 hover:to-blue-500/10 hover:text-purple-400 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
+    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-300 hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400'
   const roleDescriptionIconClass = darkMode
-    ? 'h-4 w-4 text-teal-300 transition-colors group-hover:text-teal-200'
-    : 'h-4 w-4 text-teal-700 transition-colors group-hover:text-teal-800 dark:text-teal-300 dark:group-hover:text-teal-200'
+    ? 'h-4 w-4 text-purple-400 transition-colors group-hover:text-purple-300'
+    : 'h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700 dark:text-purple-400 dark:group-hover:text-purple-300'
 
   return (
-    <header className="relative z-20 flex items-center justify-between p-4 sm:p-6 lg:p-8">
+    <header className="relative z-20 flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-4">
       {/* Logo */}
       <div className="sm:hidden">
         <Logo variant="compact" size="sm" forceWhite={darkMode} />

@@ -68,10 +68,11 @@ describe('Header', () => {
 
     render(<Header />)
 
-    expect(screen.getByRole('link', { name: 'Создать описание роли' })).toHaveAttribute(
-      'href',
-      '/career-playbook/new'
-    )
+    const link = screen.getByRole('link', { name: 'Создать описание роли' })
+
+    expect(link).toHaveAttribute('href', '/career-playbook/new')
+    expect(link.className).toContain('purple')
+    expect(link.className).not.toContain('teal')
   })
 
   it('links signed-out users to the role description landing page', () => {

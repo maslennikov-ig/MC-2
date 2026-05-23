@@ -102,7 +102,7 @@ export function RoleTitleSuggestionInput({
     <div className="relative space-y-3">
       <div className="relative">
         <Search
-          className="pointer-events-none absolute top-3 left-3 h-4 w-4 text-slate-400"
+          className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400"
           aria-hidden
         />
         <Input
@@ -144,7 +144,7 @@ export function RoleTitleSuggestionInput({
             }
           }}
           placeholder={placeholder}
-          className="h-12 pl-9 text-base"
+          className="h-12 pl-10 text-[16px] leading-6"
         />
       </div>
 
