@@ -1,47 +1,44 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-23
-Current working branch: `codex/career-playbook-authoritative-roles-flow`
-Base branch: `origin/develop`
-Base head: `a1a82bd317268fa8f507416bf17b62c03691147e`
+Branch: `codex/career-playbook-authoritative-roles-flow`
+Base: `origin/develop`
 
 ## Current state
 
-- Primary worktree `/home/me/code/mc2` is on `codex/career-playbook-authoritative-roles-flow`.
-- No active Beads task is currently claimed for this stage; latest follow-up task `mc2-db696.25` is closed.
-- This stage is open as PR #47 (`codex/career-playbook-authoritative-roles-flow` -> `develop`); it has not been merged to `develop` and has not been deployed.
-- Previous PR #46 remains the latest delivered baseline: role suggestions were delivered to Dev and staging/production route before this new correction stage.
-- Career Playbook Russian naming remains `Должностная инструкция`; header action remains `Создать описание роли`; do not regress to unclear wording such as `руководство роли`.
-- The current stage removes the global `Свободный ответ` action from fixed/follow-up flows.
-- Choice questions now expose contextual `Другое` / `Other` with inline custom entry; `content_language` intentionally does not.
-- Empty custom choices are kept as local UI draft until the user types, but are not stored, autosaved, or submitted as answers.
-- Follow-up bug `mc2-db696.23` fixes fixed-question progress percent so it follows the current step, while `Отвечено` remains a separate count.
-- Follow-up bug `mc2-db696.24` removes visible unstable `из N` totals from fixed and adaptive follow-up headers.
-- Role suggestions now use source-aware `mc2_overlay` records with source references instead of claiming a generic `curated` source.
-- Generic `Менеджер по продажам` now suggests broad Sales Manager plus B2C, retail, channel/account, and B2B variants.
-- Selecting or typing a recognizable role infers the likely department when the department answer is still empty.
-- Russian UI copy was simplified in `mc2-db696.25`: unexplained `PMF`, `Phase A/B`, `KPI`, `FAQ`, `README`, and English-heavy role/department labels were replaced or clarified.
-- Russian role suggestions use localized labels by default and show alternate-language labels only when the user searches in the other script.
-- No backend schema change, billing/payment scope, live taxonomy API, large dataset import, or paid runtime dependency was added.
+- PR #47 is active for `develop`; not merged and not deployed.
+- Working tree implements `mc2-db696.27` LazyWeb redesign and `mc2-db696.26` readiness fix.
+- Follow-up `mc2-db696.28` tracks ESCO role-title import subset.
+- Product naming remains `Должностная инструкция`; header action remains `Создать описание роли`.
+- No billing/payment scope, live taxonomy API, large dataset import, or protected-branch push was added.
 
-## Latest relevant stage
+## Changes
 
-- Current stage: `mc2-db696.22` - authoritative role-source direction, contextual `Другое`, no global free-form button. Summary and artifacts are under [`.codex/stages/mc2-db696.22`](./stages/mc2-db696.22/summary.md).
-- Research plan: [`docs/plans/career-playbook/2026-05-23-authoritative-role-source-and-other-flow.md`](../docs/plans/career-playbook/2026-05-23-authoritative-role-source-and-other-flow.md).
+- Plan added: `docs/plans/career-playbook/2026-05-23-lazyweb-generation-flow-redesign.md`.
+- `/career-playbook/new` is now a wide workbench: compact header, left rail, center work area, right context/readiness/generation panel.
+- Global `Свободный ответ` is gone; custom answers use contextual `Другое` / `Other`.
+- Company/product stage is a stable optional base question.
+- Progress percent follows current step; `Отвечено` remains separate.
+- Generation fix: unanswered follow-ups are skipped before review; fixed-only fallback works when no follow-up questions were stored; backend does not require stored `content_language`.
+- Skipped follow-ups appear handled in the rail.
+
+## Verification
+
+- Web focused Vitest 75 passed; backend router Vitest 38 passed.
+- `pnpm type-check`, `pnpm --filter @megacampus/web lint`, `pnpm build`, and `git diff --check` passed.
+- `PLAYWRIGHT_PORT=3187 pnpm --filter @megacampus/web test:e2e:career-playbook` passed 3 and skipped 2 authenticated tests because `TOKEN` is unset.
+- Visible reviewer `Leibniz` found no remaining blockers after recheck.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.22`
-Recommended action: review/merge PR #47 to `develop`, then use the normal `/push-dev` delivery path if Dev deployment is needed. Do not push directly to `develop` or `master`.
+Next stage id: `mc2-db696.27`
+Recommended action: commit and push this branch to update PR #47; after review/merge, use the normal dev delivery path if Dev deployment is needed.
 
 ## Starter prompt for next orchestrator
 
-```text
-Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" work in /home/me/code/mc2. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.22/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. Current branch is codex/career-playbook-authoritative-roles-flow based on origin/develop at a1a82bd317268fa8f507416bf17b62c03691147e. Keep manual role entry, contextual Другое/Other, existing fixed-answer state, RU/EN behavior, no billing/payment, no live taxonomy dependency, and no direct push to develop/master.
-```
+Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" work in /home/me/code/mc2. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.27/summary.md, docs/plans/career-playbook/2026-05-23-lazyweb-generation-flow-redesign.md, and Beads state for mc2-db696.26/.27/.28. Current branch is codex/career-playbook-authoritative-roles-flow; do not push directly to develop/master.
 
 ## Explicit defers
 
-- Full OKZ/O\*NET/ESCO import pipeline and normalized `role_id`/source/confidence persistence.
-- Lightcast integration until commercial access is approved.
-- Authenticated browser screenshots/flow for `/career-playbook/new` require `TOKEN` or storage state; unauthenticated guard is verified.
+- `mc2-db696.28`: ESCO import subset / normalized role-source pipeline.
+- Authenticated screenshots/flow require `TOKEN` or storage state.

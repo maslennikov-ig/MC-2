@@ -46,17 +46,17 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.getByRole('radio', { name: '201-1000 человек (Established)' }).click()
       await page.getByRole('button', { name: 'Далее' }).click()
 
-      await expect(page.getByText('Какая стадия компании / продукта?')).not.toBeVisible()
-      await expect(
-        page.getByText('На каком языке сгенерировать должностную инструкцию?')
-      ).toBeVisible()
+      await expect(page.getByText('Какая стадия компании / продукта?')).toBeVisible()
 
       await page.reload()
       await page.waitForLoadState('networkidle')
 
+      await expect(page.getByText('Какая стадия компании / продукта?')).toBeVisible()
+      await page.getByRole('button', { name: 'Далее' }).click()
       await expect(
         page.getByText('На каком языке сгенерировать должностную инструкцию?')
       ).toBeVisible()
+      await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()
@@ -71,7 +71,8 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.getByRole('button', { name: 'Далее' }).click()
       await page.getByRole('button', { name: 'Далее' }).click()
       await page.getByRole('button', { name: 'Далее' }).click()
-      await page.getByRole('button', { name: 'Завершить Phase A' }).click()
+      await page.getByRole('button', { name: 'Далее' }).click()
+      await page.getByRole('button', { name: 'Завершить базовые вопросы' }).click()
 
       await expect(
         page.getByRole('heading', { name: 'Адаптивные уточнения пока недоступны' })

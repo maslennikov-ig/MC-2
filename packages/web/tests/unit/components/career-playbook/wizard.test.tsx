@@ -84,11 +84,10 @@ const followupOpenQuestion: CareerPlaybookFollowupQuestion = {
 }
 
 describe('ProgressIndicator', () => {
-  it('uses the current question for percent while showing answered count separately', () => {
+  it('uses the current step for percent while showing answered count separately', () => {
     render(<ProgressIndicator answeredCount={5} currentIndex={3} totalCount={6} />)
 
-    expect(screen.getByText('Вопрос 4')).toBeInTheDocument()
-    expect(screen.queryByText('Вопрос 4 из 6')).not.toBeInTheDocument()
+    expect(screen.getByText('Вопрос 4 из 6')).toBeInTheDocument()
     expect(screen.getByText('Отвечено: 5')).toBeInTheDocument()
     expect(screen.getByText('67%')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
@@ -104,8 +103,7 @@ describe('ProgressIndicator', () => {
       />
     )
 
-    expect(screen.getByText('Question 2')).toBeInTheDocument()
-    expect(screen.queryByText('Question 2 of 7')).not.toBeInTheDocument()
+    expect(screen.getByText('Question 2 of 7')).toBeInTheDocument()
     expect(screen.getByText('Answered: 2')).toBeInTheDocument()
   })
 })
@@ -500,16 +498,15 @@ describe('FollowupPhase', () => {
       />
     )
 
-    expect(screen.getByText('ИИ-уточнение 1')).toBeInTheDocument()
-    expect(screen.queryByText('ИИ-уточнение 1 из 2')).not.toBeInTheDocument()
-    expect(screen.getByText('60%')).toBeInTheDocument()
+    expect(screen.getByText('ИИ-уточнение 1 из 2')).toBeInTheDocument()
+    expect(screen.getAllByText('60%').length).toBeGreaterThan(0)
     expect(screen.getByText('Можно собрать основу')).toBeInTheDocument()
-    expect(screen.getByText('80%')).toBeInTheDocument()
+    expect(screen.getAllByText('80%').length).toBeGreaterThan(0)
     expect(screen.getByText('Хорошая полнота')).toBeInTheDocument()
-    expect(screen.getByText('100%')).toBeInTheDocument()
+    expect(screen.getAllByText('100%').length).toBeGreaterThan(0)
     expect(screen.getByText('Максимум контекста')).toBeInTheDocument()
-    expect(screen.getByText(followupOpenQuestion.question_text)).toBeInTheDocument()
-    expect(screen.queryByText(followupMultiChoiceQuestion.question_text)).not.toBeInTheDocument()
+    expect(screen.getAllByText(followupOpenQuestion.question_text).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('checkbox', { name: 'Найм' })).not.toBeInTheDocument()
 
     await user.type(screen.getByLabelText(followupOpenQuestion.question_text), 'Потеря hiring bar')
     expect(handleAnswerChange).toHaveBeenLastCalledWith(
@@ -526,7 +523,7 @@ describe('FollowupPhase', () => {
     const handlePrevious = vi.fn()
     const handleNext = vi.fn()
     const handleSkip = vi.fn()
-    const { rerender } = render(
+    const { container, rerender } = render(
       <FollowupPhase
         questions={[followupOpenQuestion, followupMultiChoiceQuestion]}
         answers={{ [followupOpenQuestion.question_id]: 'Ответ' }}
@@ -559,8 +556,11 @@ describe('FollowupPhase', () => {
         onPrevious={handlePrevious}
         onSkip={handleSkip}
         onForceGenerate={vi.fn()}
+        handledQuestionIds={[followupOpenQuestion.question_id]}
       />
     )
+
+    expect(container.querySelectorAll('[data-handled="true"]').length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: 'Назад' }))
     expect(handlePrevious).toHaveBeenCalledTimes(1)
@@ -651,16 +651,16 @@ describe('CompletionScreen', () => {
       />
     )
 
-    expect(screen.getByText('Готовы создать?')).toBeInTheDocument()
-    expect(screen.getByText('Фиксированные ответы')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Готовы создать?' })).toBeInTheDocument()
+    expect(screen.getAllByText('Фиксированные ответы').length).toBeGreaterThan(0)
     expect(screen.getByText('Какую должность вы хотите оформить?')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
     expect(screen.getByText('Отдел или функциональная область')).toBeInTheDocument()
     expect(screen.getByText('Продажи / Sales')).toBeInTheDocument()
-    expect(screen.getByText('Уточнения')).toBeInTheDocument()
+    expect(screen.getAllByText('Уточнения').length).toBeGreaterThan(0)
     expect(screen.getByText('Потеря hiring bar')).toBeInTheDocument()
     expect(screen.getByText('Пропущено')).toBeInTheDocument()
-    expect(screen.getByText('Свободные заметки')).toBeInTheDocument()
+    expect(screen.getAllByText('Свободные заметки').length).toBeGreaterThan(0)
     expect(screen.getByText('Роль строит RevOps контур')).toBeInTheDocument()
 
     await user.click(

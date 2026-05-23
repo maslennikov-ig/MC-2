@@ -148,6 +148,13 @@ export default function CareerPlaybookNewPageClient({
       ),
     [state.followupAnswers]
   )
+  const handledFollowupQuestionIds = useMemo(
+    () =>
+      Object.values(state.followupAnswers)
+        .filter((answer) => answer.skipped)
+        .map((answer) => answer.question_id),
+    [state.followupAnswers]
+  )
   const fixedAnswerSummary = useMemo(
     () =>
       Object.values(state.fixedAnswers).map((answer) => {
@@ -314,35 +321,37 @@ export default function CareerPlaybookNewPageClient({
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <section className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:px-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-md">
-              <BriefcaseBusiness className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              {t('eyebrow')}
-            </Badge>
-            <Badge variant="outline" className="rounded-md">
-              <ShieldCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              {phaseBadge}
-            </Badge>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div className="max-w-3xl space-y-3">
-              <h1 className="text-3xl font-semibold tracking-normal md:text-4xl">{t('title')}</h1>
-              <p className="text-base leading-7 text-slate-600 dark:text-slate-300">
+      <section className="border-b border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
+        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-md">
+                <BriefcaseBusiness className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                {t('eyebrow')}
+              </Badge>
+              <Badge variant="outline" className="rounded-md">
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                {phaseBadge}
+              </Badge>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 className="text-xl font-semibold tracking-normal md:text-2xl">{t('title')}</h1>
+              <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                 {t('subtitle')}
               </p>
             </div>
-            <div className="flex min-h-11 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-              <Clock3 className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
-              {draftStatus}
-            </div>
+          </div>
+          <div className="flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+            <Clock3 className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
+            {draftStatus}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-0 py-6 md:px-2">
+      <section
+        data-testid="career-playbook-workspace"
+        className="mx-auto max-w-[1480px] px-4 py-5 md:px-6"
+      >
         {state.phase === 'fixed' ? (
           <Wizard
             questions={visibleQuestions}
@@ -401,6 +410,7 @@ export default function CareerPlaybookNewPageClient({
               void advanceAfterFollowup()
             }}
             onForceGenerate={state.completeCareerPlaybookFollowups}
+            handledQuestionIds={handledFollowupQuestionIds}
             copy={followupCopy}
           />
         ) : null}
@@ -451,21 +461,32 @@ function PhaseBStatus({
     <div
       role={icon === 'loading' ? 'status' : 'alert'}
       aria-live={icon === 'loading' ? 'polite' : 'assertive'}
-      className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-4 py-14 text-center"
+      className="grid w-full gap-4 lg:grid-cols-[240px_minmax(0,1fr)_320px] xl:grid-cols-[260px_minmax(0,1fr)_360px]"
     >
-      <Icon
-        className={`h-8 w-8 ${icon === 'loading' ? 'animate-spin text-teal-700 dark:text-teal-300' : 'text-amber-600 dark:text-amber-300'}`}
-        aria-hidden
-      />
-      <div className="space-y-2">
-        <h2 className="text-2xl font-semibold">{title}</h2>
-        <p className="text-slate-600 dark:text-slate-300">{description}</p>
+      <aside className="rounded-md border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+        <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+          {title}
+        </p>
+      </aside>
+      <div className="rounded-md border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-start gap-3">
+          <Icon
+            className={`mt-1 h-6 w-6 shrink-0 ${icon === 'loading' ? 'animate-spin text-teal-700 dark:text-teal-300' : 'text-amber-600 dark:text-amber-300'}`}
+            aria-hidden
+          />
+          <div className="min-w-0 space-y-2">
+            <h2 className="text-xl font-semibold">{title}</h2>
+            <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p>
+          </div>
+        </div>
       </div>
-      {actionLabel && onAction ? (
-        <Button type="button" onClick={onAction}>
-          {actionLabel}
-        </Button>
-      ) : null}
+      <aside className="rounded-md border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+        {actionLabel && onAction ? (
+          <Button type="button" onClick={onAction} className="w-full">
+            {actionLabel}
+          </Button>
+        ) : null}
+      </aside>
     </div>
   )
 }

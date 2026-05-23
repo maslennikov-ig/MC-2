@@ -188,8 +188,6 @@ interface CareerPlaybookStoreState {
 
 export type CareerPlaybookStore = CareerPlaybookStoreState
 
-const branchableStartupTeamSizes = new Set(['1-10', '11-50', '51-200'])
-
 const departmentOptions = {
   ru: [
     ['sales', 'Продажи'],
@@ -312,9 +310,6 @@ const fixedQuestionSeed: Record<
         { value: 'mature', label: 'Зрелая компания: оптимизация и устойчивость' },
       ],
       is_required: false,
-      branching_rules: {
-        when: { question_key: 'team_size', value_in: ['1-10', '11-50', '51-200'] },
-      },
     },
     {
       language: 'ru',
@@ -400,9 +395,6 @@ const fixedQuestionSeed: Record<
         { value: 'mature', label: 'Mature (stable business, optimization)' },
       ],
       is_required: false,
-      branching_rules: {
-        when: { question_key: 'team_size', value_in: ['1-10', '11-50', '51-200'] },
-      },
     },
     {
       language: 'en',
@@ -727,7 +719,7 @@ function visibleQuestionsFromState(
     const answerValue = state.fixedAnswers[branchingRules.when.question_key]?.value
     if (branchingRules.when.value) return answerValue === branchingRules.when.value
     if (branchingRules.when.value_in) {
-      return typeof answerValue === 'string' && branchableStartupTeamSizes.has(answerValue)
+      return typeof answerValue === 'string' && branchingRules.when.value_in.includes(answerValue)
     }
 
     return true
@@ -806,6 +798,22 @@ function followupAnswersEqual(
 
 function getFollowupQuestion(state: CareerPlaybookStoreState, questionId: string) {
   return state.followupQuestions.find((question) => question.question_id === questionId)
+}
+
+function markUnansweredFollowupsSkipped(state: CareerPlaybookStoreState) {
+  for (const question of state.followupQuestions) {
+    const answer = state.followupAnswers[question.question_id]
+    if (answer?.skipped || hasSubmittableAnswerValue(answer?.value)) continue
+
+    state.followupAnswers[question.question_id] = {
+      question_id: question.question_id,
+      question_text: question.question_text,
+      question_type: question.question_type,
+      skipped: true,
+      answered_at: nowIso(),
+    }
+    markDirtyFollowupId(state, question.question_id)
+  }
 }
 
 export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
@@ -1344,6 +1352,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
       completeCareerPlaybookFollowups: () =>
         set((state) => {
+          markUnansweredFollowupsSkipped(state)
           state.phase = 'completion'
           state.status = 'ready_to_generate'
         }),
