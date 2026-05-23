@@ -166,6 +166,8 @@
     "openPlaceholder": "Type your answer",
     "chooseOneLabel": "Choose one",
     "chooseManyLabel": "Choose several",
+    "roleSuggestionsLabel": "Suggested roles",
+    "roleSuggestionsHint": "Pick a close role from the short list, or keep your own title.",
     "questionLabel": "Question",
     "answeredLabel": "Answered",
     "ofLabel": "of",

@@ -63,6 +63,8 @@ const defaultCopy: Required<WizardCopy> = {
   openPlaceholder: 'Введите ответ',
   chooseOneLabel: 'Выберите один вариант',
   chooseManyLabel: 'Можно выбрать несколько',
+  roleSuggestionsLabel: 'Подходящие роли',
+  roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
 }
 
 export function Wizard({

@@ -89,6 +89,63 @@ describe('ProgressIndicator', () => {
 })
 
 describe('QuestionRenderer', () => {
+  it('offers language-aware role suggestions without blocking manual role entry', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={fixedOpenQuestion}
+        value=""
+        onValueChange={handleValueChange}
+        copy={{
+          openPlaceholder: 'Введите ответ',
+          roleSuggestionsLabel: 'Подходящие роли',
+          roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+        }}
+      />
+    )
+
+    await user.click(screen.getByLabelText('Какую должность вы хотите оформить?'))
+    expect(screen.queryByText('Подходящие роли')).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Какую должность вы хотите оформить?'), 'prod')
+
+    expect(handleValueChange).toHaveBeenLastCalledWith('prod')
+    expect(screen.getByText('Подходящие роли')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Product Manager/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('option', { name: /Product Manager/ }))
+
+    expect(handleValueChange).toHaveBeenLastCalledWith('Product Manager')
+    expect(screen.getByLabelText('Какую должность вы хотите оформить?')).toHaveValue(
+      'Product Manager'
+    )
+  })
+
+  it('supports keyboard selection for role suggestions', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={fixedOpenQuestion}
+        value=""
+        onValueChange={handleValueChange}
+        copy={{
+          openPlaceholder: 'Введите ответ',
+          roleSuggestionsLabel: 'Подходящие роли',
+          roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+        }}
+      />
+    )
+
+    await user.type(screen.getByLabelText('Какую должность вы хотите оформить?'), 'prod')
+    await user.keyboard('{Enter}')
+
+    expect(handleValueChange).toHaveBeenLastCalledWith('Product Manager')
+  })
+
   it('renders an open fixed question and emits a string answer', async () => {
     const user = userEvent.setup()
     const handleValueChange = vi.fn()

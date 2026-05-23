@@ -200,6 +200,8 @@ export default function CareerPlaybookNewPageClient({
     questionLabel: t('questionLabel'),
     answeredLabel: t('answeredLabel'),
     ofLabel: t('ofLabel'),
+    roleSuggestionsLabel: t('roleSuggestionsLabel'),
+    roleSuggestionsHint: t('roleSuggestionsHint'),
   }
   const followupCopy = {
     title: t('followupTitle'),
