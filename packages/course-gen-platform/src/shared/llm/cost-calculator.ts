@@ -71,6 +71,16 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
     inputPricePerMillion: 0.3,
     outputPricePerMillion: 1.2,
   },
+  'deepseek/deepseek-v4-flash': {
+    // OpenRouter, 2026-05-23: Career Playbook high-volume generation model
+    inputPricePerMillion: 0.1,
+    outputPricePerMillion: 0.2,
+  },
+  'deepseek/deepseek-v4-pro': {
+    // OpenRouter, 2026-05-23: Career Playbook complex planning/judging model
+    inputPricePerMillion: 0.435,
+    outputPricePerMillion: 0.87,
+  },
   'moonshotai/kimi-k2-thinking': {
     // MODEL-SELECTION-SPECIFICATION.md: Fallback model for lessons
     // Pricing: $0.55/$2.25 per 1M tokens (input/output)

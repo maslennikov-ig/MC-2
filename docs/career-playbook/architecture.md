@@ -83,7 +83,7 @@ Operator evidence should include a screenshot or exported trace from `/admin/gen
 
 Current runtime cost accounting estimates Career Playbook node costs as `0`, so the admin page proves `cost_breakdown` shape and access control but does not prove real OpenRouter spend. Operator evidence should include provider-side spend or improved runtime cost accounting when the acceptance criterion needs actual cost evidence.
 
-Staging model routing for the first live smoke uses the minimal two-tier setup encoded in migration `20260521101000_allow_career_playbook_model_phases`: `minimax/minimax-m2.7` for `stage_career_playbook_spec` and `stage_career_playbook_judge`; `deepseek/deepseek-v4-flash` for follow-up generation, groups 1-6, and block regeneration.
+Staging model routing for Career Playbook is moving to the DeepSeek V4 pair through migration `20260523073000_update_career_playbook_v4_pro_routing`: `deepseek/deepseek-v4-pro` for `stage_career_playbook_spec`, `stage_career_playbook_group_5`, `stage_career_playbook_judge`, and `stage_career_playbook_regenerator`; `deepseek/deepseek-v4-flash` for follow-up generation and groups 1-4/6. Fallbacks stay within the same V4 pair, with Pro backing Flash phases and Flash backing Pro phases.
 
 The 10-concurrent-generation load test should run against isolated staging resources:
 

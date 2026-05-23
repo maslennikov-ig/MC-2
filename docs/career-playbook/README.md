@@ -61,7 +61,7 @@ Career Playbook per-node cost evidence is available to admins at `/admin/generat
 
 As of 2026-05-20, the Career Playbook migration has been applied to the Supabase project and read-only staging preflight passes when a dedicated non-default queue name is provided. Full mutation smoke is still intentionally gated on disposable staging fixtures, auth token/storage state, queue alignment between enqueuer and worker, cleanup scope, and an accepted numeric LLM/API cost budget.
 
-As of 2026-05-21, minimal model routing for the first live smoke is configured in Supabase and encoded in migration `20260521101000_allow_career_playbook_model_phases`: MiniMax M2.7 for spec/judge and DeepSeek V4 Flash for the remaining Career Playbook phases.
+As of 2026-05-23, the target model routing is encoded in migration `20260523073000_update_career_playbook_v4_pro_routing`: DeepSeek V4 Pro for spec, group 5, judge, and block regeneration; DeepSeek V4 Flash for follow-up and groups 1-4/6. Career Playbook fallbacks now stay within the DeepSeek V4 Flash/Pro pair instead of MiniMax.
 
 As of 2026-05-21, `smoke:career-playbook:live` provides the gated runner, deterministic evidence validator, and dry-run cleanup manifest needed to run a single live staging smoke once auth fixtures, shared queue alignment, cleanup authorization, and budget are explicit. It does not remove the need for operator approval before live mutation.
 
