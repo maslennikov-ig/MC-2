@@ -1,14 +1,19 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-23
-Current working branch: `codex/career-playbook-role-suggestions`
+Current working branch: `develop`
 Base branch: `origin/develop`
-Base head: `17e826ee49ca862857cc832c562daf525a28211e`
+Base head: see current `git status`; code delivery merge was `751cb718f129d28b49f555194eb7747b7679b261`
 
 ## Current state
 
-- Primary worktree `/home/me/code/mc2` is on feature branch `codex/career-playbook-role-suggestions` for Career Playbook role-title suggestions.
-- `develop` was clean and aligned with `origin/develop` before this branch was created; PR #45 was merged and Dev health returned 200 `ok`.
+- Primary worktree `/home/me/code/mc2` is on `develop`.
+- PR #46 (`codex/career-playbook-role-suggestions` -> `develop`) is merged.
+- `/push-dev --yes` promoted Career Playbook role-title suggestions to `develop` with merge commit `751cb718f129d28b49f555194eb7747b7679b261`.
+- GitHub Actions run `26326959021` for `develop` completed successfully; `Deploy to Dev` succeeded.
+- `/deploy --yes` promoted `develop` to `master` with merge commit `15b6a72e920dae24c7cdd1b61e9cf8b7dd922d69`.
+- GitHub Actions run `26327011300` for `master` completed successfully; `Deploy to Production` succeeded. The non-blocking `Integration Tests` job failed, but the workflow conclusion and deploy job were successful.
+- Health checks after delivery returned 200 `ok` for `https://dev.ai.megacampus.ru/api/health` and `https://ai.megacampus.ru/api/health`.
 - Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, `/deploy` targets staging through `master`; do not push directly to `develop` or `master`.
 - Career Playbook Russian naming should remain `Должностная инструкция`; header action remains `Создать описание роли`; do not regress to unclear wording such as `руководство роли`.
 - `mc2-db696.20` delivered the initial small role-title suggestion MVP.
@@ -22,18 +27,18 @@ Base head: `17e826ee49ca862857cc832c562daf525a28211e`
 
 ## Latest relevant stage
 
-- Latest relevant Career Playbook stage: `mc2-db696.21` - production-grade role-title suggestions; summary and artifacts are under [`.codex/stages/mc2-db696.21`](./stages/mc2-db696.21/summary.md).
+- Latest relevant Career Playbook stage: `mc2-db696.21` - production-grade role-title suggestions, delivered to Dev and staging/production route; summary and artifacts are under [`.codex/stages/mc2-db696.21`](./stages/mc2-db696.21/summary.md).
 - Previous MVP stage remains under `mc2-db696.20`; earlier live-smoke foundation remains under `mc2-db696.11` and is unrelated to this frontend change.
 
 ## Next recommended
 
 Next stage id: `mc2-db696.21`
-Recommended action: create a PR from `codex/career-playbook-role-suggestions` to `develop`. Authenticated browser screenshots/flow still require `TOKEN` or storage state.
+Recommended action: no follow-up required for delivery. Authenticated browser screenshots/flow still require `TOKEN` or storage state if a future stage needs that evidence.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" work in /home/me/code/mc2. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.21/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. Current branch is codex/career-playbook-role-suggestions for mc2-db696.21. Keep manual role entry, existing fixed-answer state, RU/EN behavior, no billing/payment, no live taxonomy dependency, and no direct push to develop/master.
+Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" work in /home/me/code/mc2. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.21/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. Current branch is develop; mc2-db696.21 is merged via PR #46, delivered to Dev, and deployed through master. Keep manual role entry, existing fixed-answer state, RU/EN behavior, no billing/payment, no live taxonomy dependency, and no direct push to develop/master.
 ```
 
 ## Explicit defers

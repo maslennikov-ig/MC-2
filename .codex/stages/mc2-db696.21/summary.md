@@ -1,9 +1,9 @@
 # Stage mc2-db696.21 Summary
 
-Status: Production-grade role-title suggestions implemented locally; stage closeout passed
+Status: Production-grade role-title suggestions delivered to Dev and staging/production route
 Updated: 2026-05-23
-Branch: `codex/career-playbook-role-suggestions`
-Base: `origin/develop` @ `17e826ee49ca862857cc832c562daf525a28211e`
+Branch: `develop`
+Base: `origin/develop` code delivery merge `751cb718f129d28b49f555194eb7747b7679b261`
 
 ## Scope Delivered
 
@@ -34,6 +34,15 @@ Base: `origin/develop` @ `17e826ee49ca862857cc832c562daf525a28211e`
 ## Beads
 
 - `mc2-db696.21` tracks this implementation under parent `mc2-db696`; it was closed on 2026-05-23 after verification.
+
+## Delivery Evidence
+
+- PR #46 (`codex/career-playbook-role-suggestions` -> `develop`) was merged on 2026-05-23.
+- `/push-dev --yes` pushed `develop` merge commit `751cb718f129d28b49f555194eb7747b7679b261`.
+- GitHub Actions run `26326959021` completed with conclusion `success`; `Deploy to Dev` succeeded.
+- `/deploy --yes` pushed `master` merge commit `15b6a72e920dae24c7cdd1b61e9cf8b7dd922d69`.
+- GitHub Actions run `26327011300` completed with conclusion `success`; `Deploy to Production` succeeded. The non-blocking `Integration Tests` job failed, but did not block the deployment.
+- Post-delivery health checks returned 200 `ok` for `https://dev.ai.megacampus.ru/api/health` and `https://ai.megacampus.ru/api/health`.
 
 ## Verification Evidence
 
