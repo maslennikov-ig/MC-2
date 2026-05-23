@@ -74,10 +74,14 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   // Large context model
   'x-ai/grok-4-fast': { input: 0.2, output: 0.5 },
 
+  // Career Playbook DeepSeek V4 routing
+  'deepseek/deepseek-v4-flash': { input: 0.1, output: 0.2 },
+  'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
+
   // Legacy/alternative models
   'openrouter/kimi-k2-instruct': { input: 0.15, output: 0.6 },
   'anthropic/claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
-  'google/gemini-3-flash-preview': { input: 0.50, output: 3.0 },
+  'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 },
   // Legacy Gemini models (kept for historical cost tracking)
   'google/gemini-2.0-flash-001': { input: 0.1, output: 0.4 },
   'google/gemini-2.5-flash': { input: 0.075, output: 0.3 },

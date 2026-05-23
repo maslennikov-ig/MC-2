@@ -315,7 +315,7 @@ const fixedQuestionSeed: Record<
       position: 7,
       question_key: 'content_language',
       question_type: 'single_choice',
-      question_text: 'На каком языке сгенерировать Role Guide?',
+      question_text: 'На каком языке сгенерировать должностную инструкцию?',
       helper_text:
         'Если документ будет использоваться в международной компании, выберите English. По умолчанию совпадает с языком интерфейса.',
       options: languageOptions.map(([value, label]) => ({ value, label })),

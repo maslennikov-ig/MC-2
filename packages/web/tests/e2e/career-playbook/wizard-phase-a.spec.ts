@@ -14,7 +14,9 @@ test.describe('Career Playbook Phase A wizard', () => {
         page.getByRole('heading', { name: /Authorization Required|Требуется авторизация/ })
       ).toBeVisible()
       await expect(
-        page.getByRole('heading', { name: /Role Guide constructor|Конструктор Role Guide/ })
+        page.getByRole('heading', {
+          name: /Role Guide constructor|Конструктор должностной инструкции/,
+        })
       ).not.toBeVisible()
     })
   })
@@ -28,7 +30,9 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.goto('/ru/career-playbook/new')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByRole('heading', { name: 'Конструктор Role Guide' })).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: 'Конструктор должностной инструкции' })
+      ).toBeVisible()
       await expect(page.getByLabel('Какую должность вы хотите оформить?')).toBeVisible()
 
       await page.getByLabel('Какую должность вы хотите оформить?').fill('Руководитель продаж')
@@ -43,12 +47,16 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.getByRole('button', { name: 'Далее' }).click()
 
       await expect(page.getByText('Какая стадия компании / продукта?')).not.toBeVisible()
-      await expect(page.getByText('На каком языке сгенерировать Role Guide?')).toBeVisible()
+      await expect(
+        page.getByText('На каком языке сгенерировать должностную инструкцию?')
+      ).toBeVisible()
 
       await page.reload()
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('На каком языке сгенерировать Role Guide?')).toBeVisible()
+      await expect(
+        page.getByText('На каком языке сгенерировать должностную инструкцию?')
+      ).toBeVisible()
       await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()

@@ -1,0 +1,60 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  getPopularRoleTitleSuggestions,
+  getRoleTitleSuggestionGroups,
+  roleTitleSuggestions,
+  searchRoleTitleSuggestions,
+} from '@/components/career-playbook/wizard/role-title-suggestions'
+
+describe('role title suggestions', () => {
+  it('returns a broad curated seed list with stable ids', () => {
+    const uniqueIds = new Set(roleTitleSuggestions.map((suggestion) => suggestion.id))
+
+    expect(roleTitleSuggestions.length).toBeGreaterThanOrEqual(60)
+    expect(uniqueIds.size).toBe(roleTitleSuggestions.length)
+    expect(roleTitleSuggestions.every((suggestion) => suggestion.source === 'curated')).toBe(true)
+  })
+
+  it('orders popular roles by locale-aware priority and popularity rank', () => {
+    const popularRu = getPopularRoleTitleSuggestions('ru', 5)
+    const popularEn = getPopularRoleTitleSuggestions('en', 5)
+
+    expect(popularRu.map((suggestion) => suggestion.id)).toContain('product-manager')
+    expect(popularEn[0]?.label).toBe('Product Manager')
+    expect(popularRu[0]?.departmentLabel).toBe('Продукт')
+    expect(popularEn[0]?.departmentLabel).toBe('Product')
+  })
+
+  it('ranks acronyms, aliases, and localized labels before loose keyword matches', () => {
+    const pmResults = searchRoleTitleSuggestions('pm', 'en', 6)
+    const developerResults = searchRoleTitleSuggestions('разраб', 'ru', 6)
+
+    expect(pmResults[0]?.id).toBe('product-manager')
+    expect(pmResults.some((suggestion) => suggestion.id === 'project-manager')).toBe(true)
+    expect(developerResults[0]?.department).toBe('engineering')
+    expect(developerResults[0]?.matchKind).toMatch(/alias|keyword|label/)
+  })
+
+  it('supports alternate-language lookup while keeping current-locale labels', () => {
+    const results = searchRoleTitleSuggestions('product owner', 'ru', 4)
+
+    expect(results[0]?.id).toBe('product-owner')
+    expect(results[0]?.label).toBe('Product Owner')
+    expect(results[0]?.departmentLabel).toBe('Продукт')
+    expect(results[0]?.alternateLabel).toBe('Product Owner')
+  })
+
+  it('groups search results by department in first-seen order', () => {
+    const results = searchRoleTitleSuggestions('manager', 'en', 12)
+    const groups = getRoleTitleSuggestionGroups(results)
+
+    expect(groups.length).toBeGreaterThan(1)
+    expect(groups[0]?.departmentLabel).toBe(results[0]?.departmentLabel)
+    groups.forEach((group) => {
+      expect(group.suggestions).toEqual(
+        results.filter((suggestion) => suggestion.department === group.department)
+      )
+    })
+  })
+})

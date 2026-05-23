@@ -1,7 +1,7 @@
 /**
  * Model pricing per 1M tokens (USD)
  * Source: OpenRouter pricing page
- * Last updated: 2025-11-25
+ * Last updated: 2026-05-23
  */
 export const MODEL_PRICING = {
   // GPT-4 family
@@ -54,6 +54,14 @@ export const MODEL_PRICING = {
   'qwen/qwen-2.5-72b-instruct': {
     prompt: 0.35,
     completion: 0.4,
+  },
+  'deepseek/deepseek-v4-flash': {
+    prompt: 0.1,
+    completion: 0.2,
+  },
+  'deepseek/deepseek-v4-pro': {
+    prompt: 0.435,
+    completion: 0.87,
   },
 
   // Fallback for unknown models

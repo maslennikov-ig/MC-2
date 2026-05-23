@@ -12,6 +12,10 @@ import type {
   CareerPlaybookFollowupQuestion,
   CareerPlaybookOption,
 } from '@megacampus/shared-types'
+import {
+  RoleTitleSuggestionInput,
+  type RoleTitleSuggestionInputCopy,
+} from './RoleTitleSuggestionInput'
 
 export type CareerPlaybookWizardQuestion =
   | CareerPlaybookFixedQuestion
@@ -19,7 +23,7 @@ export type CareerPlaybookWizardQuestion =
 
 export type CareerPlaybookWizardValue = string | string[]
 
-export interface QuestionRendererCopy {
+export interface QuestionRendererCopy extends RoleTitleSuggestionInputCopy {
   openPlaceholder?: string
   chooseOneLabel?: string
   chooseManyLabel?: string
@@ -36,6 +40,16 @@ const defaultCopy: Required<QuestionRendererCopy> = {
   openPlaceholder: 'Введите ответ',
   chooseOneLabel: 'Выберите один вариант',
   chooseManyLabel: 'Можно выбрать несколько',
+  roleSuggestionsLabel: 'Подходящие роли',
+  roleSuggestionsHint: 'Можно выбрать подсказку или оставить свой вариант.',
+  roleSuggestionsPopularLabel: 'Популярные роли',
+  roleSuggestionsNoResultsLabel: 'Нет точного совпадения',
+  roleSuggestionsManualTemplate: 'Использовать "{value}"',
+  roleSuggestionsMatchPopular: 'Популярная роль',
+  roleSuggestionsMatchLabel: 'Название роли',
+  roleSuggestionsMatchAlias: 'Синоним',
+  roleSuggestionsMatchAcronym: 'Сокращение',
+  roleSuggestionsMatchKeyword: 'Связанный запрос',
 }
 
 const typeIcon = {
@@ -56,7 +70,13 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
   const options = question.options ?? []
   const [localTextValue, setLocalTextValue] = useState(typeof value === 'string' ? value : '')
   const [localSingleValue, setLocalSingleValue] = useState(typeof value === 'string' ? value : '')
-  const [localMultiValue, setLocalMultiValue] = useState<string[]>(Array.isArray(value) ? value : [])
+  const [localMultiValue, setLocalMultiValue] = useState<string[]>(
+    Array.isArray(value) ? value : []
+  )
+  const isRoleTitleQuestion =
+    question.question_type === 'open' &&
+    'question_key' in question &&
+    question.question_key === 'position'
 
   useEffect(() => {
     setLocalTextValue(typeof value === 'string' ? value : '')
@@ -67,8 +87,11 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
   return (
     <fieldset className="min-h-[320px] space-y-5">
       <legend className="space-y-2">
-        <span className="flex items-start gap-3 text-xl font-semibold leading-7 text-slate-950 dark:text-slate-50">
-          <TypeIcon className="mt-1 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300" aria-hidden />
+        <span className="flex items-start gap-3 text-xl leading-7 font-semibold text-slate-950 dark:text-slate-50">
+          <TypeIcon
+            className="mt-1 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300"
+            aria-hidden
+          />
           {question.question_text}
         </span>
         {helperText ? (
@@ -78,7 +101,22 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
         ) : null}
       </legend>
 
-      {question.question_type === 'open' ? (
+      {isRoleTitleQuestion ? (
+        <RoleTitleSuggestionInput
+          id={`career-playbook-${questionKey}`}
+          label={question.question_text}
+          value={localTextValue}
+          onValueChange={(nextValue) => {
+            setLocalTextValue(nextValue)
+            onValueChange(nextValue)
+          }}
+          placeholder={labels.openPlaceholder}
+          locale={'language' in question ? question.language : 'ru'}
+          copy={labels}
+        />
+      ) : null}
+
+      {question.question_type === 'open' && !isRoleTitleQuestion ? (
         <Textarea
           id={`career-playbook-${questionKey}`}
           aria-label={question.question_text}
@@ -126,7 +164,12 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
             const selected = selectedValues.includes(option.value)
 
             return (
-              <OptionRow key={option.value} option={option} questionKey={questionKey} selected={selected}>
+              <OptionRow
+                key={option.value}
+                option={option}
+                questionKey={questionKey}
+                selected={selected}
+              >
                 <Checkbox
                   id={`${questionKey}-${option.value}`}
                   checked={selected}
@@ -171,11 +214,11 @@ function OptionRow({
       {children}
       <Label
         htmlFor={`${questionKey}-${option.value}`}
-        className="cursor-pointer text-sm font-medium leading-6 text-slate-900 dark:text-slate-100"
+        className="cursor-pointer text-sm leading-6 font-medium text-slate-900 dark:text-slate-100"
       >
         {option.label}
         {option.helper ? (
-          <span className="block text-xs font-normal leading-5 text-slate-500 dark:text-slate-400">
+          <span className="block text-xs leading-5 font-normal text-slate-500 dark:text-slate-400">
             {option.helper}
           </span>
         ) : null}

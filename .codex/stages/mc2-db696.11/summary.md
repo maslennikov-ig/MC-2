@@ -38,8 +38,9 @@ Base: `origin/develop` @ `cdbe0e8c`
   - verified target tables, RLS, fixed-question seed counts, policies, and migration history
   - inserted the file-version migration history row for `20260513090000` after MCP `apply_migration` recorded a generated version row
   - reran read-only staging preflight successfully with a dedicated non-default queue name
-  - configured minimal Career Playbook model routing: MiniMax M2.7 for spec/judge and DeepSeek V4 Flash for follow-up, groups, and regenerator
-  - encoded the minimal model routing in migration `20260521101000_allow_career_playbook_model_phases` so future database rebuilds do not depend on manual Supabase rows
+  - configured initial Career Playbook model routing: MiniMax M2.7 for spec/judge and DeepSeek V4 Flash for follow-up, groups, and regenerator
+  - encoded the initial model routing in migration `20260521101000_allow_career_playbook_model_phases` so future database rebuilds do not depend on manual Supabase rows
+  - prepared follow-up routing migration `20260523073000_update_career_playbook_v4_pro_routing` to use DeepSeek V4 Pro for spec, group 5, judge, and regenerator while keeping Flash on follow-up and groups 1-4/6
 - Prepared gated live-smoke execution for `mc2-db696.11.5`:
   - added `smoke:career-playbook:live` with default non-mutating plan mode
   - gated mutation mode behind token, expected disposable user/org, tRPC URL, dedicated queue, cleanup scope, positive budget, and explicit confirmation
@@ -126,6 +127,9 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
   - the git migration now includes idempotent insert/update rows for all 10 active `stage_career_playbook%` configs.
   - active global `llm_model_config` rows exist for all `stage_career_playbook%` phases.
   - runtime resolution returns `minimax/minimax-m2.7` for `stage_career_playbook_spec` and `stage_career_playbook_judge`; all other Career Playbook phases return `deepseek/deepseek-v4-flash`.
+- Follow-up git routing update, 2026-05-23:
+  - migration `20260523073000_update_career_playbook_v4_pro_routing` updates target routing to `deepseek/deepseek-v4-pro` for spec, group 5, judge, and regenerator.
+  - follow-up and groups 1-4/6 remain on `deepseek/deepseek-v4-flash`; fallback routing stays within the DeepSeek V4 pair.
 - Read-only staging preflight after migration, 2026-05-20: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260520` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
 - Read-only staging preflight after model routing, 2026-05-21: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260521-model-routing` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
 - PR-readiness preflight after migration reproducibility update, 2026-05-21: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260521-pr-ready` - passed. No users, rows, jobs, workers, cleanup tasks, or LLM generation were created.
