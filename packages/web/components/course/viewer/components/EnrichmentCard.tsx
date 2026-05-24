@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Play,
@@ -288,6 +289,17 @@ export function EnrichmentCard({
   // @ts-expect-error — config.labelKey is a string from ENRICHMENT_CONFIG, validated at runtime
   const label = t(config.labelKey)
   const placeholderImage = PLACEHOLDER_IMAGES[type] || '/placeholders/Quiz.webp'
+  const placeholderAlt = enrichment.title || label
+
+  const renderPlaceholderImage = (className?: string) => (
+    <Image
+      src={placeholderImage}
+      alt={placeholderAlt}
+      fill
+      sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+      className={cn('object-cover', className)}
+    />
+  )
 
   // Render the image/preview area content
   const renderImageArea = () => {
@@ -307,12 +319,7 @@ export function EnrichmentCard({
     if (isVideoType && urlLoading) {
       return (
         <>
-          {/* placeholder with dynamic URL, dimensions unknown */}
-          <img
-            src={placeholderImage}
-            alt={enrichment.title || label}
-            className="h-full w-full object-cover"
-          />
+          {renderPlaceholderImage()}
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-white/80" />
@@ -325,12 +332,7 @@ export function EnrichmentCard({
     if (isVideoType && urlError) {
       return (
         <>
-          {/* placeholder with dynamic URL, dimensions unknown */}
-          <img
-            src={placeholderImage}
-            alt={enrichment.title || label}
-            className="h-full w-full object-cover opacity-50"
-          />
+          {renderPlaceholderImage('opacity-50')}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <span className="text-sm text-white/80">{t('viewer.videoUnavailable')}</span>
             <Button
@@ -354,12 +356,7 @@ export function EnrichmentCard({
     if (isAudioType && urlLoading) {
       return (
         <>
-          {/* placeholder with dynamic URL, dimensions unknown */}
-          <img
-            src={placeholderImage}
-            alt={enrichment.title || label}
-            className="h-full w-full object-cover"
-          />
+          {renderPlaceholderImage()}
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-white/80" />
@@ -372,12 +369,7 @@ export function EnrichmentCard({
     if (isAudioType && urlError) {
       return (
         <>
-          {/* placeholder with dynamic URL, dimensions unknown */}
-          <img
-            src={placeholderImage}
-            alt={enrichment.title || label}
-            className="h-full w-full object-cover opacity-50"
-          />
+          {renderPlaceholderImage('opacity-50')}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <span className="text-sm text-white/80">{t('viewer.audioUnavailable')}</span>
             <Button
@@ -401,12 +393,7 @@ export function EnrichmentCard({
     if (isAudioType && playbackUrl) {
       return (
         <>
-          {/* placeholder with dynamic URL, dimensions unknown */}
-          <img
-            src={placeholderImage}
-            alt={enrichment.title || label}
-            className="h-full w-full object-cover"
-          />
+          {renderPlaceholderImage()}
           {/* Darkened overlay — click toggles play/pause */}
           <button
             onClick={(e) => {
@@ -450,12 +437,7 @@ export function EnrichmentCard({
     // Default: placeholder image with gradient
     return (
       <>
-        {/* placeholder with dynamic URL, dimensions unknown */}
-        <img
-          src={placeholderImage}
-          alt={enrichment.title || label}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {renderPlaceholderImage('transition-transform duration-500 group-hover:scale-105')}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
       </>
     )
