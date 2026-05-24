@@ -1,6 +1,5 @@
 'use client'
 
-import { redirect } from 'next/navigation'
 import {
   ArrowRight,
   BadgeCheck,
@@ -17,8 +16,6 @@ import {
   MessageSquareText,
   PenLine,
   Search,
-  Sparkles,
-  WandSparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -113,10 +110,10 @@ const variants: Array<{
     id: 'command',
     title: 'Вариант 3. Командный центр',
     subtitle: 'Один сильный ввод роли, умные подсказки и быстрые карточки для уточнений.',
-    reference: 'Doe AI input + Chameleon setup cards',
-    bestFor: 'Если хотим ощущение AI-продукта без перегруженного “чат-бота”.',
+    reference: 'Doe input + Chameleon setup cards',
+    bestFor: 'Если хотим быстрый старт без перегруженного “чат-бота”.',
     caution: 'Нужны хорошие подсказки, иначе интерфейс будет казаться пустым.',
-    icon: WandSparkles,
+    icon: MessageSquareText,
     tone: 'bg-violet-50 text-violet-700 ring-violet-200',
   },
   {
@@ -142,10 +139,6 @@ const variants: Array<{
 ]
 
 export default function CareerPlaybookConstructorVariantsPage() {
-  if (process.env.NODE_ENV === 'production') {
-    redirect('/')
-  }
-
   return (
     <main className="min-h-screen bg-[#f6f3ee] text-slate-950">
       <TopIntro />
@@ -175,11 +168,11 @@ function TopIntro() {
         <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1 text-sm font-medium text-stone-700">
-              <Sparkles className="h-4 w-4 text-violet-600" />
+              <Library className="h-4 w-4 text-violet-600" />
               LazyWeb-подборка для конструктора
             </div>
             <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 lg:text-5xl">
-              5 направлений UI для конструктора должностной инструкции
+              5 направлений интерфейса для конструктора должностной инструкции
             </h1>
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
               Это не финальная реализация, а локальные моки для выбора. Я взял рабочие паттерны из
@@ -532,10 +525,10 @@ function CommandCenterVariant() {
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-violet-700">
-            <Sparkles className="h-5 w-5" />
+            <PenLine className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-base font-semibold">AI-конструктор инструкции</div>
+            <div className="text-base font-semibold">Конструктор инструкции</div>
             <div className="text-sm text-white/55">Сначала роль, затем только нужные уточнения</div>
           </div>
         </div>
