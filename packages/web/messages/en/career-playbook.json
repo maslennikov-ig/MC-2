@@ -98,6 +98,10 @@
     "demoShownBlocksLabel": "First 6 sections shown",
     "demoRemainingBlocksLabel": "20 more sections complete the instruction",
     "demoOutlineLabel": "Sample outline",
+    "demoAllBlocksButtonLabel": "All 26 sections",
+    "demoAllBlocksTitle": "All 26 instruction sections",
+    "demoAllBlocksDescription": "The full structure is grouped by purpose. The first six sections include examples from the demo.",
+    "demoExampleLabel": "Example",
     "demoSections": {
       "mission": {
         "title": "Mission and key results",

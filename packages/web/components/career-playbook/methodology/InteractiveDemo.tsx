@@ -4,6 +4,14 @@ import { useMemo, useState } from 'react'
 import { BookOpenCheck, ClipboardCheck, FileText, MessageSquareText } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +23,16 @@ export interface CareerPlaybookDemoSection {
   blockLabel: string
 }
 
+interface CareerPlaybookDemoBlock {
+  id: string
+  label: string
+}
+
+interface CareerPlaybookDemoBlockGroup {
+  title: string
+  blocks: CareerPlaybookDemoBlock[]
+}
+
 interface InteractiveDemoProps {
   eyebrow: string
   title: string
@@ -24,7 +42,12 @@ interface InteractiveDemoProps {
   shownBlocksLabel: string
   remainingBlocksLabel: string
   outlineLabel: string
+  allBlocksButtonLabel: string
+  allBlocksTitle: string
+  allBlocksDescription: string
+  exampleLabel: string
   sections: CareerPlaybookDemoSection[]
+  fullStructureGroups: CareerPlaybookDemoBlockGroup[]
 }
 
 export function InteractiveDemo({
@@ -36,13 +59,30 @@ export function InteractiveDemo({
   shownBlocksLabel,
   remainingBlocksLabel,
   outlineLabel,
+  allBlocksButtonLabel,
+  allBlocksTitle,
+  allBlocksDescription,
+  exampleLabel,
   sections,
+  fullStructureGroups,
 }: InteractiveDemoProps) {
   const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? '')
   const activeSection = useMemo(
     () => sections.find((section) => section.id === activeSectionId) ?? sections[0],
     [activeSectionId, sections]
   )
+  const exampleByBlockNumber = useMemo(() => {
+    const examples = new Map<string, CareerPlaybookDemoSection>()
+
+    sections.forEach((section) => {
+      const blockNumber = section.blockLabel.match(/\d+/)?.[0]
+      if (blockNumber) {
+        examples.set(blockNumber, section)
+      }
+    })
+
+    return examples
+  }, [sections])
 
   if (!activeSection) {
     return null
@@ -80,45 +120,117 @@ export function InteractiveDemo({
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
-          <div className="grid min-w-0 content-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <div className="grid min-w-0 content-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
             <div className="px-1 pb-2">
               <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
                 {outlineLabel}
               </p>
               <p className="mt-1 text-sm text-slate-300">{shownBlocksLabel}</p>
             </div>
-            {sections.map((section) => {
-              const isActive = section.id === activeSection.id
+            <div
+              data-testid="career-playbook-demo-selector-list"
+              className="grid max-h-[20rem] min-w-0 gap-2 overflow-y-auto pr-1"
+            >
+              {sections.map((section) => {
+                const isActive = section.id === activeSection.id
 
-              return (
-                <Button
-                  key={section.id}
-                  type="button"
-                  variant="ghost"
-                  className={cn(
-                    'h-auto min-h-16 w-full min-w-0 justify-start rounded-md border p-4 text-left whitespace-normal',
-                    'border-white/10 bg-white/5 text-slate-200 hover:border-amber-300/40 hover:bg-white/10',
-                    isActive && 'border-amber-300/60 bg-amber-300/15 text-white'
-                  )}
-                  onClick={() => setActiveSectionId(section.id)}
-                >
-                  <span className="flex min-w-0 items-start gap-3">
-                    <FileText
-                      className="mt-0.5 h-4 w-4 shrink-0 text-amber-200"
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-sm leading-5 font-semibold break-words">
-                        {section.title}
-                      </span>
-                      <span className="mt-1 block text-xs text-slate-400">
-                        {section.blockLabel}
+                return (
+                  <Button
+                    key={section.id}
+                    type="button"
+                    variant="ghost"
+                    data-testid="career-playbook-demo-section-button"
+                    className={cn(
+                      '!h-auto !min-h-[4.75rem] w-full min-w-0 items-start justify-start rounded-md border p-3.5 text-left whitespace-normal',
+                      'border-white/10 bg-white/5 text-slate-200 hover:border-amber-300/40 hover:bg-white/10',
+                      isActive && 'border-amber-300/60 bg-amber-300/15 text-white'
+                    )}
+                    onClick={() => setActiveSectionId(section.id)}
+                  >
+                    <span className="flex min-w-0 items-start gap-3">
+                      <FileText
+                        className="mt-0.5 h-4 w-4 shrink-0 text-amber-200"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm leading-5 font-semibold break-words">
+                          {section.title}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-400">
+                          {section.blockLabel}
+                        </span>
                       </span>
                     </span>
+                  </Button>
+                )
+              })}
+            </div>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 w-full justify-between rounded-md border-amber-300/30 bg-amber-200/10 text-sm font-semibold text-amber-100 hover:border-amber-300/50 hover:bg-amber-200/15 hover:text-white"
+                >
+                  <span>{allBlocksButtonLabel}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-200">
+                    26
                   </span>
                 </Button>
-              )
-            })}
+              </DialogTrigger>
+              <DialogContent className="max-h-[88vh] max-w-4xl overflow-hidden border-white/10 bg-slate-950 p-0 text-white shadow-2xl">
+                <DialogHeader className="border-b border-white/10 px-6 pt-6 pb-4">
+                  <DialogTitle className="text-2xl text-white">{allBlocksTitle}</DialogTitle>
+                  <DialogDescription className="text-sm leading-6 text-slate-300">
+                    {allBlocksDescription}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="max-h-[62vh] overflow-y-auto px-6 py-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {fullStructureGroups.map((group) => (
+                      <div
+                        key={group.title}
+                        className="rounded-lg border border-white/10 bg-white/[0.04] p-4"
+                      >
+                        <p className="text-sm font-semibold text-amber-100">{group.title}</p>
+                        <div className="mt-3 grid gap-2">
+                          {group.blocks.map((block) => {
+                            const blockNumber =
+                              block.id.match(/^block(\d+)$/)?.[1] ??
+                              block.label.match(/^\s*(\d+)\./)?.[1]
+                            const example = blockNumber
+                              ? exampleByBlockNumber.get(blockNumber)
+                              : undefined
+
+                            return (
+                              <div
+                                key={block.id}
+                                className="rounded-md border border-white/10 bg-slate-900/80 p-3"
+                              >
+                                <p className="text-sm leading-5 font-semibold text-slate-100">
+                                  {block.label}
+                                </p>
+                                {example ? (
+                                  <div className="mt-2 border-t border-white/10 pt-2">
+                                    <p className="text-xs font-semibold tracking-wide text-violet-200 uppercase">
+                                      {exampleLabel}
+                                    </p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-300">
+                                      {example.excerpt}
+                                    </p>
+                                  </div>
+                                ) : null}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">

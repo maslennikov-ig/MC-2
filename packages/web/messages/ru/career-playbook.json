@@ -98,6 +98,10 @@
     "demoShownBlocksLabel": "Показаны первые 6 разделов",
     "demoRemainingBlocksLabel": "Ещё 20 разделов дополняют инструкцию",
     "demoOutlineLabel": "Структура примера",
+    "demoAllBlocksButtonLabel": "Все 26 разделов",
+    "demoAllBlocksTitle": "Все 26 разделов инструкции",
+    "demoAllBlocksDescription": "Полная структура сгруппирована по смысловым частям. У первых шести разделов показаны примеры из демо.",
+    "demoExampleLabel": "Пример",
     "demoSections": {
       "mission": {
         "title": "Миссия и ключевые результаты",

@@ -155,7 +155,12 @@ export default function CareerPlaybookLandingPageClient() {
           shownBlocksLabel={t('demoShownBlocksLabel')}
           remainingBlocksLabel={t('demoRemainingBlocksLabel')}
           outlineLabel={t('demoOutlineLabel')}
+          allBlocksButtonLabel={t('demoAllBlocksButtonLabel')}
+          allBlocksTitle={t('demoAllBlocksTitle')}
+          allBlocksDescription={t('demoAllBlocksDescription')}
+          exampleLabel={t('demoExampleLabel')}
           sections={demoSections}
+          fullStructureGroups={blockGroups}
         />
 
         <MethodologySection

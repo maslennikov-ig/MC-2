@@ -83,6 +83,23 @@ const blockGroups: CareerPlaybookBlockGroup[] = [
   },
 ]
 
+const demoBlockGroups: CareerPlaybookBlockGroup[] = [
+  {
+    title: 'Foundation',
+    blocks: Array.from({ length: 6 }, (_, index) => ({
+      id: `block${index + 1}`,
+      label: `${index + 1}. Foundation ${index + 1}`,
+    })),
+  },
+  {
+    title: 'Operations',
+    blocks: Array.from({ length: 20 }, (_, index) => ({
+      id: `block${index + 7}`,
+      label: `${index + 7}. Operations ${index + 7}`,
+    })),
+  },
+]
+
 const demoSections: CareerPlaybookDemoSection[] = [
   {
     id: 'mission',
@@ -105,6 +122,11 @@ const demoChrome = {
   shownBlocksLabel: 'First 6 sections shown',
   remainingBlocksLabel: '20 more sections complete the instruction',
   outlineLabel: 'Document outline',
+  allBlocksButtonLabel: 'All 26 sections',
+  allBlocksTitle: 'All 26 instruction sections',
+  allBlocksDescription:
+    'The full structure is grouped by purpose. The first six sections include examples from the demo.',
+  exampleLabel: 'Example',
 }
 
 describe('MethodologySection', () => {
@@ -139,6 +161,7 @@ describe('InteractiveDemo', () => {
         subtitle="Inspect the generated document."
         previewTitle="B2B Sales Role Guide"
         sections={demoSections}
+        fullStructureGroups={demoBlockGroups}
         {...demoChrome}
       />
     )
@@ -169,6 +192,7 @@ describe('InteractiveDemo', () => {
             blockLabel: 'Block 6',
           },
         ]}
+        fullStructureGroups={demoBlockGroups}
         {...demoChrome}
       />
     )
@@ -178,5 +202,34 @@ describe('InteractiveDemo', () => {
         name: /very long performance indicators and control metrics label/i,
       })
     ).toHaveClass('w-full', 'min-w-0', 'whitespace-normal')
+    expect(screen.getByTestId('career-playbook-demo-selector-list')).toHaveClass(
+      'max-h-[20rem]',
+      'overflow-y-auto'
+    )
+  })
+
+  it('opens the full 26-section structure with examples', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <InteractiveDemo
+        eyebrow="Interactive demo"
+        title="Annotated B2B sales Role Guide preview"
+        subtitle="Inspect the generated document."
+        previewTitle="B2B Sales Role Guide"
+        sections={demoSections}
+        fullStructureGroups={demoBlockGroups}
+        {...demoChrome}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /all 26 sections/i }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('All 26 instruction sections')).toBeInTheDocument()
+    expect(screen.getAllByText('1. Foundation 1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('6. Foundation 6').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Example').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/pipeline is always/i).length).toBeGreaterThan(1)
   })
 })

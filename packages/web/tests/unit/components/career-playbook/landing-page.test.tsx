@@ -137,11 +137,7 @@ describe('CareerPlaybookLandingPageClient', () => {
 
     expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
-    const demoButtons = screen.getAllByRole('button').filter((button) => {
-      return /mission and key results|anti-goals|responsibility zones|duties|decision matrix|kpi and counter-metrics/i.test(
-        button.textContent ?? ''
-      )
-    })
+    const demoButtons = screen.getAllByTestId('career-playbook-demo-section-button')
     expect(demoButtons.map((button) => button.textContent)).toEqual([
       expect.stringMatching(/Mission and key results.*Block 1/i),
       expect.stringMatching(/Anti-goals.*Block 2/i),
