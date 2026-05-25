@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import CareerPlaybookLandingPage, { generateMetadata } from '@/app/[locale]/career-playbook/page'
@@ -130,7 +130,7 @@ describe('CareerPlaybookLandingPageClient', () => {
     activeLocale = 'en'
   })
 
-  it('shows six methodology cards, a 26-block map, and an interactive demo preview', () => {
+  it('shows six methodology cards, a 26-block map, and a 26-section interactive demo preview', () => {
     activeLocale = 'en'
 
     render(<CareerPlaybookLandingPageClient />)
@@ -139,7 +139,8 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
     expect(screen.getByText(/six sources we use most often/i)).toBeInTheDocument()
     const demoButtons = screen.getAllByTestId('career-playbook-demo-section-button')
-    expect(demoButtons.map((button) => button.textContent)).toEqual([
+    expect(demoButtons).toHaveLength(26)
+    expect(demoButtons.slice(0, 6).map((button) => button.textContent)).toEqual([
       expect.stringMatching(/Mission and key results.*Block 1/i),
       expect.stringMatching(/Anti-goals.*Block 2/i),
       expect.stringMatching(/Responsibility zones.*Block 3/i),
@@ -148,13 +149,20 @@ describe('CareerPlaybookLandingPageClient', () => {
       expect.stringMatching(/KPI and counter-metrics.*Block 6/i),
     ])
     expect(screen.getByText('26 sections in the full guide')).toBeInTheDocument()
-    expect(screen.getAllByText('First 6 sections shown').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('20 more sections complete the instruction').length).toBeGreaterThan(
-      0
-    )
+    expect(screen.getAllByText('All 26 sections are in the outline').length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText('Open any section to see an example from the future guide.').length
+    ).toBeGreaterThan(0)
     expect(
       screen.getByText(/the role turns b2b pipeline into predictable revenue/i)
     ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Implementation checklist.*26/i }))
+
+    expect(
+      screen.getAllByText(/before launching the role, check the owner, goals, metrics/i).length
+    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /All 26 sections/i })).not.toBeInTheDocument()
   })
 
   it('localizes the block map, selected-block label, and demo chrome for Russian', () => {
@@ -178,8 +186,11 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getAllByText('22. Памятка роли').length).toBeGreaterThan(0)
     expect(screen.getByText('Должностная инструкция: корпоративные продажи')).toBeInTheDocument()
     expect(screen.getByText('26 разделов в полной инструкции')).toBeInTheDocument()
-    expect(screen.getAllByText('Показаны первые 6 разделов').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Ещё 20 разделов дополняют инструкцию').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Все 26 разделов в списке').length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText('Откройте любой раздел, чтобы увидеть пример из будущей инструкции.')
+        .length
+    ).toBeGreaterThan(0)
     expect(screen.getByText('Должностная инструкция, которой пользуются')).toBeInTheDocument()
     expect(screen.queryByText(/operating manual/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()

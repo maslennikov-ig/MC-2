@@ -96,6 +96,7 @@ export default function CareerPlaybookLandingPageClient() {
     blocks: blockGroupBlockIds[groupId].map((blockId) => ({
       id: blockId,
       label: t(`blockMap.blocks.${blockId}`),
+      example: t(`blockMap.examples.${blockId}`),
     })),
   }))
   const methodologies: CareerPlaybookMethodology[] = methodologyIds.map((id) => ({
@@ -228,14 +229,12 @@ export default function CareerPlaybookLandingPageClient() {
           title={t('demoTitle')}
           subtitle={t('demoSubtitle')}
           previewTitle={t('demoPreviewTitle')}
+          exampleLabel={t('demoExampleLabel')}
           totalBlocksLabel={t('demoTotalBlocksLabel')}
           shownBlocksLabel={t('demoShownBlocksLabel')}
           remainingBlocksLabel={t('demoRemainingBlocksLabel')}
+          blockLabelPrefix={t('demoBlockLabelPrefix')}
           outlineLabel={t('demoOutlineLabel')}
-          allBlocksButtonLabel={t('demoAllBlocksButtonLabel')}
-          allBlocksTitle={t('demoAllBlocksTitle')}
-          allBlocksDescription={t('demoAllBlocksDescription')}
-          exampleLabel={t('demoExampleLabel')}
           sections={demoSections}
           fullStructureGroups={blockGroups}
         />
