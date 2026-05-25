@@ -1,15 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-25
-Branch: `codex/career-playbook-document-milk`
-Base: `origin/develop` at `cd19d6650afa68e31328c30439377499d821d80b`
+Branch: `develop`
+Base: `origin/develop` at `9121b2a5672e09770405ea2f6ddc9f8105280eea`
 
 ## Current State
 
-- Active stage: `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`).
-- Worktree: `/home/me/code/mc2-worktrees/career-playbook-document-milk`.
+- Stage `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`) was merged via PR #51 and deployed to Dev.
+- Dev run: GitHub Actions `26385179954`, deploy job passed, health returned `{"status":"ok"}` on 2026-05-25.
 - Main checkout `/home/me/code/mc2` is a separate worktree on `codex/career-playbook-ui-mock-variants` with unrelated local orchestration changes; do not overwrite or clean it from this branch.
-- Implementation is locally verified and ready for commit/PR to `develop`; no direct push to `develop`/`master`.
 
 ## Changes In This Branch
 
@@ -30,16 +29,17 @@ Base: `origin/develop` at `cd19d6650afa68e31328c30439377499d821d80b`
 - Production-mode Playwright smoke passed for CP and non-CP routes at 390, 1440, and 1920 px: 24 checks, no 500s, no horizontal overflow.
 - `pnpm type-check` passed.
 - `pnpm build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
+- Dev light/dark smoke passed for `/ru/career-playbook`, `/ru/career-playbook/new`, `/ru/career-playbook/library`, and `/en/career-playbook` at 390/1440/1920 px: 200 status and no horizontal overflow.
 
 ## Next recommended
 
 Next stage id: `mc2-db696.33`
-Recommended action: commit, push, open PR to `develop`, merge through PR flow, wait for Dev GitHub Actions deploy, then verify Dev health and public Career Playbook URLs.
+Recommended action: continue with next Beads-ready Career Playbook item, likely `mc2-db696.28` for ESCO-backed role suggestions.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage to continue `mc2-db696.33` in `/home/me/code/mc2-worktrees/career-playbook-document-milk`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.33/summary.md`, the two artifacts in `.codex/stages/mc2-db696.33/artifacts/`, Beads state for `mc2-db696.33.*`, and current `git status`. The branch is locally verified and should be delivered via PR to `develop`, then Dev deploy/health/public URL checks; do not push directly to `develop` or `master`.
+Use $orchestrator-stage for the next Career Playbook stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*`, Beads ready state, and current `git status`. PR #51 delivered `mc2-db696.33` to Dev; do not overwrite the separate local worktree on `codex/career-playbook-ui-mock-variants`.
 
 ## Explicit defers
 
-- `mc2-db696.28`: ESCO import subset remains outside this redesign; local authenticated screenshots require `TOKEN`, so unit tests cover authenticated behavior until Dev verification.
+- `mc2-db696.28`: ESCO import subset / normalized role-source pipeline remains outside this redesign.

@@ -4,7 +4,7 @@ task_id: mc2-db696.33
 branch: codex/career-playbook-document-milk
 base_branch: develop
 base_commit: cd19d6650afa68e31328c30439377499d821d80b
-status: local_verified
+status: deployed_to_dev
 ---
 
 # Career Playbook Document-First Milk Redesign
@@ -46,9 +46,12 @@ status: local_verified
 
 ## Delivery
 
-- Pending: commit, push branch, open PR to `develop`, merge via PR flow, wait for Dev GitHub Actions deploy, then check Dev health and public URLs.
+- PR #51 merged into `develop` as `9121b2a5672e09770405ea2f6ddc9f8105280eea`.
+- Dev deploy completed through GitHub Actions run `26385179954`; `Deploy to Dev` passed.
+- Dev health passed on 2026-05-25: `https://dev.ai.megacampus.ru/api/health` returned `{"status":"ok"}`.
+- Dev light and dark smoke passed for `/ru/career-playbook`, `/ru/career-playbook/new`, `/ru/career-playbook/library`, and `/en/career-playbook` at 390, 1440, and 1920 px: 200 status and no horizontal overflow. Dark smoke forced `localStorage.theme = "dark"`, `prefers-color-scheme: dark`, and verified that the `dark` class applied.
 
 ## Explicit Defers
 
 - `mc2-db696.28`: ESCO import subset / normalized role-source pipeline remains outside this redesign.
-- Local authenticated browser screenshots require a valid `TOKEN`; unauthenticated/private fallback states and public fallback were visually checked locally, and authenticated behavior is covered by unit tests until Dev verification.
+- Local authenticated browser screenshots require a valid `TOKEN`; unauthenticated/private fallback states and public fallback were visually checked locally, and authenticated behavior is covered by unit tests plus Dev route smoke.
