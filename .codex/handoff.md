@@ -9,7 +9,7 @@ Base: `origin/develop` at `cec55643536d7af51662428b52b21e8e4ecabffa`
 - Stage `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`) was merged via PR #51 and deployed to Dev.
 - Dev run: GitHub Actions `26385179954`, deploy job passed, health returned `{"status":"ok"}` on 2026-05-25.
 - Follow-up bug `mc2-db696.34` fixed the Career Playbook landing interactive demo overlap/order via PR #53; Dev run `26388816456` deployed successfully and health returned `{"status":"ok"}` on 2026-05-25.
-- Follow-up task `mc2-db696.35` is active on PR #55 (`codex/cp-landing-26-demo`): landing page now shows 26-block structure clearly, adds personalization marketing, smooth motion, mobile auth-button fix, and a wider document-preview hero.
+- Follow-up task `mc2-db696.35` is active on PR #55 (`codex/cp-landing-26-demo`): landing page now shows 26-block structure clearly, adds personalization marketing, smooth motion, mobile auth-button fix, and a wider methodology-backed hero with dark document preview.
 - PR #55 CI run `26399971693` passed before the latest hero-width commit; rerun PR checks after pushing any new commit.
 - Main checkout `/home/me/code/mc2` is a separate worktree on `codex/career-playbook-ui-mock-variants` with unrelated local orchestration changes; do not overwrite or clean it from this branch.
 
@@ -19,7 +19,7 @@ Base: `origin/develop` at `cec55643536d7af51662428b52b21e8e4ecabffa`
 - Added shared Career Playbook document workspace/shell/preview components.
 - Rebuilt constructor, follow-ups, and completion review as a document-first workflow with left navigation, central draft document, and right action/question panel.
 - Applied the same document styling to library, private viewer, streaming/editor states, public share, loading/error/auth-required states, and soft landing alignment through shared tokens.
-- Refined `/career-playbook` landing: first-six-block interactive demo, all-26-block modal, six methodology sources, personalized AI-assisted value section, smoother motion, mobile login decoration fix, and wider hero/section containers.
+- Refined `/career-playbook` landing: first-six-block interactive demo, all-26-block modal, six methodology sources, book-methodology source line, personalized AI-assisted value section, smoother motion, mobile login decoration fix, and wider hero/section containers.
 - Removed visible Career Playbook AI-cliche icons/labels and localized RU/EN viewer block/group/status/aria labels.
 - Added `docs/plans/career-playbook/2026-05-25-document-first-zone-redesign.md`; updated `docs/career-playbook/README.md`.
 - Tracked visible subagent reports under `.codex/stages/mc2-db696.33/artifacts/`.
@@ -42,6 +42,12 @@ Base: `origin/develop` at `cec55643536d7af51662428b52b21e8e4ecabffa`
   - `pnpm --filter @megacampus/web type-check`
   - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
   - Playwright smoke for `/career-playbook` at 2048x1060 and 390x827: no horizontal overflow; wide hero preview visible only on large viewport.
+- Latest PR #55 hero-copy verification passed locally:
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
+  - Playwright smoke for `/career-playbook` at 1335x827: H1 is `Должностная инструкция, которой пользуются`, methodology and book-source lines are present, dark hero preview is present, no horizontal overflow.
+  - `pnpm --filter @megacampus/web lint`
+  - `pnpm --filter @megacampus/web type-check`
+  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
 
 ## Next recommended
 

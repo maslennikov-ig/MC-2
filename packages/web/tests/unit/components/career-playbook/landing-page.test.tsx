@@ -85,7 +85,7 @@ describe('CareerPlaybookLandingPage', () => {
     expect(screen.getByTestId('shader-background')).toBeInTheDocument()
     expect(
       screen.getByRole('heading', {
-        name: /turn role context into a structured operating manual/i,
+        name: /a role guide your team will use/i,
       })
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /create your career playbook/i })).toHaveAttribute(
@@ -180,9 +180,7 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getByText('26 разделов в полной инструкции')).toBeInTheDocument()
     expect(screen.getAllByText('Показаны первые 6 разделов').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Ещё 20 разделов дополняют инструкцию').length).toBeGreaterThan(0)
-    expect(
-      screen.getByText('Превратите контекст роли в понятную должностную инструкцию')
-    ).toBeInTheDocument()
+    expect(screen.getByText('Должностная инструкция, которой пользуются')).toBeInTheDocument()
     expect(screen.queryByText(/operating manual/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Foundation')).not.toBeInTheDocument()
@@ -218,7 +216,17 @@ describe('CareerPlaybookLandingPageClient', () => {
 
     expect(
       screen.getByText(
-        'Ответьте на вопросы о компании, команде и роли. Искусственный интеллект соберёт не шаблон, а редактируемую инструкцию из 26 блоков под ваш контекст.'
+        'Соберите не формальный шаблон, а рабочий документ под вашу компанию: искусственный интеллект превратит контекст роли в 26 полезных блоков для найма, ввода в должность и управления.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'В основе — практики Netflix, Amazon, Toyota, Spotify, Bridgewater и Google.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Дополнено подходами Topgrading, Who, Drive, The Alliance и The Checklist Manifesto.'
       )
     ).toBeInTheDocument()
     expect(screen.getByText('Индивидуализация')).toBeInTheDocument()
@@ -243,10 +251,14 @@ describe('CareerPlaybookLandingPageClient', () => {
 
     const { container } = render(<CareerPlaybookLandingPageClient />)
 
-    expect(screen.getByText('Инструкция под вашу компанию')).toBeInTheDocument()
+    expect(screen.getByText('Не скучная должностная инструкция')).toBeInTheDocument()
+    expect(screen.getByText('26 блоков')).toBeInTheDocument()
+    expect(screen.getByText('Лучшее из сильных команд')).toBeInTheDocument()
+    expect(screen.getByText('Им будут пользоваться в работе')).toBeInTheDocument()
     expect(screen.getByText('Контекст роли')).toBeInTheDocument()
     expect(screen.getByText('Менеджер по продажам')).toBeInTheDocument()
     expect(container.querySelector('.career-playbook-hero-preview')).toBeInTheDocument()
+    expect(container.querySelector('.career-playbook-hero-preview-card')).toBeInTheDocument()
     expect(container.querySelectorAll('.career-playbook-wide-container').length).toBeGreaterThan(5)
   })
 })

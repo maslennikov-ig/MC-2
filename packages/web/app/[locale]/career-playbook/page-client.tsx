@@ -129,6 +129,19 @@ export default function CareerPlaybookLandingPageClient() {
                 {t('heroSubtitle')}
               </p>
 
+              <div className="mt-5 max-w-3xl rounded-lg border border-cyan-200/20 bg-slate-950/20 px-4 py-3 text-sm leading-6 text-slate-200 backdrop-blur-sm">
+                <div className="flex gap-3">
+                  <BookOpenCheck
+                    className="mt-1 h-4 w-4 shrink-0 text-cyan-200"
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <p className="font-semibold text-white">{t('heroMethodologyLine')}</p>
+                    <p className="mt-1 text-slate-300">{t('heroBooksLine')}</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button
                   asChild
@@ -159,12 +172,18 @@ export default function CareerPlaybookLandingPageClient() {
 
             <HeroDocumentPreview
               title={t('heroPreviewTitle')}
+              subtitle={t('heroPreviewSubtitle')}
               contextLabel={t('heroPreviewContextLabel')}
               role={t('heroPreviewRole')}
               companyLabel={t('heroPreviewCompanyLabel')}
               company={t('heroPreviewCompany')}
               draftLabel={t('heroPreviewDraftLabel')}
               draft={t('heroPreviewDraft')}
+              signalOne={t('heroPreviewSignalOne')}
+              signalTwo={t('heroPreviewSignalTwo')}
+              signalThree={t('heroPreviewSignalThree')}
+              qualityTitle={t('heroPreviewQualityTitle')}
+              qualityText={t('heroPreviewQualityText')}
             />
           </div>
         </section>
@@ -332,72 +351,94 @@ export default function CareerPlaybookLandingPageClient() {
 
 function HeroDocumentPreview({
   title,
+  subtitle,
   contextLabel,
   role,
   companyLabel,
   company,
   draftLabel,
   draft,
+  signalOne,
+  signalTwo,
+  signalThree,
+  qualityTitle,
+  qualityText,
 }: {
   title: string
+  subtitle: string
   contextLabel: string
   role: string
   companyLabel: string
   company: string
   draftLabel: string
   draft: string
+  signalOne: string
+  signalTwo: string
+  signalThree: string
+  qualityTitle: string
+  qualityText: string
 }) {
+  const signals = [
+    { icon: <ClipboardCheck className="h-4 w-4" aria-hidden="true" />, label: signalOne },
+    { icon: <BookOpenCheck className="h-4 w-4" aria-hidden="true" />, label: signalTwo },
+    { icon: <Workflow className="h-4 w-4" aria-hidden="true" />, label: signalThree },
+  ]
+
   return (
-    <aside className="career-playbook-hero-preview career-playbook-motion-card hidden rounded-2xl border border-white/15 bg-white/[0.12] p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-md xl:block">
-      <div className="rounded-xl border border-slate-200 bg-[#fbf7ef] p-6 text-slate-950 shadow-[0_35px_90px_rgba(15,23,42,0.22)] 2xl:p-7">
+    <aside className="career-playbook-hero-preview career-playbook-motion-card hidden rounded-2xl border border-cyan-200/20 bg-slate-950/30 p-4 shadow-2xl shadow-slate-950/45 backdrop-blur-md xl:block">
+      <div className="career-playbook-hero-preview-card rounded-xl border border-cyan-200/25 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(49,46,129,0.7))] p-6 text-white shadow-[0_35px_90px_rgba(15,23,42,0.35)] ring-1 ring-white/10 2xl:p-7">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <p className="text-xs font-semibold tracking-wide text-cyan-200 uppercase">
               {draftLabel}
             </p>
-            <h2 className="mt-2 text-3xl leading-tight font-bold text-slate-950">{title}</h2>
+            <h2 className="mt-2 text-3xl leading-tight font-bold text-white">{title}</h2>
+            <p className="mt-3 max-w-md text-sm leading-6 text-slate-200">{subtitle}</p>
           </div>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-200/25 bg-cyan-200/10 text-cyan-100">
             <FileText className="h-6 w-6" aria-hidden="true" />
           </div>
         </div>
 
-        <div className="mt-8 grid gap-3">
-          <div className="rounded-lg border border-slate-200 bg-white/80 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+        <div className="mt-7 grid gap-3">
+          <div className="rounded-lg border border-cyan-100/15 bg-white/10 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
               <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
               <span>{contextLabel}</span>
             </div>
-            <p className="mt-2 text-xl font-semibold text-slate-950">{role}</p>
+            <p className="mt-2 text-xl font-semibold text-white">{role}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+            <div className="rounded-lg border border-cyan-100/15 bg-white/[0.08] p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
                 <Building2 className="h-4 w-4" aria-hidden="true" />
                 <span>{companyLabel}</span>
               </div>
-              <p className="mt-2 text-base font-semibold text-slate-900">{company}</p>
+              <p className="mt-2 text-base font-semibold text-white">{company}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
-              <p className="text-sm font-semibold text-slate-500">{draftLabel}</p>
-              <p className="mt-2 text-base font-semibold text-slate-900">{draft}</p>
+            <div className="rounded-lg border border-cyan-100/15 bg-white/[0.08] p-4">
+              <p className="text-sm font-semibold text-slate-300">{draftLabel}</p>
+              <p className="mt-2 text-base font-semibold text-white">{draft}</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-8 border-t border-slate-200 pt-5">
+        <div className="mt-7 rounded-lg border border-violet-200/20 bg-violet-200/10 p-4">
+          <p className="text-sm font-semibold text-violet-100">{qualityTitle}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">{qualityText}</p>
+        </div>
+
+        <div className="mt-5 border-t border-white/10 pt-5">
           <div className="grid gap-2">
-            <div className="h-2 rounded-full bg-slate-200" />
-            <div className="h-2 w-11/12 rounded-full bg-slate-200" />
-            <div className="h-2 w-8/12 rounded-full bg-slate-200" />
-          </div>
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            {['26', '6', '1'].map((value) => (
+            {signals.map((signal) => (
               <div
-                key={value}
-                className="rounded-md border border-violet-100 bg-violet-50 px-3 py-2 text-center text-sm font-bold text-violet-800"
+                key={signal.label}
+                className="flex min-h-11 items-center gap-3 rounded-md border border-white/10 bg-white/[0.07] px-3 py-2 text-sm font-semibold text-slate-100"
               >
-                {value}
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-cyan-200/10 text-cyan-100">
+                  {signal.icon}
+                </span>
+                <span>{signal.label}</span>
               </div>
             ))}
           </div>
