@@ -120,7 +120,7 @@ export default function CareerPlaybookLandingPageClient() {
                 <Button
                   asChild
                   size="lg"
-                  className="rounded-md bg-white text-slate-950 hover:bg-slate-100"
+                  className="bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 rounded-md shadow-lg"
                 >
                   <Link href="/career-playbook/new">
                     {t('ctaPrimary')}
@@ -217,7 +217,7 @@ export default function CareerPlaybookLandingPageClient() {
             <Button
               asChild
               size="lg"
-              className="mt-8 rounded-md bg-white text-slate-950 hover:bg-slate-100"
+              className="bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 mt-8 rounded-md shadow-lg"
             >
               <Link href="/career-playbook/new" aria-label={t('finalCtaTitle')}>
                 {t('finalCtaButton')}

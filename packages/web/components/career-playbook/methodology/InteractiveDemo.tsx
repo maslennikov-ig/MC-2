@@ -122,20 +122,20 @@ export function InteractiveDemo({
           </div>
 
           <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <article className="min-h-[28rem] min-w-0 rounded-lg border border-white/10 bg-[#fbfaf7] p-6 text-slate-950 shadow-2xl md:p-8">
-              <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <article className="min-h-[28rem] min-w-0 rounded-lg border border-white/10 bg-slate-900 p-6 text-slate-50 shadow-2xl shadow-black/30 md:p-8">
+              <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-slate-500">{previewTitle}</p>
-                  <h3 className="mt-1 text-2xl font-bold text-slate-950">{activeSection.title}</h3>
-                  <p className="mt-3 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                  <p className="text-xs font-semibold text-slate-400">{previewTitle}</p>
+                  <h3 className="mt-1 text-2xl font-bold text-white">{activeSection.title}</h3>
+                  <p className="mt-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
                     {activeSection.blockLabel}
                   </p>
                 </div>
-                <BookOpenCheck className="h-6 w-6 text-violet-600" aria-hidden="true" />
+                <BookOpenCheck className="h-6 w-6 text-violet-300" aria-hidden="true" />
               </div>
 
               <div className="space-y-5">
-                <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-base leading-7 text-slate-800">
+                <p className="rounded-lg border border-white/10 bg-slate-950/55 p-4 text-base leading-7 text-slate-100">
                   {activeSection.excerpt}
                 </p>
 
@@ -144,7 +144,7 @@ export function InteractiveDemo({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        className="inline-flex min-h-10 items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-100"
+                        className="inline-flex min-h-10 items-center gap-2 rounded-md border border-violet-400/30 bg-violet-400/10 px-3 py-2 text-sm font-medium text-violet-100 transition-colors hover:bg-violet-400/15"
                       >
                         <MessageSquareText className="h-4 w-4" aria-hidden="true" />
                         {activeSection.blockLabel}
