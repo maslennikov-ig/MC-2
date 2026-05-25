@@ -1,7 +1,15 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ArrowRight, BookOpenCheck, FileText, Workflow } from 'lucide-react'
+import {
+  ArrowRight,
+  BookOpenCheck,
+  Building2,
+  ClipboardCheck,
+  Cpu,
+  FileText,
+  Workflow,
+} from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import {
@@ -31,6 +39,7 @@ const demoSectionIds = [
 ] as const
 const faqItemIds = ['0', '1', '2'] as const
 const faqHighlightIds = ['0', '1', '2'] as const
+const personalizationStepIds = ['0', '1', '2'] as const
 
 type MethodologyId = (typeof methodologyIds)[number]
 type BlockGroupId = (typeof blockGroupIds)[number]
@@ -144,6 +153,41 @@ export default function CareerPlaybookLandingPageClient() {
               <HeroMetric value={t('heroMetricOneValue')} label={t('heroMetricOneLabel')} />
               <HeroMetric value={t('heroMetricTwoValue')} label={t('heroMetricTwoLabel')} />
               <HeroMetric value={t('heroMetricThreeValue')} label={t('heroMetricThreeLabel')} />
+            </div>
+          </div>
+        </section>
+
+        <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
+          <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+            <div className="max-w-xl">
+              <p className="mb-3 text-sm font-semibold text-cyan-200">
+                {t('personalizationEyebrow')}
+              </p>
+              <h2 className="text-3xl leading-tight font-bold md:text-4xl">
+                {t('personalizationTitle')}
+              </h2>
+              <p className="mt-5 text-base leading-7 text-slate-300">
+                {t('personalizationDescription')}
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {personalizationStepIds.map((id, index) => (
+                <PersonalizationCard
+                  key={id}
+                  icon={
+                    index === 0 ? (
+                      <Building2 className="h-5 w-5" aria-hidden="true" />
+                    ) : index === 1 ? (
+                      <Cpu className="h-5 w-5" aria-hidden="true" />
+                    ) : (
+                      <ClipboardCheck className="h-5 w-5" aria-hidden="true" />
+                    )
+                  }
+                  step={String(index + 1).padStart(2, '0')}
+                  title={t(`personalizationSteps.${id}.title`)}
+                  description={t(`personalizationSteps.${id}.description`)}
+                />
+              ))}
             </div>
           </div>
         </section>
@@ -297,6 +341,31 @@ function ValueCard({
       </div>
       <h3 className="mt-4 text-lg font-semibold text-white">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
+    </div>
+  )
+}
+
+function PersonalizationCard({
+  icon,
+  step,
+  title,
+  description,
+}: {
+  icon: ReactNode
+  step: string
+  title: string
+  description: string
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.06] p-5 shadow-xl shadow-slate-950/20">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+          {icon}
+        </div>
+        <span className="text-sm font-semibold text-slate-500">{step}</span>
+      </div>
+      <h3 className="mt-5 text-lg leading-snug font-semibold text-white">{title}</h3>
+      <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
     </div>
   )
 }

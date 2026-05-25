@@ -4,7 +4,7 @@
     "metadataDescription": "Build a structured role manual for hiring, onboarding, and team review.",
     "heroEyebrow": "Career Playbook",
     "heroTitle": "Turn role context into a structured operating manual",
-    "heroSubtitle": "Collect role context, request a 26-block Role Guide, and review an editable draft for hiring and onboarding.",
+    "heroSubtitle": "Answer questions about your company, team, and role. AI assembles an editable 26-section guide for your context, not a generic template.",
     "ctaPrimary": "Create your Career Playbook",
     "ctaSecondary": "View sample guide",
     "heroMetricOneValue": "26",
@@ -13,6 +13,23 @@
     "heroMetricTwoLabel": "management systems",
     "heroMetricThreeValue": "1",
     "heroMetricThreeLabel": "role clarity draft",
+    "personalizationEyebrow": "Personalization",
+    "personalizationTitle": "Not a template, a guide for your company",
+    "personalizationDescription": "The constructor accounts for team size, product stage, department, role level, reporting line, and output language. The result feels like a working company document, not a universal sample.",
+    "personalizationSteps": {
+      "0": {
+        "title": "Company context",
+        "description": "Capture where the role works: department, team size, product stage, reporting line, and language."
+      },
+      "1": {
+        "title": "AI assembles the structure",
+        "description": "The system maps answers to 26 sections and management sources to create a coherent draft."
+      },
+      "2": {
+        "title": "You keep control",
+        "description": "Choose a suggested option, enter your own answer, and refine the generated blocks afterward."
+      }
+    },
     "methodologyEyebrow": "Methodology",
     "methodologyTitle": "Built from operating systems used by serious teams",
     "methodologySubtitle": "These are the six sources we use most often. Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",

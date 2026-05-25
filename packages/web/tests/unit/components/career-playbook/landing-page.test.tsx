@@ -210,4 +210,21 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getByText('Можно начать с черновика')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Вопросы' })).not.toBeInTheDocument()
   })
+
+  it('markets company-specific AI-assisted personalization without AI visual cliches', () => {
+    activeLocale = 'ru'
+
+    render(<CareerPlaybookLandingPageClient />)
+
+    expect(
+      screen.getByText(
+        'Ответьте на вопросы о компании, команде и роли. Искусственный интеллект соберёт не шаблон, а редактируемую инструкцию из 26 блоков под ваш контекст.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('Индивидуализация')).toBeInTheDocument()
+    expect(screen.getByText('Не шаблон, а инструкция под вашу компанию')).toBeInTheDocument()
+    expect(screen.getByText('Контекст компании')).toBeInTheDocument()
+    expect(screen.getByText('Искусственный интеллект собирает структуру')).toBeInTheDocument()
+    expect(screen.getByText('Вы оставляете контроль')).toBeInTheDocument()
+  })
 })
