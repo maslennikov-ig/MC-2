@@ -227,4 +227,14 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getByText('Искусственный интеллект собирает структуру')).toBeInTheDocument()
     expect(screen.getByText('Вы оставляете контроль')).toBeInTheDocument()
   })
+
+  it('marks landing sections and cards for subtle motion treatment', () => {
+    activeLocale = 'ru'
+
+    const { container } = render(<CareerPlaybookLandingPageClient />)
+
+    expect(container.querySelector('.career-playbook-motion-page')).toBeInTheDocument()
+    expect(container.querySelectorAll('.career-playbook-motion-section').length).toBeGreaterThan(3)
+    expect(container.querySelectorAll('.career-playbook-motion-card').length).toBeGreaterThan(6)
+  })
 })

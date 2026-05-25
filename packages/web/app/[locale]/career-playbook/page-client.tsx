@@ -115,8 +115,8 @@ export default function CareerPlaybookLandingPageClient() {
   return (
     <ShaderBackground>
       <Header darkMode={true} />
-      <main className="relative z-10 text-white">
-        <section className="grid min-h-[calc(100svh-4.75rem)] px-4 py-10 md:py-12">
+      <main className="career-playbook-motion-page relative z-10 text-white">
+        <section className="career-playbook-motion-section grid min-h-[calc(100svh-4.75rem)] px-4 py-10 md:py-12">
           <div className="mx-auto grid w-full max-w-7xl content-center gap-10">
             <div className="max-w-4xl">
               <Badge className="mb-5 rounded-md border border-cyan-300/30 bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/12">
@@ -157,7 +157,7 @@ export default function CareerPlaybookLandingPageClient() {
           </div>
         </section>
 
-        <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
+        <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
           <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div className="max-w-xl">
               <p className="mb-3 text-sm font-semibold text-cyan-200">
@@ -220,7 +220,7 @@ export default function CareerPlaybookLandingPageClient() {
           blockGroups={blockGroups}
         />
 
-        <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
+        <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
           <div className="mx-auto max-w-7xl">
             <p className="mb-3 text-sm font-semibold text-emerald-200">{t('valueEyebrow')}</p>
             <h2 className="max-w-3xl text-3xl font-bold md:text-4xl">{t('valueTitle')}</h2>
@@ -244,7 +244,7 @@ export default function CareerPlaybookLandingPageClient() {
           </div>
         </section>
 
-        <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white">
+        <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white">
           <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-stretch">
             <div className="rounded-xl border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(8,47,73,0.9),rgba(15,23,42,0.82))] p-6 shadow-2xl shadow-cyan-950/30 md:p-8">
               <p className="text-sm font-semibold text-cyan-200">{t('faqEyebrow')}</p>
@@ -276,7 +276,7 @@ export default function CareerPlaybookLandingPageClient() {
               {faqItemIds.map((id, index) => (
                 <div
                   key={id}
-                  className="group grid gap-4 rounded-xl border border-white/10 bg-white/[0.06] p-5 transition-colors hover:border-cyan-300/35 hover:bg-white/[0.08] md:grid-cols-[3rem_1fr] md:p-6"
+                  className="career-playbook-motion-card group grid gap-4 rounded-xl border border-white/10 bg-white/[0.06] p-5 transition-colors hover:border-cyan-300/35 hover:bg-white/[0.08] md:grid-cols-[3rem_1fr] md:p-6"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-sm font-semibold text-cyan-100 transition-colors group-hover:border-cyan-200/40 group-hover:bg-cyan-300/15">
                     {String(index + 1).padStart(2, '0')}
@@ -293,7 +293,7 @@ export default function CareerPlaybookLandingPageClient() {
           </div>
         </section>
 
-        <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
+        <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
           <div className="mx-auto max-w-4xl text-center">
             <h2 className="text-3xl font-bold md:text-4xl">{t('finalCtaTitle')}</h2>
             <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-300">
@@ -318,7 +318,7 @@ export default function CareerPlaybookLandingPageClient() {
 
 function HeroMetric({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+    <div className="career-playbook-motion-card rounded-lg border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
       <div className="text-3xl font-bold text-white">{value}</div>
       <div className="mt-1 text-sm text-slate-300">{label}</div>
     </div>
@@ -335,7 +335,7 @@ function ValueCard({
   description: string
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-5">
+    <div className="career-playbook-motion-card rounded-lg border border-white/10 bg-white/5 p-5">
       <div className="flex h-10 w-10 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/12 text-emerald-100">
         {icon}
       </div>
@@ -357,7 +357,7 @@ function PersonalizationCard({
   description: string
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.06] p-5 shadow-xl shadow-slate-950/20">
+    <div className="career-playbook-motion-card rounded-xl border border-white/10 bg-white/[0.06] p-5 shadow-xl shadow-slate-950/20">
       <div className="flex items-center justify-between gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
           {icon}
@@ -372,7 +372,7 @@ function PersonalizationCard({
 
 function FaqHighlight({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-medium text-slate-100">
+    <div className="career-playbook-motion-card flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-medium text-slate-100">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
         {icon}
       </span>

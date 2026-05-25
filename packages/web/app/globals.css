@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* ============================================
    TAILWIND V4 UNIFIED DESIGN SYSTEM
    ============================================
@@ -585,6 +591,37 @@
 
   .animate-tab-slide-in {
     animation: tab-slide-in 0.3s ease-out;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .career-playbook-motion-section {
+      animation: slide-up 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .career-playbook-motion-section:nth-of-type(2) {
+      animation-delay: 60ms;
+    }
+
+    .career-playbook-motion-section:nth-of-type(3) {
+      animation-delay: 120ms;
+    }
+
+    .career-playbook-motion-section:nth-of-type(4) {
+      animation-delay: 180ms;
+    }
+
+    .career-playbook-motion-card {
+      transition:
+        transform 220ms ease,
+        border-color 220ms ease,
+        background-color 220ms ease,
+        box-shadow 220ms ease;
+      will-change: transform;
+    }
+
+    .career-playbook-motion-card:hover {
+      transform: translateY(-3px);
+    }
   }
 
   /* Loading skeleton shimmer */
