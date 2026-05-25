@@ -142,4 +142,31 @@ describe('InteractiveDemo', () => {
     expect(screen.getByText(/discounts above twenty percent/i)).toBeInTheDocument()
     expect(screen.getByText(/visible guardrails/i)).toBeInTheDocument()
   })
+
+  it('allows long selector labels to wrap inside their column', () => {
+    render(
+      <InteractiveDemo
+        eyebrow="Interactive demo"
+        title="Annotated B2B sales Role Guide preview"
+        subtitle="Inspect the generated document."
+        previewTitle="B2B Sales Role Guide"
+        sections={[
+          ...demoSections,
+          {
+            id: 'metrics',
+            title: 'Very long performance indicators and control metrics label',
+            excerpt: 'Metrics stay readable.',
+            annotation: 'Long labels should not expand the selector column.',
+            blockLabel: 'Block 6',
+          },
+        ]}
+      />
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: /very long performance indicators and control metrics label/i,
+      })
+    ).toHaveClass('w-full', 'min-w-0', 'whitespace-normal')
+  })
 })

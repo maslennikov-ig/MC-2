@@ -137,8 +137,19 @@ describe('CareerPlaybookLandingPageClient', () => {
 
     expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
-    expect(screen.getByRole('button', { name: /decision matrix/i })).toBeInTheDocument()
-    expect(screen.getByText(/small discounts can move quickly/i)).toBeInTheDocument()
+    const demoButtons = screen.getAllByRole('button').filter((button) => {
+      return /mission and key results|decision matrix|kpi and counter-metrics/i.test(
+        button.textContent ?? ''
+      )
+    })
+    expect(demoButtons.map((button) => button.textContent)).toEqual([
+      expect.stringMatching(/Mission and key results.*Block 1/i),
+      expect.stringMatching(/Decision matrix.*Block 5/i),
+      expect.stringMatching(/KPI and counter-metrics.*Block 6/i),
+    ])
+    expect(
+      screen.getByText(/the role turns b2b pipeline into predictable revenue/i)
+    ).toBeInTheDocument()
   })
 
   it('localizes the block map, selected-block label, and demo chrome for Russian', () => {
