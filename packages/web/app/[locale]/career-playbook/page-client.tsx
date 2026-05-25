@@ -105,8 +105,8 @@ export default function CareerPlaybookLandingPageClient() {
     <ShaderBackground>
       <Header darkMode={true} />
       <main className="relative z-10 text-white">
-        <section className="px-4 pt-12 pb-14 md:pt-16 md:pb-20">
-          <div className="mx-auto grid min-h-[72vh] max-w-7xl content-center gap-10">
+        <section className="grid min-h-[calc(100svh-4.75rem)] px-4 py-10 md:py-12">
+          <div className="mx-auto grid w-full max-w-7xl content-center gap-10">
             <div className="max-w-4xl">
               <Badge className="mb-5 rounded-md border border-cyan-300/30 bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/12">
                 {t('heroEyebrow')}
