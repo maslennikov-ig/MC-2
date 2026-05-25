@@ -20,7 +20,7 @@ export default function CareerPlaybookAuthRequiredClient({
   return (
     <>
       <Header sticky surface="glass" />
-      <main className="min-h-[calc(100vh-73px)] bg-slate-100 px-4 py-10 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+      <main className="career-playbook-zone min-h-[calc(100vh-73px)] px-4 py-10">
         <div className="mx-auto flex min-h-[calc(100vh-153px)] max-w-3xl items-center justify-center">
           <AuthRequiredState
             variant="card"

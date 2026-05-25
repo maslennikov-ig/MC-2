@@ -81,9 +81,8 @@ describe('Career Playbook viewer components', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'Head of Sales' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('navigation', { name: 'Playbook table of contents' })
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('career-playbook-viewer-shell')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Role guide contents' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'PDF' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create course' })).toBeInTheDocument()

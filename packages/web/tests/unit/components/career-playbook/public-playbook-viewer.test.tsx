@@ -31,6 +31,7 @@ describe('PublicPlaybookViewer', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'Head of Sales' })).toBeInTheDocument()
+    expect(screen.getByTestId('career-playbook-public-document')).toBeInTheDocument()
     expect(markdownRenderer).toHaveBeenCalledWith(
       expect.objectContaining({
         content: '# Head of Sales',

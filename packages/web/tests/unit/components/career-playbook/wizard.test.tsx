@@ -406,6 +406,27 @@ describe('QuestionRenderer', () => {
 })
 
 describe('Wizard', () => {
+  it('renders the document-first shell with a live draft preview', () => {
+    render(
+      <Wizard
+        questions={[fixedOpenQuestion, fixedSingleChoiceQuestion]}
+        answers={{ position: 'Менеджер по продажам' }}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+      />
+    )
+
+    expect(screen.getByTestId('career-playbook-document-shell')).toBeInTheDocument()
+    expect(screen.getByTestId('career-playbook-document-preview')).toHaveTextContent(
+      'Менеджер по продажам'
+    )
+    expect(screen.getByTestId('career-playbook-question-panel')).toHaveTextContent(
+      'Какую должность вы хотите оформить?'
+    )
+  })
+
   it('keeps navigation disabled until the current question is answered', async () => {
     const user = userEvent.setup()
     const handleAnswerChange = vi.fn()
@@ -535,7 +556,8 @@ describe('FollowupPhase', () => {
       />
     )
 
-    expect(screen.getByText('ИИ-уточнение 1 из 2')).toBeInTheDocument()
+    expect(screen.getByText('Уточнение 1 из 2')).toBeInTheDocument()
+    expect(screen.queryByText(/ИИ-уточнение/)).not.toBeInTheDocument()
     expect(screen.getAllByText('60%').length).toBeGreaterThan(0)
     expect(screen.getByText('Можно собрать основу')).toBeInTheDocument()
     expect(screen.getAllByText('80%').length).toBeGreaterThan(0)
@@ -645,6 +667,30 @@ describe('FollowupPhase', () => {
 })
 
 describe('CompletionScreen', () => {
+  it('uses the document review shell for the final check', () => {
+    render(
+      <CompletionScreen
+        fixedAnswers={[
+          {
+            id: 'position',
+            title: 'Какую должность вы хотите оформить?',
+            value: 'Руководитель продаж',
+          },
+        ]}
+        followupAnswers={[]}
+        freeformNotes={[]}
+        onEditFixedAnswer={vi.fn()}
+        onEditFollowupAnswer={vi.fn()}
+        onGenerate={vi.fn()}
+      />
+    )
+
+    expect(screen.getByTestId('career-playbook-review-shell')).toBeInTheDocument()
+    expect(screen.getByTestId('career-playbook-document-preview')).toHaveTextContent(
+      'Руководитель продаж'
+    )
+  })
+
   it('summarizes answers and exposes edit plus generate actions', async () => {
     const user = userEvent.setup()
     const handleEditFixed = vi.fn()

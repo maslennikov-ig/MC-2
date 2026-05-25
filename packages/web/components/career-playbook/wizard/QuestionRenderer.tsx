@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Circle, ListChecks, MessageSquareText } from 'lucide-react'
+import { CircleDot, ListChecks, PenLine } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -58,8 +58,8 @@ const defaultCopy: Required<QuestionRendererCopy> = {
 }
 
 const typeIcon = {
-  open: MessageSquareText,
-  single_choice: Circle,
+  open: PenLine,
+  single_choice: CircleDot,
   multi_choice: ListChecks,
 }
 
@@ -149,11 +149,11 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
   ])
 
   return (
-    <fieldset className="min-h-[300px] space-y-5">
+    <fieldset className="min-h-[280px] space-y-5">
       <legend className="space-y-2">
-        <span className="flex items-start gap-3 text-2xl leading-8 font-semibold text-slate-950 dark:text-slate-50">
+        <span className="flex items-start gap-3 text-[22px] leading-8 font-semibold text-slate-950 dark:text-slate-50">
           <TypeIcon
-            className="mt-1.5 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300"
+            className="mt-1.5 h-5 w-5 shrink-0 text-purple-600 dark:text-purple-300"
             aria-hidden
           />
           {question.question_text}
@@ -390,8 +390,8 @@ function OptionRow({
       className={cn(
         'grid min-h-[58px] grid-cols-[auto_1fr] gap-3 rounded-md border p-3 transition-colors',
         selected
-          ? 'border-teal-600 bg-teal-50 dark:border-teal-400 dark:bg-teal-950/30'
-          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
+          ? 'border-purple-300 bg-purple-50/80 dark:border-purple-500/60 dark:bg-purple-950/30'
+          : 'border-[#d8c5aa] bg-[#fffbf4] hover:border-purple-200 hover:bg-purple-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
       )}
     >
       {children}

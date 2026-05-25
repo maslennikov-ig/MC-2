@@ -6,6 +6,22 @@ Career Playbook is the Role Guide generation track for MC2. The MVP flow is:
 2. Backend generates the 26-block Role Guide through the Career Playbook LangGraph stage.
 3. User reviews, edits/regenerates blocks, exports PDF, shares a public viewer link, or starts course generation from a completed playbook.
 
+## Product UI Direction
+
+As of 2026-05-25, the working Career Playbook zone uses a document-first milk
+design direction. The constructor shows the future role guide as the central
+surface, with question navigation on the left and the current question/action
+panel on the right. The review step is a final document check with the
+generation CTA, not another pass through the questions.
+
+The redesign covers the constructor, library, private viewer, public share,
+loading/error states, and auth-required states. The marketing landing remains
+only softly aligned. Backend contracts, generation, and role-source data are not
+part of this UI redesign.
+
+Implementation notes are in
+[`docs/plans/career-playbook/2026-05-25-document-first-zone-redesign.md`](../plans/career-playbook/2026-05-25-document-first-zone-redesign.md).
+
 ## Verification Entrypoints
 
 Local read-only checks:
@@ -21,6 +37,7 @@ Targeted unit checks:
 
 ```bash
 pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
+pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/public-playbook-viewer.test.tsx
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/admin-cost-evidence.test.tsx
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/admin-career-playbook-costs.test.ts

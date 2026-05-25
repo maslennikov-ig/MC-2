@@ -67,7 +67,7 @@ export function CreateCourseFromPlaybookDialog({
           <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+        <div className="career-playbook-muted-card p-4 text-sm text-slate-700 dark:text-slate-300">
           {t('addMaterialsLater')}
         </div>
 
