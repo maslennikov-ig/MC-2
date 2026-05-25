@@ -9,13 +9,13 @@
     "ctaSecondary": "View sample guide",
     "heroMetricOneValue": "26",
     "heroMetricOneLabel": "operational blocks",
-    "heroMetricTwoValue": "5",
+    "heroMetricTwoValue": "6",
     "heroMetricTwoLabel": "management systems",
     "heroMetricThreeValue": "1",
     "heroMetricThreeLabel": "role clarity draft",
     "methodologyEyebrow": "Methodology",
     "methodologyTitle": "Built from operating systems used by serious teams",
-    "methodologySubtitle": "Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
+    "methodologySubtitle": "These are the six sources we use most often. Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
     "methodologyBlocksTitle": "26-block map",
     "selectedBlocksLabel": "Selected blocks",
     "methodologies": {
@@ -38,6 +38,10 @@
       "bridgewater": {
         "title": "Bridgewater Baseball Cards",
         "description": "Documents strengths, communication style, energy patterns, risks, and candidate fit."
+      },
+      "google": {
+        "title": "Google Team Effectiveness",
+        "description": "Helps describe the conditions where a role performs best: clear expectations, dependencies, collaboration, and review cadence."
       }
     },
     "blockMap": {

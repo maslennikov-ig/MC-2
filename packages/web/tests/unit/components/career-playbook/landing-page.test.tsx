@@ -130,13 +130,14 @@ describe('CareerPlaybookLandingPageClient', () => {
     activeLocale = 'en'
   })
 
-  it('shows five methodology cards, a 26-block map, and an interactive demo preview', () => {
+  it('shows six methodology cards, a 26-block map, and an interactive demo preview', () => {
     activeLocale = 'en'
 
     render(<CareerPlaybookLandingPageClient />)
 
-    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
+    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(6)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
+    expect(screen.getByText(/six sources we use most often/i)).toBeInTheDocument()
     const demoButtons = screen.getAllByTestId('career-playbook-demo-section-button')
     expect(demoButtons.map((button) => button.textContent)).toEqual([
       expect.stringMatching(/Mission and key results.*Block 1/i),
@@ -163,6 +164,11 @@ describe('CareerPlaybookLandingPageClient', () => {
 
     expect(screen.getByText('Основа')).toBeInTheDocument()
     expect(screen.getByText('Выбранные блоки')).toBeInTheDocument()
+    expect(screen.getByText('Netflix: контекст вместо контроля')).toBeInTheDocument()
+    expect(screen.getByText('Google: эффективность команд')).toBeInTheDocument()
+    expect(
+      screen.getByText(/шесть источников, которые мы чаще всего используем/i)
+    ).toBeInTheDocument()
     expect(screen.getAllByText('1. Миссия и ключевые результаты').length).toBeGreaterThan(0)
     expect(screen.getAllByText('22. Памятка роли').length).toBeGreaterThan(0)
     expect(screen.getByText('Должностная инструкция: корпоративные продажи')).toBeInTheDocument()
@@ -176,6 +182,8 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Foundation')).not.toBeInTheDocument()
     expect(screen.queryByText('Selected blocks')).not.toBeInTheDocument()
+    expect(screen.queryByText('Netflix Context over Control')).not.toBeInTheDocument()
+    expect(screen.queryByText('Google Team Effectiveness')).not.toBeInTheDocument()
     expect(screen.queryByText('B2B Sales Role Guide')).not.toBeInTheDocument()
   })
 })

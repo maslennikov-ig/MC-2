@@ -43,6 +43,12 @@ const methodologies: CareerPlaybookMethodology[] = [
     description: 'Documents strengths and risk patterns.',
     affectedBlocks: ['Competencies', 'Candidate Profile', 'Red Flags'],
   },
+  {
+    id: 'google',
+    title: 'Google Team Effectiveness',
+    description: 'Describes collaboration and review cadence.',
+    affectedBlocks: ['Responsibilities', 'Competencies', 'Dependencies'],
+  },
 ]
 
 const blockGroups: CareerPlaybookBlockGroup[] = [
@@ -130,7 +136,7 @@ const demoChrome = {
 }
 
 describe('MethodologySection', () => {
-  it('renders five methodology cards and all 26 block chips', () => {
+  it('renders six methodology cards and all 26 block chips', () => {
     render(
       <MethodologySection
         eyebrow="Methodology"
@@ -143,9 +149,10 @@ describe('MethodologySection', () => {
       />
     )
 
-    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
+    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(6)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
     expect(screen.getByText('Netflix Context over Control')).toBeInTheDocument()
+    expect(screen.getByText('Google Team Effectiveness')).toBeInTheDocument()
     expect(screen.getByText('Foundation 1')).toBeInTheDocument()
   })
 })

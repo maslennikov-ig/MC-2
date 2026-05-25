@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/src/i18n/navigation'
 
-const methodologyIds = ['netflix', 'amazon', 'toyota', 'spotify', 'bridgewater'] as const
+const methodologyIds = ['netflix', 'amazon', 'toyota', 'spotify', 'bridgewater', 'google'] as const
 const blockGroupIds = ['foundation', 'operations', 'people', 'growth', 'system', 'wrap'] as const
 const demoSectionIds = [
   'mission',
@@ -76,6 +76,7 @@ const affectedBlockKeys: Record<MethodologyId, BlockId[]> = {
   toyota: ['block4', 'block16', 'block14', 'block21'],
   spotify: ['block3', 'block10', 'block23', 'block24'],
   bridgewater: ['block7', 'block12', 'block15', 'block17'],
+  google: ['block3', 'block7', 'block10', 'block25'],
 }
 
 export default function CareerPlaybookLandingPageClient() {
