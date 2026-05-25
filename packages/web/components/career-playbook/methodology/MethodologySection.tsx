@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Boxes, GitBranch, IdCard, Network, ShieldCheck } from 'lucide-react'
+import { Boxes, GitBranch, IdCard, Network, ShieldCheck, UsersRound } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ interface MethodologySectionProps {
   subtitle: string
   blocksTitle: string
   selectedBlocksLabel: string
+  selectedBlocksDescription: string
   methodologies: CareerPlaybookMethodology[]
   blockGroups: CareerPlaybookBlockGroup[]
 }
@@ -40,6 +41,7 @@ const iconByMethodology: Record<string, typeof Network> = {
   toyota: Boxes,
   spotify: GitBranch,
   bridgewater: IdCard,
+  google: UsersRound,
 }
 
 export function MethodologySection({
@@ -48,6 +50,7 @@ export function MethodologySection({
   subtitle,
   blocksTitle,
   selectedBlocksLabel,
+  selectedBlocksDescription,
   methodologies,
   blockGroups,
 }: MethodologySectionProps) {
@@ -63,7 +66,7 @@ export function MethodologySection({
       aria-labelledby="career-playbook-methodology-title"
       className="relative z-10 border-t border-white/10 bg-slate-950/92 px-4 py-16 text-white md:py-20"
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="career-playbook-wide-container mx-auto max-w-[96rem]">
         <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
           <div>
             <p className="mb-3 text-sm font-semibold text-cyan-200">{eyebrow}</p>
@@ -78,6 +81,10 @@ export function MethodologySection({
             {activeMethodology && (
               <div className="mt-8 rounded-lg border border-cyan-300/20 bg-cyan-300/10 p-5">
                 <p className="text-sm font-semibold text-cyan-100">{selectedBlocksLabel}</p>
+                <p className="mt-2 text-base leading-6 font-semibold text-white">
+                  {activeMethodology.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{selectedBlocksDescription}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {activeMethodology.affectedBlocks.map((block) => (
                     <Badge
@@ -105,18 +112,18 @@ export function MethodologySection({
                   variant="ghost"
                   data-testid="career-playbook-methodology-card"
                   className={cn(
-                    'h-auto min-h-36 justify-start rounded-lg border p-5 text-left transition-colors',
+                    'h-auto min-h-36 min-w-0 justify-start rounded-lg border p-5 text-left transition-colors',
                     'border-white/10 bg-white/5 text-white hover:border-cyan-300/40 hover:bg-white/10',
                     isActive && 'border-cyan-300/60 bg-cyan-300/15'
                   )}
                   onClick={() => setActiveMethodologyId(methodology.id)}
                 >
-                  <span className="flex w-full gap-4">
+                  <span className="flex w-full min-w-0 gap-4">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-cyan-200">
                       <Icon className="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <span>
-                      <span className="block text-base font-semibold text-white">
+                    <span className="min-w-0">
+                      <span className="block text-base leading-6 font-semibold whitespace-normal text-white">
                         {methodology.title}
                       </span>
                       <span className="mt-2 block text-sm leading-6 whitespace-normal text-slate-300">

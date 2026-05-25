@@ -43,6 +43,12 @@ const methodologies: CareerPlaybookMethodology[] = [
     description: 'Documents strengths and risk patterns.',
     affectedBlocks: ['Competencies', 'Candidate Profile', 'Red Flags'],
   },
+  {
+    id: 'google',
+    title: 'Google Team Effectiveness',
+    description: 'Describes collaboration and review cadence.',
+    affectedBlocks: ['Responsibilities', 'Competencies', 'Dependencies'],
+  },
 ]
 
 const blockGroups: CareerPlaybookBlockGroup[] = [
@@ -83,6 +89,23 @@ const blockGroups: CareerPlaybookBlockGroup[] = [
   },
 ]
 
+const demoBlockGroups: CareerPlaybookBlockGroup[] = [
+  {
+    title: 'Foundation',
+    blocks: Array.from({ length: 6 }, (_, index) => ({
+      id: `block${index + 1}`,
+      label: `${index + 1}. Foundation ${index + 1}`,
+    })),
+  },
+  {
+    title: 'Operations',
+    blocks: Array.from({ length: 20 }, (_, index) => ({
+      id: `block${index + 7}`,
+      label: `${index + 7}. Operations ${index + 7}`,
+    })),
+  },
+]
+
 const demoSections: CareerPlaybookDemoSection[] = [
   {
     id: 'mission',
@@ -100,23 +123,39 @@ const demoSections: CareerPlaybookDemoSection[] = [
   },
 ]
 
+const demoChrome = {
+  totalBlocksLabel: '26 sections in the full guide',
+  shownBlocksLabel: 'First 6 sections shown',
+  remainingBlocksLabel: '20 more sections complete the instruction',
+  outlineLabel: 'Document outline',
+  allBlocksButtonLabel: 'All 26 sections',
+  allBlocksTitle: 'All 26 instruction sections',
+  allBlocksDescription:
+    'The full structure is grouped by purpose. The first six sections include examples from the demo.',
+  exampleLabel: 'Example',
+}
+
 describe('MethodologySection', () => {
-  it('renders five methodology cards and all 26 block chips', () => {
+  it('renders six methodology cards and all 26 block chips', () => {
     render(
       <MethodologySection
         eyebrow="Methodology"
         title="Built from operating systems"
         subtitle="Each system maps to concrete Role Guide blocks."
         blocksTitle="26-block map"
-        selectedBlocksLabel="Selected blocks"
+        selectedBlocksLabel="Where the selected source is used"
+        selectedBlocksDescription="Click a source to see which sections it shapes."
         methodologies={methodologies}
         blockGroups={blockGroups}
       />
     )
 
-    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
+    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(6)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
-    expect(screen.getByText('Netflix Context over Control')).toBeInTheDocument()
+    expect(screen.getAllByText('Netflix Context over Control').length).toBeGreaterThan(1)
+    expect(screen.getByText('Where the selected source is used')).toBeInTheDocument()
+    expect(screen.getByText('Click a source to see which sections it shapes.')).toBeInTheDocument()
+    expect(screen.getByText('Google Team Effectiveness')).toBeInTheDocument()
     expect(screen.getByText('Foundation 1')).toBeInTheDocument()
   })
 })
@@ -132,10 +171,13 @@ describe('InteractiveDemo', () => {
         subtitle="Inspect the generated document."
         previewTitle="B2B Sales Role Guide"
         sections={demoSections}
+        fullStructureGroups={demoBlockGroups}
+        {...demoChrome}
       />
     )
 
     expect(screen.getByText(/pipeline is always/i)).toBeInTheDocument()
+    expect(screen.getByText('26 sections in the full guide')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /decision matrix/i }))
 
@@ -160,6 +202,8 @@ describe('InteractiveDemo', () => {
             blockLabel: 'Block 6',
           },
         ]}
+        fullStructureGroups={demoBlockGroups}
+        {...demoChrome}
       />
     )
 
@@ -168,5 +212,34 @@ describe('InteractiveDemo', () => {
         name: /very long performance indicators and control metrics label/i,
       })
     ).toHaveClass('w-full', 'min-w-0', 'whitespace-normal')
+    expect(screen.getByTestId('career-playbook-demo-selector-list')).toHaveClass(
+      'max-h-[20rem]',
+      'overflow-y-auto'
+    )
+  })
+
+  it('opens the full 26-section structure with examples', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <InteractiveDemo
+        eyebrow="Interactive demo"
+        title="Annotated B2B sales Role Guide preview"
+        subtitle="Inspect the generated document."
+        previewTitle="B2B Sales Role Guide"
+        sections={demoSections}
+        fullStructureGroups={demoBlockGroups}
+        {...demoChrome}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /all 26 sections/i }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('All 26 instruction sections')).toBeInTheDocument()
+    expect(screen.getAllByText('1. Foundation 1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('6. Foundation 6').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Example').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/pipeline is always/i).length).toBeGreaterThan(1)
   })
 })

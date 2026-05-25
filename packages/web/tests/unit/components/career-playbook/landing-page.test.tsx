@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import CareerPlaybookLandingPage, { generateMetadata } from '@/app/[locale]/career-playbook/page'
@@ -85,14 +85,14 @@ describe('CareerPlaybookLandingPage', () => {
     expect(screen.getByTestId('shader-background')).toBeInTheDocument()
     expect(
       screen.getByRole('heading', {
-        name: /turn role context into a structured operating manual/i,
+        name: /a role guide your team will use/i,
       })
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /create your career playbook/i })).toHaveAttribute(
       'href',
       '/career-playbook/new'
     )
-    expect(screen.getByText('Netflix Context over Control')).toBeInTheDocument()
+    expect(screen.getAllByText('Netflix Context over Control').length).toBeGreaterThan(1)
     expect(screen.getByText('Annotated B2B sales Role Guide preview')).toBeInTheDocument()
     expect(screen.getByTestId('career-playbook-jsonld')).toHaveAttribute(
       'type',
@@ -130,26 +130,39 @@ describe('CareerPlaybookLandingPageClient', () => {
     activeLocale = 'en'
   })
 
-  it('shows five methodology cards, a 26-block map, and an interactive demo preview', () => {
+  it('shows six methodology cards, a 26-block map, and a 26-section interactive demo preview', () => {
     activeLocale = 'en'
 
     render(<CareerPlaybookLandingPageClient />)
 
-    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
+    expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(6)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
-    const demoButtons = screen.getAllByRole('button').filter((button) => {
-      return /mission and key results|decision matrix|kpi and counter-metrics/i.test(
-        button.textContent ?? ''
-      )
-    })
-    expect(demoButtons.map((button) => button.textContent)).toEqual([
+    expect(screen.getByText(/six sources we use most often/i)).toBeInTheDocument()
+    const demoButtons = screen.getAllByTestId('career-playbook-demo-section-button')
+    expect(demoButtons).toHaveLength(26)
+    expect(demoButtons.slice(0, 6).map((button) => button.textContent)).toEqual([
       expect.stringMatching(/Mission and key results.*Block 1/i),
+      expect.stringMatching(/Anti-goals.*Block 2/i),
+      expect.stringMatching(/Responsibility zones.*Block 3/i),
+      expect.stringMatching(/Duties.*Block 4/i),
       expect.stringMatching(/Decision matrix.*Block 5/i),
       expect.stringMatching(/KPI and counter-metrics.*Block 6/i),
     ])
+    expect(screen.getByText('26 sections in the full guide')).toBeInTheDocument()
+    expect(screen.getAllByText('All 26 sections are in the outline').length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText('Open any section to see an example from the future guide.').length
+    ).toBeGreaterThan(0)
     expect(
       screen.getByText(/the role turns b2b pipeline into predictable revenue/i)
     ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Implementation checklist.*26/i }))
+
+    expect(
+      screen.getAllByText(/before launching the role, check the owner, goals, metrics/i).length
+    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /All 26 sections/i })).not.toBeInTheDocument()
   })
 
   it('localizes the block map, selected-block label, and demo chrome for Russian', () => {
@@ -158,17 +171,105 @@ describe('CareerPlaybookLandingPageClient', () => {
     render(<CareerPlaybookLandingPageClient />)
 
     expect(screen.getByText('Основа')).toBeInTheDocument()
-    expect(screen.getByText('Выбранные блоки')).toBeInTheDocument()
+    expect(screen.getByText('Где используется выбранный источник')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Нажмите на источник справа: здесь показано, какие разделы инструкции он помогает собрать.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('Netflix: контекст вместо контроля').length).toBeGreaterThan(1)
+    expect(screen.getByText('Google: эффективность команд')).toBeInTheDocument()
+    expect(
+      screen.getByText(/шесть источников, которые мы чаще всего используем/i)
+    ).toBeInTheDocument()
     expect(screen.getAllByText('1. Миссия и ключевые результаты').length).toBeGreaterThan(0)
     expect(screen.getAllByText('22. Памятка роли').length).toBeGreaterThan(0)
     expect(screen.getByText('Должностная инструкция: корпоративные продажи')).toBeInTheDocument()
+    expect(screen.getByText('26 разделов в полной инструкции')).toBeInTheDocument()
+    expect(screen.getAllByText('Все 26 разделов в списке').length).toBeGreaterThan(0)
     expect(
-      screen.getByText('Превратите контекст роли в понятную должностную инструкцию')
-    ).toBeInTheDocument()
+      screen.getAllByText('Откройте любой раздел, чтобы увидеть пример из будущей инструкции.')
+        .length
+    ).toBeGreaterThan(0)
+    expect(screen.getByText('Должностная инструкция, которой пользуются')).toBeInTheDocument()
     expect(screen.queryByText(/operating manual/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Foundation')).not.toBeInTheDocument()
     expect(screen.queryByText('Selected blocks')).not.toBeInTheDocument()
+    expect(screen.queryByText('Where the selected source is used')).not.toBeInTheDocument()
+    expect(screen.queryByText('Netflix Context over Control')).not.toBeInTheDocument()
+    expect(screen.queryByText('Google Team Effectiveness')).not.toBeInTheDocument()
     expect(screen.queryByText('B2B Sales Role Guide')).not.toBeInTheDocument()
+  })
+
+  it('shows the pre-start guidance block as a designed section', () => {
+    activeLocale = 'ru'
+
+    render(<CareerPlaybookLandingPageClient />)
+
+    expect(screen.getByText('Перед стартом')).toBeInTheDocument()
+    expect(screen.getByText('Что важно знать до первого черновика')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Коротко закрываем практические сомнения: кому подходит конструктор, можно ли править результат и что подготовить перед началом.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('3 ответа')).toBeInTheDocument()
+    expect(screen.getByText('Без повторного сбора')).toBeInTheDocument()
+    expect(screen.getByText('Можно начать с черновика')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Вопросы' })).not.toBeInTheDocument()
+  })
+
+  it('markets company-specific AI-assisted personalization without AI visual cliches', () => {
+    activeLocale = 'ru'
+
+    render(<CareerPlaybookLandingPageClient />)
+
+    expect(
+      screen.getByText(
+        'Соберите не формальный шаблон, а рабочий документ под вашу компанию: искусственный интеллект превратит контекст роли в 26 полезных блоков для найма, ввода в должность и управления.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'В основе — практики Netflix, Amazon, Toyota, Spotify, Bridgewater и Google.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Дополнено подходами Topgrading, Who, Drive, The Alliance и The Checklist Manifesto.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('Индивидуализация')).toBeInTheDocument()
+    expect(screen.getByText('Не шаблон, а инструкция под вашу компанию')).toBeInTheDocument()
+    expect(screen.getByText('Контекст компании')).toBeInTheDocument()
+    expect(screen.getByText('Искусственный интеллект собирает структуру')).toBeInTheDocument()
+    expect(screen.getByText('Вы оставляете контроль')).toBeInTheDocument()
+  })
+
+  it('marks landing sections and cards for subtle motion treatment', () => {
+    activeLocale = 'ru'
+
+    const { container } = render(<CareerPlaybookLandingPageClient />)
+
+    expect(container.querySelector('.career-playbook-motion-page')).toBeInTheDocument()
+    expect(container.querySelectorAll('.career-playbook-motion-section').length).toBeGreaterThan(3)
+    expect(container.querySelectorAll('.career-playbook-motion-card').length).toBeGreaterThan(6)
+  })
+
+  it('uses a wider landing layout with a document preview in the hero', () => {
+    activeLocale = 'ru'
+
+    const { container } = render(<CareerPlaybookLandingPageClient />)
+
+    expect(screen.getByText('Не скучная должностная инструкция')).toBeInTheDocument()
+    expect(screen.getByText('26 блоков')).toBeInTheDocument()
+    expect(screen.getByText('Лучшее из сильных команд')).toBeInTheDocument()
+    expect(screen.getByText('Им будут пользоваться в работе')).toBeInTheDocument()
+    expect(screen.getByText('Контекст роли')).toBeInTheDocument()
+    expect(screen.getByText('Менеджер по продажам')).toBeInTheDocument()
+    expect(container.querySelector('.career-playbook-hero-preview')).toBeInTheDocument()
+    expect(container.querySelector('.career-playbook-hero-preview-card')).toBeInTheDocument()
+    expect(container.querySelectorAll('.career-playbook-wide-container').length).toBeGreaterThan(5)
   })
 })
