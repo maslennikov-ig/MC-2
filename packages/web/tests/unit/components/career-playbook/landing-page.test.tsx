@@ -237,4 +237,16 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(container.querySelectorAll('.career-playbook-motion-section').length).toBeGreaterThan(3)
     expect(container.querySelectorAll('.career-playbook-motion-card').length).toBeGreaterThan(6)
   })
+
+  it('uses a wider landing layout with a document preview in the hero', () => {
+    activeLocale = 'ru'
+
+    const { container } = render(<CareerPlaybookLandingPageClient />)
+
+    expect(screen.getByText('Инструкция под вашу компанию')).toBeInTheDocument()
+    expect(screen.getByText('Контекст роли')).toBeInTheDocument()
+    expect(screen.getByText('Менеджер по продажам')).toBeInTheDocument()
+    expect(container.querySelector('.career-playbook-hero-preview')).toBeInTheDocument()
+    expect(container.querySelectorAll('.career-playbook-wide-container').length).toBeGreaterThan(5)
+  })
 })

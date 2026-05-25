@@ -116,16 +116,18 @@ export default function CareerPlaybookLandingPageClient() {
     <ShaderBackground>
       <Header darkMode={true} />
       <main className="career-playbook-motion-page relative z-10 text-white">
-        <section className="career-playbook-motion-section grid min-h-[calc(100svh-4.75rem)] px-4 py-10 md:py-12">
-          <div className="mx-auto grid w-full max-w-7xl content-center gap-10">
-            <div className="max-w-4xl">
+        <section className="career-playbook-motion-section grid min-h-[calc(100svh-4.75rem)] overflow-hidden px-4 py-10 sm:px-6 md:py-12 lg:px-10 xl:px-12 2xl:px-16">
+          <div className="career-playbook-wide-container mx-auto grid w-full max-w-[96rem] content-center gap-10 xl:grid-cols-[minmax(0,0.95fr)_minmax(28rem,0.72fr)] xl:items-center">
+            <div className="max-w-5xl">
               <Badge className="mb-5 rounded-md border border-cyan-300/30 bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/12">
                 {t('heroEyebrow')}
               </Badge>
-              <h1 className="max-w-4xl text-4xl font-bold text-white md:text-6xl">
+              <h1 className="max-w-5xl text-4xl leading-[1.04] font-bold text-white md:text-6xl xl:text-7xl">
                 {t('heroTitle')}
               </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">{t('heroSubtitle')}</p>
+              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-200 md:text-xl">
+                {t('heroSubtitle')}
+              </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button
@@ -147,18 +149,28 @@ export default function CareerPlaybookLandingPageClient() {
                   <a href="#example">{t('ctaSecondary')}</a>
                 </Button>
               </div>
+
+              <div className="mt-8 grid max-w-5xl gap-3 sm:grid-cols-3">
+                <HeroMetric value={t('heroMetricOneValue')} label={t('heroMetricOneLabel')} />
+                <HeroMetric value={t('heroMetricTwoValue')} label={t('heroMetricTwoLabel')} />
+                <HeroMetric value={t('heroMetricThreeValue')} label={t('heroMetricThreeLabel')} />
+              </div>
             </div>
 
-            <div className="grid max-w-4xl gap-3 sm:grid-cols-3">
-              <HeroMetric value={t('heroMetricOneValue')} label={t('heroMetricOneLabel')} />
-              <HeroMetric value={t('heroMetricTwoValue')} label={t('heroMetricTwoLabel')} />
-              <HeroMetric value={t('heroMetricThreeValue')} label={t('heroMetricThreeLabel')} />
-            </div>
+            <HeroDocumentPreview
+              title={t('heroPreviewTitle')}
+              contextLabel={t('heroPreviewContextLabel')}
+              role={t('heroPreviewRole')}
+              companyLabel={t('heroPreviewCompanyLabel')}
+              company={t('heroPreviewCompany')}
+              draftLabel={t('heroPreviewDraftLabel')}
+              draft={t('heroPreviewDraft')}
+            />
           </div>
         </section>
 
         <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
-          <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+          <div className="career-playbook-wide-container mx-auto grid max-w-[96rem] gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div className="max-w-xl">
               <p className="mb-3 text-sm font-semibold text-cyan-200">
                 {t('personalizationEyebrow')}
@@ -221,7 +233,7 @@ export default function CareerPlaybookLandingPageClient() {
         />
 
         <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
-          <div className="mx-auto max-w-7xl">
+          <div className="career-playbook-wide-container mx-auto max-w-[96rem]">
             <p className="mb-3 text-sm font-semibold text-emerald-200">{t('valueEyebrow')}</p>
             <h2 className="max-w-3xl text-3xl font-bold md:text-4xl">{t('valueTitle')}</h2>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -245,7 +257,7 @@ export default function CareerPlaybookLandingPageClient() {
         </section>
 
         <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white">
-          <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-stretch">
+          <div className="career-playbook-wide-container mx-auto grid max-w-[96rem] gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-stretch">
             <div className="rounded-xl border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(8,47,73,0.9),rgba(15,23,42,0.82))] p-6 shadow-2xl shadow-cyan-950/30 md:p-8">
               <p className="text-sm font-semibold text-cyan-200">{t('faqEyebrow')}</p>
               <h2 className="mt-4 max-w-lg text-3xl leading-tight font-bold md:text-4xl">
@@ -294,25 +306,104 @@ export default function CareerPlaybookLandingPageClient() {
         </section>
 
         <section className="career-playbook-motion-section relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">
-          <div className="mx-auto max-w-4xl text-center">
-            <h2 className="text-3xl font-bold md:text-4xl">{t('finalCtaTitle')}</h2>
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-300">
-              {t('finalCtaDescription')}
-            </p>
-            <Button
-              asChild
-              size="lg"
-              className="bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 mt-8 rounded-md shadow-lg"
-            >
-              <Link href="/career-playbook/new" aria-label={t('finalCtaTitle')}>
-                {t('finalCtaButton')}
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-              </Link>
-            </Button>
+          <div className="career-playbook-wide-container mx-auto max-w-[96rem] text-center">
+            <div className="mx-auto max-w-4xl">
+              <h2 className="text-3xl font-bold md:text-4xl">{t('finalCtaTitle')}</h2>
+              <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-300">
+                {t('finalCtaDescription')}
+              </p>
+              <Button
+                asChild
+                size="lg"
+                className="bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 mt-8 rounded-md shadow-lg"
+              >
+                <Link href="/career-playbook/new" aria-label={t('finalCtaTitle')}>
+                  {t('finalCtaButton')}
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </section>
       </main>
     </ShaderBackground>
+  )
+}
+
+function HeroDocumentPreview({
+  title,
+  contextLabel,
+  role,
+  companyLabel,
+  company,
+  draftLabel,
+  draft,
+}: {
+  title: string
+  contextLabel: string
+  role: string
+  companyLabel: string
+  company: string
+  draftLabel: string
+  draft: string
+}) {
+  return (
+    <aside className="career-playbook-hero-preview career-playbook-motion-card hidden rounded-2xl border border-white/15 bg-white/[0.12] p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-md xl:block">
+      <div className="rounded-xl border border-slate-200 bg-[#fbf7ef] p-6 text-slate-950 shadow-[0_35px_90px_rgba(15,23,42,0.22)] 2xl:p-7">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              {draftLabel}
+            </p>
+            <h2 className="mt-2 text-3xl leading-tight font-bold text-slate-950">{title}</h2>
+          </div>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700">
+            <FileText className="h-6 w-6" aria-hidden="true" />
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-3">
+          <div className="rounded-lg border border-slate-200 bg-white/80 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+              <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+              <span>{contextLabel}</span>
+            </div>
+            <p className="mt-2 text-xl font-semibold text-slate-950">{role}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+                <Building2 className="h-4 w-4" aria-hidden="true" />
+                <span>{companyLabel}</span>
+              </div>
+              <p className="mt-2 text-base font-semibold text-slate-900">{company}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
+              <p className="text-sm font-semibold text-slate-500">{draftLabel}</p>
+              <p className="mt-2 text-base font-semibold text-slate-900">{draft}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-slate-200 pt-5">
+          <div className="grid gap-2">
+            <div className="h-2 rounded-full bg-slate-200" />
+            <div className="h-2 w-11/12 rounded-full bg-slate-200" />
+            <div className="h-2 w-8/12 rounded-full bg-slate-200" />
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {['26', '6', '1'].map((value) => (
+              <div
+                key={value}
+                className="rounded-md border border-violet-100 bg-violet-50 px-3 py-2 text-center text-sm font-bold text-violet-800"
+              >
+                {value}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </aside>
   )
 }
 

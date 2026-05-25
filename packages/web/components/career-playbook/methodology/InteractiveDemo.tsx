@@ -94,7 +94,7 @@ export function InteractiveDemo({
       aria-labelledby="career-playbook-demo-title"
       className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20"
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="career-playbook-wide-container mx-auto max-w-[96rem]">
         <div className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
           <div className="max-w-3xl">
             <p className="mb-3 text-sm font-semibold text-amber-200">{eyebrow}</p>
@@ -119,7 +119,7 @@ export function InteractiveDemo({
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
           <div className="grid min-w-0 content-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
             <div className="px-1 pb-2">
               <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">

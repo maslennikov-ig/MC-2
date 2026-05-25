@@ -66,7 +66,7 @@ export function MethodologySection({
       aria-labelledby="career-playbook-methodology-title"
       className="relative z-10 border-t border-white/10 bg-slate-950/92 px-4 py-16 text-white md:py-20"
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="career-playbook-wide-container mx-auto max-w-[96rem]">
         <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
           <div>
             <p className="mb-3 text-sm font-semibold text-cyan-200">{eyebrow}</p>
