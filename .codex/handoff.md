@@ -2,12 +2,13 @@
 
 Updated: 2026-05-25
 Branch: `develop`
-Base: `origin/develop` at `9121b2a5672e09770405ea2f6ddc9f8105280eea`
+Base: `origin/develop` at `de9ecdfd3a33b03eb3c7658e11fe783f13f0b84a`
 
 ## Current State
 
 - Stage `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`) was merged via PR #51 and deployed to Dev.
 - Dev run: GitHub Actions `26385179954`, deploy job passed, health returned `{"status":"ok"}` on 2026-05-25.
+- Follow-up bug `mc2-db696.34` fixed the Career Playbook landing interactive demo overlap/order via PR #53; Dev run `26388816456` deployed successfully and health returned `{"status":"ok"}` on 2026-05-25.
 - Main checkout `/home/me/code/mc2` is a separate worktree on `codex/career-playbook-ui-mock-variants` with unrelated local orchestration changes; do not overwrite or clean it from this branch.
 
 ## Changes In This Branch
@@ -30,6 +31,7 @@ Base: `origin/develop` at `9121b2a5672e09770405ea2f6ddc9f8105280eea`
 - `pnpm type-check` passed.
 - `pnpm build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
 - Dev light/dark smoke passed for `/ru/career-playbook`, `/ru/career-playbook/new`, `/ru/career-playbook/library`, and `/en/career-playbook` at 390/1440/1920 px: 200 status and no horizontal overflow.
+- Dev landing demo smoke passed for `/ru/career-playbook` at 390/1440/1920 px in light and dark: demo order is block 1 -> block 5 -> block 6, no horizontal overflow, and no selector/document overlap.
 
 ## Next recommended
 
@@ -38,7 +40,7 @@ Recommended action: continue with next Beads-ready Career Playbook item, likely 
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for the next Career Playbook stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*`, Beads ready state, and current `git status`. PR #51 delivered `mc2-db696.33` to Dev; do not overwrite the separate local worktree on `codex/career-playbook-ui-mock-variants`.
+Use $orchestrator-stage for the next Career Playbook stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*`, Beads ready state, and current `git status`. PR #51 delivered `mc2-db696.33` to Dev; PR #53 fixed the landing demo overlap/order and was deployed to Dev; do not overwrite the separate local worktree on `codex/career-playbook-ui-mock-variants`.
 
 ## Explicit defers
 
