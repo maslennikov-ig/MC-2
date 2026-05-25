@@ -170,6 +170,7 @@ export default function CareerPlaybookLandingPageClient() {
           subtitle={t('methodologySubtitle')}
           blocksTitle={t('methodologyBlocksTitle')}
           selectedBlocksLabel={t('selectedBlocksLabel')}
+          selectedBlocksDescription={t('selectedBlocksDescription')}
           methodologies={methodologies}
           blockGroups={blockGroups}
         />

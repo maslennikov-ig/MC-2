@@ -30,6 +30,7 @@ interface MethodologySectionProps {
   subtitle: string
   blocksTitle: string
   selectedBlocksLabel: string
+  selectedBlocksDescription: string
   methodologies: CareerPlaybookMethodology[]
   blockGroups: CareerPlaybookBlockGroup[]
 }
@@ -49,6 +50,7 @@ export function MethodologySection({
   subtitle,
   blocksTitle,
   selectedBlocksLabel,
+  selectedBlocksDescription,
   methodologies,
   blockGroups,
 }: MethodologySectionProps) {
@@ -79,6 +81,10 @@ export function MethodologySection({
             {activeMethodology && (
               <div className="mt-8 rounded-lg border border-cyan-300/20 bg-cyan-300/10 p-5">
                 <p className="text-sm font-semibold text-cyan-100">{selectedBlocksLabel}</p>
+                <p className="mt-2 text-base leading-6 font-semibold text-white">
+                  {activeMethodology.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{selectedBlocksDescription}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {activeMethodology.affectedBlocks.map((block) => (
                     <Badge

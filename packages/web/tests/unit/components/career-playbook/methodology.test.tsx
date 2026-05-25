@@ -143,7 +143,8 @@ describe('MethodologySection', () => {
         title="Built from operating systems"
         subtitle="Each system maps to concrete Role Guide blocks."
         blocksTitle="26-block map"
-        selectedBlocksLabel="Selected blocks"
+        selectedBlocksLabel="Where the selected source is used"
+        selectedBlocksDescription="Click a source to see which sections it shapes."
         methodologies={methodologies}
         blockGroups={blockGroups}
       />
@@ -151,7 +152,9 @@ describe('MethodologySection', () => {
 
     expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(6)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
-    expect(screen.getByText('Netflix Context over Control')).toBeInTheDocument()
+    expect(screen.getAllByText('Netflix Context over Control').length).toBeGreaterThan(1)
+    expect(screen.getByText('Where the selected source is used')).toBeInTheDocument()
+    expect(screen.getByText('Click a source to see which sections it shapes.')).toBeInTheDocument()
     expect(screen.getByText('Google Team Effectiveness')).toBeInTheDocument()
     expect(screen.getByText('Foundation 1')).toBeInTheDocument()
   })

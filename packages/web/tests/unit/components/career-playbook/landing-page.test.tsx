@@ -92,7 +92,7 @@ describe('CareerPlaybookLandingPage', () => {
       'href',
       '/career-playbook/new'
     )
-    expect(screen.getByText('Netflix Context over Control')).toBeInTheDocument()
+    expect(screen.getAllByText('Netflix Context over Control').length).toBeGreaterThan(1)
     expect(screen.getByText('Annotated B2B sales Role Guide preview')).toBeInTheDocument()
     expect(screen.getByTestId('career-playbook-jsonld')).toHaveAttribute(
       'type',
@@ -163,8 +163,13 @@ describe('CareerPlaybookLandingPageClient', () => {
     render(<CareerPlaybookLandingPageClient />)
 
     expect(screen.getByText('Основа')).toBeInTheDocument()
-    expect(screen.getByText('Выбранные блоки')).toBeInTheDocument()
-    expect(screen.getByText('Netflix: контекст вместо контроля')).toBeInTheDocument()
+    expect(screen.getByText('Где используется выбранный источник')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Нажмите на источник справа: здесь показано, какие разделы инструкции он помогает собрать.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('Netflix: контекст вместо контроля').length).toBeGreaterThan(1)
     expect(screen.getByText('Google: эффективность команд')).toBeInTheDocument()
     expect(
       screen.getByText(/шесть источников, которые мы чаще всего используем/i)
@@ -182,6 +187,7 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Foundation')).not.toBeInTheDocument()
     expect(screen.queryByText('Selected blocks')).not.toBeInTheDocument()
+    expect(screen.queryByText('Where the selected source is used')).not.toBeInTheDocument()
     expect(screen.queryByText('Netflix Context over Control')).not.toBeInTheDocument()
     expect(screen.queryByText('Google Team Effectiveness')).not.toBeInTheDocument()
     expect(screen.queryByText('B2B Sales Role Guide')).not.toBeInTheDocument()

@@ -17,7 +17,8 @@
     "methodologyTitle": "Built from operating systems used by serious teams",
     "methodologySubtitle": "These are the six sources we use most often. Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
     "methodologyBlocksTitle": "26-block map",
-    "selectedBlocksLabel": "Selected blocks",
+    "selectedBlocksLabel": "Where the selected source is used",
+    "selectedBlocksDescription": "Click a source on the right: these are the instruction sections it helps shape.",
     "methodologies": {
       "netflix": {
         "title": "Netflix Context over Control",
