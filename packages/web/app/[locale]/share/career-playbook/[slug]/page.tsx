@@ -40,9 +40,9 @@ export default async function SharedCareerPlaybookPage({ params }: PageProps) {
   if (result.status === 'unavailable') {
     const t = await getTranslations({ locale, namespace: 'career-playbook.share' })
     return (
-      <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+      <main className="career-playbook-zone">
         <section className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-12 md:px-6">
-          <div className="rounded-md border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="career-playbook-panel p-6">
             <h1 className="text-2xl font-semibold">{t('fallbackTitle')}</h1>
             <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
               {t('fallbackDescription')}
@@ -60,14 +60,14 @@ export default async function SharedCareerPlaybookPage({ params }: PageProps) {
   const cta = getMc2CtaCopy(locale)
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <section className="mx-auto w-full max-w-4xl px-4 py-8 md:px-6">
+    <main className="career-playbook-zone">
+      <section className="mx-auto w-full max-w-5xl px-4 py-8 md:px-6">
         <div className="mb-4 text-sm text-slate-600 dark:text-slate-300">
           <span>{cta.label}</span>
           <span className="mx-2">-</span>
           <Link
             href={`/${locale}/career-playbook`}
-            className="font-medium text-teal-700 hover:underline dark:text-teal-300"
+            className="font-medium text-purple-700 hover:underline dark:text-purple-300"
           >
             {cta.action}
           </Link>

@@ -8,19 +8,18 @@ interface PublicPlaybookViewerProps {
 
 export function PublicPlaybookViewer({ title, playbook }: PublicPlaybookViewerProps) {
   return (
-    <article className="rounded-md border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article
+      data-testid="career-playbook-public-document"
+      className="career-playbook-document p-6 md:p-8"
+    >
       <header className="mb-4 space-y-2">
-        <h1 className="text-2xl font-semibold">{title}</h1>
+        <h1 className="text-[32px] leading-10 font-semibold">{title}</h1>
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
           {playbook.department ? (
-            <span className="rounded-md bg-slate-100 px-2 py-1 dark:bg-slate-800">
-              {playbook.department}
-            </span>
+            <span className="career-playbook-pill px-2 py-1">{playbook.department}</span>
           ) : null}
           {playbook.level ? (
-            <span className="rounded-md bg-slate-100 px-2 py-1 dark:bg-slate-800">
-              {playbook.level}
-            </span>
+            <span className="career-playbook-pill px-2 py-1">{playbook.level}</span>
           ) : null}
         </div>
       </header>

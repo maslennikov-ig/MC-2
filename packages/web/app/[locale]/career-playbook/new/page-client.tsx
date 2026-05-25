@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { AlertCircle, Clock3, Loader2 } from 'lucide-react'
+import { AlertCircle, Clock3, FileText, Loader2 } from 'lucide-react'
 
+import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
 import { FollowupPhase } from '@/components/career-playbook/wizard/FollowupPhase'
 import { Wizard, type WizardProps } from '@/components/career-playbook/wizard/Wizard'
@@ -204,6 +205,12 @@ export default function CareerPlaybookNewPageClient({
     questionLabel: t('questionLabel'),
     answeredLabel: t('answeredLabel'),
     ofLabel: t('ofLabel'),
+    navigationLabel: t('navigationLabel'),
+    documentPreviewLabel: t('documentPreviewLabel'),
+    documentPreviewTitle: t('documentPreviewTitle'),
+    documentPreviewSubtitle: t('documentPreviewSubtitle'),
+    documentPreviewEmpty: t('documentPreviewEmpty'),
+    questionPanelLabel: t('questionPanelLabel'),
     roleSuggestionsLabel: t('roleSuggestionsLabel'),
     roleSuggestionsHint: t('roleSuggestionsHint'),
     roleSuggestionsPopularLabel: t('roleSuggestionsPopularLabel'),
@@ -226,6 +233,12 @@ export default function CareerPlaybookNewPageClient({
     milestone60: t('milestone60'),
     milestone80: t('milestone80'),
     milestone100: t('milestone100'),
+    navigationLabel: t('followupNavigationLabel'),
+    documentPreviewLabel: t('documentPreviewLabel'),
+    documentPreviewTitle: t('followupDocumentPreviewTitle'),
+    documentPreviewSubtitle: t('followupDocumentPreviewSubtitle'),
+    documentPreviewEmpty: t('followupDocumentPreviewEmpty'),
+    questionPanelLabel: t('questionPanelLabel'),
     openPlaceholder: t('openPlaceholder'),
     chooseOneLabel: t('chooseOneLabel'),
     chooseManyLabel: t('chooseManyLabel'),
@@ -253,6 +266,8 @@ export default function CareerPlaybookNewPageClient({
     generationErrorTitle: t('generationErrorTitle'),
     viewGenerated: t('viewGenerated'),
     empty: t('emptySummary'),
+    reviewPanelTitle: t('reviewBadge'),
+    documentPreviewLabel: t('documentPreviewLabel'),
   }
   const completedViewerHref =
     state.status === 'completed' && state.playbookId
@@ -335,28 +350,31 @@ export default function CareerPlaybookNewPageClient({
   return (
     <>
       <Header sticky surface="glass" />
-      <main className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-        <section className="border-b border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
-          <div className="mx-auto flex max-w-[1540px] flex-col gap-2 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+      <main className="career-playbook-zone">
+        <section className="career-playbook-topbar">
+          <div className="mx-auto flex max-w-[1760px] flex-col gap-3 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <h1 className="text-2xl leading-8 font-semibold tracking-normal md:text-[28px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="career-playbook-pill inline-flex items-center gap-2 px-3 py-1.5 text-[13px] leading-5 font-medium text-slate-600 dark:text-slate-300">
+                  <FileText className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
+                  {t('eyebrow')}
+                </span>
+              </div>
+              <h1 className="mt-2 text-[28px] leading-9 font-semibold tracking-normal md:text-[34px] md:leading-10">
                 {t('title')}
               </h1>
-              <p className="mt-1 max-w-4xl text-[15px] leading-6 text-slate-600 dark:text-slate-300">
+              <p className="mt-1 max-w-5xl text-[16px] leading-7 text-slate-600 dark:text-slate-300">
                 {t('subtitle')}
               </p>
             </div>
-            <div className="flex min-h-9 shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-[13px] leading-5 text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-              <Clock3 className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
+            <div className="career-playbook-pill flex min-h-9 shrink-0 items-center gap-2 px-3 text-[13px] leading-5 text-slate-600 dark:text-slate-300">
+              <Clock3 className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
               {draftStatus}
             </div>
           </div>
         </section>
 
-        <section
-          data-testid="career-playbook-workspace"
-          className="mx-auto max-w-[1540px] px-4 py-5 md:px-6"
-        >
+        <CareerPlaybookWorkspace testId="career-playbook-workspace">
           {state.phase === 'fixed' ? (
             <Wizard
               questions={visibleQuestions}
@@ -439,7 +457,7 @@ export default function CareerPlaybookNewPageClient({
               copy={completionCopy}
             />
           ) : null}
-        </section>
+        </CareerPlaybookWorkspace>
       </main>
     </>
   )
@@ -464,17 +482,17 @@ function PhaseBStatus({
     <div
       role={icon === 'loading' ? 'status' : 'alert'}
       aria-live={icon === 'loading' ? 'polite' : 'assertive'}
-      className="grid w-full gap-4 lg:grid-cols-[240px_minmax(0,1fr)_320px] xl:grid-cols-[260px_minmax(0,1fr)_360px]"
+      className="grid w-full gap-5 xl:grid-cols-[18rem_minmax(0,1fr)_27rem] 2xl:grid-cols-[20rem_minmax(0,1fr)_30rem]"
     >
-      <aside className="rounded-md border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <aside className="career-playbook-panel p-4">
         <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
           {title}
         </p>
       </aside>
-      <div className="rounded-md border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
+      <div className="career-playbook-document p-6">
         <div className="flex items-start gap-3">
           <Icon
-            className={`mt-1 h-6 w-6 shrink-0 ${icon === 'loading' ? 'animate-spin text-teal-700 dark:text-teal-300' : 'text-amber-600 dark:text-amber-300'}`}
+            className={`mt-1 h-6 w-6 shrink-0 ${icon === 'loading' ? 'animate-spin text-purple-600 dark:text-purple-300' : 'text-amber-600 dark:text-amber-300'}`}
             aria-hidden
           />
           <div className="min-w-0 space-y-2">
@@ -483,7 +501,7 @@ function PhaseBStatus({
           </div>
         </div>
       </div>
-      <aside className="rounded-md border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <aside className="career-playbook-panel p-4">
         {actionLabel && onAction ? (
           <Button type="button" onClick={onAction} className="w-full">
             {actionLabel}

@@ -1,44 +1,45 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-23
-Branch: `codex/career-playbook-ui-polish`
-Base: `origin/develop`
+Updated: 2026-05-25
+Branch: `codex/career-playbook-document-milk`
+Base: `origin/develop` at `cd19d6650afa68e31328c30439377499d821d80b`
 
 ## Current State
 
-- PR #47 was merged into `develop` and deployed to Dev via run `26335235464`; Dev health returned `{"status":"ok"}`.
-- PR #48 is open to `develop`: https://github.com/maslennikov-ig/MC-2/pull/48.
-- `mc2-db696.29` is closed; `mc2-db696.30` is the active header standardization follow-up.
-- No direct push to `develop`/`master`; no billing/payment scope; no live taxonomy or large dataset import.
+- Active stage: `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`).
+- Worktree: `/home/me/code/mc2-worktrees/career-playbook-document-milk`.
+- Main checkout `/home/me/code/mc2` is a separate worktree on `codex/career-playbook-ui-mock-variants` with unrelated local orchestration changes; do not overwrite or clean it from this branch.
+- Implementation is locally verified and ready for commit/PR to `develop`; no direct push to `develop`/`master`.
 
 ## Changes In This Branch
 
-- Constructor state/UI polish from `mc2-db696.29`: completed base answers can finish from any selected question, left rail is clickable, and the workbench is wider/readable.
-- Shared `Header` role-description action is purple-system aligned; `/create`, `/courses`, and `/profile` now use shared-header wrappers.
-- Shared `Header` now supports `sticky` and `glass` variants for app pages.
-- Career Playbook constructor, library, viewer, and auth-required states now show the shared app header above local page/document headers.
-- Admin keeps its custom admin nav, but quick actions are localized and include “Создать описание роли”.
-- Mobile header overflow risk was reduced with an icon logo and narrower signed-out auth controls.
+- Added milk/document light tokens while keeping primary CTA purple; dark mode remains contrast-first.
+- Added shared Career Playbook document workspace/shell/preview components.
+- Rebuilt constructor, follow-ups, and completion review as a document-first workflow with left navigation, central draft document, and right action/question panel.
+- Applied the same document styling to library, private viewer, streaming/editor states, public share, loading/error/auth-required states, and soft landing alignment through shared tokens.
+- Removed visible Career Playbook AI-cliche icons/labels and localized RU/EN viewer block/group/status/aria labels.
+- Added `docs/plans/career-playbook/2026-05-25-document-first-zone-redesign.md`; updated `docs/career-playbook/README.md`.
+- Tracked visible subagent reports under `.codex/stages/mc2-db696.33/artifacts/`.
 
 ## Verification
 
-- Header audit unit set passed: 25 tests; extended Career Playbook/header unit set passed: 82 tests.
-- `pnpm --filter @megacampus/web lint` passed with 7 existing warnings outside this scope.
-- `pnpm type-check`, `git diff --check`, and `pnpm build` passed.
-- Career Playbook E2E passed 3, skipped 2 authenticated tests because `TOKEN` is unset.
-- Playwright screenshots/overflow checks passed for `/career-playbook/new`, `/career-playbook/library`, `/courses`, `/profile` at 390px and 1440px.
-- Code review reports for `mc2-db696.29` and `mc2-db696.30` recorded PASS with no blocking findings.
+- CP unit set passed: 6 files, 53 tests.
+- `pnpm --filter @megacampus/web lint` passed.
+- `pnpm --filter @megacampus/web type-check` passed.
+- `pnpm --filter @megacampus/web build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
+- Production-mode Playwright smoke passed for CP and non-CP routes at 390, 1440, and 1920 px: 24 checks, no 500s, no horizontal overflow.
+- `pnpm type-check` passed.
+- `pnpm build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.30`
-Recommended action: commit/push audit changes, update PR #48, merge through normal flow, then deploy to Dev as requested.
+Next stage id: `mc2-db696.33`
+Recommended action: commit, push, open PR to `develop`, merge through PR flow, wait for Dev GitHub Actions deploy, then verify Dev health and public Career Playbook URLs.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage to continue Career Playbook / “Должностная инструкция” UI polish in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.30/summary.md`, PR #48, and Beads state for `mc2-db696.30` and `mc2-db696.28`. Current branch is `codex/career-playbook-ui-polish`; do not push directly to `develop`/`master`.
+Use $orchestrator-stage to continue `mc2-db696.33` in `/home/me/code/mc2-worktrees/career-playbook-document-milk`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.33/summary.md`, the two artifacts in `.codex/stages/mc2-db696.33/artifacts/`, Beads state for `mc2-db696.33.*`, and current `git status`. The branch is locally verified and should be delivered via PR to `develop`, then Dev deploy/health/public URL checks; do not push directly to `develop` or `master`.
 
 ## Explicit defers
 
-- `mc2-db696.28`: ESCO import subset / normalized role-source pipeline.
-- Authenticated constructor/profile screenshots require `TOKEN` or storage state.
+- `mc2-db696.28`: ESCO import subset remains outside this redesign; local authenticated screenshots require `TOKEN`, so unit tests cover authenticated behavior until Dev verification.

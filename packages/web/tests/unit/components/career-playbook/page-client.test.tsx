@@ -43,13 +43,23 @@ const messages = {
       questionLabel: 'Question',
       answeredLabel: 'Answered',
       ofLabel: 'of',
+      navigationLabel: 'Questions',
+      documentPreviewLabel: 'Draft document',
+      documentPreviewTitle: 'Role Guide',
+      documentPreviewSubtitle: 'Answers are placed into the future document structure as you work.',
+      documentPreviewEmpty: 'Appears after an answer',
+      questionPanelLabel: 'Current question',
+      followupNavigationLabel: 'Follow-ups',
+      followupDocumentPreviewTitle: 'Follow-up context',
+      followupDocumentPreviewSubtitle: 'These answers help make the final guide more specific.',
+      followupDocumentPreviewEmpty: 'Answer or skip',
       phaseABadge: 'Phase A',
       phaseBBadge: 'Phase B',
       reviewBadge: 'Review',
       completionTitle: 'Ready to create?',
       completionDescription: 'Review the collected context before generating the Role Guide.',
       completionCta: 'Continue',
-      followupTitle: 'AI follow-up',
+      followupTitle: 'Follow-up',
       skipFollowup: 'Skip',
       enoughGenerate: 'Enough, generate',
       completeness: 'Completeness',
@@ -162,7 +172,7 @@ describe('CareerPlaybookNewPageClient', () => {
       await screen.findByRole('heading', { name: 'Role Guide constructor' })
     ).toBeInTheDocument()
     expect(await screen.findByLabelText('Which role do you want to define?')).toBeInTheDocument()
-    expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1540px]')
+    expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1760px]')
     expect(screen.getByText('Question 1 of 7')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Which role do you want to define?'), 'Head of Sales')
@@ -222,7 +232,7 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
     expect(requestFollowups).toHaveBeenCalled()
-    expect(await screen.findByText('AI follow-up 1 of 1')).toBeInTheDocument()
+    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
   })
 
   it('continues from Phase A into adaptive follow-ups and completion review', async () => {
@@ -250,7 +260,7 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
-    expect(await screen.findByText('AI follow-up 1 of 1')).toBeInTheDocument()
+    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
     expect(requestFollowups).toHaveBeenCalled()
     expect(screen.getByText('Completeness: 82%')).toBeInTheDocument()
 
@@ -397,7 +407,7 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByText('AI follow-up 1 of 1')).toBeInTheDocument()
+    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
     expect(screen.getByLabelText('Which KPIs define success in this role?')).toHaveValue('Win rate')
     expect(useCareerPlaybookStore.getState().dirtyFollowupQuestionIds).toEqual([
       '00000000-0000-4000-8000-000000000802',

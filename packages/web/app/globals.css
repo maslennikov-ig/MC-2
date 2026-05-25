@@ -31,30 +31,30 @@
     --purple-950: 59 7 100; /* #3b0764 */
 
     /* Component semantic colors */
-    --background: 0 0% 100%;
-    --foreground: 222 84% 5%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 84% 5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 84% 5%;
+    --background: 38 36% 95%;
+    --foreground: 222 47% 11%;
+    --card: 42 47% 98%;
+    --card-foreground: 222 47% 11%;
+    --popover: 42 47% 98%;
+    --popover-foreground: 222 47% 11%;
 
     /* Brand colors */
     --primary: 262 83% 58%; /* Purple-600 equivalent */
     --primary-foreground: 0 0% 100%;
-    --secondary: 280 65% 60%; /* Purple-pink blend */
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 34 32% 88%;
+    --secondary-foreground: 222 47% 11%;
 
     /* UI state colors */
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 36 28% 91%;
+    --muted-foreground: 220 10% 40%;
     --accent: 262 83% 58%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Form & borders */
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 35 24% 82%;
+    --input: 35 24% 82%;
     --ring: 262 83% 58%;
 
     /* Status colors */
@@ -76,7 +76,7 @@
     --gradient-secondary: linear-gradient(135deg, rgb(139 92 246), rgb(79 70 229));
     --gradient-accent: linear-gradient(135deg, rgb(236 72 153), rgb(139 92 246));
     --gradient-dark: linear-gradient(135deg, rgb(30 41 59), rgb(15 23 42));
-    --gradient-light: linear-gradient(135deg, rgb(255 255 255), rgb(248 250 252));
+    --gradient-light: linear-gradient(135deg, rgb(255 253 248), rgb(246 241 232));
 
     /* ===== DESIGN TOKENS - CELESTIAL THEME ===== */
     --space-bg: 10 14 26; /* #0a0e1a */
@@ -292,6 +292,111 @@
     white-space: nowrap;
     border-width: 0;
     pointer-events: none;
+  }
+}
+
+@layer components {
+  .career-playbook-zone {
+    min-height: 100vh;
+    color: #111827;
+    background:
+      linear-gradient(180deg, rgba(255, 253, 248, 0.94), rgba(244, 237, 226, 0.98)),
+      radial-gradient(circle at 16% 0%, rgba(139, 92, 246, 0.09), transparent 26%), #f4eee3;
+  }
+
+  .career-playbook-topbar {
+    border-bottom: 1px solid rgba(212, 190, 163, 0.72);
+    background: rgba(255, 252, 246, 0.86);
+    backdrop-filter: blur(18px);
+  }
+
+  .career-playbook-panel {
+    border: 1px solid rgba(214, 194, 166, 0.82);
+    border-radius: 10px;
+    background: rgba(255, 251, 244, 0.88);
+    box-shadow: 0 16px 42px rgba(85, 66, 40, 0.07);
+  }
+
+  .career-playbook-document {
+    border: 1px solid rgba(218, 200, 174, 0.92);
+    border-radius: 12px;
+    background:
+      linear-gradient(90deg, rgba(124, 58, 237, 0.08) 0 4px, transparent 4px),
+      linear-gradient(180deg, #fffdf8, #fffaf2);
+    box-shadow:
+      0 24px 72px rgba(84, 65, 38, 0.13),
+      0 2px 0 rgba(255, 255, 255, 0.75) inset;
+  }
+
+  .career-playbook-document-rule {
+    border-color: rgba(214, 194, 166, 0.72);
+  }
+
+  .career-playbook-soft-card {
+    border: 1px solid rgba(214, 194, 166, 0.76);
+    border-radius: 9px;
+    background: rgba(255, 250, 242, 0.82);
+  }
+
+  .career-playbook-muted-card {
+    border: 1px solid rgba(218, 200, 174, 0.7);
+    border-radius: 8px;
+    background: rgba(246, 239, 228, 0.64);
+  }
+
+  .career-playbook-rail-item {
+    border: 1px solid rgba(214, 194, 166, 0.74);
+    border-radius: 8px;
+    background: rgba(255, 250, 242, 0.74);
+  }
+
+  .career-playbook-rail-item-active {
+    border-color: rgba(124, 58, 237, 0.58);
+    background: rgba(244, 235, 255, 0.82);
+  }
+
+  .career-playbook-pill {
+    border: 1px solid rgba(214, 194, 166, 0.76);
+    border-radius: 999px;
+    background: rgba(255, 250, 242, 0.82);
+  }
+
+  .dark .career-playbook-zone {
+    color: hsl(var(--foreground));
+    background:
+      radial-gradient(circle at 16% 0%, rgba(139, 92, 246, 0.16), transparent 28%),
+      linear-gradient(180deg, #101827, #080d18 72%);
+  }
+
+  .dark .career-playbook-topbar {
+    border-bottom-color: rgba(71, 85, 105, 0.72);
+    background: rgba(15, 23, 42, 0.86);
+  }
+
+  .dark .career-playbook-panel,
+  .dark .career-playbook-document,
+  .dark .career-playbook-soft-card {
+    border-color: rgba(71, 85, 105, 0.8);
+    background: rgba(15, 23, 42, 0.9);
+    box-shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
+  }
+
+  .dark .career-playbook-document {
+    background:
+      linear-gradient(90deg, rgba(139, 92, 246, 0.18) 0 4px, transparent 4px),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(10, 15, 26, 0.96));
+  }
+
+  .dark .career-playbook-muted-card,
+  .dark .career-playbook-rail-item,
+  .dark .career-playbook-pill {
+    border-color: rgba(71, 85, 105, 0.76);
+    background: rgba(30, 41, 59, 0.62);
+  }
+
+  .dark .career-playbook-rail-item-active {
+    border-color: rgba(167, 139, 250, 0.72);
+    background: rgba(88, 28, 135, 0.38);
   }
 }
 
