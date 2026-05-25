@@ -161,7 +161,14 @@
         "description": "Teams can review and refine individual blocks without restarting the whole role discovery flow."
       }
     },
-    "faqTitle": "Questions",
+    "faqEyebrow": "Before you start",
+    "faqTitle": "What to know before the first draft",
+    "faqDescription": "A short practical check: who should use the constructor, whether the result can be refined, and what to prepare before starting.",
+    "faqHighlights": {
+      "0": "3 answers",
+      "1": "No repeated discovery",
+      "2": "A rough draft is enough"
+    },
     "faq": {
       "0": {
         "question": "Who should use this first?",

@@ -192,4 +192,22 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.queryByText('Google Team Effectiveness')).not.toBeInTheDocument()
     expect(screen.queryByText('B2B Sales Role Guide')).not.toBeInTheDocument()
   })
+
+  it('shows the pre-start guidance block as a designed section', () => {
+    activeLocale = 'ru'
+
+    render(<CareerPlaybookLandingPageClient />)
+
+    expect(screen.getByText('Перед стартом')).toBeInTheDocument()
+    expect(screen.getByText('Что важно знать до первого черновика')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Коротко закрываем практические сомнения: кому подходит конструктор, можно ли править результат и что подготовить перед началом.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('3 ответа')).toBeInTheDocument()
+    expect(screen.getByText('Без повторного сбора')).toBeInTheDocument()
+    expect(screen.getByText('Можно начать с черновика')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Вопросы' })).not.toBeInTheDocument()
+  })
 })

@@ -30,6 +30,7 @@ const demoSectionIds = [
   'kpi',
 ] as const
 const faqItemIds = ['0', '1', '2'] as const
+const faqHighlightIds = ['0', '1', '2'] as const
 
 type MethodologyId = (typeof methodologyIds)[number]
 type BlockGroupId = (typeof blockGroupIds)[number]
@@ -200,15 +201,48 @@ export default function CareerPlaybookLandingPageClient() {
         </section>
 
         <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white">
-          <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-            <div>
-              <h2 className="text-3xl font-bold">{t('faqTitle')}</h2>
+          <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-stretch">
+            <div className="rounded-xl border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(8,47,73,0.9),rgba(15,23,42,0.82))] p-6 shadow-2xl shadow-cyan-950/30 md:p-8">
+              <p className="text-sm font-semibold text-cyan-200">{t('faqEyebrow')}</p>
+              <h2 className="mt-4 max-w-lg text-3xl leading-tight font-bold md:text-4xl">
+                {t('faqTitle')}
+              </h2>
+              <p className="mt-5 max-w-xl text-base leading-7 text-slate-300">
+                {t('faqDescription')}
+              </p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                {faqHighlightIds.map((id, index) => (
+                  <FaqHighlight
+                    key={id}
+                    icon={
+                      index === 0 ? (
+                        <BookOpenCheck className="h-4 w-4" aria-hidden="true" />
+                      ) : index === 1 ? (
+                        <Workflow className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <FileText className="h-4 w-4" aria-hidden="true" />
+                      )
+                    }
+                    label={t(`faqHighlights.${id}`)}
+                  />
+                ))}
+              </div>
             </div>
             <div className="grid gap-3">
-              {faqItemIds.map((id) => (
-                <div key={id} className="rounded-lg border border-white/10 bg-white/5 p-5">
-                  <h3 className="text-base font-semibold text-white">{t(`faq.${id}.question`)}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{t(`faq.${id}.answer`)}</p>
+              {faqItemIds.map((id, index) => (
+                <div
+                  key={id}
+                  className="group grid gap-4 rounded-xl border border-white/10 bg-white/[0.06] p-5 transition-colors hover:border-cyan-300/35 hover:bg-white/[0.08] md:grid-cols-[3rem_1fr] md:p-6"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-sm font-semibold text-cyan-100 transition-colors group-hover:border-cyan-200/40 group-hover:bg-cyan-300/15">
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
+                  <div>
+                    <h3 className="text-lg leading-snug font-semibold text-white">
+                      {t(`faq.${id}.question`)}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-300">{t(`faq.${id}.answer`)}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -263,6 +297,17 @@ function ValueCard({
       </div>
       <h3 className="mt-4 text-lg font-semibold text-white">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
+    </div>
+  )
+}
+
+function FaqHighlight({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-medium text-slate-100">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+        {icon}
+      </span>
+      <span>{label}</span>
     </div>
   )
 }
