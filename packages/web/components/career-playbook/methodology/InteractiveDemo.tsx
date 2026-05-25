@@ -55,8 +55,8 @@ export function InteractiveDemo({
           <p className="mt-5 text-base leading-7 text-slate-300">{subtitle}</p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <div className="grid content-start gap-2">
+        <div className="grid gap-5 xl:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+          <div className="grid min-w-0 content-start gap-2">
             {sections.map((section) => {
               const isActive = section.id === activeSection.id
 
@@ -66,19 +66,21 @@ export function InteractiveDemo({
                   type="button"
                   variant="ghost"
                   className={cn(
-                    'h-auto min-h-16 justify-start rounded-lg border p-4 text-left',
+                    'h-auto min-h-16 w-full min-w-0 justify-start rounded-lg border p-4 text-left whitespace-normal',
                     'border-white/10 bg-white/5 text-slate-200 hover:border-amber-300/40 hover:bg-white/10',
                     isActive && 'border-amber-300/60 bg-amber-300/15 text-white'
                   )}
                   onClick={() => setActiveSectionId(section.id)}
                 >
-                  <span className="flex items-start gap-3">
+                  <span className="flex min-w-0 items-start gap-3">
                     <FileText
                       className="mt-0.5 h-4 w-4 shrink-0 text-amber-200"
                       aria-hidden="true"
                     />
-                    <span>
-                      <span className="block text-sm font-semibold">{section.title}</span>
+                    <span className="min-w-0">
+                      <span className="block text-sm leading-5 font-semibold break-words">
+                        {section.title}
+                      </span>
                       <span className="mt-1 block text-xs text-slate-400">
                         {section.blockLabel}
                       </span>
@@ -89,8 +91,8 @@ export function InteractiveDemo({
             })}
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <article className="min-h-[26rem] rounded-lg border border-white/10 bg-white/95 p-6 text-slate-950 shadow-2xl md:p-8">
+          <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <article className="min-h-[26rem] min-w-0 rounded-lg border border-white/10 bg-white/95 p-6 text-slate-950 shadow-2xl md:p-8">
               <div className="mb-6 flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
                 <div>
                   <p className="text-xs font-semibold text-slate-500">{previewTitle}</p>
@@ -123,7 +125,7 @@ export function InteractiveDemo({
               </div>
             </article>
 
-            <aside className="rounded-lg border border-amber-300/20 bg-amber-300/10 p-5">
+            <aside className="min-w-0 rounded-lg border border-amber-300/20 bg-amber-300/10 p-5">
               <p className="text-sm font-semibold text-amber-100">{activeSection.blockLabel}</p>
               <p className="mt-4 text-sm leading-6 text-slate-200">{activeSection.annotation}</p>
             </aside>
