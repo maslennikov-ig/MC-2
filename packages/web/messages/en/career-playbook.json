@@ -92,14 +92,36 @@
     },
     "demoEyebrow": "Interactive demo",
     "demoTitle": "Annotated B2B sales Role Guide preview",
-    "demoSubtitle": "Explore a compact preview inspired by the sample B2B sales manager playbook. Each annotation explains why that block matters.",
+    "demoSubtitle": "Explore the first six sections of the future guide in order. The full version expands the role through 26 sections.",
     "demoPreviewTitle": "B2B Sales Role Guide",
+    "demoTotalBlocksLabel": "26 sections in the full guide",
+    "demoShownBlocksLabel": "First 6 sections shown",
+    "demoRemainingBlocksLabel": "20 more sections complete the instruction",
+    "demoOutlineLabel": "Sample outline",
     "demoSections": {
       "mission": {
         "title": "Mission and key results",
         "excerpt": "The role turns B2B pipeline into predictable revenue: it qualifies opportunities, moves deals forward, and keeps the funnel healthy.",
         "annotation": "Mission connects the role purpose to measurable outcomes and gives managers a fast quality check.",
         "blockLabel": "Block 1"
+      },
+      "antiGoals": {
+        "title": "Anti-goals",
+        "excerpt": "The B2B sales manager does not own post-launch support, approve unusual legal terms, or act as the product owner.",
+        "annotation": "Role boundaries reduce ownership disputes and protect the person from hidden extra work.",
+        "blockLabel": "Block 2"
+      },
+      "responsibilities": {
+        "title": "Responsibility zones",
+        "excerpt": "The role owns opportunity qualification, deal progress, forecast accuracy, and expectation handoff to implementation teams.",
+        "annotation": "Responsibility zones show what the person owns directly and where collaboration is required.",
+        "blockLabel": "Block 3"
+      },
+      "duties": {
+        "title": "Duties",
+        "excerpt": "Update the pipeline weekly, run customer meetings, capture next steps, and prepare commercial proposals.",
+        "annotation": "Duties turn the role into a concrete working week that can be reviewed and improved.",
+        "blockLabel": "Block 4"
       },
       "decisions": {
         "title": "Decision matrix",

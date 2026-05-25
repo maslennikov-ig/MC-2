@@ -138,15 +138,23 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
     const demoButtons = screen.getAllByRole('button').filter((button) => {
-      return /mission and key results|decision matrix|kpi and counter-metrics/i.test(
+      return /mission and key results|anti-goals|responsibility zones|duties|decision matrix|kpi and counter-metrics/i.test(
         button.textContent ?? ''
       )
     })
     expect(demoButtons.map((button) => button.textContent)).toEqual([
       expect.stringMatching(/Mission and key results.*Block 1/i),
+      expect.stringMatching(/Anti-goals.*Block 2/i),
+      expect.stringMatching(/Responsibility zones.*Block 3/i),
+      expect.stringMatching(/Duties.*Block 4/i),
       expect.stringMatching(/Decision matrix.*Block 5/i),
       expect.stringMatching(/KPI and counter-metrics.*Block 6/i),
     ])
+    expect(screen.getByText('26 sections in the full guide')).toBeInTheDocument()
+    expect(screen.getAllByText('First 6 sections shown').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('20 more sections complete the instruction').length).toBeGreaterThan(
+      0
+    )
     expect(
       screen.getByText(/the role turns b2b pipeline into predictable revenue/i)
     ).toBeInTheDocument()
@@ -162,6 +170,9 @@ describe('CareerPlaybookLandingPageClient', () => {
     expect(screen.getAllByText('1. Миссия и ключевые результаты').length).toBeGreaterThan(0)
     expect(screen.getAllByText('22. Памятка роли').length).toBeGreaterThan(0)
     expect(screen.getByText('Должностная инструкция: корпоративные продажи')).toBeInTheDocument()
+    expect(screen.getByText('26 разделов в полной инструкции')).toBeInTheDocument()
+    expect(screen.getAllByText('Показаны первые 6 разделов').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ещё 20 разделов дополняют инструкцию').length).toBeGreaterThan(0)
     expect(
       screen.getByText('Превратите контекст роли в понятную должностную инструкцию')
     ).toBeInTheDocument()

@@ -21,7 +21,14 @@ import { Link } from '@/src/i18n/navigation'
 
 const methodologyIds = ['netflix', 'amazon', 'toyota', 'spotify', 'bridgewater'] as const
 const blockGroupIds = ['foundation', 'operations', 'people', 'growth', 'system', 'wrap'] as const
-const demoSectionIds = ['mission', 'decisions', 'kpi'] as const
+const demoSectionIds = [
+  'mission',
+  'antiGoals',
+  'responsibilities',
+  'duties',
+  'decisions',
+  'kpi',
+] as const
 const faqItemIds = ['0', '1', '2'] as const
 
 type MethodologyId = (typeof methodologyIds)[number]
@@ -144,6 +151,10 @@ export default function CareerPlaybookLandingPageClient() {
           title={t('demoTitle')}
           subtitle={t('demoSubtitle')}
           previewTitle={t('demoPreviewTitle')}
+          totalBlocksLabel={t('demoTotalBlocksLabel')}
+          shownBlocksLabel={t('demoShownBlocksLabel')}
+          remainingBlocksLabel={t('demoRemainingBlocksLabel')}
+          outlineLabel={t('demoOutlineLabel')}
           sections={demoSections}
         />
 

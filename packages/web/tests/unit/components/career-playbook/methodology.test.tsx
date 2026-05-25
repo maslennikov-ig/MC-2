@@ -100,6 +100,13 @@ const demoSections: CareerPlaybookDemoSection[] = [
   },
 ]
 
+const demoChrome = {
+  totalBlocksLabel: '26 sections in the full guide',
+  shownBlocksLabel: 'First 6 sections shown',
+  remainingBlocksLabel: '20 more sections complete the instruction',
+  outlineLabel: 'Document outline',
+}
+
 describe('MethodologySection', () => {
   it('renders five methodology cards and all 26 block chips', () => {
     render(
@@ -132,10 +139,12 @@ describe('InteractiveDemo', () => {
         subtitle="Inspect the generated document."
         previewTitle="B2B Sales Role Guide"
         sections={demoSections}
+        {...demoChrome}
       />
     )
 
     expect(screen.getByText(/pipeline is always/i)).toBeInTheDocument()
+    expect(screen.getByText('26 sections in the full guide')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /decision matrix/i }))
 
@@ -160,6 +169,7 @@ describe('InteractiveDemo', () => {
             blockLabel: 'Block 6',
           },
         ]}
+        {...demoChrome}
       />
     )
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { BookOpenCheck, FileText, MessageSquareText } from 'lucide-react'
+import { BookOpenCheck, ClipboardCheck, FileText, MessageSquareText } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -20,6 +20,10 @@ interface InteractiveDemoProps {
   title: string
   subtitle: string
   previewTitle: string
+  totalBlocksLabel: string
+  shownBlocksLabel: string
+  remainingBlocksLabel: string
+  outlineLabel: string
   sections: CareerPlaybookDemoSection[]
 }
 
@@ -28,6 +32,10 @@ export function InteractiveDemo({
   title,
   subtitle,
   previewTitle,
+  totalBlocksLabel,
+  shownBlocksLabel,
+  remainingBlocksLabel,
+  outlineLabel,
   sections,
 }: InteractiveDemoProps) {
   const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? '')
@@ -47,16 +55,38 @@ export function InteractiveDemo({
       className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20"
     >
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold text-amber-200">{eyebrow}</p>
-          <h2 id="career-playbook-demo-title" className="text-3xl font-bold md:text-4xl">
-            {title}
-          </h2>
-          <p className="mt-5 text-base leading-7 text-slate-300">{subtitle}</p>
+        <div className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
+          <div className="max-w-3xl">
+            <p className="mb-3 text-sm font-semibold text-amber-200">{eyebrow}</p>
+            <h2 id="career-playbook-demo-title" className="text-3xl font-bold md:text-4xl">
+              {title}
+            </h2>
+            <p className="mt-5 text-base leading-7 text-slate-300">{subtitle}</p>
+          </div>
+
+          <div className="rounded-lg border border-amber-300/25 bg-amber-200/10 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.18)]">
+            <div className="flex items-center gap-2 text-amber-100">
+              <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+              <p className="text-sm font-semibold">{totalBlocksLabel}</p>
+            </div>
+            <div className="mt-4 flex items-end gap-3">
+              <span className="text-5xl leading-none font-bold text-white">26</span>
+              <span className="pb-1 text-sm leading-5 text-slate-300">{shownBlocksLabel}</span>
+            </div>
+            <p className="mt-4 border-t border-amber-200/15 pt-4 text-sm leading-6 text-slate-300">
+              {remainingBlocksLabel}
+            </p>
+          </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
-          <div className="grid min-w-0 content-start gap-2">
+        <div className="grid gap-5 xl:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
+          <div className="grid min-w-0 content-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div className="px-1 pb-2">
+              <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+                {outlineLabel}
+              </p>
+              <p className="mt-1 text-sm text-slate-300">{shownBlocksLabel}</p>
+            </div>
             {sections.map((section) => {
               const isActive = section.id === activeSection.id
 
@@ -66,7 +96,7 @@ export function InteractiveDemo({
                   type="button"
                   variant="ghost"
                   className={cn(
-                    'h-auto min-h-16 w-full min-w-0 justify-start rounded-lg border p-4 text-left whitespace-normal',
+                    'h-auto min-h-16 w-full min-w-0 justify-start rounded-md border p-4 text-left whitespace-normal',
                     'border-white/10 bg-white/5 text-slate-200 hover:border-amber-300/40 hover:bg-white/10',
                     isActive && 'border-amber-300/60 bg-amber-300/15 text-white'
                   )}
@@ -92,11 +122,14 @@ export function InteractiveDemo({
           </div>
 
           <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <article className="min-h-[26rem] min-w-0 rounded-lg border border-white/10 bg-white/95 p-6 text-slate-950 shadow-2xl md:p-8">
-              <div className="mb-6 flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <article className="min-h-[28rem] min-w-0 rounded-lg border border-white/10 bg-[#fbfaf7] p-6 text-slate-950 shadow-2xl md:p-8">
+              <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-500">{previewTitle}</p>
                   <h3 className="mt-1 text-2xl font-bold text-slate-950">{activeSection.title}</h3>
+                  <p className="mt-3 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                    {activeSection.blockLabel}
+                  </p>
                 </div>
                 <BookOpenCheck className="h-6 w-6 text-violet-600" aria-hidden="true" />
               </div>
@@ -128,6 +161,9 @@ export function InteractiveDemo({
             <aside className="min-w-0 rounded-lg border border-amber-300/20 bg-amber-300/10 p-5">
               <p className="text-sm font-semibold text-amber-100">{activeSection.blockLabel}</p>
               <p className="mt-4 text-sm leading-6 text-slate-200">{activeSection.annotation}</p>
+              <p className="mt-5 border-t border-amber-200/15 pt-5 text-xs leading-5 text-slate-400">
+                {remainingBlocksLabel}
+              </p>
             </aside>
           </div>
         </div>
