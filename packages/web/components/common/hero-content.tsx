@@ -64,7 +64,7 @@ export default function HeroContent() {
             purpose={t('roleProductPurpose')}
             href="/career-playbook"
             cta={t('learnMoreRole')}
-            icon={<FileText className="h-5 w-5" aria-hidden="true" />}
+            icon={<FileText className="h-5 w-5 xl:h-6 xl:w-6" aria-hidden="true" />}
             emphasized
           />
           <div className="xl:hidden">
@@ -76,7 +76,7 @@ export default function HeroContent() {
             purpose={t('courseProductPurpose')}
             href="/courses"
             cta={t('learnMoreCourses')}
-            icon={<BookOpen className="h-5 w-5" aria-hidden="true" />}
+            icon={<BookOpen className="h-5 w-5 xl:h-6 xl:w-6" aria-hidden="true" />}
           />
           <ProductConnectorOverlay
             title={t('workflowTitle')}
@@ -119,25 +119,29 @@ function ProductCard({ eyebrow, title, purpose, href, cta, icon, emphasized }: P
       href={href}
       className={
         emphasized
-          ? 'focus-ring group flex min-h-[340px] flex-col justify-between rounded-xl border border-purple-300/40 bg-purple-600/35 p-5 text-white transition hover:border-purple-200/70 hover:bg-purple-600/45'
-          : 'focus-ring group flex min-h-[340px] flex-col justify-between rounded-xl border border-white/15 bg-white/10 p-5 text-white transition hover:border-purple-300/50 hover:bg-white/14'
+          ? 'focus-ring group flex min-h-[340px] flex-col justify-between rounded-xl border border-purple-300/40 bg-purple-600/35 p-5 text-white transition hover:border-purple-200/70 hover:bg-purple-600/45 xl:min-h-[390px] xl:p-7 2xl:min-h-[420px] 2xl:p-8'
+          : 'focus-ring group flex min-h-[340px] flex-col justify-between rounded-xl border border-white/15 bg-white/10 p-5 text-white transition hover:border-purple-300/50 hover:bg-white/14 xl:min-h-[390px] xl:p-7 2xl:min-h-[420px] 2xl:p-8'
       }
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-lg border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white">
+          <span className="rounded-lg border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white xl:px-3.5 xl:py-1.5 xl:text-base">
             {eyebrow}
           </span>
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/14 text-purple-100 group-hover:bg-purple-600 group-hover:text-white">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/14 text-purple-100 group-hover:bg-purple-600 group-hover:text-white xl:h-12 xl:w-12">
             {icon}
           </span>
         </div>
-        <h2 className="mt-7 text-3xl leading-tight font-bold">{title}</h2>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-white/72">{purpose}</p>
+        <h2 className="mt-7 text-3xl leading-tight font-bold xl:mt-9 xl:text-[2.65rem] xl:leading-[1.08] 2xl:text-5xl">
+          {title}
+        </h2>
+        <p className="mt-3 max-w-2xl text-base leading-7 text-white/72 xl:mt-4 xl:text-xl xl:leading-9 2xl:text-[1.35rem] 2xl:leading-10">
+          {purpose}
+        </p>
       </div>
-      <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold">
+      <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold xl:mt-10 xl:text-lg">
         {cta}
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        <ArrowRight className="h-4 w-4 xl:h-5 xl:w-5" aria-hidden="true" />
       </span>
     </Link>
   )
