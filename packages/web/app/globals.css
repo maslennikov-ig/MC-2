@@ -18,6 +18,11 @@
    ============================================ */
 
 @layer base {
+  html,
+  body {
+    overflow-x: clip;
+  }
+
   :root {
     /* ===== DESIGN TOKENS - CORE SPACING ===== */
     --spacing: 0.25rem; /* 4px base unit (standard Tailwind spacing) */
