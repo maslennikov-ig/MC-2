@@ -82,7 +82,7 @@ export default function AuthButton({
       }
     }
 
-    loadProfile()
+    void loadProfile()
 
     // Add timeout protection - max 5 seconds for profile loading
     const timeout = setTimeout(() => {
@@ -106,7 +106,7 @@ export default function AuthButton({
   }
 
   if (isLoading || profileLoading) {
-    return <Skeleton className="h-11 w-32 rounded-full" />
+    return <Skeleton className="h-11 w-11 rounded-full sm:w-32" />
   }
 
   // If not logged in, show the styled login button
@@ -121,7 +121,7 @@ export default function AuthButton({
         >
           <button
             onClick={() => open('login', { returnTo: pathname })}
-            className={`absolute right-0 z-0 flex min-h-[44px] min-w-[44px] -translate-x-12 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r px-3 py-3 text-sm font-medium text-white shadow-md transition-all duration-300 group-hover:-translate-x-20 ${
+            className={`pointer-events-none absolute right-0 z-0 hidden min-h-[44px] min-w-[44px] -translate-x-4 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r px-3 py-3 text-sm font-medium text-white opacity-0 shadow-md transition-all duration-300 sm:flex sm:group-focus-within:pointer-events-auto sm:group-focus-within:-translate-x-20 sm:group-focus-within:opacity-100 sm:group-hover:pointer-events-auto sm:group-hover:-translate-x-20 sm:group-hover:opacity-100 ${
               darkMode
                 ? 'from-purple-700 to-purple-800 hover:from-purple-800 hover:to-purple-900'
                 : 'from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
@@ -147,7 +147,7 @@ export default function AuthButton({
           </button>
           <button
             onClick={() => open('login', { returnTo: pathname })}
-            className={`z-10 flex min-h-[44px] cursor-pointer items-center rounded-full bg-gradient-to-r px-8 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
+            className={`z-10 flex min-h-[44px] cursor-pointer items-center rounded-full bg-gradient-to-r px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 sm:px-8 ${
               darkMode
                 ? 'from-purple-700 to-purple-800 hover:from-purple-800 hover:to-purple-900'
                 : 'from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'

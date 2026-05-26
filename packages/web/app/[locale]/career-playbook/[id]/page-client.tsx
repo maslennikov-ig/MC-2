@@ -2,22 +2,71 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import type { CareerPlaybookViewerSnapshot } from '@megacampus/shared-types'
+import type {
+  CareerPlaybookBlockGroupKey,
+  CareerPlaybookViewerSnapshot,
+} from '@megacampus/shared-types'
 
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
+import Header from '@/components/layouts/header'
 import { Button } from '@/components/ui/button'
 import type { Locale } from '@/src/i18n/config'
 import {
   CAREER_PLAYBOOK_BLOCK_CATALOG,
   useCareerPlaybookStore,
   type CareerPlaybookBlockId,
+  type CareerPlaybookViewerBlock,
 } from '@/stores/use-career-playbook-store'
 
 interface CareerPlaybookViewerPageClientProps {
   locale: Locale
   playbookId: string
+}
+
+const VIEWER_BLOCK_TITLE_KEYS = {
+  header: 'blocks.header',
+  block_1: 'blocks.block_1',
+  block_2: 'blocks.block_2',
+  block_3: 'blocks.block_3',
+  block_4: 'blocks.block_4',
+  block_5: 'blocks.block_5',
+  block_6: 'blocks.block_6',
+  block_7: 'blocks.block_7',
+  block_8: 'blocks.block_8',
+  block_9: 'blocks.block_9',
+  block_10: 'blocks.block_10',
+  block_11: 'blocks.block_11',
+  block_12: 'blocks.block_12',
+  block_13: 'blocks.block_13',
+  block_14: 'blocks.block_14',
+  block_15: 'blocks.block_15',
+  block_16: 'blocks.block_16',
+  block_17: 'blocks.block_17',
+  block_18: 'blocks.block_18',
+  block_19: 'blocks.block_19',
+  block_20: 'blocks.block_20',
+  block_21: 'blocks.block_21',
+  block_22: 'blocks.block_22',
+  block_23: 'blocks.block_23',
+  block_24: 'blocks.block_24',
+  block_25: 'blocks.block_25',
+  block_26: 'blocks.block_26',
+} as const satisfies Record<CareerPlaybookBlockId, `blocks.${string}`>
+
+const VIEWER_BLOCK_GROUP_KEYS = {
+  group_1_foundation: 'blockGroups.group_1_foundation',
+  group_2_operations: 'blockGroups.group_2_operations',
+  group_3_people: 'blockGroups.group_3_people',
+  group_4_growth: 'blockGroups.group_4_growth',
+  group_5_system: 'blockGroups.group_5_system',
+  group_6_wrap: 'blockGroups.group_6_wrap',
+} as const satisfies Record<CareerPlaybookBlockGroupKey, `blockGroups.${string}`>
+
+function getViewerBlockTitleKey(blockId: CareerPlaybookBlockId) {
+  const key = blockId as keyof typeof VIEWER_BLOCK_TITLE_KEYS
+  return VIEWER_BLOCK_TITLE_KEYS[key]
 }
 
 export default function CareerPlaybookViewerPageClient({
@@ -31,12 +80,23 @@ export default function CareerPlaybookViewerPageClient({
     () => ({
       productLabel: t('productLabel'),
       contents: t('contents'),
+      contentsAriaLabel: t('contentsAriaLabel'),
       waitingBlock: t('waitingBlock'),
+      statusLabel: (status: CareerPlaybookViewerSnapshot['status']) => t(`statusLabels.${status}`),
+      blockTitle: (blockId: CareerPlaybookBlockId, fallback: string) => {
+        const key = getViewerBlockTitleKey(blockId)
+        return key ? t(key) : fallback
+      },
+      blockGroupLabel: (groupKey: CareerPlaybookBlockGroupKey, fallback: string) =>
+        t(VIEWER_BLOCK_GROUP_KEYS[groupKey]) || fallback,
+      blockStatusLabel: (status: CareerPlaybookViewerBlock['state']['status']) =>
+        t(`blockStatusLabels.${status}`),
       editBlock: (title: string) => t('editBlock', { title }),
       regenerateBlock: (title: string) => t('regenerateBlock', { title }),
       collapseBlock: (title: string) => t('collapseBlock', { title }),
       expandBlock: (title: string) => t('expandBlock', { title }),
       actions: {
+        actionsLabel: t('actionsLabel'),
         pdf: t('pdf'),
         share: t('share'),
         createCourse: t('createCourse'),
@@ -64,6 +124,14 @@ export default function CareerPlaybookViewerPageClient({
       blocksReady: (ready: number, total: number) => t('blocksReady', { ready, total }),
       thinkingStream: t('thinkingStream'),
       streamingBlockPending: t('streamingBlockPending'),
+      blockTitle: (blockId: CareerPlaybookBlockId, fallback: string) => {
+        const key = getViewerBlockTitleKey(blockId)
+        return key ? t(key) : fallback
+      },
+      blockGroupLabel: (groupKey: CareerPlaybookBlockGroupKey, fallback: string) =>
+        t(VIEWER_BLOCK_GROUP_KEYS[groupKey]) || fallback,
+      blockStatusLabel: (status: CareerPlaybookViewerBlock['state']['status']) =>
+        t(`blockStatusLabels.${status}`),
     }),
     [t]
   )
@@ -105,27 +173,31 @@ export default function CareerPlaybookViewerPageClient({
 
   if (state.isLoadingViewer && !state.viewer) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-        <p className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-          {t('loading')}
-        </p>
-      </main>
+      <>
+        <Header sticky surface="glass" />
+        <main className="career-playbook-zone flex min-h-[calc(100vh-73px)] items-center justify-center px-4">
+          <p className="career-playbook-panel px-4 py-3 text-sm">{t('loading')}</p>
+        </main>
+      </>
     )
   }
 
   if (!state.viewer) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-        <div className="grid max-w-lg gap-3 rounded-md border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <h1 className="text-xl font-semibold">{t('unavailableTitle')}</h1>
-          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-            {state.viewerError ?? t('unavailableDescription')}
-          </p>
-          <Button type="button" onClick={() => void state.loadCareerPlaybookViewer(playbookId)}>
-            {t('retry')}
-          </Button>
-        </div>
-      </main>
+      <>
+        <Header sticky surface="glass" />
+        <main className="career-playbook-zone flex min-h-[calc(100vh-73px)] items-center justify-center px-4">
+          <div className="career-playbook-panel grid max-w-lg gap-3 p-5">
+            <h1 className="text-xl font-semibold">{t('unavailableTitle')}</h1>
+            <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {state.viewerError ?? t('unavailableDescription')}
+            </p>
+            <Button type="button" onClick={() => void state.loadCareerPlaybookViewer(playbookId)}>
+              {t('retry')}
+            </Button>
+          </div>
+        </main>
+      </>
     )
   }
 
@@ -166,6 +238,7 @@ export default function CareerPlaybookViewerPageClient({
   if (state.viewer.status === 'generating') {
     return (
       <>
+        <Header sticky surface="glass" />
         <StreamingView
           snapshot={state.viewer}
           blocks={state.viewerBlocks}
@@ -180,6 +253,7 @@ export default function CareerPlaybookViewerPageClient({
 
   return (
     <>
+      <Header sticky surface="glass" />
       <PlaybookViewer
         snapshot={state.viewer}
         blocks={state.viewerBlocks}

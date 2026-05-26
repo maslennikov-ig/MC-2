@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, WandSparkles } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -71,7 +71,10 @@ export function BlockEditor({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-5 sm:max-w-3xl">
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col gap-5 bg-[#fffdf8] sm:max-w-3xl dark:bg-slate-950"
+      >
         <SheetHeader>
           <SheetTitle>{block?.title ?? labels.title}</SheetTitle>
           <SheetDescription>{labels.description}</SheetDescription>
@@ -100,7 +103,7 @@ export function BlockEditor({
             </div>
           </div>
 
-          <div className="grid gap-2 border-t border-slate-200 pt-5 dark:border-slate-800">
+          <div className="grid gap-2 border-t border-[#d8c5aa] pt-5 dark:border-slate-800">
             <Label htmlFor="career-playbook-regeneration-instruction">
               {labels.regenerationInstruction}
             </Label>
@@ -120,7 +123,7 @@ export function BlockEditor({
                   if (block) void onRegenerate(block.blockId, instruction.trim())
                 }}
               >
-                <WandSparkles className="mr-2 h-4 w-4" aria-hidden />
+                <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
                 {labels.regenerateBlock}
               </Button>
             </div>

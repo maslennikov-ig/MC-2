@@ -68,10 +68,11 @@ describe('Header', () => {
 
     render(<Header />)
 
-    expect(screen.getByRole('link', { name: 'Создать описание роли' })).toHaveAttribute(
-      'href',
-      '/career-playbook/new'
-    )
+    const link = screen.getByRole('link', { name: 'Создать описание роли' })
+
+    expect(link).toHaveAttribute('href', '/career-playbook/new')
+    expect(link.className).toContain('purple')
+    expect(link.className).not.toContain('teal')
   })
 
   it('links signed-out users to the role description landing page', () => {
@@ -86,5 +87,38 @@ describe('Header', () => {
       'href',
       '/career-playbook'
     )
+  })
+
+  it('supports the shared sticky glass app header surface', () => {
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: { user: { id: 'user-1' } },
+    })
+
+    render(<Header sticky surface="glass" />)
+
+    const header = screen.getByRole('banner')
+    expect(header.className).toContain('sticky')
+    expect(header.className).toContain('backdrop-blur-sm')
+  })
+
+  it('uses compact rounded navigation buttons instead of pill buttons', () => {
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: { user: { id: 'user-1' } },
+    })
+
+    render(<Header />)
+
+    const navLinks = [
+      screen.getByRole('link', { name: 'Просмотреть доступные курсы' }),
+      screen.getByRole('link', { name: 'Создать описание роли' }),
+      screen.getByRole('link', { name: 'Создать новый курс' }),
+    ]
+
+    navLinks.forEach((link) => {
+      expect(link.className).toContain('rounded-lg')
+      expect(link.className).not.toContain('rounded-full')
+    })
   })
 })

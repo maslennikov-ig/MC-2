@@ -1,48 +1,69 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-23
-Current working branch: `develop`
-Base branch: `origin/develop`
-Base head: see current `git status`; code delivery merge was `751cb718f129d28b49f555194eb7747b7679b261`
+Updated: 2026-05-25
+Branch: `codex/cp-landing-26-demo`
+Base: `origin/develop` at `cec55643536d7af51662428b52b21e8e4ecabffa`
 
-## Current state
+## Current State
 
-- Primary worktree `/home/me/code/mc2` is on `develop`.
-- PR #46 (`codex/career-playbook-role-suggestions` -> `develop`) is merged.
-- `/push-dev --yes` promoted Career Playbook role-title suggestions to `develop` with merge commit `751cb718f129d28b49f555194eb7747b7679b261`.
-- GitHub Actions run `26326959021` for `develop` completed successfully; `Deploy to Dev` succeeded.
-- `/deploy --yes` promoted `develop` to `master` with merge commit `15b6a72e920dae24c7cdd1b61e9cf8b7dd922d69`.
-- GitHub Actions run `26327011300` for `master` completed successfully; `Deploy to Production` succeeded. The non-blocking `Integration Tests` job failed, but the workflow conclusion and deploy job were successful.
-- Health checks after delivery returned 200 `ok` for `https://dev.ai.megacampus.ru/api/health` and `https://ai.megacampus.ru/api/health`.
-- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, `/deploy` targets staging through `master`; do not push directly to `develop` or `master`.
-- Career Playbook Russian naming should remain `Должностная инструкция`; header action remains `Создать описание роли`; do not regress to unclear wording such as `руководство роли`.
-- `mc2-db696.20` delivered the initial small role-title suggestion MVP.
-- `mc2-db696.21` upgrades it to a fuller local role intelligence input: popular roles, grouped typed matches, match reasons, alias/acronym/keyword search, no-results manual fallback, and RU/EN copy.
-- The curated seed list now has 75 local RU/EN role records with departments, groups, seniority, aliases, acronyms, keywords, popularity rank, locale priority, and `source: curated`.
-- Selected and typed role titles still flow through the existing fixed-answer wizard state; no backend schema, billing/payment, live taxonomy API, or large dataset import was added.
-- 21st.dev was checked for combobox inspiration only; no external component dependency was imported.
-- LazyWeb MCP is not available in the current orchestrator runtime; accepted visible research and official/product references were used.
-- Code review report: `docs/reports/code-reviews/2026-05/CR-2026-05-23-career-playbook-role-suggestions-production.md`.
-- Beads `mc2-db696.21` is closed after local verification and stage closeout.
+- Stage `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`) was merged via PR #51 and deployed to Dev.
+- Dev run: GitHub Actions `26385179954`, deploy job passed, health returned `{"status":"ok"}` on 2026-05-25.
+- Follow-up bug `mc2-db696.34` fixed the Career Playbook landing interactive demo overlap/order via PR #53; Dev run `26388816456` deployed successfully and health returned `{"status":"ok"}` on 2026-05-25.
+- Follow-up task `mc2-db696.35` is active on PR #55 (`codex/cp-landing-26-demo`): landing page now shows 26-block structure clearly, adds personalization marketing, smooth motion, mobile auth-button fix, and a wider methodology-backed hero with dark document preview.
+- PR #55 CI run `26402611160` passed before the latest inline 26-section demo commit; rerun PR checks after pushing any new commit.
+- Main checkout `/home/me/code/mc2` is a separate worktree on `codex/career-playbook-ui-mock-variants` with unrelated local orchestration changes; do not overwrite or clean it from this branch.
 
-## Latest relevant stage
+## Changes In This Branch
 
-- Latest relevant Career Playbook stage: `mc2-db696.21` - production-grade role-title suggestions, delivered to Dev and staging/production route; summary and artifacts are under [`.codex/stages/mc2-db696.21`](./stages/mc2-db696.21/summary.md).
-- Previous MVP stage remains under `mc2-db696.20`; earlier live-smoke foundation remains under `mc2-db696.11` and is unrelated to this frontend change.
+- Added milk/document light tokens while keeping primary CTA purple; dark mode remains contrast-first.
+- Added shared Career Playbook document workspace/shell/preview components.
+- Rebuilt constructor, follow-ups, and completion review as a document-first workflow with left navigation, central draft document, and right action/question panel.
+- Applied the same document styling to library, private viewer, streaming/editor states, public share, loading/error/auth-required states, and soft landing alignment through shared tokens.
+- Refined `/career-playbook` landing: inline 26-section interactive demo with examples for every section, six methodology sources, book-methodology source line, personalized AI-assisted value section, smoother motion, mobile login decoration fix, and wider hero/section containers.
+- Removed visible Career Playbook AI-cliche icons/labels and localized RU/EN viewer block/group/status/aria labels.
+- Added `docs/plans/career-playbook/2026-05-25-document-first-zone-redesign.md`; updated `docs/career-playbook/README.md`.
+- Tracked visible subagent reports under `.codex/stages/mc2-db696.33/artifacts/`.
+
+## Verification
+
+- CP unit set passed: 6 files, 53 tests.
+- `pnpm --filter @megacampus/web lint` passed.
+- `pnpm --filter @megacampus/web type-check` passed.
+- `pnpm --filter @megacampus/web build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
+- Production-mode Playwright smoke passed for CP and non-CP routes at 390, 1440, and 1920 px: 24 checks, no 500s, no horizontal overflow.
+- `pnpm type-check` passed.
+- `pnpm build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
+- Dev light/dark smoke passed for `/ru/career-playbook`, `/ru/career-playbook/new`, `/ru/career-playbook/library`, and `/en/career-playbook` at 390/1440/1920 px: 200 status and no horizontal overflow.
+- Dev landing demo smoke passed for `/ru/career-playbook` at 390/1440/1920 px in light and dark: demo order is block 1 -> block 5 -> block 6, no horizontal overflow, and no selector/document overlap.
+- PR #55 landing verification passed locally:
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/common/auth-button.test.tsx tests/unit/components/layouts/header.test.tsx tests/unit/components/career-playbook/landing-page.test.tsx`
+  - `pnpm --filter @megacampus/web lint`
+  - `pnpm --filter @megacampus/web type-check`
+  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
+  - Playwright smoke for `/career-playbook` at 2048x1060 and 390x827: no horizontal overflow; wide hero preview visible only on large viewport.
+- Latest PR #55 hero-copy verification passed locally:
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
+  - Playwright smoke for `/career-playbook` at 1335x827: H1 is `Должностная инструкция, которой пользуются`, methodology and book-source lines are present, dark hero preview is present, no horizontal overflow.
+  - `pnpm --filter @megacampus/web lint`
+  - `pnpm --filter @megacampus/web type-check`
+  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
+- Latest PR #55 inline 26-section demo verification passed locally:
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
+  - `pnpm --filter @megacampus/web lint`
+  - `pnpm --filter @megacampus/web type-check`
+  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
+  - Playwright smoke for `/career-playbook` at 1335x827: 26 inline section buttons, no all-26 modal trigger, block 26 example visible, example label visible, no horizontal overflow.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.21`
-Recommended action: no follow-up required for delivery. Authenticated browser screenshots/flow still require `TOKEN` or storage state if a future stage needs that evidence.
+Next stage id: `mc2-db696.35`
+Recommended action: keep iterating PR #55 until landing feedback is accepted, then merge through PR delivery and let Dev deploy run from `develop`.
 
 ## Starter prompt for next orchestrator
 
-```text
-Use $orchestrator-stage to continue Career Playbook / "Должностная инструкция" work in /home/me/code/mc2. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, .codex/stages/mc2-db696.21/summary.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. Current branch is develop; mc2-db696.21 is merged via PR #46, delivered to Dev, and deployed through master. Keep manual role entry, existing fixed-answer state, RU/EN behavior, no billing/payment, no live taxonomy dependency, and no direct push to develop/master.
-```
+Use $orchestrator-stage for the next Career Playbook stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*`, Beads ready state, and current `git status`. PR #55 is active on `codex/cp-landing-26-demo` for landing-page refinements; do not overwrite the separate local worktree on `codex/career-playbook-ui-mock-variants`.
 
 ## Explicit defers
 
-- Authenticated Playwright screenshots/flow for `/career-playbook/new` require `TOKEN` or storage state; unauthenticated guard is verified.
-- Persisted normalized role metadata (`role_id`, source, confidence) is deferred until backend schema work is explicitly scoped.
-- Broader ESCO/O\*NET/ISCO/Lightcast taxonomy ingestion is deferred; current implementation uses a curated static seed list.
+- `mc2-db696.28`: ESCO import subset / normalized role-source pipeline remains outside this redesign.

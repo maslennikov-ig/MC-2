@@ -9,11 +9,17 @@ import {
   type CareerPlaybookClient,
 } from '@/stores/use-career-playbook-store'
 
+vi.mock('@/components/layouts/header', () => ({
+  default: () => <header data-testid="shared-header" />,
+}))
+
 const messages = {
   'career-playbook': {
     viewer: {
-      productLabel: 'Career Playbook',
+      productLabel: 'Role Guide',
       contents: 'Contents',
+      contentsAriaLabel: 'Role guide contents',
+      actionsLabel: 'Role Guide actions',
       pdf: 'PDF',
       share: 'Share',
       createCourse: 'Create course',
@@ -31,8 +37,8 @@ const messages = {
       regenerationInstruction: 'Regeneration instruction',
       regenerationPlaceholder: 'Make this block more specific to enterprise sales.',
       regenerateBlockButton: 'Regenerate block',
-      loading: 'Loading Career Playbook...',
-      unavailableTitle: 'Career Playbook is unavailable',
+      loading: 'Loading Role Guide...',
+      unavailableTitle: 'Role Guide is unavailable',
       unavailableDescription: 'The viewer could not be loaded.',
       retry: 'Retry',
       viewerBackendPending:
@@ -49,6 +55,60 @@ const messages = {
       blocksReady: '{ready} of {total} blocks ready',
       thinkingStream: 'Show thinking stream',
       streamingBlockPending: 'This block is being generated.',
+      statusLabels: {
+        draft: 'Draft',
+        answering_fixed: 'Answering fixed questions',
+        awaiting_followups: 'Awaiting follow-ups',
+        answering_followups: 'Answering follow-ups',
+        ready_to_generate: 'Ready to generate',
+        generating: 'Generating',
+        completed: 'Completed',
+        failed: 'Failed',
+      },
+      blockStatusLabels: {
+        pending: 'Pending',
+        generating: 'Generating',
+        generated: 'Ready',
+        failed: 'Failed',
+        regenerating: 'Regenerating',
+      },
+      blockGroups: {
+        group_1_foundation: 'Foundation',
+        group_2_operations: 'Operations',
+        group_3_people: 'People',
+        group_4_growth: 'Growth',
+        group_5_system: 'System',
+        group_6_wrap: 'Wrap-up',
+      },
+      blocks: {
+        header: 'Role guide header',
+        block_1: 'Mission and key results',
+        block_2: 'Anti-goals',
+        block_3: 'Responsibility zones',
+        block_4: 'Duties',
+        block_5: 'Decision authority matrix',
+        block_6: 'KPI and metrics',
+        block_7: 'Competencies',
+        block_8: 'Tools and technologies',
+        block_9: 'Human-tool collaboration',
+        block_10: 'Dependencies',
+        block_11: 'Career path',
+        block_12: 'Candidate profile',
+        block_13: 'Day in the life',
+        block_14: 'Onboarding',
+        block_15: 'Motivation',
+        block_16: 'Main process',
+        block_17: 'Red flags',
+        block_18: 'FAQ',
+        block_19: 'Industry context',
+        block_20: 'Business model',
+        block_21: 'Failure modes',
+        block_22: 'Role README',
+        block_23: 'Continuity plan',
+        block_24: 'Role canvas',
+        block_25: 'Footer',
+        block_26: 'Implementation checklist',
+      },
     },
   },
 }
@@ -58,6 +118,8 @@ const ruMessages = {
     viewer: {
       ...messages['career-playbook'].viewer,
       contents: 'Содержание',
+      contentsAriaLabel: 'Содержание должностной инструкции',
+      actionsLabel: 'Действия с должностной инструкцией',
       share: 'Поделиться',
       createCourse: 'Создать курс из инструкции',
       delete: 'Удалить',
@@ -66,6 +128,60 @@ const ruMessages = {
         '# Превью должностной инструкции\n\nСерверный просмотр ещё не подключён.',
       viewerBackendPending:
         'Серверный просмотр пока недоступен; показываем локальное превью до подключения интеграции.',
+      statusLabels: {
+        draft: 'Черновик',
+        answering_fixed: 'Ответы на основные вопросы',
+        awaiting_followups: 'Ожидает уточнений',
+        answering_followups: 'Ответы на уточнения',
+        ready_to_generate: 'Готово к генерации',
+        generating: 'Генерируется',
+        completed: 'Готово',
+        failed: 'Ошибка',
+      },
+      blockStatusLabels: {
+        pending: 'Ожидает',
+        generating: 'Генерируется',
+        generated: 'Готово',
+        failed: 'Ошибка',
+        regenerating: 'Генерируется заново',
+      },
+      blockGroups: {
+        group_1_foundation: 'Основа',
+        group_2_operations: 'Работа',
+        group_3_people: 'Люди и навыки',
+        group_4_growth: 'Рост',
+        group_5_system: 'Система',
+        group_6_wrap: 'Итог',
+      },
+      blocks: {
+        header: 'Шапка документа',
+        block_1: 'Миссия и ключевые результаты',
+        block_2: 'Что не входит в роль',
+        block_3: 'Зоны ответственности',
+        block_4: 'Обязанности',
+        block_5: 'Матрица полномочий',
+        block_6: 'Показатели эффективности',
+        block_7: 'Компетенции',
+        block_8: 'Инструменты и технологии',
+        block_9: 'Работа человека и цифровых инструментов',
+        block_10: 'Зависимости',
+        block_11: 'Карьерный путь',
+        block_12: 'Профиль кандидата',
+        block_13: 'День в роли',
+        block_14: 'Адаптация',
+        block_15: 'Мотивация',
+        block_16: 'Основной процесс',
+        block_17: 'Красные флаги',
+        block_18: 'Частые вопросы',
+        block_19: 'Контекст отрасли',
+        block_20: 'Бизнес-модель',
+        block_21: 'Сценарии сбоев',
+        block_22: 'Памятка роли',
+        block_23: 'План преемственности',
+        block_24: 'Карта роли',
+        block_25: 'Заключение',
+        block_26: 'Чеклист внедрения',
+      },
     },
   },
 }
@@ -100,7 +216,7 @@ describe('CareerPlaybookViewerPageClient', () => {
     renderPage()
 
     expect(
-      await screen.findByRole('heading', { name: 'Career Playbook is unavailable' })
+      await screen.findByRole('heading', { name: 'Role Guide is unavailable' })
     ).toBeInTheDocument()
     expect(screen.getByText('FORBIDDEN')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Role Guide preview' })).not.toBeInTheDocument()
@@ -119,8 +235,12 @@ describe('CareerPlaybookViewerPageClient', () => {
     ).not.toHaveLength(0)
     expect(screen.getByRole('button', { name: 'Поделиться' })).toBeInTheDocument()
     expect(
-      screen.getByRole('navigation', { name: 'Playbook table of contents' })
+      screen.getByRole('navigation', { name: 'Содержание должностной инструкции' })
     ).toHaveTextContent('Содержание')
+    expect(
+      screen.getByRole('navigation', { name: 'Содержание должностной инструкции' })
+    ).toHaveTextContent('Миссия и ключевые результаты')
+    expect(screen.queryByRole('link', { name: 'Mission and key results' })).not.toBeInTheDocument()
   })
 
   it('clears a previous viewer when the URL points at another playbook', async () => {

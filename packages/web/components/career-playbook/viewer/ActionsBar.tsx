@@ -5,6 +5,7 @@ import { BookOpen, Download, Share2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export interface ActionsBarCopy {
+  actionsLabel?: string
   pdf?: string
   share?: string
   createCourse?: string
@@ -21,6 +22,7 @@ interface ActionsBarProps {
 }
 
 const defaultCopy: Required<ActionsBarCopy> = {
+  actionsLabel: 'Role Guide actions',
   pdf: 'PDF',
   share: 'Share',
   createCourse: 'Create course',
@@ -39,7 +41,10 @@ export function ActionsBar({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2" aria-label="Career Playbook actions">
+      <div
+        className="career-playbook-panel flex flex-wrap items-center gap-2 p-2"
+        aria-label={labels.actionsLabel}
+      >
         <Button type="button" variant="outline" size="sm" onClick={onPdf}>
           <Download className="mr-2 h-4 w-4" aria-hidden />
           {labels.pdf}

@@ -101,10 +101,9 @@ export function RoleTitleSuggestionInput({
   return (
     <div className="relative space-y-3">
       <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-3 left-3 h-4 w-4 text-slate-400"
-          aria-hidden
-        />
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+          <Search className="h-4 w-4" aria-hidden />
+        </span>
         <Input
           id={id}
           aria-label={label}
@@ -144,7 +143,7 @@ export function RoleTitleSuggestionInput({
             }
           }}
           placeholder={placeholder}
-          className="h-12 pl-9 text-base"
+          className="h-12 bg-[#fffdf8] pl-10 text-[16px] leading-6 dark:bg-slate-950"
         />
       </div>
 
@@ -153,7 +152,7 @@ export function RoleTitleSuggestionInput({
           id={listId}
           role="listbox"
           aria-label={headline}
-          className="absolute right-0 left-0 z-20 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950"
+          className="absolute right-0 left-0 z-20 overflow-hidden rounded-md border border-[#d8c5aa] bg-[#fffdf8] shadow-lg dark:border-slate-800 dark:bg-slate-950"
         >
           <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
             <p className="text-xs font-medium tracking-normal text-slate-500 uppercase dark:text-slate-400">
@@ -177,6 +176,9 @@ export function RoleTitleSuggestionInput({
                   const selected = suggestion.label === value
                   const active = index === activeIndex
                   const matchLabel = getMatchLabel(suggestion.matchKind, labels)
+                  const showAlternateLabel =
+                    suggestion.alternateLabel !== suggestion.label &&
+                    shouldShowAlternateLabel(locale, trimmedValue)
 
                   return (
                     <div
@@ -190,14 +192,14 @@ export function RoleTitleSuggestionInput({
                       className={cn(
                         'flex w-full cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
                         selected
-                          ? 'bg-teal-50 text-teal-950 dark:bg-teal-950/40 dark:text-teal-50'
-                          : 'text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-900',
-                        active && !selected ? 'bg-slate-100 dark:bg-slate-900' : null
+                          ? 'bg-purple-50 text-purple-950 dark:bg-purple-950/40 dark:text-purple-50'
+                          : 'text-slate-900 hover:bg-[#f6efe4] dark:text-slate-100 dark:hover:bg-slate-900',
+                        active && !selected ? 'bg-[#f6efe4] dark:bg-slate-900' : null
                       )}
                     >
                       <Check
                         className={cn(
-                          'mt-0.5 h-4 w-4 shrink-0 text-teal-700 dark:text-teal-300',
+                          'mt-0.5 h-4 w-4 shrink-0 text-purple-600 dark:text-purple-300',
                           selected ? 'opacity-100' : 'opacity-0'
                         )}
                         aria-hidden
@@ -206,7 +208,7 @@ export function RoleTitleSuggestionInput({
                         <span className="block text-sm leading-5 font-medium break-words">
                           {suggestion.label}
                         </span>
-                        {suggestion.alternateLabel !== suggestion.label ? (
+                        {showAlternateLabel ? (
                           <span className="mt-0.5 block text-xs leading-5 break-words text-slate-500 dark:text-slate-400">
                             {suggestion.alternateLabel}
                           </span>
@@ -231,7 +233,7 @@ export function RoleTitleSuggestionInput({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={closeManualFallback}
-                className="m-1 flex w-[calc(100%-0.5rem)] flex-col items-start rounded-md border border-dashed border-slate-200 px-3 py-3 text-left text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                className="m-1 flex w-[calc(100%-0.5rem)] flex-col items-start rounded-md border border-dashed border-[#d8c5aa] px-3 py-3 text-left text-sm text-slate-700 transition-colors hover:border-purple-200 hover:bg-[#f6efe4] dark:border-slate-800 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900"
               >
                 <span className="font-medium">{labels.roleSuggestionsNoResultsLabel}</span>
                 <span className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
@@ -256,4 +258,13 @@ function getMatchLabel(matchKind: RoleMatchKind, labels: Required<RoleTitleSugge
   }
 
   return matchLabels[matchKind]
+}
+
+function shouldShowAlternateLabel(locale: string, query: string) {
+  if (!query.trim()) return false
+
+  const usesLatin = /\p{Script=Latin}/u.test(query)
+  const usesCyrillic = /\p{Script=Cyrillic}/u.test(query)
+
+  return locale === 'en' ? usesCyrillic : usesLatin
 }

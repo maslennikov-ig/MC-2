@@ -3,21 +3,54 @@
     "metadataTitle": "Career Playbook by MC2",
     "metadataDescription": "Build a structured role manual for hiring, onboarding, and team review.",
     "heroEyebrow": "Career Playbook",
-    "heroTitle": "Turn role context into a structured operating manual",
-    "heroSubtitle": "Collect role context, request a 26-block Role Guide, and review an editable draft for hiring and onboarding.",
+    "heroTitle": "A role guide your team will use",
+    "heroSubtitle": "Build more than a formal template: AI turns your company context into 26 useful sections for hiring, onboarding, and managing the role.",
+    "heroMethodologyLine": "Built from practices used by Netflix, Amazon, Toyota, Spotify, Bridgewater, and Google.",
+    "heroBooksLine": "Expanded with ideas from Topgrading, Who, Drive, The Alliance, and The Checklist Manifesto.",
     "ctaPrimary": "Create your Career Playbook",
     "ctaSecondary": "View sample guide",
+    "heroPreviewTitle": "A role guide people can actually use",
+    "heroPreviewSubtitle": "A document people keep using after hiring: for onboarding, managing the role, and checking expectations quickly.",
+    "heroPreviewContextLabel": "Role context",
+    "heroPreviewRole": "Sales manager",
+    "heroPreviewCompanyLabel": "Company",
+    "heroPreviewCompany": "B2B sales, 25-person team",
+    "heroPreviewDraftLabel": "Draft",
+    "heroPreviewDraft": "ready for review",
+    "heroPreviewSignalOne": "26 sections",
+    "heroPreviewSignalTwo": "Built from strong-team practices",
+    "heroPreviewSignalThree": "Used in day-to-day work",
+    "heroPreviewQualityTitle": "What you get",
+    "heroPreviewQualityText": "Not a half-page job post, but an editable guide with ownership, decisions, metrics, workflows, and growth context that a team can keep using after day one.",
     "heroMetricOneValue": "26",
     "heroMetricOneLabel": "operational blocks",
-    "heroMetricTwoValue": "5",
+    "heroMetricTwoValue": "6",
     "heroMetricTwoLabel": "management systems",
     "heroMetricThreeValue": "1",
     "heroMetricThreeLabel": "role clarity draft",
+    "personalizationEyebrow": "Personalization",
+    "personalizationTitle": "Not a template, a guide for your company",
+    "personalizationDescription": "The constructor accounts for team size, product stage, department, role level, reporting line, and output language. The result feels like a working company document, not a universal sample.",
+    "personalizationSteps": {
+      "0": {
+        "title": "Company context",
+        "description": "Capture where the role works: department, team size, product stage, reporting line, and language."
+      },
+      "1": {
+        "title": "AI assembles the structure",
+        "description": "The system maps answers to 26 sections and management sources to create a coherent draft."
+      },
+      "2": {
+        "title": "You keep control",
+        "description": "Choose a suggested option, enter your own answer, and refine the generated blocks afterward."
+      }
+    },
     "methodologyEyebrow": "Methodology",
     "methodologyTitle": "Built from operating systems used by serious teams",
-    "methodologySubtitle": "Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
+    "methodologySubtitle": "These are the six sources we use most often. Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
     "methodologyBlocksTitle": "26-block map",
-    "selectedBlocksLabel": "Selected blocks",
+    "selectedBlocksLabel": "Where the selected source is used",
+    "selectedBlocksDescription": "Click a source on the right: these are the instruction sections it helps shape.",
     "methodologies": {
       "netflix": {
         "title": "Netflix Context over Control",
@@ -38,6 +71,10 @@
       "bridgewater": {
         "title": "Bridgewater Baseball Cards",
         "description": "Documents strengths, communication style, energy patterns, risks, and candidate fit."
+      },
+      "google": {
+        "title": "Google Team Effectiveness",
+        "description": "Helps describe the conditions where a role performs best: clear expectations, dependencies, collaboration, and review cadence."
       }
     },
     "blockMap": {
@@ -70,7 +107,7 @@
         "block6": "6. KPI",
         "block7": "7. Competencies",
         "block8": "8. Tools",
-        "block9": "9. Human-AI",
+        "block9": "9. Human-tool collaboration",
         "block10": "10. Dependencies",
         "block11": "11. Career path",
         "block12": "12. Candidate profile",
@@ -88,18 +125,73 @@
         "block24": "24. Role canvas",
         "block25": "25. Revision cadence",
         "block26": "26. Implementation checklist"
+      },
+      "examples": {
+        "block1": "The role turns B2B pipeline into predictable revenue: it qualifies opportunities, moves deals forward, and keeps the funnel healthy.",
+        "block2": "The B2B sales manager does not own post-launch support, approve unusual legal terms, or act as the product owner.",
+        "block3": "The role owns opportunity qualification, deal progress, forecast accuracy, and expectation handoff to implementation teams.",
+        "block4": "Update the pipeline weekly, run customer meetings, capture next steps, and prepare commercial proposals.",
+        "block5": "Small discounts can move quickly; larger discounts and unusual contract terms require commercial approval.",
+        "block6": "Qualified pipeline, win rate, sales cycle, and first-year retention are paired to prevent metric gaming.",
+        "block7": "A strong candidate can negotiate, understand customer economics, capture commitments, and handle long sales cycles calmly.",
+        "block8": "CRM, calendar, proposal templates, meeting notes, and an objection library work as one operating system.",
+        "block9": "Digital tools help draft follow-ups and meeting summaries, while the person confirms the final customer promise.",
+        "block10": "The role depends on marketing, product, legal, and implementation; slow answers from these teams slow the deal.",
+        "block11": "Growth moves from owning standard deals to strategic negotiations and coaching junior sales managers.",
+        "block12": "The profile needs complex-sales experience, structure, CRM discipline, strong questions, and tolerance for ambiguity.",
+        "block13": "The day starts with pipeline and next-step review, then customer meetings, commitment capture, and proposal work.",
+        "block14": "First 30 days cover product, market, and CRM; by day 60 the person owns deals; by day 90 they own forecast rhythm.",
+        "block15": "The role is motivated by a clear target, an honest pipeline, negotiation autonomy, and visible revenue impact.",
+        "block16": "Every deal has a next step, date, owner, and success criterion; exceptions are captured separately.",
+        "block17": "Red flags: promises without confirmation, empty CRM, discount-first selling, and no next step after a meeting.",
+        "block18": "If a customer asks for unusual terms, the manager captures the business reason and escalates for commercial approval.",
+        "block19": "Enterprise sales require trust, forecast accuracy, and understanding how the customer buys internally.",
+        "block20": "The business goal is to increase predictable revenue and reduce leakage at key funnel stages.",
+        "block21": "When pipeline weakens, the role checks lead quality, response speed, loss reasons, and next-step discipline.",
+        "block22": "The role memo captures mission, key decisions, ownership areas, and collaboration rules with other teams.",
+        "block23": "A handoff preserves deal status, key contacts, risks, commitments, and the next actions.",
+        "block24": "The role canvas shows customers, internal teams, influence points, decision zones, and main dependencies.",
+        "block25": "Every quarter, the manager and employee review metrics, role boundaries, workflows, and next-period expectations.",
+        "block26": "Before launching the role, check the owner, goals, metrics, tools, meeting rhythm, access, and first-90-days plan."
       }
     },
     "demoEyebrow": "Interactive demo",
     "demoTitle": "Annotated B2B sales Role Guide preview",
-    "demoSubtitle": "Explore a compact preview inspired by the sample B2B sales manager playbook. Each annotation explains why that block matters.",
+    "demoSubtitle": "Switch between all 26 sections and see how the future guide explains the role: from mission and boundaries to implementation.",
     "demoPreviewTitle": "B2B Sales Role Guide",
+    "demoTotalBlocksLabel": "26 sections in the full guide",
+    "demoShownBlocksLabel": "All 26 sections are in the outline",
+    "demoRemainingBlocksLabel": "Open any section to see an example from the future guide.",
+    "demoBlockLabelPrefix": "Block",
+    "demoOutlineLabel": "Sample outline",
+    "demoAllBlocksButtonLabel": "All 26 sections",
+    "demoAllBlocksTitle": "All 26 instruction sections",
+    "demoAllBlocksDescription": "The full structure is grouped by purpose. The first six sections include examples from the demo.",
+    "demoExampleLabel": "Example",
     "demoSections": {
       "mission": {
         "title": "Mission and key results",
         "excerpt": "The role turns B2B pipeline into predictable revenue: it qualifies opportunities, moves deals forward, and keeps the funnel healthy.",
         "annotation": "Mission connects the role purpose to measurable outcomes and gives managers a fast quality check.",
         "blockLabel": "Block 1"
+      },
+      "antiGoals": {
+        "title": "Anti-goals",
+        "excerpt": "The B2B sales manager does not own post-launch support, approve unusual legal terms, or act as the product owner.",
+        "annotation": "Role boundaries reduce ownership disputes and protect the person from hidden extra work.",
+        "blockLabel": "Block 2"
+      },
+      "responsibilities": {
+        "title": "Responsibility zones",
+        "excerpt": "The role owns opportunity qualification, deal progress, forecast accuracy, and expectation handoff to implementation teams.",
+        "annotation": "Responsibility zones show what the person owns directly and where collaboration is required.",
+        "blockLabel": "Block 3"
+      },
+      "duties": {
+        "title": "Duties",
+        "excerpt": "Update the pipeline weekly, run customer meetings, capture next steps, and prepare commercial proposals.",
+        "annotation": "Duties turn the role into a concrete working week that can be reviewed and improved.",
+        "blockLabel": "Block 4"
       },
       "decisions": {
         "title": "Decision matrix",
@@ -130,7 +222,14 @@
         "description": "Teams can review and refine individual blocks without restarting the whole role discovery flow."
       }
     },
-    "faqTitle": "Questions",
+    "faqEyebrow": "Before you start",
+    "faqTitle": "What to know before the first draft",
+    "faqDescription": "A short practical check: who should use the constructor, whether the result can be refined, and what to prepare before starting.",
+    "faqHighlights": {
+      "0": "3 answers",
+      "1": "No repeated discovery",
+      "2": "A rough draft is enough"
+    },
     "faq": {
       "0": {
         "question": "Who should use this first?",
@@ -156,16 +255,14 @@
     "back": "Back",
     "next": "Next",
     "finish": "Finish Phase A",
-    "freeform": "Free-form",
-    "freeformTitle": "Tell freely",
-    "freeformPlaceholder": "Describe the role, company context, and important expectations in your own words.",
-    "saveFreeform": "Save text",
     "draftSaving": "Saving draft...",
     "draftSaved": "Draft saved locally",
     "draftUnsynced": "Local draft saved. Server sync is waiting for retry.",
     "openPlaceholder": "Type your answer",
     "chooseOneLabel": "Choose one",
     "chooseManyLabel": "Choose several",
+    "otherOptionLabel": "Other",
+    "otherOptionPlaceholder": "Type your option",
     "roleSuggestionsLabel": "Suggested roles",
     "roleSuggestionsHint": "Pick a close role from the short list, or keep your own title.",
     "roleSuggestionsPopularLabel": "Popular roles",
@@ -179,13 +276,23 @@
     "questionLabel": "Question",
     "answeredLabel": "Answered",
     "ofLabel": "of",
+    "navigationLabel": "Questions",
+    "documentPreviewLabel": "Draft document",
+    "documentPreviewTitle": "Role Guide",
+    "documentPreviewSubtitle": "Answers are placed into the future document structure as you work.",
+    "documentPreviewEmpty": "Appears after an answer",
+    "questionPanelLabel": "Current question",
+    "followupNavigationLabel": "Follow-ups",
+    "followupDocumentPreviewTitle": "Follow-up context",
+    "followupDocumentPreviewSubtitle": "These answers help make the final guide more specific.",
+    "followupDocumentPreviewEmpty": "Answer or skip",
     "phaseABadge": "Phase A",
     "phaseBBadge": "Phase B",
     "reviewBadge": "Review",
     "completionTitle": "Ready to create?",
     "completionDescription": "Review the collected context before generating the Role Guide.",
     "completionCta": "Continue",
-    "followupTitle": "AI follow-up",
+    "followupTitle": "Follow-up",
     "skipFollowup": "Skip",
     "enoughGenerate": "Enough, generate",
     "completeness": "Completeness",
@@ -216,8 +323,10 @@
     "emptySummary": "No data yet"
   },
   "viewer": {
-    "productLabel": "Career Playbook",
+    "productLabel": "Role Guide",
     "contents": "Contents",
+    "contentsAriaLabel": "Role guide contents",
+    "actionsLabel": "Role Guide actions",
     "pdf": "PDF",
     "share": "Share",
     "createCourse": "Create course",
@@ -234,8 +343,8 @@
     "regenerationInstruction": "Regeneration instruction",
     "regenerationPlaceholder": "Make this block more specific to enterprise sales.",
     "regenerateBlockButton": "Regenerate block",
-    "loading": "Loading Career Playbook...",
-    "unavailableTitle": "Career Playbook is unavailable",
+    "loading": "Loading Role Guide...",
+    "unavailableTitle": "Role Guide is unavailable",
     "unavailableDescription": "The viewer could not be loaded.",
     "retry": "Retry",
     "viewerBackendPending": "Viewer backend is unavailable; showing a local preview until integration lands.",
@@ -250,9 +359,64 @@
     "generatingTitle": "Generating {title}",
     "blocksReady": "{ready} of {total} blocks ready",
     "thinkingStream": "Show thinking stream",
-    "streamingBlockPending": "This block is being generated."
+    "streamingBlockPending": "This block is being generated.",
+    "statusLabels": {
+      "draft": "Draft",
+      "answering_fixed": "Answering fixed questions",
+      "awaiting_followups": "Awaiting follow-ups",
+      "answering_followups": "Answering follow-ups",
+      "ready_to_generate": "Ready to generate",
+      "generating": "Generating",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "blockStatusLabels": {
+      "pending": "Pending",
+      "generating": "Generating",
+      "generated": "Ready",
+      "failed": "Failed",
+      "regenerating": "Regenerating"
+    },
+    "blockGroups": {
+      "group_1_foundation": "Foundation",
+      "group_2_operations": "Operations",
+      "group_3_people": "People",
+      "group_4_growth": "Growth",
+      "group_5_system": "System",
+      "group_6_wrap": "Wrap-up"
+    },
+    "blocks": {
+      "header": "Role guide header",
+      "block_1": "Mission and key results",
+      "block_2": "Anti-goals",
+      "block_3": "Responsibility zones",
+      "block_4": "Duties",
+      "block_5": "Decision authority matrix",
+      "block_6": "KPIs and metrics",
+      "block_7": "Competencies",
+      "block_8": "Tools and technologies",
+      "block_9": "Human-tool collaboration",
+      "block_10": "Dependencies",
+      "block_11": "Career path",
+      "block_12": "Candidate profile",
+      "block_13": "Day in the role",
+      "block_14": "Onboarding",
+      "block_15": "Motivation",
+      "block_16": "Main process",
+      "block_17": "Red flags",
+      "block_18": "FAQ",
+      "block_19": "Industry context",
+      "block_20": "Business model",
+      "block_21": "Failure modes",
+      "block_22": "Role README",
+      "block_23": "Continuity plan",
+      "block_24": "Role canvas",
+      "block_25": "Footer",
+      "block_26": "Implementation checklist"
+    }
   },
   "library": {
+    "productLabel": "Role Guide",
     "title": "Role Guide library",
     "subtitle": "Your generated and shared role guides",
     "searchPlaceholder": "Search by role title",
@@ -268,7 +432,7 @@
     },
     "createNew": "Create new",
     "emptyTitle": "No role guides yet",
-    "emptyDescription": "Create your first Career Playbook to build your library.",
+    "emptyDescription": "Create your first Role Guide to build your library.",
     "errorTitle": "Library temporarily unavailable",
     "errorDescription": "Retry in a minute or create a new guide.",
     "selectedCount": "{count} selected",
@@ -312,7 +476,7 @@
     }
   },
   "share": {
-    "fallbackTitle": "Shared Career Playbook",
-    "fallbackDescription": "Open a shared role guide created on MC2."
+    "fallbackTitle": "Shared Role Guide",
+    "fallbackDescription": "Open a shared Role Guide created on MC2."
   }
 }

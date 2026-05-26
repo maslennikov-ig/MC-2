@@ -201,6 +201,7 @@ function buildFollowupAnswer(
 
 const FOLLOWUP_GENERATION_LIMIT = 2;
 const MAX_FOLLOWUP_QUESTIONS = 7;
+const REQUIRED_FIXED_QUESTION_KEYS = ['position', 'department', 'level', 'reporting', 'team_size'];
 
 function mergeGeneratedQuestions(
   existing: CareerPlaybookFollowupQuestion[],
@@ -227,11 +228,37 @@ function capGeneratedQuestionsForResponse(
 function isReadyForGeneration(row: CareerPlaybookRow, qaData: StoredQAData): boolean {
   if (row.status === 'ready_to_generate') return true;
   if (row.status === 'failed') return qaData.fixed.length > 0;
+  if (
+    qaData.followup_questions.length === 0 &&
+    (row.status === 'answering_fixed' ||
+      row.status === 'awaiting_followups' ||
+      row.status === 'answering_followups')
+  ) {
+    return hasRequiredFixedAnswers(qaData);
+  }
   if (row.status !== 'answering_followups') return false;
   if (qaData.fixed.length === 0 || qaData.followup_questions.length === 0) return false;
 
   const answeredQuestionIds = new Set(qaData.followups.map(answer => answer.question_id));
   return qaData.followup_questions.every(question => answeredQuestionIds.has(question.question_id));
+}
+
+function hasRequiredFixedAnswers(qaData: StoredQAData): boolean {
+  const answeredFixedKeys = new Set(
+    qaData.fixed
+      .filter(answer => hasStoredAnswerValue(answer.value))
+      .map(answer => answer.question_key)
+  );
+
+  return REQUIRED_FIXED_QUESTION_KEYS.every(questionKey => answeredFixedKeys.has(questionKey));
+}
+
+function hasStoredAnswerValue(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(item => typeof item === 'string' && item.trim().length > 0);
+  }
+
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function assertCanRequestFollowups(

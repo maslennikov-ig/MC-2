@@ -498,6 +498,48 @@ describe('careerPlaybookRouter transport', () => {
     });
   });
 
+  it('allows fixed-only generation when follow-up generation never persisted questions', async () => {
+    mocks.addJob.mockResolvedValue({ id: 'career-playbook-job-fixed-only' });
+    mocks.removeTerminalJobById.mockResolvedValue(false);
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'answering_fixed',
+          q_a_data: {
+            fixed: [
+              { question_key: 'position', value: 'Sales Manager' },
+              { question_key: 'department', value: 'sales' },
+              { question_key: 'level', value: 'middle' },
+              { question_key: 'reporting', value: 'Reports to CRO.' },
+              { question_key: 'team_size', value: '201-1000' },
+            ],
+            followups: [],
+            freeform: [],
+            followup_questions: [],
+          },
+        }),
+        error: null,
+      },
+      { data: playbookRow({ status: 'generating' }), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.generation.approveAndGenerate({ playbookId });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'generating',
+      })
+    );
+    expect(mocks.addJob).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      playbookId,
+      status: 'generating',
+      phase: 'completion',
+    });
+  });
+
   it('removes a stale terminal generation job before retrying a failed playbook', async () => {
     mocks.addJob.mockResolvedValue({ id: 'career-playbook-job-2' });
     mocks.removeTerminalJobById.mockResolvedValue(true);
