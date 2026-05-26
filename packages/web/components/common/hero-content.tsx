@@ -132,7 +132,7 @@ function ProductCard({ eyebrow, title, purpose, href, cta, icon, emphasized }: P
             {icon}
           </span>
         </div>
-        <h2 className="mt-7 text-3xl leading-tight font-bold xl:mt-9 xl:text-[2.65rem] xl:leading-[1.08] 2xl:text-5xl">
+        <h2 className="mt-7 text-3xl leading-tight font-bold xl:mt-9 xl:text-[2.45rem] xl:leading-[1.1] 2xl:text-[2.75rem]">
           {title}
         </h2>
         <p className="mt-3 max-w-2xl text-base leading-7 text-white/72 xl:mt-4 xl:text-xl xl:leading-9 2xl:text-[1.35rem] 2xl:leading-10">
