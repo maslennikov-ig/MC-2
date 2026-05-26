@@ -27,9 +27,35 @@ export default function Header({
   const { session, isLoading } = useSupabase()
   const isAuthenticated = !!session
   const t = useTranslations('common.nav')
+  const navLinkBaseClass =
+    'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs font-medium shadow-sm transition-all duration-200 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
+  const catalogLinkClass = darkMode
+    ? cn(
+        navLinkBaseClass,
+        'border-white/10 bg-white/5 text-white/90 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-400'
+      )
+    : cn(
+        navLinkBaseClass,
+        'border-gray-200 bg-gray-100 text-gray-700 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
+      )
   const roleDescriptionLinkClass = darkMode
-    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-purple-500/25 bg-white/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-400 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
-    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-purple-200 bg-white/70 px-3 py-2.5 text-xs font-medium text-purple-700 shadow-sm transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-800 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-purple-500/25 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/40 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
+    ? cn(
+        navLinkBaseClass,
+        'border-purple-500/25 bg-white/5 text-white/90 hover:border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-400'
+      )
+    : cn(
+        navLinkBaseClass,
+        'border-purple-200 bg-white/70 text-purple-700 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-800 dark:border-purple-500/25 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/40 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
+      )
+  const createLinkClass = darkMode
+    ? cn(
+        navLinkBaseClass,
+        'border-purple-500/20 bg-gradient-to-r from-purple-500/5 to-blue-500/5 text-white/90 hover:border-purple-500/30 hover:from-purple-500/10 hover:to-blue-500/10 hover:text-purple-400'
+      )
+    : cn(
+        navLinkBaseClass,
+        'border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 text-gray-700 hover:border-purple-300 hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400'
+      )
   const roleDescriptionIconClass = darkMode
     ? 'h-4 w-4 text-purple-400 transition-colors group-hover:text-purple-300'
     : 'h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700 dark:text-purple-400 dark:group-hover:text-purple-300'
@@ -63,15 +89,7 @@ export default function Header({
         {!isLoading &&
           (isAuthenticated ? (
             <>
-              <Link
-                href="/courses"
-                className={
-                  darkMode
-                    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-400 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
-                    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-3 py-2.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
-                }
-                aria-label={t('catalogAria')}
-              >
+              <Link href="/courses" className={catalogLinkClass} aria-label={t('catalogAria')}>
                 <BookOpen
                   className={
                     darkMode
@@ -90,15 +108,7 @@ export default function Header({
                 <FileText className={roleDescriptionIconClass} aria-hidden="true" />
                 <span className="hidden lg:inline">{t('createRoleDescription')}</span>
               </Link>
-              <Link
-                href="/create"
-                className={
-                  darkMode
-                    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-purple-500/20 bg-gradient-to-r from-purple-500/5 to-blue-500/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-purple-500/30 hover:from-purple-500/10 hover:to-blue-500/10 hover:text-purple-400 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
-                    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-300 hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400'
-                }
-                aria-label={t('createCourseAria')}
-              >
+              <Link href="/create" className={createLinkClass} aria-label={t('createCourseAria')}>
                 <Plus
                   className={
                     darkMode
@@ -112,15 +122,7 @@ export default function Header({
             </>
           ) : (
             <>
-              <Link
-                href="/courses"
-                className={
-                  darkMode
-                    ? 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-white/90 shadow-sm transition-all duration-200 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-400 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
-                    : 'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-3 py-2.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
-                }
-                aria-label={t('examplesAria')}
-              >
+              <Link href="/courses" className={catalogLinkClass} aria-label={t('examplesAria')}>
                 <BookOpen
                   className={
                     darkMode

@@ -290,7 +290,7 @@ export function CoursesFilters({
         {/* Favorites filter button */}
         <Button
           variant="outline"
-          className="!rounded-full border-gray-300 bg-white text-gray-900 transition-colors duration-200 hover:bg-gray-100 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white dark:hover:bg-slate-800"
+          className="h-10 rounded-lg border-gray-300 bg-white text-gray-900 shadow-sm transition-colors duration-200 hover:border-gray-400 hover:bg-gray-100 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white dark:hover:border-slate-600 dark:hover:bg-slate-800"
           disabled={isPending}
           onClick={() =>
             updateFilters({ favorites: searchParams.get('favorites') === 'true' ? '' : 'true' })
