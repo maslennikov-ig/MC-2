@@ -60,7 +60,7 @@ export function CoursesFilters({
       params.delete('page')
 
       startTransition(() => {
-        router.push(`/courses?${params.toString()}`)
+        router.push(`/courses/library?${params.toString()}`)
       })
     },
     [router, searchParams]

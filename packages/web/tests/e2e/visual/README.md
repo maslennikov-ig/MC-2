@@ -11,7 +11,7 @@ Visual regression testing helps ensure that UI changes don't unintentionally bre
 ### Core Visual Tests
 
 - **Homepage snapshots**: Full page and component-level screenshots
-- **Page-specific tests**: Individual pages like `/courses`, `/create`
+- **Page-specific tests**: Individual pages like `/courses`, `/courses/library`, `/create`
 - **Responsive design**: Mobile, tablet, and desktop viewports
 - **Theme variations**: Light and dark mode comparisons
 - **Component states**: Loading, error, and empty states

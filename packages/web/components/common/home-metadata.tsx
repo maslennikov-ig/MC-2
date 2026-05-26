@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 export default function HomeMetadata() {
   useEffect(() => {
     // Set page title and meta description
-    document.title = 'MegaCampusAI - Автоматизированная генерация курсов'
+    document.title = 'MegaCampusAI - Должностные инструкции и курсы для команды'
 
     // Update meta description
     let metaDescription = document.querySelector('meta[name="description"]')
@@ -16,7 +16,7 @@ export default function HomeMetadata() {
     }
     metaDescription.setAttribute(
       'content',
-      'Создавайте профессиональные образовательные курсы с помощью искусственного интеллекта. Загрузите документы и получите полноценный курс с видео, аудио и тестами.'
+      'Создавайте должностные инструкции под компанию и превращайте их в практические курсы для команды.'
     )
 
     // Update keywords
@@ -28,16 +28,19 @@ export default function HomeMetadata() {
     }
     metaKeywords.setAttribute(
       'content',
-      'генерация курсов, AI обучение, автоматизация образования, создание курсов, искусственный интеллект, онлайн курсы'
+      'должностные инструкции, создание курсов, обучение команды, искусственный интеллект, онлайн курсы'
     )
 
     // Add Open Graph tags
     const ogTags = [
-      { property: 'og:title', content: 'MegaCampusAI - Автоматизированная генерация курсов' },
+      {
+        property: 'og:title',
+        content: 'MegaCampusAI - Должностные инструкции и курсы для команды',
+      },
       {
         property: 'og:description',
         content:
-          'Создавайте профессиональные образовательные курсы с помощью искусственного интеллекта',
+          'Создавайте должностные инструкции под компанию и превращайте их в практические курсы',
       },
       { property: 'og:type', content: 'website' },
       { property: 'og:image', content: 'https://courseai.ru/og-image.jpg' },
@@ -59,11 +62,14 @@ export default function HomeMetadata() {
     // Add Twitter Card tags
     const twitterTags = [
       { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: 'MegaCampusAI - Автоматизированная генерация курсов' },
+      {
+        name: 'twitter:title',
+        content: 'MegaCampusAI - Должностные инструкции и курсы для команды',
+      },
       {
         name: 'twitter:description',
         content:
-          'Создавайте профессиональные образовательные курсы с помощью искусственного интеллекта',
+          'Создавайте должностные инструкции под компанию и превращайте их в практические курсы',
       },
       { name: 'twitter:image', content: `${window.location.origin}/images/twitter-image.png` },
     ]
@@ -84,13 +90,13 @@ export default function HomeMetadata() {
       '@type': 'WebSite',
       name: 'MegaCampusAI',
       description:
-        'Платформа для автоматической генерации образовательных курсов с использованием искусственного интеллекта',
+        'Платформа для создания должностных инструкций и курсов с использованием искусственного интеллекта',
       url: window.location.origin,
       potentialAction: {
         '@type': 'SearchAction',
         target: {
           '@type': 'EntryPoint',
-          urlTemplate: `${window.location.origin}/courses?search={search_term_string}`,
+          urlTemplate: `${window.location.origin}/courses/library?search={search_term_string}`,
         },
         'query-input': 'required name=search_term_string',
       },

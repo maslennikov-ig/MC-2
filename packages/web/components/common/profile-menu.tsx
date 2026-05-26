@@ -64,7 +64,7 @@ export default function ProfileMenu({
   const { theme, toggleTheme } = useThemeSync()
 
   // Locale switching
-  const locale = useLocale() as Locale
+  const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -131,7 +131,7 @@ export default function ProfileMenu({
       label: 'Мои курсы',
       icon: BookOpen,
       onClick: () => {},
-      href: '/courses',
+      href: '/courses/library',
     },
     {
       id: 'profile',
@@ -304,7 +304,9 @@ export default function ProfileMenu({
         {mounted && (
           <DropdownMenuItem
             role="menuitem"
-            onSelect={handleLanguageToggle}
+            onSelect={() => {
+              void handleLanguageToggle()
+            }}
             disabled={isLocaleChanging}
             className={cn(
               'flex cursor-pointer items-center gap-3 px-3 py-2',
@@ -340,7 +342,9 @@ export default function ProfileMenu({
               ? 'text-red-400 hover:bg-slate-700 hover:text-red-400 focus:bg-slate-700 focus:text-red-400'
               : 'text-destructive focus:text-destructive'
           )}
-          onSelect={handleSignOut}
+          onSelect={() => {
+            void handleSignOut()
+          }}
         >
           <div className="flex h-4 w-4 items-center justify-center">
             <LogOut className="h-4 w-4" aria-hidden="true" />

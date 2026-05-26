@@ -134,19 +134,115 @@
     "cancelledMessage": "Generation was cancelled"
   },
   "hero": {
-    "badge": "A new era of education with AI",
-    "title1": "MegaCampusAI",
-    "title2": "create",
-    "title3": "courses in one click",
-    "description": "Automated educational course generation system. Upload documents, get full-featured courses with video, audio and tests in minutes.",
+    "badge": "Two products for team learning",
+    "title": "Start with a clear role. Then build the course.",
+    "description": "MegaCampusAI helps you create a company-specific role guide and turn it into a practical learning course.",
+    "roleProduct": "Role guides",
+    "roleProductDescription": "26 working sections for hiring, onboarding, and managing a role.",
+    "courseProduct": "Courses",
+    "courseProductDescription": "Course structure, lessons, checks, and materials based on the role and your documents.",
+    "recommended": "Recommended first step",
+    "openRole": "Open role guides",
+    "openCourses": "Open courses",
+    "viewCourseLibrary": "Course catalog",
+    "viewRoleLibrary": "Role guide catalog",
+    "workflowTitle": "How the products connect",
+    "workflowDescription": "A role guide captures the role context; a course turns that context into team learning.",
     "viewCourses": "View Courses",
     "createCourse": "Create Course",
     "startFree": "Start for Free",
     "signIn": "Sign In",
     "exploreExamples": "or explore example courses →"
   },
+  "coursesLanding": {
+    "metadataTitle": "AI course builder by MegaCampusAI",
+    "metadataDescription": "Create courses from role context, company documents, and practical team needs.",
+    "eyebrow": "Courses",
+    "title": "A course starts with a clear role",
+    "description": "First define what the person should do in the company. Then artificial intelligence helps assemble the course: structure, lessons, knowledge checks, and materials for your team.",
+    "primaryCta": "Start with a role guide",
+    "libraryCta": "Open course catalog",
+    "createCourseCta": "Create course",
+    "metricBlocks": "role guide sections",
+    "metricSteps": "steps to a draft",
+    "metricDraft": "course for your team",
+    "previewTitle": "Course draft",
+    "previewSubtitle": "Based on the role",
+    "previewPillRole": "Role",
+    "previewPillMaterials": "Materials",
+    "previewPillReview": "Review",
+    "previewModules": "modules",
+    "previewLessons": "lessons",
+    "flowEyebrow": "Process",
+    "flowTitle": "From role to learning without chaos",
+    "steps": [
+      {
+        "title": "Role",
+        "description": "Capture tasks, responsibility boundaries, metrics, and company context."
+      },
+      {
+        "title": "Course draft",
+        "description": "Build the program, lessons, and knowledge checks from the role and your materials."
+      },
+      {
+        "title": "Review",
+        "description": "Edit the result, refine emphasis, and keep only what is useful."
+      }
+    ],
+    "featuresEyebrow": "Output",
+    "featuresTitle": "A course connected to real work",
+    "featuresDescription": "Not a random lesson list, but learning tied to duties, decisions, and quality standards for the role.",
+    "features": [
+      {
+        "title": "Program",
+        "description": "A logical structure of modules and lessons for the specific role."
+      },
+      {
+        "title": "Knowledge checks",
+        "description": "Questions and tasks that verify practical understanding."
+      },
+      {
+        "title": "Materials",
+        "description": "Documents, excerpts, and examples connected to the right lessons."
+      },
+      {
+        "title": "Team-ready draft",
+        "description": "A result your team can review before launching training."
+      }
+    ],
+    "examplesEyebrow": "Examples",
+    "examplesTitle": "Courses you can assemble",
+    "examples": [
+      {
+        "title": "Sales manager onboarding",
+        "description": "From pipeline and qualification to discount rules and reporting."
+      },
+      {
+        "title": "Department lead training",
+        "description": "Goals, management rhythm, meetings, metrics, and feedback."
+      },
+      {
+        "title": "Product role course",
+        "description": "Responsibility zones, hypotheses, metrics, and team collaboration."
+      }
+    ],
+    "ctaTitle": "Start with the role so the course is precise",
+    "ctaDescription": "Training becomes grounded in your company's tasks, decisions, and standards."
+  },
   "nav": {
     "catalog": "Catalog",
+    "courses": "Courses",
+    "coursesAria": "Open courses landing page",
+    "coursesMenuAria": "Open course actions",
+    "courseLibrary": "Course catalog",
+    "courseLibraryAria": "Open course catalog",
+    "courseLanding": "About courses",
+    "roleDescriptions": "Role guides",
+    "roleDescriptionsAria": "Open role guides landing page",
+    "roleDescriptionsMenuAria": "Open role guide actions",
+    "roleDescriptionLibrary": "Role guide catalog",
+    "roleDescriptionLibraryAria": "Open role guide catalog",
+    "roleDescriptionLanding": "About role guides",
     "createRoleDescription": "Create Role Guide",
     "createCourse": "Create Course",
     "exampleCourses": "Example Courses",

@@ -100,7 +100,7 @@ export function AuthStatus({ user }: AuthStatusProps) {
         {/* Profile page - not implemented yet, hidden from menu */}
         <DropdownMenuItem asChild>
           <Link
-            href="/courses"
+            href="/courses/library"
             className="cursor-pointer text-gray-300 hover:bg-slate-800 hover:text-white"
           >
             <BookOpen className="mr-2 h-4 w-4" />
@@ -110,7 +110,7 @@ export function AuthStatus({ user }: AuthStatusProps) {
         {user.role === 'superadmin' && (
           <DropdownMenuItem asChild>
             <Link
-              href="/courses"
+              href="/courses/library"
               className="cursor-pointer text-gray-300 hover:bg-slate-800 hover:text-white"
             >
               <Settings className="mr-2 h-4 w-4" />

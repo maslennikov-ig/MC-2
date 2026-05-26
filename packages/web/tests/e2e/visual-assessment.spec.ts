@@ -5,8 +5,8 @@ test.describe('Visual Assessment - Courses Page', () => {
     // Set viewport for desktop
     await page.setViewportSize({ width: 1920, height: 1080 })
 
-    // Navigate to courses page
-    await page.goto('http://localhost:3001/courses')
+    // Navigate to courses catalog page
+    await page.goto('http://localhost:3001/courses/library')
 
     // Wait for content to load
     await page.waitForLoadState('networkidle')
@@ -69,8 +69,8 @@ test.describe('Visual Assessment - Courses Page', () => {
   })
 
   test('check performance metrics', async ({ page }) => {
-    // Navigate to courses page
-    await page.goto('http://localhost:3001/courses')
+    // Navigate to courses catalog page
+    await page.goto('http://localhost:3001/courses/library')
 
     // Get performance metrics
     const metrics = await page.evaluate(() => {

@@ -1,14 +1,23 @@
 'use client'
 
 import { Link } from '@/src/i18n/navigation'
+import type { ReactNode } from 'react'
 
-import { BookOpen, FileText, Plus } from 'lucide-react'
+import { BookOpen, ChevronDown, FileText, Library, Plus } from 'lucide-react'
 import Logo from '@/components/common/logo'
 import AuthButton from '@/components/common/auth-button'
 import { LanguageSwitcher } from '@/components/common/language-switcher'
 import { useSupabase } from '@/lib/supabase/browser-client'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface HeaderProps {
   darkMode?: boolean
@@ -17,48 +26,31 @@ interface HeaderProps {
   className?: string
 }
 
+type ProductNavItemProps = {
+  darkMode: boolean
+  href: '/career-playbook' | '/courses'
+  label: string
+  ariaLabel: string
+  menuLabel: string
+  menuAriaLabel: string
+  icon: ReactNode
+  actions: Array<{
+    href: string
+    label: string
+    ariaLabel: string
+    icon: ReactNode
+    primary?: boolean
+  }>
+}
+
 export default function Header({
   darkMode = false,
   sticky = false,
   surface = 'transparent',
   className,
 }: HeaderProps = {}) {
-  // Use the single source of truth from SupabaseProvider
-  const { session, isLoading } = useSupabase()
-  const isAuthenticated = !!session
+  const { isLoading } = useSupabase()
   const t = useTranslations('common.nav')
-  const navLinkBaseClass =
-    'group flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-lg border px-3 py-2.5 text-xs font-medium shadow-sm transition-all duration-200 hover:shadow-md sm:gap-2 sm:px-4 sm:text-sm'
-  const catalogLinkClass = darkMode
-    ? cn(
-        navLinkBaseClass,
-        'border-white/10 bg-white/5 text-white/90 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-400'
-      )
-    : cn(
-        navLinkBaseClass,
-        'border-gray-200 bg-gray-100 text-gray-700 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
-      )
-  const roleDescriptionLinkClass = darkMode
-    ? cn(
-        navLinkBaseClass,
-        'border-purple-500/25 bg-white/5 text-white/90 hover:border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-400'
-      )
-    : cn(
-        navLinkBaseClass,
-        'border-purple-200 bg-white/70 text-purple-700 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-800 dark:border-purple-500/25 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/40 dark:hover:bg-purple-500/10 dark:hover:text-purple-400'
-      )
-  const createLinkClass = darkMode
-    ? cn(
-        navLinkBaseClass,
-        'border-purple-500/20 bg-gradient-to-r from-purple-500/5 to-blue-500/5 text-white/90 hover:border-purple-500/30 hover:from-purple-500/10 hover:to-blue-500/10 hover:text-purple-400'
-      )
-    : cn(
-        navLinkBaseClass,
-        'border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 text-gray-700 hover:border-purple-300 hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400'
-      )
-  const roleDescriptionIconClass = darkMode
-    ? 'h-4 w-4 text-purple-400 transition-colors group-hover:text-purple-300'
-    : 'h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700 dark:text-purple-400 dark:group-hover:text-purple-300'
   const headerClassName = cn(
     'relative z-20 flex items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-4',
     sticky ? 'sticky top-0 z-50' : null,
@@ -70,9 +62,52 @@ export default function Header({
     className
   )
 
+  const roleActions = [
+    {
+      href: '/career-playbook',
+      label: t('roleDescriptionLanding'),
+      ariaLabel: t('roleDescriptionsAria'),
+      icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+    },
+    {
+      href: '/career-playbook/new',
+      label: t('createRoleDescription'),
+      ariaLabel: t('createRoleDescriptionAria'),
+      icon: <Plus className="h-4 w-4" aria-hidden="true" />,
+      primary: true,
+    },
+    {
+      href: '/career-playbook/library',
+      label: t('roleDescriptionLibrary'),
+      ariaLabel: t('roleDescriptionLibraryAria'),
+      icon: <Library className="h-4 w-4" aria-hidden="true" />,
+    },
+  ]
+
+  const courseActions = [
+    {
+      href: '/courses',
+      label: t('courseLanding'),
+      ariaLabel: t('coursesAria'),
+      icon: <BookOpen className="h-4 w-4" aria-hidden="true" />,
+    },
+    {
+      href: '/create',
+      label: t('createCourse'),
+      ariaLabel: t('createCourseAria'),
+      icon: <Plus className="h-4 w-4" aria-hidden="true" />,
+      primary: true,
+    },
+    {
+      href: '/courses/library',
+      label: t('courseLibrary'),
+      ariaLabel: t('courseLibraryAria'),
+      icon: <Library className="h-4 w-4" aria-hidden="true" />,
+    },
+  ]
+
   return (
     <header className={headerClassName}>
-      {/* Logo */}
       <div className="sm:hidden">
         <Logo variant="icon" showText={false} forceWhite={darkMode} />
       </div>
@@ -80,77 +115,109 @@ export default function Header({
         <Logo variant="compact" size="md" forceWhite={darkMode} />
       </div>
 
-      {/* Navigation - visible on all screen sizes */}
       <nav
-        className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-3"
+        className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2"
         role="navigation"
         aria-label={t('mainMenu')}
       >
-        {!isLoading &&
-          (isAuthenticated ? (
-            <>
-              <Link href="/courses" className={catalogLinkClass} aria-label={t('catalogAria')}>
-                <BookOpen
-                  className={
-                    darkMode
-                      ? 'h-4 w-4 text-white/60 transition-colors group-hover:text-purple-400'
-                      : 'h-4 w-4 text-gray-500 transition-colors group-hover:text-purple-600 dark:text-gray-400 dark:group-hover:text-purple-400'
-                  }
-                  aria-hidden="true"
-                />
-                <span className="hidden sm:inline">{t('catalog')}</span>
-              </Link>
-              <Link
-                href="/career-playbook/new"
-                className={roleDescriptionLinkClass}
-                aria-label={t('createRoleDescriptionAria')}
-              >
-                <FileText className={roleDescriptionIconClass} aria-hidden="true" />
-                <span className="hidden lg:inline">{t('createRoleDescription')}</span>
-              </Link>
-              <Link href="/create" className={createLinkClass} aria-label={t('createCourseAria')}>
-                <Plus
-                  className={
-                    darkMode
-                      ? 'h-4 w-4 text-purple-400 transition-colors group-hover:text-purple-300'
-                      : 'h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700 dark:text-purple-400 dark:group-hover:text-purple-300'
-                  }
-                  aria-hidden="true"
-                />
-                <span className="hidden sm:inline">{t('createCourse')}</span>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/courses" className={catalogLinkClass} aria-label={t('examplesAria')}>
-                <BookOpen
-                  className={
-                    darkMode
-                      ? 'h-4 w-4 text-white/60 transition-colors group-hover:text-purple-400'
-                      : 'h-4 w-4 text-gray-500 transition-colors group-hover:text-purple-600 dark:text-gray-400 dark:group-hover:text-purple-400'
-                  }
-                  aria-hidden="true"
-                />
-                <span className="xs:inline hidden sm:hidden">{t('examples')}</span>
-                <span className="hidden sm:inline">{t('exampleCourses')}</span>
-              </Link>
-              <Link
-                href="/career-playbook"
-                className={roleDescriptionLinkClass}
-                aria-label={t('createRoleDescriptionAria')}
-              >
-                <FileText className={roleDescriptionIconClass} aria-hidden="true" />
-                <span className="hidden lg:inline">{t('createRoleDescription')}</span>
-              </Link>
-            </>
-          ))}
+        {!isLoading && (
+          <>
+            <ProductNavItem
+              darkMode={darkMode}
+              href="/career-playbook"
+              label={t('roleDescriptions')}
+              ariaLabel={t('roleDescriptionsAria')}
+              menuLabel={t('roleDescriptions')}
+              menuAriaLabel={t('roleDescriptionsMenuAria')}
+              icon={<FileText className="h-4 w-4" aria-hidden="true" />}
+              actions={roleActions}
+            />
+            <ProductNavItem
+              darkMode={darkMode}
+              href="/courses"
+              label={t('courses')}
+              ariaLabel={t('coursesAria')}
+              menuLabel={t('courses')}
+              menuAriaLabel={t('coursesMenuAria')}
+              icon={<BookOpen className="h-4 w-4" aria-hidden="true" />}
+              actions={courseActions}
+            />
+          </>
+        )}
       </nav>
 
-      {/* Language & Auth - visible on all screen sizes */}
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <LanguageSwitcher darkMode={darkMode} compact showChevron={false} />
         <AuthButton darkMode={darkMode} forceWhiteDropdown={darkMode} />
       </div>
     </header>
+  )
+}
+
+function ProductNavItem({
+  darkMode,
+  href,
+  label,
+  ariaLabel,
+  menuLabel,
+  menuAriaLabel,
+  icon,
+  actions,
+}: ProductNavItemProps) {
+  const shellClass = darkMode
+    ? 'border-white/10 bg-white/5 text-white/90 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-200'
+    : 'border-gray-200 bg-white/75 text-gray-800 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-200 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-300'
+
+  return (
+    <div
+      className={cn(
+        'group flex min-h-[44px] min-w-[44px] items-center overflow-hidden rounded-lg border shadow-sm transition-all duration-200',
+        shellClass
+      )}
+    >
+      <Link
+        href={href}
+        aria-label={label}
+        title={ariaLabel}
+        className="flex min-h-[44px] items-center gap-1.5 px-3 text-xs font-medium sm:gap-2 sm:px-4 sm:text-sm"
+      >
+        {icon}
+        <span className="hidden md:inline">{label}</span>
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={menuAriaLabel}
+          className={cn(
+            'flex min-h-[44px] min-w-[36px] items-center justify-center border-l px-2 transition outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+            darkMode ? 'border-white/10' : 'border-gray-200 dark:border-slate-700'
+          )}
+        >
+          <ChevronDown className="h-4 w-4" aria-hidden="true" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="center" className="w-72 p-2">
+          <DropdownMenuLabel className="px-3 py-2 text-xs tracking-[0.14em] text-gray-500 uppercase dark:text-gray-400">
+            {menuLabel}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {actions.map((action) => (
+            <DropdownMenuItem key={action.href} asChild>
+              <Link
+                href={action.href}
+                aria-label={action.ariaLabel}
+                className={cn(
+                  'flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm',
+                  action.primary
+                    ? 'font-semibold text-purple-700 dark:text-purple-300'
+                    : 'text-gray-800 dark:text-gray-100'
+                )}
+              >
+                {action.icon}
+                <span>{action.label}</span>
+              </Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 }

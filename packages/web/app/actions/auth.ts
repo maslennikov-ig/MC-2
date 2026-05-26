@@ -20,6 +20,7 @@ export async function refreshAuthState() {
   // Force refresh all auth-related caches
   revalidatePath('/', 'layout')
   revalidatePath('/courses', 'layout')
+  revalidatePath('/courses/library', 'layout')
   revalidatePath('/create', 'layout')
   revalidatePath('/courses/[orgSlug]/[courseSlug]', 'layout')
 

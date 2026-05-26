@@ -30,7 +30,7 @@ test.describe('Accessibility Tests', () => {
 
   // Test courses catalog page
   test('Courses catalog should be accessible', async ({ page }) => {
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 
@@ -76,13 +76,13 @@ test.describe('Accessibility Tests', () => {
     // Test Tab navigation through interactive elements
     await page.keyboard.press('Tab')
 
-    let focusedElement = await page.locator(':focus').first()
+    let focusedElement = page.locator(':focus').first()
     await expect(focusedElement).toBeVisible()
 
     // Continue tabbing through several elements
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab')
-      focusedElement = await page.locator(':focus').first()
+      focusedElement = page.locator(':focus').first()
 
       // Verify element is focusable and visible
       if ((await focusedElement.count()) > 0) {
@@ -243,7 +243,7 @@ test.describe('Accessibility Tests', () => {
 
     // Check for skip links (usually hidden but accessible via keyboard)
     await page.keyboard.press('Tab')
-    const firstFocusedElement = await page.locator(':focus').first()
+    const firstFocusedElement = page.locator(':focus').first()
 
     // If skip link exists, it should be focusable
     if ((await firstFocusedElement.count()) > 0) {
@@ -317,7 +317,7 @@ test.describe('Accessibility Tests', () => {
 test.describe('Component Accessibility', () => {
   // Test individual components that might be loaded dynamically
   test('Course cards should be accessible', async ({ page }) => {
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
 
     // Check if course cards exist before running accessibility scan
@@ -367,7 +367,7 @@ test.describe('Component Accessibility', () => {
 
           // Test focus trap - pressing Tab should cycle within modal
           await page.keyboard.press('Tab')
-          const focusedElement = await page.locator(':focus').first()
+          const focusedElement = page.locator(':focus').first()
           const isWithinModal = await focusedElement.evaluate((el, modalSelector) => {
             const modal = document.querySelector(modalSelector)
             return modal && modal.contains(el)
