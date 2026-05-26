@@ -194,7 +194,11 @@ function ProductNavItem({
         >
           <ChevronDown className="h-4 w-4" aria-hidden="true" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" className="w-72 p-2">
+        <DropdownMenuContent
+          align="center"
+          collisionPadding={16}
+          className="w-[calc(100vw-2rem)] max-w-72 p-2"
+        >
           <DropdownMenuLabel className="px-3 py-2 text-xs tracking-[0.14em] text-gray-500 uppercase dark:text-gray-400">
             {menuLabel}
           </DropdownMenuLabel>

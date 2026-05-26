@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CoursesFilters } from '@/app/[locale]/courses/_components/courses-filters'
 
@@ -7,8 +7,11 @@ const mockPush = vi.hoisted(() => vi.fn())
 const mockSearchParams = vi.hoisted(() => new URLSearchParams())
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
   useSearchParams: () => mockSearchParams,
+}))
+
+vi.mock('@/src/i18n/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
 }))
 
 vi.mock('next-intl', () => ({
@@ -48,6 +51,10 @@ vi.mock('next-intl', () => ({
 }))
 
 describe('CoursesFilters', () => {
+  beforeEach(() => {
+    mockPush.mockClear()
+  })
+
   it('matches the favorites filter shape to the other filter controls', () => {
     render(<CoursesFilters totalCount={122} />)
 
@@ -55,5 +62,13 @@ describe('CoursesFilters', () => {
 
     expect(favoritesButton.className).toContain('rounded-lg')
     expect(favoritesButton.className).not.toContain('rounded-full')
+  })
+
+  it('routes filter changes through the locale-aware course library path', () => {
+    render(<CoursesFilters totalCount={122} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Избранные' }))
+
+    expect(mockPush).toHaveBeenCalledWith('/courses/library?favorites=true')
   })
 })

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Header from '@/components/layouts/header'
@@ -138,5 +139,46 @@ describe('Header', () => {
       screen.getByRole('button', { name: 'Открыть действия для должностных инструкций' })
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Открыть действия для курсов' })).toBeInTheDocument()
+  })
+
+  it('exposes create and library actions inside the role descriptions menu', async () => {
+    const user = userEvent.setup()
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: { user: { id: 'user-1' } },
+    })
+
+    render(<Header />)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Открыть действия для должностных инструкций' })
+    )
+    expect(screen.getByRole('menuitem', { name: 'Создать описание роли' })).toHaveAttribute(
+      'href',
+      '/career-playbook/new'
+    )
+    expect(
+      screen.getByRole('menuitem', { name: 'Открыть каталог должностных инструкций' })
+    ).toHaveAttribute('href', '/career-playbook/library')
+  })
+
+  it('exposes create and library actions inside the courses menu', async () => {
+    const user = userEvent.setup()
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: { user: { id: 'user-1' } },
+    })
+
+    render(<Header />)
+
+    await user.click(screen.getByRole('button', { name: 'Открыть действия для курсов' }))
+    expect(screen.getByRole('menuitem', { name: 'Создать новый курс' })).toHaveAttribute(
+      'href',
+      '/create'
+    )
+    expect(screen.getByRole('menuitem', { name: 'Открыть каталог курсов' })).toHaveAttribute(
+      'href',
+      '/courses/library'
+    )
   })
 })
