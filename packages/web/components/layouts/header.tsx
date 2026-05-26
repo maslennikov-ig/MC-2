@@ -182,7 +182,7 @@ function ProductNavItem({
         className="flex min-h-[44px] items-center gap-1.5 px-3 text-xs font-medium sm:gap-2 sm:px-4 sm:text-sm"
       >
         {icon}
-        <span className="hidden md:inline">{label}</span>
+        <span className="hidden lg:inline">{label}</span>
       </Link>
       <DropdownMenu>
         <DropdownMenuTrigger

@@ -9,6 +9,8 @@ node_modules/
 .agents/
 .codex/*
 !.codex/
+!.codex/skills/
+!.codex/skills/**
 !.codex/orchestrator.toml
 !.codex/handoff.md
 !.codex/project-index.md

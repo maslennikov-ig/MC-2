@@ -1,0 +1,49 @@
+{
+  "scannedAt": "2026-05-26",
+  "skill": "hallmark",
+  "source": "Nutlope/hallmark",
+  "findings": {
+    "fontStack": {
+      "preserve": true,
+      "summary": "Manrope and JetBrains Mono via next/font with CSS variables.",
+      "sources": [
+        "packages/web/app/[locale]/layout.tsx:3",
+        "packages/web/app/[locale]/layout.tsx:54",
+        "packages/web/app/[locale]/layout.tsx:61",
+        "packages/web/app/globals.css:135",
+        "packages/web/tailwind.config.ts:92"
+      ]
+    },
+    "palette": {
+      "preserve": true,
+      "summary": "Existing semantic theme tokens and purple brand palette with light/dark overrides.",
+      "sources": [
+        "packages/web/app/globals.css:25",
+        "packages/web/app/globals.css:39",
+        "packages/web/app/globals.css:167",
+        "packages/web/tailwind.config.ts:9"
+      ]
+    },
+    "motion": {
+      "preserve": true,
+      "summary": "Motion-capable project; framer-motion is already installed.",
+      "sources": ["packages/web/package.json:96"]
+    },
+    "spacing": {
+      "preserve": true,
+      "summary": "Tailwind spacing is driven by the existing 4px --spacing scale.",
+      "sources": ["packages/web/app/globals.css:22", "packages/web/tailwind.config.ts:114"]
+    },
+    "framework": {
+      "preserve": true,
+      "summary": "Next.js App Router with next-intl locale routes.",
+      "sources": ["packages/web/package.json:107", "packages/web/app/[locale]/page.tsx:1"]
+    }
+  },
+  "constraints": [
+    "Use existing app styles and design tokens only.",
+    "Support both light and dark themes.",
+    "Do not introduce new fonts, palettes, CSS token systems, or production dependencies.",
+    "Preserve current product information architecture: role guides first, courses second."
+  ]
+}
