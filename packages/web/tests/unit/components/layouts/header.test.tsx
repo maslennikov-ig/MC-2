@@ -101,4 +101,24 @@ describe('Header', () => {
     expect(header.className).toContain('sticky')
     expect(header.className).toContain('backdrop-blur-sm')
   })
+
+  it('uses compact rounded navigation buttons instead of pill buttons', () => {
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: { user: { id: 'user-1' } },
+    })
+
+    render(<Header />)
+
+    const navLinks = [
+      screen.getByRole('link', { name: 'Просмотреть доступные курсы' }),
+      screen.getByRole('link', { name: 'Создать описание роли' }),
+      screen.getByRole('link', { name: 'Создать новый курс' }),
+    ]
+
+    navLinks.forEach((link) => {
+      expect(link.className).toContain('rounded-lg')
+      expect(link.className).not.toContain('rounded-full')
+    })
+  })
 })
