@@ -35,7 +35,13 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'home', labelRu: 'Главная', labelEn: 'Home', icon: Home, href: '/' },
-  { id: 'courses', labelRu: 'Каталог', labelEn: 'Catalog', icon: BookOpen, href: '/courses' },
+  {
+    id: 'courses',
+    labelRu: 'Каталог курсов',
+    labelEn: 'Course Catalog',
+    icon: BookOpen,
+    href: '/courses/library',
+  },
   {
     id: 'create',
     labelRu: 'Создать курс',

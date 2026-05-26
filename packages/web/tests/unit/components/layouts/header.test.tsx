@@ -15,8 +15,20 @@ vi.mock('next-intl', () => ({
       ({
         catalog: 'Каталог',
         catalogAria: 'Просмотреть доступные курсы',
+        courses: 'Курсы',
+        coursesAria: 'Открыть лендинг курсов',
+        courseLibrary: 'Каталог курсов',
+        courseLibraryAria: 'Открыть каталог курсов',
+        courseLanding: 'О курсах',
         createCourse: 'Создать курс',
         createCourseAria: 'Создать новый курс',
+        roleDescriptions: 'Должностные инструкции',
+        roleDescriptionsAria: 'Открыть лендинг должностных инструкций',
+        roleDescriptionsMenuAria: 'Открыть действия для должностных инструкций',
+        roleDescriptionLibrary: 'Каталог инструкций',
+        roleDescriptionLibraryAria: 'Открыть каталог должностных инструкций',
+        roleDescriptionLanding: 'О должностных инструкциях',
+        coursesMenuAria: 'Открыть действия для курсов',
         createRoleDescription: 'Создать описание роли',
         createRoleDescriptionAria: 'Создать описание роли',
         exampleCourses: 'Примеры курсов',
@@ -60,7 +72,7 @@ describe('Header', () => {
     mockUseSupabase.mockReset()
   })
 
-  it('links authenticated users directly to the role description creation flow', () => {
+  it('shows two product landing entries for authenticated users', () => {
     mockUseSupabase.mockReturnValue({
       isLoading: false,
       session: { user: { id: 'user-1' } },
@@ -68,14 +80,14 @@ describe('Header', () => {
 
     render(<Header />)
 
-    const link = screen.getByRole('link', { name: 'Создать описание роли' })
-
-    expect(link).toHaveAttribute('href', '/career-playbook/new')
-    expect(link.className).toContain('purple')
-    expect(link.className).not.toContain('teal')
+    expect(screen.getByRole('link', { name: 'Должностные инструкции' })).toHaveAttribute(
+      'href',
+      '/career-playbook'
+    )
+    expect(screen.getByRole('link', { name: 'Курсы' })).toHaveAttribute('href', '/courses')
   })
 
-  it('links signed-out users to the role description landing page', () => {
+  it('keeps product landing entries available for signed-out users', () => {
     mockUseSupabase.mockReturnValue({
       isLoading: false,
       session: null,
@@ -83,10 +95,11 @@ describe('Header', () => {
 
     render(<Header />)
 
-    expect(screen.getByRole('link', { name: 'Создать описание роли' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Должностные инструкции' })).toHaveAttribute(
       'href',
       '/career-playbook'
     )
+    expect(screen.getByRole('link', { name: 'Курсы' })).toHaveAttribute('href', '/courses')
   })
 
   it('supports the shared sticky glass app header surface', () => {
@@ -102,7 +115,7 @@ describe('Header', () => {
     expect(header.className).toContain('backdrop-blur-sm')
   })
 
-  it('uses compact rounded navigation buttons instead of pill buttons', () => {
+  it('uses compact rounded product controls instead of pill buttons', () => {
     mockUseSupabase.mockReturnValue({
       isLoading: false,
       session: { user: { id: 'user-1' } },
@@ -110,15 +123,20 @@ describe('Header', () => {
 
     render(<Header />)
 
-    const navLinks = [
-      screen.getByRole('link', { name: 'Просмотреть доступные курсы' }),
-      screen.getByRole('link', { name: 'Создать описание роли' }),
-      screen.getByRole('link', { name: 'Создать новый курс' }),
+    const productLinks = [
+      screen.getByRole('link', { name: 'Должностные инструкции' }),
+      screen.getByRole('link', { name: 'Курсы' }),
     ]
 
-    navLinks.forEach((link) => {
-      expect(link.className).toContain('rounded-lg')
-      expect(link.className).not.toContain('rounded-full')
+    productLinks.forEach((link) => {
+      const productControl = link.closest('div')
+
+      expect(productControl?.className).toContain('rounded-lg')
+      expect(productControl?.className).not.toContain('rounded-full')
     })
+    expect(
+      screen.getByRole('button', { name: 'Открыть действия для должностных инструкций' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Открыть действия для курсов' })).toBeInTheDocument()
   })
 })

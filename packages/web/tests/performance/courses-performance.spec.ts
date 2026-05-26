@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Courses Page Performance & UI Tests', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/courses')
+    await page.goto('/courses/library')
   })
 
   test('should load within performance budget', async ({ page }) => {
@@ -214,8 +214,8 @@ test.describe('Courses Page Performance & UI Tests', () => {
   })
 
   test('should measure First Contentful Paint', async ({ page }) => {
-    const fcp = await page.evaluate(() => {
-      return new Promise((resolve) => {
+    const fcp = await page.evaluate<number | null>(() => {
+      return new Promise<number | null>((resolve) => {
         new PerformanceObserver((list) => {
           const entries = list.getEntries()
           for (const entry of entries) {

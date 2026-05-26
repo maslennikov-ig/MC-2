@@ -145,7 +145,7 @@ class GenerationErrorBoundary extends Component<Props, State> {
                   </Button>
 
                   <Button asChild variant="ghost" size="sm" className="gap-2">
-                    <Link href="/courses">
+                    <Link href="/courses/library">
                       <Home className="h-4 w-4" />
                       Back to Courses
                     </Link>

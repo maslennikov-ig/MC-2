@@ -64,7 +64,7 @@ export default function CreateCourseForm() {
         <PermissionDeniedState
           variant="card"
           userRole={userRole}
-          returnUrl="/courses"
+          returnUrl="/courses/library"
           contactUrl="/profile"
         />
       </div>

@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 
 test('take courses page screenshot', async ({ page }) => {
-  // Navigate to courses page
-  await page.goto('/courses')
+  // Navigate to courses catalog page
+  await page.goto('/courses/library')
 
   // Wait for the page to be fully loaded
   await page.waitForLoadState('networkidle')

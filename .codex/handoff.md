@@ -1,40 +1,47 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-26
-Branch: `develop`
-Base: `origin/develop`
+Branch: `codex/product-ia-course-landing`
+Base: `origin/develop` at `0560dc52` after final rebase.
 
 ## Current State
 
-- Dev delivery is current at `50705a90` (`dev: merge codex/career-playbook-ui-mock-variants into develop`); GitHub Actions run `26441778486` passed and Dev health returned `{"status":"ok"}`.
-- `master` also contains `e6d967b1` from an accidental-but-accepted deploy; GitHub Actions run `26441929337` concluded success and `ai.megacampus.ru/api/health` returned `{"status":"ok"}`.
-- `mc2-y34k9` is closed: catalog favorites and shared header menu buttons now use compact `rounded-lg` styling.
-- Orchestration contract refresh is in progress on `develop`: baseline `balanced-v2.14`, subagent prompt/contract docs impact fields, and stage closeout docs-review enforcement.
-- Local old branches still need triage; do not delete unmerged archive/backup/feature branches without checking unique commits.
+- Active Beads root: `mc2-db696.36` (`Product IA: two-product navigation and course landing`) is closed.
+- Worktree: `/home/me/code/mc2-worktrees/product-ia-course-landing`.
+- Main checkout `/home/me/code/mc2` is a separate worktree on `develop`; do not clean or overwrite it from this branch.
+- This branch is rebased over the latest orchestration contract refresh from `develop` (`balanced-v2.14`).
+- Context7 lookup was not needed: implementation uses existing Next.js App Router and project UI patterns, with no new framework/API behavior.
+- LazyWeb references used as design direction: user-approved product-path and course-landing patterns.
 
 ## Changes In This Branch
 
-- Product IA / Career Playbook work through `mc2-db696.36` is reflected in Beads and previously delivered branches.
-- UI polish commit `a64d9ccd` is merged to `develop`.
-- Pending local commit scope: orchestration contract/profile update plus this handoff compaction to satisfy process verification.
+- Header now has two product entries: `Должностные инструкции` and `Курсы`.
+- Product label click opens the product landing; the adjacent menu exposes description, create, and catalog actions.
+- Home `/` is a two-product gateway and recommends starting course work from a clear role.
+- `/courses` is now a course landing with hero, product preview, process, feature blocks, examples, and final CTA.
+- Existing course catalog moved to `/courses/library`; links, `revalidatePath`, metadata, unit tests, and relevant browser/performance/accessibility test routes were updated.
+- RU/EN messages added for the product gateway, course landing, and product navigation.
+- Added `docs/plans/2026-05-26-two-product-navigation-course-landing.md`; updated `.codex/project-index.md`.
 
 ## Verification
 
-- UI polish: targeted Vitest passed, `pnpm type-check` passed, `pnpm build` passed.
-- Dev run `26441778486`: success.
-- Master run `26441929337`: conclusion success; non-blocking Integration Tests job failed but Deploy to Production succeeded.
-- Current orchestration verification must pass before committing these local contract updates.
+- Passed after final rebase:
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/layouts/header.test.tsx tests/unit/components/courses/landing-page.test.tsx tests/unit/components/courses/library-page.test.tsx`
+  - `pnpm --filter @megacampus/web lint`
+  - `pnpm --filter @megacampus/web type-check`
+  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
+  - `pnpm type-check`
+  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm build`
+  - Browser smoke on local production server for `/`, `/ru/courses`, `/ru/courses/library`, `/ru/career-playbook`, `/ru/career-playbook/library` at 390/1440 px in light and dark themes: 20 checks passed, main content visible, no horizontal overflow.
+- Existing build warnings remain: stale Browserslist data and Node `url.parse()` deprecation warnings.
 
-## Next recommended
+## Next Recommended
 
-Next stage id: `mc2-db696.36`
-Recommended action: finish and commit orchestration contract refresh, then triage old local branches into delete/keep categories.
+1. Push `codex/product-ia-course-landing` and open PR to `develop`.
+2. After PR merge, let Dev deploy run from `develop` and verify `/api/health`.
 
-## Starter prompt for next orchestrator
+## Explicit Defers
 
-Use $orchestrator-stage in `/home/me/code/mc2` on `develop`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads state for `mc2-db696.36` and `mc2-y34k9`, and `git status`. Verify `scripts/orchestration/run_process_verification.sh` before committing orchestration changes.
-
-## Explicit defers
-
-- `mc2-db696.28`: ESCO import subset / normalized role-source pipeline.
-- Old local branch cleanup: inspect unique commits before deleting unmerged branches.
+- No backend schema, course generation, Career Playbook generation, ESCO, or role-suggestion data changes are included in this branch.
+- Broader replacement of old visible `AI` wording outside the changed navigation/course/product pages remains out of scope.
+- Old local branch cleanup from `develop` remains separate; inspect unique commits before deleting unmerged branches.

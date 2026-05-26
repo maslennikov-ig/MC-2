@@ -30,7 +30,13 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Frontend locale messages: `packages/web/messages/{ru,en}/`.
 - Frontend i18n config/types: `packages/web/src/i18n/config.ts` and `packages/web/types/i18n.d.ts`.
 - Frontend unit/e2e tests: `packages/web/tests/unit/` and `packages/web/tests/e2e/`.
+- Product gateway route: `packages/web/app/[locale]/page.tsx` with content from `packages/web/components/common/hero-content.tsx`.
+- Product header navigation: `packages/web/components/layouts/header.tsx`.
+- Course landing route: `packages/web/app/[locale]/courses/page.tsx`.
+- Course library route: `packages/web/app/[locale]/courses/library/page.tsx`.
+- Course creation route: `packages/web/app/[locale]/create/`.
 - Career Playbook wizard route: `packages/web/app/[locale]/career-playbook/new/`.
+- Career Playbook landing route: `packages/web/app/[locale]/career-playbook/`.
 - Career Playbook library route: `packages/web/app/[locale]/career-playbook/library/`.
 - Career Playbook public share route: `packages/web/app/[locale]/share/career-playbook/[slug]/`.
 - Career Playbook wizard UI: `packages/web/components/career-playbook/wizard/`.

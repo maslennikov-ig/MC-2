@@ -85,7 +85,7 @@ export function useKeyboardNavigation({
             const currentPage = parseInt(searchParams.get('page') || '1')
             if (currentPage > 1) {
               searchParams.set('page', (currentPage - 1).toString())
-              router.push(`/courses?${searchParams.toString()}`)
+              router.push(`/courses/library?${searchParams.toString()}`)
             }
           }
           break
@@ -97,7 +97,7 @@ export function useKeyboardNavigation({
             const searchParams = new URLSearchParams(window.location.search)
             const currentPage = parseInt(searchParams.get('page') || '1')
             searchParams.set('page', (currentPage + 1).toString())
-            router.push(`/courses?${searchParams.toString()}`)
+            router.push(`/courses/library?${searchParams.toString()}`)
           }
           break
 
