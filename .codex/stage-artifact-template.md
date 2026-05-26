@@ -34,6 +34,9 @@ accepted_by_orchestrator: <yes|no>
 cleanup_status: <pending|cleaned|blocked|not_applicable>
 cleanup_notes: <short cleanup result or blocker>
 risk_level: <low|medium|high>
+docs_impact: <none|tests-only|refactor|behavior|structural|api-contract|migration|ops-deploy|docs-only|n/a>
+docs_reviewed: <updated|no-change-needed|n/a>
+docs_review_notes: <short reason or updated docs>
 verification:
   - <command>: <passed|failed|blocked>
 changed_files:
@@ -48,7 +51,7 @@ Short outcome summary.
 
 # Scope / Routing
 
-Record the assigned write zone, success criteria, selected docs, selected skills, selected agents, catalog candidates, model/reasoning choice, parallel group, and dependency boundaries.
+Record the assigned write zone, success criteria, selected docs, selected skills, selected agents, catalog candidates, model/reasoning choice, parallel group, dependency boundaries, and any documentation impact.
 
 # Verification
 

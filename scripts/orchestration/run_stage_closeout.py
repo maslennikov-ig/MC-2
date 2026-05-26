@@ -18,17 +18,35 @@ DEBT_POLICY_REFERENCE_PATTERNS = (
     "debt markers",
 )
 PROJECT_INDEX_REVIEW_MARKER = "project-index: reviewed-no-change"
+DOCS_REVIEW_MARKER = "docs-reviewed:"
 PLACEHOLDERS = {"", "n/a", "<short cleanup result or blocker>"}
 STRUCTURAL_CHANGE_PREFIXES = (
+    "app/",
+    "apps/",
+    "api/",
+    "pages/",
+    "routes/",
+    "packages/",
     "src/api/",
+    "src/app/",
     "src/integrations/",
+    "src/routes/",
+    "src/server/",
+    "src/services/",
+    "migrations/",
+    "db/migrations/",
+    "supabase/migrations/",
+    ".github/workflows/",
     "scripts/orchestration/",
     "frontend/",
 )
 STRUCTURAL_CHANGE_FILES = {
     "AGENTS.md",
     "README.md",
+    "package.json",
+    "pnpm-workspace.yaml",
     "pyproject.toml",
+    "Dockerfile",
     "docker-compose.yml",
     "docker-compose.dev.yml",
     ".codex/orchestrator.toml",
@@ -350,6 +368,83 @@ def check_project_index_review(repo_root: pathlib.Path, contract: dict[str, obje
     raise SystemExit(1)
 
 
+def documentation_impact(changed: list[str]) -> list[str]:
+    if not changed:
+        return ["none"]
+
+    categories: set[str] = set()
+    non_docs = [
+        path
+        for path in changed
+        if not (
+            path.endswith(".md")
+            or path.startswith("docs/")
+            or path.startswith(".codex/stages/")
+            or path == ".codex/handoff.md"
+        )
+    ]
+    if not non_docs:
+        return ["docs-only"]
+
+    if all(path.startswith("tests/") or "/tests/" in path or path.endswith((".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx", "_test.py")) for path in non_docs):
+        categories.add("tests-only")
+
+    structural = [
+        path
+        for path in non_docs
+        if path in STRUCTURAL_CHANGE_FILES
+        or any(path.startswith(prefix) for prefix in STRUCTURAL_CHANGE_PREFIXES)
+    ]
+    if structural:
+        categories.add("structural")
+
+    if any(path.startswith(("migrations/", "db/migrations/", "supabase/migrations/")) for path in non_docs):
+        categories.add("migration")
+
+    if any(
+        path in {"Dockerfile", "docker-compose.yml", "docker-compose.dev.yml"}
+        or path.startswith((".github/workflows/", "deploy/", "infra/", "ops/"))
+        for path in non_docs
+    ):
+        categories.add("ops-deploy")
+
+    if any(
+        path.startswith(("api/", "src/api/", "src/server/", "packages/shared", "packages/shared-types"))
+        or "contract" in path.lower()
+        or "schema" in path.lower()
+        for path in non_docs
+    ):
+        categories.add("api-contract")
+
+    if not categories:
+        categories.add("behavior")
+    return sorted(categories)
+
+
+def check_documentation_review(repo_root: pathlib.Path, stage_id: str) -> None:
+    changed = git_changed_files(repo_root)
+    if not changed:
+        print("documentation review OK (no changed files)")
+        return
+
+    summary = stage_summary_text(repo_root, stage_id).lower()
+    if DOCS_REVIEW_MARKER in summary:
+        impact = ", ".join(documentation_impact(changed))
+        print(f"documentation review OK ({impact})")
+        return
+
+    impact = documentation_impact(changed)
+    print("Stage close requires a documentation review marker:", file=sys.stderr)
+    print(f"- impact: {', '.join(impact)}", file=sys.stderr)
+    print(
+        "- add `docs-reviewed: updated - <what changed>` or "
+        "`docs-reviewed: no-change-needed - <reason>` to the stage summary",
+        file=sys.stderr,
+    )
+    print("- update stable docs first when the impact changes navigation, contracts, ops, migrations, integrations, or durable behavior", file=sys.stderr)
+    raise SystemExit(1)
+
+
 def has_tracked_defer(body: str) -> bool:
     normalized = body.strip().lower()
     if not normalized or normalized in {"none", "- none"}:
@@ -413,6 +508,7 @@ def main(argv: list[str]) -> int:
 
     check_child_acceptance_cleanup(artifacts)
     check_project_index_review(repo_root, contract, args.stage_id)
+    check_documentation_review(repo_root, args.stage_id)
     check_debt_markers(repo_root, contract)
 
     for group in groups:

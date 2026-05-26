@@ -12,7 +12,7 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.12"
+profile = "balanced-v2.14"
 source_skill = "orchestration-setup"
 
 [execution]
