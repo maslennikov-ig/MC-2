@@ -1,8 +1,9 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useState, useTransition, useCallback, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
+import { useRouter } from '@/src/i18n/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {

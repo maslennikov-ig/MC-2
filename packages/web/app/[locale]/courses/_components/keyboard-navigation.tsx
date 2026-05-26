@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/src/i18n/navigation'
 
 interface KeyboardNavigationProps {
   onSearch?: () => void
