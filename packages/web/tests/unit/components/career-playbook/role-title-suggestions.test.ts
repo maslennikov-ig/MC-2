@@ -4,12 +4,13 @@ import {
   inferRoleDepartmentFromTitle,
   getPopularRoleTitleSuggestions,
   getRoleTitleSuggestionGroups,
+  roleTitleSuggestionSourceMetadata,
   roleTitleSuggestions,
   searchRoleTitleSuggestions,
 } from '@/components/career-playbook/wizard/role-title-suggestions'
 
 describe('role title suggestions', () => {
-  it('returns a broad source-aware local index with stable ids', () => {
+  it('returns a broad source-aware ESCO-backed local index with stable ids', () => {
     const uniqueIds = new Set(roleTitleSuggestions.map((suggestion) => suggestion.id))
 
     expect(roleTitleSuggestions.length).toBeGreaterThanOrEqual(60)
@@ -17,9 +18,37 @@ describe('role title suggestions', () => {
     expect(
       roleTitleSuggestions.every((suggestion) => (suggestion.source as string) !== 'curated')
     ).toBe(true)
+    expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'esco')).toBe(true)
     expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'mc2_overlay')).toBe(
       true
     )
+    expect(
+      roleTitleSuggestions
+        .filter((suggestion) => suggestion.source === 'esco')
+        .every((suggestion) => Boolean(suggestion.sourceReferences?.escoUri))
+    ).toBe(true)
+  })
+
+  it('documents ESCO version, attribution, and Russian fallback policy', () => {
+    expect(roleTitleSuggestionSourceMetadata.esco.version).toBe('v1.2.1')
+    expect(roleTitleSuggestionSourceMetadata.esco.lastUpdate).toBe('2025-12-10')
+    expect(roleTitleSuggestionSourceMetadata.esco.attribution).toContain('European Commission')
+    expect(roleTitleSuggestionSourceMetadata.esco.languages).toContain('en')
+    expect(roleTitleSuggestionSourceMetadata.esco.languages).not.toContain('ru')
+    expect(roleTitleSuggestionSourceMetadata.esco.ruFallback).toContain('MC2')
+  })
+
+  it('uses ESCO-backed records with Russian MC2 fallback labels', () => {
+    const salesManager = roleTitleSuggestions.find(
+      (suggestion) => suggestion.id === 'sales-manager'
+    )
+
+    expect(salesManager?.source).toBe('esco')
+    expect(salesManager?.sourceReferences?.escoUri).toBe(
+      'http://data.europa.eu/esco/occupation/a7594892-ff23-4e2a-aedf-2f967ebca15c'
+    )
+    expect(salesManager?.labels.ru).toBe('Менеджер по продажам')
+    expect(salesManager?.labels.en).toBe('Sales Manager')
   })
 
   it('orders popular roles by locale-aware priority and popularity rank', () => {
