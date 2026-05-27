@@ -1,8 +1,12 @@
 import {
   escoRoleTitleSuggestions,
-  roleTitleSuggestionSourceMetadata,
+  roleTitleSuggestionSourceMetadata as escoRoleTitleSuggestionSourceMetadata,
 } from './role-title-suggestions-esco'
 import { mc2OverlayRoleTitleSuggestions } from './role-title-suggestions-mc2-overlay'
+import {
+  wikidataRoleTitleSuggestions,
+  wikidataRoleTitleSuggestionSourceMetadata,
+} from './role-title-suggestions-wikidata'
 import type {
   LocalizedRoleTitleSuggestion,
   RoleDepartment,
@@ -25,7 +29,10 @@ export type {
   RoleTitleSuggestionSource,
 } from './role-title-suggestions.types'
 
-export { roleTitleSuggestionSourceMetadata }
+export const roleTitleSuggestionSourceMetadata = {
+  ...escoRoleTitleSuggestionSourceMetadata,
+  ...wikidataRoleTitleSuggestionSourceMetadata,
+} as const
 
 const departmentLabels: Record<RoleDepartment, Record<RoleTitleSuggestionLocale, string>> = {
   sales: { ru: 'Продажи', en: 'Sales' },
@@ -41,8 +48,9 @@ const departmentLabels: Record<RoleDepartment, Record<RoleTitleSuggestionLocale,
   legal: { ru: 'Право и соблюдение требований', en: 'Legal and Compliance' },
 }
 
-export const roleTitleSuggestions: RoleTitleSuggestion[] = mergeRoleTitleSuggestions(
+export const roleTitleSuggestions: RoleTitleSuggestion[] = mergeRoleTitleSuggestionSources(
   escoRoleTitleSuggestions,
+  wikidataRoleTitleSuggestions,
   mc2OverlayRoleTitleSuggestions
 )
 
@@ -268,11 +276,20 @@ function normalizeSearchText(value: string) {
     .replace(/\s+/g, ' ')
 }
 
-function mergeRoleTitleSuggestions(
-  primary: RoleTitleSuggestion[],
-  fallback: RoleTitleSuggestion[]
+function mergeRoleTitleSuggestionSources(
+  ...sources: RoleTitleSuggestion[][]
 ): RoleTitleSuggestion[] {
-  const seenIds = new Set(primary.map((suggestion) => suggestion.id))
+  const merged: RoleTitleSuggestion[] = []
+  const seenIds = new Set<string>()
 
-  return [...primary, ...fallback.filter((suggestion) => !seenIds.has(suggestion.id))]
+  sources.forEach((source) => {
+    source.forEach((suggestion) => {
+      if (seenIds.has(suggestion.id)) return
+
+      seenIds.add(suggestion.id)
+      merged.push(suggestion)
+    })
+  })
+
+  return merged
 }

@@ -37,12 +37,13 @@ export type RoleSeniority = 'individual_contributor' | 'lead' | 'manager' | 'hea
 
 export type RoleMatchKind = 'popular' | 'label' | 'alias' | 'acronym' | 'keyword'
 
-export type RoleTitleSuggestionSource = 'esco' | 'onet' | 'okz' | 'mc2_overlay'
+export type RoleTitleSuggestionSource = 'esco' | 'onet' | 'okz' | 'wikidata' | 'mc2_overlay'
 
 export interface RoleTitleSourceReferences {
   escoUri?: string
   onetSocCode?: string
   okzCode?: string
+  wikidataQid?: string
 }
 
 export interface RoleTitleSuggestion {

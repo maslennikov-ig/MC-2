@@ -1,43 +1,43 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-27
-Stage: `mc2-db696.28`
-Branch: `codex/career-playbook-esco-role-suggestions`
-Base: `origin/develop` at `62559c6f333117b1a147bb6bcc75ee3d4be1dcf8`
+Stage: `mc2-db696.37`
+Branch: `codex/career-playbook-wikidata-role-suggestions`
+Base: stacked on `codex/career-playbook-esco-role-suggestions` at `5d88716e4cf3821eaf3c724910ca8af21d402a3d`
 
 ## Current State
 
-- `mc2-db696.28` is in progress and locally verified.
-- Career Playbook role suggestions now use a local ESCO-backed subset plus MC2 overlay.
-- The constructor does not call the ESCO live API and does not bundle the full ESCO dataset.
-- Russian role labels are explicit MC2 fallback copy because ESCO does not include Russian.
-- The former large role suggestion file is split into search/ranking API, types, ESCO data, and MC2 overlay modules.
-- Import tooling is tracked under `scripts/career-playbook/`.
+- `mc2-db696.37` is closed and adds a local Wikidata-backed RU layer to Career Playbook role-title suggestions.
+- The branch is stacked on the ESCO source branch because ESCO changes are not yet in `develop`.
+- Runtime remains local: no live Wikidata, HH, Faker, SPARQL crawl, or broad dump dependency in the constructor.
+- ESCO remains the first source, Wikidata is second, and MC2 overlay remains third with first-source-wins duplicate handling.
+- Wikidata source metadata records CC0, `wbgetentities`, and allowlist-only import policy.
+- The Wikidata allowlist/import script is tracked under `scripts/career-playbook/`.
 
 ## Verification
 
-- Focused role suggestion tests passed after red/green TDD.
-- Focused Career Playbook wizard/store suite passed: 70 tests.
-- `python3 -m py_compile scripts/career-playbook/import_esco_role_suggestions.py` passed.
+- TDD red check failed before implementation for missing Wikidata source, metadata, and RU operational role search.
+- Focused role suggestion tests passed: 11 tests.
+- Focused Career Playbook wizard/store suite passed: 72 tests.
+- `python3 -m py_compile scripts/career-playbook/import_wikidata_role_suggestions.py` passed.
 - `pnpm --filter @megacampus/web lint` passed.
 - `pnpm type-check` passed.
 - `pnpm build` passed with existing Browserslist and `url.parse()` warnings.
 - `git diff --check` passed.
-- Read-only correctness and docs reviews were accepted.
+- `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.37` passed.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.28`
-Recommended action: commit and push `codex/career-playbook-esco-role-suggestions`, then close or update Beads according to delivery status. Do not deploy to Dev unless explicitly requested.
+Next stage id: `mc2-db696.37`
+Recommended action: review/merge this stacked branch after the ESCO source branch lands; do not deploy to Dev unless explicitly requested.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Continue `mc2-db696.28` on branch `codex/career-playbook-esco-role-suggestions`. Read `AGENTS.md`, `.codex/orchestrator.toml`, this handoff, `.codex/stages/mc2-db696.28/summary.md`, artifacts under `.codex/stages/mc2-db696.28/artifacts/`, Beads state, and `git status`. Current state: ESCO role suggestion subset, MC2 overlay split, import script, docs, and tests are implemented locally; closeout/delivery remains.
+Use $orchestrator-stage in `/home/me/code/mc2`. Continue `mc2-db696.37` on branch `codex/career-playbook-wikidata-role-suggestions`. Read `AGENTS.md`, `.codex/orchestrator.toml`, this handoff, `.codex/stages/mc2-db696.37/summary.md`, Beads state, and `git status`. Current state: Wikidata RU source layer, allowlist import script, docs, tests, Beads close, and stage closeout are complete; branch is stacked on the ESCO source branch.
 
 ## Explicit defers
 
-- No live ESCO API in the constructor.
-- No full ESCO dataset or raw CSV committed/bundled.
+- No live Wikidata, HH, Faker, or SPARQL autocomplete in the constructor.
+- No full Wikidata dump or broad GitHub/Faker role list committed or bundled.
 - No backend persistence of normalized role IDs/source metadata.
-- No OKZ/O\*NET/Lightcast import in this stage.
 - No Dev deploy without explicit approval.

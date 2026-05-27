@@ -19,6 +19,7 @@ describe('role title suggestions', () => {
       roleTitleSuggestions.every((suggestion) => (suggestion.source as string) !== 'curated')
     ).toBe(true)
     expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'esco')).toBe(true)
+    expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'wikidata')).toBe(true)
     expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'mc2_overlay')).toBe(
       true
     )
@@ -26,6 +27,11 @@ describe('role title suggestions', () => {
       roleTitleSuggestions
         .filter((suggestion) => suggestion.source === 'esco')
         .every((suggestion) => Boolean(suggestion.sourceReferences?.escoUri))
+    ).toBe(true)
+    expect(
+      roleTitleSuggestions
+        .filter((suggestion) => suggestion.source === 'wikidata')
+        .every((suggestion) => Boolean(suggestion.sourceReferences?.wikidataQid))
     ).toBe(true)
   })
 
@@ -36,6 +42,12 @@ describe('role title suggestions', () => {
     expect(roleTitleSuggestionSourceMetadata.esco.languages).toContain('en')
     expect(roleTitleSuggestionSourceMetadata.esco.languages).not.toContain('ru')
     expect(roleTitleSuggestionSourceMetadata.esco.ruFallback).toContain('MC2')
+  })
+
+  it('documents Wikidata source license and allowlisted import policy', () => {
+    expect(roleTitleSuggestionSourceMetadata.wikidata.license).toBe('CC0 1.0')
+    expect(roleTitleSuggestionSourceMetadata.wikidata.apiUrl).toContain('wbgetentities')
+    expect(roleTitleSuggestionSourceMetadata.wikidata.importPolicy).toContain('allowlist')
   })
 
   it('uses ESCO-backed records with Russian MC2 fallback labels', () => {
@@ -106,6 +118,18 @@ describe('role title suggestions', () => {
     expect(
       results.filter((suggestion) => suggestion.department === 'sales').length
     ).toBeGreaterThan(4)
+  })
+
+  it('returns allowlisted Wikidata-backed Russian operational roles', () => {
+    expect(searchRoleTitleSuggestions('сисадмин', 'ru', 3)[0]?.id).toBe('system-administrator')
+    expect(searchRoleTitleSuggestions('администратор базы данных', 'ru', 3)[0]?.id).toBe(
+      'database-administrator'
+    )
+    expect(searchRoleTitleSuggestions('офис менеджер', 'ru', 3)[0]?.id).toBe('office-manager')
+    expect(searchRoleTitleSuggestions('секретарь', 'ru', 3)[0]?.id).toBe('secretary')
+    expect(searchRoleTitleSuggestions('техподдержка', 'ru', 3)[0]?.id).toBe(
+      'technical-support-specialist'
+    )
   })
 
   it('infers a likely department from selected or typed role titles', () => {
