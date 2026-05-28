@@ -1,43 +1,41 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-28
-Stage: `mc2-p2cfr`
-Branch: `codex/update-github-actions-node24`
-Base: `origin/develop` at `5db4ee8b080b049999cddde7985c01976449ef3d`
+Stage: `mc2-db696.38`
+Branch: `codex/career-playbook-smart-department`
+Base: `origin/develop` at `9de0ed1654c9b9301a495d39f0bb9972d77c9f47`
 
 ## Current State
 
-- `mc2-db696.28` and `mc2-db696.37` are closed and merged into `develop`.
-- Career Playbook role suggestions now use a local ESCO-backed subset, a small allowlisted Wikidata RU layer, and MC2 overlay records.
-- Runtime remains local: no live ESCO, Wikidata, HH, Faker, SPARQL crawl, or broad dump dependency in the constructor.
-- Source merge order is ESCO, Wikidata, then MC2 overlay, with first-source-wins duplicate handling.
-- ESCO and Wikidata import tooling is tracked under `scripts/career-playbook/`.
-- `develop` was pushed to `origin/develop` after post-merge verification.
-- Follow-up stage `mc2-p2cfr` updates the active CI/CD workflow to Node 24-compatible GitHub Actions while keeping app Node, pnpm, CI commands, and deploy scripts unchanged.
+- `mc2-db696.38` implements smart Career Playbook functional-area resolution.
+- Known role titles infer and save `department` locally, skip the standalone department step, and show a compact "Functional area" chip with an edit action.
+- Ambiguous role titles call `careerPlaybook.session.resolveDepartmentOptions` from the Next action and show only 2-5 LLM candidates.
+- LLM failure or invalid/no candidates reveals the existing full department list as fallback.
+- Follow-up generation is guarded and will not start without a saved department context.
+- Backend adds `department-classifier.ts`, prompt `career_playbook_department_classifier`, phase `stage_career_playbook_department_classifier`, config seed, and migration `20260528193000_add_career_playbook_department_classifier.sql`.
+- Career Playbook runtime LLM calls now use `llm_model_config` for retries, fallback model, temperature, and token budget.
+- Docs updated in `docs/career-playbook/README.md`, `docs/career-playbook/architecture.md`, `.codex/project-index.md`, and `.codex/stages/mc2-db696.38/summary.md`.
 
 ## Verification
 
-- ESCO and Wikidata focused stage checks passed before merge.
-- Post-merge import script compile passed for ESCO and Wikidata importers.
-- Post-merge focused Career Playbook wizard/store suite passed: 72 tests.
-- Post-merge `pnpm --filter @megacampus/web lint` passed.
-- Post-merge `pnpm type-check` passed.
-- Post-merge `pnpm build` passed with existing Browserslist and `url.parse()` warnings.
-- `mc2-p2cfr` local verification passed: YAML parse, old-action grep check, `git diff --check`, `pnpm type-check`, `pnpm build`, and `pnpm lint` with existing warnings only.
+- Web focused suite passed: 89 tests.
+- Backend focused suite passed: 46 tests.
+- `pnpm --filter @megacampus/web lint` passed.
+- `pnpm type-check` passed.
+- `pnpm build` passed with existing Browserslist and `url.parse()` warnings.
+- `git diff --check` passed.
 
 ## Next recommended
 
-Next stage id: `mc2-p2cfr`
-Recommended action: deliver the GitHub Actions Node 24 update to `develop` and monitor the resulting dev CI/CD run. Do not deploy to staging or production without explicit approval.
+Next stage id: `mc2-db696.38`
+Recommended action: run stage closeout, close Beads, commit and push `codex/career-playbook-smart-department`; then deliver to `develop` only after explicit merge/push-dev instruction.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, this handoff, `.codex/stages/mc2-p2cfr/summary.md`, Beads state, and `git status`. Current state: ESCO and Wikidata role suggestion source branches are merged into `develop`; `mc2-p2cfr` updates the active GitHub Actions workflow to Node 24-compatible action versions and has passed local verification.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, this handoff, `.codex/stages/mc2-db696.38/summary.md`, Beads state, and `git status`. Current state: smart Career Playbook department resolution is implemented and locally verified on `codex/career-playbook-smart-department`; complete closeout/delivery if not already done.
 
 ## Explicit defers
 
-- No live ESCO, Wikidata, HH, Faker, or SPARQL autocomplete in the constructor.
-- No full ESCO or Wikidata dump committed or bundled.
-- No backend persistence of normalized role IDs/source metadata.
-- No staging or production deploy without explicit approval.
-- Disabled workflow snapshots (`.yml.dis`, `.bak`) are not updated in `mc2-p2cfr`.
+- No LLM call while typing; classifier runs only from Next.
+- No live HH, ESCO, Wikidata, Faker, or broad autocomplete API in the constructor.
+- No dev deploy in this implementation stage.

@@ -38,6 +38,21 @@ Source details, import script, and verification notes are documented in
 and
 [`docs/plans/career-playbook/2026-05-27-wikidata-role-title-suggestions.md`](../plans/career-playbook/2026-05-27-wikidata-role-title-suggestions.md).
 
+## Functional Area Resolution
+
+As of 2026-05-28, the constructor no longer asks every user a static
+"department or functional area" question. Known role titles infer and save the
+functional area locally, show a compact "Functional area" chip, and move the
+user directly to role level. Ambiguous titles resolve on the Next action through
+`careerPlaybook.session.resolveDepartmentOptions`, which returns 2-5 relevant
+candidates. If the LLM classifier cannot return valid candidates after retries,
+the wizard reveals the full static department list as an emergency fallback.
+
+The department remains required generation context: follow-up generation is
+blocked unless a saved department value is present. The classifier uses
+`stage_career_playbook_department_classifier` model routing with retry and
+fallback-model escalation from `llm_model_config`.
+
 ## Verification Entrypoints
 
 Local read-only checks:

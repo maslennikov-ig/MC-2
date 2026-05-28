@@ -25,6 +25,11 @@ export const fixedQuestionsInputSchema = z.object({
   uiLanguage: CareerPlaybookFixedQuestionLanguageSchema.default('ru'),
 });
 
+export const resolveDepartmentOptionsInputSchema = z.object({
+  title: z.string().min(2).max(160),
+  language: CareerPlaybookFixedQuestionLanguageSchema.default('ru'),
+});
+
 export const startSessionInputSchema = z.object({
   language: languageSchema.default('ru'),
 });
