@@ -98,10 +98,10 @@ let requestFollowups: Mock
 let approveAndGenerate: Mock
 let getGenerationStatus: Mock
 
-function renderPage() {
+function renderPage(props: Partial<Parameters<typeof CareerPlaybookNewPageClient>[0]> = {}) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookNewPageClient locale="en" userId="user-1" />
+      <CareerPlaybookNewPageClient locale="en" userId="user-1" {...props} />
     </NextIntlClientProvider>
   )
 }
@@ -161,6 +161,33 @@ describe('CareerPlaybookNewPageClient', () => {
       await screen.findByRole('heading', { name: 'Role Guide constructor' })
     ).toBeInTheDocument()
     expect(startSession).toHaveBeenCalledWith({ language: 'en' })
+  })
+
+  it('starts a blank wizard when explicitly opening a fresh guide', async () => {
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Deleted Head of Sales',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      },
+      currentFixedIndex: 0,
+    })
+
+    renderPage({ resetOnMount: true })
+
+    const positionInput = await screen.findByLabelText('Which role do you want to define?')
+    expect(positionInput).toHaveValue('')
+    expect(startSession).toHaveBeenCalledWith({ language: 'en' })
+    expect(useCareerPlaybookStore.getState().playbookId).not.toBe(
+      '00000000-0000-4000-8000-000000000777'
+    )
   })
 
   it('renders Phase A and advances through fixed questions with localized copy', async () => {
