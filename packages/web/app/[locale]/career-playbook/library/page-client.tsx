@@ -274,12 +274,13 @@ export default function CareerPlaybookLibraryPageClient({
           ) : null}
 
           <div className="career-playbook-panel grid gap-3 p-4 md:grid-cols-[minmax(16rem,1fr)_180px_180px_180px]">
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+            <div className="relative self-end">
+              <span className="pointer-events-none absolute top-1/2 left-3 flex -translate-y-1/2 items-center text-slate-400">
                 <Search className="h-4 w-4" aria-hidden />
               </span>
               <Input
                 placeholder={t('searchPlaceholder')}
+                aria-label={t('searchPlaceholder')}
                 className="h-11 bg-[#fffdf8] pl-9 dark:bg-slate-950"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
