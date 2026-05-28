@@ -1,9 +1,9 @@
 # Stage mc2-db696.37 Summary
 
-Status: merged locally into `develop`; post-merge verification passed
+Status: merged into `develop` and pushed after post-merge verification
 Updated: 2026-05-28
-Branch: `codex/career-playbook-wikidata-role-suggestions`
-Base: stacked on `codex/career-playbook-esco-role-suggestions` at `5d88716e4cf3821eaf3c724910ca8af21d402a3d`
+Branch: `develop`
+Base: merged from `codex/career-playbook-wikidata-role-suggestions` at `c0f957b4613c9fbdceddc49aeb476d7d8db35ebe`
 
 ## Scope
 
@@ -42,6 +42,7 @@ Base: stacked on `codex/career-playbook-esco-role-suggestions` at `5d88716e4cf38
 - `pnpm --filter @megacampus/web lint` - passed after merge.
 - `pnpm type-check` - passed after merge.
 - `pnpm build` - passed after merge with existing Browserslist and `url.parse()` warnings.
+- `git push origin develop` - pushed `develop` through `6e0d4ff00ae4aa457631b887e7561cd2632b731d`.
 - TDD red check: focused role suggestion tests failed before implementation because `wikidata` source records, metadata, and RU operational role search were missing.
 - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/role-title-suggestions.test.ts` - passed, 11 tests.
 - `python3 -m py_compile scripts/career-playbook/import_wikidata_role_suggestions.py` - passed.

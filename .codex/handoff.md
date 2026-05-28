@@ -3,16 +3,16 @@
 Updated: 2026-05-28
 Stage: `mc2-db696.37`
 Branch: `develop`
-Base: `origin/develop` at `62559c6f333117b1a147bb6bcc75ee3d4be1dcf8`
+Base: `origin/develop` at `6e0d4ff00ae4aa457631b887e7561cd2632b731d`
 
 ## Current State
 
-- `mc2-db696.28` and `mc2-db696.37` are closed and merged locally into `develop`.
+- `mc2-db696.28` and `mc2-db696.37` are closed and merged into `develop`.
 - Career Playbook role suggestions now use a local ESCO-backed subset, a small allowlisted Wikidata RU layer, and MC2 overlay records.
 - Runtime remains local: no live ESCO, Wikidata, HH, Faker, SPARQL crawl, or broad dump dependency in the constructor.
 - Source merge order is ESCO, Wikidata, then MC2 overlay, with first-source-wins duplicate handling.
 - ESCO and Wikidata import tooling is tracked under `scripts/career-playbook/`.
-- `develop` is ahead of `origin/develop`; post-merge verification passed and push remains.
+- `develop` was pushed to `origin/develop` after post-merge verification.
 
 ## Verification
 
@@ -26,11 +26,11 @@ Base: `origin/develop` at `62559c6f333117b1a147bb6bcc75ee3d4be1dcf8`
 ## Next recommended
 
 Next stage id: `mc2-db696.37`
-Recommended action: commit the post-merge handoff update, push `develop`, then push Beads if needed. Do not deploy to staging or production without explicit approval.
+Recommended action: monitor the dev delivery pipeline if needed. Do not deploy to staging or production without explicit approval.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Continue post-merge delivery for `mc2-db696.37` on `develop`. Read `AGENTS.md`, `.codex/orchestrator.toml`, this handoff, `.codex/stages/mc2-db696.28/summary.md`, `.codex/stages/mc2-db696.37/summary.md`, Beads state, and `git status`. Current state: ESCO and Wikidata role suggestion source branches are merged locally into `develop`; post-merge verification passed; push remains.
+Use $orchestrator-stage in `/home/me/code/mc2`. Continue from `develop`. Read `AGENTS.md`, `.codex/orchestrator.toml`, this handoff, `.codex/stages/mc2-db696.28/summary.md`, `.codex/stages/mc2-db696.37/summary.md`, Beads state, and `git status`. Current state: ESCO and Wikidata role suggestion source branches are merged into `develop`, post-merge verification passed, and `develop` was pushed.
 
 ## Explicit defers
 
