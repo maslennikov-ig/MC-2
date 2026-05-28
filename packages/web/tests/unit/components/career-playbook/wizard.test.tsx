@@ -268,6 +268,26 @@ describe('QuestionRenderer', () => {
     expect(handleValueChange).toHaveBeenCalledWith('engineering')
   })
 
+  it('selects a single-choice option when clicking empty space inside the option card', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={fixedSingleChoiceQuestion}
+        value=""
+        onValueChange={handleValueChange}
+      />
+    )
+
+    const optionCard = screen.getByText('Инженерия / IT').closest('.rounded-md')
+    expect(optionCard).not.toBeNull()
+
+    await user.click(optionCard!)
+
+    expect(handleValueChange).toHaveBeenCalledWith('engineering')
+  })
+
   it('lets single-choice questions save a custom Other value inline', async () => {
     const user = userEvent.setup()
     const handleValueChange = vi.fn()
@@ -351,6 +371,26 @@ describe('QuestionRenderer', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Найм' }))
     expect(handleValueChange).toHaveBeenLastCalledWith(['budgeting'])
+  })
+
+  it('toggles a multi-choice option when clicking empty space inside the option card', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={followupMultiChoiceQuestion}
+        value={['hiring']}
+        onValueChange={handleValueChange}
+      />
+    )
+
+    const optionCard = screen.getByText('Бюджетирование').closest('.rounded-md')
+    expect(optionCard).not.toBeNull()
+
+    await user.click(optionCard!)
+
+    expect(handleValueChange).toHaveBeenLastCalledWith(['hiring', 'budgeting'])
   })
 
   it('lets multi-choice questions include a custom Other value inline', async () => {
