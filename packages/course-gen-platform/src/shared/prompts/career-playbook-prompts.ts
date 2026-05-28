@@ -76,6 +76,7 @@ Generate 3-7 additional questions that collect critical data for a high-quality 
 Rules:
 - Each question focuses on one concrete aspect.
 - Prefer single_choice or multi_choice when sensible options exist.
+- Use "ready_to_generate" only when completeness_score is at least 0.75 and no critical gaps remain; otherwise use "ask_more".
 - Return only valid JSON matching this shape:
 {
   "questions": [

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CareerPlaybookBlockStateSchema,
+  CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD,
   CareerPlaybookCostBreakdownSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFixedQuestionSchema,
@@ -8,6 +9,8 @@ import {
   CareerPlaybookQADataSchema,
   CareerPlaybookRoleProfileSpecSchema,
   SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES,
+  isCareerPlaybookFollowupResponseReady,
+  normalizeCareerPlaybookFollowupResponseReadiness,
 } from '../src/career-playbook';
 import { DEFAULT_JOB_OPTIONS, JobDataSchema, JobType } from '../src/bullmq-jobs';
 
@@ -178,6 +181,28 @@ describe('Career Playbook shared schemas', () => {
         skipped: true,
       }).success
     ).toBe(true);
+  });
+
+  it('normalizes follow-up readiness recommendations below the completeness threshold', () => {
+    expect(CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD).toBe(0.75);
+
+    const lowCompletenessResponse = normalizeCareerPlaybookFollowupResponseReadiness({
+      questions: [],
+      completeness_score: 0.55,
+      stop_recommendation: 'ready_to_generate',
+    });
+
+    expect(lowCompletenessResponse.stop_recommendation).toBe('ask_more');
+    expect(isCareerPlaybookFollowupResponseReady(lowCompletenessResponse)).toBe(false);
+
+    const readyResponse = normalizeCareerPlaybookFollowupResponseReadiness({
+      questions: [],
+      completeness_score: 0.82,
+      stop_recommendation: 'ready_to_generate',
+    });
+
+    expect(readyResponse.stop_recommendation).toBe('ready_to_generate');
+    expect(isCareerPlaybookFollowupResponseReady(readyResponse)).toBe(true);
   });
 
   it('validates RoleProfileSpec with every Stage 6 content language and rejects unknown languages', () => {

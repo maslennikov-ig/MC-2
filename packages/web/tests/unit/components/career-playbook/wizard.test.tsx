@@ -794,6 +794,7 @@ describe('CompletionScreen', () => {
         fixedAnswers={fixedAnswers}
         followupAnswers={followupAnswers}
         freeformNotes={['Роль строит RevOps контур']}
+        completenessScore={0.82}
         onEditFixedAnswer={handleEditFixed}
         onEditFollowupAnswer={handleEditFollowup}
         onGenerate={handleGenerate}
@@ -802,6 +803,8 @@ describe('CompletionScreen', () => {
 
     expect(screen.getByRole('heading', { name: 'Готовы создать?' })).toBeInTheDocument()
     expect(screen.getAllByText('Фиксированные ответы').length).toBeGreaterThan(0)
+    expect(screen.getByText('Полнота')).toBeInTheDocument()
+    expect(screen.getByText('82%')).toBeInTheDocument()
     expect(screen.getByText('Какую должность вы хотите оформить?')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
     expect(screen.getByText('Отдел или функциональная область')).toBeInTheDocument()

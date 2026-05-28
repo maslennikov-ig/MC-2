@@ -22,6 +22,7 @@ export interface CompletionScreenCopy {
   fixedTitle?: string
   followupsTitle?: string
   freeformTitle?: string
+  completeness?: string
   skipped?: string
   edit?: string
   generate?: string
@@ -51,6 +52,7 @@ interface CompletionScreenProps {
   generationHandoffVisible?: boolean
   generationStatus?: CareerPlaybookPlaybookStatus
   generationProgress?: number | null
+  completenessScore?: number | null
   generationError?: string | null
   isGenerationStarting?: boolean
   isEditingDisabled?: boolean
@@ -71,6 +73,7 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   fixedTitle: 'Фиксированные ответы',
   followupsTitle: 'Уточнения',
   freeformTitle: 'Свободные заметки',
+  completeness: 'Полнота',
   skipped: 'Пропущено',
   edit: 'Редактировать',
   generate: 'Сгенерировать должностную инструкцию',
@@ -101,6 +104,7 @@ export function CompletionScreen({
   generationHandoffVisible = false,
   generationStatus,
   generationProgress = null,
+  completenessScore = null,
   generationError = null,
   isGenerationStarting = false,
   isEditingDisabled = false,
@@ -124,6 +128,10 @@ export function CompletionScreen({
       : labels.generationHandoffDescription
   const generationStatusProgress =
     typeof generationProgress === 'number' ? `${Math.round(generationProgress)}%` : null
+  const completenessPercent =
+    typeof completenessScore === 'number'
+      ? `${Math.min(Math.max(Math.round(completenessScore * 100), 0), 100)}%`
+      : null
   const visibleGenerationError =
     generationError ?? (isFailed ? labels.generationFailedDescription : null)
   const generationErrorTitle = isFailed ? labels.generationFailedTitle : labels.generationErrorTitle
@@ -140,6 +148,9 @@ export function CompletionScreen({
             <ReviewMetric label={labels.fixedTitle} value={fixedAnswers.length} />
             <ReviewMetric label={labels.followupsTitle} value={followupAnswers.length} />
             <ReviewMetric label={labels.freeformTitle} value={freeformNotes.length} />
+            {completenessPercent ? (
+              <ReviewMetric label={labels.completeness} value={completenessPercent} />
+            ) : null}
           </div>
         </aside>
       }
@@ -270,7 +281,7 @@ export function CompletionScreen({
   )
 }
 
-function ReviewMetric({ label, value }: { label: string; value: number }) {
+function ReviewMetric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="career-playbook-muted-card flex items-center justify-between gap-3 px-3 py-2">
       <span className="text-sm text-slate-600 dark:text-slate-300">{label}</span>

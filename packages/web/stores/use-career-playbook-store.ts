@@ -6,7 +6,12 @@ import { immer } from 'zustand/middleware/immer'
 
 import { inferRoleDepartmentFromTitle } from '@/components/career-playbook/wizard/role-title-suggestions'
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
-import { CAREER_PLAYBOOK_BLOCK_CATALOG, languageSchema } from '@megacampus/shared-types'
+import {
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  isCareerPlaybookFollowupResponseReady,
+  languageSchema,
+  normalizeCareerPlaybookFollowupResponseReadiness,
+} from '@megacampus/shared-types'
 import type {
   CareerPlaybookAnswerSubmission,
   CareerPlaybookBlockCatalogItem,
@@ -1595,20 +1600,20 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.followupGenerationError = null
           })
 
-          const response = await client.requestFollowups({
-            playbookId,
-            fixedAnswers: submittableFixedAnswers(snapshot.fixedAnswers),
-            followupAnswers: submittableFollowupAnswers(snapshot.followupAnswers),
-            contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
-          })
+          const response = normalizeCareerPlaybookFollowupResponseReadiness(
+            await client.requestFollowups({
+              playbookId,
+              fixedAnswers: submittableFixedAnswers(snapshot.fixedAnswers),
+              followupAnswers: submittableFollowupAnswers(snapshot.followupAnswers),
+              contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
+            })
+          )
 
           set((state) => {
             state.phase = 'followups'
-            state.status =
-              response.stop_recommendation === 'ready_to_generate' &&
-              response.questions.length === 0
-                ? 'ready_to_generate'
-                : 'answering_followups'
+            state.status = isCareerPlaybookFollowupResponseReady(response)
+              ? 'ready_to_generate'
+              : 'answering_followups'
             const existingQuestionIds = new Set(
               state.followupQuestions.map((question) => question.question_id)
             )

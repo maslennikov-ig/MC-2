@@ -354,6 +354,52 @@ describe('careerPlaybookRouter transport', () => {
     expect(result).toEqual(followupResponse);
   });
 
+  it('does not persist ready-to-generate when follow-up completeness is below threshold', async () => {
+    const followupResponse = {
+      questions: [],
+      completeness_score: 0.55,
+      stop_recommendation: 'ready_to_generate' as const,
+    };
+    mocks.generateCareerPlaybookFollowups.mockResolvedValue({
+      response: followupResponse,
+      nodeCost: {
+        node: 'followupGenerator',
+        model: 'mock-model',
+        input_tokens: 10,
+        output_tokens: 10,
+        cost_usd: 0,
+      },
+    });
+    const builder = createBuilder([
+      { data: playbookRow({ status: 'answering_followups' }), error: null },
+      { data: playbookRow({ status: 'answering_followups' }), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.generation.requestFollowups({
+      playbookId,
+      fixedAnswers: {
+        position: { question_key: 'position', value: 'Product Lead' },
+      },
+      followupAnswers: {},
+      contentLanguage: 'en',
+    });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'answering_followups',
+        q_a_data: expect.objectContaining({
+          completeness_score: 0.55,
+        }),
+      })
+    );
+    expect(result).toEqual({
+      ...followupResponse,
+      stop_recommendation: 'ask_more',
+    });
+  });
+
   it('keeps persisted follow-up round count and caps stored follow-up questions', async () => {
     const existingQuestions = Array.from({ length: 6 }, (_, index) => ({
       question_id: `55555555-5555-4555-8555-55555555556${index}`,
