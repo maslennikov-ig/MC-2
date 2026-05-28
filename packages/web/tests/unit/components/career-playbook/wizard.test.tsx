@@ -577,6 +577,32 @@ describe('Wizard', () => {
 })
 
 describe('FollowupPhase', () => {
+  it('uses the current follow-up index for the progress bar, not completeness', () => {
+    const questions = Array.from({ length: 6 }, (_, index) => ({
+      ...followupOpenQuestion,
+      question_id: `00000000-0000-4000-8000-00000000010${index}`,
+      question_text: `Уточняющий вопрос ${index + 1}`,
+    }))
+
+    render(
+      <FollowupPhase
+        questions={questions}
+        answers={{}}
+        currentIndex={4}
+        completenessScore={0.3}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+        onSkip={vi.fn()}
+        onForceGenerate={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Уточнение 5 из 6')).toBeInTheDocument()
+    expect(screen.getByText('Полнота: 30%')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '83')
+  })
+
   it('renders one focused follow-up at a time with completeness labels and enough CTA', async () => {
     const user = userEvent.setup()
     const handleAnswerChange = vi.fn()

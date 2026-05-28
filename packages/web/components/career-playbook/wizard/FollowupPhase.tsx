@@ -100,12 +100,13 @@ export function FollowupPhase({
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(questions.length - 1, 0))
   const currentQuestion = questions[safeIndex]
   const currentAnswer = currentQuestion ? answers[currentQuestion.question_id] : undefined
-  const percent = Math.min(Math.max(Math.round(completenessScore * 100), 0), 100)
+  const completenessPercent = Math.min(Math.max(Math.round(completenessScore * 100), 0), 100)
 
   if (!currentQuestion) {
     return null
   }
 
+  const progressPercent = Math.round(((safeIndex + 1) / questions.length) * 100)
   const handledQuestionIdSet = new Set(handledQuestionIds)
   const canGoNext =
     hasAnswer(currentAnswer) || handledQuestionIdSet.has(currentQuestion.question_id)
@@ -168,9 +169,21 @@ export function FollowupPhase({
           sections={previewSections}
           footer={
             <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-3 dark:text-slate-400">
-              <Milestone percent={60} label={labels.milestone60} active={percent >= 60} />
-              <Milestone percent={80} label={labels.milestone80} active={percent >= 80} />
-              <Milestone percent={100} label={labels.milestone100} active={percent >= 100} />
+              <Milestone
+                percent={60}
+                label={labels.milestone60}
+                active={completenessPercent >= 60}
+              />
+              <Milestone
+                percent={80}
+                label={labels.milestone80}
+                active={completenessPercent >= 80}
+              />
+              <Milestone
+                percent={100}
+                label={labels.milestone100}
+                active={completenessPercent >= 100}
+              />
             </div>
           }
         />
@@ -188,12 +201,12 @@ export function FollowupPhase({
               </div>
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 tabular-nums dark:text-slate-50">
                 <Gauge className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                {labels.completeness}: {percent}%
+                {labels.completeness}: {completenessPercent}%
               </div>
             </div>
             <Progress
-              value={percent}
-              aria-valuenow={percent}
+              value={progressPercent}
+              aria-valuenow={progressPercent}
               aria-valuemin={0}
               aria-valuemax={100}
             />
