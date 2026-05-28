@@ -385,10 +385,13 @@ function OptionRow({
   questionKey: string
   selected: boolean
 }) {
+  const inputId = `${questionKey}-${option.value}`
+
   return (
-    <div
+    <Label
+      htmlFor={inputId}
       className={cn(
-        'grid min-h-[58px] grid-cols-[auto_1fr] gap-3 rounded-md border p-3 transition-colors',
+        'grid min-h-[58px] cursor-pointer grid-cols-[auto_1fr] gap-3 rounded-md border p-3 text-sm leading-none font-medium transition-colors',
         selected
           ? 'border-purple-300 bg-purple-50/80 dark:border-purple-500/60 dark:bg-purple-950/30'
           : 'border-[#d8c5aa] bg-[#fffbf4] hover:border-purple-200 hover:bg-purple-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
@@ -396,19 +399,16 @@ function OptionRow({
     >
       {children}
       <div className="min-w-0">
-        <Label
-          htmlFor={`${questionKey}-${option.value}`}
-          className="cursor-pointer text-[15px] leading-6 font-medium text-slate-900 dark:text-slate-100"
-        >
+        <span className="text-[15px] leading-6 font-medium text-slate-900 dark:text-slate-100">
           {option.label}
           {option.helper ? (
             <span className="block text-[13px] leading-5 font-normal text-slate-500 dark:text-slate-400">
               {option.helper}
             </span>
           ) : null}
-        </Label>
+        </span>
         {afterLabel}
       </div>
-    </div>
+    </Label>
   )
 }

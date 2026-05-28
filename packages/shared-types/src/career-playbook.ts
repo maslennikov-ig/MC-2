@@ -158,6 +158,34 @@ export const CareerPlaybookFollowupResponseSchema = z.object({
 });
 export type CareerPlaybookFollowupResponse = z.infer<typeof CareerPlaybookFollowupResponseSchema>;
 
+export const CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD = 0.75;
+
+export function isCareerPlaybookFollowupResponseReady(
+  response: Pick<
+    CareerPlaybookFollowupResponse,
+    'completeness_score' | 'questions' | 'stop_recommendation'
+  >
+): boolean {
+  return (
+    response.stop_recommendation === 'ready_to_generate' &&
+    response.questions.length === 0 &&
+    response.completeness_score >= CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD
+  );
+}
+
+export function normalizeCareerPlaybookFollowupResponseReadiness(
+  response: CareerPlaybookFollowupResponse
+): CareerPlaybookFollowupResponse {
+  if (
+    response.stop_recommendation === 'ready_to_generate' &&
+    !isCareerPlaybookFollowupResponseReady(response)
+  ) {
+    return { ...response, stop_recommendation: 'ask_more' };
+  }
+
+  return response;
+}
+
 export const CareerPlaybookFreeformAnswerSchema = z.object({
   text: z.string().min(1),
   parsed_signals: z.record(z.unknown()).optional(),

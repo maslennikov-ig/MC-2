@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
   CareerPlaybookFollowupResponseSchema,
+  normalizeCareerPlaybookFollowupResponseReadiness,
   type CareerPlaybookFollowupResponse,
   type CareerPlaybookNodeCost,
   type CareerPlaybookQAData,
@@ -52,13 +53,15 @@ export function buildFollowupPromptVariables(
 export function parseFollowupResponseFromLLM(rawContent: string): CareerPlaybookFollowupResponse {
   const extractedJson = extractJSON(rawContent);
   const parsed = LLMFollowupResponseSchema.parse(safeJSONParse(extractedJson));
-  return CareerPlaybookFollowupResponseSchema.parse({
-    ...parsed,
-    questions: parsed.questions.map(question => ({
-      ...question,
-      question_id: question.question_id ?? randomUUID(),
-    })),
-  });
+  return normalizeCareerPlaybookFollowupResponseReadiness(
+    CareerPlaybookFollowupResponseSchema.parse({
+      ...parsed,
+      questions: parsed.questions.map(question => ({
+        ...question,
+        question_id: question.question_id ?? randomUUID(),
+      })),
+    })
+  );
 }
 
 const LLMFollowupQuestionSchema = CareerPlaybookFollowupResponseSchema.shape.questions.element

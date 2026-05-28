@@ -40,7 +40,7 @@ const followupResponse = {
     },
   ],
   completeness_score: 0.82,
-  stop_recommendation: 'ready_to_generate',
+  stop_recommendation: 'ask_more',
 };
 
 describe('Career Playbook follow-up questions helper', () => {
@@ -64,12 +64,29 @@ describe('Career Playbook follow-up questions helper', () => {
 
   it('parses fenced LLM JSON with the shared follow-up schema', () => {
     const parsed = parseFollowupResponseFromLLM(
-      `Here is the result:\n\n\`\`\`json\n${JSON.stringify(followupResponse)}\n\`\`\``
+      `Here is the result:\n\n\`\`\`json\n${JSON.stringify({
+        questions: [],
+        completeness_score: 0.82,
+        stop_recommendation: 'ready_to_generate',
+      })}\n\`\`\``
     );
 
-    expect(parsed.questions).toHaveLength(1);
+    expect(parsed.questions).toHaveLength(0);
     expect(parsed.completeness_score).toBe(0.82);
     expect(parsed.stop_recommendation).toBe('ready_to_generate');
+  });
+
+  it('normalizes low-completeness ready recommendations back to ask_more', () => {
+    const parsed = parseFollowupResponseFromLLM(
+      JSON.stringify({
+        questions: [],
+        completeness_score: 0.55,
+        stop_recommendation: 'ready_to_generate',
+      })
+    );
+
+    expect(parsed.completeness_score).toBe(0.55);
+    expect(parsed.stop_recommendation).toBe('ask_more');
   });
 
   it('normalizes missing or invalid LLM follow-up question ids', () => {

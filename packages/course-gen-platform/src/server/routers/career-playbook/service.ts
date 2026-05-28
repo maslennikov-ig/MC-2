@@ -5,6 +5,8 @@ import {
   CareerPlaybookFollowupResponseSchema,
   CareerPlaybookQADataSchema,
   JobType,
+  isCareerPlaybookFollowupResponseReady,
+  normalizeCareerPlaybookFollowupResponseReadiness,
   type CareerPlaybookAnswerSubmission,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
@@ -36,6 +38,7 @@ import {
   type StoredQAData,
   type WizardPhase,
 } from './service-mappers';
+import { getCareerPlaybookGenerationJobId } from './job-ids';
 
 export interface CareerPlaybookDraftResponse {
   playbookId: string;
@@ -438,11 +441,12 @@ export async function requestCareerPlaybookFollowups(
     qaData,
     language: input.contentLanguage,
   });
-  const response = CareerPlaybookFollowupResponseSchema.parse(result.response);
-  const status =
-    response.stop_recommendation === 'ready_to_generate' && response.questions.length === 0
-      ? 'ready_to_generate'
-      : 'answering_followups';
+  const response = normalizeCareerPlaybookFollowupResponseReadiness(
+    CareerPlaybookFollowupResponseSchema.parse(result.response)
+  );
+  const status = isCareerPlaybookFollowupResponseReady(response)
+    ? 'ready_to_generate'
+    : 'answering_followups';
   const mergedQuestions = mergeGeneratedQuestions(
     existingQAData.followup_questions,
     response.questions
@@ -495,7 +499,7 @@ export async function approveCareerPlaybookGeneration(
     });
   }
 
-  const generationJobId = `career-playbook:${input.playbookId}`;
+  const generationJobId = getCareerPlaybookGenerationJobId(input.playbookId);
   await removeTerminalJobById(generationJobId);
   const qaDataForGeneration = qaDataWithoutGenerationError(qaData);
   const supabase = getCareerPlaybookSupabase();

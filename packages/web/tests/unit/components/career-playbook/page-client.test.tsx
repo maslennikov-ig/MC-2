@@ -574,6 +574,8 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
     expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
+    expect(screen.getByText('Completeness')).toBeInTheDocument()
+    expect(screen.getByText('76%')).toBeInTheDocument()
     expect(screen.getByText('Win rate')).toBeInTheDocument()
   })
 

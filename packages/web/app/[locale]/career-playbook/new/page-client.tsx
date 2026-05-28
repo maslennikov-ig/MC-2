@@ -258,6 +258,7 @@ export default function CareerPlaybookNewPageClient({
     fixedTitle: t('fixedAnswersTitle'),
     followupsTitle: t('followupAnswersTitle'),
     freeformTitle: t('freeformNotesTitle'),
+    completeness: t('completeness'),
     skipped: t('skippedLabel'),
     edit: t('editLabel'),
     generate: t('generateCta'),
@@ -520,6 +521,7 @@ export default function CareerPlaybookNewPageClient({
               }
               generationStatus={state.status}
               generationProgress={state.generationProgress}
+              completenessScore={state.completenessScore}
               generationError={state.generationStatusError ?? state.generationStartError}
               isGenerationStarting={state.isStartingGeneration || state.isAutosaving}
               isEditingDisabled={state.status === 'generating'}

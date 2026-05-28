@@ -268,6 +268,26 @@ describe('QuestionRenderer', () => {
     expect(handleValueChange).toHaveBeenCalledWith('engineering')
   })
 
+  it('selects a single-choice option when clicking empty space inside the option card', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={fixedSingleChoiceQuestion}
+        value=""
+        onValueChange={handleValueChange}
+      />
+    )
+
+    const optionCard = screen.getByText('Инженерия / IT').closest('.rounded-md')
+    expect(optionCard).not.toBeNull()
+
+    await user.click(optionCard!)
+
+    expect(handleValueChange).toHaveBeenCalledWith('engineering')
+  })
+
   it('lets single-choice questions save a custom Other value inline', async () => {
     const user = userEvent.setup()
     const handleValueChange = vi.fn()
@@ -351,6 +371,26 @@ describe('QuestionRenderer', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Найм' }))
     expect(handleValueChange).toHaveBeenLastCalledWith(['budgeting'])
+  })
+
+  it('toggles a multi-choice option when clicking empty space inside the option card', async () => {
+    const user = userEvent.setup()
+    const handleValueChange = vi.fn()
+
+    render(
+      <QuestionRenderer
+        question={followupMultiChoiceQuestion}
+        value={['hiring']}
+        onValueChange={handleValueChange}
+      />
+    )
+
+    const optionCard = screen.getByText('Бюджетирование').closest('.rounded-md')
+    expect(optionCard).not.toBeNull()
+
+    await user.click(optionCard!)
+
+    expect(handleValueChange).toHaveBeenLastCalledWith(['hiring', 'budgeting'])
   })
 
   it('lets multi-choice questions include a custom Other value inline', async () => {
@@ -537,6 +577,32 @@ describe('Wizard', () => {
 })
 
 describe('FollowupPhase', () => {
+  it('uses the current follow-up index for the progress bar, not completeness', () => {
+    const questions = Array.from({ length: 6 }, (_, index) => ({
+      ...followupOpenQuestion,
+      question_id: `00000000-0000-4000-8000-00000000010${index}`,
+      question_text: `Уточняющий вопрос ${index + 1}`,
+    }))
+
+    render(
+      <FollowupPhase
+        questions={questions}
+        answers={{}}
+        currentIndex={4}
+        completenessScore={0.3}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+        onSkip={vi.fn()}
+        onForceGenerate={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Уточнение 5 из 6')).toBeInTheDocument()
+    expect(screen.getByText('Полнота: 30%')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '83')
+  })
+
   it('renders one focused follow-up at a time with completeness labels and enough CTA', async () => {
     const user = userEvent.setup()
     const handleAnswerChange = vi.fn()
@@ -728,6 +794,7 @@ describe('CompletionScreen', () => {
         fixedAnswers={fixedAnswers}
         followupAnswers={followupAnswers}
         freeformNotes={['Роль строит RevOps контур']}
+        completenessScore={0.82}
         onEditFixedAnswer={handleEditFixed}
         onEditFollowupAnswer={handleEditFollowup}
         onGenerate={handleGenerate}
@@ -736,6 +803,8 @@ describe('CompletionScreen', () => {
 
     expect(screen.getByRole('heading', { name: 'Готовы создать?' })).toBeInTheDocument()
     expect(screen.getAllByText('Фиксированные ответы').length).toBeGreaterThan(0)
+    expect(screen.getByText('Полнота')).toBeInTheDocument()
+    expect(screen.getByText('82%')).toBeInTheDocument()
     expect(screen.getByText('Какую должность вы хотите оформить?')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
     expect(screen.getByText('Отдел или функциональная область')).toBeInTheDocument()
