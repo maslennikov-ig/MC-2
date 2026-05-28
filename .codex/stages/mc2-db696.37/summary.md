@@ -1,7 +1,7 @@
 # Stage mc2-db696.37 Summary
 
-Status: closed and locally verified on `codex/career-playbook-wikidata-role-suggestions`
-Updated: 2026-05-27
+Status: merged locally into `develop`; post-merge verification passed
+Updated: 2026-05-28
 Branch: `codex/career-playbook-wikidata-role-suggestions`
 Base: stacked on `codex/career-playbook-esco-role-suggestions` at `5d88716e4cf3821eaf3c724910ca8af21d402a3d`
 
@@ -36,6 +36,12 @@ Base: stacked on `codex/career-playbook-esco-role-suggestions` at `5d88716e4cf38
 
 ## Verification Evidence
 
+- `git merge codex/career-playbook-wikidata-role-suggestions --no-ff` into `develop` - passed with no conflicts.
+- `python3 -m py_compile scripts/career-playbook/import_esco_role_suggestions.py scripts/career-playbook/import_wikidata_role_suggestions.py` - passed after merge.
+- `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/role-title-suggestions.test.ts tests/unit/components/career-playbook/wizard.test.tsx tests/unit/career-playbook-store.test.ts` - passed after merge, 72 tests.
+- `pnpm --filter @megacampus/web lint` - passed after merge.
+- `pnpm type-check` - passed after merge.
+- `pnpm build` - passed after merge with existing Browserslist and `url.parse()` warnings.
 - TDD red check: focused role suggestion tests failed before implementation because `wikidata` source records, metadata, and RU operational role search were missing.
 - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/role-title-suggestions.test.ts` - passed, 11 tests.
 - `python3 -m py_compile scripts/career-playbook/import_wikidata_role_suggestions.py` - passed.
