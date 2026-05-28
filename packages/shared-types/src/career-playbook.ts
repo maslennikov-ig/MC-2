@@ -57,6 +57,43 @@ export const CareerPlaybookOptionSchema = z.object({
 });
 export type CareerPlaybookOption = z.infer<typeof CareerPlaybookOptionSchema>;
 
+export const CareerPlaybookDepartmentValueSchema = z.enum([
+  'sales',
+  'marketing',
+  'product',
+  'engineering',
+  'design',
+  'data',
+  'operations',
+  'hr',
+  'finance',
+  'support',
+  'legal',
+  'other',
+]);
+export type CareerPlaybookDepartmentValue = z.infer<typeof CareerPlaybookDepartmentValueSchema>;
+
+export const CareerPlaybookDepartmentCandidateSchema = z.object({
+  value: CareerPlaybookDepartmentValueSchema,
+  label: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  rationale: z.string().min(1).optional(),
+});
+export type CareerPlaybookDepartmentCandidate = z.infer<
+  typeof CareerPlaybookDepartmentCandidateSchema
+>;
+
+export const CareerPlaybookDepartmentResolutionSchema = z.object({
+  status: z.enum(['resolved', 'needs_user_choice', 'fallback']),
+  source: z.enum(['local', 'llm', 'fallback']),
+  candidates: z.array(CareerPlaybookDepartmentCandidateSchema).max(5).default([]),
+  selectedDepartment: CareerPlaybookDepartmentValueSchema.optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+export type CareerPlaybookDepartmentResolution = z.infer<
+  typeof CareerPlaybookDepartmentResolutionSchema
+>;
+
 export const CareerPlaybookBranchingRulesSchema = z
   .object({
     when: z.object({

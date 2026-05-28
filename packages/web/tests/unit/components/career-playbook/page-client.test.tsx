@@ -40,6 +40,9 @@ const messages = {
       roleSuggestionsMatchAlias: 'Alias',
       roleSuggestionsMatchAcronym: 'Acronym',
       roleSuggestionsMatchKeyword: 'Related query',
+      departmentAutoLabel: 'Functional area',
+      departmentAutoChange: 'Change',
+      departmentResolving: 'Selecting functional area...',
       questionLabel: 'Question',
       answeredLabel: 'Answered',
       ofLabel: 'of',
@@ -95,6 +98,7 @@ const messages = {
 let startSession: Mock
 let submitAnswer: Mock
 let requestFollowups: Mock
+let resolveDepartmentOptions: Mock
 let approveAndGenerate: Mock
 let getGenerationStatus: Mock
 
@@ -128,6 +132,15 @@ describe('CareerPlaybookNewPageClient', () => {
       completeness_score: 0.82,
       stop_recommendation: 'ready_to_generate',
     })
+    resolveDepartmentOptions = vi.fn().mockResolvedValue({
+      status: 'needs_user_choice',
+      source: 'llm',
+      confidence: 0.62,
+      candidates: [
+        { value: 'operations', label: 'Operations', confidence: 0.72 },
+        { value: 'support', label: 'Support / Customer Success', confidence: 0.68 },
+      ],
+    })
     approveAndGenerate = vi.fn().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000901',
       status: 'generating',
@@ -143,6 +156,7 @@ describe('CareerPlaybookNewPageClient', () => {
     setCareerPlaybookClientForTests({
       startSession,
       requestFollowups,
+      resolveDepartmentOptions,
       approveAndGenerate,
       getGenerationStatus,
       submitAnswer,
@@ -200,13 +214,36 @@ describe('CareerPlaybookNewPageClient', () => {
     ).toBeInTheDocument()
     expect(await screen.findByLabelText('Which role do you want to define?')).toBeInTheDocument()
     expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1760px]')
-    expect(screen.getByText('Question 1 of 7')).toBeInTheDocument()
+    expect(screen.getByText('Question 1 of 6')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Which role do you want to define?'), 'Head of Sales')
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('Role seniority level')).length).toBeGreaterThan(0)
+    expect(screen.getByText('Functional area: Sales')).toBeInTheDocument()
+    expect(resolveDepartmentOptions).not.toHaveBeenCalled()
     expect(screen.getByText('Draft saved locally')).toBeInTheDocument()
+  })
+
+  it('asks the backend for narrow department choices when the role title is ambiguous', async () => {
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await user.type(
+      await screen.findByLabelText('Which role do you want to define?'),
+      'Unusual company role'
+    )
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(resolveDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Unusual company role',
+      language: 'en',
+    })
+    expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
+    expect(screen.getByRole('radio', { name: 'Operations' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Support / Customer Success' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Sales' })).not.toBeInTheDocument()
   })
 
   it('continues to follow-ups from any fixed question when all fixed answers are already present', async () => {
@@ -255,11 +292,63 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Question 1 of 7')).toBeInTheDocument()
+    expect(await screen.findByText('Question 1 of 6')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
     expect(requestFollowups).toHaveBeenCalled()
     expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+  })
+
+  it('does not request follow-ups without a saved department context', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000832',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'fixed',
+      status: 'answering_fixed',
+      currentFixedIndex: 5,
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Unusual company role',
+        },
+        level: {
+          question_key: 'level',
+          value: 'middle',
+        },
+        reporting: {
+          question_key: 'reporting',
+          value: 'Reports to COO.',
+        },
+        team_size: {
+          question_key: 'team_size',
+          value: '1-10',
+        },
+        company_stage: {
+          question_key: 'company_stage',
+          value: 'growth',
+        },
+        content_language: {
+          question_key: 'content_language',
+          value: 'en',
+        },
+      },
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Finish Phase A' }))
+
+    expect(resolveDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Unusual company role',
+      language: 'en',
+    })
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
   })
 
   it('continues from Phase A into adaptive follow-ups and completion review', async () => {
@@ -271,8 +360,6 @@ describe('CareerPlaybookNewPageClient', () => {
       await screen.findByLabelText('Which role do you want to define?'),
       'Head of Sales'
     )
-    await user.click(screen.getByRole('button', { name: 'Next' }))
-    await user.click(screen.getByRole('radio', { name: 'Sales' }))
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('radio', { name: /Lead \/ Team Lead/ }))
     await user.click(screen.getByRole('button', { name: 'Next' }))

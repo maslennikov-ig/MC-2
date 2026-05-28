@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
+  resolveCareerPlaybookDepartmentOptions: vi.fn(),
   generateCareerPlaybookFollowups: vi.fn(),
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
@@ -19,6 +20,10 @@ vi.mock('@/shared/supabase/admin', () => ({
 
 vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
   generateCareerPlaybookFollowups: mocks.generateCareerPlaybookFollowups,
+}));
+
+vi.mock('@/stages/stage-career-playbook/nodes/department-classifier', () => ({
+  resolveCareerPlaybookDepartmentOptions: mocks.resolveCareerPlaybookDepartmentOptions,
 }));
 
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
@@ -136,6 +141,9 @@ describe('careerPlaybookRouter transport', () => {
   it('is wired into the app router under careerPlaybook', () => {
     expect(appRouter._def.procedures['careerPlaybook.exportPdf']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.session.start']).toBeDefined();
+    expect(
+      appRouter._def.procedures['careerPlaybook.session.resolveDepartmentOptions']
+    ).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.requestFollowups']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.approveAndGenerate']).toBeDefined();
     expect(
@@ -147,6 +155,32 @@ describe('careerPlaybookRouter transport', () => {
     const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
 
     await expect(caller.session.start({ language: 'ru' })).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it('resolves narrow department options through the Career Playbook classifier', async () => {
+    mocks.resolveCareerPlaybookDepartmentOptions.mockResolvedValue({
+      status: 'needs_user_choice',
+      source: 'llm',
+      confidence: 0.74,
+      candidates: [{ value: 'operations', label: 'Operations', confidence: 0.74 }],
+    });
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.session.resolveDepartmentOptions({
+      title: 'Unusual company role',
+      language: 'en',
+    });
+
+    expect(mocks.resolveCareerPlaybookDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Unusual company role',
+      language: 'en',
+    });
+    expect(result).toEqual({
+      status: 'needs_user_choice',
+      source: 'llm',
+      confidence: 0.74,
+      candidates: [{ value: 'operations', label: 'Operations', confidence: 0.74 }],
+    });
   });
 
   it('starts a persisted playbook session and returns a frontend draft', async () => {

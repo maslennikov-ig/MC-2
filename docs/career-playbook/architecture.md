@@ -6,8 +6,30 @@
 - Web state: `packages/web/stores/use-career-playbook-store.ts`
 - Backend tRPC router: `packages/course-gen-platform/src/server/routers/career-playbook/**`
 - Generation stage: `packages/course-gen-platform/src/stages/stage-career-playbook/**`
+- Department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`
 - Worker handler: `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts`
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
+
+## Department Resolution
+
+The fixed-question flow treats department as required internal context, not a
+mandatory standalone user step. The web store first uses local role-title
+inference from `role-title-suggestions.ts`. When a role title is unknown or
+ambiguous, the page calls `careerPlaybook.session.resolveDepartmentOptions` only
+from the Next action, never while the user types.
+
+The backend classifier renders `career_playbook_department_classifier`, calls
+the configured model for `stage_career_playbook_department_classifier`, validates
+the returned JSON with shared Career Playbook schemas, and keeps only 2-5
+allowed department candidates. Runtime LLM calls retry transient provider
+failures and can escalate from the configured primary model to the configured
+fallback model. Invalid classifier JSON is retried with fallback preference and
+larger token budget before the web flow reveals the static department list.
+
+Follow-up generation must receive a saved department answer. The store blocks a
+direct follow-up request without department context and sends the user back to
+the department question instead of starting generation with incomplete fixed
+answers.
 
 ## E2E Harness
 
@@ -83,7 +105,7 @@ Operator evidence should include a screenshot or exported trace from `/admin/gen
 
 Current runtime cost accounting estimates Career Playbook node costs as `0`, so the admin page proves `cost_breakdown` shape and access control but does not prove real OpenRouter spend. Operator evidence should include provider-side spend or improved runtime cost accounting when the acceptance criterion needs actual cost evidence.
 
-Staging model routing for Career Playbook is moving to the DeepSeek V4 pair through migration `20260523073000_update_career_playbook_v4_pro_routing`: `deepseek/deepseek-v4-pro` for `stage_career_playbook_spec`, `stage_career_playbook_group_5`, `stage_career_playbook_judge`, and `stage_career_playbook_regenerator`; `deepseek/deepseek-v4-flash` for follow-up generation and groups 1-4/6. Fallbacks stay within the same V4 pair, with Pro backing Flash phases and Flash backing Pro phases.
+Staging model routing for Career Playbook is moving to the DeepSeek V4 pair through migration `20260523073000_update_career_playbook_v4_pro_routing`: `deepseek/deepseek-v4-pro` for `stage_career_playbook_spec`, `stage_career_playbook_group_5`, `stage_career_playbook_judge`, and `stage_career_playbook_regenerator`; `deepseek/deepseek-v4-flash` for follow-up generation and groups 1-4/6. Migration `20260528193000_add_career_playbook_department_classifier` adds `stage_career_playbook_department_classifier` with Flash primary and Pro fallback. Fallbacks stay within the same V4 pair, with Pro backing Flash phases and Flash backing Pro phases.
 
 The 10-concurrent-generation load test should run against isolated staging resources:
 

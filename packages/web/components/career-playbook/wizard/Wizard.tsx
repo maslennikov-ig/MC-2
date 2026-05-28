@@ -1,6 +1,7 @@
 'use client'
 
-import { ArrowLeft, ArrowRight, CheckCircle2, Circle, ClipboardCheck } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Circle, ClipboardCheck, Loader2 } from 'lucide-react'
 import {
   CareerPlaybookDocumentPreview,
   CareerPlaybookDocumentShell,
@@ -20,6 +21,7 @@ interface WizardCopy extends QuestionRendererCopy {
   back?: string
   next?: string
   finish?: string
+  nextLoading?: string
   draftSaved?: string
   questionLabel?: string
   answeredLabel?: string
@@ -41,6 +43,8 @@ export interface WizardProps {
   onPrevious: () => void
   onQuestionSelect?: (questionKey: string) => void
   isSaving?: boolean
+  isNextLoading?: boolean
+  contextSlot?: ReactNode
   copy?: WizardCopy
 }
 
@@ -48,6 +52,7 @@ const defaultCopy: Required<WizardCopy> = {
   back: 'Назад',
   next: 'Далее',
   finish: 'Завершить',
+  nextLoading: 'Подбираем варианты',
   draftSaved: 'Черновик сохраняется',
   questionLabel: 'Вопрос',
   answeredLabel: 'Отвечено',
@@ -84,6 +89,8 @@ export function Wizard({
   onPrevious,
   onQuestionSelect,
   isSaving = false,
+  isNextLoading = false,
+  contextSlot,
   copy,
 }: WizardProps) {
   const labels = { ...defaultCopy, ...copy }
@@ -194,6 +201,8 @@ export function Wizard({
             />
           </div>
 
+          {contextSlot ? <div className="career-playbook-soft-card p-3">{contextSlot}</div> : null}
+
           <div className="flex items-center gap-2 text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
             <ClipboardCheck className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
             {labels.questionPanelLabel}
@@ -223,11 +232,15 @@ export function Wizard({
             <Button
               type="button"
               onClick={onNext}
-              disabled={!canGoNext}
+              disabled={!canGoNext || isNextLoading}
               className="w-full min-w-28 2xl:w-auto"
             >
-              {primaryActionLabel}
-              <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+              {isNextLoading ? labels.nextLoading : primaryActionLabel}
+              {isNextLoading ? (
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+              )}
             </Button>
           </div>
         </aside>

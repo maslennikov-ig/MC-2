@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { AlertCircle, Clock3, FileText, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock3, FileText, Loader2 } from 'lucide-react'
 
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
@@ -227,6 +227,7 @@ export default function CareerPlaybookNewPageClient({
     roleSuggestionsMatchAlias: t('roleSuggestionsMatchAlias'),
     roleSuggestionsMatchAcronym: t('roleSuggestionsMatchAcronym'),
     roleSuggestionsMatchKeyword: t('roleSuggestionsMatchKeyword'),
+    nextLoading: t('departmentResolving'),
   }
   const followupCopy = {
     title: t('followupTitle'),
@@ -288,6 +289,37 @@ export default function CareerPlaybookNewPageClient({
   const allVisibleFixedQuestionsAnswered = visibleQuestions.every((question) =>
     hasAnswerValue(answers[question.question_key])
   )
+  const departmentQuestion = state.fixedQuestions.find(
+    (question) => question.question_key === 'department'
+  )
+  const departmentValue = state.fixedAnswers.department?.value
+  const departmentLabel =
+    typeof departmentValue === 'string'
+      ? optionLabel(departmentValue, departmentQuestion?.options)
+      : ''
+  const departmentContextSlot =
+    state.phase === 'fixed' &&
+    state.departmentResolution.status === 'resolved' &&
+    departmentLabel ? (
+      <div className="flex flex-wrap items-center gap-2 text-[13px] leading-5">
+        <span className="inline-flex min-w-0 items-center gap-2 font-medium text-slate-700 dark:text-slate-200">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span className="min-w-0">
+            {t('departmentAutoLabel')}: {departmentLabel}
+          </span>
+        </span>
+        <Button
+          type="button"
+          variant="link"
+          className="h-auto p-0 text-[13px] leading-5"
+          onClick={() =>
+            useCareerPlaybookStore.getState().editCareerPlaybookFixedAnswer('department')
+          }
+        >
+          {t('departmentAutoChange')}
+        </Button>
+      </div>
+    ) : null
 
   const advanceAfterFollowup = async () => {
     await useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
@@ -324,12 +356,42 @@ export default function CareerPlaybookNewPageClient({
     }
   }
 
-  const handleFixedNext = () => {
+  const handleFixedNext = async () => {
     const snapshot = useCareerPlaybookStore.getState()
     const latestVisibleQuestions = getCareerPlaybookVisibleQuestions(snapshot)
-    const isLastQuestion = snapshot.currentFixedIndex >= latestVisibleQuestions.length - 1
-    const allVisibleAnswered = latestVisibleQuestions.every((question) =>
-      hasAnswerValue(snapshot.fixedAnswers[question.question_key]?.value)
+    const currentQuestion = latestVisibleQuestions[snapshot.currentFixedIndex]
+    const needsDepartmentResolution =
+      currentQuestion?.question_key === 'position' &&
+      hasAnswerValue(snapshot.fixedAnswers.position?.value) &&
+      !hasAnswerValue(snapshot.fixedAnswers.department?.value)
+
+    if (needsDepartmentResolution) {
+      const result = await snapshot.resolveCareerPlaybookDepartmentOptions()
+      if (
+        !result.ok ||
+        !hasAnswerValue(useCareerPlaybookStore.getState().fixedAnswers.department?.value)
+      ) {
+        return
+      }
+    }
+
+    let latestAfterResolution = useCareerPlaybookStore.getState()
+    if (
+      hasAnswerValue(latestAfterResolution.fixedAnswers.position?.value) &&
+      !hasAnswerValue(latestAfterResolution.fixedAnswers.department?.value)
+    ) {
+      const result = await latestAfterResolution.resolveCareerPlaybookDepartmentOptions()
+      latestAfterResolution = useCareerPlaybookStore.getState()
+      if (!result.ok || !hasAnswerValue(latestAfterResolution.fixedAnswers.department?.value)) {
+        return
+      }
+    }
+
+    const visibleAfterResolution = getCareerPlaybookVisibleQuestions(latestAfterResolution)
+    const isLastQuestion =
+      latestAfterResolution.currentFixedIndex >= visibleAfterResolution.length - 1
+    const allVisibleAnswered = visibleAfterResolution.every((question) =>
+      hasAnswerValue(latestAfterResolution.fixedAnswers[question.question_key]?.value)
     )
 
     if (isLastQuestion || allVisibleAnswered) {
@@ -337,7 +399,7 @@ export default function CareerPlaybookNewPageClient({
       return
     }
 
-    snapshot.goToNextCareerPlaybookQuestion()
+    useCareerPlaybookStore.getState().goToNextCareerPlaybookQuestion()
   }
 
   const handleGenerate = () => {
@@ -389,10 +451,12 @@ export default function CareerPlaybookNewPageClient({
               onAnswerChange={(questionKey, value) =>
                 state.answerCareerPlaybookFixedQuestion(questionKey, value)
               }
-              onNext={handleFixedNext}
+              onNext={() => void handleFixedNext()}
               onPrevious={state.goToPreviousCareerPlaybookQuestion}
               onQuestionSelect={state.editCareerPlaybookFixedAnswer}
               isSaving={state.isAutosaving}
+              isNextLoading={state.isResolvingDepartment}
+              contextSlot={departmentContextSlot}
               copy={{
                 ...copy,
                 finish: allVisibleFixedQuestionsAnswered ? t('finish') : copy.finish,

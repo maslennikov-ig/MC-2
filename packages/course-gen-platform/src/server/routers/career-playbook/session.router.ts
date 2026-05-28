@@ -3,9 +3,11 @@ import { protectedProcedure } from '../../middleware/auth';
 import {
   fixedQuestionsInputSchema,
   playbookIdInputSchema,
+  resolveDepartmentOptionsInputSchema,
   startSessionInputSchema,
   submitAnswerInputSchema,
 } from './_shared';
+import { resolveCareerPlaybookDepartmentOptions } from '@/stages/stage-career-playbook/nodes/department-classifier';
 import {
   getCareerPlaybookDraft,
   getCareerPlaybookFixedQuestions,
@@ -33,6 +35,12 @@ export const careerPlaybookSessionRouter = router({
   getFixedQuestions: protectedProcedure.input(fixedQuestionsInputSchema).query(({ ctx, input }) => {
     return getCareerPlaybookFixedQuestions(ctx, input);
   }),
+
+  resolveDepartmentOptions: protectedProcedure
+    .input(resolveDepartmentOptionsInputSchema)
+    .mutation(({ input }) => {
+      return resolveCareerPlaybookDepartmentOptions(input);
+    }),
 });
 
 export type CareerPlaybookSessionRouter = typeof careerPlaybookSessionRouter;

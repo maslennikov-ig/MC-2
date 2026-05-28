@@ -12,6 +12,8 @@ import type {
   CareerPlaybookBlockCatalogItem,
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookDepartmentResolution,
+  CareerPlaybookDepartmentValue,
   CareerPlaybookFixedAnswer,
   CareerPlaybookFixedQuestion,
   CareerPlaybookFixedQuestionLanguage,
@@ -61,6 +63,20 @@ export interface CareerPlaybookGenerationStatus {
   completedAt?: string
 }
 
+export type CareerPlaybookDepartmentResolutionState =
+  | CareerPlaybookDepartmentResolution
+  | {
+      status: 'unresolved'
+      source: 'none'
+      candidates: []
+      selectedDepartment?: undefined
+      confidence?: undefined
+    }
+
+export type CareerPlaybookDepartmentResolutionResult =
+  | { ok: true; status: CareerPlaybookDepartmentResolution['status'] }
+  | { ok: false; status: 'fallback'; error: string }
+
 interface CareerPlaybookPdfExportResponse {
   pdfBase64: string
   fileName: string
@@ -89,6 +105,10 @@ export interface CareerPlaybookClient {
     followupAnswers: Record<string, CareerPlaybookFollowupAnswer>
     contentLanguage: Language
   }) => Promise<CareerPlaybookFollowupResponse>
+  resolveDepartmentOptions?: (input: {
+    title: string
+    language: CareerPlaybookFixedQuestionLanguage
+  }) => Promise<CareerPlaybookDepartmentResolution>
   approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   getGenerationStatus?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   submitAnswer: (input: {
@@ -118,6 +138,10 @@ interface CareerPlaybookStoreState {
   fixedQuestions: CareerPlaybookFixedQuestion[]
   fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
   currentFixedIndex: number
+  departmentResolution: CareerPlaybookDepartmentResolutionState
+  isResolvingDepartment: boolean
+  departmentResolutionError: string | null
+  departmentQuestionVisible: boolean
   followupQuestions: CareerPlaybookFollowupQuestion[]
   followupAnswers: Record<string, CareerPlaybookFollowupAnswer>
   currentFollowupIndex: number
@@ -163,6 +187,7 @@ interface CareerPlaybookStoreState {
   toggleCareerPlaybookThinkingStream: () => void
   setCareerPlaybookDraftOwner: (ownerUserId: string) => void
   answerCareerPlaybookFixedQuestion: (questionKey: string, value: CareerPlaybookAnswerValue) => void
+  resolveCareerPlaybookDepartmentOptions: () => Promise<CareerPlaybookDepartmentResolutionResult>
   goToNextCareerPlaybookQuestion: () => void
   goToPreviousCareerPlaybookQuestion: () => void
   requestCareerPlaybookFollowups: () => Promise<CareerPlaybookAutosaveResult>
@@ -410,6 +435,103 @@ const fixedQuestionSeed: Record<
   ],
 }
 
+function createUnresolvedDepartmentResolution(): CareerPlaybookDepartmentResolutionState {
+  return {
+    status: 'unresolved',
+    source: 'none',
+    candidates: [],
+  }
+}
+
+function getDefaultDepartmentOptions(language: CareerPlaybookFixedQuestionLanguage) {
+  return departmentOptions[language].map(([value, label]) => ({ value, label }))
+}
+
+function getDepartmentLabel(
+  value: CareerPlaybookDepartmentValue,
+  language: CareerPlaybookFixedQuestionLanguage
+) {
+  return (
+    getDefaultDepartmentOptions(language).find((option) => option.value === value)?.label ?? value
+  )
+}
+
+function setDepartmentQuestionOptions(
+  state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'uiLanguage'>,
+  options: Array<{ value: string; label: string }>
+) {
+  state.fixedQuestions = state.fixedQuestions.map((question) =>
+    question.question_key === 'department'
+      ? {
+          ...question,
+          options: options.map((option) => ({ ...option })),
+        }
+      : question
+  )
+}
+
+function setResolvedDepartmentState(
+  state: Pick<
+    CareerPlaybookStoreState,
+    | 'departmentResolution'
+    | 'departmentQuestionVisible'
+    | 'departmentResolutionError'
+    | 'uiLanguage'
+  >,
+  department: string,
+  source: 'local' | 'llm' | 'fallback',
+  confidence = 0.9
+) {
+  const departmentValue = department as CareerPlaybookDepartmentValue
+  state.departmentResolution = {
+    status: 'resolved',
+    source,
+    candidates: [
+      {
+        value: departmentValue,
+        label: getDepartmentLabel(departmentValue, state.uiLanguage),
+        confidence,
+      },
+    ],
+    selectedDepartment: departmentValue,
+    confidence,
+  }
+  state.departmentQuestionVisible = false
+  state.departmentResolutionError = null
+}
+
+function inferMissingDepartmentFromPosition(state: CareerPlaybookStoreState) {
+  if (state.fixedAnswers.department) {
+    const value = state.fixedAnswers.department.value
+    if (typeof value === 'string' && hasSubmittableAnswerValue(value)) {
+      setResolvedDepartmentState(state, value, 'local', 0.9)
+      return
+    }
+
+    delete state.fixedAnswers.department
+    markDirtyKey(state, 'department')
+  }
+
+  const positionValue = state.fixedAnswers.position?.value
+  if (typeof positionValue !== 'string') return
+
+  const inferredDepartment = inferRoleDepartmentFromTitle(positionValue, state.uiLanguage)
+  if (!inferredDepartment) {
+    state.departmentResolution = createUnresolvedDepartmentResolution()
+    state.departmentQuestionVisible = false
+    state.departmentResolutionError = null
+    return
+  }
+
+  state.fixedAnswers.department = {
+    question_key: 'department',
+    value: inferredDepartment,
+    answered_at: nowIso(),
+  }
+  markDirtyKey(state, 'department')
+  setResolvedDepartmentState(state, inferredDepartment, 'local', 0.92)
+}
+
 function initialState(): Omit<
   CareerPlaybookStoreState,
   | 'initializeCareerPlaybookPhaseA'
@@ -422,6 +544,7 @@ function initialState(): Omit<
   | 'toggleCareerPlaybookThinkingStream'
   | 'setCareerPlaybookDraftOwner'
   | 'answerCareerPlaybookFixedQuestion'
+  | 'resolveCareerPlaybookDepartmentOptions'
   | 'goToNextCareerPlaybookQuestion'
   | 'goToPreviousCareerPlaybookQuestion'
   | 'requestCareerPlaybookFollowups'
@@ -451,6 +574,10 @@ function initialState(): Omit<
     fixedQuestions: [],
     fixedAnswers: {},
     currentFixedIndex: 0,
+    departmentResolution: createUnresolvedDepartmentResolution(),
+    isResolvingDepartment: false,
+    departmentResolutionError: null,
+    departmentQuestionVisible: false,
     followupQuestions: [],
     followupAnswers: {},
     currentFollowupIndex: 0,
@@ -697,6 +824,8 @@ function getClient(): CareerPlaybookClient {
         input
       )) as unknown as CareerPlaybookPdfExportResponse,
     requestFollowups: (input) => client.careerPlaybook.generation.requestFollowups.mutate(input),
+    resolveDepartmentOptions: (input) =>
+      client.careerPlaybook.session.resolveDepartmentOptions.mutate(input),
     approveAndGenerate: async (input) =>
       (await client.careerPlaybook.generation.approveAndGenerate.mutate(
         input
@@ -710,9 +839,21 @@ function getClient(): CareerPlaybookClient {
 }
 
 function visibleQuestionsFromState(
-  state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers'>
+  state: Pick<
+    CareerPlaybookStoreState,
+    'fixedQuestions' | 'fixedAnswers' | 'departmentQuestionVisible' | 'departmentResolution'
+  >
 ) {
   return state.fixedQuestions.filter((question) => {
+    if (
+      question.question_key === 'department' &&
+      !state.departmentQuestionVisible &&
+      state.departmentResolution.status !== 'needs_user_choice' &&
+      state.departmentResolution.status !== 'fallback'
+    ) {
+      return false
+    }
+
     const branchingRules = question.branching_rules
     if (!branchingRules) return true
 
@@ -748,6 +889,8 @@ function removeHiddenFixedAnswers(state: CareerPlaybookStoreState) {
   )
 
   for (const questionKey of Object.keys(state.fixedAnswers)) {
+    if (questionKey === 'department') continue
+
     if (!visibleQuestionKeys.has(questionKey)) {
       delete state.fixedAnswers[questionKey]
       state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter(
@@ -830,6 +973,10 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.phase = 'fixed'
           state.fixedQuestions = fallbackQuestions(normalizedUiLanguage)
           state.currentFixedIndex = 0
+          state.departmentResolution = createUnresolvedDepartmentResolution()
+          state.departmentResolutionError = null
+          state.departmentQuestionVisible = false
+          state.isResolvingDepartment = false
           state.fixedAnswers.content_language = {
             question_key: 'content_language',
             value: contentLanguage,
@@ -861,6 +1008,12 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
               answered_at: nowIso(),
             }
           }
+          state.departmentResolution = createUnresolvedDepartmentResolution()
+          state.departmentResolutionError = null
+          state.departmentQuestionVisible = false
+          state.isResolvingDepartment = false
+          setDepartmentQuestionOptions(state, getDefaultDepartmentOptions(normalizedUiLanguage))
+          inferMissingDepartmentFromPosition(state)
           state.currentFixedIndex = draft.currentFixedIndex ?? 0
           state.currentFollowupIndex = draft.currentFollowupIndex ?? state.currentFollowupIndex
           state.completenessScore = draft.completenessScore ?? state.completenessScore
@@ -1188,6 +1341,14 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           if (nextValue === undefined) {
             delete state.fixedAnswers[questionKey]
             unmarkDirtyKey(state, questionKey)
+            if (questionKey === 'position') {
+              delete state.fixedAnswers.department
+              markDirtyKey(state, 'department')
+              state.departmentResolution = createUnresolvedDepartmentResolution()
+              state.departmentResolutionError = null
+              state.departmentQuestionVisible = false
+              setDepartmentQuestionOptions(state, getDefaultDepartmentOptions(state.uiLanguage))
+            }
             if (fixedContextChanged) {
               clearDependentFollowupContext(state)
             }
@@ -1205,11 +1366,15 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           if (questionKey === 'content_language' && typeof nextValue === 'string') {
             state.contentLanguage = nextValue
           }
-          if (
-            questionKey === 'position' &&
-            typeof nextValue === 'string' &&
-            !state.fixedAnswers.department
-          ) {
+          if (questionKey === 'position' && fixedContextChanged) {
+            delete state.fixedAnswers.department
+            markDirtyKey(state, 'department')
+            state.departmentResolution = createUnresolvedDepartmentResolution()
+            state.departmentResolutionError = null
+            state.departmentQuestionVisible = false
+            setDepartmentQuestionOptions(state, getDefaultDepartmentOptions(state.uiLanguage))
+          }
+          if (questionKey === 'position' && typeof nextValue === 'string') {
             const inferredDepartment = inferRoleDepartmentFromTitle(nextValue, state.uiLanguage)
             if (inferredDepartment) {
               state.fixedAnswers.department = {
@@ -1217,8 +1382,34 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
                 value: inferredDepartment,
                 answered_at: nowIso(),
               }
+              state.departmentResolution = {
+                status: 'resolved',
+                source: 'local',
+                candidates: [
+                  {
+                    value: inferredDepartment,
+                    label: getDepartmentLabel(inferredDepartment, state.uiLanguage),
+                    confidence: 0.92,
+                  },
+                ],
+                selectedDepartment: inferredDepartment,
+                confidence: 0.92,
+              }
+              state.departmentQuestionVisible = false
+              state.departmentResolutionError = null
               markDirtyKey(state, 'department')
             }
+          }
+          if (questionKey === 'department' && typeof nextValue === 'string') {
+            state.departmentResolution = {
+              status: 'resolved',
+              source: state.departmentResolution.source === 'llm' ? 'llm' : 'fallback',
+              candidates: state.departmentResolution.candidates,
+              selectedDepartment: nextValue as CareerPlaybookDepartmentValue,
+              confidence: state.departmentResolution.confidence,
+            }
+            state.departmentQuestionVisible = false
+            state.departmentResolutionError = null
           }
           if (fixedContextChanged) {
             clearDependentFollowupContext(state)
@@ -1226,6 +1417,120 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
+
+      resolveCareerPlaybookDepartmentOptions: async () => {
+        const snapshot = get()
+        const titleValue = snapshot.fixedAnswers.position?.value
+        const title = typeof titleValue === 'string' ? titleValue.trim() : ''
+
+        if (
+          snapshot.fixedAnswers.department &&
+          snapshot.departmentResolution.status === 'resolved'
+        ) {
+          return { ok: true, status: 'resolved' }
+        }
+
+        const revealFallbackDepartmentQuestion = (message: string) => {
+          set((state) => {
+            state.isResolvingDepartment = false
+            state.departmentResolutionError = message
+            state.departmentResolution = {
+              status: 'fallback',
+              source: 'fallback',
+              candidates: [],
+            }
+            state.departmentQuestionVisible = true
+            setDepartmentQuestionOptions(state, getDefaultDepartmentOptions(state.uiLanguage))
+            const visibleQuestions = visibleQuestionsFromState(state)
+            const departmentIndex = visibleQuestions.findIndex(
+              (question) => question.question_key === 'department'
+            )
+            state.currentFixedIndex =
+              departmentIndex >= 0 ? departmentIndex : state.currentFixedIndex
+          })
+        }
+
+        if (!title) {
+          const message = 'Role title is required before department resolution'
+          revealFallbackDepartmentQuestion(message)
+          return { ok: false, status: 'fallback', error: message }
+        }
+
+        try {
+          const client = getClient()
+          if (!client.resolveDepartmentOptions) {
+            throw new Error('Department resolver is unavailable')
+          }
+
+          set((state) => {
+            state.isResolvingDepartment = true
+            state.departmentResolutionError = null
+          })
+
+          const resolution = await client.resolveDepartmentOptions({
+            title,
+            language: snapshot.uiLanguage,
+          })
+
+          const selectedDepartment = resolution.selectedDepartment
+          if (resolution.status === 'resolved' && selectedDepartment) {
+            set((state) => {
+              state.fixedAnswers.department = {
+                question_key: 'department',
+                value: selectedDepartment,
+                answered_at: nowIso(),
+              }
+              markDirtyKey(state, 'department')
+              state.departmentResolution = resolution
+              state.departmentQuestionVisible = false
+              state.isResolvingDepartment = false
+              state.departmentResolutionError = null
+              removeHiddenFixedAnswers(state)
+              clampCurrentFixedIndex(state)
+            })
+            return { ok: true, status: 'resolved' }
+          }
+
+          const candidates = resolution.candidates.slice(0, 5)
+          if (resolution.status === 'needs_user_choice' && candidates.length > 0) {
+            set((state) => {
+              state.departmentResolution = {
+                ...resolution,
+                candidates,
+              }
+              state.departmentQuestionVisible = true
+              state.isResolvingDepartment = false
+              state.departmentResolutionError = null
+              setDepartmentQuestionOptions(
+                state,
+                candidates.map((candidate) => ({
+                  value: candidate.value,
+                  label: candidate.label,
+                }))
+              )
+              const visibleQuestions = visibleQuestionsFromState(state)
+              const departmentIndex = visibleQuestions.findIndex(
+                (question) => question.question_key === 'department'
+              )
+              state.currentFixedIndex =
+                departmentIndex >= 0 ? departmentIndex : state.currentFixedIndex
+            })
+            return { ok: true, status: 'needs_user_choice' }
+          }
+
+          revealFallbackDepartmentQuestion('Department classifier returned no valid candidates')
+          return {
+            ok: false,
+            status: 'fallback',
+            error: 'Department classifier returned no valid candidates',
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Department classifier is unavailable'
+          revealFallbackDepartmentQuestion(message)
+          return { ok: false, status: 'fallback', error: message }
+        }
+      },
 
       goToNextCareerPlaybookQuestion: () =>
         set((state) => {
@@ -1242,9 +1547,41 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         }),
 
       requestCareerPlaybookFollowups: async () => {
-        const snapshot = get()
-        if (!snapshot.playbookId) {
+        let snapshot = get()
+        const playbookId = snapshot.playbookId
+        if (!playbookId) {
           return { ok: false, error: 'Playbook session is required before follow-ups' }
+        }
+
+        if (!hasSubmittableAnswerValue(snapshot.fixedAnswers.department?.value)) {
+          set((state) => {
+            inferMissingDepartmentFromPosition(state)
+          })
+          snapshot = get()
+        }
+
+        if (!hasSubmittableAnswerValue(snapshot.fixedAnswers.department?.value)) {
+          const message = 'Department is required before follow-up generation'
+          set((state) => {
+            state.phase = 'fixed'
+            state.status = 'answering_fixed'
+            state.isGeneratingFollowups = false
+            state.followupGenerationError = message
+            state.departmentResolution = {
+              status: 'fallback',
+              source: 'fallback',
+              candidates: [],
+            }
+            state.departmentQuestionVisible = true
+            setDepartmentQuestionOptions(state, getDefaultDepartmentOptions(state.uiLanguage))
+            const visibleQuestions = visibleQuestionsFromState(state)
+            const departmentIndex = visibleQuestions.findIndex(
+              (question) => question.question_key === 'department'
+            )
+            state.currentFixedIndex =
+              departmentIndex >= 0 ? departmentIndex : state.currentFixedIndex
+          })
+          return { ok: false, error: message }
         }
 
         try {
@@ -1259,7 +1596,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           })
 
           const response = await client.requestFollowups({
-            playbookId: snapshot.playbookId,
+            playbookId,
             fixedAnswers: submittableFixedAnswers(snapshot.fixedAnswers),
             followupAnswers: submittableFollowupAnswers(snapshot.followupAnswers),
             contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
@@ -1476,6 +1813,15 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         set((state) => {
           if (state.status === 'generating') return
 
+          if (questionKey === 'department') {
+            state.departmentQuestionVisible = true
+            if (
+              state.departmentResolution.status !== 'needs_user_choice' &&
+              state.departmentResolution.status !== 'fallback'
+            ) {
+              setDepartmentQuestionOptions(state, getDefaultDepartmentOptions(state.uiLanguage))
+            }
+          }
           const visibleQuestions = visibleQuestionsFromState(state)
           const questionIndex = visibleQuestions.findIndex(
             (question) => question.question_key === questionKey
@@ -1729,6 +2075,9 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         contentLanguage: state.contentLanguage,
         fixedAnswers: state.fixedAnswers,
         currentFixedIndex: state.currentFixedIndex,
+        departmentResolution: state.departmentResolution,
+        departmentQuestionVisible: state.departmentQuestionVisible,
+        departmentResolutionError: state.departmentResolutionError,
         followupQuestions: state.followupQuestions,
         followupAnswers: state.followupAnswers,
         currentFollowupIndex: state.currentFollowupIndex,
@@ -1746,19 +2095,36 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 )
 
 export function getCareerPlaybookVisibleQuestions(
-  state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers'>
+  state: Pick<
+    CareerPlaybookStoreState,
+    'fixedQuestions' | 'fixedAnswers' | 'departmentQuestionVisible' | 'departmentResolution'
+  >
 ): CareerPlaybookFixedQuestion[] {
   return visibleQuestionsFromState(state)
 }
 
 export function getCareerPlaybookCurrentQuestion(
-  state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers' | 'currentFixedIndex'>
+  state: Pick<
+    CareerPlaybookStoreState,
+    | 'fixedQuestions'
+    | 'fixedAnswers'
+    | 'currentFixedIndex'
+    | 'departmentQuestionVisible'
+    | 'departmentResolution'
+  >
 ): CareerPlaybookFixedQuestion | null {
   return getCareerPlaybookVisibleQuestions(state)[state.currentFixedIndex] ?? null
 }
 
 export function getCareerPlaybookProgress(
-  state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers' | 'currentFixedIndex'>
+  state: Pick<
+    CareerPlaybookStoreState,
+    | 'fixedQuestions'
+    | 'fixedAnswers'
+    | 'currentFixedIndex'
+    | 'departmentQuestionVisible'
+    | 'departmentResolution'
+  >
 ) {
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
   const total = visibleQuestions.length

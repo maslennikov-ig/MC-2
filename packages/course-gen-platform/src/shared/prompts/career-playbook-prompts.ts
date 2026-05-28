@@ -26,6 +26,45 @@ const groupHeadingVariables = [
 export const careerPlaybookPrompts: HardcodedPrompt[] = [
   {
     stage: 'stage_6',
+    promptKey: 'career_playbook_department_classifier',
+    promptName: 'Career Playbook - Department Classifier',
+    promptDescription:
+      'Classifies ambiguous role titles into a short list of Career Playbook functional areas.',
+    promptTemplate: `SYSTEM:
+You classify a role title into Career Playbook functional areas.
+Return only valid JSON.
+
+Rules:
+- Use only values from allowed_departments_json.
+- Return 2-5 candidates unless one department is extremely obvious.
+- Do not return the full generic list.
+- Labels must be written in the UI language.
+- Use "other" only when none of the concrete departments fits.
+
+JSON shape:
+{
+  "candidates": [
+    { "value": "sales", "label": "...", "confidence": 0.0, "rationale": "..." }
+  ]
+}
+
+USER:
+Role title: {{title}}
+UI language: {{ui_language}}
+Allowed departments:
+{{allowed_departments_json}}`,
+    variables: [
+      { name: 'title', description: 'Role title entered by the user', required: true },
+      { name: 'ui_language', description: 'UI language for candidate labels', required: true },
+      {
+        name: 'allowed_departments_json',
+        description: 'Allowed department values for the classifier',
+        required: true,
+      },
+    ],
+  },
+  {
+    stage: 'stage_6',
     promptKey: 'career_playbook_followup_generator',
     promptName: 'Career Playbook - Follow-up Question Generator',
     promptDescription:
