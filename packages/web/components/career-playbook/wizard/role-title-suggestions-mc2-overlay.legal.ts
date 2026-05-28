@@ -1,0 +1,50 @@
+import type { RoleTitleSuggestion } from './role-title-suggestions.types'
+import { mc2OverlayRole } from './role-title-suggestions-mc2-overlay.helpers'
+
+export const mc2LegalRoleTitleSuggestions: RoleTitleSuggestion[] = [
+  mc2OverlayRole({
+    id: 'legal-counsel',
+    department: 'legal',
+    group: 'legal-compliance',
+    seniority: 'individual_contributor',
+    labels: { ru: 'Юрист', en: 'Legal Counsel' },
+    aliases: { ru: ['legal counsel', 'корпоративный юрист'], en: ['lawyer', 'corporate counsel'] },
+    keywords: { ru: ['договоры', 'право'], en: ['contracts', 'legal'] },
+    popularityRank: 30,
+    localePriority: { ru: 24, en: 30 },
+  }),
+  mc2OverlayRole({
+    id: 'compliance-manager',
+    department: 'legal',
+    group: 'legal-compliance',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер по соблюдению требований', en: 'Compliance Manager' },
+    aliases: { ru: ['комплаенс-менеджер', 'compliance officer'], en: ['compliance officer'] },
+    keywords: { ru: ['регуляторика', 'комплаенс'], en: ['regulation', 'compliance'] },
+    popularityRank: 64,
+    localePriority: { ru: 48, en: 48 },
+  }),
+  mc2OverlayRole({
+    id: 'contract-manager',
+    department: 'legal',
+    group: 'legal-compliance',
+    seniority: 'manager',
+    labels: { ru: 'Менеджер договоров', en: 'Contract Manager' },
+    aliases: { ru: ['менеджер договоров', 'специалист по договорам'], en: ['contracts manager'] },
+    keywords: { ru: ['договоры', 'согласование'], en: ['contracts', 'review'] },
+    popularityRank: 66,
+    localePriority: { ru: 49, en: 49 },
+  }),
+  mc2OverlayRole({
+    id: 'data-protection-officer',
+    department: 'legal',
+    group: 'legal-compliance',
+    seniority: 'lead',
+    labels: { ru: 'Ответственный за защиту данных', en: 'Data Protection Officer' },
+    aliases: { ru: ['dpo', 'специалист по персональным данным'], en: ['dpo', 'privacy officer'] },
+    acronyms: ['DPO'],
+    keywords: { ru: ['персональные данные', 'privacy'], en: ['privacy', 'personal data'] },
+    popularityRank: 70,
+    localePriority: { ru: 52, en: 52 },
+  }),
+]

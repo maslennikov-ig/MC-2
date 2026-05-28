@@ -22,6 +22,22 @@ part of this UI redesign.
 Implementation notes are in
 [`docs/plans/career-playbook/2026-05-25-document-first-zone-redesign.md`](../plans/career-playbook/2026-05-25-document-first-zone-redesign.md).
 
+## Role Title Suggestions
+
+As of 2026-05-27, constructor role suggestions use a local ESCO-backed subset, a
+small allowlisted Wikidata RU layer, and an MC2 overlay. The runtime does not
+call ESCO, Wikidata, HH, Faker, or other live role-title APIs, and it does not
+bundle full external datasets. Russian is not an ESCO source language, so ESCO
+Russian labels, aliases, and keywords are MC2-maintained fallback copy mapped to
+ESCO occupation URIs. Wikidata records are imported only from reviewed QIDs under
+the CC0 policy and are used for Russian operational roles that ESCO/overlay do
+not cover well.
+
+Source details, import script, and verification notes are documented in
+[`docs/plans/career-playbook/2026-05-27-esco-role-title-suggestions.md`](../plans/career-playbook/2026-05-27-esco-role-title-suggestions.md)
+and
+[`docs/plans/career-playbook/2026-05-27-wikidata-role-title-suggestions.md`](../plans/career-playbook/2026-05-27-wikidata-role-title-suggestions.md).
+
 ## Verification Entrypoints
 
 Local read-only checks:

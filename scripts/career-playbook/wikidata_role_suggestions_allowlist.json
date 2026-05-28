@@ -1,0 +1,133 @@
+[
+  {
+    "id": "system-administrator",
+    "department": "engineering",
+    "group": "data-platform",
+    "seniority": "individual_contributor",
+    "labels": {
+      "ru": "Системный администратор",
+      "en": "System Administrator"
+    },
+    "aliases": {
+      "ru": ["сисадмин", "ИТ-администратор", "sysadmin", "system administrator"],
+      "en": ["sysadmin", "IT administrator"]
+    },
+    "keywords": {
+      "ru": ["инфраструктура", "серверы", "доступы", "сети"],
+      "en": ["infrastructure", "servers", "access management", "networks"]
+    },
+    "popularityRank": 62,
+    "localePriority": {
+      "ru": 44,
+      "en": 60
+    },
+    "sourceReferences": {
+      "wikidataQid": "Q327353"
+    }
+  },
+  {
+    "id": "database-administrator",
+    "department": "data",
+    "group": "data-platform",
+    "seniority": "individual_contributor",
+    "labels": {
+      "ru": "Администратор базы данных",
+      "en": "Database Administrator"
+    },
+    "aliases": {
+      "ru": ["dba", "администратор баз данных", "database administrator"],
+      "en": ["DBA", "database admin"]
+    },
+    "acronyms": ["DBA"],
+    "keywords": {
+      "ru": ["базы данных", "postgres", "sql", "резервное копирование"],
+      "en": ["databases", "postgres", "sql", "backup"]
+    },
+    "popularityRank": 63,
+    "localePriority": {
+      "ru": 45,
+      "en": 61
+    },
+    "sourceReferences": {
+      "wikidataQid": "Q1078262"
+    }
+  },
+  {
+    "id": "office-manager",
+    "department": "operations",
+    "group": "business-operations",
+    "seniority": "individual_contributor",
+    "labels": {
+      "ru": "Офис-менеджер",
+      "en": "Office Manager"
+    },
+    "aliases": {
+      "ru": ["офис менеджер", "администратор офиса", "office manager"],
+      "en": ["office administrator", "office management"]
+    },
+    "keywords": {
+      "ru": ["офис", "административная поддержка", "закупки"],
+      "en": ["office", "administration", "supplies"]
+    },
+    "popularityRank": 64,
+    "localePriority": {
+      "ru": 46,
+      "en": 62
+    },
+    "sourceReferences": {
+      "wikidataQid": "Q1966741"
+    }
+  },
+  {
+    "id": "secretary",
+    "department": "operations",
+    "group": "business-operations",
+    "seniority": "individual_contributor",
+    "labels": {
+      "ru": "Секретарь",
+      "en": "Secretary"
+    },
+    "aliases": {
+      "ru": ["ассистент руководителя", "секретарь-референт", "secretary"],
+      "en": ["administrative assistant", "executive assistant"]
+    },
+    "keywords": {
+      "ru": ["документы", "расписание", "приемная"],
+      "en": ["documents", "schedule", "front office"]
+    },
+    "popularityRank": 65,
+    "localePriority": {
+      "ru": 47,
+      "en": 63
+    },
+    "sourceReferences": {
+      "wikidataQid": "Q319544"
+    }
+  },
+  {
+    "id": "technical-support-specialist",
+    "department": "support",
+    "group": "customer-support",
+    "seniority": "individual_contributor",
+    "labels": {
+      "ru": "Специалист технической поддержки",
+      "en": "Computer User Support Specialist"
+    },
+    "aliases": {
+      "ru": ["техподдержка", "специалист техподдержки", "специалист поддержки"],
+      "en": ["technical support specialist", "user support specialist", "help desk specialist"]
+    },
+    "keywords": {
+      "ru": ["поддержка", "обращения", "инциденты", "пользователи"],
+      "en": ["support", "tickets", "incidents", "users"]
+    },
+    "popularityRank": 66,
+    "localePriority": {
+      "ru": 48,
+      "en": 64
+    },
+    "sourceReferences": {
+      "wikidataQid": "Q33492554"
+    }
+  }
+]
