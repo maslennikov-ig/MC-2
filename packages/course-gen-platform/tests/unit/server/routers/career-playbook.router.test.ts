@@ -542,14 +542,14 @@ describe('careerPlaybookRouter transport', () => {
         status: 'generating',
       })
     );
-    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook:${playbookId}`);
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook-${playbookId}`);
     expect(mocks.addJob).toHaveBeenCalledWith(
       JobType.CAREER_PLAYBOOK,
       expect.not.objectContaining({
         courseId: expect.any(String),
       }),
       expect.objectContaining({
-        jobId: `career-playbook:${playbookId}`,
+        jobId: `career-playbook-${playbookId}`,
       })
     );
     expect(mocks.addJob).toHaveBeenCalledWith(
@@ -646,7 +646,7 @@ describe('careerPlaybookRouter transport', () => {
       status: 'generating',
     });
 
-    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook:${playbookId}`);
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook-${playbookId}`);
     expect(mocks.addJob).toHaveBeenCalledTimes(1);
   });
 

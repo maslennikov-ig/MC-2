@@ -12,6 +12,7 @@ import {
   validateCareerPlaybookSmokeEvidence,
   type CareerPlaybookSmokeEvidenceReport,
 } from './career-playbook-validation';
+import { getCareerPlaybookGenerationJobId } from '../server/routers/career-playbook/job-ids';
 
 export type CareerPlaybookLiveSmokeMode = 'plan' | 'mutation-smoke';
 export type CareerPlaybookLiveSmokeTarget =
@@ -115,7 +116,9 @@ export interface CareerPlaybookLiveSmokeClient {
     playbookId: string;
   }) => Promise<CareerPlaybookLiveSmokeGenerationStatus>;
   getStatus: (input: { playbookId: string }) => Promise<CareerPlaybookLiveSmokeGenerationStatus>;
-  getLibraryDetail: (input: { playbookId: string }) => Promise<CareerPlaybookLiveSmokeLibraryDetail>;
+  getLibraryDetail: (input: {
+    playbookId: string;
+  }) => Promise<CareerPlaybookLiveSmokeLibraryDetail>;
   exportPdf: (input: { playbookId: string }) => Promise<unknown>;
   toggleShare: (input: {
     playbookId: string;
@@ -218,7 +221,10 @@ function resolveToken(options: CareerPlaybookLiveSmokeOptions, env: CareerPlaybo
   return options.token ?? env.TOKEN ?? env.CAREER_PLAYBOOK_SMOKE_TOKEN;
 }
 
-function resolveQueueName(options: CareerPlaybookLiveSmokeOptions, env: CareerPlaybookLiveSmokeEnv) {
+function resolveQueueName(
+  options: CareerPlaybookLiveSmokeOptions,
+  env: CareerPlaybookLiveSmokeEnv
+) {
   return options.queueName ?? env.BULLMQ_QUEUE_NAME ?? DEFAULT_QUEUE_NAME;
 }
 
@@ -250,7 +256,9 @@ function check(
   return { id, status, mutates, note };
 }
 
-function summarizePlan(checks: CareerPlaybookLiveSmokeCheck[]): CareerPlaybookLiveSmokePlan['status'] {
+function summarizePlan(
+  checks: CareerPlaybookLiveSmokeCheck[]
+): CareerPlaybookLiveSmokePlan['status'] {
   if (checks.some(item => item.status === 'blocked')) return 'blocked';
   if (checks.some(item => item.status === 'warn')) return 'warn';
   return 'pass';
@@ -262,7 +270,12 @@ function requireGate(
   noteWhenPresent: string,
   noteWhenMissing: string
 ): CareerPlaybookLiveSmokeCheck {
-  return check(id, present ? 'pass' : 'blocked', false, present ? noteWhenPresent : noteWhenMissing);
+  return check(
+    id,
+    present ? 'pass' : 'blocked',
+    false,
+    present ? noteWhenPresent : noteWhenMissing
+  );
 }
 
 export function buildCareerPlaybookLiveSmokePlan(
@@ -368,7 +381,9 @@ function fixedAnswerRecord(): Record<string, CareerPlaybookFixedAnswer> {
   );
 }
 
-function followupAnswerFor(question: CareerPlaybookFollowupQuestion): CareerPlaybookAnswerSubmission {
+function followupAnswerFor(
+  question: CareerPlaybookFollowupQuestion
+): CareerPlaybookAnswerSubmission {
   if (question.options?.[0]?.value) {
     return {
       question_id: question.question_id,
@@ -547,7 +562,7 @@ export async function runCareerPlaybookLiveSmoke(
       expectedUserId,
       expectedOrganizationId,
       playbookId,
-      careerPlaybookJobId: `career-playbook:${playbookId}`,
+      careerPlaybookJobId: getCareerPlaybookGenerationJobId(playbookId),
       shareSlug: share.shareSlug,
       courseId,
       sourceDocumentIds,
@@ -570,7 +585,12 @@ export function buildCareerPlaybookCleanupManifest(
 ): CareerPlaybookCleanupManifest {
   const items: CareerPlaybookCleanupItem[] = [];
 
-  pushCleanupItem(items, 'auth_user', input.expectedUserId, 'Delete only if this user is disposable.');
+  pushCleanupItem(
+    items,
+    'auth_user',
+    input.expectedUserId,
+    'Delete only if this user is disposable.'
+  );
   pushCleanupItem(
     items,
     'organization',
@@ -594,7 +614,12 @@ export function buildCareerPlaybookCleanupManifest(
   pushCleanupItem(items, 'course', input.courseId, 'Delete bridge course after file/job cleanup.');
 
   for (const documentId of input.sourceDocumentIds ?? []) {
-    pushCleanupItem(items, 'source_document', documentId, 'Delete bridge source document by exact id.');
+    pushCleanupItem(
+      items,
+      'source_document',
+      documentId,
+      'Delete bridge source document by exact id.'
+    );
   }
 
   for (const uploadPath of input.uploadPaths ?? []) {

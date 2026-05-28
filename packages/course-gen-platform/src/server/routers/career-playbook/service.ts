@@ -38,6 +38,7 @@ import {
   type StoredQAData,
   type WizardPhase,
 } from './service-mappers';
+import { getCareerPlaybookGenerationJobId } from './job-ids';
 
 export interface CareerPlaybookDraftResponse {
   playbookId: string;
@@ -498,7 +499,7 @@ export async function approveCareerPlaybookGeneration(
     });
   }
 
-  const generationJobId = `career-playbook:${input.playbookId}`;
+  const generationJobId = getCareerPlaybookGenerationJobId(input.playbookId);
   await removeTerminalJobById(generationJobId);
   const qaDataForGeneration = qaDataWithoutGenerationError(qaData);
   const supabase = getCareerPlaybookSupabase();
