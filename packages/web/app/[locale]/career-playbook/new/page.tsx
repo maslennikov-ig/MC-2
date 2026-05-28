@@ -10,10 +10,14 @@ export const fetchCache = 'force-no-store'
 
 type Props = {
   params: Promise<{ locale: Locale }>
+  searchParams?: Promise<{
+    fresh?: string | string[]
+  }>
 }
 
-export default async function CareerPlaybookNewPage({ params }: Props) {
+export default async function CareerPlaybookNewPage({ params, searchParams }: Props) {
   const { locale } = await params
+  const resolvedSearchParams = searchParams ? await searchParams : {}
   setRequestLocale(locale)
   const user = await getCurrentUser()
 
@@ -21,7 +25,17 @@ export default async function CareerPlaybookNewPage({ params }: Props) {
     return <CareerPlaybookAuthRequiredClient locale={locale} />
   }
 
-  return <CareerPlaybookNewPageClient locale={locale} userId={user.id} />
+  const freshParam = Array.isArray(resolvedSearchParams.fresh)
+    ? resolvedSearchParams.fresh[0]
+    : resolvedSearchParams.fresh
+
+  return (
+    <CareerPlaybookNewPageClient
+      locale={locale}
+      userId={user.id}
+      resetOnMount={freshParam === '1'}
+    />
+  )
 }
 
 export async function generateMetadata({ params }: Props) {

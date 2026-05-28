@@ -21,11 +21,13 @@ import {
 interface CareerPlaybookNewPageClientProps {
   locale: Locale
   userId: string
+  resetOnMount?: boolean
 }
 
 export default function CareerPlaybookNewPageClient({
   locale,
   userId,
+  resetOnMount = false,
 }: CareerPlaybookNewPageClientProps) {
   const t = useTranslations('career-playbook.wizard')
   const state = useCareerPlaybookStore()
@@ -34,6 +36,10 @@ export default function CareerPlaybookNewPageClient({
   const [generationHandoffVisible, setGenerationHandoffVisible] = useState(false)
 
   useEffect(() => {
+    if (resetOnMount) {
+      useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
+    }
+
     useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner(userId)
     const snapshot = useCareerPlaybookStore.getState()
     if (snapshot.fixedQuestions.length === 0) {
@@ -77,7 +83,7 @@ export default function CareerPlaybookNewPageClient({
     }
 
     void current.startCareerPlaybookSession()
-  }, [locale, userId])
+  }, [locale, resetOnMount, userId])
 
   useEffect(() => {
     const interval = window.setInterval(() => {

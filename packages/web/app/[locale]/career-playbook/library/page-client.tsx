@@ -253,7 +253,7 @@ export default function CareerPlaybookLibraryPageClient({
               </p>
             </div>
             <Button asChild className="rounded-md">
-              <Link href={`/${locale}/career-playbook/new`}>
+              <Link href={`/${locale}/career-playbook/new?fresh=1`}>
                 <Plus className="h-4 w-4" aria-hidden />
                 {t('createNew')}
               </Link>

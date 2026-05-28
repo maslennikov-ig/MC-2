@@ -159,7 +159,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByTestId('career-playbook-library-shell')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Create new' })).toHaveAttribute(
       'href',
-      '/en/career-playbook/new'
+      '/en/career-playbook/new?fresh=1'
     )
     expect(screen.getByRole('link', { name: 'Open Head of Sales' })).toHaveAttribute(
       'href',
