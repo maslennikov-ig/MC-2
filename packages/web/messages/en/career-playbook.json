@@ -443,6 +443,21 @@
     "deleting": "Deleting...",
     "loadMore": "Load more",
     "loadingMore": "Loading...",
+    "resultsCount": "{count} of {total}",
+    "sort": "Sort",
+    "sortOptions": {
+      "created_desc": "Newest first",
+      "created_asc": "Oldest first",
+      "title_asc": "Title A-Z",
+      "title_desc": "Title Z-A"
+    },
+    "statistics": {
+      "title": "Guide statistics",
+      "total": "Total guides",
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "public": "Public"
+    },
     "card": {
       "createCourse": "Create course",
       "publicBadge": "Public",

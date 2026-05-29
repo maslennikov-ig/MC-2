@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CareerPlaybookLibraryPageClient from '@/app/[locale]/career-playbook/library/page-client'
+import type { CareerPlaybookLibraryFilters } from '@/components/career-playbook/library/types'
 
 vi.mock('@/components/layouts/header', () => ({
   default: () => <header data-testid="shared-header" />,
@@ -13,6 +14,17 @@ const deleteMany = vi.fn()
 const fetchPage = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const toggleShare = vi.fn()
+const mockPush = vi.hoisted(() => vi.fn())
+const mockSearchParams = vi.hoisted(() => new URLSearchParams())
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
+  useSearchParams: () => mockSearchParams,
+}))
+
+vi.mock('@/src/i18n/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
   createCourseFromPlaybook: (...args: unknown[]) =>
@@ -28,6 +40,10 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
           locale: string
           cursor?: string | null
           search?: string
+          status?: string
+          department?: string
+          level?: string
+          sort?: string
           limit?: number
         },
       ])
@@ -63,6 +79,21 @@ const messages = {
       deleting: 'Deleting...',
       loadMore: 'Load more',
       loadingMore: 'Loading...',
+      resultsCount: '{count} of {total}',
+      sort: 'Sort',
+      sortOptions: {
+        created_desc: 'Newest first',
+        created_asc: 'Oldest first',
+        title_asc: 'Title A-Z',
+        title_desc: 'Title Z-A',
+      },
+      statistics: {
+        title: 'Guide statistics',
+        total: 'Total guides',
+        completed: 'Completed guides',
+        inProgress: 'In progress',
+        public: 'Public guides',
+      },
       card: {
         createCourse: 'Create course',
         publicBadge: 'Public',
@@ -104,13 +135,21 @@ const messages = {
 }
 
 function renderPage({
+  filters = {
+    search: undefined,
+    status: undefined,
+    department: undefined,
+    level: undefined,
+    sort: 'created_desc',
+  },
   initialData,
 }: {
+  filters?: CareerPlaybookLibraryFilters
   initialData: Parameters<typeof CareerPlaybookLibraryPageClient>[0]['initialData']
 }) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookLibraryPageClient locale="en" initialData={initialData} />
+      <CareerPlaybookLibraryPageClient locale="en" initialData={initialData} filters={filters} />
     </NextIntlClientProvider>
   )
 }
@@ -120,12 +159,12 @@ describe('CareerPlaybookLibraryPageClient', () => {
     createCourseFromPlaybook.mockReset()
     deleteMany.mockReset()
     fetchPage.mockReset()
+    mockPush.mockReset()
     toggleShare.mockReset()
+    mockSearchParams.forEach((_, key) => mockSearchParams.delete(key))
   })
 
-  it('renders cards, filters by search/status, and shows create CTA', async () => {
-    const user = userEvent.setup()
-
+  it('renders cards, shared catalog filters, statistics, and create CTA', () => {
     renderPage({
       initialData: {
         items: [
@@ -152,6 +191,18 @@ describe('CareerPlaybookLibraryPageClient', () => {
         ],
         nextCursor: null,
         error: null,
+        totalCount: 2,
+        statistics: {
+          totalCount: 2,
+          completedCount: 1,
+          inProgressCount: 1,
+          publicCount: 1,
+        },
+        facets: {
+          statuses: ['completed', 'generating'],
+          departments: ['engineering', 'sales'],
+          levels: ['lead', 'senior'],
+        },
       },
     })
 
@@ -165,14 +216,11 @@ describe('CareerPlaybookLibraryPageClient', () => {
       'href',
       '/en/career-playbook/pb-1'
     )
-
-    await user.type(screen.getByPlaceholderText('Search by role title'), 'sales')
+    expect(screen.getByText('Guide statistics')).toBeInTheDocument()
+    expect(screen.getByText('Total guides')).toBeInTheDocument()
+    expect(screen.getByText('2 of 2')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search by role title')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
-    expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
-
-    await user.clear(screen.getByPlaceholderText('Search by role title'))
-    await user.selectOptions(screen.getByLabelText('All statuses'), 'generating')
-    expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
     expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
   })
 
@@ -308,9 +356,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
     )
   })
 
-  it('filters by department and level', async () => {
-    const user = userEvent.setup()
-
+  it('uses server-provided department and level facets for catalog filters', () => {
     renderPage({
       initialData: {
         items: [
@@ -337,22 +383,21 @@ describe('CareerPlaybookLibraryPageClient', () => {
         ],
         nextCursor: null,
         error: null,
+        facets: {
+          statuses: ['completed'],
+          departments: ['engineering', 'sales'],
+          levels: ['lead', 'senior'],
+        },
       },
     })
 
-    await user.selectOptions(screen.getByLabelText('Department'), 'engineering')
-    expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
-    expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
-
-    await user.selectOptions(screen.getByLabelText('Department'), 'all')
-    await user.selectOptions(screen.getByLabelText('Level'), 'lead')
+    expect(screen.getByLabelText('Department')).toBeInTheDocument()
+    expect(screen.getByLabelText('Level')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
-    expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
+    expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
   })
 
-  it('renders localized labels and filters every library status', async () => {
-    const user = userEvent.setup()
-
+  it('renders localized labels for every library status in loaded cards', () => {
     renderPage({
       initialData: {
         items: [
@@ -384,10 +429,6 @@ describe('CareerPlaybookLibraryPageClient', () => {
 
     expect(screen.getAllByText('Answering follow-ups').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Ready to generate').length).toBeGreaterThan(0)
-
-    await user.selectOptions(screen.getByLabelText('All statuses'), 'ready_to_generate')
-    expect(screen.queryByText('Draft Role')).not.toBeInTheDocument()
-    expect(screen.getByText('Ready Role')).toBeInTheDocument()
   })
 
   it('loads the next library page when nextCursor is present', async () => {
@@ -410,6 +451,13 @@ describe('CareerPlaybookLibraryPageClient', () => {
     })
 
     renderPage({
+      filters: {
+        search: 'sales',
+        status: 'completed',
+        department: 'sales',
+        level: 'lead',
+        sort: 'title_asc',
+      },
       initialData: {
         items: [
           {
@@ -434,7 +482,11 @@ describe('CareerPlaybookLibraryPageClient', () => {
       locale: 'en',
       cursor: '2026-05-14T10:00:00.000Z',
       limit: 50,
-      search: undefined,
+      search: 'sales',
+      status: 'completed',
+      department: 'sales',
+      level: 'lead',
+      sort: 'title_asc',
     })
     expect(await screen.findByText('DevOps Engineer')).toBeInTheDocument()
   })
@@ -445,6 +497,13 @@ describe('CareerPlaybookLibraryPageClient', () => {
         <CareerPlaybookLibraryPageClient
           locale="en"
           initialData={{ items: [], nextCursor: null, error: null }}
+          filters={{
+            search: undefined,
+            status: undefined,
+            department: undefined,
+            level: undefined,
+            sort: 'created_desc',
+          }}
         />
       </NextIntlClientProvider>
     )
@@ -459,6 +518,13 @@ describe('CareerPlaybookLibraryPageClient', () => {
             items: [],
             nextCursor: null,
             error: 'careerPlaybook.library.list unavailable',
+          }}
+          filters={{
+            search: undefined,
+            status: undefined,
+            department: undefined,
+            level: undefined,
+            sort: 'created_desc',
           }}
         />
       </NextIntlClientProvider>

@@ -27,6 +27,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 
 - Frontend app routes: `packages/web/app/[locale]/`.
 - Frontend reusable UI: `packages/web/components/`.
+- Shared catalog UI primitives: `packages/web/components/catalog/`.
 - Frontend locale messages: `packages/web/messages/{ru,en}/`.
 - Frontend i18n config/types: `packages/web/src/i18n/config.ts` and `packages/web/types/i18n.d.ts`.
 - Frontend unit/e2e tests: `packages/web/tests/unit/` and `packages/web/tests/e2e/`.

@@ -443,6 +443,21 @@
     "deleting": "Удаляем...",
     "loadMore": "Загрузить ещё",
     "loadingMore": "Загружаем...",
+    "resultsCount": "{count} из {total}",
+    "sort": "Сортировка",
+    "sortOptions": {
+      "created_desc": "Сначала новые",
+      "created_asc": "Сначала старые",
+      "title_asc": "Название А-Я",
+      "title_desc": "Название Я-А"
+    },
+    "statistics": {
+      "title": "Статистика инструкций",
+      "total": "Всего инструкций",
+      "completed": "Готово",
+      "inProgress": "В работе",
+      "public": "Публичные"
+    },
     "card": {
       "createCourse": "Создать курс из инструкции",
       "publicBadge": "Публичный",

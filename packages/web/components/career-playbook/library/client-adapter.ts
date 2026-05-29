@@ -4,6 +4,7 @@ import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import { normalizeLibraryResponse } from './normalizers'
 import type {
   CareerPlaybookLibraryData,
+  CareerPlaybookLibraryFilters,
   CreateCourseFromPlaybookInput,
   CreateCourseFromPlaybookResult,
 } from './types'
@@ -15,7 +16,9 @@ type BrowserCareerPlaybookClient = {
         mutate: (input: { playbookId: string }) => Promise<unknown>
       }
       list?: {
-        query: (input: { limit: number; cursor?: string; search?: string }) => Promise<unknown>
+        query: (
+          input: { limit: number; cursor?: string } & Partial<CareerPlaybookLibraryFilters>
+        ) => Promise<unknown>
       }
     }
     share?: {
@@ -35,6 +38,10 @@ export async function fetchCareerPlaybookLibraryPage(input: {
   locale: string
   cursor?: string | null
   search?: string
+  status?: CareerPlaybookLibraryFilters['status']
+  department?: string
+  level?: string
+  sort?: CareerPlaybookLibraryFilters['sort']
   limit?: number
 }): Promise<CareerPlaybookLibraryData> {
   const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
@@ -53,6 +60,10 @@ export async function fetchCareerPlaybookLibraryPage(input: {
       limit: input.limit ?? 50,
       cursor: input.cursor ?? undefined,
       search: input.search,
+      status: input.status,
+      department: input.department,
+      level: input.level,
+      sort: input.sort,
     })
     return normalizeLibraryResponse(data)
   } catch (error) {

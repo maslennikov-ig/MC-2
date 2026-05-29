@@ -33,6 +33,34 @@ export interface CareerPlaybookLibraryItem {
 export interface CareerPlaybookLibraryListResponse {
   items: CareerPlaybookLibraryItem[];
   nextCursor?: string;
+  totalCount: number;
+  statistics: CareerPlaybookLibraryStatistics;
+  facets: CareerPlaybookLibraryFacets;
+}
+
+export interface CareerPlaybookLibraryStatistics {
+  totalCount: number;
+  completedCount: number;
+  inProgressCount: number;
+  publicCount: number;
+}
+
+export interface CareerPlaybookLibraryFacets {
+  statuses: CareerPlaybookPlaybookStatus[];
+  departments: string[];
+  levels: string[];
+}
+
+export type CareerPlaybookLibrarySort = 'created_desc' | 'created_asc' | 'title_asc' | 'title_desc';
+
+export interface CareerPlaybookLibraryListInput {
+  limit: number;
+  cursor?: string;
+  search?: string;
+  status?: CareerPlaybookPlaybookStatus;
+  department?: string;
+  level?: string;
+  sort?: CareerPlaybookLibrarySort;
 }
 
 export interface CareerPlaybookLibraryDetailResponse extends CareerPlaybookLibraryItem {
@@ -167,6 +195,70 @@ function mapRowToLibraryItem(row: CareerPlaybookRow): CareerPlaybookLibraryItem 
   return toLibraryItemFromMappedRow(mapped);
 }
 
+function parseOffsetCursor(cursor: string | undefined): number {
+  if (!cursor) return 0;
+  if (!cursor.startsWith('offset:')) return 0;
+  const offset = Number.parseInt(cursor.slice('offset:'.length), 10);
+  return Number.isFinite(offset) && offset > 0 ? offset : 0;
+}
+
+function buildFacet(values: Array<string | null>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort(
+    (a, b) => a.localeCompare(b)
+  );
+}
+
+function buildStatistics(rows: CareerPlaybookRow[]): CareerPlaybookLibraryStatistics {
+  const inProgressStatuses = new Set<CareerPlaybookPlaybookStatus>([
+    'answering_fixed',
+    'awaiting_followups',
+    'answering_followups',
+    'ready_to_generate',
+    'generating',
+  ]);
+
+  return {
+    totalCount: rows.length,
+    completedCount: rows.filter(row => row.status === 'completed').length,
+    inProgressCount: rows.filter(row => inProgressStatuses.has(row.status)).length,
+    publicCount: rows.filter(row => row.is_public).length,
+  };
+}
+
+function buildFacets(rows: CareerPlaybookRow[]): CareerPlaybookLibraryFacets {
+  const statusOrder: CareerPlaybookPlaybookStatus[] = [
+    'draft',
+    'answering_fixed',
+    'awaiting_followups',
+    'answering_followups',
+    'ready_to_generate',
+    'generating',
+    'completed',
+    'failed',
+  ];
+  const statuses = new Set(rows.map(row => row.status));
+
+  return {
+    statuses: statusOrder.filter(status => statuses.has(status)),
+    departments: buildFacet(rows.map(row => row.department)),
+    levels: buildFacet(rows.map(row => row.level)),
+  };
+}
+
+function sortRows(
+  rows: CareerPlaybookRow[],
+  sort: CareerPlaybookLibrarySort = 'created_desc'
+): CareerPlaybookRow[] {
+  const titleOf = (row: CareerPlaybookRow) => row.position_title ?? '';
+  const dateOf = (row: CareerPlaybookRow) => Date.parse(row.created_at) || 0;
+  return [...rows].sort((left, right) => {
+    if (sort === 'created_asc') return dateOf(left) - dateOf(right);
+    if (sort === 'title_asc') return titleOf(left).localeCompare(titleOf(right));
+    if (sort === 'title_desc') return titleOf(right).localeCompare(titleOf(left));
+    return dateOf(right) - dateOf(left);
+  });
+}
+
 function mapRowToLibraryDetail(row: CareerPlaybookRow): CareerPlaybookLibraryDetailResponse {
   const mapped = mapPlaybookRow(row);
   return {
@@ -186,7 +278,7 @@ function mapRowToPublicShare(row: CareerPlaybookRow): CareerPlaybookPublicShareR
 
 export async function listCareerPlaybooks(
   ctx: Context,
-  input: { limit: number; cursor?: string; search?: string }
+  input: CareerPlaybookLibraryListInput
 ): Promise<CareerPlaybookLibraryListResponse> {
   const user = requireUser(ctx);
   const supabase = getCareerPlaybookSupabase();
@@ -199,23 +291,31 @@ export async function listCareerPlaybooks(
   if (error) throwOnDbError(error, 'Failed to list Career Playbooks');
 
   const lowerSearch = input.search?.trim().toLowerCase();
-  const scopedRows = (data ?? [])
-    .map(mapPlaybookRow)
-    .filter(row => isOwnedByUser(row, user))
-    .filter(row => (input.cursor ? row.created_at < input.cursor : true))
+  const ownedRows = (data ?? []).map(mapPlaybookRow).filter(row => isOwnedByUser(row, user));
+
+  const scopedRows = ownedRows
     .filter(row => {
       if (!lowerSearch) return true;
       const fields = [row.position_title, row.department, row.specialization, row.level];
       return fields.some(field => field?.toLowerCase().includes(lowerSearch));
-    });
+    })
+    .filter(row => (input.status ? row.status === input.status : true))
+    .filter(row => (input.department ? row.department === input.department : true))
+    .filter(row => (input.level ? row.level === input.level : true));
 
-  const page = scopedRows.slice(0, input.limit + 1);
+  const sortedRows = sortRows(scopedRows, input.sort);
+  const offset = parseOffsetCursor(input.cursor);
+  const page = sortedRows.slice(offset, offset + input.limit + 1);
+  const pageRows = page.slice(0, input.limit);
   const hasMore = page.length > input.limit;
-  const items = page.slice(0, input.limit).map(mapRowToLibraryItem);
+  const items = pageRows.map(mapRowToLibraryItem);
 
   return {
     items,
-    nextCursor: hasMore ? items[items.length - 1]?.createdAt : undefined,
+    nextCursor: hasMore ? `offset:${offset + input.limit}` : undefined,
+    totalCount: scopedRows.length,
+    statistics: buildStatistics(ownedRows),
+    facets: buildFacets(ownedRows),
   };
 }
 

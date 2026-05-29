@@ -929,6 +929,69 @@ describe('careerPlaybookRouter transport', () => {
     expect(result.items.every(item => item.id !== foreignPlaybook.id)).toBe(true);
   });
 
+  it('filters, sorts, counts, and exposes facets for the personal library', async () => {
+    const rows = [
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333337',
+        position_title: 'Sales Manager',
+        status: 'completed',
+        department: 'sales',
+        level: 'lead',
+        is_public: true,
+        created_at: '2026-05-14T03:00:00.000Z',
+      }),
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333338',
+        position_title: 'Sales Analyst',
+        status: 'completed',
+        department: 'sales',
+        level: 'junior',
+        created_at: '2026-05-14T02:00:00.000Z',
+      }),
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333339',
+        position_title: 'Engineering Manager',
+        status: 'completed',
+        department: 'engineering',
+        level: 'lead',
+        created_at: '2026-05-14T01:00:00.000Z',
+      }),
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333340',
+        position_title: 'Sales Draft',
+        status: 'draft',
+        department: 'sales',
+        level: 'lead',
+        created_at: '2026-05-13T01:00:00.000Z',
+      }),
+    ];
+    const builder = createListBuilder(rows);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.list({
+      limit: 20,
+      search: 'sales',
+      status: 'completed',
+      department: 'sales',
+      level: 'lead',
+      sort: 'title_asc',
+    });
+
+    expect(result.items.map(item => item.positionTitle)).toEqual(['Sales Manager']);
+    expect(result.totalCount).toBe(1);
+    expect(result.statistics).toEqual({
+      totalCount: 4,
+      completedCount: 3,
+      inProgressCount: 0,
+      publicCount: 1,
+    });
+    expect(result.facets.departments).toEqual(['engineering', 'sales']);
+    expect(result.facets.levels).toEqual(['junior', 'lead']);
+    expect(result.facets.statuses).toContain('completed');
+    expect(result.facets.statuses).toContain('draft');
+  });
+
   it('returns a readable playbook by id from the library router', async () => {
     const builder = createBuilder([
       {
