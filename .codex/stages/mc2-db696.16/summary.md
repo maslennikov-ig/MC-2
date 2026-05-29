@@ -1,8 +1,8 @@
 # Stage mc2-db696.16 Summary
 
-Status: closeout verified; ready for branch delivery
+Status: delivered to develop and Dev
 Updated: 2026-05-29
-Branch: `codex/career-playbook-open-followups`
+Branch: `develop`
 Base: `origin/develop` @ `a92ffb704cc854b0b04a7ff78421f53a96e5d3e8`
 
 ## Scope
@@ -30,6 +30,9 @@ Base: `origin/develop` @ `a92ffb704cc854b0b04a7ff78421f53a96e5d3e8`
 - `pnpm --filter @megacampus/course-gen-platform lint` passed with existing warnings.
 - `git diff --check` passed.
 - `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.16` passed.
+- `bash .claude/scripts/push-dev.sh --yes` merged `codex/career-playbook-open-followups` into `develop` as `66e74eff` and pushed `develop`.
+- GitHub Actions run `26622781178` passed; `Deploy to Dev` passed.
+- `curl -fsS https://dev.ai.megacampus.ru/api/health` returned `{"status":"ok"}`.
 - Read-only staging preflight passed with `BULLMQ_QUEUE_NAME=career-playbook-smoke-20260529`.
 - Non-mutating live-smoke plan remained blocked as expected because tRPC URL, token, disposable user/org IDs, cleanup scope, positive cost budget, and `--confirm-live-mutation` were not provided.
 
@@ -43,4 +46,4 @@ Base: `origin/develop` @ `a92ffb704cc854b0b04a7ff78421f53a96e5d3e8`
 
 - `mc2-db696.11.5` live mutation smoke remains gated on disposable staging fixtures, token, tRPC URL, dedicated queue alignment, cleanup scope, numeric LLM/API budget, and explicit mutation confirmation.
 - `mc2-db696.11.6` remains blocked until `.11.5` succeeds.
-- `.github/workflows/ci-cd.yml` Qdrant service fix still needs GitHub Actions proof after branch delivery; Docker is not available in this local WSL environment.
+- `.github/workflows/ci-cd.yml` Qdrant service fix still needs master/PR Integration Tests proof; the develop run skipped Integration Tests by workflow design, and Docker is not available in this local WSL environment.
