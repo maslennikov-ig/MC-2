@@ -238,7 +238,7 @@ export function ConfigHistoryDialog({
                               <RadioGroupItem value={item.id} id={`v1-${item.id}`} />
                               <Label
                                 htmlFor={`v1-${item.id}`}
-                                className="flex-1 cursor-pointer space-y-1"
+                                className="flex-1 cursor-pointer space-y-1 caret-transparent select-none"
                               >
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline">V{item.version}</Badge>
@@ -266,7 +266,7 @@ export function ConfigHistoryDialog({
                               <RadioGroupItem value={item.id} id={`v2-${item.id}`} />
                               <Label
                                 htmlFor={`v2-${item.id}`}
-                                className="flex-1 cursor-pointer space-y-1"
+                                className="flex-1 cursor-pointer space-y-1 caret-transparent select-none"
                               >
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline">V{item.version}</Badge>

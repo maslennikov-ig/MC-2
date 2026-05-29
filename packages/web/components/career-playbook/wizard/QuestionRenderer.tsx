@@ -233,7 +233,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                             onValueChange(event.target.value)
                           }}
                           placeholder={labels.otherOptionPlaceholder}
-                          className="mt-2 h-11 text-[15px]"
+                          className="caret-auto mt-2 h-11 text-[15px] select-text"
                         />
                       ) : null
                     }
@@ -283,7 +283,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                           onValueChange(nextValues)
                         }}
                         placeholder={labels.otherOptionPlaceholder}
-                        className="mt-2 h-11 text-[15px]"
+                        className="caret-auto mt-2 h-11 text-[15px] select-text"
                       />
                     ) : null
                   }
@@ -391,7 +391,7 @@ function OptionRow({
     <Label
       htmlFor={inputId}
       className={cn(
-        'grid min-h-[58px] cursor-pointer grid-cols-[auto_1fr] gap-3 rounded-md border p-3 text-sm leading-none font-medium transition-colors',
+        'grid min-h-[58px] cursor-pointer grid-cols-[auto_1fr] gap-3 rounded-md border p-3 text-sm leading-none font-medium caret-transparent transition-colors select-none',
         selected
           ? 'border-purple-300 bg-purple-50/80 dark:border-purple-500/60 dark:bg-purple-950/30'
           : 'border-[#d8c5aa] bg-[#fffbf4] hover:border-purple-200 hover:bg-purple-50/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'

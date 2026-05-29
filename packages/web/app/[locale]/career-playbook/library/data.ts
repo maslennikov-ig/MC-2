@@ -5,20 +5,22 @@ import {
 } from '@/components/career-playbook/library/normalizers'
 import type {
   CareerPlaybookLibraryData,
+  CareerPlaybookLibraryFilters,
   CareerPlaybookLibraryItem,
 } from '@/components/career-playbook/library/types'
 
-interface GetCareerPlaybookLibraryInput {
+type GetCareerPlaybookLibraryInput = Partial<CareerPlaybookLibraryFilters> & {
   userId: string
   limit?: number
-  search?: string
 }
 
 type ServerCareerPlaybookClient = {
   careerPlaybook?: {
     library?: {
       list?: {
-        query: (input: { limit: number; search?: string }) => Promise<unknown>
+        query: (
+          input: { limit: number } & Partial<CareerPlaybookLibraryFilters>
+        ) => Promise<unknown>
       }
       get?: {
         query: (input: { playbookId: string }) => Promise<unknown>
@@ -45,6 +47,10 @@ export async function getCareerPlaybookLibrary(
     const data = await transport.query({
       limit: input.limit ?? 50,
       search: input.search,
+      status: input.status,
+      department: input.department,
+      level: input.level,
+      sort: input.sort,
     })
     return normalizeLibraryResponse(data)
   } catch (error) {

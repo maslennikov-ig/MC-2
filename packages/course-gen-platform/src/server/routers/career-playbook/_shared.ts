@@ -49,6 +49,21 @@ export const listInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   cursor: z.string().optional(),
   search: z.string().max(200).optional(),
+  status: z
+    .enum([
+      'draft',
+      'answering_fixed',
+      'awaiting_followups',
+      'answering_followups',
+      'ready_to_generate',
+      'generating',
+      'completed',
+      'failed',
+    ])
+    .optional(),
+  department: z.string().max(120).optional(),
+  level: z.string().max(120).optional(),
+  sort: z.enum(['created_desc', 'created_asc', 'title_asc', 'title_desc']).default('created_desc'),
 });
 
 export const editBlockInputSchema = blockInputSchema.extend({

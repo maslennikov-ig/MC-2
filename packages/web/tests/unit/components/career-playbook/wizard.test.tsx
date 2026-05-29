@@ -288,6 +288,30 @@ describe('QuestionRenderer', () => {
     expect(handleValueChange).toHaveBeenCalledWith('engineering')
   })
 
+  it('prevents browser text caret on non-text option cards while keeping custom inputs editable', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <QuestionRenderer
+        question={fixedSingleChoiceQuestion}
+        value=""
+        onValueChange={vi.fn()}
+        copy={{
+          otherOptionLabel: 'Другое',
+          otherOptionPlaceholder: 'Введите свой вариант',
+        }}
+      />
+    )
+
+    const optionCard = screen.getByText('Инженерия / IT').closest('label')
+    expect(optionCard).toHaveClass('select-none', 'caret-transparent')
+
+    await user.click(screen.getByRole('radio', { name: 'Другое' }))
+
+    const customInput = screen.getByPlaceholderText('Введите свой вариант')
+    expect(customInput).toHaveClass('select-text', 'caret-auto')
+  })
+
   it('lets single-choice questions save a custom Other value inline', async () => {
     const user = userEvent.setup()
     const handleValueChange = vi.fn()

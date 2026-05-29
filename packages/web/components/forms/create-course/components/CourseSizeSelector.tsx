@@ -70,7 +70,9 @@ export function CourseSizeSelector() {
     return (
       <label
         key={size}
-        className={`relative cursor-pointer transition-all ${isSelected ? 'scale-[1.02]' : ''}`}
+        className={`relative cursor-pointer caret-transparent transition-all select-none ${
+          isSelected ? 'scale-[1.02]' : ''
+        }`}
       >
         <input
           type="radio"
