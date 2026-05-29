@@ -12,6 +12,7 @@ type Props = {
   params: Promise<{ locale: Locale }>
   searchParams?: Promise<{
     fresh?: string | string[]
+    resume?: string | string[]
   }>
 }
 
@@ -28,12 +29,17 @@ export default async function CareerPlaybookNewPage({ params, searchParams }: Pr
   const freshParam = Array.isArray(resolvedSearchParams.fresh)
     ? resolvedSearchParams.fresh[0]
     : resolvedSearchParams.fresh
+  const resumeParam = Array.isArray(resolvedSearchParams.resume)
+    ? resolvedSearchParams.resume[0]
+    : resolvedSearchParams.resume
+  const resumePlaybookId = freshParam === '1' ? undefined : resumeParam
 
   return (
     <CareerPlaybookNewPageClient
       locale={locale}
       userId={user.id}
       resetOnMount={freshParam === '1'}
+      resumePlaybookId={resumePlaybookId}
     />
   )
 }

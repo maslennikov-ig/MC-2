@@ -438,9 +438,6 @@
     "emptyDescription": "Создайте первую должностную инструкцию, чтобы собрать библиотеку.",
     "errorTitle": "Библиотека временно недоступна",
     "errorDescription": "Повторите позже или начните новую инструкцию.",
-    "selectedCount": "Выбрано: {count}",
-    "bulkDelete": "Удалить выбранные",
-    "deleting": "Удаляем...",
     "loadMore": "Загрузить ещё",
     "loadingMore": "Загружаем...",
     "resultsCount": "{count} из {total}",
@@ -462,10 +459,12 @@
       "createCourse": "Создать курс из инструкции",
       "publicBadge": "Публичный",
       "privateBadge": "Приватный",
-      "makePublic": "Опубликовать",
+      "share": "Поделиться",
       "makePrivate": "Сделать приватным",
       "publicLink": "Публичная ссылка",
-      "open": "Открыть"
+      "open": "Открыть",
+      "openBuilder": "Зайти в конструктор",
+      "delete": "Удалить"
     },
     "statusLabels": {
       "draft": "Черновик",
@@ -478,10 +477,10 @@
       "failed": "Ошибка"
     },
     "deleteDialog": {
-      "title": "Удалить выбранные инструкции?",
-      "description": "Будет удалено выбранных инструкций: {count}.",
+      "title": "Удалить инструкцию?",
+      "description": "Инструкция «{title}» будет удалена.",
       "cancel": "Отмена",
-      "confirm": "Удалить инструкции"
+      "confirm": "Удалить инструкцию"
     },
     "createCourseDialog": {
       "title": "Создать курс из инструкции",

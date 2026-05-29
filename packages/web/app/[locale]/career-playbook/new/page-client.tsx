@@ -22,21 +22,27 @@ interface CareerPlaybookNewPageClientProps {
   locale: Locale
   userId: string
   resetOnMount?: boolean
+  resumePlaybookId?: string
 }
 
 export default function CareerPlaybookNewPageClient({
   locale,
+  resumePlaybookId,
   userId,
   resetOnMount = false,
 }: CareerPlaybookNewPageClientProps) {
   const t = useTranslations('career-playbook.wizard')
   const state = useCareerPlaybookStore()
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
-  const sessionStartAttemptedRef = useRef(false)
+  const sessionStartTargetRef = useRef<string | null>(null)
   const [generationHandoffVisible, setGenerationHandoffVisible] = useState(false)
 
   useEffect(() => {
     if (resetOnMount) {
+      useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
+    }
+
+    if (resumePlaybookId && useCareerPlaybookStore.getState().playbookId !== resumePlaybookId) {
       useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     }
 
@@ -73,17 +79,23 @@ export default function CareerPlaybookNewPageClient({
       })
     }
 
-    if (sessionStartAttemptedRef.current) return
-    sessionStartAttemptedRef.current = true
-
     const current = useCareerPlaybookStore.getState()
+    const sessionTarget = resumePlaybookId ?? current.playbookId ?? `new:${userId}:${locale}`
+    if (sessionStartTargetRef.current === sessionTarget) return
+    sessionStartTargetRef.current = sessionTarget
+
+    if (resumePlaybookId) {
+      void current.resumeCareerPlaybookSession(resumePlaybookId)
+      return
+    }
+
     if (current.playbookId) {
       void current.resumeCareerPlaybookSession(current.playbookId)
       return
     }
 
     void current.startCareerPlaybookSession()
-  }, [locale, resetOnMount, userId])
+  }, [locale, resetOnMount, resumePlaybookId, userId])
 
   useEffect(() => {
     const interval = window.setInterval(() => {

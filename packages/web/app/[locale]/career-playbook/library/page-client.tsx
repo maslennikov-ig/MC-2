@@ -10,7 +10,9 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  GitBranch,
   Link2,
+  Loader2,
   Plus,
   Share2,
   Trash2,
@@ -29,12 +31,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CatalogActionButton } from '@/components/catalog/catalog-action-button'
 import { CatalogFilters } from '@/components/catalog/catalog-filters'
 import { CatalogGrid } from '@/components/catalog/catalog-grid'
 import { CatalogStatistics } from '@/components/catalog/catalog-statistics'
 import {
-  deleteCareerPlaybookMany,
+  deleteCareerPlaybook,
   fetchCareerPlaybookLibraryPage,
   toggleCareerPlaybookShare,
 } from '@/components/career-playbook/library/client-adapter'
@@ -139,8 +142,7 @@ export default function CareerPlaybookLibraryPageClient({
   const t = useTranslations('career-playbook.library')
   const [items, setItems] = useState<CareerPlaybookLibraryItem[]>(initialData.items ?? EMPTY_ITEMS)
   const [nextCursor, setNextCursor] = useState<string | null>(initialData.nextCursor)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [sharingIds, setSharingIds] = useState<Set<string>>(new Set())
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
@@ -148,7 +150,7 @@ export default function CareerPlaybookLibraryPageClient({
   useEffect(() => {
     setItems(initialData.items ?? EMPTY_ITEMS)
     setNextCursor(initialData.nextCursor)
-    setSelectedIds(new Set())
+    setDeletingIds(new Set())
   }, [initialData])
 
   const statistics = initialData.statistics ?? defaultStatistics(items)
@@ -166,28 +168,23 @@ export default function CareerPlaybookLibraryPageClient({
     [initialData.facets?.levels, items]
   )
 
-  const handleToggleSelection = (playbookId: string, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (checked) {
-        next.add(playbookId)
-      } else {
-        next.delete(playbookId)
-      }
-      return next
-    })
-  }
+  const handleDeleteItem = async (item: CareerPlaybookLibraryItem) => {
+    if (deletingIds.has(item.id)) return
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0 || isDeleting) return
-    setIsDeleting(true)
+    setDeletingIds((prev) => new Set(prev).add(item.id))
+    setLoadMoreError(null)
+
     try {
-      const { deletedIds } = await deleteCareerPlaybookMany(Array.from(selectedIds), locale)
-      const deletedSet = new Set(deletedIds)
-      setItems((prev) => prev.filter((item) => !deletedSet.has(item.id)))
-      setSelectedIds(new Set())
+      const { deletedId } = await deleteCareerPlaybook(item.id, locale)
+      setItems((prev) => prev.filter((current) => current.id !== deletedId))
+    } catch {
+      setLoadMoreError(t('errorDescription'))
     } finally {
-      setIsDeleting(false)
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
     }
   }
 
@@ -264,19 +261,18 @@ export default function CareerPlaybookLibraryPageClient({
   }
 
   const renderLibraryCard = (item: CareerPlaybookLibraryItem) => {
-    const isChecked = selectedIds.has(item.id)
+    const isDeleting = deletingIds.has(item.id)
     const isShareable = item.status === 'completed'
     const shareHref =
       item.isPublic && item.shareSlug ? `/${locale}/share/career-playbook/${item.shareSlug}` : null
+    const builderHref = `/${locale}/career-playbook/new?resume=${encodeURIComponent(item.id)}`
 
     return (
-      <article className="career-playbook-panel p-4">
+      <article className="career-playbook-panel flex h-full flex-col p-4">
         <div className="flex items-start justify-between gap-3">
-          <Checkbox
-            checked={isChecked}
-            onCheckedChange={(checked) => handleToggleSelection(item.id, Boolean(checked))}
-            aria-label={item.title}
-          />
+          <Badge variant="secondary">
+            {item.isPublic ? t('card.publicBadge') : t('card.privateBadge')}
+          </Badge>
           <Badge className={getStatusTone(item.status)}>{t(`statusLabels.${item.status}`)}</Badge>
         </div>
         <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
@@ -284,54 +280,113 @@ export default function CareerPlaybookLibraryPageClient({
           {formatDate(item.createdAt, locale)}
         </p>
         <div className="mt-3 flex items-center gap-2 text-xs">
-          <Badge variant="secondary">
-            {item.isPublic ? t('card.publicBadge') : t('card.privateBadge')}
-          </Badge>
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
           {item.department ? <Badge variant="outline">{item.department}</Badge> : null}
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-md"
-            disabled={!isShareable || sharingIds.has(item.id)}
-            onClick={() => {
-              void handleShareToggle(item)
-            }}
-          >
-            <Share2 className="h-4 w-4" aria-hidden />
-            {item.isPublic ? t('card.makePrivate') : t('card.makePublic')}
-          </Button>
-          {shareHref ? (
-            <Button asChild variant="ghost" size="sm" className="rounded-md">
-              <Link href={shareHref}>
-                <Link2 className="h-4 w-4" aria-hidden />
-                {t('card.publicLink')}
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <div className="flex items-center gap-1">
+            <CatalogActionButton
+              icon={<Share2 className="h-3.5 w-3.5" aria-hidden />}
+              label={item.isPublic ? t('card.makePrivate') : t('card.share')}
+              className="text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300"
+              isActive={item.isPublic}
+              disabled={!isShareable || sharingIds.has(item.id)}
+              onClick={() => {
+                void handleShareToggle(item)
+              }}
+            />
+            {shareHref ? (
+              <CatalogActionButton
+                label={t('card.publicLink')}
+                className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                <Link href={shareHref}>
+                  <Link2 className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">{t('card.publicLink')}</span>
+                </Link>
+              </CatalogActionButton>
+            ) : null}
+            <CatalogActionButton
+              label={t('card.openBuilder')}
+              className="text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300"
+            >
+              <Link href={builderHref}>
+                <GitBranch className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">{t('card.openBuilder')}</span>
+              </Link>
+            </CatalogActionButton>
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                      disabled={isDeleting}
+                      aria-label={t('card.delete')}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      <span className="sr-only">{t('card.delete')}</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t('card.delete')}</p>
+                </TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('deleteDialog.description', { title: item.title })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>
+                    {t('deleteDialog.cancel')}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      void handleDeleteItem(item)
+                    }}
+                  >
+                    {t('deleteDialog.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {item.status === 'completed' ? (
+              <CreateCourseFromPlaybookDialog
+                playbookId={item.id}
+                trigger={
+                  <Button type="button" variant="outline" size="sm" className="rounded-md">
+                    <BookOpenCheck className="h-4 w-4" aria-hidden />
+                    {t('card.createCourse')}
+                  </Button>
+                }
+              />
+            ) : null}
+            <Button asChild variant="default" size="sm" className="rounded-md">
+              <Link
+                href={`/${locale}/career-playbook/${item.id}`}
+                aria-label={`${t('card.open')} ${item.title}`}
+              >
+                <BookOpen className="h-4 w-4" aria-hidden />
+                {t('card.open')}
               </Link>
             </Button>
-          ) : null}
-          <Button asChild variant="ghost" size="sm" className="rounded-md">
-            <Link
-              href={`/${locale}/career-playbook/${item.id}`}
-              aria-label={`${t('card.open')} ${item.title}`}
-            >
-              <BookOpen className="h-4 w-4" aria-hidden />
-              {t('card.open')}
-            </Link>
-          </Button>
-          {item.status === 'completed' ? (
-            <CreateCourseFromPlaybookDialog
-              playbookId={item.id}
-              trigger={
-                <Button type="button" variant="outline" size="sm" className="rounded-md">
-                  <BookOpenCheck className="h-4 w-4" aria-hidden />
-                  {t('card.createCourse')}
-                </Button>
-              }
-            />
-          ) : null}
+          </div>
         </div>
       </article>
     )
@@ -468,69 +523,28 @@ export default function CareerPlaybookLibraryPageClient({
             />
           </div>
 
-          {selectedIds.size > 0 ? (
-            <div className="career-playbook-panel flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium">
-                {t('selectedCount', { count: selectedIds.size })}
-              </span>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="rounded-md"
-                    disabled={isDeleting}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                    {isDeleting ? t('deleting') : t('bulkDelete')}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t('deleteDialog.description', { count: selectedIds.size })}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>
-                      {t('deleteDialog.cancel')}
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      disabled={isDeleting}
-                      onClick={() => {
-                        void handleBulkDelete()
-                      }}
-                    >
-                      {t('deleteDialog.confirm')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          ) : null}
-
-          <CatalogGrid
-            items={items}
-            getKey={(item) => item.id}
-            renderItem={renderLibraryCard}
-            columnsClassName="gap-4 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3"
-            emptyState={{
-              title: t('emptyTitle'),
-              description: t('emptyDescription'),
-              icon: BookCopy,
-            }}
-            loadMore={{
-              hasMore: Boolean(nextCursor),
-              isLoading: isLoadingMore,
-              label: t('loadMore'),
-              loadingLabel: t('loadingMore'),
-              onLoadMore: () => {
-                void handleLoadMore()
-              },
-            }}
-          />
+          <TooltipProvider delayDuration={120}>
+            <CatalogGrid
+              items={items}
+              getKey={(item) => item.id}
+              renderItem={renderLibraryCard}
+              columnsClassName="gap-4 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3"
+              emptyState={{
+                title: t('emptyTitle'),
+                description: t('emptyDescription'),
+                icon: BookCopy,
+              }}
+              loadMore={{
+                hasMore: Boolean(nextCursor),
+                isLoading: isLoadingMore,
+                label: t('loadMore'),
+                loadingLabel: t('loadingMore'),
+                onLoadMore: () => {
+                  void handleLoadMore()
+                },
+              }}
+            />
+          </TooltipProvider>
         </CareerPlaybookWorkspace>
       </main>
     </>
