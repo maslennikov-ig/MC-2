@@ -130,6 +130,7 @@ describe('QuestionRenderer', () => {
 
     await user.click(screen.getByLabelText('Какую должность вы хотите оформить?'))
     expect(screen.getByText('Популярные роли')).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(30)
     expect(screen.getAllByRole('option', { name: /Менеджер продукта/ })[0]).toBeInTheDocument()
     expect(screen.queryByText('Product Manager')).not.toBeInTheDocument()
     expect(handleValueChange).not.toHaveBeenCalled()
@@ -229,7 +230,7 @@ describe('QuestionRenderer', () => {
 
     expect(screen.getByText('Popular roles')).toBeInTheDocument()
     expect(screen.getByText('Product')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Product Manager/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('option', { name: /Product Manager/ })[0]).toBeInTheDocument()
   })
 
   it('renders an open fixed question and emits a string answer', async () => {

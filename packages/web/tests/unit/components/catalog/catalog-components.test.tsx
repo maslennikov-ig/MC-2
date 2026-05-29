@@ -66,6 +66,25 @@ describe('catalog primitives', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
+  it('keeps statistic cards compact enough for four metrics on one desktop row', () => {
+    render(
+      <CatalogStatistics
+        title="Library stats"
+        items={[
+          { id: 'total', label: 'Role guides', value: 7, icon: BookOpen, tone: 'purple' },
+          { id: 'completed', label: 'Completed', value: 3, icon: CheckCircle, tone: 'green' },
+          { id: 'drafts', label: 'Drafts', value: 2, icon: BookOpen, tone: 'amber' },
+          { id: 'public', label: 'Public', value: 1, icon: CheckCircle, tone: 'blue' },
+        ]}
+      />
+    )
+
+    const grid = screen.getByText('Role guides').closest('.grid')
+
+    expect(grid).toHaveClass('grid-cols-[repeat(auto-fit,minmax(12rem,16rem))]')
+    expect(grid).not.toHaveClass('lg:grid-cols-3')
+  })
+
   it('renders a shared grid, empty state, and load-more action', () => {
     const handleLoadMore = vi.fn()
     const { rerender } = render(

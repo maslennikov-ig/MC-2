@@ -54,19 +54,48 @@ export const roleTitleSuggestions: RoleTitleSuggestion[] = mergeRoleTitleSuggest
   mc2OverlayRoleTitleSuggestions
 )
 
+const defaultPopularRoleTitleSuggestionLimit = 30
+
+const popularRoleTitleSuggestionIds = [
+  'product-manager',
+  'sales-manager',
+  'software-engineer',
+  'customer-success-manager',
+  'project-manager',
+  'marketing-manager',
+  'data-analyst',
+  'operations-manager',
+  'ux-ui-designer',
+  'hr-business-partner',
+  'finance-manager',
+  'frontend-developer',
+  'backend-developer',
+  'b2b-sales-manager',
+  'b2c-sales-manager',
+  'retail-sales-manager',
+  'product-owner',
+  'business-analyst',
+  'qa-engineer',
+  'devops-engineer',
+  'talent-acquisition-manager',
+  'recruiter',
+  'support-specialist',
+  'account-executive',
+  'key-account-manager',
+  'data-scientist',
+  'data-engineer',
+  'product-designer',
+  'content-marketing-manager',
+  'legal-counsel',
+]
+
 export function getPopularRoleTitleSuggestions(
   locale: string,
-  limit = 8
+  limit = defaultPopularRoleTitleSuggestionLimit
 ): LocalizedRoleTitleSuggestion[] {
   const normalizedLocale = normalizeLocale(locale)
 
-  return [...roleTitleSuggestions]
-    .sort(
-      (left, right) =>
-        getLocalePriority(left, normalizedLocale) - getLocalePriority(right, normalizedLocale) ||
-        left.popularityRank - right.popularityRank ||
-        left.id.localeCompare(right.id)
-    )
+  return getPopularRoleTitleSuggestionCandidates(normalizedLocale)
     .slice(0, limit)
     .map((suggestion) =>
       localizeSuggestion(suggestion, normalizedLocale, {
@@ -75,6 +104,26 @@ export function getPopularRoleTitleSuggestions(
         score: 0,
       })
     )
+}
+
+function getPopularRoleTitleSuggestionCandidates(
+  locale: RoleTitleSuggestionLocale
+): RoleTitleSuggestion[] {
+  const byId = new Map(roleTitleSuggestions.map((suggestion) => [suggestion.id, suggestion]))
+  const curatedSuggestions = popularRoleTitleSuggestionIds
+    .map((id) => byId.get(id))
+    .filter((suggestion): suggestion is RoleTitleSuggestion => Boolean(suggestion))
+  const curatedIds = new Set(curatedSuggestions.map((suggestion) => suggestion.id))
+  const rankedRemainder = [...roleTitleSuggestions]
+    .filter((suggestion) => !curatedIds.has(suggestion.id))
+    .sort(
+      (left, right) =>
+        getLocalePriority(left, locale) - getLocalePriority(right, locale) ||
+        left.popularityRank - right.popularityRank ||
+        left.id.localeCompare(right.id)
+    )
+
+  return [...curatedSuggestions, ...rankedRemainder]
 }
 
 export function searchRoleTitleSuggestions(
