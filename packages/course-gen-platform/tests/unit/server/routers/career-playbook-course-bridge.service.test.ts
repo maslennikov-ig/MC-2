@@ -1,10 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 import type { Context } from '@/server/trpc';
+
+const bridgeMocks = vi.hoisted(() => ({
+  decrementQuota: vi.fn(),
+  getSupabaseAdmin: vi.fn(),
+  incrementQuota: vi.fn(),
+  mkdir: vi.fn(),
+  unlink: vi.fn(),
+  writeFile: vi.fn(),
+}));
+
+vi.mock('@/shared/validation/quota-enforcer', () => ({
+  decrementQuota: bridgeMocks.decrementQuota,
+  incrementQuota: bridgeMocks.incrementQuota,
+}));
+
+vi.mock('@/shared/supabase/admin', () => ({
+  getSupabaseAdmin: bridgeMocks.getSupabaseAdmin,
+}));
+
+vi.mock('node:fs/promises', () => ({
+  mkdir: bridgeMocks.mkdir,
+  unlink: bridgeMocks.unlink,
+  writeFile: bridgeMocks.writeFile,
+}));
+
 import {
   buildCourseBridgeBrief,
   createCourseFromPlaybook,
+  deleteCareerPlaybookBridgeCourse,
   renderCourseBridgeSourceDocuments,
+  uploadSyntheticCourseBridgeDocument,
   type CourseBridgeDependencies,
 } from '@/server/routers/career-playbook/course-bridge.service';
 import type { CareerPlaybookRow } from '@/server/routers/career-playbook/service-mappers';
@@ -114,33 +141,39 @@ function completedPlaybook(overrides: Partial<CareerPlaybookRow> = {}): CareerPl
 function createDependencies(overrides: Partial<CourseBridgeDependencies> = {}) {
   const uploadedIds: string[] = [];
   const dependencies: CourseBridgeDependencies = {
-    loadPlaybook: vi.fn(async () => completedPlaybook()),
-    getOrganizationSlug: vi.fn(async () => 'acme'),
-    insertCourse: vi.fn(async input => ({
-      id: courseId,
-      slug: input.slug,
-      title: input.title,
-    })),
-    deleteCourse: vi.fn(async () => undefined),
-    uploadDocument: vi.fn(async input => {
+    loadPlaybook: vi.fn(() => Promise.resolve(completedPlaybook())),
+    getOrganizationSlug: vi.fn(() => Promise.resolve('acme')),
+    insertCourse: vi.fn(input =>
+      Promise.resolve({
+        id: courseId,
+        slug: input.slug,
+        title: input.title,
+      })
+    ),
+    deleteCourse: vi.fn(() => Promise.resolve(undefined)),
+    uploadDocument: vi.fn(input => {
       const id = input.filename.includes('web-research') ? 'file-web-kpis' : 'file-role-guide';
       uploadedIds.push(id);
-      return { fileId: id };
+      return Promise.resolve({ fileId: id });
     }),
-    runWebResearch: vi.fn(async () => ({
-      kpis_insights: ['Activation and retention are common product lead KPIs.'],
-      trends_insights: ['AI-assisted product discovery is becoming standard.'],
-      onboarding_insights: ['First 30 days should cover rituals and stakeholders.'],
-      sources: ['https://example.com/product-lead-kpis'],
-      errors: [],
-    })),
-    initiateGeneration: vi.fn(async () => ({
-      success: true,
-      jobId: 'job-1',
-      message: 'Генерация курса инициализирована',
-      courseId,
-      generationCode: 'GEN-123',
-    })),
+    runWebResearch: vi.fn(() =>
+      Promise.resolve({
+        kpis_insights: ['Activation and retention are common product lead KPIs.'],
+        trends_insights: ['AI-assisted product discovery is becoming standard.'],
+        onboarding_insights: ['First 30 days should cover rituals and stakeholders.'],
+        sources: ['https://example.com/product-lead-kpis'],
+        errors: [],
+      })
+    ),
+    initiateGeneration: vi.fn(() =>
+      Promise.resolve({
+        success: true,
+        jobId: 'job-1',
+        message: 'Генерация курса инициализирована',
+        courseId,
+        generationCode: 'GEN-123',
+      })
+    ),
     now: () => new Date('2026-05-19T10:00:00.000Z'),
     ...overrides,
   };
@@ -149,6 +182,15 @@ function createDependencies(overrides: Partial<CourseBridgeDependencies> = {}) {
 }
 
 describe('course bridge service', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    bridgeMocks.decrementQuota.mockResolvedValue(undefined);
+    bridgeMocks.incrementQuota.mockResolvedValue(undefined);
+    bridgeMocks.mkdir.mockResolvedValue(undefined);
+    bridgeMocks.unlink.mockResolvedValue(undefined);
+    bridgeMocks.writeFile.mockResolvedValue(undefined);
+  });
+
   it('extracts a course brief from blocks 6, 7, 8, 14, and 21', () => {
     const brief = buildCourseBridgeBrief(completedPlaybook());
 
@@ -165,14 +207,16 @@ describe('course bridge service', () => {
 
   it('creates fallback source markdown when web research is unavailable', async () => {
     const { dependencies } = createDependencies({
-      loadPlaybook: vi.fn(async () => completedPlaybook({ role_profile_spec: null })),
-      runWebResearch: vi.fn(async () => ({
-        kpis_insights: [],
-        trends_insights: [],
-        onboarding_insights: [],
-        sources: [],
-        errors: ['TAVILY_API_KEY is not configured'],
-      })),
+      loadPlaybook: vi.fn(() => Promise.resolve(completedPlaybook({ role_profile_spec: null }))),
+      runWebResearch: vi.fn(() =>
+        Promise.resolve({
+          kpis_insights: [],
+          trends_insights: [],
+          onboarding_insights: [],
+          sources: [],
+          errors: ['TAVILY_API_KEY is not configured'],
+        })
+      ),
     });
 
     const result = await createCourseFromPlaybook(
@@ -210,8 +254,8 @@ describe('course bridge service', () => {
     expect(documents[1]).toMatchObject({
       filename: 'career-playbook-web-research-product-lead.md',
     });
-    expect(documents[1]!.markdown).toContain('https://example.com/product-lead-kpis');
-    expect(documents[1]!.markdown).toContain('Activation and retention');
+    expect(documents[1].markdown).toContain('https://example.com/product-lead-kpis');
+    expect(documents[1].markdown).toContain('Activation and retention');
   });
 
   it('reuses persisted playbook web research before running a fresh external lookup', async () => {
@@ -223,10 +267,10 @@ describe('course bridge service', () => {
       errors: [],
     };
     const { dependencies } = createDependencies({
-      loadPlaybook: vi.fn(async () => completedPlaybook({ web_research: persistedResearch })),
-      runWebResearch: vi.fn(async () => {
-        throw new Error('external lookup should not run');
-      }),
+      loadPlaybook: vi.fn(() =>
+        Promise.resolve(completedPlaybook({ web_research: persistedResearch }))
+      ),
+      runWebResearch: vi.fn(() => Promise.reject(new Error('external lookup should not run'))),
     });
 
     await createCourseFromPlaybook(
@@ -248,9 +292,7 @@ describe('course bridge service', () => {
   it('rolls back the created course when synthetic source upload fails', async () => {
     const uploadError = new Error('disk unavailable');
     const { dependencies } = createDependencies({
-      uploadDocument: vi.fn(async () => {
-        throw uploadError;
-      }),
+      uploadDocument: vi.fn(() => Promise.reject(uploadError)),
     });
 
     await expect(
@@ -300,9 +342,7 @@ describe('course bridge service', () => {
       message: 'Worker is not ready',
     });
     const { dependencies } = createDependencies({
-      initiateGeneration: vi.fn(async () => {
-        throw serviceUnavailable;
-      }),
+      initiateGeneration: vi.fn(() => Promise.reject(serviceUnavailable)),
     });
 
     await expect(
@@ -315,7 +355,7 @@ describe('course bridge service', () => {
 
   it('rejects non-completed playbooks before creating a course', async () => {
     const { dependencies } = createDependencies({
-      loadPlaybook: vi.fn(async () => completedPlaybook({ status: 'generating' })),
+      loadPlaybook: vi.fn(() => Promise.resolve(completedPlaybook({ status: 'generating' }))),
     });
 
     await expect(
@@ -327,10 +367,12 @@ describe('course bridge service', () => {
 
   it('rejects non-superadmin users when the playbook belongs to another organization', async () => {
     const { dependencies } = createDependencies({
-      loadPlaybook: vi.fn(async () =>
-        completedPlaybook({
-          organization_id: '99999999-9999-4999-8999-999999999999',
-        })
+      loadPlaybook: vi.fn(() =>
+        Promise.resolve(
+          completedPlaybook({
+            organization_id: '99999999-9999-4999-8999-999999999999',
+          })
+        )
       ),
     });
 
@@ -341,5 +383,148 @@ describe('course bridge service', () => {
     });
 
     expect(dependencies.insertCourse).not.toHaveBeenCalled();
+  });
+
+  it('reserves storage quota when persisting synthetic bridge markdown', async () => {
+    const insert = vi.fn(() => Promise.resolve({ error: null }));
+    bridgeMocks.getSupabaseAdmin.mockReturnValue({
+      from: vi.fn(() => ({ insert })),
+    });
+    const markdown = '# Product Lead\n\nComplete role guide.';
+
+    const result = await uploadSyntheticCourseBridgeDocument({
+      courseId,
+      organizationId: instructorContext.user!.organizationId,
+      userId: instructorContext.user!.id,
+      filename: 'career-playbook-product-lead.md',
+      markdown,
+      sourceUrls: [],
+    });
+
+    const expectedSize = Buffer.byteLength(markdown, 'utf8');
+    expect(result.fileId).toEqual(expect.any(String));
+    expect(bridgeMocks.incrementQuota).toHaveBeenCalledWith(
+      instructorContext.user!.organizationId,
+      expectedSize
+    );
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        course_id: courseId,
+        file_size: expectedSize,
+        filename: 'career-playbook-product-lead.md',
+        processing_method: 'career_playbook_bridge',
+      })
+    );
+    expect(bridgeMocks.decrementQuota).not.toHaveBeenCalled();
+  });
+
+  it('releases reserved quota when synthetic bridge markdown persistence fails', async () => {
+    bridgeMocks.getSupabaseAdmin.mockReturnValue({
+      from: vi.fn(() => ({
+        insert: vi.fn(() => Promise.resolve({ error: { message: 'insert failed' } })),
+      })),
+    });
+    const markdown = '# Product Lead\n\nComplete role guide.';
+
+    await expect(
+      uploadSyntheticCourseBridgeDocument({
+        courseId,
+        organizationId: instructorContext.user!.organizationId,
+        userId: instructorContext.user!.id,
+        filename: 'career-playbook-product-lead.md',
+        markdown,
+        sourceUrls: [],
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+
+    expect(bridgeMocks.decrementQuota).toHaveBeenCalledWith(
+      instructorContext.user!.organizationId,
+      Buffer.byteLength(markdown, 'utf8')
+    );
+  });
+
+  it('releases bridge document quota when rolling back a created course', async () => {
+    const selectEq = vi.fn(() =>
+      Promise.resolve({
+        data: [
+          {
+            storage_path: `uploads/${instructorContext.user!.organizationId}/${courseId}/source.md`,
+            file_size: 128,
+            organization_id: instructorContext.user!.organizationId,
+          },
+          {
+            storage_path: `uploads/${instructorContext.user!.organizationId}/${courseId}/research.md`,
+            file_size: 256,
+            organization_id: instructorContext.user!.organizationId,
+          },
+        ],
+      })
+    );
+    const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+    bridgeMocks.getSupabaseAdmin.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'file_catalog') {
+          return {
+            select: vi.fn(() => ({ eq: selectEq })),
+          };
+        }
+        if (table === 'courses') {
+          return {
+            delete: vi.fn(() => ({ eq: deleteEq })),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    });
+
+    await deleteCareerPlaybookBridgeCourse(courseId);
+
+    expect(bridgeMocks.decrementQuota).toHaveBeenCalledWith(
+      instructorContext.user!.organizationId,
+      128
+    );
+    expect(bridgeMocks.decrementQuota).toHaveBeenCalledWith(
+      instructorContext.user!.organizationId,
+      256
+    );
+  });
+
+  it('keeps bridge document quota and files when course rollback delete fails', async () => {
+    bridgeMocks.getSupabaseAdmin.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'file_catalog') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() =>
+                Promise.resolve({
+                  data: [
+                    {
+                      storage_path: `uploads/${instructorContext.user!.organizationId}/${courseId}/source.md`,
+                      file_size: 128,
+                      organization_id: instructorContext.user!.organizationId,
+                    },
+                  ],
+                })
+              ),
+            })),
+          };
+        }
+        if (table === 'courses') {
+          return {
+            delete: vi.fn(() => ({
+              eq: vi.fn(() => Promise.resolve({ error: { message: 'delete failed' } })),
+            })),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    });
+
+    await deleteCareerPlaybookBridgeCourse(courseId);
+
+    expect(bridgeMocks.unlink).not.toHaveBeenCalled();
+    expect(bridgeMocks.decrementQuota).not.toHaveBeenCalled();
   });
 });

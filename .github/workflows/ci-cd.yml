@@ -290,6 +290,12 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      qdrant:
+        image: qdrant/qdrant:latest
+        env:
+          QDRANT__SERVICE__API_KEY: test-qdrant-key
+        ports:
+          - 6333:6333
 
     steps:
       - uses: actions/checkout@v6
@@ -394,6 +400,20 @@ jobs:
       - name: Build course-gen-platform (required for tests with global-setup)
         run: pnpm --filter @megacampus/course-gen-platform build
 
+      - name: Wait for Qdrant
+        run: |
+          for attempt in {1..30}; do
+            if curl -fsS -H 'api-key: test-qdrant-key' http://localhost:6333/readyz >/dev/null; then
+              echo "Qdrant is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Qdrant did not become ready"
+          curl -v -H 'api-key: test-qdrant-key' http://localhost:6333/readyz || true
+          exit 1
+
       - name: Run integration tests
         run: |
           timeout 900 pnpm test:integration
@@ -410,8 +430,8 @@ jobs:
           SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-          QDRANT_URL: ${{ secrets.QDRANT_URL }}
-          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          QDRANT_URL: http://localhost:6333
+          QDRANT_API_KEY: test-qdrant-key
           REDIS_URL: redis://localhost:6379
 
   # ============================================

@@ -31,6 +31,25 @@ direct follow-up request without department context and sends the user back to
 the department question instead of starting generation with incomplete fixed
 answers.
 
+## Course Bridge Sources
+
+`careerPlaybook.courseBridge.createCourseFromPlaybook` creates a draft course
+from a completed Role Guide and persists generated markdown sources through the
+Career Playbook bridge storage module:
+
+- `course-bridge.service.ts` owns playbook access, course creation, web-research
+  selection, and generation start.
+- `course-bridge-storage.ts` owns synthetic markdown file writes, `file_catalog`
+  rows, and storage-quota accounting.
+
+Bridge sources are still trusted generated markdown and keep
+`processing_method = 'career_playbook_bridge'`, `markdown_content`, and
+`processed_content` populated for the downstream course pipeline. They now
+reserve organization storage quota before writing the source file, release it if
+the write or `file_catalog` insert fails, and release quota during bridge course
+rollback after the course delete succeeds. If course rollback delete fails, the
+files and quota are left intact because database ownership may still exist.
+
 ## E2E Harness
 
 `packages/web/playwright.config.ts` derives one web URL from `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_PORT`, `PORT`, or the default `http://localhost:3000`. The same URL is used for Playwright `baseURL`, `webServer.url`, and `NEXT_PUBLIC_APP_URL`; the resolved port is passed into the Next dev server through `PORT`.
