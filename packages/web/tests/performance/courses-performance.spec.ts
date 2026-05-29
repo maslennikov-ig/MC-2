@@ -205,7 +205,7 @@ test.describe('Courses Page Performance & UI Tests', () => {
     const mobileMenu = page.locator('[class*="lg:hidden"]').first()
     await mobileMenu.isVisible().catch(() => false)
 
-    const statsBar = page.locator('[class*="grid-cols-2"][class*="md:grid-cols-3"]')
+    const statsBar = page.getByTestId('catalog-statistics-grid')
     await expect(statsBar).toBeVisible()
 
     const searchInput = page.locator('input[placeholder*="Поиск"]')

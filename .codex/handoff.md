@@ -1,14 +1,15 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-29
-Stage: `mc2-db696.45`
-Branch: `develop`
+Stage: `mc2-db696.46`
+Branch: `codex/compact-catalog-statistics`
 
 ## Current State
 
-- `mc2-db696.45` is merged into `develop` and deployed to Dev.
-- Delivery merge commit: `b91aeb7e` (`dev: merge codex/career-playbook-card-actions-ux into develop`).
-- Dev CI/CD run: `26633038399`, conclusion `success`; `Deploy to Dev` completed successfully and `https://dev.ai.megacampus.ru` returned `HTTP/2 200`.
+- `mc2-db696.46` is implemented on `codex/compact-catalog-statistics`; it has not been merged or deployed yet.
+- Shared catalog statistics cards now use bounded auto-fit columns (`12rem` to `16rem`) instead of the previous `lg:grid-cols-3` wide banners.
+- This affects both Career Playbook library statistics and course library statistics through `CatalogStatistics`.
+- A stable `data-testid="catalog-statistics-grid"` was added for tests instead of asserting old grid breakpoint classes.
 - Career Playbook library cards now follow the course catalog action pattern: direct card actions for share, public link, constructor resume, delete, create course, and open.
 - The old Career Playbook checkbox selection and bulk-delete card path was removed.
 - `/career-playbook/new?resume=<playbookId>` now resumes the selected guide in the constructor; `/career-playbook/new?fresh=1` still starts a blank guide.
@@ -17,7 +18,8 @@ Branch: `develop`
 
 ## Verification
 
-- Focused RED/GREEN tests passed for Career Playbook library cards, constructor resume query handling, wizard resume behavior, and shared catalog primitives.
+- Focused RED/GREEN test passed for compact catalog statistics layout.
+- Focused Vitest passed for catalog primitives, Career Playbook library client, and courses library page: 15 tests.
 - `pnpm --filter @megacampus/web lint` passed.
 - `pnpm type-check` passed.
 - `pnpm build` passed; Next.js emitted existing Browserslist and `url.parse()` warnings.
@@ -25,18 +27,16 @@ Branch: `develop`
 
 ## Next recommended
 
-Next stage id: TBD
-Recommended action: pick the next ready Beads task or validate the deployed Career Playbook library UX in an authenticated Dev session.
+Next stage id: `mc2-db696.46`
+Recommended action: merge `codex/compact-catalog-statistics` into `develop` and deploy Dev if the compact statistics layout is approved.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.45/summary.md`, Beads `mc2-db696.45`, and `git status`. Continue from `develop` unless a new feature branch is needed; do not touch the unrelated `product-ia-course-landing` worktree.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.46/summary.md`, Beads `mc2-db696.46`, and `git status`. Continue from `codex/compact-catalog-statistics`; do not touch the unrelated `product-ia-course-landing` worktree.
 
 ## Delivery
 
-- `codex/career-playbook-card-actions-ux` was pushed and merged into `develop`.
-- `develop` was pushed to origin at `b91aeb7e`.
-- Dev auto-deploy completed successfully through GitHub Actions run `26633038399`.
+- No merge or deploy has happened yet for `mc2-db696.46`.
 
 ## Explicit defers
 

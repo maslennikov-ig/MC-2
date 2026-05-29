@@ -89,7 +89,10 @@ export function CatalogStatistics({
         </span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        data-testid="catalog-statistics-grid"
+        className="grid grid-cols-[repeat(auto-fit,minmax(12rem,16rem))] gap-3"
+      >
         {items.map((item) => {
           const Icon = item.icon
           const tone = toneClasses[item.tone ?? 'slate']
