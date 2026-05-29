@@ -33,4 +33,5 @@
 ## Delivery
 
 - Branch: `codex/compact-catalog-statistics`.
-- Not merged or deployed yet.
+- Merged into `develop` as part of `d0e7a523`.
+- Deployed to Dev by GitHub Actions run `26654070813`; `Deploy to Dev` verification passed.

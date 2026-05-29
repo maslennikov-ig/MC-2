@@ -2,11 +2,11 @@
 
 Updated: 2026-05-29
 Stage: `mc2-db696.47`
-Branch: `codex/compact-catalog-statistics`
+Branch: `develop`
 
 ## Current State
 
-- `mc2-db696.46` and `mc2-db696.47` are implemented on `codex/compact-catalog-statistics`; they have not been merged or deployed yet.
+- `mc2-db696.46` and `mc2-db696.47` were merged into `develop` as `d0e7a523` and deployed to Dev.
 - Shared catalog statistics cards now use bounded auto-fit columns (`12rem` to `16rem`) through `CatalogStatistics`; tests use `data-testid="catalog-statistics-grid"`.
 - Career Playbook role-title suggestions now show 30 curated popular roles by default instead of 8.
 - The popular role set is intentionally cross-functional: product, sales, engineering, support, data, operations, marketing, HR, finance, design, and legal are represented before the user types.
@@ -28,16 +28,16 @@ Branch: `codex/compact-catalog-statistics`
 
 ## Next recommended
 
-Next stage id: `mc2-db696.47`
-Recommended action: merge `codex/compact-catalog-statistics` into `develop` and deploy Dev if the compact statistics layout and expanded popular role suggestions are approved.
+Next stage id: pick the next ready Beads task.
+Recommended action: continue from clean `develop`; no pending delivery remains for `mc2-db696.46` or `mc2-db696.47`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.46/summary.md`, `.codex/stages/mc2-db696.47/summary.md`, Beads `mc2-db696.47`, and `git status`. Continue from `codex/compact-catalog-statistics`; do not touch the unrelated `product-ia-course-landing` worktree.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*/summary.md`, Beads, and `git status`. Continue from clean `develop`; do not touch the unrelated `product-ia-course-landing` worktree.
 
 ## Delivery
 
-- No merge or deploy has happened yet for `mc2-db696.46` or `mc2-db696.47`.
+- Dev delivery completed via GitHub Actions run `26654070813`; `Deploy to Dev` and deployment verification passed.
 
 ## Explicit defers
 
