@@ -1,11 +1,8 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { type CareerPlaybookQAData, type Json, type Language } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
-import { logger } from '../../../shared/logger/index.js';
 import {
   runCareerPlaybookWebResearch,
   type CareerPlaybookWebResearchResult,
@@ -23,6 +20,13 @@ import {
   persistedWebResearch,
   renderCourseBridgeSourceDocuments,
 } from './course-bridge-helpers';
+import {
+  deleteCareerPlaybookBridgeCourse,
+  uploadSyntheticCourseBridgeDocument,
+  type UploadDocumentInput,
+} from './course-bridge-storage';
+
+export { deleteCareerPlaybookBridgeCourse, uploadSyntheticCourseBridgeDocument };
 
 export { buildCourseBridgeBrief, renderCourseBridgeSourceDocuments };
 
@@ -48,15 +52,6 @@ interface InsertedCourse {
   id: string;
   slug: string;
   title: string;
-}
-
-interface UploadDocumentInput {
-  courseId: string;
-  organizationId: string;
-  userId: string;
-  filename: string;
-  markdown: string;
-  sourceUrls?: string[];
 }
 
 export interface CourseBridgeDependencies {
@@ -188,87 +183,13 @@ async function insertCourse(input: InsertCourseInput): Promise<InsertedCourse> {
   });
 }
 
-async function deleteCourse(courseId: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  const { data: files } = await supabase
-    .from('file_catalog')
-    .select('storage_path')
-    .eq('course_id', courseId);
-  const { error } = await supabase.from('courses').delete().eq('id', courseId);
-  if (error) {
-    logger.warn({ courseId, error }, 'Failed to rollback Career Playbook bridge course');
-  }
-
-  for (const file of files ?? []) {
-    await safeUnlinkStoragePath(file.storage_path);
-  }
-}
-
-async function safeUnlinkStoragePath(storagePath: string | null): Promise<void> {
-  if (!storagePath) return;
-  const cwd = path.resolve(process.cwd());
-  const absolutePath = path.resolve(cwd, storagePath);
-  if (!absolutePath.startsWith(`${cwd}${path.sep}`)) return;
-
-  try {
-    await unlink(absolutePath);
-  } catch (error) {
-    logger.warn({ storagePath, error }, 'Failed to remove synthetic Career Playbook source file');
-  }
-}
-
-async function uploadSyntheticDocument(input: UploadDocumentInput): Promise<{ fileId: string }> {
-  const supabase = getSupabaseAdmin();
-  const fileId = randomUUID();
-  const fileSize = Buffer.byteLength(input.markdown, 'utf8');
-  const hash = createHash('sha256').update(input.markdown).digest('hex');
-  const safeFilename = path.basename(input.filename);
-  const uploadDir = path.join(process.cwd(), 'uploads', input.organizationId, input.courseId);
-  const storagePath = path.join(uploadDir, `${fileId}-${safeFilename}`);
-
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(storagePath, input.markdown, 'utf8');
-
-  const { error } = await supabase.from('file_catalog').insert({
-    id: fileId,
-    organization_id: input.organizationId,
-    course_id: input.courseId,
-    filename: safeFilename,
-    file_type: 'md',
-    file_size: fileSize,
-    storage_path: path.relative(process.cwd(), storagePath),
-    hash,
-    mime_type: 'text/markdown',
-    vector_status: 'pending',
-    markdown_content: input.markdown,
-    processed_content: input.markdown,
-    processing_method: 'career_playbook_bridge',
-    summary_metadata: {
-      source: 'career_playbook_bridge',
-      source_urls: input.sourceUrls ?? [],
-      user_id: input.userId,
-    },
-  });
-
-  if (error) {
-    await safeUnlinkStoragePath(path.relative(process.cwd(), storagePath));
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to persist Career Playbook source document',
-      cause: error,
-    });
-  }
-
-  return { fileId };
-}
-
 function defaultDependencies(): CourseBridgeDependencies {
   return {
     loadPlaybook: loadOwnedPlaybook,
     getOrganizationSlug,
     insertCourse,
-    deleteCourse,
-    uploadDocument: uploadSyntheticDocument,
+    deleteCourse: deleteCareerPlaybookBridgeCourse,
+    uploadDocument: uploadSyntheticCourseBridgeDocument,
     runWebResearch: runCareerPlaybookWebResearch,
     initiateGeneration: initiateCourseGeneration,
     now: () => new Date(),

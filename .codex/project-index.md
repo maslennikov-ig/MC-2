@@ -45,6 +45,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend tRPC routers and services: `packages/course-gen-platform/src/server/routers/`.
 - Backend Career Playbook stage: `packages/course-gen-platform/src/stages/stage-career-playbook/`.
 - Backend Career Playbook department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`.
+- Backend Career Playbook course bridge: `packages/course-gen-platform/src/server/routers/career-playbook/course-bridge.service.ts` with storage/quota helpers in `course-bridge-storage.ts`.
 - Backend Career Playbook PDF service: `packages/course-gen-platform/src/services/career-playbook-pdf.ts`.
 - Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.
 - Backend Supabase migrations: `packages/course-gen-platform/supabase/migrations/`.
