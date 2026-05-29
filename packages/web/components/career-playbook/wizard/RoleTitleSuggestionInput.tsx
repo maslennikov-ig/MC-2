@@ -162,7 +162,7 @@ export function RoleTitleSuggestionInput({
               {labels.roleSuggestionsHint}
             </p>
           </div>
-          <div className="max-h-72 overflow-y-auto p-1">
+          <div className="max-h-[min(32rem,60vh)] overflow-y-auto p-1">
             {suggestionGroups.map((group) => (
               <div key={`${group.department}-${group.suggestions[0]?.id}`} className="py-1">
                 <div

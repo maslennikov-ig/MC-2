@@ -74,6 +74,43 @@ describe('role title suggestions', () => {
     expect(popularEn[0]?.departmentLabel).toBe('Product')
   })
 
+  it('shows a broad default popular set before the user searches', () => {
+    const popularRu = getPopularRoleTitleSuggestions('ru')
+    const ids = popularRu.map((suggestion) => suggestion.id)
+    const departments = new Set(popularRu.map((suggestion) => suggestion.department))
+
+    expect(popularRu).toHaveLength(30)
+    expect(new Set(ids).size).toBe(30)
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'product-manager',
+        'sales-manager',
+        'software-engineer',
+        'customer-success-manager',
+        'data-analyst',
+        'project-manager',
+        'marketing-manager',
+        'hr-business-partner',
+        'finance-manager',
+        'ux-ui-designer',
+      ])
+    )
+    expect([...departments]).toEqual(
+      expect.arrayContaining([
+        'product',
+        'sales',
+        'engineering',
+        'support',
+        'data',
+        'operations',
+        'marketing',
+        'hr',
+        'finance',
+        'design',
+      ])
+    )
+  })
+
   it('ranks acronyms, aliases, and localized labels before loose keyword matches', () => {
     const pmResults = searchRoleTitleSuggestions('pm', 'en', 6)
     const developerResults = searchRoleTitleSuggestions('разраб', 'ru', 6)
