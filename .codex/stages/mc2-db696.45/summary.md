@@ -45,6 +45,13 @@
 - project-index: updated.
 - graph-reviewed: no-change-needed - Graphify is not configured and `graphify-out/GRAPH_REPORT.md` is absent.
 
+## Delivery
+
+- Feature branch `codex/career-playbook-card-actions-ux` was pushed to origin.
+- Merged into `develop` with merge commit `b91aeb7e`.
+- `develop` was pushed to origin and triggered GitHub Actions run `26633038399`.
+- Dev deploy completed successfully; `Deploy to Dev` passed and `https://dev.ai.megacampus.ru` returned `HTTP/2 200`.
+
 ## Explicit Defers
 
 - Browser visual smoke for authenticated library cards remains deferred until a reusable authenticated local session or fixture is available.
