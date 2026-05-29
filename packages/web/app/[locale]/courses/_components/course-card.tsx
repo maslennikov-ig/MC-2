@@ -42,7 +42,7 @@ import { cn } from '@/lib/utils'
 import type { Course } from '@/types/database'
 import { ShareButton } from '@/components/courses/share-button'
 import { buildCourseUrl, buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
-import { ActionButtonWithTooltip } from '@/components/courses/action-button-with-tooltip'
+import { CatalogActionButton } from '@/components/catalog/catalog-action-button'
 import { ImageSkeleton } from '@/components/ui/image-skeleton'
 
 interface User {
@@ -777,7 +777,7 @@ export function CourseCard({
                 transition={{ delay: 0.32 }}
                 className="mt-3 flex items-center gap-1"
               >
-                <ActionButtonWithTooltip
+                <CatalogActionButton
                   icon={
                     isUpdatingFavorite ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -793,6 +793,7 @@ export function CourseCard({
                   label={t('addToFavorites')}
                   onClick={(e) => void handleToggleFavorite(e)}
                   disabled={isUpdatingFavorite}
+                  size="icon-sm"
                   className="h-7 w-7 text-gray-500 hover:text-purple-500 dark:text-slate-400 dark:hover:text-purple-400"
                   isActive={isFavorited}
                 />
@@ -859,16 +860,17 @@ export function CourseCard({
                   (user.id === course.user_id ||
                     user.role === 'admin' ||
                     user.role === 'superadmin') && (
-                    <ActionButtonWithTooltip
+                    <CatalogActionButton
                       icon={<GitBranch className="h-3.5 w-3.5" />}
                       label={tc('nav.courseConstructor')}
                       onClick={handleWorkflow}
+                      size="icon-sm"
                       className="h-7 w-7 text-gray-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400"
                     />
                   )}
 
                 {canDelete && (
-                  <ActionButtonWithTooltip
+                  <CatalogActionButton
                     icon={
                       isDeleting ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -879,6 +881,7 @@ export function CourseCard({
                     label={tc('nav.deleteCourse')}
                     onClick={() => void handleDelete()}
                     disabled={isDeleting}
+                    size="icon-sm"
                     className="h-7 w-7 text-gray-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400"
                   />
                 )}

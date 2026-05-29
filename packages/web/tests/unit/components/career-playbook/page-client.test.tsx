@@ -101,6 +101,7 @@ let requestFollowups: Mock
 let resolveDepartmentOptions: Mock
 let approveAndGenerate: Mock
 let getGenerationStatus: Mock
+let getDraft: Mock
 
 function renderPage(props: Partial<Parameters<typeof CareerPlaybookNewPageClient>[0]> = {}) {
   return render(
@@ -153,6 +154,22 @@ describe('CareerPlaybookNewPageClient', () => {
       phase: 'completion',
       progress: 80,
     })
+    getDraft = vi.fn().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      currentFixedIndex: 0,
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Existing Head of Sales',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      },
+      status: 'answering_fixed',
+      phase: 'fixed',
+    })
     setCareerPlaybookClientForTests({
       startSession,
       requestFollowups,
@@ -202,6 +219,28 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(useCareerPlaybookStore.getState().playbookId).not.toBe(
       '00000000-0000-4000-8000-000000000777'
     )
+  })
+
+  it('resumes the concrete guide selected from the library constructor action', async () => {
+    setCareerPlaybookClientForTests({
+      startSession,
+      getDraft,
+      requestFollowups,
+      resolveDepartmentOptions,
+      approveAndGenerate,
+      getGenerationStatus,
+      submitAnswer,
+    })
+
+    renderPage({ resumePlaybookId: '00000000-0000-4000-8000-000000000777' })
+
+    expect(await screen.findByLabelText('Which role do you want to define?')).toHaveValue(
+      'Existing Head of Sales'
+    )
+    expect(getDraft).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+    })
+    expect(startSession).not.toHaveBeenCalled()
   })
 
   it('renders Phase A and advances through fixed questions with localized copy', async () => {

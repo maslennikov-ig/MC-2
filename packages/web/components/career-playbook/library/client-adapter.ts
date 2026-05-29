@@ -75,7 +75,7 @@ export async function fetchCareerPlaybookLibraryPage(input: {
   }
 }
 
-export async function deleteCareerPlaybookMany(playbookIds: string[], locale: string) {
+export async function deleteCareerPlaybook(playbookId: string, locale: string) {
   const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
   const procedure = client.careerPlaybook?.library?.delete
 
@@ -83,15 +83,9 @@ export async function deleteCareerPlaybookMany(playbookIds: string[], locale: st
     throw new Error(`careerPlaybook.library.delete unavailable (${locale})`)
   }
 
-  const deletedIds: string[] = []
-  await Promise.all(
-    playbookIds.map(async (playbookId) => {
-      await procedure.mutate({ playbookId })
-      deletedIds.push(playbookId)
-    })
-  )
+  await procedure.mutate({ playbookId })
 
-  return { deletedIds }
+  return { deletedId: playbookId }
 }
 
 export async function toggleCareerPlaybookShare(

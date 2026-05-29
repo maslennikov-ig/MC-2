@@ -438,9 +438,6 @@
     "emptyDescription": "Create your first Role Guide to build your library.",
     "errorTitle": "Library temporarily unavailable",
     "errorDescription": "Retry in a minute or create a new guide.",
-    "selectedCount": "{count} selected",
-    "bulkDelete": "Delete selected",
-    "deleting": "Deleting...",
     "loadMore": "Load more",
     "loadingMore": "Loading...",
     "resultsCount": "{count} of {total}",
@@ -462,10 +459,12 @@
       "createCourse": "Create course",
       "publicBadge": "Public",
       "privateBadge": "Private",
-      "makePublic": "Make public",
+      "share": "Share",
       "makePrivate": "Make private",
       "publicLink": "Public link",
-      "open": "Open"
+      "open": "Open",
+      "openBuilder": "Open constructor",
+      "delete": "Delete"
     },
     "statusLabels": {
       "draft": "Draft",
@@ -478,10 +477,10 @@
       "failed": "Failed"
     },
     "deleteDialog": {
-      "title": "Delete selected guides?",
-      "description": "This will delete {count} selected guides.",
+      "title": "Delete guide?",
+      "description": "This will delete \"{title}\".",
       "cancel": "Cancel",
-      "confirm": "Delete guides"
+      "confirm": "Delete guide"
     },
     "createCourseDialog": {
       "title": "Create course from Role Guide",
