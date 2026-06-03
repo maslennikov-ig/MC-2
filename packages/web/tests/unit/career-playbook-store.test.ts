@@ -6,6 +6,7 @@ const trpcMocks = vi.hoisted(() => ({
   requestFollowupsMutate: vi.fn(),
   approveAndGenerateMutate: vi.fn(),
   getStatusQuery: vi.fn(),
+  libraryGetQuery: vi.fn(),
   submitAnswerMutate: vi.fn(),
   exportPdfQuery: vi.fn(),
 }))
@@ -32,6 +33,7 @@ function resetStore() {
   trpcMocks.requestFollowupsMutate.mockReset()
   trpcMocks.approveAndGenerateMutate.mockReset()
   trpcMocks.getStatusQuery.mockReset()
+  trpcMocks.libraryGetQuery.mockReset()
   trpcMocks.submitAnswerMutate.mockReset()
   trpcMocks.exportPdfQuery.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReset()
@@ -48,6 +50,9 @@ function resetStore() {
         requestFollowups: { mutate: trpcMocks.requestFollowupsMutate },
         approveAndGenerate: { mutate: trpcMocks.approveAndGenerateMutate },
         getStatus: { query: trpcMocks.getStatusQuery },
+      },
+      library: {
+        get: { query: trpcMocks.libraryGetQuery },
       },
     },
   })
@@ -969,6 +974,50 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().status).toBe('failed')
     expect(useCareerPlaybookStore.getState().generationProgress).toBe(100)
     expect(useCareerPlaybookStore.getState().generationStatusError).toBe('worker failed')
+  })
+
+  it('maps production library details into a viewer snapshot', async () => {
+    const playbookId = '00000000-0000-4000-8000-000000000930'
+    trpcMocks.libraryGetQuery.mockResolvedValue({
+      id: playbookId,
+      status: 'completed',
+      language: 'ru',
+      positionTitle: 'Менеджер по продажам',
+      department: 'sales',
+      level: 'junior',
+      isPublic: false,
+      shareSlug: null,
+      createdAt: '2026-06-03T09:00:00.000Z',
+      updatedAt: '2026-06-03T09:10:00.000Z',
+      completedAt: '2026-06-03T09:10:00.000Z',
+      finalMarkdown: '# Менеджер по продажам',
+      generatedBlocks: {
+        header: {
+          content: '# Менеджер по продажам',
+          status: 'generated',
+          attempt: 1,
+        },
+      },
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().loadCareerPlaybookViewer(playbookId)
+    ).resolves.toEqual({ ok: true })
+
+    expect(trpcMocks.libraryGetQuery).toHaveBeenCalledWith({ playbookId })
+    expect(useCareerPlaybookStore.getState().viewer).toMatchObject({
+      playbookId,
+      title: 'Менеджер по продажам',
+      contentLanguage: 'ru',
+      status: 'completed',
+      department: 'sales',
+      level: 'junior',
+      isPublic: false,
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.header?.content).toBe(
+      '# Менеджер по продажам'
+    )
+    expect(useCareerPlaybookStore.getState().viewerError).toBeNull()
   })
 
   it('does not leave completion review while generation is active', () => {

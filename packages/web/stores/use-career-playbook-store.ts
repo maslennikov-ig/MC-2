@@ -74,6 +74,19 @@ export interface CareerPlaybookGenerationStatus {
   completedAt?: string
 }
 
+interface CareerPlaybookLibraryDetail {
+  id: string
+  status: CareerPlaybookPlaybookStatus
+  language?: string | null
+  positionTitle?: string | null
+  department?: string | null
+  level?: string | null
+  generatedBlocks?: Record<string, CareerPlaybookBlockState> | null
+  finalMarkdown?: string | null
+  shareSlug?: string | null
+  isPublic?: boolean
+}
+
 export type CareerPlaybookDepartmentResolutionState =
   | CareerPlaybookDepartmentResolution
   | {
@@ -836,6 +849,50 @@ function normalizeViewerSnapshot(
   }
 }
 
+function extractMarkdownTitle(markdown: string | null | undefined): string | null {
+  const firstHeading = markdown?.match(/^#\s+(.+)$/m)?.[1]?.trim()
+  return firstHeading && firstHeading.length > 0 ? firstHeading : null
+}
+
+function generatedBlocksToViewerBlocks(
+  generatedBlocks: Record<string, CareerPlaybookBlockState> | null | undefined,
+  finalMarkdown: string | null | undefined
+): CareerPlaybookViewerSnapshot['blocks'] {
+  const knownBlockIds = new Set<string>(CAREER_PLAYBOOK_BLOCK_CATALOG.map((block) => block.blockId))
+  const blocks = Object.fromEntries(
+    Object.entries(generatedBlocks ?? {}).filter(([blockId]) => knownBlockIds.has(blockId))
+  ) as CareerPlaybookViewerSnapshot['blocks']
+
+  if (Object.keys(blocks).length > 0 || !finalMarkdown?.trim()) {
+    return blocks
+  }
+
+  return {
+    header: {
+      content: finalMarkdown,
+      status: 'generated',
+      attempt: 0,
+    },
+  }
+}
+
+function libraryDetailToViewerSnapshot(
+  detail: CareerPlaybookLibraryDetail
+): CareerPlaybookViewerSnapshot {
+  return {
+    playbookId: detail.id,
+    title:
+      detail.positionTitle?.trim() || extractMarkdownTitle(detail.finalMarkdown) || 'Role Guide',
+    department: detail.department ?? null,
+    level: detail.level ?? null,
+    contentLanguage: detail.language ?? 'ru',
+    status: detail.status,
+    blocks: generatedBlocksToViewerBlocks(detail.generatedBlocks, detail.finalMarkdown),
+    shareSlug: detail.shareSlug ?? null,
+    isPublic: detail.isPublic ?? false,
+  }
+}
+
 function isCareerPlaybookBackendPending(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   return message.includes('METHOD_NOT_SUPPORTED') || message.includes('not implemented')
@@ -884,9 +941,11 @@ function getClient(): CareerPlaybookClient {
     getDraft: async (input) =>
       (await client.careerPlaybook.session.getDraft.query(input)) as unknown as CareerPlaybookDraft,
     getViewer: async (input) =>
-      (await client.careerPlaybook.library.get.query(
-        input
-      )) as unknown as CareerPlaybookViewerSnapshot,
+      libraryDetailToViewerSnapshot(
+        (await client.careerPlaybook.library.get.query(
+          input
+        )) as unknown as CareerPlaybookLibraryDetail
+      ),
     editBlock: async (input) =>
       (await client.careerPlaybook.library.edit.mutate(
         input
