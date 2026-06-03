@@ -8,6 +8,11 @@ import {
   type CareerPlaybookNodeCost,
   type CareerPlaybookQAData,
 } from '@megacampus/shared-types';
+import {
+  formatCareerPlaybookBusinessContextDigest,
+  formatCareerPlaybookBusinessContextMissingSignals,
+  getCareerPlaybookBusinessContext,
+} from './business-context';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 
 export const FOLLOWUP_GENERATOR_PROMPT_KEY = 'career_playbook_followup_generator';
@@ -37,6 +42,8 @@ export function buildFollowupPromptVariables(
   qaData: CareerPlaybookQAData,
   contentLanguage: string
 ): Record<string, string> {
+  const businessContext = getCareerPlaybookBusinessContext(qaData);
+
   return {
     position: getAnswer(qaData, 'position'),
     department: getAnswer(qaData, 'department'),
@@ -46,6 +53,10 @@ export function buildFollowupPromptVariables(
     reporting: getAnswer(qaData, 'reporting'),
     content_language: contentLanguage,
     freeform_text: getFreeformText(qaData),
+    business_context_mode: businessContext.mode,
+    business_context_digest: formatCareerPlaybookBusinessContextDigest(businessContext),
+    business_context_missing_signals:
+      formatCareerPlaybookBusinessContextMissingSignals(businessContext),
     previous_followups_json: JSON.stringify(qaData.followups, null, 2),
   };
 }

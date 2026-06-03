@@ -47,6 +47,35 @@ interface FileUploadProps {
   maxFiles?: number
   /** Organization tier for file limits (defaults to 'standard') */
   tier?: TierKey
+  copy?: Partial<FileUploadCopy>
+}
+
+interface FileUploadCopy {
+  missingOwner: string
+  draggingTitle: string
+  idleTitle: string
+  limitTemplate: string
+  maxFilesTemplate: string
+  uploading: string
+  uploaded: string
+  error: string
+  pending: string
+  retry: string
+  remove: string
+}
+
+const defaultCopy: FileUploadCopy = {
+  missingOwner: 'Сначала создайте курс',
+  draggingTitle: 'Отпустите файлы здесь',
+  idleTitle: 'Перетащите файлы или нажмите для выбора',
+  limitTemplate: '{extensions} (до {maxFileSizeMB} МБ)',
+  maxFilesTemplate: 'Максимум {maxFiles} файлов',
+  uploading: 'Загрузка...',
+  uploaded: 'Загружен',
+  error: 'Ошибка загрузки',
+  pending: 'Ожидает загрузки',
+  retry: 'Повторить загрузку',
+  remove: 'Удалить файл',
 }
 
 /**
@@ -102,9 +131,11 @@ export function FileUpload({
   disabled = false,
   maxFiles: maxFilesProp,
   tier = DEFAULT_TIER,
+  copy,
 }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const labels: FileUploadCopy = { ...defaultCopy, ...copy }
 
   // Compute tier-based limits
   const effectiveTier = tier || DEFAULT_TIER
@@ -326,7 +357,7 @@ export function FileUpload({
   const retryUpload = useCallback(
     async (file: UploadedFile) => {
       if (!courseId) {
-        toast.error('Сначала создайте курс')
+        toast.error(labels.missingOwner)
         return
       }
 
@@ -350,7 +381,7 @@ export function FileUpload({
         )
       }
     },
-    [courseId, uploadedFiles, onFilesChange, onUploadFile]
+    [courseId, labels.missingOwner, uploadedFiles, onFilesChange, onUploadFile]
   )
 
   // Get file icon based on extension
@@ -406,7 +437,7 @@ export function FileUpload({
             className="mb-1 font-medium text-slate-700 dark:text-white"
             style={{ textShadow: '0 0 0 transparent, 0 1px 3px rgba(0,0,0,0.5)' }}
           >
-            {isDragging ? 'Отпустите файлы здесь' : 'Перетащите файлы или нажмите для выбора'}
+            {isDragging ? labels.draggingTitle : labels.idleTitle}
           </p>
 
           {/* Secondary text - IMPROVED READABILITY */}
@@ -414,7 +445,9 @@ export function FileUpload({
             className="text-sm text-slate-500 dark:text-white/70"
             style={{ textShadow: '0 0 0 transparent, 0 1px 2px rgba(0,0,0,0.4)' }}
           >
-            {allowedExtensions.map((ext) => ext.toUpperCase()).join(', ')} (до {maxFileSizeMB} МБ)
+            {labels.limitTemplate
+              .replace('{extensions}', allowedExtensions.map((ext) => ext.toUpperCase()).join(', '))
+              .replace('{maxFileSizeMB}', String(maxFileSizeMB))}
           </p>
 
           {/* Tertiary text - IMPROVED CONTRAST */}
@@ -422,7 +455,7 @@ export function FileUpload({
             className="mt-2 text-xs text-slate-400 dark:text-white/60"
             style={{ textShadow: '0 0 0 transparent, 0 1px 2px rgba(0,0,0,0.4)' }}
           >
-            Максимум {maxFiles} файлов
+            {labels.maxFilesTemplate.replace('{maxFiles}', String(maxFiles))}
           </p>
         </div>
       </div>
@@ -467,19 +500,19 @@ export function FileUpload({
                     </span>
                     {file.status === 'uploading' && (
                       <span className="text-purple-600 dark:text-purple-400">
-                        Загрузка... {file.progress}%
+                        {labels.uploading} {file.progress}%
                       </span>
                     )}
                     {file.status === 'success' && (
-                      <span className="text-green-600 dark:text-green-400">Загружен</span>
+                      <span className="text-green-600 dark:text-green-400">{labels.uploaded}</span>
                     )}
                     {file.status === 'error' && (
                       <span className="text-red-600 dark:text-red-400">
-                        {file.error || 'Ошибка загрузки'}
+                        {file.error || labels.error}
                       </span>
                     )}
                     {file.status === 'pending' && (
-                      <span className="text-slate-400 dark:text-white/50">Ожидает загрузки</span>
+                      <span className="text-slate-400 dark:text-white/50">{labels.pending}</span>
                     )}
                   </div>
 
@@ -502,10 +535,10 @@ export function FileUpload({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        retryUpload(file)
+                        void retryUpload(file)
                       }}
                       className="rounded-lg p-1 transition-colors hover:bg-slate-200 dark:hover:bg-white/10"
-                      title="Повторить загрузку"
+                      title={labels.retry}
                     >
                       <RefreshCw className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </button>
@@ -522,7 +555,7 @@ export function FileUpload({
                       removeFile(file.id)
                     }}
                     className="rounded-lg p-1 transition-colors hover:bg-slate-200 dark:hover:bg-white/10"
-                    title="Удалить файл"
+                    title={labels.remove}
                   >
                     <X className="h-5 w-5 text-slate-500 hover:text-red-600 dark:text-white/60 dark:hover:text-red-400" />
                   </button>

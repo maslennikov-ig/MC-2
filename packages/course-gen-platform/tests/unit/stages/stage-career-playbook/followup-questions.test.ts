@@ -24,6 +24,23 @@ const qaData: CareerPlaybookQAData = {
     },
   ],
   freeform: [{ text: 'Enterprise sales, consultative deals, CRM discipline.' }],
+  business_context: {
+    mode: 'company_specific',
+    status: 'ready',
+    source_ids: ['00000000-0000-4000-8000-000000000010'],
+    digest: {
+      product: ['AI course generation platform'],
+      customers: ['B2B education teams'],
+      sales_channels: ['Inbound demos'],
+      processes: ['Course generation from uploaded materials'],
+      metrics: ['Qualified pipeline'],
+      org_structure: ['Sales reports to CRO'],
+      constraints: ['No customer secrets in generated documents'],
+      source_ids: ['00000000-0000-4000-8000-000000000010'],
+      missing_signals: ['pricing model'],
+      user_edited: false,
+    },
+  },
 };
 
 const followupResponse = {
@@ -57,9 +74,12 @@ describe('Career Playbook follow-up questions helper', () => {
         reporting: 'Reports to CRO. Leads 3 SDRs.',
         content_language: 'ru',
         freeform_text: 'Enterprise sales, consultative deals, CRM discipline.',
+        business_context_mode: 'company_specific',
       })
     );
     expect(variables.previous_followups_json).toContain('Enterprise cycle');
+    expect(variables.business_context_digest).toContain('AI course generation platform');
+    expect(variables.business_context_missing_signals).toContain('pricing model');
   });
 
   it('parses fenced LLM JSON with the shared follow-up schema', () => {

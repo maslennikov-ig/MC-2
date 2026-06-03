@@ -11,6 +11,11 @@ import {
   runCareerPlaybookWebResearch,
   type RunCareerPlaybookWebResearchOptions,
 } from '../rag/web-research';
+import {
+  formatCareerPlaybookBusinessContextDigest,
+  formatCareerPlaybookBusinessContextMissingSignals,
+  getCareerPlaybookBusinessContext,
+} from './business-context';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 
 export { buildCareerPlaybookResearchQueries, runCareerPlaybookWebResearch };
@@ -108,11 +113,18 @@ export function buildSpecBuilderPromptVariables(
     trends_insights: string[];
     onboarding_insights: string[];
     sources: string[];
+    errors?: string[];
   },
   contentLanguage: string
 ): Record<string, string> {
+  const businessContext = getCareerPlaybookBusinessContext(qaData);
+
   return {
     qa_data_json: JSON.stringify(qaData, null, 2),
+    business_context_mode: businessContext.mode,
+    business_context_digest: formatCareerPlaybookBusinessContextDigest(businessContext),
+    business_context_missing_signals:
+      formatCareerPlaybookBusinessContextMissingSignals(businessContext),
     kpi_insights: joinInsights(research.kpis_insights),
     trends_insights: joinInsights(research.trends_insights),
     onboarding_insights: joinInsights(research.onboarding_insights),

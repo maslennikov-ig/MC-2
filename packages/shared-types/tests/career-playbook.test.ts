@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   CareerPlaybookBlockStateSchema,
+  CareerPlaybookBusinessContextSchema,
+  CareerPlaybookBusinessContextDigestSchema,
+  CareerPlaybookBusinessContextSourceSchema,
   CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD,
   CareerPlaybookCostBreakdownSchema,
   CareerPlaybookFollowupAnswerSchema,
@@ -142,6 +145,58 @@ describe('Career Playbook shared schemas', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('validates guided business context for company-specific and universal Role Guides', () => {
+    const digest = CareerPlaybookBusinessContextDigestSchema.parse({
+      product: ['AI course generation platform for internal training teams'],
+      customers: ['B2B education and HR departments'],
+      sales_channels: ['Founder-led sales', 'Inbound demos'],
+      processes: ['Course creation starts from uploaded materials'],
+      metrics: ['Qualified pipeline', 'Course completion quality'],
+      org_structure: ['Sales reports to CEO'],
+      constraints: ['No hardcoded customer data in generated documents'],
+      source_ids: ['00000000-0000-4000-8000-000000000010'],
+      missing_signals: ['pricing model'],
+      user_edited: true,
+    });
+
+    expect(digest.user_edited).toBe(true);
+
+    const companyContext = CareerPlaybookBusinessContextSchema.parse({
+      mode: 'company_specific',
+      digest,
+      status: 'ready',
+      source_ids: ['00000000-0000-4000-8000-000000000010'],
+    });
+
+    expect(companyContext.mode).toBe('company_specific');
+    expect(companyContext.digest?.customers).toContain('B2B education and HR departments');
+
+    const universalContext = CareerPlaybookBusinessContextSchema.parse({
+      mode: 'universal',
+      status: 'skipped',
+      skip_reason: 'User chose benchmark generation without company data',
+    });
+
+    expect(universalContext.digest).toBeNull();
+    expect(universalContext.source_ids).toEqual([]);
+  });
+
+  it('validates Career Playbook business context source records without course ownership', () => {
+    const source = CareerPlaybookBusinessContextSourceSchema.parse({
+      id: '00000000-0000-4000-8000-000000000010',
+      playbook_id: '00000000-0000-4000-8000-000000000011',
+      organization_id: '00000000-0000-4000-8000-000000000012',
+      source_type: 'file',
+      status: 'uploaded',
+      filename: 'sales-playbook.pdf',
+      file_catalog_id: '00000000-0000-4000-8000-000000000013',
+      created_at: '2026-06-03T00:00:00.000Z',
+    });
+
+    expect(source.status).toBe('uploaded');
+    expect(source.file_catalog_id).toBe('00000000-0000-4000-8000-000000000013');
   });
 
   it('validates Career Playbook queue jobs without requiring a courseId', () => {

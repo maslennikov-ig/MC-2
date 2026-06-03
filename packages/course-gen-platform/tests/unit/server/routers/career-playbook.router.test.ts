@@ -8,14 +8,33 @@ const mocks = vi.hoisted(() => ({
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
   createCourseFromPlaybook: vi.fn(),
+  validateFile: vi.fn(),
+  runPhase2Storage: vi.fn(),
+  isStorageError: vi.fn(),
+  decrementQuota: vi.fn(),
   addJob: vi.fn(),
   removeTerminalJobById: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
   getSupabaseAdmin: vi.fn(() => ({
     from: mocks.from,
+    rpc: mocks.rpc,
   })),
+}));
+
+vi.mock('@/shared/validation/file-validator', () => ({
+  validateFile: mocks.validateFile,
+}));
+
+vi.mock('@/shared/validation/quota-enforcer', () => ({
+  decrementQuota: mocks.decrementQuota,
+}));
+
+vi.mock('@/stages/stage1-document-upload/phases', () => ({
+  runPhase2Storage: mocks.runPhase2Storage,
+  isStorageError: mocks.isStorageError,
 }));
 
 vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
@@ -113,11 +132,22 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
     delete: vi.fn(() => builder),
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
     order: vi.fn(() => builder),
     single: vi.fn(() => {
       const result = singleResults.shift();
       return Promise.resolve(result ?? { data: null, error: new Error('No mocked single result') });
     }),
+  };
+
+  return builder;
+}
+
+function createCountBuilder(count = 0, error: unknown = null) {
+  const builder = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    neq: vi.fn(() => Promise.resolve({ count, error })),
   };
 
   return builder;
@@ -136,6 +166,19 @@ function createListBuilder(data: unknown[], error: unknown = null) {
 describe('careerPlaybookRouter transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.validateFile.mockReturnValue({ valid: true });
+    mocks.runPhase2Storage.mockResolvedValue({
+      fileId: '55555555-5555-4555-8555-555555555555',
+      storagePath:
+        'uploads/22222222-2222-4222-8222-222222222222/career-playbooks/33333333-3333-4333-8333-333333333333/55555555-5555-4555-8555-555555555555.pdf',
+      fileHash: 'hash',
+      actualSize: 12,
+      durationMs: 10,
+      deduplicated: false,
+    });
+    mocks.isStorageError.mockReturnValue(false);
+    mocks.decrementQuota.mockResolvedValue(undefined);
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
   it('is wired into the app router under careerPlaybook', () => {
@@ -145,6 +188,7 @@ describe('careerPlaybookRouter transport', () => {
       appRouter._def.procedures['careerPlaybook.session.resolveDepartmentOptions']
     ).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.requestFollowups']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.uploadFile']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.approveAndGenerate']).toBeDefined();
     expect(
       appRouter._def.procedures['careerPlaybook.courseBridge.createCourseFromPlaybook']
@@ -155,6 +199,126 @@ describe('careerPlaybookRouter transport', () => {
     const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
 
     await expect(caller.session.start({ language: 'ru' })).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it('uploads a Career Playbook business context source without binding it to a course', async () => {
+    const playbookBuilder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'awaiting_followups',
+          organization_id: authenticatedContext.user!.organizationId,
+        }),
+        error: null,
+      },
+    ]);
+    const organizationBuilder = createBuilder([
+      { data: { id: authenticatedContext.user!.organizationId, tier: 'standard' }, error: null },
+    ]);
+    const countBuilder = createCountBuilder(0);
+    const sourceBuilder = createBuilder([
+      {
+        data: {
+          id: '66666666-6666-4666-8666-666666666666',
+          playbook_id: playbookId,
+          organization_id: authenticatedContext.user!.organizationId,
+          user_id: authenticatedContext.user!.id,
+          status: 'uploaded',
+          file_catalog_id: '55555555-5555-4555-8555-555555555555',
+        },
+        error: null,
+      },
+    ]);
+    const sourceBuilders = [countBuilder, sourceBuilder];
+
+    mocks.from.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbookBuilder;
+      if (table === 'organizations') return organizationBuilder;
+      if (table === 'career_playbook_sources') return sourceBuilders.shift();
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.sources.uploadFile({
+      playbookId,
+      filename: 'product.pdf',
+      fileSize: 12,
+      mimeType: 'application/pdf',
+      fileContent: Buffer.from('hello').toString('base64'),
+    });
+
+    expect(mocks.runPhase2Storage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerType: 'career_playbook',
+        ownerId: playbookId,
+        organizationId: authenticatedContext.user!.organizationId,
+        userId: authenticatedContext.user!.id,
+        filename: 'product.pdf',
+      })
+    );
+    expect(sourceBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playbook_id: playbookId,
+        organization_id: authenticatedContext.user!.organizationId,
+        user_id: authenticatedContext.user!.id,
+        source_type: 'file',
+        status: 'uploaded',
+        file_catalog_id: '55555555-5555-4555-8555-555555555555',
+      })
+    );
+    expect(result).toMatchObject({
+      sourceId: '66666666-6666-4666-8666-666666666666',
+      fileId: '55555555-5555-4555-8555-555555555555',
+      status: 'uploaded',
+    });
+  });
+
+  it('cleans up stored Career Playbook source files when source record creation fails', async () => {
+    const playbookBuilder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'awaiting_followups',
+          organization_id: authenticatedContext.user!.organizationId,
+        }),
+        error: null,
+      },
+    ]);
+    const organizationBuilder = createBuilder([
+      { data: { id: authenticatedContext.user!.organizationId, tier: 'standard' }, error: null },
+    ]);
+    const countBuilder = createCountBuilder(0);
+    const sourceBuilder = createBuilder([{ data: null, error: new Error('insert failed') }]);
+    const fileCatalogBuilder = createBuilder();
+    const sourceBuilders = [countBuilder, sourceBuilder];
+
+    mocks.from.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbookBuilder;
+      if (table === 'organizations') return organizationBuilder;
+      if (table === 'career_playbook_sources') return sourceBuilders.shift();
+      if (table === 'file_catalog') return fileCatalogBuilder;
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(
+      caller.sources.uploadFile({
+        playbookId,
+        filename: 'product.pdf',
+        fileSize: 12,
+        mimeType: 'application/pdf',
+        fileContent: Buffer.from('hello').toString('base64'),
+      })
+    ).rejects.toBeInstanceOf(TRPCError);
+
+    expect(fileCatalogBuilder.delete).toHaveBeenCalled();
+    expect(fileCatalogBuilder.eq).toHaveBeenCalledWith(
+      'id',
+      '55555555-5555-4555-8555-555555555555'
+    );
+    expect(mocks.decrementQuota).toHaveBeenCalledWith(
+      authenticatedContext.user!.organizationId,
+      12
+    );
   });
 
   it('resolves narrow department options through the Career Playbook classifier', async () => {
@@ -335,11 +499,12 @@ describe('careerPlaybookRouter transport', () => {
     });
 
     expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
-      qaData: {
+      qaData: expect.objectContaining({
         fixed: [{ question_key: 'position', value: 'Product Lead' }],
         followups: [],
         freeform: [],
-      },
+        business_context: expect.objectContaining({ mode: 'universal' }),
+      }),
       language: 'en',
     });
     expect(builder.update).toHaveBeenCalledWith(
@@ -562,11 +727,12 @@ describe('careerPlaybookRouter transport', () => {
         organizationId: authenticatedContext.user!.organizationId,
         language: 'en',
         locale: 'en',
-        qaData: {
+        qaData: expect.objectContaining({
           fixed: [{ question_key: 'position', value: 'Product Lead' }],
           followups: [],
           freeform: [],
-        },
+          business_context: expect.objectContaining({ mode: 'universal' }),
+        }),
         createdAt: expect.any(String),
       }),
       expect.any(Object)

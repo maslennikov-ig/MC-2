@@ -53,6 +53,25 @@ blocked unless a saved department value is present. The classifier uses
 `stage_career_playbook_department_classifier` model routing with retry and
 fallback-model escalation from `llm_model_config`.
 
+## Business Context Intake
+
+As of 2026-06-03, the constructor inserts a guided Business Context step after
+the fixed questions and before adaptive follow-ups. Users can describe the
+company manually, attach helpful files, or explicitly choose a universal
+benchmark Role Guide.
+
+The step collects product, customer, sales/channel, process, metric,
+organization, and constraint signals. It reuses the shared course `FileUpload`
+component with Career Playbook-specific copy. Uploaded files are stored as
+Career Playbook sources tied to `career_playbooks` through
+`career_playbook_sources`; they do not require a fake draft course or a
+`course_id`.
+
+Generation receives the user-editable business-context digest separately from
+external web research. Company-specific mode may use the digest as client facts.
+Universal mode must not invent company details and should produce a benchmark
+guide with explicit adaptation notes.
+
 ## Verification Entrypoints
 
 Local read-only checks:

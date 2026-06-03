@@ -52,6 +52,74 @@ const messages = {
       documentPreviewSubtitle: 'Answers are placed into the future document structure as you work.',
       documentPreviewEmpty: 'Appears after an answer',
       questionPanelLabel: 'Current question',
+      businessContextNavigationLabel: 'Context',
+      businessContextDocumentLabel: 'Business context',
+      businessContextTitle: 'Business context',
+      businessContextDescription:
+        'Add company-specific product, customer, channel, process, metric, and constraint context.',
+      businessContextEmpty: 'Fill this manually or attach files',
+      businessContextPanelTitle: 'Sources',
+      businessContextPanelDescription:
+        'Useful inputs include proposals, product descriptions, sales playbooks, KPIs, org charts, and similar role guides.',
+      businessContextFilesTitle: 'Files',
+      businessContextFilesDescription:
+        'Files are saved as sources for this Role Guide, not as course materials.',
+      businessContextUploadMissingSession: 'Create the Career Playbook session before upload',
+      businessContextUploadMaxFilesTemplate: 'Maximum {maxFiles} sources',
+      businessContextUploadPending: 'Upload selected files',
+      businessContextUploadedSources: 'Uploaded sources',
+      businessContextSourceCountTemplate: '{count} sources',
+      businessContextMissingTitle: 'Gaps',
+      businessContextMissingEmpty: 'Core categories are covered',
+      businessContextContinue: 'Continue to follow-ups',
+      businessContextUniversal: 'Generate a universal guide',
+      businessContextUniversalDescription:
+        'Without company context the system creates a benchmark guide and marks what must be adapted before rollout.',
+      businessContextUniversalSummary: 'Universal benchmark mode selected.',
+      businessContextUploading: 'Uploading files...',
+      businessContextProductTitle: 'Product',
+      businessContextProductHelper: 'What you sell or deliver and the value proposition.',
+      businessContextProductPlaceholder: 'For example: B2B SaaS for learning automation...',
+      businessContextProductHint1: 'commercial proposal',
+      businessContextProductHint2: 'product description',
+      businessContextProductHint3: 'product deck',
+      businessContextCustomersTitle: 'Customers',
+      businessContextCustomersHelper: 'Who buys, who uses it, and which segments or pains matter.',
+      businessContextCustomersPlaceholder: 'For example: HR leaders in enterprise companies...',
+      businessContextCustomersHint1: 'ICP',
+      businessContextCustomersHint2: 'customer profile',
+      businessContextCustomersHint3: 'customer research',
+      businessContextSalesTitle: 'Sales and channels',
+      businessContextSalesHelper: 'How customers are found and how the funnel works.',
+      businessContextSalesPlaceholder: 'For example: outbound, partners, tenders...',
+      businessContextSalesHint1: 'sales playbook',
+      businessContextSalesHint2: 'funnel',
+      businessContextSalesHint3: 'scripts',
+      businessContextProcessesTitle: 'Processes',
+      businessContextProcessesHelper: 'Operating procedures and handoffs between roles.',
+      businessContextProcessesPlaceholder: 'For example: lead moves SDR -> AE -> implementation...',
+      businessContextProcessesHint1: 'SOP',
+      businessContextProcessesHint2: 'team playbook',
+      businessContextProcessesHint3: 'process maps',
+      businessContextMetricsTitle: 'Metrics',
+      businessContextMetricsHelper: 'How the role, team, and business outcome are measured.',
+      businessContextMetricsPlaceholder: 'For example: revenue, win rate, NPS...',
+      businessContextMetricsHint1: 'department KPIs',
+      businessContextMetricsHint2: 'dashboards',
+      businessContextMetricsHint3: 'OKRs',
+      businessContextOrgTitle: 'Org structure',
+      businessContextOrgHelper: 'Teams, reporting lines, collaborators, and ownership boundaries.',
+      businessContextOrgPlaceholder: 'For example: role sits in sales and works with marketing...',
+      businessContextOrgHint1: 'org chart',
+      businessContextOrgHint2: 'staffing plan',
+      businessContextOrgHint3: 'similar guides',
+      businessContextConstraintsTitle: 'Constraints',
+      businessContextConstraintsHelper:
+        'Legal, industry, geography, security, and operating constraints.',
+      businessContextConstraintsPlaceholder: 'For example: enterprise security review, GDPR...',
+      businessContextConstraintsHint1: 'policies',
+      businessContextConstraintsHint2: 'compliance',
+      businessContextConstraintsHint3: 'contract limits',
       followupNavigationLabel: 'Follow-ups',
       followupDocumentPreviewTitle: 'Follow-up context',
       followupDocumentPreviewSubtitle: 'These answers help make the final guide more specific.',
@@ -285,7 +353,7 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(screen.queryByRole('radio', { name: 'Sales' })).not.toBeInTheDocument()
   })
 
-  it('continues to follow-ups from any fixed question when all fixed answers are already present', async () => {
+  it('continues to business context from any fixed question when all fixed answers are already present', async () => {
     const user = userEvent.setup()
 
     useCareerPlaybookStore.setState({
@@ -334,8 +402,22 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(await screen.findByText('Question 1 of 6')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(requestFollowups).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Generate a universal guide' }))
+
     expect(requestFollowups).toHaveBeenCalled()
     expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000831',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'universal',
+          status: 'skipped',
+        }),
+      },
+    })
   })
 
   it('does not request follow-ups without a saved department context', async () => {
@@ -413,8 +495,22 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Product'), 'B2B SaaS for sales enablement')
+    await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+
     expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
     expect(requestFollowups).toHaveBeenCalled()
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000006',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'company_specific',
+          status: 'ready',
+        }),
+      },
+    })
     expect(screen.getByText('Completeness: 82%')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Which KPIs define success in this role?'), 'Win rate')

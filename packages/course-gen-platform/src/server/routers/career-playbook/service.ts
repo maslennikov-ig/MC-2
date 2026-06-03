@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import {
+  CareerPlaybookBusinessContextSchema,
   CareerPlaybookFixedQuestionSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFollowupResponseSchema,
@@ -10,6 +11,7 @@ import {
   type CareerPlaybookAnswerSubmission,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
+  type CareerPlaybookBusinessContext,
   type CareerPlaybookFixedAnswer,
   type CareerPlaybookFixedQuestion,
   type CareerPlaybookFollowupAnswer,
@@ -50,6 +52,7 @@ export interface CareerPlaybookDraftResponse {
   completenessScore: number;
   followupGenerationCount: number;
   freeformDraft: string;
+  businessContext: CareerPlaybookBusinessContext;
   status: CareerPlaybookPlaybookStatus;
   phase: WizardPhase;
 }
@@ -106,8 +109,9 @@ function mapRowToDraft(row: CareerPlaybookRow): CareerPlaybookDraftResponse {
     completenessScore: qaData.completeness_score ?? 0,
     followupGenerationCount: qaData.followup_generation_count,
     freeformDraft: freeformDraftFromQAData(qaData),
+    businessContext: qaData.business_context,
     status: mapped.status,
-    phase: phaseFromStatus(mapped.status),
+    phase: phaseFromStatus(mapped.status, qaData),
   };
 }
 
@@ -307,6 +311,12 @@ export async function startCareerPlaybookSession(
         fixed: [],
         followups: [],
         freeform: [],
+        business_context: {
+          mode: 'universal',
+          status: 'not_started',
+          digest: null,
+          source_ids: [],
+        },
         followup_questions: [],
         followup_generation_count: 0,
       }),
@@ -332,7 +342,7 @@ export async function submitCareerPlaybookAnswer(
   ctx: Context,
   input: {
     playbookId: string;
-    phase: 'fixed' | 'followup' | 'freeform';
+    phase: 'fixed' | 'followup' | 'freeform' | 'business_context';
     answer: CareerPlaybookAnswerSubmission;
   }
 ): Promise<CareerPlaybookDraftResponse> {
@@ -383,6 +393,20 @@ export async function submitCareerPlaybookAnswer(
         submitted_at: new Date().toISOString(),
       },
     ];
+  }
+
+  if (input.phase === 'business_context') {
+    if (!input.answer.business_context) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Business context answers require business_context',
+      });
+    }
+
+    qaData.business_context = CareerPlaybookBusinessContextSchema.parse({
+      ...input.answer.business_context,
+      updated_at: new Date().toISOString(),
+    });
   }
 
   updatePayload.q_a_data = toJson(qaData);
@@ -436,6 +460,7 @@ export async function requestCareerPlaybookFollowups(
     fixed: Object.values(input.fixedAnswers),
     followups: Object.values(input.followupAnswers),
     freeform: existingQAData.freeform,
+    business_context: existingQAData.business_context,
   });
   const result = await generateCareerPlaybookFollowups({
     qaData,
@@ -595,7 +620,7 @@ function mapRowToGenerationStatus(row: CareerPlaybookRow): CareerPlaybookGenerat
   return {
     playbookId: mapped.id,
     status: mapped.status,
-    phase: phaseFromStatus(mapped.status),
+    phase: phaseFromStatus(mapped.status, qaData),
     progress: generationProgress(mapped.status),
     error: mapped.status === 'failed' ? qaData.generation_error : undefined,
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),

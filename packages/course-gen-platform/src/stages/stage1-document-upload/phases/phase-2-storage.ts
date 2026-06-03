@@ -26,7 +26,7 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { incrementQuota, decrementQuota } from '../../../shared/validation/quota-enforcer';
 import { logger } from '../../../shared/logger/index.js';
 import { duplicateVectorsForNewCourse } from '../../../shared/qdrant/lifecycle';
-import type { Stage1Input, Phase2StorageOutput, RollbackContext } from '../types';
+import type { Stage1StorageInput, Phase2StorageOutput, RollbackContext } from '../types';
 import type { DuplicateFileResult } from '../../../shared/types/database-queries';
 import type { Json } from '@megacampus/shared-types';
 
@@ -81,6 +81,42 @@ export class StorageError extends Error {
   }
 }
 
+interface StorageOwner {
+  ownerType: 'course' | 'career_playbook';
+  ownerId: string;
+  courseId: string | null;
+  uploadPathSegments: string[];
+}
+
+function resolveStorageOwner(input: Stage1StorageInput): StorageOwner {
+  const ownerType = input.ownerType ?? 'course';
+  const ownerId = input.ownerId ?? input.courseId;
+
+  if (!ownerId || !isValidUUID(ownerId)) {
+    throw new Error(`Invalid ${ownerType} owner ID format: ${ownerId ?? 'missing'}`);
+  }
+
+  if (ownerType === 'course') {
+    if (!input.courseId || !isValidUUID(input.courseId)) {
+      throw new Error(`Invalid course ID format: ${input.courseId ?? 'missing'}`);
+    }
+
+    return {
+      ownerType,
+      ownerId: input.courseId,
+      courseId: input.courseId,
+      uploadPathSegments: [input.courseId],
+    };
+  }
+
+  return {
+    ownerType,
+    ownerId,
+    courseId: null,
+    uploadPathSegments: ['career-playbooks', ownerId],
+  };
+}
+
 /**
  * Phase 2: Store uploaded file
  *
@@ -111,16 +147,14 @@ export class StorageError extends Error {
  * }
  * ```
  */
-export async function runPhase2Storage(input: Stage1Input): Promise<Phase2StorageOutput> {
+export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase2StorageOutput> {
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
+  const owner = resolveStorageOwner(input);
 
   // H7: Validate UUIDs to prevent path traversal and SQL issues
   if (!isValidUUID(input.organizationId)) {
     throw new Error(`Invalid organization ID format: ${input.organizationId}`);
-  }
-  if (!isValidUUID(input.courseId)) {
-    throw new Error(`Invalid course ID format: ${input.courseId}`);
   }
   if (!isValidUUID(input.userId)) {
     throw new Error(`Invalid user ID format: ${input.userId}`);
@@ -135,7 +169,8 @@ export async function runPhase2Storage(input: Stage1Input): Promise<Phase2Storag
 
   logger.debug(
     {
-      courseId: input.courseId,
+      ownerType: owner.ownerType,
+      ownerId: owner.ownerId,
       filename: input.filename,
       fileSize: input.fileSize,
     },
@@ -163,7 +198,12 @@ export async function runPhase2Storage(input: Stage1Input): Promise<Phase2Storag
     // Allow only alphanumeric and dots, max 10 chars
     const fileExtension = rawExtension.replace(/[^a-z0-9.]/gi, '').substring(0, 10) || '.bin';
 
-    const uploadDir = path.join(process.cwd(), 'uploads', input.organizationId, input.courseId);
+    const uploadDir = path.join(
+      process.cwd(),
+      'uploads',
+      input.organizationId,
+      ...owner.uploadPathSegments
+    );
     const storagePath = path.join(uploadDir, `${fileId}${fileExtension}`);
 
     // Validate path to prevent directory traversal attacks
@@ -288,7 +328,8 @@ export async function runPhase2Storage(input: Stage1Input): Promise<Phase2Storag
           existingFileId: duplicateFile.file_id,
           hashPrefix,
           filename: input.filename,
-          courseId: input.courseId,
+          ownerType: owner.ownerType,
+          ownerId: owner.ownerId,
         },
         '[Phase 2] Content deduplication detected'
       );
@@ -304,14 +345,14 @@ export async function runPhase2Storage(input: Stage1Input): Promise<Phase2Storag
         const { error: insertError } = await supabase.from('file_catalog').insert({
           id: fileId,
           organization_id: input.organizationId,
-          course_id: input.courseId,
+          course_id: owner.courseId,
           filename: input.filename,
           file_type: fileExtension.replace('.', ''),
           file_size: actualSize,
           storage_path: duplicateFile.storage_path, // SAME storage path as original
           hash: fileHash, // SAME hash
           mime_type: input.mimeType,
-          vector_status: 'indexed', // Already indexed!
+          vector_status: owner.ownerType === 'course' ? 'indexed' : 'pending',
           original_file_id: duplicateFile.file_id, // Reference to original
           reference_count: 1, // This reference counts as 1
           parsed_content: duplicateFile.parsed_content, // Reuse parsed content
@@ -361,42 +402,45 @@ export async function runPhase2Storage(input: Stage1Input): Promise<Phase2Storag
 
         refCountIncremented = true;
 
-        // Step 3: Duplicate vectors for new course
-        // Note: If vectors don't exist yet (async indexing), gracefully fallback to normal path
+        // Step 3: Duplicate vectors for new course.
+        // Career Playbook sources are not course-indexed at upload time, so they keep the
+        // deduplicated file metadata without creating course vectors.
         let vectorsDuplicated = 0;
-        try {
-          vectorsDuplicated = await duplicateVectorsForNewCourse(
-            duplicateFile.file_id,
-            fileId,
-            input.courseId,
-            input.organizationId
-          );
-        } catch (vectorError) {
-          logger.warn(
-            {
-              err: vectorError instanceof Error ? vectorError.message : String(vectorError),
-              originalFileId: duplicateFile.file_id,
-              newFileId: fileId,
-            },
-            '[Phase 2] Vector duplication failed - falling back to normal upload'
-          );
+        if (owner.ownerType === 'course' && owner.courseId) {
+          try {
+            vectorsDuplicated = await duplicateVectorsForNewCourse(
+              duplicateFile.file_id,
+              fileId,
+              owner.courseId,
+              input.organizationId
+            );
+          } catch (vectorError) {
+            logger.warn(
+              {
+                err: vectorError instanceof Error ? vectorError.message : String(vectorError),
+                originalFileId: duplicateFile.file_id,
+                newFileId: fileId,
+              },
+              '[Phase 2] Vector duplication failed - falling back to normal upload'
+            );
 
-          // Signal fallback needed (will be caught by outer catch)
-          throw vectorError;
-        }
+            // Signal fallback needed (will be caught by outer catch)
+            throw vectorError;
+          }
 
-        // If no vectors were duplicated (async indexing not complete), fallback gracefully
-        if (vectorsDuplicated === 0) {
-          logger.warn(
-            {
-              originalFileId: duplicateFile.file_id,
-              newFileId: fileId,
-            },
-            '[Phase 2] No vectors to duplicate (async indexing incomplete) - falling back to normal upload'
-          );
+          // If no vectors were duplicated (async indexing not complete), fallback gracefully
+          if (vectorsDuplicated === 0) {
+            logger.warn(
+              {
+                originalFileId: duplicateFile.file_id,
+                newFileId: fileId,
+              },
+              '[Phase 2] No vectors to duplicate (async indexing incomplete) - falling back to normal upload'
+            );
 
-          // Throw to trigger cleanup and fallback to normal path
-          throw new Error('Vectors not yet indexed - fallback to normal upload');
+            // Throw to trigger cleanup and fallback to normal path
+            throw new Error('Vectors not yet indexed - fallback to normal upload');
+          }
         }
 
         // Step 4: Delete redundant file from disk (ONLY after all DB operations succeed)
@@ -521,7 +565,7 @@ export async function runPhase2Storage(input: Stage1Input): Promise<Phase2Storag
     const { error: insertError } = await supabase.from('file_catalog').insert({
       id: fileId,
       organization_id: input.organizationId,
-      course_id: input.courseId,
+      course_id: owner.courseId,
       filename: input.filename,
       file_type: fileExtension.replace('.', ''),
       file_size: actualSize,
