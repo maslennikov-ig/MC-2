@@ -27,8 +27,9 @@
 ## Delivery State
 
 - Branch: `codex/career-playbook-viewer-library-snapshot`.
-- Beads: `mc2-ev2nq` in progress until commit/push and delivery decision.
-- Dev deploy: not performed yet in this stage summary.
+- Beads: `mc2-ev2nq` closed after dev smoke.
+- Dev delivery: completed via GitHub Actions run `26899302080` on `develop` merge commit `66032b29bddc5064737b2920f6574a750490a7b9`.
+- Dev smoke: `megacampus-web-dev` and `megacampus-api-dev` both report image revision `66032b29bddc5064737b2920f6574a750490a7b9`; target URL returns HTTP 200 and the page bundle is present.
 
 ## Explicit Defers
 
