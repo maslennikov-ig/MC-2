@@ -17,6 +17,8 @@ Stable navigation map for this repository. Keep stage history and current task s
 - `.codex/orchestrator.toml` - machine-readable orchestration contract and verification groups.
 - `.codex/handoff.md` - current-state handoff only.
 - `.codex/project-index.md` - this stable navigation map.
+- `graphify-out/GRAPH_REPORT.md` - local ignored Graphify orientation report for architecture, impact, and unfamiliar-code navigation.
+- `.graphifyignore` - Graphify source filter for dependencies, runtime state, generated output, secrets, and noisy artifacts.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
 - `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.
@@ -55,6 +57,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 ## Integrations And Sources Of Truth
 
 - Beads (`bd`) is the task source of truth.
+- Graphify is the local knowledge-graph source for repo orientation; use `graphify query`, `graphify path`, or `graphify explain` with `graphify-out/graph.json`.
 - Shared contracts must be imported from `@megacampus/shared-types`.
 - Career Playbook product scope comes from `docs/plans/quiet-waddling-starfish.md` and `docs/plans/career-playbook/*`.
 - Supabase schema changes belong in backend migrations under `packages/course-gen-platform/supabase/migrations/`.
@@ -74,6 +77,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Career Playbook ESCO role suggestion subset import: `scripts/career-playbook/import_esco_role_suggestions.py`.
 - Career Playbook Wikidata RU role suggestion subset import: `scripts/career-playbook/import_wikidata_role_suggestions.py`.
 - Artifact validation: `python3 scripts/orchestration/validate_artifact.py <artifact.md>`.
+- Graphify local graph refresh: `graphify update .` then `graphify cluster-only . --no-viz`.
 
 ## Conventions And Boundaries
 

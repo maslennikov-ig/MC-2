@@ -53,7 +53,16 @@ Typical code-change gates in this repo include:
 - `scripts/orchestration/cleanup_stage_workspace.py --stage <stage_id>` removes safe local worktrees and branches for completed stage deliveries.
 - Beads remains the source of truth for queue, status, and dependencies.
 
+## Knowledge Graph
+
+- This repo uses a local Graphify graph under `graphify-out/`; read `graphify-out/GRAPH_REPORT.md` before broad search for architecture, impact, or unfamiliar code.
+- Use focused `graphify query`, `graphify path`, or `graphify explain`; do not paste `graphify-out/graph.json` into chat context.
+- The project-local Codex `PreToolUse` hook that runs `graphify hook-check` is allowed for Bash reminders.
+- Do not install Graphify git hooks or configure external semantic/model backends unless explicitly asked.
+- During closeout, record `graph-reviewed: used`, `graph-reviewed: updated`, `graph-reviewed: no-change-needed`, or `graph-reviewed: blocked`.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
+
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -94,6 +103,7 @@ bd close <id>         # Complete work
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
+
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
