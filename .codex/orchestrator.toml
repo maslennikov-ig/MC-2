@@ -89,6 +89,21 @@ notes = [
   "Do not append stage chronology into .codex/handoff.md; move material stage history into .codex/stages/.",
 ]
 
+[knowledge_graph]
+enabled = true
+graph_dir = "graphify-out"
+ignore_file = ".graphifyignore"
+code_update_command = "graphify update ."
+cluster_command = "graphify cluster-only . --no-viz"
+query_command = "graphify query \"<question>\" --graph graphify-out/graph.json --budget 2000"
+path_command = "graphify path \"<from>\" \"<to>\" --graph graphify-out/graph.json"
+explain_command = "graphify explain \"<node>\" --graph graphify-out/graph.json"
+hooks_allowed = "codex_pre_tool_use_only"
+git_hooks_allowed = false
+codex_pre_tool_use_hook = true
+codex_pre_tool_use_command = "/home/me/.local/bin/graphify hook-check"
+closeout_marker = "graph-reviewed"
+
 [delivery]
 dev_branch = "develop"
 staging_branch = "master"

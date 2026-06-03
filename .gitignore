@@ -19,6 +19,7 @@ node_modules/
 !.codex/subagent-task-contract.md
 !.codex/subagent-spawn-template.md
 !.codex/manual-agent-prompt-template.md
+!.codex/hooks.json
 !.codex/stages/
 !.codex/stages/**
 
@@ -68,6 +69,7 @@ packages/web/tests/.auth/
 # We WANT to commit agent commands and configs, but not their temp work folders
 .gemini/tmp/
 .agent/
+graphify-out/
 
 # We WANT to commit shared Claude configs, but not local user settings
 .claude/settings.local.json
