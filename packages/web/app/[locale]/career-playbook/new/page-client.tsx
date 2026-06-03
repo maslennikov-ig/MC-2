@@ -5,13 +5,17 @@ import { useTranslations } from 'next-intl'
 import { AlertCircle, CheckCircle2, Clock3, FileText, Loader2 } from 'lucide-react'
 
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
+import {
+  BusinessContextStep,
+  type BusinessContextCategoryCopy,
+} from '@/components/career-playbook/wizard/BusinessContextStep'
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
 import { FollowupPhase } from '@/components/career-playbook/wizard/FollowupPhase'
 import { Wizard, type WizardProps } from '@/components/career-playbook/wizard/Wizard'
 import Header from '@/components/layouts/header'
 import { Button } from '@/components/ui/button'
 import type { Locale } from '@/src/i18n/config'
-import type { CareerPlaybookOption } from '@megacampus/shared-types'
+import type { CareerPlaybookBusinessContext, CareerPlaybookOption } from '@megacampus/shared-types'
 import {
   getCareerPlaybookVisibleQuestions,
   useCareerPlaybookStore,
@@ -69,11 +73,13 @@ export default function CareerPlaybookNewPageClient({
         completenessScore: snapshot.completenessScore,
         followupGenerationCount: snapshot.followupGenerationCount,
         freeformDraft: snapshot.freeformDraft,
+        businessContext: snapshot.businessContext,
         status: snapshot.status === 'draft' ? 'answering_fixed' : snapshot.status,
         phase: snapshot.phase,
         dirtyFixedQuestionKeys: snapshot.dirtyFixedQuestionKeys,
         dirtyFollowupQuestionIds: snapshot.dirtyFollowupQuestionIds,
         dirtyFreeformDraft: snapshot.dirtyFreeformDraft,
+        dirtyBusinessContext: snapshot.dirtyBusinessContext,
         generationProgress: snapshot.generationProgress,
         finalMarkdown: snapshot.finalMarkdown,
       })
@@ -146,6 +152,42 @@ export default function CareerPlaybookNewPageClient({
       }
     }
   }, [state.phase, state.playbookId, state.status])
+
+  const hasProcessingBusinessContextSources = state.businessContextSources.some((source) =>
+    ['uploaded', 'processing'].includes(source.status)
+  )
+
+  useEffect(() => {
+    if (state.phase !== 'business_context' || !state.playbookId) return
+
+    let cancelled = false
+    let inFlight = false
+    let intervalId: number | null = null
+
+    const refreshSources = async () => {
+      if (cancelled || inFlight) return
+      inFlight = true
+      await useCareerPlaybookStore.getState().refreshCareerPlaybookBusinessContextSources()
+      inFlight = false
+    }
+
+    if (!hasProcessingBusinessContextSources) {
+      void refreshSources()
+    }
+
+    if (hasProcessingBusinessContextSources) {
+      intervalId = window.setInterval(() => {
+        void refreshSources()
+      }, 5000)
+    }
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [hasProcessingBusinessContextSources, state.phase, state.playbookId])
 
   const answers = useMemo<Record<string, CareerPlaybookAnswerValue | undefined>>(
     () =>
@@ -264,10 +306,133 @@ export default function CareerPlaybookNewPageClient({
     otherOptionLabel: t('otherOptionLabel'),
     otherOptionPlaceholder: t('otherOptionPlaceholder'),
   }
+  const businessContextCategories = useMemo<BusinessContextCategoryCopy[]>(
+    () => [
+      {
+        key: 'product',
+        title: t('businessContextProductTitle'),
+        helper: t('businessContextProductHelper'),
+        placeholder: t('businessContextProductPlaceholder'),
+        hints: [
+          t('businessContextProductHint1'),
+          t('businessContextProductHint2'),
+          t('businessContextProductHint3'),
+        ],
+      },
+      {
+        key: 'customers',
+        title: t('businessContextCustomersTitle'),
+        helper: t('businessContextCustomersHelper'),
+        placeholder: t('businessContextCustomersPlaceholder'),
+        hints: [
+          t('businessContextCustomersHint1'),
+          t('businessContextCustomersHint2'),
+          t('businessContextCustomersHint3'),
+        ],
+      },
+      {
+        key: 'sales_channels',
+        title: t('businessContextSalesTitle'),
+        helper: t('businessContextSalesHelper'),
+        placeholder: t('businessContextSalesPlaceholder'),
+        hints: [
+          t('businessContextSalesHint1'),
+          t('businessContextSalesHint2'),
+          t('businessContextSalesHint3'),
+        ],
+      },
+      {
+        key: 'processes',
+        title: t('businessContextProcessesTitle'),
+        helper: t('businessContextProcessesHelper'),
+        placeholder: t('businessContextProcessesPlaceholder'),
+        hints: [
+          t('businessContextProcessesHint1'),
+          t('businessContextProcessesHint2'),
+          t('businessContextProcessesHint3'),
+        ],
+      },
+      {
+        key: 'metrics',
+        title: t('businessContextMetricsTitle'),
+        helper: t('businessContextMetricsHelper'),
+        placeholder: t('businessContextMetricsPlaceholder'),
+        hints: [
+          t('businessContextMetricsHint1'),
+          t('businessContextMetricsHint2'),
+          t('businessContextMetricsHint3'),
+        ],
+      },
+      {
+        key: 'org_structure',
+        title: t('businessContextOrgTitle'),
+        helper: t('businessContextOrgHelper'),
+        placeholder: t('businessContextOrgPlaceholder'),
+        hints: [
+          t('businessContextOrgHint1'),
+          t('businessContextOrgHint2'),
+          t('businessContextOrgHint3'),
+        ],
+      },
+      {
+        key: 'constraints',
+        title: t('businessContextConstraintsTitle'),
+        helper: t('businessContextConstraintsHelper'),
+        placeholder: t('businessContextConstraintsPlaceholder'),
+        hints: [
+          t('businessContextConstraintsHint1'),
+          t('businessContextConstraintsHint2'),
+          t('businessContextConstraintsHint3'),
+        ],
+      },
+    ],
+    [t]
+  )
+  const businessContextCopy = {
+    navigationLabel: t('businessContextNavigationLabel'),
+    documentLabel: t('businessContextDocumentLabel'),
+    title: t('businessContextTitle'),
+    description: t('businessContextDescription'),
+    empty: t('businessContextEmpty'),
+    panelTitle: t('businessContextPanelTitle'),
+    panelDescription: t('businessContextPanelDescription'),
+    filesTitle: t('businessContextFilesTitle'),
+    filesDescription: t('businessContextFilesDescription'),
+    uploadMissingSession: t('businessContextUploadMissingSession'),
+    uploadMaxFilesTemplate: t.raw('businessContextUploadMaxFilesTemplate') as string,
+    uploadPending: t('businessContextUploadPending'),
+    uploadedSources: t('businessContextUploadedSources'),
+    sourceCountTemplate: t.raw('businessContextSourceCountTemplate') as string,
+    sourceStatusUploaded: t('businessContextSourceStatusUploaded'),
+    sourceStatusProcessing: t('businessContextSourceStatusProcessing'),
+    sourceStatusReady: t('businessContextSourceStatusReady'),
+    sourceStatusFailed: t('businessContextSourceStatusFailed'),
+    sourceStatusRemoved: t('businessContextSourceStatusRemoved'),
+    sourceTextFallback: t('businessContextSourceTextFallback'),
+    removeSourceTemplate: t.raw('businessContextRemoveSourceTemplate') as string,
+    missingTitle: t('businessContextMissingTitle'),
+    missingEmpty: t('businessContextMissingEmpty'),
+    back: t('back'),
+    continue: t('businessContextContinue'),
+    universal: t('businessContextUniversal'),
+    universalDescription: t('businessContextUniversalDescription'),
+    uploading: t('businessContextUploading'),
+    categories: businessContextCategories,
+  }
+  const businessContextNotes = useMemo(
+    () =>
+      formatBusinessContextSummary(
+        state.businessContext,
+        businessContextCategories,
+        t('businessContextUniversalSummary')
+      ),
+    [businessContextCategories, state.businessContext, t]
+  )
   const completionCopy = {
     title: t('completionTitle'),
     description: t('completionDescription'),
     fixedTitle: t('fixedAnswersTitle'),
+    businessContextTitle: t('businessContextTitle'),
     followupsTitle: t('followupAnswersTitle'),
     freeformTitle: t('freeformNotesTitle'),
     completeness: t('completeness'),
@@ -360,9 +525,13 @@ export default function CareerPlaybookNewPageClient({
     useCareerPlaybookStore.getState().completeCareerPlaybookFollowups()
   }
 
-  const startFollowupsAfterFixedPhase = async () => {
+  const startBusinessContextAfterFixedPhase = async () => {
     await useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
     useCareerPlaybookStore.getState().completeCareerPlaybookFixedPhase()
+  }
+
+  const continueAfterBusinessContext = async () => {
+    await useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
     const result = await useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
     if (result.ok && useCareerPlaybookStore.getState().status === 'ready_to_generate') {
       useCareerPlaybookStore.getState().completeCareerPlaybookFollowups()
@@ -408,7 +577,7 @@ export default function CareerPlaybookNewPageClient({
     )
 
     if (isLastQuestion || allVisibleAnswered) {
-      void startFollowupsAfterFixedPhase()
+      void startBusinessContextAfterFixedPhase()
       return
     }
 
@@ -477,6 +646,27 @@ export default function CareerPlaybookNewPageClient({
             />
           ) : null}
 
+          {state.phase === 'business_context' ? (
+            <BusinessContextStep
+              playbookId={state.playbookId}
+              context={state.businessContext}
+              sources={state.businessContextSources}
+              onContextChange={state.saveCareerPlaybookBusinessContext}
+              onRemoveSource={state.removeCareerPlaybookBusinessContextSource}
+              onSourceUploaded={state.upsertCareerPlaybookBusinessContextSource}
+              onBack={() =>
+                useCareerPlaybookStore.getState().editCareerPlaybookFixedAnswer('content_language')
+              }
+              onContinue={() => void continueAfterBusinessContext()}
+              onUniversal={() => {
+                useCareerPlaybookStore.getState().skipCareerPlaybookBusinessContext()
+                void continueAfterBusinessContext()
+              }}
+              isSaving={state.isAutosaving || state.isGeneratingFollowups}
+              copy={businessContextCopy}
+            />
+          ) : null}
+
           {state.phase === 'followups' && state.isGeneratingFollowups ? (
             <PhaseBStatus
               icon="loading"
@@ -521,9 +711,16 @@ export default function CareerPlaybookNewPageClient({
           {state.phase === 'completion' ? (
             <CompletionScreen
               fixedAnswers={fixedAnswerSummary}
+              businessContextNotes={businessContextNotes}
               followupAnswers={followupAnswerSummary}
               freeformNotes={freeformNotes}
               onEditFixedAnswer={state.editCareerPlaybookFixedAnswer}
+              onEditBusinessContext={() =>
+                useCareerPlaybookStore.setState({
+                  phase: 'business_context',
+                  status: 'awaiting_followups',
+                })
+              }
               onEditFollowupAnswer={state.editCareerPlaybookFollowupAnswer}
               onGenerate={handleGenerate}
               generationHandoffVisible={
@@ -617,4 +814,24 @@ function hasAnswerValue(value: CareerPlaybookAnswerValue | undefined) {
   }
 
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function formatBusinessContextSummary(
+  context: CareerPlaybookBusinessContext,
+  categories: BusinessContextCategoryCopy[],
+  universalSummary: string
+) {
+  if (context.mode === 'universal') {
+    return context.status === 'skipped' ? [universalSummary] : []
+  }
+
+  const digest = context.digest
+  if (!digest) return []
+
+  return categories
+    .map((category) => {
+      const values = digest[category.key]
+      return values.length > 0 ? `${category.title}: ${values.join('; ')}` : null
+    })
+    .filter((value): value is string => Boolean(value))
 }

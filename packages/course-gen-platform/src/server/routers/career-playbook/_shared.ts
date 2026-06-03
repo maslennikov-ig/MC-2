@@ -9,6 +9,10 @@ import {
   languageSchema,
 } from '@megacampus/shared-types';
 
+const MAX_BUSINESS_CONTEXT_UPLOAD_BYTES = 104_857_600;
+const MAX_BUSINESS_CONTEXT_BASE64_LENGTH =
+  Math.ceil((MAX_BUSINESS_CONTEXT_UPLOAD_BYTES * 4) / 3) + 8;
+
 export const playbookIdInputSchema = z.object({
   playbookId: z.string().uuid('Invalid playbook ID'),
 });
@@ -35,8 +39,26 @@ export const startSessionInputSchema = z.object({
 });
 
 export const submitAnswerInputSchema = playbookIdInputSchema.extend({
-  phase: z.enum(['fixed', 'followup', 'freeform']),
+  phase: z.enum(['fixed', 'followup', 'freeform', 'business_context']),
   answer: CareerPlaybookAnswerSubmissionSchema,
+});
+
+export const uploadBusinessContextSourceInputSchema = playbookIdInputSchema.extend({
+  filename: z.string().min(1, 'Filename is required').max(255, 'Filename too long'),
+  fileSize: z
+    .number()
+    .int('File size must be an integer')
+    .positive('File size must be positive')
+    .max(MAX_BUSINESS_CONTEXT_UPLOAD_BYTES, 'File size exceeds 100MB limit'),
+  mimeType: z.string().min(1, 'MIME type is required'),
+  fileContent: z
+    .string()
+    .min(1, 'File content is required')
+    .max(MAX_BUSINESS_CONTEXT_BASE64_LENGTH, 'File content exceeds upload limit'),
+});
+
+export const removeBusinessContextSourceInputSchema = playbookIdInputSchema.extend({
+  sourceId: z.string().uuid('Invalid source ID'),
 });
 
 export const requestFollowupsInputSchema = playbookIdInputSchema.extend({

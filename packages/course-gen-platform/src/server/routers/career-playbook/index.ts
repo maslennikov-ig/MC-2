@@ -7,6 +7,7 @@ import { careerPlaybookGenerationRouter } from './generation.router';
 import { careerPlaybookLibraryRouter } from './library.router';
 import { careerPlaybookSessionRouter } from './session.router';
 import { careerPlaybookShareRouter } from './share.router';
+import { careerPlaybookSourcesRouter } from './sources.router';
 import { exportCareerPlaybookPdf } from './library-service';
 
 export const careerPlaybookRouter = router({
@@ -20,6 +21,7 @@ export const careerPlaybookRouter = router({
   generation: careerPlaybookGenerationRouter,
   library: careerPlaybookLibraryRouter,
   share: careerPlaybookShareRouter,
+  sources: careerPlaybookSourcesRouter,
   courseBridge: careerPlaybookCourseBridgeRouter,
 });
 

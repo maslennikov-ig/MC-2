@@ -281,14 +281,14 @@ describe('useCareerPlaybookStore', () => {
     ])
   })
 
-  it('moves from fixed questions into follow-ups once Phase A is complete', () => {
+  it('moves from fixed questions into business context once Phase A is complete', () => {
     useCareerPlaybookStore
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
 
     useCareerPlaybookStore.getState().completeCareerPlaybookFixedPhase()
 
-    expect(useCareerPlaybookStore.getState().phase).toBe('followups')
+    expect(useCareerPlaybookStore.getState().phase).toBe('business_context')
     expect(useCareerPlaybookStore.getState().status).toBe('awaiting_followups')
   })
 
@@ -1434,6 +1434,53 @@ describe('useCareerPlaybookStore', () => {
       },
     })
     expect(useCareerPlaybookStore.getState().dirtyFollowupQuestionIds).toEqual([])
+  })
+
+  it('flushes business context through submitAnswer using the business_context phase', async () => {
+    const submitAnswer = vi.fn<CareerPlaybookClient['submitAnswer']>().mockResolvedValue({})
+    setCareerPlaybookClientForTests({ submitAnswer })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000114',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'business_context',
+      status: 'awaiting_followups',
+    })
+
+    useCareerPlaybookStore.getState().saveCareerPlaybookBusinessContext({
+      mode: 'company_specific',
+      status: 'ready',
+      source_ids: ['00000000-0000-4000-8000-000000000115'],
+      digest: {
+        product: ['B2B SaaS for learning operations'],
+        customers: ['Enterprise HR teams'],
+        sales_channels: [],
+        processes: [],
+        metrics: ['Activation rate'],
+        org_structure: [],
+        constraints: [],
+        source_ids: ['00000000-0000-4000-8000-000000000115'],
+        missing_signals: ['Sales and channels'],
+        user_edited: true,
+      },
+    })
+
+    await expect(useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()).resolves.toEqual({
+      ok: true,
+    })
+
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000114',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'company_specific',
+          status: 'ready',
+        }),
+      },
+    })
+    expect(useCareerPlaybookStore.getState().dirtyBusinessContext).toBe(false)
   })
 
   it('resumes a server draft through the injectable client', async () => {

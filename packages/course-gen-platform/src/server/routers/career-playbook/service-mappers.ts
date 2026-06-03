@@ -14,7 +14,7 @@ import {
   type Language,
 } from '@megacampus/shared-types';
 
-export type WizardPhase = 'fixed' | 'followups' | 'completion';
+export type WizardPhase = 'fixed' | 'business_context' | 'followups' | 'completion';
 
 export interface StoredQAData extends CareerPlaybookQAData {
   followup_questions: CareerPlaybookFollowupQuestion[];
@@ -81,10 +81,20 @@ export function normalizeLanguage(language: unknown): Language {
 
 export function normalizeStoredQAData(raw: unknown): StoredQAData {
   const value = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const hasBusinessContext = Object.prototype.hasOwnProperty.call(value, 'business_context');
   const qaData = CareerPlaybookQADataSchema.parse({
     fixed: value.fixed ?? [],
     followups: value.followups ?? [],
     freeform: value.freeform ?? [],
+    business_context: hasBusinessContext
+      ? value.business_context
+      : {
+          mode: 'universal',
+          status: 'skipped',
+          digest: null,
+          source_ids: [],
+          skip_reason: 'legacy_draft_without_business_context',
+        },
     completeness_score: value.completeness_score,
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(
@@ -119,8 +129,23 @@ export function toJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value)) as Json;
 }
 
-export function phaseFromStatus(status: CareerPlaybookPlaybookStatus): WizardPhase {
-  if (status === 'awaiting_followups' || status === 'answering_followups') return 'followups';
+export function phaseFromStatus(
+  status: CareerPlaybookPlaybookStatus,
+  qaData?: Pick<StoredQAData, 'business_context' | 'followup_questions'>
+): WizardPhase {
+  if (status === 'awaiting_followups') {
+    if (
+      qaData &&
+      qaData.followup_questions.length === 0 &&
+      qaData.business_context.status !== 'ready' &&
+      qaData.business_context.status !== 'skipped'
+    ) {
+      return 'business_context';
+    }
+
+    return 'followups';
+  }
+  if (status === 'answering_followups') return 'followups';
   if (status === 'ready_to_generate' || status === 'generating' || status === 'completed') {
     return 'completion';
   }

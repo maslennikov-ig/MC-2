@@ -39,6 +39,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Course library route: `packages/web/app/[locale]/courses/library/page.tsx`.
 - Course creation route: `packages/web/app/[locale]/create/`.
 - Career Playbook wizard route: `packages/web/app/[locale]/career-playbook/new/`.
+- Career Playbook business-context upload route: `packages/web/app/api/career-playbook/upload/route.ts`.
 - Career Playbook landing route: `packages/web/app/[locale]/career-playbook/`.
 - Career Playbook library route: `packages/web/app/[locale]/career-playbook/library/`.
 - Career Playbook public share route: `packages/web/app/[locale]/share/career-playbook/[slug]/`.
@@ -48,6 +49,9 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend tRPC routers and services: `packages/course-gen-platform/src/server/routers/`.
 - Backend Career Playbook stage: `packages/course-gen-platform/src/stages/stage-career-playbook/`.
 - Backend Career Playbook department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`.
+- Backend Career Playbook business-context helpers: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/business-context.ts`.
+- Backend Career Playbook business-context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`.
+- Backend Career Playbook business-context sources: `packages/course-gen-platform/src/server/routers/career-playbook/sources.router.ts` and `sources.service.ts`.
 - Backend Career Playbook course bridge: `packages/course-gen-platform/src/server/routers/career-playbook/course-bridge.service.ts` with storage/quota helpers in `course-bridge-storage.ts`.
 - Backend Career Playbook PDF service: `packages/course-gen-platform/src/services/career-playbook-pdf.ts`.
 - Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.

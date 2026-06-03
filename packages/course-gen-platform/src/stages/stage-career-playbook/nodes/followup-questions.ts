@@ -8,14 +8,22 @@ import {
   type CareerPlaybookNodeCost,
   type CareerPlaybookQAData,
 } from '@megacampus/shared-types';
+import {
+  formatCareerPlaybookBusinessContextDigest,
+  formatCareerPlaybookBusinessContextMissingSignals,
+  getCareerPlaybookBusinessContext,
+  loadCareerPlaybookBusinessContextSourceExcerpts,
+} from './business-context';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 
 export const FOLLOWUP_GENERATOR_PROMPT_KEY = 'career_playbook_followup_generator';
 export const FOLLOWUP_GENERATOR_PHASE = 'stage_career_playbook_followup';
 
 export interface GenerateCareerPlaybookFollowupsInput {
+  playbookId?: string;
   qaData: CareerPlaybookQAData;
   language: string;
+  businessContextSourceExcerpts?: string;
 }
 
 export interface GenerateCareerPlaybookFollowupsResult {
@@ -35,8 +43,11 @@ function getFreeformText(qaData: CareerPlaybookQAData): string {
 
 export function buildFollowupPromptVariables(
   qaData: CareerPlaybookQAData,
-  contentLanguage: string
+  contentLanguage: string,
+  businessContextSourceExcerpts = '- none'
 ): Record<string, string> {
+  const businessContext = getCareerPlaybookBusinessContext(qaData);
+
   return {
     position: getAnswer(qaData, 'position'),
     department: getAnswer(qaData, 'department'),
@@ -46,6 +57,11 @@ export function buildFollowupPromptVariables(
     reporting: getAnswer(qaData, 'reporting'),
     content_language: contentLanguage,
     freeform_text: getFreeformText(qaData),
+    business_context_mode: businessContext.mode,
+    business_context_digest: formatCareerPlaybookBusinessContextDigest(businessContext),
+    business_context_source_excerpts: businessContextSourceExcerpts,
+    business_context_missing_signals:
+      formatCareerPlaybookBusinessContextMissingSignals(businessContext),
     previous_followups_json: JSON.stringify(qaData.followups, null, 2),
   };
 }
@@ -93,9 +109,16 @@ export async function generateCareerPlaybookFollowups(
   input: GenerateCareerPlaybookFollowupsInput,
   runtime: CareerPlaybookRuntime = createCareerPlaybookRuntime()
 ): Promise<GenerateCareerPlaybookFollowupsResult> {
+  const businessContext = getCareerPlaybookBusinessContext(input.qaData);
+  const businessContextSourceExcerpts =
+    input.businessContextSourceExcerpts ??
+    (await loadCareerPlaybookBusinessContextSourceExcerpts({
+      playbookId: input.playbookId,
+      context: businessContext,
+    }));
   const prompt = await runtime.renderPrompt(
     FOLLOWUP_GENERATOR_PROMPT_KEY,
-    buildFollowupPromptVariables(input.qaData, input.language)
+    buildFollowupPromptVariables(input.qaData, input.language, businessContextSourceExcerpts)
   );
   const llmResult = await runtime.invokeLLM(prompt, {
     phaseName: FOLLOWUP_GENERATOR_PHASE,

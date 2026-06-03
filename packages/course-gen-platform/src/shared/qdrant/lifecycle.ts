@@ -464,9 +464,9 @@ export async function handleFileUpload(
  * Process:
  * 1. Get file record
  * 2. Delete vectors for this course_id only
- * 3. Decrement reference_count on original
- * 4. Delete file_catalog record for this reference
- * 5. If reference_count = 0, delete physical file and all remaining vectors
+ * 3. Delete file_catalog record for this reference
+ * 4. Read trigger-maintained reference_count from the original
+ * 5. If no references remain, delete physical file and all remaining vectors
  *
  * @param fileId - File ID to delete
  * @returns Delete result
@@ -496,6 +496,13 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
   // 2. Determine if this is original or reference
   const isOriginal = fileRecord.original_file_id === null;
   const targetFileId = isOriginal ? fileId : (fileRecord.original_file_id as string);
+  const currentReferenceCount = Number(fileRecord.reference_count ?? 1);
+
+  if (isOriginal && currentReferenceCount > 1) {
+    throw new Error(
+      `Cannot delete original file ${fileId} while ${currentReferenceCount - 1} active references still point at it`
+    );
+  }
 
   // 3. Delete vectors from Qdrant (only for THIS document_id and course_id)
   await qdrantClient.delete(COLLECTION_CONFIG.name, {
@@ -510,15 +517,15 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
 
   logger.info({ courseId: fileRecord.course_id, documentId: fileId }, 'Deleted vectors for course');
 
-  // 4. Decrement reference_count on original
-  const remainingReferences = await LifecycleHelpers.decrementReferenceCount(
-    supabase,
-    targetFileId
-  );
-  logger.info({ remainingReferences, targetFileId }, 'Reference count after decrement');
-
-  // 5. Delete file_catalog record for THIS reference
+  // 4. Delete file_catalog record for THIS reference.
+  // Database triggers own reference_count updates for reference rows.
   await LifecycleHelpers.deleteFileCatalogRecord(supabase, fileId);
+
+  // 5. Read remaining references after the delete trigger has run.
+  const remainingReferences = isOriginal
+    ? 0
+    : await LifecycleHelpers.getReferenceCount(supabase, targetFileId);
+  logger.info({ remainingReferences, targetFileId }, 'Reference count after file record delete');
 
   // 6. Update storage quota
   await updateStorageQuota(fileRecord.organization_id, fileRecord.file_size, 'decrement');

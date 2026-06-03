@@ -53,6 +53,25 @@ blocked unless a saved department value is present. The classifier uses
 `stage_career_playbook_department_classifier` model routing with retry and
 fallback-model escalation from `llm_model_config`.
 
+## Business Context Intake
+
+As of 2026-06-03, the constructor inserts a guided Business Context step after
+the fixed questions and before adaptive follow-ups. Users can describe the
+company manually, attach helpful files, or explicitly choose a universal
+benchmark Role Guide.
+
+The step collects product, customer, sales/channel, process, metric,
+organization, and constraint signals. It reuses the shared course `FileUpload`
+component with Career Playbook-specific copy. Uploaded files are stored as
+Career Playbook sources tied to `career_playbooks` through
+`career_playbook_sources`; they do not require a fake draft course or a
+`course_id`.
+
+Generation receives the user-editable business-context digest separately from
+external web research. Company-specific mode may use the digest as client facts.
+Universal mode must not invent company details and should produce a benchmark
+guide with explicit adaptation notes.
+
 ## Verification Entrypoints
 
 Local read-only checks:
@@ -69,6 +88,9 @@ Targeted unit checks:
 ```bash
 pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/public-playbook-viewer.test.tsx
+pnpm --filter @megacampus/shared-types exec vitest run tests/career-playbook.test.ts
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/stages/stage-career-playbook/followup-questions.test.ts tests/unit/stages/stage-career-playbook/spec-builder.test.ts
+pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/page-client.test.tsx tests/unit/api/career-playbook/upload.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/admin-cost-evidence.test.tsx
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/admin-career-playbook-costs.test.ts
@@ -108,6 +130,8 @@ Career Playbook per-node cost evidence is available to admins at `/admin/generat
 ## Current Live Readiness
 
 As of 2026-05-20, the Career Playbook migration has been applied to the Supabase project and read-only staging preflight passes when a dedicated non-default queue name is provided. Full mutation smoke is still intentionally gated on disposable staging fixtures, auth token/storage state, queue alignment between enqueuer and worker, cleanup scope, and an accepted numeric LLM/API cost budget.
+
+As of 2026-06-03, Business Context file uploads require migrations `20260603110000_add_career_playbook_sources` and `20260603123000_cascade_career_playbook_source_file_catalog` in addition to the base Career Playbook schema. Before enabling uploads in staging/dev, verify `career_playbook_sources` RLS, `file_catalog.course_id IS NULL` for Career Playbook files, and explicit source removal cascades source rows when their `file_catalog` metadata is deleted.
 
 As of 2026-05-23, the target model routing is encoded in migration `20260523073000_update_career_playbook_v4_pro_routing`: DeepSeek V4 Pro for spec, group 5, judge, and block regeneration; DeepSeek V4 Flash for follow-up and groups 1-4/6. Career Playbook fallbacks now stay within the DeepSeek V4 Flash/Pro pair instead of MiniMax.
 

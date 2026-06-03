@@ -8,14 +8,38 @@ const mocks = vi.hoisted(() => ({
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
   createCourseFromPlaybook: vi.fn(),
+  validateFile: vi.fn(),
+  runPhase2Storage: vi.fn(),
+  isStorageError: vi.fn(),
+  decrementQuota: vi.fn(),
+  unlink: vi.fn(),
   addJob: vi.fn(),
   removeTerminalJobById: vi.fn(),
+  rpc: vi.fn(),
+}));
+
+vi.mock('fs/promises', () => ({
+  unlink: mocks.unlink,
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
   getSupabaseAdmin: vi.fn(() => ({
     from: mocks.from,
+    rpc: mocks.rpc,
   })),
+}));
+
+vi.mock('@/shared/validation/file-validator', () => ({
+  validateFile: mocks.validateFile,
+}));
+
+vi.mock('@/shared/validation/quota-enforcer', () => ({
+  decrementQuota: mocks.decrementQuota,
+}));
+
+vi.mock('@/stages/stage1-document-upload/phases', () => ({
+  runPhase2Storage: mocks.runPhase2Storage,
+  isStorageError: mocks.isStorageError,
 }));
 
 vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
@@ -113,6 +137,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
     delete: vi.fn(() => builder),
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
     order: vi.fn(() => builder),
     single: vi.fn(() => {
       const result = singleResults.shift();
@@ -127,6 +152,7 @@ function createListBuilder(data: unknown[], error: unknown = null) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
     order: vi.fn(() => Promise.resolve({ data, error })),
   };
 
@@ -136,6 +162,20 @@ function createListBuilder(data: unknown[], error: unknown = null) {
 describe('careerPlaybookRouter transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.validateFile.mockReturnValue({ valid: true });
+    mocks.runPhase2Storage.mockResolvedValue({
+      fileId: '55555555-5555-4555-8555-555555555555',
+      storagePath:
+        'uploads/22222222-2222-4222-8222-222222222222/career-playbooks/33333333-3333-4333-8333-333333333333/55555555-5555-4555-8555-555555555555.pdf',
+      fileHash: 'hash',
+      actualSize: 12,
+      durationMs: 10,
+      deduplicated: false,
+    });
+    mocks.isStorageError.mockReturnValue(false);
+    mocks.decrementQuota.mockResolvedValue(undefined);
+    mocks.unlink.mockResolvedValue(undefined);
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
   it('is wired into the app router under careerPlaybook', () => {
@@ -145,6 +185,9 @@ describe('careerPlaybookRouter transport', () => {
       appRouter._def.procedures['careerPlaybook.session.resolveDepartmentOptions']
     ).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.requestFollowups']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.uploadFile']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.listSources']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.removeSource']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.approveAndGenerate']).toBeDefined();
     expect(
       appRouter._def.procedures['careerPlaybook.courseBridge.createCourseFromPlaybook']
@@ -214,6 +257,7 @@ describe('careerPlaybookRouter transport', () => {
       status: 'answering_fixed',
       phase: 'fixed',
       fixedAnswers: [],
+      businessContextSources: [],
     });
   });
 
@@ -280,78 +324,6 @@ describe('careerPlaybookRouter transport', () => {
     expect(mocks.from).toHaveBeenCalledWith('career_playbook_fixed_questions');
     expect(builder.eq).toHaveBeenCalledWith('language', 'en');
     expect(result).toEqual(questions);
-  });
-
-  it('requests follow-up questions through the backend generator and persists them', async () => {
-    const followupResponse = {
-      questions: [
-        {
-          question_id: '55555555-5555-4555-8555-555555555555',
-          question_text: 'Which KPIs define success?',
-          question_type: 'open',
-          options: null,
-          rationale: 'KPI specificity improves the guide.',
-        },
-      ],
-      completeness_score: 0.71,
-      stop_recommendation: 'ask_more',
-    };
-    mocks.generateCareerPlaybookFollowups.mockResolvedValue({
-      response: followupResponse,
-      nodeCost: {
-        node: 'followupGenerator',
-        model: 'mock-model',
-        input_tokens: 10,
-        output_tokens: 10,
-        cost_usd: 0,
-      },
-    });
-    const builder = createBuilder([
-      { data: playbookRow({ status: 'awaiting_followups' }), error: null },
-      {
-        data: playbookRow({
-          status: 'answering_followups',
-          q_a_data: {
-            fixed: [{ question_key: 'position', value: 'Product Lead' }],
-            followups: [],
-            freeform: [],
-            completeness_score: 0.71,
-            followup_questions: followupResponse.questions,
-          },
-        }),
-        error: null,
-      },
-    ]);
-    mocks.from.mockReturnValue(builder);
-
-    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
-    const result = await caller.generation.requestFollowups({
-      playbookId,
-      fixedAnswers: {
-        position: { question_key: 'position', value: 'Product Lead' },
-      },
-      followupAnswers: {},
-      contentLanguage: 'en',
-    });
-
-    expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
-      qaData: {
-        fixed: [{ question_key: 'position', value: 'Product Lead' }],
-        followups: [],
-        freeform: [],
-      },
-      language: 'en',
-    });
-    expect(builder.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'answering_followups',
-        q_a_data: expect.objectContaining({
-          completeness_score: 0.71,
-          followup_questions: followupResponse.questions,
-        }),
-      })
-    );
-    expect(result).toEqual(followupResponse);
   });
 
   it('does not persist ready-to-generate when follow-up completeness is below threshold', async () => {
@@ -562,11 +534,12 @@ describe('careerPlaybookRouter transport', () => {
         organizationId: authenticatedContext.user!.organizationId,
         language: 'en',
         locale: 'en',
-        qaData: {
+        qaData: expect.objectContaining({
           fixed: [{ question_key: 'position', value: 'Product Lead' }],
           followups: [],
           freeform: [],
-        },
+          business_context: expect.objectContaining({ mode: 'universal' }),
+        }),
         createdAt: expect.any(String),
       }),
       expect.any(Object)

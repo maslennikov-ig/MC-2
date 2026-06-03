@@ -7,8 +7,12 @@
 - Backend tRPC router: `packages/course-gen-platform/src/server/routers/career-playbook/**`
 - Generation stage: `packages/course-gen-platform/src/stages/stage-career-playbook/**`
 - Department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`
+- Business context helpers: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/business-context.ts`
+- Business context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`
 - Worker handler: `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts`
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
+- Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
+- Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
 
 ## Department Resolution
 
@@ -30,6 +34,55 @@ Follow-up generation must receive a saved department answer. The store blocks a
 direct follow-up request without department context and sends the user back to
 the department question instead of starting generation with incomplete fixed
 answers.
+
+## Business Context Intake
+
+The constructor now has an intermediate Business Context phase between fixed
+questions and follow-up generation. The web step lives in
+`BusinessContextStep.tsx` and uses the document-first constructor shell: category
+navigation on the left, an editable digest in the center, and source guidance
+plus upload controls on the right.
+
+The shared `CareerPlaybookQADataSchema` stores `business_context` with:
+
+- `mode`: `company_specific` or `universal`
+- `status`: collection/readiness state
+- `digest`: product, customer, sales/channel, process, metric, organization,
+  and constraint signals, plus nested `source_ids`, `missing_signals`,
+  `user_edited`, and digest timestamps
+- `source_ids`: uploaded source record IDs mirrored at the context level for
+  quick access
+- `skip_reason`: optional explanation for universal/skipped mode
+- `updated_at`: last context edit timestamp
+
+`career_playbook_sources` is the domain owner for uploaded Business Context
+files and text snippets. It references `career_playbooks`, `organizations`,
+`auth.users`, and optional `file_catalog` rows. File storage still goes through
+the existing Stage 1 validation, quota, storage, and dedup primitives, but Career
+Playbook files use `uploads/<organization>/career-playbooks/<playbookId>/` and
+leave `file_catalog.course_id` null. This keeps course uploads unchanged and
+avoids creating fake draft courses just to attach Role Guide context.
+
+Business Context file uploads enqueue `JobType.CAREER_PLAYBOOK` with operation
+`PROCESS_SOURCE`. `source-processing.ts` reuses Docling conversion,
+processed-document storage, and summarization with the playbook ID as the
+markdown namespace instead of creating a fake course. Source rows move through
+`uploaded`, `processing`, `ready`, and `failed`; follow-up generation blocks
+while any selected source is still uploaded or processing.
+
+The tRPC source lifecycle surface is `careerPlaybook.sources.listSources`,
+`uploadFile`, and `removeSource`. Draft reads include
+`businessContextSources`, so the web store can render persisted filenames,
+source status, source errors, and removal actions across constructor resume.
+
+Follow-up and spec-builder prompts receive the formatted business digest,
+processed source excerpts, and missing signals as separate prompt variables.
+Company-specific mode may treat the digest and available processed source
+excerpts as client-provided facts. If an uploaded source has no processed text
+yet, the prompt receives an explicit unavailable-content warning rather than raw
+UUIDs. Universal mode explicitly instructs the model not to invent
+company/product/channel details; the generated Role Guide is a benchmark guide
+that names adaptation areas before operational rollout.
 
 ## Course Bridge Sources
 

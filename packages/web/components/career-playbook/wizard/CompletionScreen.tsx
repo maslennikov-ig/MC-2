@@ -20,6 +20,7 @@ export interface CompletionScreenCopy {
   title?: string
   description?: string
   fixedTitle?: string
+  businessContextTitle?: string
   followupsTitle?: string
   freeformTitle?: string
   completeness?: string
@@ -44,9 +45,11 @@ export interface CompletionScreenCopy {
 
 interface CompletionScreenProps {
   fixedAnswers: CompletionSummaryAnswer[]
+  businessContextNotes?: string[]
   followupAnswers: CompletionSummaryAnswer[]
   freeformNotes: string[]
   onEditFixedAnswer: (questionKey: string) => void
+  onEditBusinessContext?: () => void
   onEditFollowupAnswer: (questionId: string) => void
   onGenerate: () => void
   generationHandoffVisible?: boolean
@@ -71,6 +74,7 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   title: 'Готовы создать?',
   description: 'Проверьте собранный контекст перед генерацией должностной инструкции.',
   fixedTitle: 'Фиксированные ответы',
+  businessContextTitle: 'Контекст бизнеса',
   followupsTitle: 'Уточнения',
   freeformTitle: 'Свободные заметки',
   completeness: 'Полнота',
@@ -96,9 +100,11 @@ const defaultCopy: Required<CompletionScreenCopy> = {
 
 export function CompletionScreen({
   fixedAnswers,
+  businessContextNotes = [],
   followupAnswers,
   freeformNotes,
   onEditFixedAnswer,
+  onEditBusinessContext,
   onEditFollowupAnswer,
   onGenerate,
   generationHandoffVisible = false,
@@ -146,6 +152,7 @@ export function CompletionScreen({
           </p>
           <div className="mt-4 grid gap-3">
             <ReviewMetric label={labels.fixedTitle} value={fixedAnswers.length} />
+            <ReviewMetric label={labels.businessContextTitle} value={businessContextNotes.length} />
             <ReviewMetric label={labels.followupsTitle} value={followupAnswers.length} />
             <ReviewMetric label={labels.freeformTitle} value={freeformNotes.length} />
             {completenessPercent ? (
@@ -191,6 +198,29 @@ export function CompletionScreen({
                   onEdit={() => onEditFixedAnswer(answer.id)}
                   isEditDisabled={isEditingDisabled}
                 />
+              ))}
+            </SummarySection>
+
+            <SummarySection title={labels.businessContextTitle} empty={labels.empty}>
+              {businessContextNotes.map((note, index) => (
+                <div key={`${note}-${index}`} className="career-playbook-muted-card p-3">
+                  <p className="text-sm leading-6 break-words whitespace-pre-wrap text-slate-800 dark:text-slate-100">
+                    {note}
+                  </p>
+                  {onEditBusinessContext ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={onEditBusinessContext}
+                      disabled={isEditingDisabled}
+                      className="mt-2 h-8 px-2 text-xs"
+                    >
+                      <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      {labels.edit}
+                    </Button>
+                  ) : null}
+                </div>
               ))}
             </SummarySection>
 

@@ -35,6 +35,19 @@ export interface Stage1Input {
 }
 
 /**
+ * Owner-aware storage input used when Stage 1 storage primitives are reused by
+ * non-course domains. The original course upload flow still passes Stage1Input.
+ */
+export interface Stage1StorageInput extends Omit<Stage1Input, 'courseId'> {
+  /** UUID of the course to upload to. Required for course uploads. */
+  courseId?: string;
+  /** Domain owner for storage and file_catalog association. */
+  ownerType?: 'course' | 'career_playbook';
+  /** UUID of the owner. Defaults to courseId for course uploads. */
+  ownerId?: string;
+}
+
+/**
  * Context passed through pipeline phases
  * Contains resolved metadata and state accumulated during processing
  */
