@@ -4,8 +4,8 @@ import {
   type CareerPlaybookBusinessContextDigest,
   type CareerPlaybookQAData,
 } from '@megacampus/shared-types';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
+import { getCareerPlaybookBusinessContextSupabase } from '@/shared/career-playbook/source-db';
 
 type DigestArrayKey =
   | 'product'
@@ -297,7 +297,7 @@ async function loadBusinessContextSources(input: {
     .slice(0, input.maxSources ?? DEFAULT_MAX_SOURCE_EXCERPTS);
   if (selectedSourceIds.length === 0) return [];
 
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { data: sourceRows, error: sourceError } = await supabase
     .from('career_playbook_sources')
     .select('id, filename, status, file_catalog_id')

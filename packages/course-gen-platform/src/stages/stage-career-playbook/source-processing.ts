@@ -4,8 +4,8 @@ import type {
   DocumentProcessingJobData,
   Language,
 } from '@megacampus/shared-types';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import logger from '@/shared/logger';
+import { getCareerPlaybookBusinessContextSupabase } from '@/shared/career-playbook/source-db';
 import { executeDoclingConversion } from '@/stages/stage2-document-processing/phases/phase-1-docling-conversion';
 import { storeProcessedDocument } from '@/stages/stage2-document-processing/orchestrator-helpers';
 import { executePhase6Summarization } from '@/stages/stage2-document-processing/phases/phase-6-summarization';
@@ -34,7 +34,7 @@ function errorMessageFrom(error: unknown): string {
 }
 
 async function updateSourceStatus(sourceId: string, status: SourceStatus): Promise<void> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { error } = await supabase
     .from('career_playbook_sources')
     .update({ status, updated_at: new Date().toISOString() })
@@ -46,7 +46,7 @@ async function updateSourceStatus(sourceId: string, status: SourceStatus): Promi
 }
 
 async function markFileProcessingFailed(fileId: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { error } = await supabase
     .from('file_catalog')
     .update({ vector_status: 'failed', updated_at: new Date().toISOString() })
