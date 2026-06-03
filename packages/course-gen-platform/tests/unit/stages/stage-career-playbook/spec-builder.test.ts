@@ -71,6 +71,30 @@ describe('Career Playbook spec builder', () => {
     expect(parsed.block_boundaries.block_5.primary_topics).toContain('decision authority');
   });
 
+  it('drops blank optional string fields before validating RoleProfileSpec', () => {
+    const parsed = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...roleProfileSpec,
+        position: {
+          ...roleProfileSpec.position,
+          specialization: '',
+        },
+        context: {
+          ...roleProfileSpec.context,
+          has_subordinates: false,
+          subordinates_description: '',
+          industry: '   ',
+          region: '',
+        },
+      })
+    );
+
+    expect(parsed.position.specialization).toBeUndefined();
+    expect(parsed.context.subordinates_description).toBeUndefined();
+    expect(parsed.context.industry).toBeUndefined();
+    expect(parsed.context.region).toBeUndefined();
+  });
+
   it('builds exactly three role-specific web research queries', () => {
     const queries = buildCareerPlaybookResearchQueries(qaData);
 

@@ -66,7 +66,39 @@ Do not use arrays for block_boundaries. Do not use strings where an object is re
 export function parseRoleProfileSpecFromLLM(rawContent: string): CareerPlaybookRoleProfileSpec {
   const extractedJson = extractJSON(rawContent);
   const parsed = safeJSONParse(extractedJson);
-  return CareerPlaybookRoleProfileSpecSchema.parse(parsed);
+  return CareerPlaybookRoleProfileSpecSchema.parse(normalizeRoleProfileSpecCandidate(parsed));
+}
+
+function dropBlankOptionalString(record: Record<string, unknown>, key: string): void {
+  const value = record[key];
+  if (typeof value === 'string' && value.trim().length === 0) {
+    delete record[key];
+  }
+}
+
+function normalizeRoleProfileSpecCandidate(candidate: unknown): unknown {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
+
+  const normalized = candidate as Record<string, unknown>;
+  if (
+    normalized.position &&
+    typeof normalized.position === 'object' &&
+    !Array.isArray(normalized.position)
+  ) {
+    dropBlankOptionalString(normalized.position as Record<string, unknown>, 'specialization');
+  }
+  if (
+    normalized.context &&
+    typeof normalized.context === 'object' &&
+    !Array.isArray(normalized.context)
+  ) {
+    const context = normalized.context as Record<string, unknown>;
+    dropBlankOptionalString(context, 'subordinates_description');
+    dropBlankOptionalString(context, 'industry');
+    dropBlankOptionalString(context, 'region');
+  }
+
+  return normalized;
 }
 
 export function buildSpecBuilderPromptVariables(
