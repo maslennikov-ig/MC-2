@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CareerPlaybookQAData } from '@megacampus/shared-types';
 import {
   buildCareerPlaybookResearchQueries,
+  createSpecBuilderNode,
   parseRoleProfileSpecFromLLM,
   runCareerPlaybookWebResearch,
 } from '@/stages/stage-career-playbook/nodes/spec-builder';
@@ -90,5 +91,61 @@ describe('Career Playbook spec builder', () => {
     expect(research.onboarding_insights).toEqual([]);
     expect(research.sources).toEqual([]);
     expect(research.errors).toHaveLength(3);
+  });
+
+  it('retries spec generation with fallback model instructions when primary output fails schema validation', async () => {
+    const invokeLLM = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          position: 'B2B Sales Manager',
+          block_boundaries: [],
+        }),
+        model: 'fast-model',
+        inputTokens: 10,
+        outputTokens: 10,
+        costUsd: 0,
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(roleProfileSpec),
+        model: 'fallback-model',
+        inputTokens: 20,
+        outputTokens: 20,
+        costUsd: 0,
+      });
+    const specBuilderNode = createSpecBuilderNode({
+      runtime: {
+        renderPrompt: vi.fn().mockResolvedValue('base spec prompt'),
+        invokeLLM,
+      },
+      webResearch: { client: () => Promise.resolve([]) },
+    });
+
+    const result = await specBuilderNode({
+      playbookId: '33333333-3333-4333-8333-333333333333',
+      userId: '11111111-1111-4111-8111-111111111111',
+      organizationId: '22222222-2222-4222-8222-222222222222',
+      language: 'ru',
+      qaData,
+      currentNode: 'specBuilder',
+      roleProfileSpec: null,
+      webResearch: null,
+      generatedBlocks: {},
+      nodeCosts: [],
+      errors: [],
+    });
+
+    expect(result.errors).toBeUndefined();
+    expect(result.roleProfileSpec?.position.title).toBe('B2B Sales Manager');
+    expect(result.currentNode).toBe('group1Generator');
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
+    expect(invokeLLM).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('Previous RoleProfileSpec response failed validation'),
+      expect.objectContaining({
+        preferFallbackModel: true,
+        maxTokensMultiplier: 1.25,
+      })
+    );
   });
 });

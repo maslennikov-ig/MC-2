@@ -37,6 +37,32 @@ function buildNodeCost(result: {
   };
 }
 
+function errorMessageFrom(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function buildRoleProfileSpecRepairPrompt(basePrompt: string, validationError: unknown): string {
+  return `${basePrompt}
+
+Previous RoleProfileSpec response failed validation:
+${errorMessageFrom(validationError)}
+
+Return ONLY valid JSON. It must be an object with this shape; replace placeholder strings with real values:
+{
+  "position": { "title": "...", "slug": "...", "department": "...", "level": "middle", "specialization": "..." },
+  "context": { "company_stage": "growth", "team_size": "51-200", "reports_to": "...", "has_subordinates": false, "subordinates_description": "...", "industry": "...", "region": "..." },
+  "focus_areas": { "primary_kpis": ["..."], "key_tools": ["..."], "critical_competencies": ["..."], "anti_goals": ["..."], "failure_patterns": ["..."] },
+  "research": { "kpis_insights": ["..."], "trends_insights": ["..."], "onboarding_insights": ["..."], "sources": ["..."] },
+  "block_boundaries": { "block_1": { "primary_topics": ["..."], "do_not_repeat": ["..."] } },
+  "content_language": "ru"
+}
+
+Allowed level values: junior, middle, senior, lead, director, c-level.
+Allowed company_stage values: pre-pmf, growth, scale, mature.
+Allowed team_size values: 1-10, 11-50, 51-200, 201-1000, 1000+.
+Do not use arrays for block_boundaries. Do not use strings where an object is required.`;
+}
+
 export function parseRoleProfileSpecFromLLM(rawContent: string): CareerPlaybookRoleProfileSpec {
   const extractedJson = extractJSON(rawContent);
   const parsed = safeJSONParse(extractedJson);
@@ -68,6 +94,43 @@ export interface CreateSpecBuilderNodeOptions {
   webResearch?: RunCareerPlaybookWebResearchOptions;
 }
 
+async function invokeRoleProfileSpecWithFallback(
+  runtime: CareerPlaybookRuntime,
+  prompt: string
+): Promise<{
+  roleProfileSpec: CareerPlaybookRoleProfileSpec;
+  llmResults: Awaited<ReturnType<CareerPlaybookRuntime['invokeLLM']>>[];
+}> {
+  const baseOptions = {
+    phaseName: SPEC_BUILDER_PHASE,
+    promptKey: SPEC_BUILDER_PROMPT_KEY,
+    node: 'specBuilder',
+    temperature: 0.3,
+    maxTokens: 8_000,
+  };
+  const firstResult = await runtime.invokeLLM(prompt, baseOptions);
+
+  try {
+    return {
+      roleProfileSpec: parseRoleProfileSpecFromLLM(firstResult.content),
+      llmResults: [firstResult],
+    };
+  } catch (validationError) {
+    const repairPrompt = buildRoleProfileSpecRepairPrompt(prompt, validationError);
+    const fallbackResult = await runtime.invokeLLM(repairPrompt, {
+      ...baseOptions,
+      temperature: 0.2,
+      preferFallbackModel: true,
+      maxTokensMultiplier: 1.25,
+    });
+
+    return {
+      roleProfileSpec: parseRoleProfileSpecFromLLM(fallbackResult.content),
+      llmResults: [firstResult, fallbackResult],
+    };
+  }
+}
+
 export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}) {
   const runtime = options.runtime ?? createCareerPlaybookRuntime();
 
@@ -80,24 +143,20 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
         SPEC_BUILDER_PROMPT_KEY,
         buildSpecBuilderPromptVariables(state.qaData, webResearch, state.language)
       );
-      const llmResult = await runtime.invokeLLM(prompt, {
-        phaseName: SPEC_BUILDER_PHASE,
-        promptKey: SPEC_BUILDER_PROMPT_KEY,
-        node: 'specBuilder',
-        temperature: 0.3,
-        maxTokens: 8_000,
-      });
-      const roleProfileSpec = parseRoleProfileSpecFromLLM(llmResult.content);
+      const { roleProfileSpec, llmResults } = await invokeRoleProfileSpecWithFallback(
+        runtime,
+        prompt
+      );
 
       return {
         roleProfileSpec,
         webResearch,
-        nodeCosts: [buildNodeCost(llmResult)],
+        nodeCosts: llmResults.map(buildNodeCost),
         currentNode: 'group1Generator',
       };
     } catch (error) {
       return {
-        errors: [`specBuilder failed: ${error instanceof Error ? error.message : String(error)}`],
+        errors: [`specBuilder failed: ${errorMessageFrom(error)}`],
         currentNode: 'specBuilder',
       };
     }
