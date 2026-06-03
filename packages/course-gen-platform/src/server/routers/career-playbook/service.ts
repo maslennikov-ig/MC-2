@@ -12,6 +12,7 @@ import {
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookBusinessContext,
+  type CareerPlaybookBusinessContextSourceSummary,
   type CareerPlaybookFixedAnswer,
   type CareerPlaybookFixedQuestion,
   type CareerPlaybookFollowupAnswer,
@@ -25,6 +26,10 @@ import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { addJob, removeTerminalJobById } from '../../../orchestrator/queue';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
+import {
+  hasPendingCareerPlaybookBusinessContextSources,
+  refreshCareerPlaybookBusinessContextDigest,
+} from '@/stages/stage-career-playbook/nodes/business-context';
 import {
   freeformDraftFromQAData,
   generationProgress,
@@ -41,6 +46,7 @@ import {
   type WizardPhase,
 } from './service-mappers';
 import { getCareerPlaybookGenerationJobId } from './job-ids';
+import { listCareerPlaybookBusinessContextSourceSummaries } from './sources.service';
 
 export interface CareerPlaybookDraftResponse {
   playbookId: string;
@@ -53,6 +59,7 @@ export interface CareerPlaybookDraftResponse {
   followupGenerationCount: number;
   freeformDraft: string;
   businessContext: CareerPlaybookBusinessContext;
+  businessContextSources?: CareerPlaybookBusinessContextSourceSummary[];
   status: CareerPlaybookPlaybookStatus;
   phase: WizardPhase;
 }
@@ -95,11 +102,14 @@ function throwOnDbError(error: unknown, message: string): never {
   });
 }
 
-function mapRowToDraft(row: CareerPlaybookRow): CareerPlaybookDraftResponse {
+function mapRowToDraft(
+  row: CareerPlaybookRow,
+  options: { businessContextSources?: CareerPlaybookBusinessContextSourceSummary[] } = {}
+): CareerPlaybookDraftResponse {
   const mapped = mapPlaybookRow(row);
   const qaData = normalizeStoredQAData(mapped.q_a_data);
 
-  return {
+  const draft: CareerPlaybookDraftResponse = {
     playbookId: mapped.id,
     uiLanguage: uiLanguageFromContent(mapped.language),
     contentLanguage: mapped.language,
@@ -113,6 +123,12 @@ function mapRowToDraft(row: CareerPlaybookRow): CareerPlaybookDraftResponse {
     status: mapped.status,
     phase: phaseFromStatus(mapped.status, qaData),
   };
+
+  if (options.businessContextSources) {
+    draft.businessContextSources = options.businessContextSources;
+  }
+
+  return draft;
 }
 
 function assertReadable(row: CareerPlaybookRow, user: UserContext): void {
@@ -346,7 +362,7 @@ export async function startCareerPlaybookSession(
 
   if (error || !data) throwOnDbError(error, 'Failed to start Career Playbook session');
 
-  return mapRowToDraft(data);
+  return mapRowToDraft(data, { businessContextSources: [] });
 }
 
 export async function getCareerPlaybookDraft(
@@ -354,7 +370,9 @@ export async function getCareerPlaybookDraft(
   input: { playbookId: string }
 ): Promise<CareerPlaybookDraftResponse> {
   const user = requireUser(ctx);
-  return mapRowToDraft(await loadPlaybook(input.playbookId, user, 'read'));
+  const row = await loadPlaybook(input.playbookId, user, 'read');
+  const businessContextSources = await listCareerPlaybookBusinessContextSourceSummaries(row.id);
+  return mapRowToDraft(row, { businessContextSources });
 }
 
 export async function submitCareerPlaybookAnswer(
@@ -467,7 +485,22 @@ export async function requestCareerPlaybookFollowups(
   const user = requireUser(ctx);
   const row = await loadPlaybook(input.playbookId, user, 'write');
   const existingQAData = normalizeStoredQAData(row.q_a_data);
-  assertCanRequestFollowups(row, existingQAData, input.fixedAnswers);
+  const refreshedBusinessContext = await refreshCareerPlaybookBusinessContextDigest({
+    playbookId: input.playbookId,
+    context: existingQAData.business_context,
+    freeformText: freeformDraftFromQAData(existingQAData),
+  });
+  if (hasPendingCareerPlaybookBusinessContextSources(refreshedBusinessContext)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Business context source files are still processing',
+    });
+  }
+  const existingQADataWithDigest: StoredQAData = {
+    ...existingQAData,
+    business_context: refreshedBusinessContext.context,
+  };
+  assertCanRequestFollowups(row, existingQADataWithDigest, input.fixedAnswers);
   if (existingQAData.followup_generation_count >= FOLLOWUP_GENERATION_LIMIT) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -479,12 +512,13 @@ export async function requestCareerPlaybookFollowups(
     fixed: Object.values(input.fixedAnswers),
     followups: Object.values(input.followupAnswers),
     freeform: existingQAData.freeform,
-    business_context: existingQAData.business_context,
+    business_context: refreshedBusinessContext.context,
   });
   const result = await generateCareerPlaybookFollowups({
     playbookId: input.playbookId,
     qaData,
     language: input.contentLanguage,
+    businessContextSourceExcerpts: refreshedBusinessContext.sourceExcerpts,
   });
   const response = normalizeCareerPlaybookFollowupResponseReadiness(
     CareerPlaybookFollowupResponseSchema.parse(result.response)

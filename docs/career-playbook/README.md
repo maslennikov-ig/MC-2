@@ -131,7 +131,7 @@ Career Playbook per-node cost evidence is available to admins at `/admin/generat
 
 As of 2026-05-20, the Career Playbook migration has been applied to the Supabase project and read-only staging preflight passes when a dedicated non-default queue name is provided. Full mutation smoke is still intentionally gated on disposable staging fixtures, auth token/storage state, queue alignment between enqueuer and worker, cleanup scope, and an accepted numeric LLM/API cost budget.
 
-As of 2026-06-03, Business Context file uploads require migration `20260603110000_add_career_playbook_sources` in addition to the base Career Playbook schema. Before enabling uploads in staging/dev, verify `career_playbook_sources` RLS and that Career Playbook uploads create `file_catalog` rows with `course_id IS NULL`.
+As of 2026-06-03, Business Context file uploads require migrations `20260603110000_add_career_playbook_sources` and `20260603123000_cascade_career_playbook_source_file_catalog` in addition to the base Career Playbook schema. Before enabling uploads in staging/dev, verify `career_playbook_sources` RLS, `file_catalog.course_id IS NULL` for Career Playbook files, and explicit source removal cascades source rows when their `file_catalog` metadata is deleted.
 
 As of 2026-05-23, the target model routing is encoded in migration `20260523073000_update_career_playbook_v4_pro_routing`: DeepSeek V4 Pro for spec, group 5, judge, and block regeneration; DeepSeek V4 Flash for follow-up and groups 1-4/6. Career Playbook fallbacks now stay within the DeepSeek V4 Flash/Pro pair instead of MiniMax.
 

@@ -69,6 +69,13 @@ const messages = {
       businessContextUploadPending: 'Upload selected files',
       businessContextUploadedSources: 'Uploaded sources',
       businessContextSourceCountTemplate: '{count} sources',
+      businessContextSourceStatusUploaded: 'Uploaded',
+      businessContextSourceStatusProcessing: 'Processing',
+      businessContextSourceStatusReady: 'Ready',
+      businessContextSourceStatusFailed: 'Failed',
+      businessContextSourceStatusRemoved: 'Removed',
+      businessContextSourceTextFallback: 'Text source',
+      businessContextRemoveSourceTemplate: 'Remove {name}',
       businessContextMissingTitle: 'Gaps',
       businessContextMissingEmpty: 'Core categories are covered',
       businessContextContinue: 'Continue to follow-ups',
@@ -170,6 +177,8 @@ let resolveDepartmentOptions: Mock
 let approveAndGenerate: Mock
 let getGenerationStatus: Mock
 let getDraft: Mock
+let listSources: Mock
+let removeSource: Mock
 
 function renderPage(props: Partial<Parameters<typeof CareerPlaybookNewPageClient>[0]> = {}) {
   return render(
@@ -261,6 +270,8 @@ describe('CareerPlaybookNewPageClient', () => {
       status: 'answering_fixed',
       phase: 'fixed',
     })
+    listSources = vi.fn().mockResolvedValue([])
+    removeSource = vi.fn().mockResolvedValue({ ok: true })
     setCareerPlaybookClientForTests({
       startSession,
       requestFollowups,
@@ -268,6 +279,8 @@ describe('CareerPlaybookNewPageClient', () => {
       approveAndGenerate,
       getGenerationStatus,
       submitAnswer,
+      listSources,
+      removeSource,
     })
     localStorage.clear()
   })
@@ -322,6 +335,7 @@ describe('CareerPlaybookNewPageClient', () => {
       approveAndGenerate,
       getGenerationStatus,
       submitAnswer,
+      listSources,
     })
 
     renderPage({ resumePlaybookId: '00000000-0000-4000-8000-000000000777' })
@@ -560,8 +574,8 @@ describe('CareerPlaybookNewPageClient', () => {
             sourceId: sourceIdOne,
             fileId: '00000000-0000-4000-8000-000000002001',
             storagePath: 'uploads/context-one.pdf',
-            status: 'uploaded',
-            message: 'uploaded',
+            status: 'processing',
+            message: 'queued',
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
@@ -572,8 +586,8 @@ describe('CareerPlaybookNewPageClient', () => {
             sourceId: sourceIdTwo,
             fileId: '00000000-0000-4000-8000-000000002002',
             storagePath: 'uploads/context-two.pdf',
-            status: 'uploaded',
-            message: 'uploaded',
+            status: 'processing',
+            message: 'queued',
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
@@ -591,24 +605,87 @@ describe('CareerPlaybookNewPageClient', () => {
     ])
     await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
 
-    await waitFor(() => expect(requestFollowups).toHaveBeenCalled())
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(submitAnswer).toHaveBeenCalledWith({
-      playbookId: '00000000-0000-4000-8000-000000000833',
-      phase: 'business_context',
-      answer: {
-        business_context: expect.objectContaining({
-          mode: 'company_specific',
-          status: 'ready',
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toMatchObject({ method: 'POST' })
+      expect(init?.headers).toBeUndefined()
+      expect(init?.body).toBeInstanceOf(FormData)
+      const body = init?.body as FormData
+      expect(body.get('playbookId')).toBe('00000000-0000-4000-8000-000000000833')
+      expect(body.get('file')).toBeInstanceOf(File)
+    }
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect(submitAnswer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'business_context' })
+    )
+    expect(useCareerPlaybookStore.getState().businessContext).toEqual(
+      expect.objectContaining({
+        mode: 'company_specific',
+        status: 'collecting',
+        source_ids: [sourceIdOne, sourceIdTwo],
+        digest: expect.objectContaining({
           source_ids: [sourceIdOne, sourceIdTwo],
-          digest: expect.objectContaining({
-            source_ids: [sourceIdOne, sourceIdTwo],
-          }),
         }),
-      },
-    })
+      })
+    )
+    expect(screen.getAllByText('product.pdf').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('kpi.pdf').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Processing').length).toBeGreaterThanOrEqual(2)
 
     fetchMock.mockRestore()
+  })
+
+  it('shows persisted business context source status and removes a source on request', async () => {
+    const user = userEvent.setup()
+    const sourceId = '00000000-0000-4000-8000-000000001004'
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000835')
+    useCareerPlaybookStore.setState({
+      businessContext: {
+        mode: 'company_specific',
+        status: 'collecting',
+        digest: {
+          product: [],
+          customers: [],
+          sales_channels: [],
+          processes: [],
+          metrics: [],
+          org_structure: [],
+          constraints: [],
+          source_ids: [sourceId],
+          missing_signals: [],
+          user_edited: false,
+        },
+        source_ids: [sourceId],
+      },
+      businessContextSources: [
+        {
+          id: sourceId,
+          playbookId: '00000000-0000-4000-8000-000000000835',
+          sourceType: 'file',
+          status: 'processing',
+          filename: 'sales-playbook.pdf',
+          fileCatalogId: '00000000-0000-4000-8000-000000002004',
+          errorMessage: null,
+          createdAt: '2026-06-03T09:00:00.000Z',
+          updatedAt: '2026-06-03T09:01:00.000Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('sales-playbook.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Processing')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove sales-playbook.pdf' }))
+
+    expect(removeSource).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000835',
+      sourceId,
+    })
+    expect(screen.queryByText('sales-playbook.pdf')).not.toBeInTheDocument()
   })
 
   it('keeps typed business context when a source upload resolves after editing', async () => {
@@ -640,30 +717,26 @@ describe('CareerPlaybookNewPageClient', () => {
           sourceId,
           fileId: '00000000-0000-4000-8000-000000002003',
           storagePath: 'uploads/context-product.pdf',
-          status: 'uploaded',
-          message: 'uploaded',
+          status: 'processing',
+          message: 'queued',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     )
 
     await continueClick
-    await waitFor(() => expect(requestFollowups).toHaveBeenCalled())
-    expect(submitAnswer).toHaveBeenCalledWith({
-      playbookId: '00000000-0000-4000-8000-000000000834',
-      phase: 'business_context',
-      answer: {
-        business_context: expect.objectContaining({
-          mode: 'company_specific',
-          status: 'ready',
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect(useCareerPlaybookStore.getState().businessContext).toEqual(
+      expect.objectContaining({
+        mode: 'company_specific',
+        status: 'collecting',
+        source_ids: [sourceId],
+        digest: expect.objectContaining({
+          product: ['B2B learning platform'],
           source_ids: [sourceId],
-          digest: expect.objectContaining({
-            product: ['B2B learning platform'],
-            source_ids: [sourceId],
-          }),
         }),
-      },
-    })
+      })
+    )
 
     fetchMock.mockRestore()
   })

@@ -1,44 +1,38 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-03
-Stage: `mc2-sn365`
+Stage: `mc2-db696.49`
 Branch: `codex/career-playbook-business-context`
 
 ## Current State
 
-- Business Context review/fix pass is active. Base commit `2dc0c264` added the
-  context step, sources table, upload route, contracts, docs, and tests.
-- Visible correctness, improvement, docs, DB, and frontend reviewers completed.
-  Fixed: source-id/edit-upload races, FileUpload retry/a11y basics, backend
-  context guards, source excerpts in prompts, upload size guards, cleanup error
-  handling, Stage 1 dedup double-counting, migration FK/RLS checks, and docs.
-- Tracked follow-ups: `mc2-db696.49` async file processing/editable digest,
-  `mc2-db696.50` source lifecycle cleanup, `mc2-db696.48` streaming upload,
-  `mc2-si7jz` remaining reference-count helper audit.
-- Review diff against merge-base `909df621da32fa234130390db17ed37ce7b05d64`;
-  `origin/develop` moved with unrelated cross-block-judge commits.
+- `mc2-db696.49`, `.50`, `.48`, and `mc2-si7jz` are implemented on the active branch.
+- Business Context uploads enqueue Career Playbook `PROCESS_SOURCE`, reuse existing file-processing primitives, and avoid fake draft courses.
+- Digest refresh combines manual context, ready source excerpts, and missing signals; uploaded/processing selected sources block follow-ups.
+- Source lifecycle has `listSources`, `uploadFile`, and `removeSource`; the web constructor renders persisted source status, polls processing sources, and supports removal.
+- Web upload uses multipart `FormData`; qdrant reference counts are trigger-owned.
+- Docs now cover `PROCESS_SOURCE`, source statuses, list/remove lifecycle, and migration `20260603123000`.
+- Do not touch unrelated worktree `/home/me/code/mc2` on `codex/career-playbook-generation-enqueue-500`.
 
 ## Verification
 
-- Targeted tests passed: shared Career Playbook 15, backend 55, web 90.
-- `pnpm type-check`, `pnpm build`, process verification, and `git diff --check`
-  passed. Build emitted existing Browserslist and `url.parse()` warnings.
+- Targeted shared/backend/web/qdrant tests passed for the touched scope.
+- Targeted frontend ESLint, `pnpm type-check`, `pnpm build` with dummy Supabase build env, `git diff --check`, and stage closeout passed.
+- Graphify 0.8.27 refresh passed: 56,980 nodes / 79,001 edges, 3,648 communities.
 
 ## Next recommended
 
-Next stage id: `mc2-sn365` until pushed and closed.
-Recommended action: push/close, then prioritize `mc2-db696.49`.
+Next stage id: pick the next ready Beads task after `mc2-db696.49` closeout.
+Recommended action: close Beads, commit, and push.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`,
-`.codex/orchestrator.toml`, `.codex/handoff.md`, Beads, and `git status`.
-Continue branch `codex/career-playbook-business-context`.
+Use $orchestrator-stage in `/home/me/code/mc2-worktrees/career-playbook-business-context`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.49/summary.md`, accepted artifacts, Beads, Graphify report, and `git status`. Continue final closeout; do not touch `/home/me/code/mc2`.
 
 ## Delivery
 
-- Pending: push review-and-fix follow-up commit.
+- Pending: commit and push `codex/career-playbook-business-context`.
 
 ## Explicit defers
 
-- Authenticated browser E2E/live staging mutation smoke deferred until approval.
+- None.

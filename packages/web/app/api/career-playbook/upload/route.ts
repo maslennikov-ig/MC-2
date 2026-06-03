@@ -6,24 +6,30 @@ import { createClient } from '@/lib/supabase/server'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { isValidUUID } from '@/lib/uuid-validation'
 
-interface UploadFileInput {
-  playbookId: string
-  filename: string
-  fileSize: number
-  mimeType: string
-  fileContent: string
-}
-
 const MAX_UPLOAD_BYTES = 104_857_600
-const MAX_BASE64_CONTENT_LENGTH = Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 8
-const MAX_JSON_BODY_BYTES = MAX_BASE64_CONTENT_LENGTH + 16_384
+const MAX_MULTIPART_BODY_BYTES = MAX_UPLOAD_BYTES + 16_384
 
 function isOversizedContentLength(request: NextRequest) {
   const contentLength = request.headers.get('content-length')
   if (!contentLength) return false
 
   const parsed = Number(contentLength)
-  return Number.isFinite(parsed) && parsed > MAX_JSON_BODY_BYTES
+  return Number.isFinite(parsed) && parsed > MAX_MULTIPART_BODY_BYTES
+}
+
+function hasInvalidContentType(request: NextRequest) {
+  const contentType = request.headers.get('content-type')
+  return Boolean(contentType && !contentType.toLowerCase().startsWith('multipart/form-data'))
+}
+
+function isUploadedFile(value: FormDataEntryValue | null): value is File {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'arrayBuffer' in value &&
+    'name' in value &&
+    'size' in value
+  )
 }
 
 export async function POST(request: NextRequest) {
@@ -56,9 +62,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let body: UploadFileInput
+    if (hasInvalidContentType(request)) {
+      return NextResponse.json(
+        { error: 'Invalid request format', code: 'INVALID_REQUEST' },
+        { status: 400 }
+      )
+    }
+
+    let formData: FormData
     try {
-      body = await request.json()
+      formData = await request.formData()
     } catch (parseError) {
       logger.error('Failed to parse Career Playbook upload request body', {
         userId,
@@ -70,45 +83,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!body.playbookId || !body.filename || !body.fileContent) {
+    const playbookId = formData.get('playbookId')
+    const file = formData.get('file')
+
+    if (typeof playbookId !== 'string' || !playbookId || !isUploadedFile(file)) {
       return NextResponse.json(
         { error: 'Missing required fields', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    if (
-      typeof body.fileSize !== 'number' ||
-      !Number.isFinite(body.fileSize) ||
-      body.fileSize <= 0
-    ) {
+    if (file.size <= 0 || !file.name) {
       return NextResponse.json(
         { error: 'Invalid file size', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    if (body.fileSize > MAX_UPLOAD_BYTES || body.fileContent.length > MAX_BASE64_CONTENT_LENGTH) {
+    if (file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json(
         { error: 'Upload payload is too large', code: 'PAYLOAD_TOO_LARGE' },
         { status: 413 }
       )
     }
 
-    if (!isValidUUID(body.playbookId)) {
+    if (!isValidUUID(playbookId)) {
       return NextResponse.json(
         { error: 'Invalid Career Playbook ID format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
+    const fileContent = Buffer.from(await file.arrayBuffer()).toString('base64')
     const client = await getServerTrpcClient()
     const result = await client.careerPlaybook.sources.uploadFile.mutate({
-      playbookId: body.playbookId,
-      filename: body.filename,
-      fileSize: body.fileSize,
-      mimeType: body.mimeType,
-      fileContent: body.fileContent,
+      playbookId,
+      filename: file.name,
+      fileSize: file.size,
+      mimeType: file.type || 'application/octet-stream',
+      fileContent,
     })
 
     return NextResponse.json({

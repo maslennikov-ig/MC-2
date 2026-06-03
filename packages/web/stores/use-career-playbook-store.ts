@@ -19,6 +19,7 @@ import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookBusinessContext,
+  CareerPlaybookBusinessContextSourceSummary,
   CareerPlaybookDepartmentResolution,
   CareerPlaybookDepartmentValue,
   CareerPlaybookFixedAnswer,
@@ -52,6 +53,7 @@ export interface CareerPlaybookDraft {
   followupGenerationCount?: number
   freeformDraft?: string
   businessContext?: CareerPlaybookBusinessContext
+  businessContextSources?: CareerPlaybookBusinessContextSourceSummary[]
   status?: CareerPlaybookPlaybookStatus
   phase?: CareerPlaybookWizardPhase
   dirtyFixedQuestionKeys?: string[]
@@ -93,6 +95,21 @@ interface CareerPlaybookPdfExportResponse {
   sizeBytes: number
 }
 
+interface CareerPlaybookSourcesClient {
+  careerPlaybook?: {
+    sources?: {
+      listSources?: {
+        query: (input: {
+          playbookId: string
+        }) => Promise<CareerPlaybookBusinessContextSourceSummary[]>
+      }
+      removeSource?: {
+        mutate: (input: { playbookId: string; sourceId: string }) => Promise<unknown>
+      }
+    }
+  }
+}
+
 export interface CareerPlaybookClient {
   startSession?: (input: { language: Language }) => Promise<CareerPlaybookDraft>
   getDraft?: (input: { playbookId: string }) => Promise<CareerPlaybookDraft>
@@ -120,6 +137,10 @@ export interface CareerPlaybookClient {
   }) => Promise<CareerPlaybookDepartmentResolution>
   approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   getGenerationStatus?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
+  listSources?: (input: {
+    playbookId: string
+  }) => Promise<CareerPlaybookBusinessContextSourceSummary[]>
+  removeSource?: (input: { playbookId: string; sourceId: string }) => Promise<unknown>
   submitAnswer: (input: {
     playbookId: string
     phase: 'fixed' | 'followup' | 'freeform' | 'business_context'
@@ -166,6 +187,7 @@ interface CareerPlaybookStoreState {
   finalMarkdown: string | null
   freeformDraft: string
   businessContext: CareerPlaybookBusinessContext
+  businessContextSources: CareerPlaybookBusinessContextSourceSummary[]
   isAutosaving: boolean
   autosaveError: string | null
   dirtyFixedQuestionKeys: string[]
@@ -216,6 +238,13 @@ interface CareerPlaybookStoreState {
   editCareerPlaybookFollowupAnswer: (questionId: string) => void
   saveCareerPlaybookFreeformDraft: (text: string) => void
   saveCareerPlaybookBusinessContext: (context: CareerPlaybookBusinessContext) => void
+  upsertCareerPlaybookBusinessContextSource: (
+    source: CareerPlaybookBusinessContextSourceSummary
+  ) => void
+  refreshCareerPlaybookBusinessContextSources: () => Promise<CareerPlaybookAutosaveResult>
+  removeCareerPlaybookBusinessContextSource: (
+    sourceId: string
+  ) => Promise<CareerPlaybookAutosaveResult>
   skipCareerPlaybookBusinessContext: () => void
   completeCareerPlaybookFixedPhase: () => void
   startCareerPlaybookSession: () => Promise<CareerPlaybookAutosaveResult>
@@ -585,6 +614,9 @@ function initialState(): Omit<
   | 'editCareerPlaybookFollowupAnswer'
   | 'saveCareerPlaybookFreeformDraft'
   | 'saveCareerPlaybookBusinessContext'
+  | 'upsertCareerPlaybookBusinessContextSource'
+  | 'refreshCareerPlaybookBusinessContextSources'
+  | 'removeCareerPlaybookBusinessContextSource'
   | 'skipCareerPlaybookBusinessContext'
   | 'completeCareerPlaybookFixedPhase'
   | 'startCareerPlaybookSession'
@@ -621,6 +653,7 @@ function initialState(): Omit<
     finalMarkdown: null,
     freeformDraft: '',
     businessContext: createDefaultBusinessContext(),
+    businessContextSources: [],
     isAutosaving: false,
     autosaveError: null,
     dirtyFixedQuestionKeys: [],
@@ -877,6 +910,14 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.generation.getStatus.query(
         input
       )) as unknown as CareerPlaybookGenerationStatus,
+    listSources: (input) =>
+      (
+        client as unknown as CareerPlaybookSourcesClient
+      ).careerPlaybook?.sources?.listSources?.query(input) ?? Promise.resolve([]),
+    removeSource: (input) =>
+      (
+        client as unknown as CareerPlaybookSourcesClient
+      ).careerPlaybook?.sources?.removeSource?.mutate(input) ?? Promise.resolve(),
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -1067,6 +1108,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.businessContext = CareerPlaybookBusinessContextSchema.parse(
             draft.businessContext ?? state.businessContext ?? createDefaultBusinessContext()
           )
+          state.businessContextSources =
+            draft.businessContextSources ?? state.businessContextSources
           state.autosaveError = null
           state.isAutosaving = false
           state.followupGenerationError = null
@@ -1921,6 +1964,84 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           clearDependentFollowupContext(state)
         }),
 
+      upsertCareerPlaybookBusinessContextSource: (source) =>
+        set((state) => {
+          const existingIndex = state.businessContextSources.findIndex(
+            (item) => item.id === source.id
+          )
+          if (existingIndex >= 0) {
+            state.businessContextSources[existingIndex] = source
+          } else {
+            state.businessContextSources.push(source)
+          }
+        }),
+
+      refreshCareerPlaybookBusinessContextSources: async () => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return { ok: false, error: 'Career Playbook session is required before source refresh' }
+        }
+
+        try {
+          const client = getClient()
+          const sources = client.listSources
+            ? await client.listSources({ playbookId: snapshot.playbookId })
+            : []
+          set((state) => {
+            state.businessContextSources = sources
+          })
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Source refresh failed'
+          set((state) => {
+            state.autosaveError = message
+          })
+          return { ok: false, error: message }
+        }
+      },
+
+      removeCareerPlaybookBusinessContextSource: async (sourceId) => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return { ok: false, error: 'Career Playbook session is required before source removal' }
+        }
+
+        set((state) => {
+          state.businessContextSources = state.businessContextSources.filter(
+            (source) => source.id !== sourceId
+          )
+          const nextSourceIds = state.businessContext.source_ids.filter((id) => id !== sourceId)
+          state.businessContext = CareerPlaybookBusinessContextSchema.parse({
+            ...state.businessContext,
+            source_ids: nextSourceIds,
+            digest: state.businessContext.digest
+              ? {
+                  ...state.businessContext.digest,
+                  source_ids: nextSourceIds,
+                  updated_at: nowIso(),
+                }
+              : state.businessContext.digest,
+            updated_at: nowIso(),
+          })
+          state.dirtyBusinessContext = true
+          clearDependentFollowupContext(state)
+        })
+
+        try {
+          const client = getClient()
+          if (client.removeSource) {
+            await client.removeSource({ playbookId: snapshot.playbookId, sourceId })
+          }
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Source removal failed'
+          set((state) => {
+            state.autosaveError = message
+          })
+          return { ok: false, error: message }
+        }
+      },
+
       skipCareerPlaybookBusinessContext: () =>
         set((state) => {
           state.businessContext = CareerPlaybookBusinessContextSchema.parse({
@@ -1931,6 +2052,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             skip_reason: 'User chose universal benchmark Role Guide generation',
             updated_at: nowIso(),
           })
+          state.businessContextSources = []
           state.dirtyBusinessContext = true
           clearDependentFollowupContext(state)
         }),

@@ -153,6 +153,42 @@ export default function CareerPlaybookNewPageClient({
     }
   }, [state.phase, state.playbookId, state.status])
 
+  const hasProcessingBusinessContextSources = state.businessContextSources.some((source) =>
+    ['uploaded', 'processing'].includes(source.status)
+  )
+
+  useEffect(() => {
+    if (state.phase !== 'business_context' || !state.playbookId) return
+
+    let cancelled = false
+    let inFlight = false
+    let intervalId: number | null = null
+
+    const refreshSources = async () => {
+      if (cancelled || inFlight) return
+      inFlight = true
+      await useCareerPlaybookStore.getState().refreshCareerPlaybookBusinessContextSources()
+      inFlight = false
+    }
+
+    if (!hasProcessingBusinessContextSources) {
+      void refreshSources()
+    }
+
+    if (hasProcessingBusinessContextSources) {
+      intervalId = window.setInterval(() => {
+        void refreshSources()
+      }, 5000)
+    }
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [hasProcessingBusinessContextSources, state.phase, state.playbookId])
+
   const answers = useMemo<Record<string, CareerPlaybookAnswerValue | undefined>>(
     () =>
       Object.fromEntries(
@@ -270,85 +306,88 @@ export default function CareerPlaybookNewPageClient({
     otherOptionLabel: t('otherOptionLabel'),
     otherOptionPlaceholder: t('otherOptionPlaceholder'),
   }
-  const businessContextCategories: BusinessContextCategoryCopy[] = [
-    {
-      key: 'product',
-      title: t('businessContextProductTitle'),
-      helper: t('businessContextProductHelper'),
-      placeholder: t('businessContextProductPlaceholder'),
-      hints: [
-        t('businessContextProductHint1'),
-        t('businessContextProductHint2'),
-        t('businessContextProductHint3'),
-      ],
-    },
-    {
-      key: 'customers',
-      title: t('businessContextCustomersTitle'),
-      helper: t('businessContextCustomersHelper'),
-      placeholder: t('businessContextCustomersPlaceholder'),
-      hints: [
-        t('businessContextCustomersHint1'),
-        t('businessContextCustomersHint2'),
-        t('businessContextCustomersHint3'),
-      ],
-    },
-    {
-      key: 'sales_channels',
-      title: t('businessContextSalesTitle'),
-      helper: t('businessContextSalesHelper'),
-      placeholder: t('businessContextSalesPlaceholder'),
-      hints: [
-        t('businessContextSalesHint1'),
-        t('businessContextSalesHint2'),
-        t('businessContextSalesHint3'),
-      ],
-    },
-    {
-      key: 'processes',
-      title: t('businessContextProcessesTitle'),
-      helper: t('businessContextProcessesHelper'),
-      placeholder: t('businessContextProcessesPlaceholder'),
-      hints: [
-        t('businessContextProcessesHint1'),
-        t('businessContextProcessesHint2'),
-        t('businessContextProcessesHint3'),
-      ],
-    },
-    {
-      key: 'metrics',
-      title: t('businessContextMetricsTitle'),
-      helper: t('businessContextMetricsHelper'),
-      placeholder: t('businessContextMetricsPlaceholder'),
-      hints: [
-        t('businessContextMetricsHint1'),
-        t('businessContextMetricsHint2'),
-        t('businessContextMetricsHint3'),
-      ],
-    },
-    {
-      key: 'org_structure',
-      title: t('businessContextOrgTitle'),
-      helper: t('businessContextOrgHelper'),
-      placeholder: t('businessContextOrgPlaceholder'),
-      hints: [
-        t('businessContextOrgHint1'),
-        t('businessContextOrgHint2'),
-        t('businessContextOrgHint3'),
-      ],
-    },
-    {
-      key: 'constraints',
-      title: t('businessContextConstraintsTitle'),
-      helper: t('businessContextConstraintsHelper'),
-      placeholder: t('businessContextConstraintsPlaceholder'),
-      hints: [
-        t('businessContextConstraintsHint1'),
-        t('businessContextConstraintsHint2'),
-        t('businessContextConstraintsHint3'),
-      ],
-    },
-  ]
+  const businessContextCategories = useMemo<BusinessContextCategoryCopy[]>(
+    () => [
+      {
+        key: 'product',
+        title: t('businessContextProductTitle'),
+        helper: t('businessContextProductHelper'),
+        placeholder: t('businessContextProductPlaceholder'),
+        hints: [
+          t('businessContextProductHint1'),
+          t('businessContextProductHint2'),
+          t('businessContextProductHint3'),
+        ],
+      },
+      {
+        key: 'customers',
+        title: t('businessContextCustomersTitle'),
+        helper: t('businessContextCustomersHelper'),
+        placeholder: t('businessContextCustomersPlaceholder'),
+        hints: [
+          t('businessContextCustomersHint1'),
+          t('businessContextCustomersHint2'),
+          t('businessContextCustomersHint3'),
+        ],
+      },
+      {
+        key: 'sales_channels',
+        title: t('businessContextSalesTitle'),
+        helper: t('businessContextSalesHelper'),
+        placeholder: t('businessContextSalesPlaceholder'),
+        hints: [
+          t('businessContextSalesHint1'),
+          t('businessContextSalesHint2'),
+          t('businessContextSalesHint3'),
+        ],
+      },
+      {
+        key: 'processes',
+        title: t('businessContextProcessesTitle'),
+        helper: t('businessContextProcessesHelper'),
+        placeholder: t('businessContextProcessesPlaceholder'),
+        hints: [
+          t('businessContextProcessesHint1'),
+          t('businessContextProcessesHint2'),
+          t('businessContextProcessesHint3'),
+        ],
+      },
+      {
+        key: 'metrics',
+        title: t('businessContextMetricsTitle'),
+        helper: t('businessContextMetricsHelper'),
+        placeholder: t('businessContextMetricsPlaceholder'),
+        hints: [
+          t('businessContextMetricsHint1'),
+          t('businessContextMetricsHint2'),
+          t('businessContextMetricsHint3'),
+        ],
+      },
+      {
+        key: 'org_structure',
+        title: t('businessContextOrgTitle'),
+        helper: t('businessContextOrgHelper'),
+        placeholder: t('businessContextOrgPlaceholder'),
+        hints: [
+          t('businessContextOrgHint1'),
+          t('businessContextOrgHint2'),
+          t('businessContextOrgHint3'),
+        ],
+      },
+      {
+        key: 'constraints',
+        title: t('businessContextConstraintsTitle'),
+        helper: t('businessContextConstraintsHelper'),
+        placeholder: t('businessContextConstraintsPlaceholder'),
+        hints: [
+          t('businessContextConstraintsHint1'),
+          t('businessContextConstraintsHint2'),
+          t('businessContextConstraintsHint3'),
+        ],
+      },
+    ],
+    [t]
+  )
   const businessContextCopy = {
     navigationLabel: t('businessContextNavigationLabel'),
     documentLabel: t('businessContextDocumentLabel'),
@@ -364,6 +403,13 @@ export default function CareerPlaybookNewPageClient({
     uploadPending: t('businessContextUploadPending'),
     uploadedSources: t('businessContextUploadedSources'),
     sourceCountTemplate: t.raw('businessContextSourceCountTemplate') as string,
+    sourceStatusUploaded: t('businessContextSourceStatusUploaded'),
+    sourceStatusProcessing: t('businessContextSourceStatusProcessing'),
+    sourceStatusReady: t('businessContextSourceStatusReady'),
+    sourceStatusFailed: t('businessContextSourceStatusFailed'),
+    sourceStatusRemoved: t('businessContextSourceStatusRemoved'),
+    sourceTextFallback: t('businessContextSourceTextFallback'),
+    removeSourceTemplate: t.raw('businessContextRemoveSourceTemplate') as string,
     missingTitle: t('businessContextMissingTitle'),
     missingEmpty: t('businessContextMissingEmpty'),
     back: t('back'),
@@ -604,7 +650,10 @@ export default function CareerPlaybookNewPageClient({
             <BusinessContextStep
               playbookId={state.playbookId}
               context={state.businessContext}
+              sources={state.businessContextSources}
               onContextChange={state.saveCareerPlaybookBusinessContext}
+              onRemoveSource={state.removeCareerPlaybookBusinessContextSource}
+              onSourceUploaded={state.upsertCareerPlaybookBusinessContextSource}
               onBack={() =>
                 useCareerPlaybookStore.getState().editCareerPlaybookFixedAnswer('content_language')
               }

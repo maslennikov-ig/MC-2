@@ -271,6 +271,21 @@ export type CareerPlaybookBusinessContextSource = z.infer<
   typeof CareerPlaybookBusinessContextSourceSchema
 >;
 
+export const CareerPlaybookBusinessContextSourceSummarySchema = z.object({
+  id: z.string().uuid(),
+  playbookId: z.string().uuid(),
+  sourceType: CareerPlaybookBusinessContextSourceTypeSchema,
+  status: CareerPlaybookBusinessContextSourceStatusSchema,
+  filename: z.string().min(1).nullable(),
+  fileCatalogId: z.string().uuid().nullable(),
+  errorMessage: z.string().min(1).nullable().optional(),
+  createdAt: z.string().datetime().or(z.literal('')),
+  updatedAt: z.string().datetime().or(z.literal('')),
+});
+export type CareerPlaybookBusinessContextSourceSummary = z.infer<
+  typeof CareerPlaybookBusinessContextSourceSummarySchema
+>;
+
 export const CareerPlaybookQADataSchema = z.object({
   fixed: z.array(CareerPlaybookFixedAnswerSchema).default([]),
   followups: z.array(CareerPlaybookFollowupAnswerSchema).default([]),

@@ -10,16 +10,17 @@ import {
   FileSearch,
   Loader2,
   Sparkles,
+  Trash2,
 } from 'lucide-react'
 import type {
   CareerPlaybookBusinessContext,
   CareerPlaybookBusinessContextDigest,
+  CareerPlaybookBusinessContextSourceSummary,
   TierKey,
 } from '@megacampus/shared-types'
 
 import {
   FileUpload,
-  readFileAsBase64,
   type UploadedFile,
   type FileUploadStatus,
 } from '@/components/forms/file-upload'
@@ -59,6 +60,13 @@ export interface BusinessContextStepCopy {
   uploadPending?: string
   uploadedSources?: string
   sourceCountTemplate?: string
+  sourceStatusUploaded?: string
+  sourceStatusProcessing?: string
+  sourceStatusReady?: string
+  sourceStatusFailed?: string
+  sourceStatusRemoved?: string
+  sourceTextFallback?: string
+  removeSourceTemplate?: string
   missingTitle?: string
   missingEmpty?: string
   back?: string
@@ -72,7 +80,10 @@ export interface BusinessContextStepCopy {
 interface BusinessContextStepProps {
   playbookId: string | null
   context: CareerPlaybookBusinessContext
+  sources?: CareerPlaybookBusinessContextSourceSummary[]
   onContextChange: (context: CareerPlaybookBusinessContext) => void
+  onRemoveSource?: (sourceId: string) => Promise<unknown> | void
+  onSourceUploaded?: (source: CareerPlaybookBusinessContextSourceSummary) => void
   onBack: () => void
   onContinue: () => Promise<void> | void
   onUniversal: () => Promise<void> | void
@@ -150,6 +161,13 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
   uploadPending: 'Загрузить выбранные файлы',
   uploadedSources: 'Загруженные источники',
   sourceCountTemplate: '{count} источников',
+  sourceStatusUploaded: 'Загружен',
+  sourceStatusProcessing: 'Обрабатывается',
+  sourceStatusReady: 'Готов',
+  sourceStatusFailed: 'Ошибка',
+  sourceStatusRemoved: 'Удалён',
+  sourceTextFallback: 'Текстовый источник',
+  removeSourceTemplate: 'Удалить {name}',
   missingTitle: 'Пробелы',
   missingEmpty: 'Ключевые категории заполнены',
   back: 'Назад',
@@ -211,10 +229,28 @@ function hasDigestSignal(digest: CareerPlaybookBusinessContextDigest): boolean {
   )
 }
 
+function sourceStatusLabel(
+  status: CareerPlaybookBusinessContextSourceSummary['status'],
+  labels: Required<BusinessContextStepCopy>
+) {
+  const statusLabels: Record<CareerPlaybookBusinessContextSourceSummary['status'], string> = {
+    uploaded: labels.sourceStatusUploaded,
+    processing: labels.sourceStatusProcessing,
+    ready: labels.sourceStatusReady,
+    failed: labels.sourceStatusFailed,
+    removed: labels.sourceStatusRemoved,
+  }
+
+  return statusLabels[status]
+}
+
 export function BusinessContextStep({
   playbookId,
   context,
+  sources = [],
   onContextChange,
+  onRemoveSource,
+  onSourceUploaded,
   onBack,
   onContinue,
   onUniversal,
@@ -230,14 +266,19 @@ export function BusinessContextStep({
   const categories = labels.categories
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploadingFiles, setIsUploadingFiles] = useState(false)
+  const [removingSourceId, setRemovingSourceId] = useState<string | null>(null)
   const contextRef = useRef(context)
   const digest = ensureDigest(context)
+  const activeSources = sources.filter((source) => source.status !== 'removed')
+  const hasProcessingSources = activeSources.some((source) =>
+    ['uploaded', 'processing'].includes(source.status)
+  )
   const missingSignals = useMemo(
     () => buildMissingSignals(digest, categories),
     [categories, digest]
   )
   const pendingFiles = uploadedFiles.filter((file) => file.status === 'pending')
-  const hasContext = hasDigestSignal(digest) || pendingFiles.length > 0
+  const hasContext = hasDigestSignal(digest) || pendingFiles.length > 0 || activeSources.length > 0
 
   useEffect(() => {
     contextRef.current = context
@@ -280,7 +321,7 @@ export function BusinessContextStep({
 
     const nextContext: CareerPlaybookBusinessContext = {
       mode: 'company_specific',
-      status: 'ready',
+      status: 'collecting',
       digest: nextDigest,
       source_ids: nextSourceIds,
       updated_at: new Date().toISOString(),
@@ -293,17 +334,13 @@ export function BusinessContextStep({
   const uploadFile = async (file: UploadedFile): Promise<string | null> => {
     if (!playbookId) return null
 
-    const fileContent = await readFileAsBase64(file.file)
+    const formData = new FormData()
+    formData.set('playbookId', playbookId)
+    formData.set('file', file.file)
+
     const response = await fetch('/api/career-playbook/upload', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        playbookId,
-        filename: file.file.name,
-        fileSize: file.file.size,
-        mimeType: file.file.type || 'application/octet-stream',
-        fileContent,
-      }),
+      body: formData,
     })
 
     const body = await response.json()
@@ -312,7 +349,29 @@ export function BusinessContextStep({
     }
 
     appendSourceId(body.sourceId)
+    onSourceUploaded?.({
+      id: body.sourceId,
+      playbookId,
+      sourceType: 'file',
+      status: body.status === 'ready' ? 'ready' : 'processing',
+      filename: file.file.name,
+      fileCatalogId: body.fileId ?? null,
+      errorMessage: null,
+      createdAt: '',
+      updatedAt: '',
+    })
     return body.sourceId
+  }
+
+  const handleRemoveSource = async (sourceId: string) => {
+    if (!onRemoveSource) return
+
+    setRemovingSourceId(sourceId)
+    try {
+      await onRemoveSource(sourceId)
+    } finally {
+      setRemovingSourceId((current) => (current === sourceId ? null : current))
+    }
   }
 
   const updateFileStatus = (
@@ -359,8 +418,10 @@ export function BusinessContextStep({
   }
 
   const handleContinue = async () => {
+    const hadPendingFiles = pendingFiles.length > 0
     const uploaded = await uploadPendingFiles()
     if (!uploaded) return
+    if (hadPendingFiles || hasProcessingSources) return
     await onContinue()
   }
 
@@ -511,6 +572,54 @@ export function BusinessContextStep({
             <p className="text-sm text-slate-600 dark:text-slate-300">
               {labels.sourceCountTemplate.replace('{count}', String(context.source_ids.length))}
             </p>
+            {activeSources.length > 0 ? (
+              <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+                {activeSources.map((source) => {
+                  const title =
+                    source.filename ||
+                    (source.sourceType === 'text' ? labels.sourceTextFallback : source.id)
+                  const isRemoving = removingSourceId === source.id
+                  const removeLabel = labels.removeSourceTemplate.replace('{name}', title)
+
+                  return (
+                    <li
+                      key={source.id}
+                      className="grid grid-cols-[1fr_auto] items-center gap-2 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                          {title}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {sourceStatusLabel(source.status, labels)}
+                        </p>
+                        {source.errorMessage ? (
+                          <p className="mt-1 line-clamp-2 text-xs text-red-600 dark:text-red-300">
+                            {source.errorMessage}
+                          </p>
+                        ) : null}
+                      </div>
+                      {onRemoveSource ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                          aria-label={removeLabel}
+                          title={removeLabel}
+                          disabled={isRemoving}
+                          onClick={() => void handleRemoveSource(source.id)}
+                        >
+                          {isRemoving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                          ) : (
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          )}
+                        </button>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
           </div>
 
           <div className="career-playbook-soft-card space-y-2 p-3">
@@ -533,7 +642,7 @@ export function BusinessContextStep({
             <Button
               type="button"
               onClick={() => void handleContinue()}
-              disabled={!hasContext || isSaving || isUploadingFiles}
+              disabled={!hasContext || hasProcessingSources || isSaving || isUploadingFiles}
             >
               {isSaving || isUploadingFiles ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />

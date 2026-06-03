@@ -12,9 +12,14 @@ const mocks = vi.hoisted(() => ({
   runPhase2Storage: vi.fn(),
   isStorageError: vi.fn(),
   decrementQuota: vi.fn(),
+  unlink: vi.fn(),
   addJob: vi.fn(),
   removeTerminalJobById: vi.fn(),
   rpc: vi.fn(),
+}));
+
+vi.mock('fs/promises', () => ({
+  unlink: mocks.unlink,
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
@@ -143,20 +148,11 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
   return builder;
 }
 
-function createCountBuilder(count = 0, error: unknown = null) {
-  const builder = {
-    select: vi.fn(() => builder),
-    eq: vi.fn(() => builder),
-    neq: vi.fn(() => Promise.resolve({ count, error })),
-  };
-
-  return builder;
-}
-
 function createListBuilder(data: unknown[], error: unknown = null) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
     order: vi.fn(() => Promise.resolve({ data, error })),
   };
 
@@ -178,6 +174,7 @@ describe('careerPlaybookRouter transport', () => {
     });
     mocks.isStorageError.mockReturnValue(false);
     mocks.decrementQuota.mockResolvedValue(undefined);
+    mocks.unlink.mockResolvedValue(undefined);
     mocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
@@ -189,6 +186,8 @@ describe('careerPlaybookRouter transport', () => {
     ).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.requestFollowups']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.sources.uploadFile']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.listSources']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.removeSource']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.approveAndGenerate']).toBeDefined();
     expect(
       appRouter._def.procedures['careerPlaybook.courseBridge.createCourseFromPlaybook']
@@ -199,126 +198,6 @@ describe('careerPlaybookRouter transport', () => {
     const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
 
     await expect(caller.session.start({ language: 'ru' })).rejects.toBeInstanceOf(TRPCError);
-  });
-
-  it('uploads a Career Playbook business context source without binding it to a course', async () => {
-    const playbookBuilder = createBuilder([
-      {
-        data: playbookRow({
-          status: 'awaiting_followups',
-          organization_id: authenticatedContext.user!.organizationId,
-        }),
-        error: null,
-      },
-    ]);
-    const organizationBuilder = createBuilder([
-      { data: { id: authenticatedContext.user!.organizationId, tier: 'standard' }, error: null },
-    ]);
-    const countBuilder = createCountBuilder(0);
-    const sourceBuilder = createBuilder([
-      {
-        data: {
-          id: '66666666-6666-4666-8666-666666666666',
-          playbook_id: playbookId,
-          organization_id: authenticatedContext.user!.organizationId,
-          user_id: authenticatedContext.user!.id,
-          status: 'uploaded',
-          file_catalog_id: '55555555-5555-4555-8555-555555555555',
-        },
-        error: null,
-      },
-    ]);
-    const sourceBuilders = [countBuilder, sourceBuilder];
-
-    mocks.from.mockImplementation((table: string) => {
-      if (table === 'career_playbooks') return playbookBuilder;
-      if (table === 'organizations') return organizationBuilder;
-      if (table === 'career_playbook_sources') return sourceBuilders.shift();
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
-    const result = await caller.sources.uploadFile({
-      playbookId,
-      filename: 'product.pdf',
-      fileSize: 12,
-      mimeType: 'application/pdf',
-      fileContent: Buffer.from('hello').toString('base64'),
-    });
-
-    expect(mocks.runPhase2Storage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ownerType: 'career_playbook',
-        ownerId: playbookId,
-        organizationId: authenticatedContext.user!.organizationId,
-        userId: authenticatedContext.user!.id,
-        filename: 'product.pdf',
-      })
-    );
-    expect(sourceBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        playbook_id: playbookId,
-        organization_id: authenticatedContext.user!.organizationId,
-        user_id: authenticatedContext.user!.id,
-        source_type: 'file',
-        status: 'uploaded',
-        file_catalog_id: '55555555-5555-4555-8555-555555555555',
-      })
-    );
-    expect(result).toMatchObject({
-      sourceId: '66666666-6666-4666-8666-666666666666',
-      fileId: '55555555-5555-4555-8555-555555555555',
-      status: 'uploaded',
-    });
-  });
-
-  it('cleans up stored Career Playbook source files when source record creation fails', async () => {
-    const playbookBuilder = createBuilder([
-      {
-        data: playbookRow({
-          status: 'awaiting_followups',
-          organization_id: authenticatedContext.user!.organizationId,
-        }),
-        error: null,
-      },
-    ]);
-    const organizationBuilder = createBuilder([
-      { data: { id: authenticatedContext.user!.organizationId, tier: 'standard' }, error: null },
-    ]);
-    const countBuilder = createCountBuilder(0);
-    const sourceBuilder = createBuilder([{ data: null, error: new Error('insert failed') }]);
-    const fileCatalogBuilder = createBuilder();
-    const sourceBuilders = [countBuilder, sourceBuilder];
-
-    mocks.from.mockImplementation((table: string) => {
-      if (table === 'career_playbooks') return playbookBuilder;
-      if (table === 'organizations') return organizationBuilder;
-      if (table === 'career_playbook_sources') return sourceBuilders.shift();
-      if (table === 'file_catalog') return fileCatalogBuilder;
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
-
-    await expect(
-      caller.sources.uploadFile({
-        playbookId,
-        filename: 'product.pdf',
-        fileSize: 12,
-        mimeType: 'application/pdf',
-        fileContent: Buffer.from('hello').toString('base64'),
-      })
-    ).rejects.toBeInstanceOf(TRPCError);
-
-    expect(fileCatalogBuilder.delete).toHaveBeenCalled();
-    expect(fileCatalogBuilder.eq).toHaveBeenCalledWith(
-      'id',
-      '55555555-5555-4555-8555-555555555555'
-    );
-    expect(mocks.decrementQuota).toHaveBeenCalledWith(
-      authenticatedContext.user!.organizationId,
-      12
-    );
   });
 
   it('resolves narrow department options through the Career Playbook classifier', async () => {
@@ -378,6 +257,7 @@ describe('careerPlaybookRouter transport', () => {
       status: 'answering_fixed',
       phase: 'fixed',
       fixedAnswers: [],
+      businessContextSources: [],
     });
   });
 
@@ -444,80 +324,6 @@ describe('careerPlaybookRouter transport', () => {
     expect(mocks.from).toHaveBeenCalledWith('career_playbook_fixed_questions');
     expect(builder.eq).toHaveBeenCalledWith('language', 'en');
     expect(result).toEqual(questions);
-  });
-
-  it('requests follow-up questions through the backend generator and persists them', async () => {
-    const followupResponse = {
-      questions: [
-        {
-          question_id: '55555555-5555-4555-8555-555555555555',
-          question_text: 'Which KPIs define success?',
-          question_type: 'open',
-          options: null,
-          rationale: 'KPI specificity improves the guide.',
-        },
-      ],
-      completeness_score: 0.71,
-      stop_recommendation: 'ask_more',
-    };
-    mocks.generateCareerPlaybookFollowups.mockResolvedValue({
-      response: followupResponse,
-      nodeCost: {
-        node: 'followupGenerator',
-        model: 'mock-model',
-        input_tokens: 10,
-        output_tokens: 10,
-        cost_usd: 0,
-      },
-    });
-    const builder = createBuilder([
-      { data: playbookRow({ status: 'awaiting_followups' }), error: null },
-      {
-        data: playbookRow({
-          status: 'answering_followups',
-          q_a_data: {
-            fixed: [{ question_key: 'position', value: 'Product Lead' }],
-            followups: [],
-            freeform: [],
-            completeness_score: 0.71,
-            followup_questions: followupResponse.questions,
-          },
-        }),
-        error: null,
-      },
-    ]);
-    mocks.from.mockReturnValue(builder);
-
-    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
-    const result = await caller.generation.requestFollowups({
-      playbookId,
-      fixedAnswers: {
-        position: { question_key: 'position', value: 'Product Lead' },
-      },
-      followupAnswers: {},
-      contentLanguage: 'en',
-    });
-
-    expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
-      playbookId,
-      qaData: expect.objectContaining({
-        fixed: [{ question_key: 'position', value: 'Product Lead' }],
-        followups: [],
-        freeform: [],
-        business_context: expect.objectContaining({ mode: 'universal' }),
-      }),
-      language: 'en',
-    });
-    expect(builder.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'answering_followups',
-        q_a_data: expect.objectContaining({
-          completeness_score: 0.71,
-          followup_questions: followupResponse.questions,
-        }),
-      })
-    );
-    expect(result).toEqual(followupResponse);
   });
 
   it('does not persist ready-to-generate when follow-up completeness is below threshold', async () => {

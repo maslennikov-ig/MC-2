@@ -1,9 +1,16 @@
 import { TRPCError } from '@trpc/server';
-import type { Tier } from '@megacampus/shared-types';
+import {
+  JobType,
+  type CareerPlaybookBusinessContextSourceSummary,
+  type CareerPlaybookProcessSourceJobData,
+  type Language,
+  type Tier,
+} from '@megacampus/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 import type { Context, UserContext } from '../../trpc';
+import { addJob } from '@/orchestrator/queue';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { validateFile } from '../../../shared/validation/file-validator';
@@ -23,8 +30,24 @@ export interface UploadCareerPlaybookSourceResult {
   sourceId: string;
   fileId: string;
   storagePath: string;
-  status: 'uploaded';
+  status: 'processing';
   message: string;
+}
+
+export type ListCareerPlaybookSourceResult = CareerPlaybookBusinessContextSourceSummary;
+
+export interface RemoveCareerPlaybookSourceInput {
+  playbookId: string;
+  sourceId: string;
+}
+
+export interface RemoveCareerPlaybookSourceResult {
+  sourceId: string;
+  playbookId: string;
+  fileCatalogId: string | null;
+  status: 'removed';
+  quotaReleasedBytes: number;
+  fileDeleted: boolean;
 }
 
 interface CareerPlaybookSourceRow {
@@ -32,8 +55,23 @@ interface CareerPlaybookSourceRow {
   playbook_id: string;
   organization_id: string;
   user_id: string;
+  source_type?: string | null;
   status: string;
+  filename: string | null;
   file_catalog_id: string | null;
+  error_message?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface FileCatalogCleanupRow {
+  id: string;
+  organization_id: string | null;
+  course_id: string | null;
+  storage_path: string | null;
+  file_size: number | null;
+  original_file_id: string | null;
+  reference_count: number | null;
 }
 
 function requireUser(ctx: Context): UserContext {
@@ -66,7 +104,7 @@ async function loadWritablePlaybook(playbookId: string, user: UserContext) {
   const supabase = getSupabaseAdmin() as any;
   const { data, error } = await supabase
     .from('career_playbooks')
-    .select('id, user_id, organization_id, status')
+    .select('id, user_id, organization_id, status, language')
     .eq('id', playbookId)
     .single();
 
@@ -87,7 +125,197 @@ async function loadWritablePlaybook(playbookId: string, user: UserContext) {
     user_id: string;
     organization_id: string;
     status: string;
+    language: Language;
   };
+}
+
+function mapSource(row: CareerPlaybookSourceRow): ListCareerPlaybookSourceResult {
+  return {
+    id: row.id,
+    playbookId: row.playbook_id,
+    sourceType: row.source_type === 'text' ? 'text' : 'file',
+    filename: row.filename,
+    status: row.status as CareerPlaybookBusinessContextSourceSummary['status'],
+    fileCatalogId: row.file_catalog_id,
+    errorMessage: row.error_message ?? null,
+    createdAt: row.created_at ?? '',
+    updatedAt: row.updated_at ?? '',
+  };
+}
+
+async function loadSourceForPlaybook(
+  sourceId: string,
+  playbookId: string,
+  organizationId: string
+): Promise<CareerPlaybookSourceRow> {
+  const supabase = getSupabaseAdmin() as any;
+  const { data, error } = await supabase
+    .from('career_playbook_sources')
+    .select(
+      'id, playbook_id, organization_id, user_id, status, filename, file_catalog_id, created_at, updated_at'
+    )
+    .eq('id', sourceId)
+    .eq('playbook_id', playbookId)
+    .eq('organization_id', organizationId)
+    .single();
+
+  if (error || !data) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Career Playbook source not found',
+      cause: error,
+    });
+  }
+
+  return data as CareerPlaybookSourceRow;
+}
+
+async function loadFileCatalogForCleanup(fileCatalogId: string): Promise<FileCatalogCleanupRow> {
+  const supabase = getSupabaseAdmin() as any;
+  const { data, error } = await supabase
+    .from('file_catalog')
+    .select(
+      'id, organization_id, course_id, storage_path, file_size, original_file_id, reference_count'
+    )
+    .eq('id', fileCatalogId)
+    .single();
+
+  if (error || !data) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to load Career Playbook source file metadata',
+      cause: error,
+    });
+  }
+
+  return data as FileCatalogCleanupRow;
+}
+
+async function deleteSourceRow(sourceId: string): Promise<void> {
+  const supabase = getSupabaseAdmin() as any;
+  const { error } = await supabase.from('career_playbook_sources').delete().eq('id', sourceId);
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to remove Career Playbook source record',
+      cause: error,
+    });
+  }
+}
+
+async function deleteFileCatalogRow(fileCatalogId: string): Promise<void> {
+  const supabase = getSupabaseAdmin() as any;
+  const { error } = await supabase.from('file_catalog').delete().eq('id', fileCatalogId);
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to remove Career Playbook source file metadata',
+      cause: error,
+    });
+  }
+}
+
+async function releaseSourceQuota(file: FileCatalogCleanupRow): Promise<number> {
+  if (!file.organization_id || !file.file_size || file.file_size <= 0) return 0;
+
+  try {
+    await decrementQuota(file.organization_id, file.file_size);
+    return file.file_size;
+  } catch (error) {
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        organizationId: file.organization_id,
+        quotaAmount: file.file_size,
+        fileCatalogId: file.id,
+      },
+      'Failed to release quota for removed Career Playbook source file'
+    );
+    return 0;
+  }
+}
+
+function canDeleteFileCatalogRow(file: FileCatalogCleanupRow): boolean {
+  if (file.original_file_id) return true;
+  return (file.reference_count ?? 1) <= 1;
+}
+
+function canDeletePhysicalFile(file: FileCatalogCleanupRow): boolean {
+  return !file.original_file_id && (file.reference_count ?? 1) <= 1;
+}
+
+function getSourceProcessingJobId(playbookId: string, sourceId: string): string {
+  return `career-playbook-source-${playbookId}-${sourceId}`;
+}
+
+function resolveProcessingFilePath(storagePath: string): string {
+  if (path.isAbsolute(storagePath)) return storagePath;
+  return path.join(process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd(), storagePath);
+}
+
+async function safeUnlinkCareerPlaybookStoragePath(file: FileCatalogCleanupRow): Promise<boolean> {
+  if (!file.storage_path) return false;
+
+  const uploadsRoot = path.resolve(process.cwd(), 'uploads');
+  const absolutePath = path.resolve(process.cwd(), file.storage_path);
+  if (absolutePath === uploadsRoot || !absolutePath.startsWith(`${uploadsRoot}${path.sep}`)) {
+    logger.warn(
+      { fileCatalogId: file.id, storagePath: file.storage_path },
+      'Skipped unsafe Career Playbook source file removal path'
+    );
+    return false;
+  }
+
+  try {
+    await fs.unlink(absolutePath);
+    return true;
+  } catch (error) {
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        fileCatalogId: file.id,
+        storagePath: file.storage_path,
+      },
+      'Failed to delete removed Career Playbook source file'
+    );
+    return false;
+  }
+}
+
+export async function listCareerPlaybookBusinessContextSourceSummaries(
+  playbookId: string
+): Promise<ListCareerPlaybookSourceResult[]> {
+  const supabase = getSupabaseAdmin() as any;
+  const { data, error } = await supabase
+    .from('career_playbook_sources')
+    .select(
+      'id, playbook_id, source_type, status, filename, file_catalog_id, error_message, created_at, updated_at'
+    )
+    .eq('playbook_id', playbookId)
+    .neq('status', 'removed')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to list Career Playbook sources',
+      cause: error,
+    });
+  }
+
+  return ((data ?? []) as CareerPlaybookSourceRow[]).map(mapSource);
+}
+
+export async function listCareerPlaybookBusinessContextSources(
+  ctx: Context,
+  playbookId: string
+): Promise<ListCareerPlaybookSourceResult[]> {
+  const user = requireUser(ctx);
+  await loadWritablePlaybook(playbookId, user);
+
+  return listCareerPlaybookBusinessContextSourceSummaries(playbookId);
 }
 
 async function getOrganizationTier(organizationId: string): Promise<Tier> {
@@ -248,6 +476,24 @@ export async function uploadCareerPlaybookBusinessContextSource(
     }
 
     const source = data as CareerPlaybookSourceRow;
+    const jobData: CareerPlaybookProcessSourceJobData = {
+      jobType: JobType.CAREER_PLAYBOOK,
+      operation: 'PROCESS_SOURCE',
+      playbookId: input.playbookId,
+      sourceId: source.id,
+      fileId: storage.fileId,
+      filePath: resolveProcessingFilePath(storage.storagePath),
+      mimeType: input.mimeType,
+      userId: user.id,
+      organizationId: playbook.organization_id,
+      language: playbook.language,
+      locale: playbook.language === 'en' ? 'en' : 'ru',
+      createdAt: new Date().toISOString(),
+    };
+
+    await addJob(JobType.CAREER_PLAYBOOK, jobData, {
+      jobId: getSourceProcessingJobId(input.playbookId, source.id),
+    });
 
     logger.info(
       {
@@ -263,11 +509,87 @@ export async function uploadCareerPlaybookBusinessContextSource(
       sourceId: source.id,
       fileId: storage.fileId,
       storagePath: storage.storagePath,
-      status: 'uploaded',
-      message: `File "${input.filename}" uploaded as Career Playbook business context`,
+      status: 'processing',
+      message: `File "${input.filename}" uploaded and queued for Career Playbook business context processing`,
     };
   } catch (error) {
     if (error instanceof TRPCError) throw error;
     throw mapStorageError(error);
   }
+}
+
+export async function removeCareerPlaybookBusinessContextSource(
+  ctx: Context,
+  input: RemoveCareerPlaybookSourceInput
+): Promise<RemoveCareerPlaybookSourceResult> {
+  const user = requireUser(ctx);
+  const playbook = await loadWritablePlaybook(input.playbookId, user);
+  const source = await loadSourceForPlaybook(
+    input.sourceId,
+    input.playbookId,
+    playbook.organization_id
+  );
+
+  if (!source.file_catalog_id) {
+    await deleteSourceRow(source.id);
+    return {
+      sourceId: source.id,
+      playbookId: source.playbook_id,
+      fileCatalogId: null,
+      status: 'removed',
+      quotaReleasedBytes: 0,
+      fileDeleted: false,
+    };
+  }
+
+  const file = await loadFileCatalogForCleanup(source.file_catalog_id);
+
+  if (file.organization_id !== playbook.organization_id || file.course_id !== null) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Career Playbook source file access denied',
+    });
+  }
+
+  let fileDeleted = false;
+
+  if (canDeleteFileCatalogRow(file)) {
+    await deleteFileCatalogRow(file.id);
+
+    if (canDeletePhysicalFile(file)) {
+      fileDeleted = await safeUnlinkCareerPlaybookStoragePath(file);
+    }
+  } else {
+    logger.warn(
+      {
+        sourceId: source.id,
+        fileCatalogId: file.id,
+        referenceCount: file.reference_count,
+      },
+      'Removed Career Playbook source record but kept shared original file_catalog row'
+    );
+    await deleteSourceRow(source.id);
+  }
+
+  const quotaReleasedBytes = await releaseSourceQuota(file);
+
+  logger.info(
+    {
+      playbookId: input.playbookId,
+      sourceId: source.id,
+      fileCatalogId: file.id,
+      quotaReleasedBytes,
+      fileDeleted,
+    },
+    'Career Playbook business context source removed'
+  );
+
+  return {
+    sourceId: source.id,
+    playbookId: source.playbook_id,
+    fileCatalogId: source.file_catalog_id,
+    status: 'removed',
+    quotaReleasedBytes,
+    fileDeleted,
+  };
 }

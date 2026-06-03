@@ -8,9 +8,11 @@
 - Generation stage: `packages/course-gen-platform/src/stages/stage-career-playbook/**`
 - Department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`
 - Business context helpers: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/business-context.ts`
+- Business context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`
 - Worker handler: `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts`
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
 - Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
+- Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
 
 ## Department Resolution
 
@@ -60,6 +62,18 @@ the existing Stage 1 validation, quota, storage, and dedup primitives, but Caree
 Playbook files use `uploads/<organization>/career-playbooks/<playbookId>/` and
 leave `file_catalog.course_id` null. This keeps course uploads unchanged and
 avoids creating fake draft courses just to attach Role Guide context.
+
+Business Context file uploads enqueue `JobType.CAREER_PLAYBOOK` with operation
+`PROCESS_SOURCE`. `source-processing.ts` reuses Docling conversion,
+processed-document storage, and summarization with the playbook ID as the
+markdown namespace instead of creating a fake course. Source rows move through
+`uploaded`, `processing`, `ready`, and `failed`; follow-up generation blocks
+while any selected source is still uploaded or processing.
+
+The tRPC source lifecycle surface is `careerPlaybook.sources.listSources`,
+`uploadFile`, and `removeSource`. Draft reads include
+`businessContextSources`, so the web store can render persisted filenames,
+source status, source errors, and removal actions across constructor resume.
 
 Follow-up and spec-builder prompts receive the formatted business digest,
 processed source excerpts, and missing signals as separate prompt variables.

@@ -57,6 +57,10 @@ export const uploadBusinessContextSourceInputSchema = playbookIdInputSchema.exte
     .max(MAX_BUSINESS_CONTEXT_BASE64_LENGTH, 'File content exceeds upload limit'),
 });
 
+export const removeBusinessContextSourceInputSchema = playbookIdInputSchema.extend({
+  sourceId: z.string().uuid('Invalid source ID'),
+});
+
 export const requestFollowupsInputSchema = playbookIdInputSchema.extend({
   fixedAnswers: z.record(CareerPlaybookFixedAnswerSchema),
   followupAnswers: z.record(CareerPlaybookFollowupAnswerSchema),

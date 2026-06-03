@@ -4,6 +4,7 @@ import {
   CareerPlaybookBusinessContextSchema,
   CareerPlaybookBusinessContextDigestSchema,
   CareerPlaybookBusinessContextSourceSchema,
+  CareerPlaybookBusinessContextSourceSummarySchema,
   CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD,
   CareerPlaybookCostBreakdownSchema,
   CareerPlaybookFollowupAnswerSchema,
@@ -199,6 +200,23 @@ describe('Career Playbook shared schemas', () => {
     expect(source.file_catalog_id).toBe('00000000-0000-4000-8000-000000000013');
   });
 
+  it('validates Career Playbook business context source summaries for frontend drafts', () => {
+    const source = CareerPlaybookBusinessContextSourceSummarySchema.parse({
+      id: '00000000-0000-4000-8000-000000000010',
+      playbookId: '00000000-0000-4000-8000-000000000011',
+      sourceType: 'file',
+      status: 'processing',
+      filename: 'sales-playbook.pdf',
+      fileCatalogId: '00000000-0000-4000-8000-000000000013',
+      errorMessage: null,
+      createdAt: '2026-06-03T00:00:00.000Z',
+      updatedAt: '2026-06-03T00:01:00.000Z',
+    });
+
+    expect(source.status).toBe('processing');
+    expect(source.sourceType).toBe('file');
+  });
+
   it('validates Career Playbook queue jobs without requiring a courseId', () => {
     const result = JobDataSchema.safeParse({
       jobType: JobType.CAREER_PLAYBOOK,
@@ -217,6 +235,29 @@ describe('Career Playbook shared schemas', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('validates Career Playbook source processing jobs without fake course ownership', () => {
+    const result = JobDataSchema.safeParse({
+      jobType: JobType.CAREER_PLAYBOOK,
+      operation: 'PROCESS_SOURCE',
+      playbookId: '00000000-0000-4000-8000-000000000014',
+      sourceId: '00000000-0000-4000-8000-000000000015',
+      fileId: '00000000-0000-4000-8000-000000000016',
+      filePath: 'uploads/career-playbooks/context.pdf',
+      mimeType: 'application/pdf',
+      userId: '00000000-0000-4000-8000-000000000017',
+      organizationId: '00000000-0000-4000-8000-000000000018',
+      language: 'ru',
+      locale: 'ru',
+      createdAt: '2026-06-03T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.error.format()));
+    }
+    expect('courseId' in result.data).toBe(false);
   });
 
   it('rejects empty follow-up answers unless explicitly skipped', () => {
