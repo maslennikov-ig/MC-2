@@ -22,20 +22,21 @@ Branch: `codex/career-playbook-viewer-library-snapshot`
 - `pnpm type-check` passed.
 - `pnpm build` passed; Next.js emitted existing Browserslist and `url.parse()` warnings.
 - `graphify update .` passed (57,062 nodes / 79,102 edges); `graphify-out` is local/untracked.
+- Dev delivery completed via GitHub Actions run `26899302080`; `megacampus-web-dev` and `megacampus-api-dev` both report revision `66032b29bddc5064737b2920f6574a750490a7b9`.
 
 ## Next recommended
 
-Next stage id: `mc2-ev2nq` until delivered.
-Recommended action: commit and push `codex/career-playbook-viewer-library-snapshot`; merge/deploy to Dev only with explicit confirmation or via the repo delivery command.
+Next stage id: pick the next ready Beads task.
+Recommended action: continue from `develop`; no pending delivery remains for `mc2-ev2nq`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-ev2nq/summary.md`, Beads, Graphify report, and `git status`. Continue `mc2-ev2nq` from `codex/career-playbook-viewer-library-snapshot`.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-ev2nq/summary.md`, Beads, Graphify report, and `git status`. Continue from `develop`; `mc2-ev2nq` is delivered and closed.
 
 ## Delivery
 
-- Dev delivery not performed yet for `mc2-ev2nq`.
+- Dev delivery completed through `/push-dev`: `codex/career-playbook-viewer-library-snapshot` -> `develop` at `66032b29bddc5064737b2920f6574a750490a7b9`.
 
 ## Explicit defers
 
-- Authenticated browser smoke on dev is pending deploy of this branch; unit/API evidence confirms the root cause and data state.
+- Authenticated browser smoke with the user's session was not available from CLI; API data, deployed revision, page bundle, and unit coverage verify the fixed layer.
