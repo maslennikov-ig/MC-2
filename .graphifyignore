@@ -1,0 +1,80 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+packages/*/node_modules/
+
+# Build outputs, caches, coverage, and generated reports
+dist/
+build/
+.next/
+*.tsbuildinfo
+.eslintcache
+.cache/
+coverage/
+.nyc_output/
+packages/*/dist/
+packages/*/coverage/
+packages/course-gen-platform/src/build/
+packages/course-gen-platform/.tmp/
+graphify-out/
+
+# Runtime state, worktrees, local databases, and temporary files
+.git/
+**/.git/
+.worktrees/
+.tmp/
+.local/
+tmp/
+logs/
+.locks/
+.dolt/
+.beads/
+.venv*/
+**/.venv*/
+venv/
+**/venv/
+code-review-workspace/
+
+# Agent runtime noise. Keep stable repo instructions in AGENTS.md and .codex/*.md/.toml.
+.agent/
+.agents/
+.gemini/
+.hallmark/
+.lazyweb/
+.playwright-mcp/
+.pytest_cache/
+.specify/
+.claude/
+.codex/agent-reports/
+.codex/skills/
+
+# Secrets, env files, uploaded user data, and local data stores
+.env
+.env.*
+*.env
+*.env.local
+secrets/
+data/
+packages/course-gen-platform/uploads/
+packages/course-gen-platform/docker/notebooklm-bridge/.venv/
+packages/course-gen-platform/tests/test-data/
+packages/course-gen-platform/tests/integration/fixtures/
+
+# Heavy visual/test artifacts and historical generated runs
+docs/qa-screenshots/
+docs/llm-testing/test-run-*/
+docs/archive/
+docs/stitch-*.png
+docs/stitch-*.html
+docs/reports/
+
+# Binary media assets not needed for code/local orientation
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.mp4
+*.mov
+*.wav
+*.mp3
