@@ -22,7 +22,7 @@
 ## Verification
 
 - Shared targeted Career Playbook schema test passed, 15 tests.
-- Backend targeted Career Playbook router/follow-up/spec tests passed, 56 tests.
+- Backend targeted Career Playbook router/follow-up/spec tests passed, 55 tests.
 - Web targeted Career Playbook store/page/wizard/upload tests passed, 90 tests.
 - `pnpm type-check` passed.
 - `pnpm build` passed; existing Browserslist and `url.parse()` warnings remain.

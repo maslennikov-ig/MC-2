@@ -20,7 +20,7 @@ Branch: `codex/career-playbook-business-context`
 
 ## Verification
 
-- Targeted tests passed: shared Career Playbook 15, backend 56, web 90.
+- Targeted tests passed: shared Career Playbook 15, backend 55, web 90.
 - `pnpm type-check`, `pnpm build`, process verification, and `git diff --check`
   passed. Build emitted existing Browserslist and `url.parse()` warnings.
 
