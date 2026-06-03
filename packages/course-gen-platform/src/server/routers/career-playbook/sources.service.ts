@@ -3,7 +3,6 @@ import {
   JobType,
   type CareerPlaybookBusinessContextSourceSummary,
   type CareerPlaybookProcessSourceJobData,
-  type Language,
   type Tier,
 } from '@megacampus/shared-types';
 import * as fs from 'fs/promises';
@@ -11,12 +10,16 @@ import * as path from 'path';
 
 import type { Context, UserContext } from '../../trpc';
 import { addJob } from '@/orchestrator/queue';
-import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { validateFile } from '../../../shared/validation/file-validator';
 import { decrementQuota } from '../../../shared/validation/quota-enforcer';
 import { runPhase2Storage, isStorageError } from '@/stages/stage1-document-upload/phases';
 import type { Phase2StorageOutput } from '@/stages/stage1-document-upload/types';
+import {
+  getCareerPlaybookBusinessContextSupabase,
+  type CareerPlaybookFileCatalogRow,
+  type CareerPlaybookSourceRow,
+} from '@/shared/career-playbook/source-db';
 
 export interface UploadCareerPlaybookSourceInput {
   playbookId: string;
@@ -50,30 +53,6 @@ export interface RemoveCareerPlaybookSourceResult {
   fileDeleted: boolean;
 }
 
-interface CareerPlaybookSourceRow {
-  id: string;
-  playbook_id: string;
-  organization_id: string;
-  user_id: string;
-  source_type?: string | null;
-  status: string;
-  filename: string | null;
-  file_catalog_id: string | null;
-  error_message?: string | null;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface FileCatalogCleanupRow {
-  id: string;
-  organization_id: string | null;
-  course_id: string | null;
-  storage_path: string | null;
-  file_size: number | null;
-  original_file_id: string | null;
-  reference_count: number | null;
-}
-
 function requireUser(ctx: Context): UserContext {
   if (!ctx.user) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
@@ -101,7 +80,7 @@ function mapStorageError(error: unknown): TRPCError {
 }
 
 async function loadWritablePlaybook(playbookId: string, user: UserContext) {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
     .select('id, user_id, organization_id, status, language')
@@ -120,13 +99,7 @@ async function loadWritablePlaybook(playbookId: string, user: UserContext) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Career Playbook access denied' });
   }
 
-  return data as {
-    id: string;
-    user_id: string;
-    organization_id: string;
-    status: string;
-    language: Language;
-  };
+  return data;
 }
 
 function mapSource(row: CareerPlaybookSourceRow): ListCareerPlaybookSourceResult {
@@ -148,7 +121,7 @@ async function loadSourceForPlaybook(
   playbookId: string,
   organizationId: string
 ): Promise<CareerPlaybookSourceRow> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { data, error } = await supabase
     .from('career_playbook_sources')
     .select(
@@ -167,11 +140,13 @@ async function loadSourceForPlaybook(
     });
   }
 
-  return data as CareerPlaybookSourceRow;
+  return data;
 }
 
-async function loadFileCatalogForCleanup(fileCatalogId: string): Promise<FileCatalogCleanupRow> {
-  const supabase = getSupabaseAdmin() as any;
+async function loadFileCatalogForCleanup(
+  fileCatalogId: string
+): Promise<CareerPlaybookFileCatalogRow> {
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { data, error } = await supabase
     .from('file_catalog')
     .select(
@@ -188,11 +163,11 @@ async function loadFileCatalogForCleanup(fileCatalogId: string): Promise<FileCat
     });
   }
 
-  return data as FileCatalogCleanupRow;
+  return data;
 }
 
 async function deleteSourceRow(sourceId: string): Promise<void> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { error } = await supabase.from('career_playbook_sources').delete().eq('id', sourceId);
 
   if (error) {
@@ -205,7 +180,7 @@ async function deleteSourceRow(sourceId: string): Promise<void> {
 }
 
 async function deleteFileCatalogRow(fileCatalogId: string): Promise<void> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { error } = await supabase.from('file_catalog').delete().eq('id', fileCatalogId);
 
   if (error) {
@@ -217,7 +192,7 @@ async function deleteFileCatalogRow(fileCatalogId: string): Promise<void> {
   }
 }
 
-async function releaseSourceQuota(file: FileCatalogCleanupRow): Promise<number> {
+async function releaseSourceQuota(file: CareerPlaybookFileCatalogRow): Promise<number> {
   if (!file.organization_id || !file.file_size || file.file_size <= 0) return 0;
 
   try {
@@ -237,12 +212,12 @@ async function releaseSourceQuota(file: FileCatalogCleanupRow): Promise<number> 
   }
 }
 
-function canDeleteFileCatalogRow(file: FileCatalogCleanupRow): boolean {
+function canDeleteFileCatalogRow(file: CareerPlaybookFileCatalogRow): boolean {
   if (file.original_file_id) return true;
   return (file.reference_count ?? 1) <= 1;
 }
 
-function canDeletePhysicalFile(file: FileCatalogCleanupRow): boolean {
+function canDeletePhysicalFile(file: CareerPlaybookFileCatalogRow): boolean {
   return !file.original_file_id && (file.reference_count ?? 1) <= 1;
 }
 
@@ -255,7 +230,9 @@ function resolveProcessingFilePath(storagePath: string): string {
   return path.join(process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd(), storagePath);
 }
 
-async function safeUnlinkCareerPlaybookStoragePath(file: FileCatalogCleanupRow): Promise<boolean> {
+async function safeUnlinkCareerPlaybookStoragePath(
+  file: CareerPlaybookFileCatalogRow
+): Promise<boolean> {
   if (!file.storage_path) return false;
 
   const uploadsRoot = path.resolve(process.cwd(), 'uploads');
@@ -287,7 +264,7 @@ async function safeUnlinkCareerPlaybookStoragePath(file: FileCatalogCleanupRow):
 export async function listCareerPlaybookBusinessContextSourceSummaries(
   playbookId: string
 ): Promise<ListCareerPlaybookSourceResult[]> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { data, error } = await supabase
     .from('career_playbook_sources')
     .select(
@@ -305,7 +282,7 @@ export async function listCareerPlaybookBusinessContextSourceSummaries(
     });
   }
 
-  return ((data ?? []) as CareerPlaybookSourceRow[]).map(mapSource);
+  return (data ?? []).map(mapSource);
 }
 
 export async function listCareerPlaybookBusinessContextSources(
@@ -319,7 +296,7 @@ export async function listCareerPlaybookBusinessContextSources(
 }
 
 async function getOrganizationTier(organizationId: string): Promise<Tier> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { data, error } = await supabase
     .from('organizations')
     .select('id, tier')
@@ -338,7 +315,7 @@ async function getOrganizationTier(organizationId: string): Promise<Tier> {
 }
 
 async function countExistingSources(playbookId: string): Promise<number> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
   const { count, error } = await supabase
     .from('career_playbook_sources')
     .select('*', { count: 'exact', head: true })
@@ -360,11 +337,11 @@ async function cleanupStoredSourceFile(
   storage: Phase2StorageOutput,
   organizationId: string
 ): Promise<void> {
-  const supabase = getSupabaseAdmin() as any;
+  const supabase = getCareerPlaybookBusinessContextSupabase();
 
   try {
     const { error } = await supabase.from('file_catalog').delete().eq('id', storage.fileId);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
   } catch (error) {
     logger.warn(
       {
@@ -451,7 +428,7 @@ export async function uploadCareerPlaybookBusinessContextSource(
       fileContent: input.fileContent,
     });
 
-    const supabase = getSupabaseAdmin() as any;
+    const supabase = getCareerPlaybookBusinessContextSupabase();
     const { data, error } = await supabase
       .from('career_playbook_sources')
       .insert({
@@ -474,13 +451,11 @@ export async function uploadCareerPlaybookBusinessContextSource(
         cause: error,
       });
     }
-
-    const source = data as CareerPlaybookSourceRow;
     const jobData: CareerPlaybookProcessSourceJobData = {
       jobType: JobType.CAREER_PLAYBOOK,
       operation: 'PROCESS_SOURCE',
       playbookId: input.playbookId,
-      sourceId: source.id,
+      sourceId: data.id,
       fileId: storage.fileId,
       filePath: resolveProcessingFilePath(storage.storagePath),
       mimeType: input.mimeType,
@@ -492,13 +467,13 @@ export async function uploadCareerPlaybookBusinessContextSource(
     };
 
     await addJob(JobType.CAREER_PLAYBOOK, jobData, {
-      jobId: getSourceProcessingJobId(input.playbookId, source.id),
+      jobId: getSourceProcessingJobId(input.playbookId, data.id),
     });
 
     logger.info(
       {
         playbookId: input.playbookId,
-        sourceId: source.id,
+        sourceId: data.id,
         fileId: storage.fileId,
         organizationId: playbook.organization_id,
       },
@@ -506,7 +481,7 @@ export async function uploadCareerPlaybookBusinessContextSource(
     );
 
     return {
-      sourceId: source.id,
+      sourceId: data.id,
       fileId: storage.fileId,
       storagePath: storage.storagePath,
       status: 'processing',
