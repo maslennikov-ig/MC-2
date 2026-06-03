@@ -233,21 +233,33 @@ function capGeneratedQuestionsForResponse(
 }
 
 function isReadyForGeneration(row: CareerPlaybookRow, qaData: StoredQAData): boolean {
-  if (row.status === 'ready_to_generate') return true;
-  if (row.status === 'failed') return qaData.fixed.length > 0;
+  if (row.status === 'ready_to_generate') return hasCompletedBusinessContext(qaData);
+  if (row.status === 'failed') {
+    return qaData.fixed.length > 0 && hasCompletedBusinessContext(qaData);
+  }
   if (
     qaData.followup_questions.length === 0 &&
     (row.status === 'answering_fixed' ||
       row.status === 'awaiting_followups' ||
       row.status === 'answering_followups')
   ) {
-    return hasRequiredFixedAnswers(qaData);
+    return hasRequiredFixedAnswers(qaData) && hasCompletedBusinessContext(qaData);
   }
   if (row.status !== 'answering_followups') return false;
-  if (qaData.fixed.length === 0 || qaData.followup_questions.length === 0) return false;
+  if (
+    qaData.fixed.length === 0 ||
+    qaData.followup_questions.length === 0 ||
+    !hasCompletedBusinessContext(qaData)
+  ) {
+    return false;
+  }
 
   const answeredQuestionIds = new Set(qaData.followups.map(answer => answer.question_id));
   return qaData.followup_questions.every(question => answeredQuestionIds.has(question.question_id));
+}
+
+function hasCompletedBusinessContext(qaData: StoredQAData): boolean {
+  return qaData.business_context.status === 'ready' || qaData.business_context.status === 'skipped';
 }
 
 function hasRequiredFixedAnswers(qaData: StoredQAData): boolean {
@@ -270,6 +282,7 @@ function hasStoredAnswerValue(value: unknown): boolean {
 
 function assertCanRequestFollowups(
   row: CareerPlaybookRow,
+  qaData: StoredQAData,
   fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
 ): void {
   const allowedStatuses: CareerPlaybookPlaybookStatus[] = [
@@ -277,7 +290,13 @@ function assertCanRequestFollowups(
     'awaiting_followups',
     'answering_followups',
   ];
-  if (allowedStatuses.includes(row.status) && Object.keys(fixedAnswers).length > 0) return;
+  if (
+    allowedStatuses.includes(row.status) &&
+    Object.keys(fixedAnswers).length > 0 &&
+    hasCompletedBusinessContext(qaData)
+  ) {
+    return;
+  }
 
   throw new TRPCError({
     code: 'BAD_REQUEST',
@@ -448,7 +467,7 @@ export async function requestCareerPlaybookFollowups(
   const user = requireUser(ctx);
   const row = await loadPlaybook(input.playbookId, user, 'write');
   const existingQAData = normalizeStoredQAData(row.q_a_data);
-  assertCanRequestFollowups(row, input.fixedAnswers);
+  assertCanRequestFollowups(row, existingQAData, input.fixedAnswers);
   if (existingQAData.followup_generation_count >= FOLLOWUP_GENERATION_LIMIT) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -463,6 +482,7 @@ export async function requestCareerPlaybookFollowups(
     business_context: existingQAData.business_context,
   });
   const result = await generateCareerPlaybookFollowups({
+    playbookId: input.playbookId,
     qaData,
     language: input.contentLanguage,
   });

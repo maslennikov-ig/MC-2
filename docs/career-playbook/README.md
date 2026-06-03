@@ -88,6 +88,9 @@ Targeted unit checks:
 ```bash
 pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/public-playbook-viewer.test.tsx
+pnpm --filter @megacampus/shared-types exec vitest run tests/career-playbook.test.ts
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/stages/stage-career-playbook/followup-questions.test.ts tests/unit/stages/stage-career-playbook/spec-builder.test.ts
+pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/page-client.test.tsx tests/unit/api/career-playbook/upload.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/admin-cost-evidence.test.tsx
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/admin-career-playbook-costs.test.ts
@@ -127,6 +130,8 @@ Career Playbook per-node cost evidence is available to admins at `/admin/generat
 ## Current Live Readiness
 
 As of 2026-05-20, the Career Playbook migration has been applied to the Supabase project and read-only staging preflight passes when a dedicated non-default queue name is provided. Full mutation smoke is still intentionally gated on disposable staging fixtures, auth token/storage state, queue alignment between enqueuer and worker, cleanup scope, and an accepted numeric LLM/API cost budget.
+
+As of 2026-06-03, Business Context file uploads require migration `20260603110000_add_career_playbook_sources` in addition to the base Career Playbook schema. Before enabling uploads in staging/dev, verify `career_playbook_sources` RLS and that Career Playbook uploads create `file_catalog` rows with `course_id IS NULL`.
 
 As of 2026-05-23, the target model routing is encoded in migration `20260523073000_update_career_playbook_v4_pro_routing`: DeepSeek V4 Pro for spec, group 5, judge, and block regeneration; DeepSeek V4 Flash for follow-up and groups 1-4/6. Career Playbook fallbacks now stay within the DeepSeek V4 Flash/Pro pair instead of MiniMax.
 

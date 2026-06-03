@@ -15,6 +15,7 @@ import {
   formatCareerPlaybookBusinessContextDigest,
   formatCareerPlaybookBusinessContextMissingSignals,
   getCareerPlaybookBusinessContext,
+  loadCareerPlaybookBusinessContextSourceExcerpts,
 } from './business-context';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 
@@ -115,7 +116,8 @@ export function buildSpecBuilderPromptVariables(
     sources: string[];
     errors?: string[];
   },
-  contentLanguage: string
+  contentLanguage: string,
+  businessContextSourceExcerpts = '- none'
 ): Record<string, string> {
   const businessContext = getCareerPlaybookBusinessContext(qaData);
 
@@ -123,6 +125,7 @@ export function buildSpecBuilderPromptVariables(
     qa_data_json: JSON.stringify(qaData, null, 2),
     business_context_mode: businessContext.mode,
     business_context_digest: formatCareerPlaybookBusinessContextDigest(businessContext),
+    business_context_source_excerpts: businessContextSourceExcerpts,
     business_context_missing_signals:
       formatCareerPlaybookBusinessContextMissingSignals(businessContext),
     kpi_insights: joinInsights(research.kpis_insights),
@@ -136,6 +139,7 @@ export function buildSpecBuilderPromptVariables(
 export interface CreateSpecBuilderNodeOptions {
   runtime?: CareerPlaybookRuntime;
   webResearch?: RunCareerPlaybookWebResearchOptions;
+  businessContextSourceExcerpts?: (state: CareerPlaybookGraphStateType) => Promise<string>;
 }
 
 async function invokeRoleProfileSpecWithFallback(
@@ -183,9 +187,21 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
   ): Promise<CareerPlaybookGraphStateUpdate> {
     try {
       const webResearch = await runCareerPlaybookWebResearch(state.qaData, options.webResearch);
+      const businessContext = getCareerPlaybookBusinessContext(state.qaData);
+      const businessContextSourceExcerpts = options.businessContextSourceExcerpts
+        ? await options.businessContextSourceExcerpts(state)
+        : await loadCareerPlaybookBusinessContextSourceExcerpts({
+            playbookId: state.playbookId,
+            context: businessContext,
+          });
       const prompt = await runtime.renderPrompt(
         SPEC_BUILDER_PROMPT_KEY,
-        buildSpecBuilderPromptVariables(state.qaData, webResearch, state.language)
+        buildSpecBuilderPromptVariables(
+          state.qaData,
+          webResearch,
+          state.language,
+          businessContextSourceExcerpts
+        )
       );
       const { roleProfileSpec, llmResults } = await invokeRoleProfileSpecWithFallback(
         runtime,

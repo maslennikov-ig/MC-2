@@ -135,7 +135,8 @@ async function cleanupStoredSourceFile(
   const supabase = getSupabaseAdmin() as any;
 
   try {
-    await supabase.from('file_catalog').delete().eq('id', storage.fileId);
+    const { error } = await supabase.from('file_catalog').delete().eq('id', storage.fileId);
+    if (error) throw error;
   } catch (error) {
     logger.warn(
       {
@@ -144,22 +145,6 @@ async function cleanupStoredSourceFile(
       },
       'Failed to delete orphaned Career Playbook file_catalog row'
     );
-  }
-
-  if (storage.deduplicated && storage.originalFileId) {
-    try {
-      await supabase.rpc('decrement_file_reference_count', {
-        p_file_id: storage.originalFileId,
-      });
-    } catch (error) {
-      logger.warn(
-        {
-          err: error instanceof Error ? error.message : String(error),
-          fileId: storage.originalFileId,
-        },
-        'Failed to decrement deduplicated Career Playbook file reference count'
-      );
-    }
   }
 
   if (!storage.deduplicated) {

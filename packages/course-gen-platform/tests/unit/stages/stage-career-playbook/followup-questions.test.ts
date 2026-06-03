@@ -1,5 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CareerPlaybookQAData } from '@megacampus/shared-types';
+
+const sourceMocks = vi.hoisted(() => ({
+  from: vi.fn(),
+}));
+
+vi.mock('@/shared/supabase/admin', () => ({
+  getSupabaseAdmin: vi.fn(() => ({
+    from: sourceMocks.from,
+  })),
+}));
+
 import {
   buildFollowupPromptVariables,
   generateCareerPlaybookFollowups,
@@ -60,7 +71,57 @@ const followupResponse = {
   stop_recommendation: 'ask_more',
 };
 
+function createSourceRowsBuilder(data: unknown[], error: unknown = null) {
+  const builder = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    neq: vi.fn(() => Promise.resolve({ data, error })),
+  };
+
+  return builder;
+}
+
+function createFileRowsBuilder(data: unknown[], error: unknown = null) {
+  const builder = {
+    select: vi.fn(() => builder),
+    in: vi.fn(() => Promise.resolve({ data, error })),
+  };
+
+  return builder;
+}
+
+function mockBusinessContextSourceExcerpt(content: string) {
+  const sourceBuilder = createSourceRowsBuilder([
+    {
+      id: '00000000-0000-4000-8000-000000000010',
+      filename: 'sales-deck.pdf',
+      status: 'ready',
+      file_catalog_id: '00000000-0000-4000-8000-000000000020',
+    },
+  ]);
+  const fileBuilder = createFileRowsBuilder([
+    {
+      id: '00000000-0000-4000-8000-000000000020',
+      filename: 'sales-deck.pdf',
+      processed_content: content,
+      markdown_content: null,
+    },
+  ]);
+
+  sourceMocks.from.mockImplementation((table: string) => {
+    if (table === 'career_playbook_sources') return sourceBuilder;
+    if (table === 'file_catalog') return fileBuilder;
+    throw new Error(`Unexpected table ${table}`);
+  });
+}
+
 describe('Career Playbook follow-up questions helper', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sourceMocks.from.mockReset();
+  });
+
   it('builds prompt variables from Q&A data', () => {
     const variables = buildFollowupPromptVariables(qaData, 'ru');
 
@@ -141,6 +202,7 @@ describe('Career Playbook follow-up questions helper', () => {
   });
 
   it('renders the follow-up prompt, invokes runtime, and returns parsed response with cost', async () => {
+    mockBusinessContextSourceExcerpt('Sales deck: enterprise onboarding requires security review.');
     const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
       content: JSON.stringify(followupResponse),
@@ -151,7 +213,11 @@ describe('Career Playbook follow-up questions helper', () => {
     });
 
     const result = await generateCareerPlaybookFollowups(
-      { qaData, language: 'ru' },
+      {
+        playbookId: '33333333-3333-4333-8333-333333333333',
+        qaData,
+        language: 'ru',
+      },
       { renderPrompt, invokeLLM }
     );
 
@@ -160,6 +226,9 @@ describe('Career Playbook follow-up questions helper', () => {
       expect.objectContaining({
         position: 'B2B Sales Manager',
         content_language: 'ru',
+        business_context_source_excerpts: expect.stringContaining(
+          'enterprise onboarding requires security review'
+        ),
       })
     );
     expect(invokeLLM).toHaveBeenCalledWith(

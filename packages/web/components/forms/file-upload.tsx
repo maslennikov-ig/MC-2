@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Upload,
@@ -135,6 +135,11 @@ export function FileUpload({
 }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadedFilesRef = useRef(uploadedFiles)
+
+  useEffect(() => {
+    uploadedFilesRef.current = uploadedFiles
+  }, [uploadedFiles])
   const labels: FileUploadCopy = { ...defaultCopy, ...copy }
 
   // Compute tier-based limits
@@ -211,7 +216,7 @@ export function FileUpload({
       }
 
       // Check max files with tier-aware messaging
-      if (uploadedFiles.length >= maxFiles) {
+      if (uploadedFilesRef.current.length >= maxFiles) {
         // Find minimum tier that supports more files than current
         const currentIndex = TIER_ORDER.indexOf(effectiveTier)
         let suggestedTier: TierKey | null = null
@@ -235,7 +240,7 @@ export function FileUpload({
       }
 
       // Check for duplicate files
-      const isDuplicate = uploadedFiles.some(
+      const isDuplicate = uploadedFilesRef.current.some(
         (f) => f.file.name === file.name && f.file.size === file.size
       )
       if (isDuplicate) {
@@ -248,7 +253,6 @@ export function FileUpload({
       return { valid: true }
     },
     [
-      uploadedFiles,
       maxFiles,
       maxFileSize,
       maxFileSizeMB,
@@ -281,10 +285,12 @@ export function FileUpload({
       }
 
       if (newFiles.length > 0) {
-        onFilesChange([...uploadedFiles, ...newFiles])
+        const nextFiles = [...uploadedFilesRef.current, ...newFiles]
+        uploadedFilesRef.current = nextFiles
+        onFilesChange(nextFiles)
       }
     },
-    [validateFile, uploadedFiles, onFilesChange]
+    [validateFile, onFilesChange]
   )
 
   // Drag and drop handlers
@@ -333,6 +339,15 @@ export function FileUpload({
     }
   }, [disabled])
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return
+      e.preventDefault()
+      handleClick()
+    },
+    [handleClick]
+  )
+
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const { files } = e.target
@@ -348,9 +363,11 @@ export function FileUpload({
   // Remove file from list
   const removeFile = useCallback(
     (fileId: string) => {
-      onFilesChange(uploadedFiles.filter((f) => f.id !== fileId))
+      const nextFiles = uploadedFilesRef.current.filter((f) => f.id !== fileId)
+      uploadedFilesRef.current = nextFiles
+      onFilesChange(nextFiles)
     },
-    [uploadedFiles, onFilesChange]
+    [onFilesChange]
   )
 
   // Retry failed upload
@@ -362,26 +379,43 @@ export function FileUpload({
       }
 
       // Update status to uploading
-      onFilesChange(
-        uploadedFiles.map((f) =>
+      const uploadingFiles = uploadedFilesRef.current.map((f) =>
+        f.id === file.id
+          ? { ...f, status: 'uploading' as FileUploadStatus, progress: 0, error: undefined }
+          : f
+      )
+      uploadedFilesRef.current = uploadingFiles
+      onFilesChange(uploadingFiles)
+
+      try {
+        const fileId = await onUploadFile(file)
+        if (!fileId) {
+          throw new Error(labels.missingOwner)
+        }
+
+        const successFiles = uploadedFilesRef.current.map((f) =>
           f.id === file.id
-            ? { ...f, status: 'uploading' as FileUploadStatus, progress: 0, error: undefined }
+            ? { ...f, status: 'success' as FileUploadStatus, progress: 100, fileId }
             : f
         )
-      )
-
-      const fileId = await onUploadFile(file)
-      if (fileId) {
-        onFilesChange(
-          uploadedFiles.map((f) =>
-            f.id === file.id
-              ? { ...f, status: 'success' as FileUploadStatus, progress: 100, fileId }
-              : f
-          )
+        uploadedFilesRef.current = successFiles
+        onFilesChange(successFiles)
+      } catch (error) {
+        const errorFiles = uploadedFilesRef.current.map((f) =>
+          f.id === file.id
+            ? {
+                ...f,
+                status: 'error' as FileUploadStatus,
+                progress: 0,
+                error: error instanceof Error ? error.message : labels.error,
+              }
+            : f
         )
+        uploadedFilesRef.current = errorFiles
+        onFilesChange(errorFiles)
       }
     },
-    [courseId, labels.missingOwner, uploadedFiles, onFilesChange, onUploadFile]
+    [courseId, labels.error, labels.missingOwner, onFilesChange, onUploadFile]
   )
 
   // Get file icon based on extension
@@ -393,6 +427,10 @@ export function FileUpload({
     <div className="space-y-4">
       {/* Drag and drop zone - IMPROVED READABILITY */}
       <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
+        aria-label={labels.idleTitle}
         className={`relative cursor-pointer rounded-xl border-2 border-dashed p-6 transition-all ${
           isDragging
             ? 'border-purple-500 bg-purple-500/10 dark:border-purple-400 dark:bg-purple-500/10'
@@ -405,6 +443,7 @@ export function FileUpload({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
       >
         <input
           ref={fileInputRef}
@@ -538,6 +577,7 @@ export function FileUpload({
                         void retryUpload(file)
                       }}
                       className="rounded-lg p-1 transition-colors hover:bg-slate-200 dark:hover:bg-white/10"
+                      aria-label={labels.retry}
                       title={labels.retry}
                     >
                       <RefreshCw className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -555,6 +595,7 @@ export function FileUpload({
                       removeFile(file.id)
                     }}
                     className="rounded-lg p-1 transition-colors hover:bg-slate-200 dark:hover:bg-white/10"
+                    aria-label={labels.remove}
                     title={labels.remove}
                   >
                     <X className="h-5 w-5 text-slate-500 hover:text-red-600 dark:text-white/60 dark:hover:text-red-400" />

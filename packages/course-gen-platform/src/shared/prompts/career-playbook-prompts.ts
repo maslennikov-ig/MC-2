@@ -106,6 +106,8 @@ Free-form context: {{freeform_text}}
 Business context mode: {{business_context_mode}}
 Business context digest:
 {{business_context_digest}}
+Business context source excerpts:
+{{business_context_source_excerpts}}
 Business context missing signals:
 {{business_context_missing_signals}}
 Previous follow-ups answered: {{previous_followups_json}}`,
@@ -126,6 +128,12 @@ Previous follow-ups answered: {{previous_followups_json}}`,
       {
         name: 'business_context_digest',
         description: 'Structured business context digest or universal mode warning',
+        required: true,
+      },
+      {
+        name: 'business_context_source_excerpts',
+        description:
+          'Sanitized excerpts from processed first-party source files, or an unavailable-content warning',
         required: true,
       },
       {
@@ -168,6 +176,9 @@ Business context mode:
 Business context digest:
 {{business_context_digest}}
 
+Business context source excerpts:
+{{business_context_source_excerpts}}
+
 Business context missing signals:
 {{business_context_missing_signals}}
 
@@ -192,6 +203,12 @@ Source URLs:
       {
         name: 'business_context_digest',
         description: 'Structured first-party business context digest',
+        required: true,
+      },
+      {
+        name: 'business_context_source_excerpts',
+        description:
+          'Sanitized excerpts from processed first-party source files, or an unavailable-content warning',
         required: true,
       },
       {

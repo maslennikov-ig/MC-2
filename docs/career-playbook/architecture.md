@@ -46,10 +46,12 @@ The shared `CareerPlaybookQADataSchema` stores `business_context` with:
 - `mode`: `company_specific` or `universal`
 - `status`: collection/readiness state
 - `digest`: product, customer, sales/channel, process, metric, organization,
-  constraint, and custom notes
-- `source_ids`: uploaded source record IDs
-- `missing_signals`: explicit gaps for targeted follow-up questions
-- `user_edited`: whether the digest came from user edits
+  and constraint signals, plus nested `source_ids`, `missing_signals`,
+  `user_edited`, and digest timestamps
+- `source_ids`: uploaded source record IDs mirrored at the context level for
+  quick access
+- `skip_reason`: optional explanation for universal/skipped mode
+- `updated_at`: last context edit timestamp
 
 `career_playbook_sources` is the domain owner for uploaded Business Context
 files and text snippets. It references `career_playbooks`, `organizations`,
@@ -59,11 +61,14 @@ Playbook files use `uploads/<organization>/career-playbooks/<playbookId>/` and
 leave `file_catalog.course_id` null. This keeps course uploads unchanged and
 avoids creating fake draft courses just to attach Role Guide context.
 
-Follow-up and spec-builder prompts receive the formatted business digest and
-missing signals as separate prompt variables. Company-specific mode may treat
-the digest as client-provided facts. Universal mode explicitly instructs the
-model not to invent company/product/channel details; the generated Role Guide is
-a benchmark guide that names adaptation areas before operational rollout.
+Follow-up and spec-builder prompts receive the formatted business digest,
+processed source excerpts, and missing signals as separate prompt variables.
+Company-specific mode may treat the digest and available processed source
+excerpts as client-provided facts. If an uploaded source has no processed text
+yet, the prompt receives an explicit unavailable-content warning rather than raw
+UUIDs. Universal mode explicitly instructs the model not to invent
+company/product/channel details; the generated Role Guide is a benchmark guide
+that names adaptation areas before operational rollout.
 
 ## Course Bridge Sources
 

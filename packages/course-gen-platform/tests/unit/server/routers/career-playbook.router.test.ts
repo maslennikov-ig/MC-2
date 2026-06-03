@@ -499,6 +499,7 @@ describe('careerPlaybookRouter transport', () => {
     });
 
     expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
+      playbookId,
       qaData: expect.objectContaining({
         fixed: [{ question_key: 'position', value: 'Product Lead' }],
         followups: [],

@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
@@ -179,8 +179,31 @@ function renderPage(props: Partial<Parameters<typeof CareerPlaybookNewPageClient
   )
 }
 
+function setBusinessContextState(playbookId: string) {
+  useCareerPlaybookStore.setState({
+    playbookId,
+    ownerUserId: 'user-1',
+    uiLanguage: 'en',
+    contentLanguage: 'en',
+    phase: 'business_context',
+    status: 'awaiting_followups',
+    fixedQuestions: [],
+    fixedAnswers: {
+      position: { question_key: 'position', value: 'Sales Manager' },
+      department: { question_key: 'department', value: 'sales' },
+      level: { question_key: 'level', value: 'middle' },
+      content_language: { question_key: 'content_language', value: 'en' },
+    },
+  })
+}
+
 describe('CareerPlaybookNewPageClient', () => {
   beforeEach(() => {
+    Object.defineProperty(window, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    })
     useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     startSession = vi.fn().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000006',
@@ -251,6 +274,7 @@ describe('CareerPlaybookNewPageClient', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('starts a best-effort backend session on mount', async () => {
@@ -522,6 +546,126 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(screen.getAllByText('Department or functional area').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Sales').length).toBeGreaterThan(0)
     expect(screen.getByText('Win rate')).toBeInTheDocument()
+  })
+
+  it('preserves all source IDs when uploading multiple business context files before follow-ups', async () => {
+    const user = userEvent.setup()
+    const sourceIdOne = '00000000-0000-4000-8000-000000001001'
+    const sourceIdTwo = '00000000-0000-4000-8000-000000001002'
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sourceId: sourceIdOne,
+            fileId: '00000000-0000-4000-8000-000000002001',
+            storagePath: 'uploads/context-one.pdf',
+            status: 'uploaded',
+            message: 'uploaded',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sourceId: sourceIdTwo,
+            fileId: '00000000-0000-4000-8000-000000002002',
+            storagePath: 'uploads/context-two.pdf',
+            status: 'uploaded',
+            message: 'uploaded',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000833')
+
+    const { container } = renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, [
+      new File(['product'], 'product.pdf', { type: 'application/pdf' }),
+      new File(['kpi'], 'kpi.pdf', { type: 'application/pdf' }),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+
+    await waitFor(() => expect(requestFollowups).toHaveBeenCalled())
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000833',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'company_specific',
+          status: 'ready',
+          source_ids: [sourceIdOne, sourceIdTwo],
+          digest: expect.objectContaining({
+            source_ids: [sourceIdOne, sourceIdTwo],
+          }),
+        }),
+      },
+    })
+
+    fetchMock.mockRestore()
+  })
+
+  it('keeps typed business context when a source upload resolves after editing', async () => {
+    const user = userEvent.setup()
+    const sourceId = '00000000-0000-4000-8000-000000001003'
+    let resolveUpload!: (response: Response) => void
+    const uploadResponse = new Promise<Response>((resolve) => {
+      resolveUpload = resolve
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => uploadResponse)
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000834')
+
+    const { container } = renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, [new File(['product'], 'product.pdf', { type: 'application/pdf' })])
+
+    const continueClick = user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    fireEvent.change(screen.getByRole('textbox', { name: 'Product' }), {
+      target: { value: 'B2B learning platform' },
+    })
+
+    resolveUpload(
+      new Response(
+        JSON.stringify({
+          sourceId,
+          fileId: '00000000-0000-4000-8000-000000002003',
+          storagePath: 'uploads/context-product.pdf',
+          status: 'uploaded',
+          message: 'uploaded',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    )
+
+    await continueClick
+    await waitFor(() => expect(requestFollowups).toHaveBeenCalled())
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000834',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'company_specific',
+          status: 'ready',
+          source_ids: [sourceId],
+          digest: expect.objectContaining({
+            product: ['B2B learning platform'],
+            source_ids: [sourceId],
+          }),
+        }),
+      },
+    })
+
+    fetchMock.mockRestore()
   })
 
   it('flushes skipped remaining follow-ups before approving generation', async () => {

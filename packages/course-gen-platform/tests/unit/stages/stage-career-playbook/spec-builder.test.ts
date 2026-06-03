@@ -148,11 +148,15 @@ describe('Career Playbook spec builder', () => {
         sources: ['https://example.com/sales-kpi'],
         errors: [],
       },
-      'ru'
+      'ru',
+      'Source excerpt: customer onboarding requires security review.'
     );
 
     expect(variables.business_context_mode).toBe('company_specific');
     expect(variables.business_context_digest).toContain('AI course generation platform');
+    expect(variables.business_context_source_excerpts).toContain(
+      'customer onboarding requires security review'
+    );
     expect(variables.business_context_digest).toContain('B2B education teams');
     expect(variables.business_context_missing_signals).toContain('pricing model');
     expect(variables.kpi_insights).toContain('External benchmark');
@@ -198,6 +202,7 @@ describe('Career Playbook spec builder', () => {
         invokeLLM,
       },
       webResearch: { client: () => Promise.resolve([]) },
+      businessContextSourceExcerpts: () => Promise.resolve('- none'),
     });
 
     const result = await specBuilderNode({

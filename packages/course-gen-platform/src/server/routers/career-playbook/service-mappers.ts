@@ -81,11 +81,20 @@ export function normalizeLanguage(language: unknown): Language {
 
 export function normalizeStoredQAData(raw: unknown): StoredQAData {
   const value = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const hasBusinessContext = Object.prototype.hasOwnProperty.call(value, 'business_context');
   const qaData = CareerPlaybookQADataSchema.parse({
     fixed: value.fixed ?? [],
     followups: value.followups ?? [],
     freeform: value.freeform ?? [],
-    business_context: value.business_context ?? undefined,
+    business_context: hasBusinessContext
+      ? value.business_context
+      : {
+          mode: 'universal',
+          status: 'skipped',
+          digest: null,
+          source_ids: [],
+          skip_reason: 'legacy_draft_without_business_context',
+        },
     completeness_score: value.completeness_score,
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -230,6 +230,7 @@ export function BusinessContextStep({
   const categories = labels.categories
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploadingFiles, setIsUploadingFiles] = useState(false)
+  const contextRef = useRef(context)
   const digest = ensureDigest(context)
   const missingSignals = useMemo(
     () => buildMissingSignals(digest, categories),
@@ -238,42 +239,55 @@ export function BusinessContextStep({
   const pendingFiles = uploadedFiles.filter((file) => file.status === 'pending')
   const hasContext = hasDigestSignal(digest) || pendingFiles.length > 0
 
+  useEffect(() => {
+    contextRef.current = context
+  }, [context])
+
   const updateDigest = (key: DigestCategoryKey, value: string) => {
+    const currentContext = contextRef.current
+    const currentDigest = ensureDigest(currentContext)
     const nextDigest: CareerPlaybookBusinessContextDigest = {
-      ...digest,
+      ...currentDigest,
       [key]: linesFromText(value),
-      source_ids: context.source_ids,
+      source_ids: currentContext.source_ids,
       user_edited: true,
       updated_at: new Date().toISOString(),
     }
     nextDigest.missing_signals = buildMissingSignals(nextDigest, categories)
 
-    onContextChange({
+    const nextContext: CareerPlaybookBusinessContext = {
       mode: 'company_specific',
       status: hasDigestSignal(nextDigest) ? 'ready' : 'collecting',
       digest: nextDigest,
       source_ids: nextDigest.source_ids,
       updated_at: new Date().toISOString(),
-    })
+    }
+
+    contextRef.current = nextContext
+    onContextChange(nextContext)
   }
 
   const appendSourceId = (sourceId: string) => {
-    const nextSourceIds = Array.from(new Set([...context.source_ids, sourceId]))
+    const currentContext = contextRef.current
+    const nextSourceIds = Array.from(new Set([...currentContext.source_ids, sourceId]))
     const nextDigest: CareerPlaybookBusinessContextDigest = {
-      ...ensureDigest(context),
+      ...ensureDigest(currentContext),
       source_ids: nextSourceIds,
       user_edited: true,
       updated_at: new Date().toISOString(),
     }
     nextDigest.missing_signals = buildMissingSignals(nextDigest, categories)
 
-    onContextChange({
+    const nextContext: CareerPlaybookBusinessContext = {
       mode: 'company_specific',
       status: 'ready',
       digest: nextDigest,
       source_ids: nextSourceIds,
       updated_at: new Date().toISOString(),
-    })
+    }
+
+    contextRef.current = nextContext
+    onContextChange(nextContext)
   }
 
   const uploadFile = async (file: UploadedFile): Promise<string | null> => {
@@ -519,7 +533,7 @@ export function BusinessContextStep({
             <Button
               type="button"
               onClick={() => void handleContinue()}
-              disabled={!hasContext || isSaving}
+              disabled={!hasContext || isSaving || isUploadingFiles}
             >
               {isSaving || isUploadingFiles ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />

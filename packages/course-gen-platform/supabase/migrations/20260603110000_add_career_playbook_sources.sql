@@ -10,7 +10,7 @@ CREATE TABLE career_playbook_sources (
     status IN ('uploaded', 'processing', 'ready', 'failed', 'removed')
   ),
   filename TEXT,
-  file_catalog_id UUID REFERENCES file_catalog(id) ON DELETE SET NULL,
+  file_catalog_id UUID REFERENCES file_catalog(id) ON DELETE RESTRICT,
   text TEXT,
   error_message TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -74,6 +74,16 @@ CREATE POLICY career_playbook_sources_insert_own_org
         AND cp.organization_id = organization_id
         AND (cp.user_id = (SELECT auth.uid()) OR is_superadmin((SELECT auth.uid())))
     )
+    AND (
+      source_type <> 'file'
+      OR EXISTS (
+        SELECT 1
+        FROM file_catalog fc
+        WHERE fc.id = file_catalog_id
+          AND fc.organization_id = organization_id
+          AND fc.course_id IS NULL
+      )
+    )
   );
 
 CREATE POLICY career_playbook_sources_update_own_org
@@ -100,6 +110,16 @@ CREATE POLICY career_playbook_sources_update_own_org
         WHERE user_id = (SELECT auth.uid())
       )
       OR is_superadmin((SELECT auth.uid()))
+    )
+    AND (
+      source_type <> 'file'
+      OR EXISTS (
+        SELECT 1
+        FROM file_catalog fc
+        WHERE fc.id = file_catalog_id
+          AND fc.organization_id = organization_id
+          AND fc.course_id IS NULL
+      )
     )
   );
 

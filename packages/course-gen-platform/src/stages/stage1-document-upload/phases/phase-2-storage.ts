@@ -334,9 +334,6 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
         '[Phase 2] Content deduplication detected'
       );
 
-      // Track if reference count was incremented for cleanup purposes
-      let refCountIncremented = false;
-
       try {
         // C1: Reorder operations - delete file AFTER database operations succeed
 
@@ -373,36 +370,7 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
           );
         }
 
-        // Step 2: Increment reference_count on original file
-        // NOTE: This will be automatic with database trigger (C3) once deployed
-        // For now, keep manual increment with graceful degradation
-        const refCountResult = await supabase.rpc('increment_file_reference_count', {
-          p_file_id: duplicateFile.file_id,
-        });
-
-        if (refCountResult.error) {
-          // M4: Make reference count blocking (non-atomic without trigger)
-          logger.error(
-            {
-              err: refCountResult.error.message,
-              fileId: duplicateFile.file_id,
-            },
-            '[Phase 2] Failed to increment reference count - rolling back'
-          );
-
-          // Delete the reference record we just created
-          await supabase.from('file_catalog').delete().eq('id', fileId);
-
-          throw createStorageError(
-            'INTERNAL_SERVER_ERROR',
-            `Failed to increment reference count: ${refCountResult.error.message}`,
-            rollback
-          );
-        }
-
-        refCountIncremented = true;
-
-        // Step 3: Duplicate vectors for new course.
+        // Step 2: Duplicate vectors for new course.
         // Career Playbook sources are not course-indexed at upload time, so they keep the
         // deduplicated file metadata without creating course vectors.
         let vectorsDuplicated = 0;
@@ -443,7 +411,7 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
           }
         }
 
-        // Step 4: Delete redundant file from disk (ONLY after all DB operations succeed)
+        // Step 3: Delete redundant file from disk (ONLY after all DB operations succeed)
         try {
           await fs.unlink(storagePath);
           rollback.filePath = undefined; // H1: Clear so rollback won't try to delete
@@ -504,27 +472,6 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
             },
             '[Phase 2] Failed to clean up reference record (non-fatal)'
           );
-        }
-
-        // C2: CRITICAL - Decrement reference count if it was incremented
-        if (refCountIncremented) {
-          try {
-            await supabase.rpc('decrement_file_reference_count', {
-              p_file_id: duplicateFile.file_id,
-            });
-            logger.debug(
-              { fileId: duplicateFile.file_id },
-              '[Phase 2] Decremented reference count after deduplication failure'
-            );
-          } catch (cleanupError) {
-            logger.warn(
-              {
-                err: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-                fileId: duplicateFile.file_id,
-              },
-              '[Phase 2] Failed to decrement reference count (non-fatal)'
-            );
-          }
         }
 
         // Re-write file to disk if needed (file may have been deleted already)

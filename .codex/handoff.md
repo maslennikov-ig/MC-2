@@ -1,44 +1,44 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-29
-Stage: `mc2-db696.47`
-Branch: `develop`
+Updated: 2026-06-03
+Stage: `mc2-sn365`
+Branch: `codex/career-playbook-business-context`
 
 ## Current State
 
-- `mc2-db696.46` and `mc2-db696.47` were merged into `develop` as `d0e7a523` and deployed to Dev.
-- Shared catalog statistics cards now use bounded auto-fit columns (`12rem` to `16rem`) through `CatalogStatistics`; tests use `data-testid="catalog-statistics-grid"`.
-- Career Playbook role-title suggestions now show 30 curated popular roles by default instead of 8.
-- The popular role set is intentionally cross-functional: product, sales, engineering, support, data, operations, marketing, HR, finance, design, and legal are represented before the user types.
-- The role-suggestion dropdown height was increased with viewport bounds so the larger default list remains usable.
-- Career Playbook library cards now follow the course catalog action pattern: direct card actions for share, public link, constructor resume, delete, create course, and open.
-- The old Career Playbook checkbox selection and bulk-delete card path was removed.
-- `/career-playbook/new?resume=<playbookId>` now resumes the selected guide in the constructor; `/career-playbook/new?fresh=1` still starts a blank guide.
-- Shared catalog UI primitives now include `packages/web/components/catalog/catalog-action-button.tsx`; the course card uses this shared action button instead of its old course-local copy.
-- Separate worktree `/home/me/code/mc2-worktrees/product-ia-course-landing` on `codex/product-ia-handoff-dev` is unrelated and must not be touched.
+- Business Context review/fix pass is active. Base commit `2dc0c264` added the
+  context step, sources table, upload route, contracts, docs, and tests.
+- Visible correctness, improvement, docs, DB, and frontend reviewers completed.
+  Fixed: source-id/edit-upload races, FileUpload retry/a11y basics, backend
+  context guards, source excerpts in prompts, upload size guards, cleanup error
+  handling, Stage 1 dedup double-counting, migration FK/RLS checks, and docs.
+- Tracked follow-ups: `mc2-db696.49` async file processing/editable digest,
+  `mc2-db696.50` source lifecycle cleanup, `mc2-db696.48` streaming upload,
+  `mc2-si7jz` remaining reference-count helper audit.
+- Review diff against merge-base `909df621da32fa234130390db17ed37ce7b05d64`;
+  `origin/develop` moved with unrelated cross-block-judge commits.
 
 ## Verification
 
-- Focused RED/GREEN tests passed for compact catalog statistics and expanded popular role suggestions.
-- Focused catalog/Career Playbook tests passed: 15 tests for catalog pages and 57 tests for role suggestions, wizard, and page client.
-- `pnpm --filter @megacampus/web lint` passed.
-- `pnpm type-check` passed.
-- `pnpm build` passed; Next.js emitted existing Browserslist and `url.parse()` warnings.
-- `git diff --check` passed.
+- Targeted tests passed: shared Career Playbook 15, backend 56, web 90.
+- `pnpm type-check`, `pnpm build`, process verification, and `git diff --check`
+  passed. Build emitted existing Browserslist and `url.parse()` warnings.
 
 ## Next recommended
 
-Next stage id: pick the next ready Beads task.
-Recommended action: continue from clean `develop`; no pending delivery remains for `mc2-db696.46` or `mc2-db696.47`.
+Next stage id: `mc2-sn365` until pushed and closed.
+Recommended action: push/close, then prioritize `mc2-db696.49`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*/summary.md`, Beads, and `git status`. Continue from clean `develop`; do not touch the unrelated `product-ia-course-landing` worktree.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`,
+`.codex/orchestrator.toml`, `.codex/handoff.md`, Beads, and `git status`.
+Continue branch `codex/career-playbook-business-context`.
 
 ## Delivery
 
-- Dev delivery completed via GitHub Actions run `26654070813`; `Deploy to Dev` and deployment verification passed.
+- Pending: push review-and-fix follow-up commit.
 
 ## Explicit defers
 
-- Browser visual smoke for authenticated library cards is deferred until a reusable authenticated local session or fixture is available.
+- Authenticated browser E2E/live staging mutation smoke deferred until approval.
