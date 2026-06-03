@@ -1,5 +1,7 @@
 import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
 import {
+  CareerPlaybookBlockIdSchema,
+  CareerPlaybookJudgeIssueSchema,
   CareerPlaybookJudgeVerdictSchema,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
@@ -191,6 +193,62 @@ function verdictFromIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybookJu
   };
 }
 
+function normalizeJudgeBlockId(value: unknown): CareerPlaybookBlockId | null {
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, '_');
+  if (normalized === 'header') return 'header';
+
+  const blockMatch = normalized.match(/^block_0?([1-9]|1[0-9]|2[0-6])$/);
+  if (blockMatch) {
+    return `block_${blockMatch[1]}`;
+  }
+
+  const numberMatch = normalized.match(/^0?([1-9]|1[0-9]|2[0-6])$/);
+  if (numberMatch) {
+    return `block_${numberMatch[1]}`;
+  }
+
+  const parsed = CareerPlaybookBlockIdSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+function normalizeJudgeIssueCandidate(candidate: unknown): CareerPlaybookJudgeIssue | null {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+
+  const issue = { ...(candidate as Record<string, unknown>) };
+  const blockId = normalizeJudgeBlockId(issue.block_id);
+  if (!blockId) return null;
+
+  issue.block_id = blockId;
+  if (typeof issue.suggestion === 'string' && issue.suggestion.trim().length === 0) {
+    delete issue.suggestion;
+  }
+
+  const parsed = CareerPlaybookJudgeIssueSchema.safeParse(issue);
+  return parsed.success ? parsed.data : null;
+}
+
+function normalizeJudgeVerdictCandidate(candidate: unknown): unknown {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
+
+  const verdict = { ...(candidate as Record<string, unknown>) };
+  if (Array.isArray(verdict.issues)) {
+    verdict.issues = verdict.issues
+      .map(issue => normalizeJudgeIssueCandidate(issue))
+      .filter((issue): issue is CareerPlaybookJudgeIssue => Boolean(issue));
+  }
+  if (Array.isArray(verdict.needs_regeneration)) {
+    verdict.needs_regeneration = uniqueBlockIds(
+      verdict.needs_regeneration
+        .map(blockId => normalizeJudgeBlockId(blockId))
+        .filter((blockId): blockId is CareerPlaybookBlockId => Boolean(blockId))
+    );
+  }
+
+  return verdict;
+}
+
 export function runCareerPlaybookDeterministicChecks(
   input: RunDeterministicChecksInput
 ): CareerPlaybookJudgeVerdict {
@@ -219,7 +277,7 @@ export function runCareerPlaybookDeterministicChecks(
 
 export function parseCareerPlaybookJudgeVerdict(rawContent: string): CareerPlaybookJudgeVerdict {
   const parsed = safeJSONParse(extractJSON(rawContent));
-  return CareerPlaybookJudgeVerdictSchema.parse(parsed);
+  return CareerPlaybookJudgeVerdictSchema.parse(normalizeJudgeVerdictCandidate(parsed));
 }
 
 function mergeJudgeVerdicts(
@@ -374,16 +432,20 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           temperature: 0.2,
           maxTokens: 4_000,
         });
+        nodeCosts.push(buildNodeCost(llmResult));
         const llmVerdict = parseCareerPlaybookJudgeVerdict(llmResult.content);
         verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict);
-        nodeCosts.push(buildNodeCost(llmResult));
       } catch (error) {
         return {
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
+          judgeVerdicts: [deterministicVerdict],
           lastJudgeVerdict: deterministicVerdict,
           lastJudgedBlockIds: currentBlockIds,
-          errors: [
-            `crossBlockJudge failed: ${error instanceof Error ? error.message : String(error)}`,
+          nodeCosts,
+          warnings: [
+            `crossBlockJudge ignored LLM verdict: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           ],
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
