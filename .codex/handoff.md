@@ -1,38 +1,41 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-03
-Stage: `mc2-db696.49`
-Branch: `codex/career-playbook-business-context`
+Stage: `mc2-ev2nq`
+Branch: `codex/career-playbook-viewer-library-snapshot`
 
 ## Current State
 
-- `mc2-db696.49`, `.50`, `.48`, and `mc2-si7jz` are implemented on the active branch.
-- Business Context uploads enqueue Career Playbook `PROCESS_SOURCE`, reuse existing file-processing primitives, and avoid fake draft courses.
-- Digest refresh combines manual context, ready source excerpts, and missing signals; uploaded/processing selected sources block follow-ups.
-- Source lifecycle has `listSources`, `uploadFile`, and `removeSource`; the web constructor renders persisted source status, polls processing sources, and supports removal.
-- Web upload uses multipart `FormData`; qdrant reference counts are trigger-owned.
-- Docs now cover `PROCESS_SOURCE`, source statuses, list/remove lifecycle, and migration `20260603123000`.
-- Do not touch unrelated worktree `/home/me/code/mc2` on `codex/career-playbook-generation-enqueue-500`.
+- `mc2-ev2nq` fixes the authenticated Career Playbook viewer loading path.
+- Root cause: the web store called `careerPlaybook.library.get` but cast the library detail response directly to `CareerPlaybookViewerSnapshot`; the response has `id`/`positionTitle`/`generatedBlocks`, while the viewer expects `playbookId`/`title`/`blocks`.
+- The store now maps library details into a proper viewer snapshot and falls back to `finalMarkdown` in the header block if no normalized generated blocks are present.
+- Regression coverage was added in `packages/web/tests/unit/career-playbook-store.test.ts` for production `library.get` detail mapping.
+- Dev data for `656e70ac-0082-4f5a-94a6-f862244d2fbd` is intact: `status=completed`, 27 generated blocks, `final_markdown` length 52174.
+- Stage summary: `.codex/stages/mc2-ev2nq/summary.md`.
 
 ## Verification
 
-- Targeted shared/backend/web/qdrant tests passed for the touched scope.
-- Targeted frontend ESLint, `pnpm type-check`, `pnpm build` with dummy Supabase build env, `git diff --check`, and stage closeout passed.
-- Graphify 0.8.27 refresh passed: 56,980 nodes / 79,001 edges, 3,648 communities.
+- RED observed before fix: new store test failed with `Career Playbook viewer request was superseded`.
+- Focused tests passed: `../../node_modules/.bin/vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/viewer-page-client.test.tsx` (44 tests).
+- `git diff --check` passed.
+- `pnpm --filter @megacampus/web lint` passed.
+- `pnpm type-check` passed.
+- `pnpm build` passed; Next.js emitted existing Browserslist and `url.parse()` warnings.
+- `graphify update .` passed (57,062 nodes / 79,102 edges); `graphify-out` is local/untracked.
 
 ## Next recommended
 
-Next stage id: pick the next ready Beads task after `mc2-db696.49` closeout.
-Recommended action: close Beads, commit, and push.
+Next stage id: `mc2-ev2nq` until delivered.
+Recommended action: commit and push `codex/career-playbook-viewer-library-snapshot`; merge/deploy to Dev only with explicit confirmation or via the repo delivery command.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2-worktrees/career-playbook-business-context`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.49/summary.md`, accepted artifacts, Beads, Graphify report, and `git status`. Continue final closeout; do not touch `/home/me/code/mc2`.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-ev2nq/summary.md`, Beads, Graphify report, and `git status`. Continue `mc2-ev2nq` from `codex/career-playbook-viewer-library-snapshot`.
 
 ## Delivery
 
-- Pending: commit and push `codex/career-playbook-business-context`.
+- Dev delivery not performed yet for `mc2-ev2nq`.
 
 ## Explicit defers
 
-- None.
+- Authenticated browser smoke on dev is pending deploy of this branch; unit/API evidence confirms the root cause and data state.
