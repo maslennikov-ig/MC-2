@@ -171,6 +171,9 @@ describe('role title suggestions', () => {
 
   it('infers a likely department from selected or typed role titles', () => {
     expect(inferRoleDepartmentFromTitle('Менеджер по продажам', 'ru')).toBe('sales')
+    expect(inferRoleDepartmentFromTitle('Менеджер по продажам в продуктовой компании', 'ru')).toBe(
+      'sales'
+    )
     expect(inferRoleDepartmentFromTitle('B2C Sales Manager', 'en')).toBe('sales')
     expect(inferRoleDepartmentFromTitle('DevOps Engineer', 'en')).toBe('engineering')
     expect(inferRoleDepartmentFromTitle('Completely unknown title', 'en')).toBeNull()

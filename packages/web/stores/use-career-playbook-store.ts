@@ -506,6 +506,26 @@ function setResolvedDepartmentState(
 }
 
 function inferMissingDepartmentFromPosition(state: CareerPlaybookStoreState) {
+  const positionValue = state.fixedAnswers.position?.value
+  const inferredDepartment =
+    typeof positionValue === 'string'
+      ? inferRoleDepartmentFromTitle(positionValue, state.uiLanguage)
+      : null
+
+  if (inferredDepartment) {
+    const existingValue = state.fixedAnswers.department?.value
+    if (existingValue !== inferredDepartment) {
+      state.fixedAnswers.department = {
+        question_key: 'department',
+        value: inferredDepartment,
+        answered_at: nowIso(),
+      }
+      markDirtyKey(state, 'department')
+    }
+    setResolvedDepartmentState(state, inferredDepartment, 'local', 0.92)
+    return
+  }
+
   if (state.fixedAnswers.department) {
     const value = state.fixedAnswers.department.value
     if (typeof value === 'string' && hasSubmittableAnswerValue(value)) {
@@ -516,25 +536,9 @@ function inferMissingDepartmentFromPosition(state: CareerPlaybookStoreState) {
     delete state.fixedAnswers.department
     markDirtyKey(state, 'department')
   }
-
-  const positionValue = state.fixedAnswers.position?.value
-  if (typeof positionValue !== 'string') return
-
-  const inferredDepartment = inferRoleDepartmentFromTitle(positionValue, state.uiLanguage)
-  if (!inferredDepartment) {
-    state.departmentResolution = createUnresolvedDepartmentResolution()
-    state.departmentQuestionVisible = false
-    state.departmentResolutionError = null
-    return
-  }
-
-  state.fixedAnswers.department = {
-    question_key: 'department',
-    value: inferredDepartment,
-    answered_at: nowIso(),
-  }
-  markDirtyKey(state, 'department')
-  setResolvedDepartmentState(state, inferredDepartment, 'local', 0.92)
+  state.departmentResolution = createUnresolvedDepartmentResolution()
+  state.departmentQuestionVisible = false
+  state.departmentResolutionError = null
 }
 
 function initialState(): Omit<

@@ -178,6 +178,36 @@ describe('useCareerPlaybookStore', () => {
     expect(getCareerPlaybookProgress(useCareerPlaybookStore.getState()).answered).toBe(2)
   })
 
+  it('repairs a stale saved department when the role title has a confident local department', () => {
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      uiLanguage: 'ru',
+      contentLanguage: 'ru',
+      currentFixedIndex: 1,
+      fixedAnswers: [
+        {
+          question_key: 'position',
+          value: 'Менеджер по продажам',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+        {
+          question_key: 'department',
+          value: 'product',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      ],
+    })
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.department?.value).toBe('sales')
+    expect(useCareerPlaybookStore.getState().departmentResolution).toMatchObject({
+      status: 'resolved',
+      source: 'local',
+      selectedDepartment: 'sales',
+    })
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'level'
+    )
+  })
+
   it('reveals only LLM-generated department candidates for an ambiguous role title', async () => {
     const resolveDepartmentOptions = vi
       .fn<NonNullable<CareerPlaybookClient['resolveDepartmentOptions']>>()

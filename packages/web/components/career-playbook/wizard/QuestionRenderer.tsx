@@ -94,6 +94,22 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
     'question_key' in question &&
     question.question_key === 'position'
   const customChoiceEnabled = shouldOfferCustomChoice(question)
+  const selectSingleValue = (nextValue: string) => {
+    if (nextValue === customOptionValue) {
+      setActiveCustomSingleQuestionKey(questionKey)
+      setLocalSingleValue(customOptionValue)
+      if (localSingleValue !== customOptionValue) {
+        setLocalCustomSingleValue('')
+        onValueChange('')
+      }
+      return
+    }
+
+    setActiveCustomSingleQuestionKey(null)
+    setLocalSingleValue(nextValue)
+    setLocalCustomSingleValue('')
+    onValueChange(nextValue)
+  }
 
   useEffect(() => {
     const knownChoiceValues = new Set(
@@ -198,20 +214,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
         <div className="space-y-3" aria-label={labels.chooseOneLabel}>
           <RadioGroup
             value={localSingleValue}
-            onValueChange={(nextValue) => {
-              if (nextValue === customOptionValue) {
-                setActiveCustomSingleQuestionKey(questionKey)
-                setLocalSingleValue(customOptionValue)
-                setLocalCustomSingleValue('')
-                onValueChange('')
-                return
-              }
-
-              setActiveCustomSingleQuestionKey(null)
-              setLocalSingleValue(nextValue)
-              setLocalCustomSingleValue('')
-              onValueChange(nextValue)
-            }}
+            onValueChange={selectSingleValue}
           >
             {getChoiceOptionsWithCustom(options, labels.otherOptionLabel, customChoiceEnabled).map(
               (option) => {
@@ -223,6 +226,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                     option={option}
                     questionKey={questionKey}
                     selected={selected}
+                    onSelect={() => selectSingleValue(option.value)}
                     afterLabel={
                       option.value === customOptionValue && selected ? (
                         <Input
@@ -260,6 +264,28 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                 option.value === customOptionValue
                   ? localMultiOtherSelected
                   : knownSelectedValues.includes(option.value)
+              const applyCheckedChange = (checked: boolean) => {
+                if (option.value === customOptionValue) {
+                  const nextOtherSelected = checked
+                  const nextValues = nextOtherSelected
+                    ? mergeKnownAndCustomValues(knownSelectedValues, localCustomMultiValue)
+                    : knownSelectedValues
+                  setActiveCustomMultiQuestionKey(nextOtherSelected ? questionKey : null)
+                  setLocalMultiOtherSelected(nextOtherSelected)
+                  setLocalMultiValue(nextValues)
+                  onValueChange(nextValues)
+                  return
+                }
+
+                const nextKnownValues = checked
+                  ? [...knownSelectedValues, option.value]
+                  : knownSelectedValues.filter((selectedValue) => selectedValue !== option.value)
+                const nextValues = localMultiOtherSelected
+                  ? mergeKnownAndCustomValues(nextKnownValues, localCustomMultiValue)
+                  : nextKnownValues
+                setLocalMultiValue(nextValues)
+                onValueChange(nextValues)
+              }
 
               return (
                 <OptionRow
@@ -267,6 +293,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                   option={option}
                   questionKey={questionKey}
                   selected={selected}
+                  onSelect={() => applyCheckedChange(!selected)}
                   afterLabel={
                     option.value === customOptionValue && selected ? (
                       <Input
@@ -291,30 +318,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
                   <Checkbox
                     id={`${questionKey}-${option.value}`}
                     checked={selected}
-                    onCheckedChange={(checked) => {
-                      if (option.value === customOptionValue) {
-                        const nextOtherSelected = Boolean(checked)
-                        const nextValues = nextOtherSelected
-                          ? mergeKnownAndCustomValues(knownSelectedValues, localCustomMultiValue)
-                          : knownSelectedValues
-                        setActiveCustomMultiQuestionKey(nextOtherSelected ? questionKey : null)
-                        setLocalMultiOtherSelected(nextOtherSelected)
-                        setLocalMultiValue(nextValues)
-                        onValueChange(nextValues)
-                        return
-                      }
-
-                      const nextKnownValues = checked
-                        ? [...knownSelectedValues, option.value]
-                        : knownSelectedValues.filter(
-                            (selectedValue) => selectedValue !== option.value
-                          )
-                      const nextValues = localMultiOtherSelected
-                        ? mergeKnownAndCustomValues(nextKnownValues, localCustomMultiValue)
-                        : nextKnownValues
-                      setLocalMultiValue(nextValues)
-                      onValueChange(nextValues)
-                    }}
+                    onCheckedChange={(checked) => applyCheckedChange(Boolean(checked))}
                     className="mt-1"
                   />
                 </OptionRow>
@@ -377,12 +381,14 @@ function OptionRow({
   afterLabel,
   option,
   questionKey,
+  onSelect,
   selected,
 }: {
   children: React.ReactNode
   afterLabel?: React.ReactNode
   option: CareerPlaybookOption
   questionKey: string
+  onSelect?: () => void
   selected: boolean
 }) {
   const inputId = `${questionKey}-${option.value}`
@@ -390,6 +396,12 @@ function OptionRow({
   return (
     <Label
       htmlFor={inputId}
+      onClick={(event) => {
+        if (!onSelect || isInteractiveOptionTarget(event.target)) return
+
+        event.preventDefault()
+        onSelect()
+      }}
       className={cn(
         'grid min-h-[58px] cursor-pointer grid-cols-[auto_1fr] gap-3 rounded-md border p-3 text-sm leading-none font-medium caret-transparent transition-colors select-none',
         selected
@@ -411,4 +423,10 @@ function OptionRow({
       </div>
     </Label>
   )
+}
+
+function isInteractiveOptionTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+
+  return Boolean(target.closest('button,input,textarea,select,a'))
 }
