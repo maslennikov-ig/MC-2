@@ -1,19 +1,23 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
-  BookOpen,
   BriefcaseBusiness,
   CheckCircle2,
-  ChevronRight,
   ClipboardCheck,
+  Download,
   FileText,
   GraduationCap,
-  LayoutGrid,
+  Maximize2,
+  Minimize2,
   Moon,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   PenLine,
   Share2,
+  ShieldCheck,
   Sun,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -21,76 +25,8 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type ThemeMode = 'light' | 'dark'
-
-interface ReaderVariant {
-  slug: string
-  title: string
-  subtitle: string
-  reference: string
-  bestFor: string
-  caution: string
-  icon: LucideIcon
-  frame: 'executive' | 'docs' | 'academy' | 'review' | 'print'
-  accentClass: string
-}
-
-const variants: ReaderVariant[] = [
-  {
-    slug: 'executive-document',
-    title: 'Документ руководителя',
-    subtitle: 'Строгий рабочий документ: минимум интерфейсного шума, сильная типографика.',
-    reference: 'Деловые документы и премиальные правовые страницы',
-    bestFor: 'Когда должностная инструкция должна выглядеть как управленческий артефакт.',
-    caution: 'Меньше учебных сигналов, поэтому для курса нужен отдельный прогресс-слой.',
-    icon: BriefcaseBusiness,
-    frame: 'executive',
-    accentClass: 'bg-emerald-500',
-  },
-  {
-    slug: 'docs-workspace',
-    title: 'Рабочая документация',
-    subtitle: 'Три колонки: оглавление, документ, контекстные действия и проверка.',
-    reference: 'Редакторы документации и базы знаний',
-    bestFor: 'Когда важны навигация по блокам, редактирование и быстрые действия.',
-    caution: 'Нужно держать правую колонку компактной, иначе экран станет админкой.',
-    icon: LayoutGrid,
-    frame: 'docs',
-    accentClass: 'bg-blue-500',
-  },
-  {
-    slug: 'academy-reader',
-    title: 'Академический ридер',
-    subtitle: 'Единый язык с курсом: прогресс, следующий шаг и учебная навигация.',
-    reference: 'Учебные ридеры и центры обучения',
-    bestFor: 'Когда инструкция и курс должны ощущаться частями одной платформы.',
-    caution: 'Для самой инструкции нельзя перегружать экран элементами прохождения уроков.',
-    icon: GraduationCap,
-    frame: 'academy',
-    accentClass: 'bg-violet-500',
-  },
-  {
-    slug: 'split-review',
-    title: 'Проверка перед внедрением',
-    subtitle: 'Документ рядом с чеклистом качества, публикацией и созданием курса.',
-    reference: 'Корпоративные экраны проверки',
-    bestFor: 'Когда HR или руководитель должен быстро понять, можно ли документ использовать.',
-    caution: 'Это сильный режим для готового документа, но слабее как режим спокойного чтения.',
-    icon: ClipboardCheck,
-    frame: 'review',
-    accentClass: 'bg-amber-500',
-  },
-  {
-    slug: 'minimal-print',
-    title: 'Печатный минимализм',
-    subtitle: 'Почти PDF: белый лист, тихие действия, идеальный акцент на тексте.',
-    reference: 'Читалки и редакторы документов',
-    bestFor: 'Когда нужно ощущение дорогого, чистого и готового к экспорту документа.',
-    caution: 'Мало продуктовой индивидуальности, если не усилить фирменные детали.',
-    icon: FileText,
-    frame: 'print',
-    accentClass: 'bg-slate-900',
-  },
-]
+type PanelState = 'open' | 'closed'
+type ReaderMode = 'standard' | 'reading'
 
 const documentMeta = [
   ['Статус', 'Готово'],
@@ -136,52 +72,109 @@ const documentSections = [
   },
 ]
 
-function isVariantSlug(value: string | null): value is ReaderVariant['slug'] {
-  return Boolean(value && variants.some((variant) => variant.slug === value))
-}
+const inspectorActions: Array<[string, LucideIcon]> = [
+  ['Редактировать блок', PenLine],
+  ['Создать курс', GraduationCap],
+  ['Опубликовать ссылку', Share2],
+  ['Скачать PDF', Download],
+]
 
-function readInitialVariant() {
-  if (typeof window === 'undefined') return variants[0].slug
-  const slug = new URLSearchParams(window.location.search).get('variant')
-  return isVariantSlug(slug) ? slug : variants[0].slug
-}
+const readinessChecks = [
+  ['Структура полная', '27 разделов собраны'],
+  ['Язык документа', 'Русский'],
+  ['Следующий шаг', 'Создать курс для адаптации'],
+]
 
 function readInitialTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light'
   return new URLSearchParams(window.location.search).get('theme') === 'dark' ? 'dark' : 'light'
 }
 
-function writeGalleryUrl(variantSlug: string, theme: ThemeMode) {
+function readInitialPanel(): PanelState {
+  if (typeof window === 'undefined') return 'open'
+  return new URLSearchParams(window.location.search).get('panel') === 'closed' ? 'closed' : 'open'
+}
+
+function readInitialToc(): PanelState {
+  if (typeof window === 'undefined') return 'open'
+  return new URLSearchParams(window.location.search).get('toc') === 'closed' ? 'closed' : 'open'
+}
+
+function readInitialMode(): ReaderMode {
+  if (typeof window === 'undefined') return 'standard'
+  return new URLSearchParams(window.location.search).get('mode') === 'reading'
+    ? 'reading'
+    : 'standard'
+}
+
+function writeReaderUrl(theme: ThemeMode, toc: PanelState, panel: PanelState, mode: ReaderMode) {
   if (typeof window === 'undefined') return
   const params = new URLSearchParams()
-  params.set('variant', variantSlug)
   params.set('theme', theme)
+  params.set('toc', toc)
+  params.set('panel', panel)
+  params.set('mode', mode)
   window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`)
 }
 
 export default function CareerPlaybookReaderVariantsPage() {
-  const [selectedSlug, setSelectedSlug] = useState(readInitialVariant)
   const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
-  const selectedVariant = useMemo(
-    () => variants.find((variant) => variant.slug === selectedSlug) ?? variants[0],
-    [selectedSlug]
-  )
+  const [toc, setToc] = useState<PanelState>(readInitialToc)
+  const [panel, setPanel] = useState<PanelState>(readInitialPanel)
+  const [mode, setMode] = useState<ReaderMode>(readInitialMode)
   const dark = theme === 'dark'
-
-  const selectVariant = (slug: string) => {
-    setSelectedSlug(slug)
-    writeGalleryUrl(slug, theme)
-  }
+  const reading = mode === 'reading'
+  const tocOpen = toc === 'open'
+  const panelOpen = panel === 'open'
 
   const selectTheme = (nextTheme: ThemeMode) => {
     setTheme(nextTheme)
-    writeGalleryUrl(selectedSlug, nextTheme)
+    writeReaderUrl(nextTheme, toc, panel, mode)
+  }
+
+  const selectToc = (nextToc: PanelState) => {
+    setToc(nextToc)
+    writeReaderUrl(theme, nextToc, panel, mode)
+  }
+
+  const selectPanel = (nextPanel: PanelState) => {
+    setPanel(nextPanel)
+    writeReaderUrl(theme, toc, nextPanel, mode)
+  }
+
+  const selectMode = (nextMode: ReaderMode) => {
+    setMode(nextMode)
+    writeReaderUrl(theme, toc, panel, nextMode)
+  }
+
+  if (reading) {
+    return (
+      <main
+        data-testid="reader-variant-gallery"
+        data-theme={theme}
+        data-toc={toc}
+        data-panel={panel}
+        data-mode={mode}
+        className={cn(
+          'min-h-screen transition-colors',
+          dark ? 'bg-[#070b12] text-slate-100' : 'bg-[#f3f0ea] text-slate-950'
+        )}
+      >
+        <ReadingTopbar dark={dark} onExit={() => selectMode('standard')} />
+        <section className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-10">
+          <DocumentPaper dark={dark} spacious />
+        </section>
+      </main>
+    )
   }
 
   return (
     <main
       data-testid="reader-variant-gallery"
       data-theme={theme}
+      data-toc={toc}
+      data-panel={panel}
+      data-mode={mode}
       className={cn(
         'min-h-screen transition-colors',
         dark ? 'bg-[#070b12] text-slate-100' : 'bg-[#f3f0ea] text-slate-950'
@@ -203,11 +196,11 @@ export default function CareerPlaybookReaderVariantsPage() {
                   : 'border-stone-300 bg-white text-stone-700'
               )}
             >
-              <BookOpen className="h-4 w-4" aria-hidden />
-              Галерея вариантов
+              <BriefcaseBusiness className="h-4 w-4" aria-hidden />
+              Выбранное направление
             </div>
             <h1 className="text-4xl leading-tight font-semibold md:text-5xl">
-              5 вариантов единого ридера
+              Единый ридер: Документ руководителя
             </h1>
             <p
               className={cn(
@@ -215,289 +208,217 @@ export default function CareerPlaybookReaderVariantsPage() {
                 dark ? 'text-slate-300' : 'text-slate-600'
               )}
             >
-              Один и тот же контент должностной инструкции показан в пяти интерфейсных подходах.
-              После выбора направления его можно будет перенести в общий ридер для инструкций и
-              курсов.
+              Основной экран должностной инструкции выглядит как управленческий документ: сильная
+              типографика, спокойное содержание слева и правый инспектор, который можно скрыть.
+              Печатный минимализм теперь включается одной кнопкой режима чтения.
             </p>
           </div>
 
-          <div
-            className={cn(
-              'grid min-w-[18rem] gap-3 rounded-md border p-3',
-              dark ? 'border-white/10 bg-white/5' : 'border-stone-300 bg-white'
-            )}
-          >
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                aria-pressed={theme === 'light'}
-                onClick={() => selectTheme('light')}
-                className={cn(
-                  'inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition',
-                  theme === 'light'
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : dark
-                      ? 'border-white/10 text-slate-300 hover:bg-white/8'
-                      : 'border-stone-300 text-slate-700 hover:bg-stone-100'
-                )}
-              >
-                <Sun className="h-4 w-4" aria-hidden />
-                Светлая тема
-              </button>
-              <button
-                type="button"
-                aria-pressed={theme === 'dark'}
-                onClick={() => selectTheme('dark')}
-                className={cn(
-                  'inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition',
-                  theme === 'dark'
-                    ? 'border-white bg-white text-slate-950'
-                    : dark
-                      ? 'border-white/10 text-slate-300 hover:bg-white/8'
-                      : 'border-stone-300 text-slate-700 hover:bg-stone-100'
-                )}
-              >
-                <Moon className="h-4 w-4" aria-hidden />
-                Темная тема
-              </button>
-            </div>
-            <p
-              role="status"
-              className={cn(
-                'rounded-md px-3 py-2 text-sm',
-                dark ? 'bg-white/6 text-slate-300' : 'bg-stone-100 text-stone-700'
-              )}
-            >
-              Выбран: {selectedVariant.title}
-            </p>
-          </div>
+          <ControlPanel
+            dark={dark}
+            theme={theme}
+            toc={toc}
+            panel={panel}
+            onThemeChange={selectTheme}
+          />
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-[1720px] gap-6 px-5 py-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:px-8">
-        <aside className="grid gap-3 lg:sticky lg:top-5 lg:self-start">
-          {variants.map((variant) => {
-            const Icon = variant.icon
-            const selected = variant.slug === selectedSlug
+      <section
+        className={cn(
+          'mx-auto grid max-w-[1720px] gap-5 px-5 py-6 lg:px-8',
+          tocOpen && panelOpen
+            ? 'xl:grid-cols-[18rem_minmax(0,1fr)_22rem]'
+            : tocOpen
+              ? 'xl:grid-cols-[18rem_minmax(0,1fr)]'
+              : panelOpen
+                ? 'xl:grid-cols-[minmax(0,1fr)_22rem]'
+                : 'xl:grid-cols-[minmax(0,1fr)]'
+        )}
+      >
+        {tocOpen ? <TocRail dark={dark} /> : null}
 
-            return (
-              <article
-                key={variant.slug}
-                aria-label={variant.title}
-                className={cn(
-                  'rounded-md border p-4 transition',
-                  selected
-                    ? dark
-                      ? 'border-white/30 bg-white/10'
-                      : 'border-slate-900 bg-white shadow-sm'
-                    : dark
-                      ? 'border-white/10 bg-white/4 hover:bg-white/7'
-                      : 'border-stone-300 bg-white/72 hover:bg-white'
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={cn(
-                        'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white',
-                        variant.accentClass
-                      )}
-                    >
-                      <Icon className="h-4 w-4" aria-hidden />
-                    </span>
-                    <div className="min-w-0">
-                      <h2 className="text-base leading-6 font-semibold">{variant.title}</h2>
-                      <p className={cn('text-sm', dark ? 'text-slate-400' : 'text-slate-500')}>
-                        {variant.reference}
-                      </p>
-                    </div>
-                  </div>
-                  {selected ? (
-                    <span
-                      className={cn(
-                        'inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium',
-                        dark
-                          ? 'bg-emerald-400/15 text-emerald-200'
-                          : 'bg-emerald-50 text-emerald-700'
-                      )}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-                      Выбрано
-                    </span>
-                  ) : null}
-                </div>
-                <p
-                  className={cn(
-                    'mt-3 text-sm leading-6',
-                    dark ? 'text-slate-300' : 'text-slate-600'
-                  )}
-                >
-                  {variant.subtitle}
-                </p>
-                <button
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => selectVariant(variant.slug)}
-                  className={cn(
-                    'mt-4 inline-flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm font-medium transition',
-                    selected
-                      ? dark
-                        ? 'border-white/20 bg-white text-slate-950'
-                        : 'border-slate-900 bg-slate-900 text-white'
-                      : dark
-                        ? 'border-white/10 text-slate-200 hover:bg-white/8'
-                        : 'border-stone-300 text-slate-700 hover:bg-stone-100'
-                  )}
-                >
-                  Выбрать {variant.title}
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </button>
-              </article>
-            )
-          })}
-        </aside>
+        <section
+          className={cn(
+            'min-w-0 overflow-hidden rounded-md border',
+            dark ? 'border-white/10 bg-[#0b111d]' : 'border-stone-300 bg-[#fbfaf7]'
+          )}
+        >
+          <PreviewTopbar
+            dark={dark}
+            tocOpen={tocOpen}
+            panelOpen={panelOpen}
+            onTocChange={selectToc}
+            onPanelChange={selectPanel}
+            onReadingMode={() => selectMode('reading')}
+          />
+          <div className={cn('min-w-0 p-5 md:p-8', dark ? 'bg-[#101624]' : 'bg-[#ece7dd]')}>
+            <DocumentPaper dark={dark} executive />
+          </div>
+        </section>
 
-        <div className="grid min-w-0 gap-5">
-          <SelectedVariantBrief variant={selectedVariant} dark={dark} />
-          <ReaderPreview variant={selectedVariant} dark={dark} />
-        </div>
+        {panelOpen ? <InspectorRail dark={dark} /> : null}
       </section>
     </main>
   )
 }
 
-function SelectedVariantBrief({ variant, dark }: { variant: ReaderVariant; dark: boolean }) {
-  const Icon = variant.icon
-
+function ControlPanel({
+  dark,
+  theme,
+  toc,
+  panel,
+  onThemeChange,
+}: {
+  dark: boolean
+  theme: ThemeMode
+  toc: PanelState
+  panel: PanelState
+  onThemeChange: (theme: ThemeMode) => void
+}) {
   return (
-    <section
+    <div
       className={cn(
-        'grid gap-5 rounded-md border p-5 xl:grid-cols-[minmax(0,1fr)_24rem]',
-        dark ? 'border-white/10 bg-white/5' : 'border-stone-300 bg-white/82'
+        'grid min-w-[18rem] gap-3 rounded-md border p-3',
+        dark ? 'border-white/10 bg-white/5' : 'border-stone-300 bg-white'
       )}
     >
-      <div className="min-w-0">
-        <div className="mb-3 flex items-center gap-3">
-          <span
-            className={cn(
-              'inline-flex h-10 w-10 items-center justify-center rounded-md text-white',
-              variant.accentClass
-            )}
-          >
-            <Icon className="h-5 w-5" aria-hidden />
-          </span>
-          <div>
-            <p className={cn('text-sm font-medium', dark ? 'text-slate-400' : 'text-slate-500')}>
-              Выбранное направление
-            </p>
-            <h2 className="text-2xl leading-8 font-semibold">{variant.title}</h2>
-          </div>
-        </div>
-        <p
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          aria-pressed={theme === 'light'}
+          onClick={() => onThemeChange('light')}
           className={cn(
-            'max-w-3xl text-base leading-7',
-            dark ? 'text-slate-300' : 'text-slate-600'
+            'inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition',
+            theme === 'light'
+              ? 'border-slate-900 bg-slate-900 text-white'
+              : dark
+                ? 'border-white/10 text-slate-300 hover:bg-white/8'
+                : 'border-stone-300 text-slate-700 hover:bg-stone-100'
           )}
         >
-          {variant.bestFor}
-        </p>
+          <Sun className="h-4 w-4" aria-hidden />
+          Светлая тема
+        </button>
+        <button
+          type="button"
+          aria-pressed={theme === 'dark'}
+          onClick={() => onThemeChange('dark')}
+          className={cn(
+            'inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition',
+            theme === 'dark'
+              ? 'border-white bg-white text-slate-950'
+              : dark
+                ? 'border-white/10 text-slate-300 hover:bg-white/8'
+                : 'border-stone-300 text-slate-700 hover:bg-stone-100'
+          )}
+        >
+          <Moon className="h-4 w-4" aria-hidden />
+          Темная тема
+        </button>
       </div>
-      <div
+      <p
+        role="status"
         className={cn(
-          'rounded-md border p-4 text-sm leading-6',
-          dark
-            ? 'border-white/10 bg-black/18 text-slate-300'
-            : 'border-stone-300 bg-stone-50 text-stone-700'
+          'rounded-md px-3 py-2 text-sm',
+          dark ? 'bg-white/6 text-slate-300' : 'bg-stone-100 text-stone-700'
         )}
       >
-        <div className="font-semibold">Ограничение варианта</div>
-        <p className="mt-2">{variant.caution}</p>
-      </div>
-    </section>
+        Режим: стандартный · {toc === 'open' ? 'Левая панель открыта' : 'Левая панель скрыта'} ·{' '}
+        {panel === 'open' ? 'Правая панель открыта' : 'Правая панель скрыта'}
+      </p>
+    </div>
   )
 }
 
-function ReaderPreview({ variant, dark }: { variant: ReaderVariant; dark: boolean }) {
-  const frameClass = cn(
-    'overflow-hidden rounded-md border',
-    dark ? 'border-white/10 bg-[#0b111d]' : 'border-stone-300 bg-[#fbfaf7]'
-  )
-
-  if (variant.frame === 'print') {
-    return (
-      <section className={frameClass}>
-        <PreviewTopbar dark={dark} quiet />
-        <div className="mx-auto max-w-4xl px-5 py-8 md:px-8">
-          <DocumentPaper dark={dark} spacious />
-        </div>
-      </section>
-    )
-  }
-
-  if (variant.frame === 'academy') {
-    return (
-      <section className={frameClass}>
-        <PreviewTopbar dark={dark} progress />
-        <div className="grid min-h-[44rem] lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <CourseRail dark={dark} />
-          <div className={cn('min-w-0 p-5 md:p-7', dark ? 'bg-[#0f1726]' : 'bg-[#f6f3ee]')}>
-            <DocumentPaper dark={dark} academy />
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (variant.frame === 'docs') {
-    return (
-      <section className={frameClass}>
-        <PreviewTopbar dark={dark} />
-        <div className="grid min-h-[44rem] xl:grid-cols-[17rem_minmax(0,1fr)_21rem]">
-          <TocRail dark={dark} />
-          <div className={cn('min-w-0 p-5 md:p-7', dark ? 'bg-[#0f1726]' : 'bg-[#f6f3ee]')}>
-            <DocumentPaper dark={dark} />
-          </div>
-          <ActionRail dark={dark} />
-        </div>
-      </section>
-    )
-  }
-
-  if (variant.frame === 'review') {
-    return (
-      <section className={frameClass}>
-        <PreviewTopbar dark={dark} />
-        <div className="grid min-h-[44rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className={cn('min-w-0 p-5 md:p-7', dark ? 'bg-[#0f1726]' : 'bg-[#f6f3ee]')}>
-            <DocumentPaper dark={dark} />
-          </div>
-          <ReviewRail dark={dark} />
-        </div>
-      </section>
-    )
-  }
-
+function PanelIconButton({
+  dark,
+  label,
+  Icon,
+  onClick,
+}: {
+  dark: boolean
+  label: string
+  Icon: LucideIcon
+  onClick: () => void
+}) {
   return (
-    <section className={frameClass}>
-      <PreviewTopbar dark={dark} />
-      <div className="grid min-h-[44rem] xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <TocRail dark={dark} executive />
-        <div className={cn('min-w-0 p-5 md:p-8', dark ? 'bg-[#101624]' : 'bg-[#ece7dd]')}>
-          <DocumentPaper dark={dark} executive />
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition',
+        dark
+          ? 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+          : 'border-stone-300 bg-white text-slate-700 hover:bg-stone-100'
+      )}
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+    </button>
+  )
+}
+
+function ReadingTopbar({ dark, onExit }: { dark: boolean; onExit: () => void }) {
+  return (
+    <div
+      className={cn(
+        'sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-xl',
+        dark
+          ? 'border-white/10 bg-[#070b12]/90 text-slate-100'
+          : 'border-stone-300 bg-[#f3f0ea]/90 text-slate-950'
+      )}
+    >
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={cn(
+              'inline-flex h-8 w-8 items-center justify-center rounded-md',
+              dark ? 'bg-white text-slate-950' : 'bg-slate-950 text-white'
+            )}
+          >
+            <FileText className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="hidden min-w-0 sm:block">
+            <div className="truncate text-sm font-semibold">Должностная инструкция</div>
+            <div className={cn('text-xs', dark ? 'text-slate-400' : 'text-stone-500')}>
+              Чистое чтение без боковых панелей
+            </div>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={onExit}
+          className={cn(
+            'inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold',
+            dark
+              ? 'border-white/10 bg-white text-slate-950 hover:bg-slate-200'
+              : 'border-slate-900 bg-slate-950 text-white hover:bg-slate-800'
+          )}
+        >
+          <Minimize2 className="h-4 w-4" aria-hidden />
+          Выйти из режима чтения
+        </button>
       </div>
-    </section>
+    </div>
   )
 }
 
 function PreviewTopbar({
   dark,
-  quiet = false,
-  progress = false,
+  tocOpen,
+  panelOpen,
+  onTocChange,
+  onPanelChange,
+  onReadingMode,
 }: {
   dark: boolean
-  quiet?: boolean
-  progress?: boolean
+  tocOpen: boolean
+  panelOpen: boolean
+  onTocChange: (panel: PanelState) => void
+  onPanelChange: (panel: PanelState) => void
+  onReadingMode: () => void
 }) {
   return (
     <div
@@ -507,6 +428,12 @@ function PreviewTopbar({
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
+        <PanelIconButton
+          dark={dark}
+          label={tocOpen ? 'Скрыть левую панель' : 'Показать левую панель'}
+          Icon={tocOpen ? PanelLeftClose : PanelLeftOpen}
+          onClick={() => onTocChange(tocOpen ? 'closed' : 'open')}
+        />
         <span
           className={cn(
             'inline-flex h-8 w-8 items-center justify-center rounded-md',
@@ -517,24 +444,25 @@ function PreviewTopbar({
         </span>
         <div className="min-w-0">
           <div className="text-sm font-semibold">Должностная инструкция</div>
-          {!quiet ? (
-            <div className={cn('text-xs', dark ? 'text-slate-400' : 'text-slate-500')}>
-              Продажи · Готово · Средний уровень
-            </div>
-          ) : null}
+          <div className={cn('text-xs', dark ? 'text-slate-400' : 'text-slate-500')}>
+            Продажи · Готово · Средний уровень
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {progress ? (
-          <span
-            className={cn(
-              'hidden rounded-md px-2.5 py-1 text-xs font-medium sm:inline-flex',
-              dark ? 'bg-violet-400/14 text-violet-200' : 'bg-violet-50 text-violet-700'
-            )}
-          >
-            27 разделов · 100%
-          </span>
-        ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onReadingMode}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium',
+            dark
+              ? 'border-white/10 text-slate-200 hover:bg-white/8'
+              : 'border-stone-300 text-slate-700 hover:bg-stone-100'
+          )}
+        >
+          <Maximize2 className="h-4 w-4" aria-hidden />
+          Режим чтения
+        </button>
         <button
           type="button"
           className={cn(
@@ -554,28 +482,27 @@ function PreviewTopbar({
         >
           PDF
         </button>
+        <PanelIconButton
+          dark={dark}
+          label={panelOpen ? 'Скрыть правый блок' : 'Показать правый блок'}
+          Icon={panelOpen ? PanelRightClose : PanelRightOpen}
+          onClick={() => onPanelChange(panelOpen ? 'closed' : 'open')}
+        />
       </div>
     </div>
   )
 }
 
-function TocRail({ dark, executive = false }: { dark: boolean; executive?: boolean }) {
+function TocRail({ dark }: { dark: boolean }) {
   return (
     <nav
-      aria-label="Содержание варианта"
+      aria-label="Содержание документа"
       className={cn(
-        'hidden border-r p-4 xl:block',
+        'hidden rounded-md border p-4 xl:sticky xl:top-5 xl:block xl:self-start',
         dark ? 'border-white/10 bg-[#0b111d]' : 'border-stone-300 bg-white'
       )}
     >
-      <div
-        className={cn(
-          'mb-4 text-xs font-semibold uppercase',
-          dark ? 'text-slate-500' : 'text-stone-500'
-        )}
-      >
-        Содержание
-      </div>
+      <div className="mb-4 text-sm font-semibold">Содержание</div>
       <div className="grid gap-4">
         {tocGroups.map(([group, items]) => (
           <div key={group}>
@@ -591,7 +518,7 @@ function TocRail({ dark, executive = false }: { dark: boolean; executive?: boole
                   href="#reader-document"
                   className={cn(
                     'block rounded-md px-2 py-1.5 text-sm transition',
-                    index === 0 && executive
+                    index === 0
                       ? dark
                         ? 'bg-white/10 text-white'
                         : 'bg-stone-100 text-slate-950'
@@ -611,89 +538,38 @@ function TocRail({ dark, executive = false }: { dark: boolean; executive?: boole
   )
 }
 
-function CourseRail({ dark }: { dark: boolean }) {
+function InspectorRail({ dark }: { dark: boolean }) {
   return (
     <aside
+      role="complementary"
+      aria-label="Инспектор документа"
       className={cn(
-        'hidden border-r p-4 lg:block',
+        'rounded-md border p-4 xl:sticky xl:top-5 xl:self-start',
         dark ? 'border-white/10 bg-[#0b111d]' : 'border-stone-300 bg-white'
       )}
     >
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
-        <PanelLeft className="h-4 w-4" aria-hidden />
-        Навигация
-      </div>
-      <div
-        className={cn(
-          'mb-5 rounded-md border p-3',
-          dark ? 'border-white/10 bg-white/5' : 'border-stone-300 bg-stone-50'
-        )}
-      >
-        <div className="text-sm font-medium">Связанный курс</div>
-        <div className={cn('mt-1 text-xs', dark ? 'text-slate-400' : 'text-slate-500')}>
-          Ввод в должность менеджера по продажам
-        </div>
-        <div className={cn('mt-3 h-2 rounded-full', dark ? 'bg-white/10' : 'bg-stone-200')}>
-          <div className="h-2 w-4/5 rounded-full bg-violet-500" />
-        </div>
+        <ShieldCheck className="h-4 w-4" aria-hidden />
+        Инспектор документа
       </div>
       <div className="grid gap-2">
-        {['Документ', 'Уроки курса', 'Материалы', 'Проверка'].map((item, index) => (
+        {inspectorActions.map(([label, Icon]) => (
           <button
-            key={item}
+            key={label}
             type="button"
             className={cn(
-              'rounded-md px-3 py-2 text-left text-sm',
-              index === 0
-                ? dark
-                  ? 'bg-white text-slate-950'
-                  : 'bg-slate-950 text-white'
-                : dark
-                  ? 'text-slate-400 hover:bg-white/6'
-                  : 'text-slate-600 hover:bg-stone-100'
+              'inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium',
+              dark
+                ? 'border-white/10 text-slate-200 hover:bg-white/7'
+                : 'border-stone-300 text-slate-700 hover:bg-stone-100'
             )}
           >
-            {item}
+            <Icon className="h-4 w-4" aria-hidden />
+            {label}
           </button>
         ))}
       </div>
-    </aside>
-  )
-}
 
-function ActionRail({ dark }: { dark: boolean }) {
-  return (
-    <aside
-      className={cn(
-        'hidden border-l p-4 xl:block',
-        dark ? 'border-white/10 bg-[#0b111d]' : 'border-stone-300 bg-white'
-      )}
-    >
-      <div className="mb-4 text-sm font-semibold">Действия</div>
-      <div className="grid gap-2">
-        {[
-          ['Редактировать блок', PenLine],
-          ['Создать курс', GraduationCap],
-          ['Опубликовать ссылку', Share2],
-        ].map(([label, Icon]) => {
-          const TypedIcon = Icon as LucideIcon
-          return (
-            <button
-              key={label as string}
-              type="button"
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium',
-                dark
-                  ? 'border-white/10 text-slate-200 hover:bg-white/7'
-                  : 'border-stone-300 text-slate-700 hover:bg-stone-100'
-              )}
-            >
-              <TypedIcon className="h-4 w-4" aria-hidden />
-              {label as string}
-            </button>
-          )
-        })}
-      </div>
       <div
         className={cn(
           'mt-5 rounded-md border p-3 text-sm',
@@ -712,25 +588,9 @@ function ActionRail({ dark }: { dark: boolean }) {
           ))}
         </div>
       </div>
-    </aside>
-  )
-}
 
-function ReviewRail({ dark }: { dark: boolean }) {
-  return (
-    <aside
-      className={cn(
-        'border-t p-5 xl:border-t-0 xl:border-l',
-        dark ? 'border-white/10 bg-[#0b111d]' : 'border-stone-300 bg-white'
-      )}
-    >
-      <div className="mb-4 text-lg font-semibold">Готовность к внедрению</div>
-      <div className="grid gap-3">
-        {[
-          ['Структура полная', '27 разделов собраны'],
-          ['Язык документа', 'Русский'],
-          ['Следующий шаг', 'Создать курс для адаптации'],
-        ].map(([title, body]) => (
+      <div className="mt-5 grid gap-3">
+        {readinessChecks.map(([title, body]) => (
           <div
             key={title}
             className={cn(
@@ -755,7 +615,8 @@ function ReviewRail({ dark }: { dark: boolean }) {
           dark ? 'bg-white text-slate-950' : 'bg-slate-950 text-white'
         )}
       >
-        Создать курс из инструкции
+        <ClipboardCheck className="h-4 w-4" aria-hidden />
+        Подготовить к внедрению
       </button>
     </aside>
   )
@@ -764,12 +625,10 @@ function ReviewRail({ dark }: { dark: boolean }) {
 function DocumentPaper({
   dark,
   executive = false,
-  academy = false,
   spacious = false,
 }: {
   dark: boolean
   executive?: boolean
-  academy?: boolean
   spacious?: boolean
 }) {
   return (
@@ -810,18 +669,16 @@ function DocumentPaper({
             Рабочий документ для найма, адаптации и управления ролью в отделе продаж.
           </p>
         </div>
-        {academy ? (
-          <div
-            className={cn(
-              'rounded-md border px-3 py-2 text-sm',
-              dark
-                ? 'border-violet-300/20 bg-violet-300/10 text-violet-100'
-                : 'border-violet-200 bg-violet-50 text-violet-700'
-            )}
-          >
-            Готово к курсу
-          </div>
-        ) : null}
+        <div
+          className={cn(
+            'rounded-md border px-3 py-2 text-sm',
+            dark
+              ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          )}
+        >
+          Готово к использованию
+        </div>
       </div>
 
       <div className="grid gap-6">
