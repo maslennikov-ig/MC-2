@@ -222,7 +222,7 @@ export const GraphHeader = ({
               size="icon"
               className={`h-7 w-7 shrink-0 ${isDark ? 'text-slate-400 hover:text-slate-100' : 'text-slate-500 hover:text-slate-900'}`}
             >
-              <Link href="/courses">
+              <Link href="/courses/library">
                 <ArrowLeft size={16} />
               </Link>
             </Button>

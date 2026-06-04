@@ -3,22 +3,51 @@ import { TRPCError } from '@trpc/server';
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
+  resolveCareerPlaybookDepartmentOptions: vi.fn(),
   generateCareerPlaybookFollowups: vi.fn(),
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
   createCourseFromPlaybook: vi.fn(),
+  validateFile: vi.fn(),
+  runPhase2Storage: vi.fn(),
+  isStorageError: vi.fn(),
+  decrementQuota: vi.fn(),
+  unlink: vi.fn(),
   addJob: vi.fn(),
   removeTerminalJobById: vi.fn(),
+  rpc: vi.fn(),
+}));
+
+vi.mock('fs/promises', () => ({
+  unlink: mocks.unlink,
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
   getSupabaseAdmin: vi.fn(() => ({
     from: mocks.from,
+    rpc: mocks.rpc,
   })),
+}));
+
+vi.mock('@/shared/validation/file-validator', () => ({
+  validateFile: mocks.validateFile,
+}));
+
+vi.mock('@/shared/validation/quota-enforcer', () => ({
+  decrementQuota: mocks.decrementQuota,
+}));
+
+vi.mock('@/stages/stage1-document-upload/phases', () => ({
+  runPhase2Storage: mocks.runPhase2Storage,
+  isStorageError: mocks.isStorageError,
 }));
 
 vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
   generateCareerPlaybookFollowups: mocks.generateCareerPlaybookFollowups,
+}));
+
+vi.mock('@/stages/stage-career-playbook/nodes/department-classifier', () => ({
+  resolveCareerPlaybookDepartmentOptions: mocks.resolveCareerPlaybookDepartmentOptions,
 }));
 
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
@@ -108,6 +137,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
     delete: vi.fn(() => builder),
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
     order: vi.fn(() => builder),
     single: vi.fn(() => {
       const result = singleResults.shift();
@@ -122,6 +152,7 @@ function createListBuilder(data: unknown[], error: unknown = null) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
     order: vi.fn(() => Promise.resolve({ data, error })),
   };
 
@@ -131,12 +162,32 @@ function createListBuilder(data: unknown[], error: unknown = null) {
 describe('careerPlaybookRouter transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.validateFile.mockReturnValue({ valid: true });
+    mocks.runPhase2Storage.mockResolvedValue({
+      fileId: '55555555-5555-4555-8555-555555555555',
+      storagePath:
+        'uploads/22222222-2222-4222-8222-222222222222/career-playbooks/33333333-3333-4333-8333-333333333333/55555555-5555-4555-8555-555555555555.pdf',
+      fileHash: 'hash',
+      actualSize: 12,
+      durationMs: 10,
+      deduplicated: false,
+    });
+    mocks.isStorageError.mockReturnValue(false);
+    mocks.decrementQuota.mockResolvedValue(undefined);
+    mocks.unlink.mockResolvedValue(undefined);
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
   it('is wired into the app router under careerPlaybook', () => {
     expect(appRouter._def.procedures['careerPlaybook.exportPdf']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.session.start']).toBeDefined();
+    expect(
+      appRouter._def.procedures['careerPlaybook.session.resolveDepartmentOptions']
+    ).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.requestFollowups']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.uploadFile']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.listSources']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.sources.removeSource']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.approveAndGenerate']).toBeDefined();
     expect(
       appRouter._def.procedures['careerPlaybook.courseBridge.createCourseFromPlaybook']
@@ -147,6 +198,32 @@ describe('careerPlaybookRouter transport', () => {
     const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
 
     await expect(caller.session.start({ language: 'ru' })).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it('resolves narrow department options through the Career Playbook classifier', async () => {
+    mocks.resolveCareerPlaybookDepartmentOptions.mockResolvedValue({
+      status: 'needs_user_choice',
+      source: 'llm',
+      confidence: 0.74,
+      candidates: [{ value: 'operations', label: 'Operations', confidence: 0.74 }],
+    });
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.session.resolveDepartmentOptions({
+      title: 'Unusual company role',
+      language: 'en',
+    });
+
+    expect(mocks.resolveCareerPlaybookDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Unusual company role',
+      language: 'en',
+    });
+    expect(result).toEqual({
+      status: 'needs_user_choice',
+      source: 'llm',
+      confidence: 0.74,
+      candidates: [{ value: 'operations', label: 'Operations', confidence: 0.74 }],
+    });
   });
 
   it('starts a persisted playbook session and returns a frontend draft', async () => {
@@ -180,6 +257,7 @@ describe('careerPlaybookRouter transport', () => {
       status: 'answering_fixed',
       phase: 'fixed',
       fixedAnswers: [],
+      businessContextSources: [],
     });
   });
 
@@ -248,19 +326,11 @@ describe('careerPlaybookRouter transport', () => {
     expect(result).toEqual(questions);
   });
 
-  it('requests follow-up questions through the backend generator and persists them', async () => {
+  it('does not persist ready-to-generate when follow-up completeness is below threshold', async () => {
     const followupResponse = {
-      questions: [
-        {
-          question_id: '55555555-5555-4555-8555-555555555555',
-          question_text: 'Which KPIs define success?',
-          question_type: 'open',
-          options: null,
-          rationale: 'KPI specificity improves the guide.',
-        },
-      ],
-      completeness_score: 0.71,
-      stop_recommendation: 'ask_more',
+      questions: [],
+      completeness_score: 0.55,
+      stop_recommendation: 'ready_to_generate' as const,
     };
     mocks.generateCareerPlaybookFollowups.mockResolvedValue({
       response: followupResponse,
@@ -273,20 +343,8 @@ describe('careerPlaybookRouter transport', () => {
       },
     });
     const builder = createBuilder([
-      { data: playbookRow({ status: 'awaiting_followups' }), error: null },
-      {
-        data: playbookRow({
-          status: 'answering_followups',
-          q_a_data: {
-            fixed: [{ question_key: 'position', value: 'Product Lead' }],
-            followups: [],
-            freeform: [],
-            completeness_score: 0.71,
-            followup_questions: followupResponse.questions,
-          },
-        }),
-        error: null,
-      },
+      { data: playbookRow({ status: 'answering_followups' }), error: null },
+      { data: playbookRow({ status: 'answering_followups' }), error: null },
     ]);
     mocks.from.mockReturnValue(builder);
 
@@ -300,24 +358,18 @@ describe('careerPlaybookRouter transport', () => {
       contentLanguage: 'en',
     });
 
-    expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
-      qaData: {
-        fixed: [{ question_key: 'position', value: 'Product Lead' }],
-        followups: [],
-        freeform: [],
-      },
-      language: 'en',
-    });
     expect(builder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'answering_followups',
         q_a_data: expect.objectContaining({
-          completeness_score: 0.71,
-          followup_questions: followupResponse.questions,
+          completeness_score: 0.55,
         }),
       })
     );
-    expect(result).toEqual(followupResponse);
+    expect(result).toEqual({
+      ...followupResponse,
+      stop_recommendation: 'ask_more',
+    });
   });
 
   it('keeps persisted follow-up round count and caps stored follow-up questions', async () => {
@@ -462,14 +514,14 @@ describe('careerPlaybookRouter transport', () => {
         status: 'generating',
       })
     );
-    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook:${playbookId}`);
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook-${playbookId}`);
     expect(mocks.addJob).toHaveBeenCalledWith(
       JobType.CAREER_PLAYBOOK,
       expect.not.objectContaining({
         courseId: expect.any(String),
       }),
       expect.objectContaining({
-        jobId: `career-playbook:${playbookId}`,
+        jobId: `career-playbook-${playbookId}`,
       })
     );
     expect(mocks.addJob).toHaveBeenCalledWith(
@@ -482,11 +534,12 @@ describe('careerPlaybookRouter transport', () => {
         organizationId: authenticatedContext.user!.organizationId,
         language: 'en',
         locale: 'en',
-        qaData: {
+        qaData: expect.objectContaining({
           fixed: [{ question_key: 'position', value: 'Product Lead' }],
           followups: [],
           freeform: [],
-        },
+          business_context: expect.objectContaining({ mode: 'universal' }),
+        }),
         createdAt: expect.any(String),
       }),
       expect.any(Object)
@@ -566,7 +619,7 @@ describe('careerPlaybookRouter transport', () => {
       status: 'generating',
     });
 
-    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook:${playbookId}`);
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook-${playbookId}`);
     expect(mocks.addJob).toHaveBeenCalledTimes(1);
   });
 
@@ -847,6 +900,69 @@ describe('careerPlaybookRouter transport', () => {
     expect(result.items.map(item => item.id)).toEqual([ownPlaybook.id]);
     expect(result.items.every(item => item.id !== sameOrgPlaybook.id)).toBe(true);
     expect(result.items.every(item => item.id !== foreignPlaybook.id)).toBe(true);
+  });
+
+  it('filters, sorts, counts, and exposes facets for the personal library', async () => {
+    const rows = [
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333337',
+        position_title: 'Sales Manager',
+        status: 'completed',
+        department: 'sales',
+        level: 'lead',
+        is_public: true,
+        created_at: '2026-05-14T03:00:00.000Z',
+      }),
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333338',
+        position_title: 'Sales Analyst',
+        status: 'completed',
+        department: 'sales',
+        level: 'junior',
+        created_at: '2026-05-14T02:00:00.000Z',
+      }),
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333339',
+        position_title: 'Engineering Manager',
+        status: 'completed',
+        department: 'engineering',
+        level: 'lead',
+        created_at: '2026-05-14T01:00:00.000Z',
+      }),
+      playbookRow({
+        id: '33333333-3333-4333-8333-333333333340',
+        position_title: 'Sales Draft',
+        status: 'draft',
+        department: 'sales',
+        level: 'lead',
+        created_at: '2026-05-13T01:00:00.000Z',
+      }),
+    ];
+    const builder = createListBuilder(rows);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.list({
+      limit: 20,
+      search: 'sales',
+      status: 'completed',
+      department: 'sales',
+      level: 'lead',
+      sort: 'title_asc',
+    });
+
+    expect(result.items.map(item => item.positionTitle)).toEqual(['Sales Manager']);
+    expect(result.totalCount).toBe(1);
+    expect(result.statistics).toEqual({
+      totalCount: 4,
+      completedCount: 3,
+      inProgressCount: 0,
+      publicCount: 1,
+    });
+    expect(result.facets.departments).toEqual(['engineering', 'sales']);
+    expect(result.facets.levels).toEqual(['junior', 'lead']);
+    expect(result.facets.statuses).toContain('completed');
+    expect(result.facets.statuses).toContain('draft');
   });
 
   it('returns a readable playbook by id from the library router', async () => {

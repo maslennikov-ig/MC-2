@@ -100,28 +100,6 @@ export async function createReferenceFileRecord(
 }
 
 /**
- * Increments reference count on original file
- */
-export async function incrementReferenceCount(
-  supabase: SupabaseClient,
-  fileId: string
-): Promise<void> {
-  const refCountResult = await supabase.rpc('increment_file_reference_count', {
-    p_file_id: fileId,
-  });
-
-  if (refCountResult.error) {
-    logger.warn(
-      {
-        err: refCountResult.error.message,
-        fileId,
-      },
-      'Failed to increment reference count'
-    );
-  }
-}
-
-/**
  * Processes deduplicated file upload
  */
 export async function processDeduplicatedUpload(
@@ -140,33 +118,35 @@ export async function processDeduplicatedUpload(
     duplicateFile
   );
 
-  // Increment reference_count on original file
-  await incrementReferenceCount(supabase, duplicateFile.file_id);
+  try {
+    // Duplicate vectors for new course
+    const vectorsDuplicated = await duplicateVectorsForNewCourse(
+      duplicateFile.file_id,
+      fileRecord.id,
+      metadata.course_id,
+      metadata.organization_id
+    );
 
-  // Duplicate vectors for new course
-  const vectorsDuplicated = await duplicateVectorsForNewCourse(
-    duplicateFile.file_id,
-    fileRecord.id,
-    metadata.course_id,
-    metadata.organization_id
-  );
+    // Update storage quota (BOTH organizations pay for their reference)
+    await updateStorageQuota(metadata.organization_id, fileBuffer.length, 'increment');
 
-  // Update storage quota (BOTH organizations pay for their reference)
-  await updateStorageQuota(metadata.organization_id, fileBuffer.length, 'increment');
+    logger.info(
+      {
+        newFileId: fileRecord.id,
+        vectorsDuplicated,
+        originalFileId: duplicateFile.file_id,
+      },
+      'Deduplication complete'
+    );
 
-  logger.info(
-    {
-      newFileId: fileRecord.id,
-      vectorsDuplicated,
-      originalFileId: duplicateFile.file_id,
-    },
-    'Deduplication complete'
-  );
-
-  return {
-    file_id: fileRecord.id,
-    vectors_duplicated: vectorsDuplicated,
-  };
+    return {
+      file_id: fileRecord.id,
+      vectors_duplicated: vectorsDuplicated,
+    };
+  } catch (error) {
+    await deleteFileCatalogRecord(supabase, fileRecord.id);
+    throw error;
+  }
 }
 
 /**
@@ -241,27 +221,30 @@ export async function createNewFileRecord(
 }
 
 /**
- * Decrements reference count and returns remaining count
+ * Reads the current reference count from file_catalog.
+ *
+ * Reference counts are maintained by database INSERT/DELETE triggers, so
+ * lifecycle code reads the persisted count instead of mutating it manually.
  */
-export async function decrementReferenceCount(
-  supabase: SupabaseClient,
-  fileId: string
-): Promise<number> {
-  const refCountResult = await supabase.rpc('decrement_file_reference_count', {
-    p_file_id: fileId,
-  });
+export async function getReferenceCount(supabase: SupabaseClient, fileId: string): Promise<number> {
+  const result = await supabase
+    .from('file_catalog')
+    .select('reference_count')
+    .eq('id', fileId)
+    .single();
 
-  if (refCountResult.error) {
+  if (result.error || !result.data) {
     logger.warn(
       {
-        err: refCountResult.error.message,
+        err: result.error?.message || 'No record',
         fileId,
       },
-      'Failed to decrement reference count'
+      'Failed to read reference count'
     );
+    return 0;
   }
 
-  return (refCountResult.data as number | null) || 0;
+  return Number((result.data as Pick<FileCatalogRow, 'reference_count'>).reference_count ?? 0);
 }
 
 /**

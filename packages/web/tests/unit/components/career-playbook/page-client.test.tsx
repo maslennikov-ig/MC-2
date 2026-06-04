@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
@@ -40,6 +40,9 @@ const messages = {
       roleSuggestionsMatchAlias: 'Alias',
       roleSuggestionsMatchAcronym: 'Acronym',
       roleSuggestionsMatchKeyword: 'Related query',
+      departmentAutoLabel: 'Functional area',
+      departmentAutoChange: 'Change',
+      departmentResolving: 'Selecting functional area...',
       questionLabel: 'Question',
       answeredLabel: 'Answered',
       ofLabel: 'of',
@@ -49,6 +52,81 @@ const messages = {
       documentPreviewSubtitle: 'Answers are placed into the future document structure as you work.',
       documentPreviewEmpty: 'Appears after an answer',
       questionPanelLabel: 'Current question',
+      businessContextNavigationLabel: 'Context',
+      businessContextDocumentLabel: 'Business context',
+      businessContextTitle: 'Business context',
+      businessContextDescription:
+        'Add company-specific product, customer, channel, process, metric, and constraint context.',
+      businessContextEmpty: 'Fill this manually or attach files',
+      businessContextPanelTitle: 'Sources',
+      businessContextPanelDescription:
+        'Useful inputs include proposals, product descriptions, sales playbooks, KPIs, org charts, and similar role guides.',
+      businessContextFilesTitle: 'Files',
+      businessContextFilesDescription:
+        'Files are saved as sources for this Role Guide, not as course materials.',
+      businessContextUploadMissingSession: 'Create the Career Playbook session before upload',
+      businessContextUploadMaxFilesTemplate: 'Maximum {maxFiles} sources',
+      businessContextUploadPending: 'Upload selected files',
+      businessContextUploadedSources: 'Uploaded sources',
+      businessContextSourceCountTemplate: '{count} sources',
+      businessContextSourceStatusUploaded: 'Uploaded',
+      businessContextSourceStatusProcessing: 'Processing',
+      businessContextSourceStatusReady: 'Ready',
+      businessContextSourceStatusFailed: 'Failed',
+      businessContextSourceStatusRemoved: 'Removed',
+      businessContextSourceTextFallback: 'Text source',
+      businessContextRemoveSourceTemplate: 'Remove {name}',
+      businessContextMissingTitle: 'Gaps',
+      businessContextMissingEmpty: 'Core categories are covered',
+      businessContextContinue: 'Continue to follow-ups',
+      businessContextUniversal: 'Generate a universal guide',
+      businessContextUniversalDescription:
+        'Without company context the system creates a benchmark guide and marks what must be adapted before rollout.',
+      businessContextUniversalSummary: 'Universal benchmark mode selected.',
+      businessContextUploading: 'Uploading files...',
+      businessContextProductTitle: 'Product',
+      businessContextProductHelper: 'What you sell or deliver and the value proposition.',
+      businessContextProductPlaceholder: 'For example: B2B SaaS for learning automation...',
+      businessContextProductHint1: 'commercial proposal',
+      businessContextProductHint2: 'product description',
+      businessContextProductHint3: 'product deck',
+      businessContextCustomersTitle: 'Customers',
+      businessContextCustomersHelper: 'Who buys, who uses it, and which segments or pains matter.',
+      businessContextCustomersPlaceholder: 'For example: HR leaders in enterprise companies...',
+      businessContextCustomersHint1: 'ICP',
+      businessContextCustomersHint2: 'customer profile',
+      businessContextCustomersHint3: 'customer research',
+      businessContextSalesTitle: 'Sales and channels',
+      businessContextSalesHelper: 'How customers are found and how the funnel works.',
+      businessContextSalesPlaceholder: 'For example: outbound, partners, tenders...',
+      businessContextSalesHint1: 'sales playbook',
+      businessContextSalesHint2: 'funnel',
+      businessContextSalesHint3: 'scripts',
+      businessContextProcessesTitle: 'Processes',
+      businessContextProcessesHelper: 'Operating procedures and handoffs between roles.',
+      businessContextProcessesPlaceholder: 'For example: lead moves SDR -> AE -> implementation...',
+      businessContextProcessesHint1: 'SOP',
+      businessContextProcessesHint2: 'team playbook',
+      businessContextProcessesHint3: 'process maps',
+      businessContextMetricsTitle: 'Metrics',
+      businessContextMetricsHelper: 'How the role, team, and business outcome are measured.',
+      businessContextMetricsPlaceholder: 'For example: revenue, win rate, NPS...',
+      businessContextMetricsHint1: 'department KPIs',
+      businessContextMetricsHint2: 'dashboards',
+      businessContextMetricsHint3: 'OKRs',
+      businessContextOrgTitle: 'Org structure',
+      businessContextOrgHelper: 'Teams, reporting lines, collaborators, and ownership boundaries.',
+      businessContextOrgPlaceholder: 'For example: role sits in sales and works with marketing...',
+      businessContextOrgHint1: 'org chart',
+      businessContextOrgHint2: 'staffing plan',
+      businessContextOrgHint3: 'similar guides',
+      businessContextConstraintsTitle: 'Constraints',
+      businessContextConstraintsHelper:
+        'Legal, industry, geography, security, and operating constraints.',
+      businessContextConstraintsPlaceholder: 'For example: enterprise security review, GDPR...',
+      businessContextConstraintsHint1: 'policies',
+      businessContextConstraintsHint2: 'compliance',
+      businessContextConstraintsHint3: 'contract limits',
       followupNavigationLabel: 'Follow-ups',
       followupDocumentPreviewTitle: 'Follow-up context',
       followupDocumentPreviewSubtitle: 'These answers help make the final guide more specific.',
@@ -95,19 +173,46 @@ const messages = {
 let startSession: Mock
 let submitAnswer: Mock
 let requestFollowups: Mock
+let resolveDepartmentOptions: Mock
 let approveAndGenerate: Mock
 let getGenerationStatus: Mock
+let getDraft: Mock
+let listSources: Mock
+let removeSource: Mock
 
-function renderPage() {
+function renderPage(props: Partial<Parameters<typeof CareerPlaybookNewPageClient>[0]> = {}) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookNewPageClient locale="en" userId="user-1" />
+      <CareerPlaybookNewPageClient locale="en" userId="user-1" {...props} />
     </NextIntlClientProvider>
   )
 }
 
+function setBusinessContextState(playbookId: string) {
+  useCareerPlaybookStore.setState({
+    playbookId,
+    ownerUserId: 'user-1',
+    uiLanguage: 'en',
+    contentLanguage: 'en',
+    phase: 'business_context',
+    status: 'awaiting_followups',
+    fixedQuestions: [],
+    fixedAnswers: {
+      position: { question_key: 'position', value: 'Sales Manager' },
+      department: { question_key: 'department', value: 'sales' },
+      level: { question_key: 'level', value: 'middle' },
+      content_language: { question_key: 'content_language', value: 'en' },
+    },
+  })
+}
+
 describe('CareerPlaybookNewPageClient', () => {
   beforeEach(() => {
+    Object.defineProperty(window, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    })
     useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     startSession = vi.fn().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000006',
@@ -128,6 +233,15 @@ describe('CareerPlaybookNewPageClient', () => {
       completeness_score: 0.82,
       stop_recommendation: 'ready_to_generate',
     })
+    resolveDepartmentOptions = vi.fn().mockResolvedValue({
+      status: 'needs_user_choice',
+      source: 'llm',
+      confidence: 0.62,
+      candidates: [
+        { value: 'operations', label: 'Operations', confidence: 0.72 },
+        { value: 'support', label: 'Support / Customer Success', confidence: 0.68 },
+      ],
+    })
     approveAndGenerate = vi.fn().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000901',
       status: 'generating',
@@ -140,18 +254,40 @@ describe('CareerPlaybookNewPageClient', () => {
       phase: 'completion',
       progress: 80,
     })
+    getDraft = vi.fn().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      currentFixedIndex: 0,
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Existing Head of Sales',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      },
+      status: 'answering_fixed',
+      phase: 'fixed',
+    })
+    listSources = vi.fn().mockResolvedValue([])
+    removeSource = vi.fn().mockResolvedValue({ ok: true })
     setCareerPlaybookClientForTests({
       startSession,
       requestFollowups,
+      resolveDepartmentOptions,
       approveAndGenerate,
       getGenerationStatus,
       submitAnswer,
+      listSources,
+      removeSource,
     })
     localStorage.clear()
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('starts a best-effort backend session on mount', async () => {
@@ -161,6 +297,56 @@ describe('CareerPlaybookNewPageClient', () => {
       await screen.findByRole('heading', { name: 'Role Guide constructor' })
     ).toBeInTheDocument()
     expect(startSession).toHaveBeenCalledWith({ language: 'en' })
+  })
+
+  it('starts a blank wizard when explicitly opening a fresh guide', async () => {
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Deleted Head of Sales',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      },
+      currentFixedIndex: 0,
+    })
+
+    renderPage({ resetOnMount: true })
+
+    const positionInput = await screen.findByLabelText('Which role do you want to define?')
+    expect(positionInput).toHaveValue('')
+    expect(startSession).toHaveBeenCalledWith({ language: 'en' })
+    expect(useCareerPlaybookStore.getState().playbookId).not.toBe(
+      '00000000-0000-4000-8000-000000000777'
+    )
+  })
+
+  it('resumes the concrete guide selected from the library constructor action', async () => {
+    setCareerPlaybookClientForTests({
+      startSession,
+      getDraft,
+      requestFollowups,
+      resolveDepartmentOptions,
+      approveAndGenerate,
+      getGenerationStatus,
+      submitAnswer,
+      listSources,
+    })
+
+    renderPage({ resumePlaybookId: '00000000-0000-4000-8000-000000000777' })
+
+    expect(await screen.findByLabelText('Which role do you want to define?')).toHaveValue(
+      'Existing Head of Sales'
+    )
+    expect(getDraft).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000777',
+    })
+    expect(startSession).not.toHaveBeenCalled()
   })
 
   it('renders Phase A and advances through fixed questions with localized copy', async () => {
@@ -173,16 +359,39 @@ describe('CareerPlaybookNewPageClient', () => {
     ).toBeInTheDocument()
     expect(await screen.findByLabelText('Which role do you want to define?')).toBeInTheDocument()
     expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1760px]')
-    expect(screen.getByText('Question 1 of 7')).toBeInTheDocument()
+    expect(screen.getByText('Question 1 of 6')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Which role do you want to define?'), 'Head of Sales')
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('Role seniority level')).length).toBeGreaterThan(0)
+    expect(screen.getByText('Functional area: Sales')).toBeInTheDocument()
+    expect(resolveDepartmentOptions).not.toHaveBeenCalled()
     expect(screen.getByText('Draft saved locally')).toBeInTheDocument()
   })
 
-  it('continues to follow-ups from any fixed question when all fixed answers are already present', async () => {
+  it('asks the backend for narrow department choices when the role title is ambiguous', async () => {
+    const user = userEvent.setup()
+
+    renderPage()
+
+    await user.type(
+      await screen.findByLabelText('Which role do you want to define?'),
+      'Unusual company role'
+    )
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(resolveDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Unusual company role',
+      language: 'en',
+    })
+    expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
+    expect(screen.getByRole('radio', { name: 'Operations' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Support / Customer Success' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Sales' })).not.toBeInTheDocument()
+  })
+
+  it('continues to business context from any fixed question when all fixed answers are already present', async () => {
     const user = userEvent.setup()
 
     useCareerPlaybookStore.setState({
@@ -228,11 +437,77 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Question 1 of 7')).toBeInTheDocument()
+    expect(await screen.findByText('Question 1 of 6')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(requestFollowups).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Generate a universal guide' }))
 
     expect(requestFollowups).toHaveBeenCalled()
     expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000831',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'universal',
+          status: 'skipped',
+        }),
+      },
+    })
+  })
+
+  it('does not request follow-ups without a saved department context', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000832',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'fixed',
+      status: 'answering_fixed',
+      currentFixedIndex: 5,
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Unusual company role',
+        },
+        level: {
+          question_key: 'level',
+          value: 'middle',
+        },
+        reporting: {
+          question_key: 'reporting',
+          value: 'Reports to COO.',
+        },
+        team_size: {
+          question_key: 'team_size',
+          value: '1-10',
+        },
+        company_stage: {
+          question_key: 'company_stage',
+          value: 'growth',
+        },
+        content_language: {
+          question_key: 'content_language',
+          value: 'en',
+        },
+      },
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Finish Phase A' }))
+
+    expect(resolveDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Unusual company role',
+      language: 'en',
+    })
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect((await screen.findAllByText('Department or functional area')).length).toBeGreaterThan(0)
   })
 
   it('continues from Phase A into adaptive follow-ups and completion review', async () => {
@@ -244,8 +519,6 @@ describe('CareerPlaybookNewPageClient', () => {
       await screen.findByLabelText('Which role do you want to define?'),
       'Head of Sales'
     )
-    await user.click(screen.getByRole('button', { name: 'Next' }))
-    await user.click(screen.getByRole('radio', { name: 'Sales' }))
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('radio', { name: /Lead \/ Team Lead/ }))
     await user.click(screen.getByRole('button', { name: 'Next' }))
@@ -260,8 +533,22 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Product'), 'B2B SaaS for sales enablement')
+    await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+
     expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
     expect(requestFollowups).toHaveBeenCalled()
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000006',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'company_specific',
+          status: 'ready',
+        }),
+      },
+    })
     expect(screen.getByText('Completeness: 82%')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Which KPIs define success in this role?'), 'Win rate')
@@ -273,6 +560,185 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(screen.getAllByText('Department or functional area').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Sales').length).toBeGreaterThan(0)
     expect(screen.getByText('Win rate')).toBeInTheDocument()
+  })
+
+  it('preserves all source IDs when uploading multiple business context files before follow-ups', async () => {
+    const user = userEvent.setup()
+    const sourceIdOne = '00000000-0000-4000-8000-000000001001'
+    const sourceIdTwo = '00000000-0000-4000-8000-000000001002'
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sourceId: sourceIdOne,
+            fileId: '00000000-0000-4000-8000-000000002001',
+            storagePath: 'uploads/context-one.pdf',
+            status: 'processing',
+            message: 'queued',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sourceId: sourceIdTwo,
+            fileId: '00000000-0000-4000-8000-000000002002',
+            storagePath: 'uploads/context-two.pdf',
+            status: 'processing',
+            message: 'queued',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000833')
+
+    const { container } = renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, [
+      new File(['product'], 'product.pdf', { type: 'application/pdf' }),
+      new File(['kpi'], 'kpi.pdf', { type: 'application/pdf' }),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toMatchObject({ method: 'POST' })
+      expect(init?.headers).toBeUndefined()
+      expect(init?.body).toBeInstanceOf(FormData)
+      const body = init?.body as FormData
+      expect(body.get('playbookId')).toBe('00000000-0000-4000-8000-000000000833')
+      expect(body.get('file')).toBeInstanceOf(File)
+    }
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect(submitAnswer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'business_context' })
+    )
+    expect(useCareerPlaybookStore.getState().businessContext).toEqual(
+      expect.objectContaining({
+        mode: 'company_specific',
+        status: 'collecting',
+        source_ids: [sourceIdOne, sourceIdTwo],
+        digest: expect.objectContaining({
+          source_ids: [sourceIdOne, sourceIdTwo],
+        }),
+      })
+    )
+    expect(screen.getAllByText('product.pdf').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('kpi.pdf').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Processing').length).toBeGreaterThanOrEqual(2)
+
+    fetchMock.mockRestore()
+  })
+
+  it('shows persisted business context source status and removes a source on request', async () => {
+    const user = userEvent.setup()
+    const sourceId = '00000000-0000-4000-8000-000000001004'
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000835')
+    useCareerPlaybookStore.setState({
+      businessContext: {
+        mode: 'company_specific',
+        status: 'collecting',
+        digest: {
+          product: [],
+          customers: [],
+          sales_channels: [],
+          processes: [],
+          metrics: [],
+          org_structure: [],
+          constraints: [],
+          source_ids: [sourceId],
+          missing_signals: [],
+          user_edited: false,
+        },
+        source_ids: [sourceId],
+      },
+      businessContextSources: [
+        {
+          id: sourceId,
+          playbookId: '00000000-0000-4000-8000-000000000835',
+          sourceType: 'file',
+          status: 'processing',
+          filename: 'sales-playbook.pdf',
+          fileCatalogId: '00000000-0000-4000-8000-000000002004',
+          errorMessage: null,
+          createdAt: '2026-06-03T09:00:00.000Z',
+          updatedAt: '2026-06-03T09:01:00.000Z',
+        },
+      ],
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('sales-playbook.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Processing')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove sales-playbook.pdf' }))
+
+    expect(removeSource).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000835',
+      sourceId,
+    })
+    expect(screen.queryByText('sales-playbook.pdf')).not.toBeInTheDocument()
+  })
+
+  it('keeps typed business context when a source upload resolves after editing', async () => {
+    const user = userEvent.setup()
+    const sourceId = '00000000-0000-4000-8000-000000001003'
+    let resolveUpload!: (response: Response) => void
+    const uploadResponse = new Promise<Response>((resolve) => {
+      resolveUpload = resolve
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => uploadResponse)
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000834')
+
+    const { container } = renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, [new File(['product'], 'product.pdf', { type: 'application/pdf' })])
+
+    const continueClick = user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    fireEvent.change(screen.getByRole('textbox', { name: 'Product' }), {
+      target: { value: 'B2B learning platform' },
+    })
+
+    resolveUpload(
+      new Response(
+        JSON.stringify({
+          sourceId,
+          fileId: '00000000-0000-4000-8000-000000002003',
+          storagePath: 'uploads/context-product.pdf',
+          status: 'processing',
+          message: 'queued',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    )
+
+    await continueClick
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect(useCareerPlaybookStore.getState().businessContext).toEqual(
+      expect.objectContaining({
+        mode: 'company_specific',
+        status: 'collecting',
+        source_ids: [sourceId],
+        digest: expect.objectContaining({
+          product: ['B2B learning platform'],
+          source_ids: [sourceId],
+        }),
+      })
+    )
+
+    fetchMock.mockRestore()
   })
 
   it('flushes skipped remaining follow-ups before approving generation', async () => {
@@ -460,6 +926,8 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
     expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
+    expect(screen.getByText('Completeness')).toBeInTheDocument()
+    expect(screen.getByText('76%')).toBeInTheDocument()
     expect(screen.getByText('Win rate')).toBeInTheDocument()
   })
 

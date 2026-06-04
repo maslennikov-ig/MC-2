@@ -1,69 +1,44 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-25
-Branch: `codex/cp-landing-26-demo`
-Base: `origin/develop` at `cec55643536d7af51662428b52b21e8e4ecabffa`
+Updated: 2026-06-04
+Stage: `mc2-uv7n7.2`
+Branch: `codex/career-playbook-reader-variants`
 
 ## Current State
 
-- Stage `mc2-db696.33` (`Career Playbook: document-first milk design zone refresh`) was merged via PR #51 and deployed to Dev.
-- Dev run: GitHub Actions `26385179954`, deploy job passed, health returned `{"status":"ok"}` on 2026-05-25.
-- Follow-up bug `mc2-db696.34` fixed the Career Playbook landing interactive demo overlap/order via PR #53; Dev run `26388816456` deployed successfully and health returned `{"status":"ok"}` on 2026-05-25.
-- Follow-up task `mc2-db696.35` is active on PR #55 (`codex/cp-landing-26-demo`): landing page now shows 26-block structure clearly, adds personalization marketing, smooth motion, mobile auth-button fix, and a wider methodology-backed hero with dark document preview.
-- PR #55 CI run `26402611160` passed before the latest inline 26-section demo commit; rerun PR checks after pushing any new commit.
-- Main checkout `/home/me/code/mc2` is a separate worktree on `codex/career-playbook-ui-mock-variants` with unrelated local orchestration changes; do not overwrite or clean it from this branch.
-
-## Changes In This Branch
-
-- Added milk/document light tokens while keeping primary CTA purple; dark mode remains contrast-first.
-- Added shared Career Playbook document workspace/shell/preview components.
-- Rebuilt constructor, follow-ups, and completion review as a document-first workflow with left navigation, central draft document, and right action/question panel.
-- Applied the same document styling to library, private viewer, streaming/editor states, public share, loading/error/auth-required states, and soft landing alignment through shared tokens.
-- Refined `/career-playbook` landing: inline 26-section interactive demo with examples for every section, six methodology sources, book-methodology source line, personalized AI-assisted value section, smoother motion, mobile login decoration fix, and wider hero/section containers.
-- Removed visible Career Playbook AI-cliche icons/labels and localized RU/EN viewer block/group/status/aria labels.
-- Added `docs/plans/career-playbook/2026-05-25-document-first-zone-redesign.md`; updated `docs/career-playbook/README.md`.
-- Tracked visible subagent reports under `.codex/stages/mc2-db696.33/artifacts/`.
+- `mc2-uv7n7.2` converted `/mocks/career-playbook-reader-variants` from the five-card gallery into `Единый ридер: Документ руководителя`.
+- Scope is mock-only; production Career Playbook viewer and course viewer were not edited.
+- Standard mode has left contents, central executive document, and right inspector. Icon-only Lucide buttons control `toc=open|closed` and `panel=open|closed` independently.
+- `mode=reading` is the separate print-minimal reading mode; it hides side panels and mock explanatory chrome while keeping the document visible.
+- URL state is `theme=light|dark`, `toc=open|closed`, `panel=open|closed`, and `mode=standard|reading`.
+- Visible content stays Russian; tests guard against `Header`, `Role Guide`, `Contents`, `Mission and key results`, `Edit`, and `Regenerate`.
+- Visible read-only `frontend_specialist` subagent `Pixel` reviewed the old mock; implementation stayed local because the write zone was one tightly coupled mock route and test.
 
 ## Verification
 
-- CP unit set passed: 6 files, 53 tests.
-- `pnpm --filter @megacampus/web lint` passed.
-- `pnpm --filter @megacampus/web type-check` passed.
-- `pnpm --filter @megacampus/web build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
-- Production-mode Playwright smoke passed for CP and non-CP routes at 390, 1440, and 1920 px: 24 checks, no 500s, no horizontal overflow.
+- RED observed after updating tests for left/right panel controls: targeted Vitest failed on missing `Скрыть левую панель` and missing `toc` URL state.
+- Targeted Vitest passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/reader-variants-page.test.tsx` (5 tests).
+- Targeted ESLint and Prettier checks passed for the mock page and test.
 - `pnpm type-check` passed.
-- `pnpm build` passed with test Supabase env and existing Browserslist/`url.parse()` warnings.
-- Dev light/dark smoke passed for `/ru/career-playbook`, `/ru/career-playbook/new`, `/ru/career-playbook/library`, and `/en/career-playbook` at 390/1440/1920 px: 200 status and no horizontal overflow.
-- Dev landing demo smoke passed for `/ru/career-playbook` at 390/1440/1920 px in light and dark: demo order is block 1 -> block 5 -> block 6, no horizontal overflow, and no selector/document overlap.
-- PR #55 landing verification passed locally:
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/common/auth-button.test.tsx tests/unit/components/layouts/header.test.tsx tests/unit/components/career-playbook/landing-page.test.tsx`
-  - `pnpm --filter @megacampus/web lint`
-  - `pnpm --filter @megacampus/web type-check`
-  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
-  - Playwright smoke for `/career-playbook` at 2048x1060 and 390x827: no horizontal overflow; wide hero preview visible only on large viewport.
-- Latest PR #55 hero-copy verification passed locally:
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
-  - Playwright smoke for `/career-playbook` at 1335x827: H1 is `Должностная инструкция, которой пользуются`, methodology and book-source lines are present, dark hero preview is present, no horizontal overflow.
-  - `pnpm --filter @megacampus/web lint`
-  - `pnpm --filter @megacampus/web type-check`
-  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
-- Latest PR #55 inline 26-section demo verification passed locally:
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/landing-page.test.tsx`
-  - `pnpm --filter @megacampus/web lint`
-  - `pnpm --filter @megacampus/web type-check`
-  - `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm --filter @megacampus/web build`
-  - Playwright smoke for `/career-playbook` at 1335x827: 26 inline section buttons, no all-26 modal trigger, block 26 example visible, example label visible, no horizontal overflow.
+- `pnpm build` passed; only existing Browserslist and `url.parse()` warnings appeared.
+- Browser smoke via Playwright CDP/Windows Chrome passed at 320/375/414/768/1440: no guarded English text, no horizontal overflow, left/right panel controls and reading mode work.
+- Dev server on `http://127.0.0.1:3107/mocks/career-playbook-reader-variants` must be restarted after `pnpm build` because build invalidates Turbopack dev manifests.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.35`
-Recommended action: keep iterating PR #55 until landing feedback is accepted, then merge through PR delivery and let Dev deploy run from `develop`.
+Next stage id: pick the next ready Beads task.
+Recommended action: review the selected mock; if approved, create a separate production ReaderShell Beads task for Career Playbook viewer reuse.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for the next Career Playbook stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, relevant `.codex/stages/*`, Beads ready state, and current `git status`. PR #55 is active on `codex/cp-landing-26-demo` for landing-page refinements; do not overwrite the separate local worktree on `codex/career-playbook-ui-mock-variants`.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads, Graphify report, and `git status`. If continuing this UX work, inspect `/mocks/career-playbook-reader-variants` on `codex/career-playbook-reader-variants`.
+
+## Delivery
+
+- Local branch: `codex/career-playbook-reader-variants`; commit and push this feature branch only.
+- docs-reviewed: updated - `.codex/project-index.md` and this handoff describe the selected executive reader mock instead of the old gallery.
+- graph-reviewed: updated - Graphify was used for route/course-viewer orientation and refreshed during closeout; rerun after final commit to align report freshness.
 
 ## Explicit defers
 
-- `mc2-db696.28`: ESCO import subset / normalized role-source pipeline remains outside this redesign.
+- No production Career Playbook viewer or course viewer refactor was attempted; this branch is mock-only. Track production reuse as a new Beads task if approved.

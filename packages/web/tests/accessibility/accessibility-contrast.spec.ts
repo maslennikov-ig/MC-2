@@ -3,8 +3,8 @@ import AxeBuilder from '@axe-core/playwright'
 
 test.describe('WCAG AA Contrast Compliance - Light Theme', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to courses page
-    await page.goto('http://localhost:3002/courses')
+    // Navigate to courses catalog page
+    await page.goto('http://localhost:3002/courses/library')
 
     // Ensure light theme is active
     await page.evaluate(() => {
@@ -206,7 +206,7 @@ test.describe('WCAG AA Contrast Compliance - Light Theme', () => {
 
 test.describe('WCAG AA Contrast Compliance - Dark Theme', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:3002/courses')
+    await page.goto('http://localhost:3002/courses/library')
 
     // Ensure dark theme is active
     await page.evaluate(() => {

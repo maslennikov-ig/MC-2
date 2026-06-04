@@ -6,6 +6,7 @@ import {
   type CareerPlaybookGenerateFollowupsJobData,
   type CareerPlaybookGeneratePlaybookJobData,
   type CareerPlaybookJobData,
+  type CareerPlaybookProcessSourceJobData,
   type CareerPlaybookRegenerateBlockJobData,
 } from '@megacampus/shared-types';
 import type { JobResult } from './base-handler';
@@ -17,6 +18,7 @@ import type {
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
+import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
 
 export type { CareerPlaybookJobData };
 
@@ -52,15 +54,16 @@ export class CareerPlaybookHandler {
   async process(job: Job<CareerPlaybookJobData>): Promise<JobResult> {
     const jobData = CareerPlaybookOperationJobDataSchema.parse(job.data);
 
-    if (jobData.operation === 'GENERATE_FOLLOWUPS') {
-      return this.generateFollowups(jobData);
+    switch (jobData.operation) {
+      case 'GENERATE_FOLLOWUPS':
+        return this.generateFollowups(jobData);
+      case 'GENERATE_PLAYBOOK':
+        return this.generatePlaybook(jobData, job);
+      case 'PROCESS_SOURCE':
+        return this.processSource(jobData, job);
+      default:
+        return this.regenerateBlock(jobData);
     }
-
-    if (jobData.operation === 'GENERATE_PLAYBOOK') {
-      return this.generatePlaybook(jobData, job);
-    }
-
-    return this.regenerateBlock(jobData);
   }
 
   private async generateFollowups(
@@ -131,6 +134,28 @@ export class CareerPlaybookHandler {
     return {
       success: true,
       message: `Regenerated Career Playbook block ${jobData.blockId}`,
+      data: result,
+    };
+  }
+
+  private async processSource(
+    jobData: CareerPlaybookProcessSourceJobData,
+    job: Job<CareerPlaybookJobData>
+  ): Promise<JobResult> {
+    const result = await processCareerPlaybookSource({
+      playbookId: jobData.playbookId,
+      sourceId: jobData.sourceId,
+      fileId: jobData.fileId,
+      filePath: jobData.filePath,
+      mimeType: jobData.mimeType,
+      organizationId: jobData.organizationId,
+      language: jobData.language,
+      job,
+    });
+
+    return {
+      success: true,
+      message: 'Processed Career Playbook business context source',
       data: result,
     };
   }

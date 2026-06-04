@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   CareerPlaybookBlockStateSchema,
+  CareerPlaybookBusinessContextSchema,
+  CareerPlaybookBusinessContextDigestSchema,
+  CareerPlaybookBusinessContextSourceSchema,
+  CareerPlaybookBusinessContextSourceSummarySchema,
+  CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD,
   CareerPlaybookCostBreakdownSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFixedQuestionSchema,
@@ -8,6 +13,8 @@ import {
   CareerPlaybookQADataSchema,
   CareerPlaybookRoleProfileSpecSchema,
   SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES,
+  isCareerPlaybookFollowupResponseReady,
+  normalizeCareerPlaybookFollowupResponseReadiness,
 } from '../src/career-playbook';
 import { DEFAULT_JOB_OPTIONS, JobDataSchema, JobType } from '../src/bullmq-jobs';
 
@@ -141,6 +148,75 @@ describe('Career Playbook shared schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('validates guided business context for company-specific and universal Role Guides', () => {
+    const digest = CareerPlaybookBusinessContextDigestSchema.parse({
+      product: ['AI course generation platform for internal training teams'],
+      customers: ['B2B education and HR departments'],
+      sales_channels: ['Founder-led sales', 'Inbound demos'],
+      processes: ['Course creation starts from uploaded materials'],
+      metrics: ['Qualified pipeline', 'Course completion quality'],
+      org_structure: ['Sales reports to CEO'],
+      constraints: ['No hardcoded customer data in generated documents'],
+      source_ids: ['00000000-0000-4000-8000-000000000010'],
+      missing_signals: ['pricing model'],
+      user_edited: true,
+    });
+
+    expect(digest.user_edited).toBe(true);
+
+    const companyContext = CareerPlaybookBusinessContextSchema.parse({
+      mode: 'company_specific',
+      digest,
+      status: 'ready',
+      source_ids: ['00000000-0000-4000-8000-000000000010'],
+    });
+
+    expect(companyContext.mode).toBe('company_specific');
+    expect(companyContext.digest?.customers).toContain('B2B education and HR departments');
+
+    const universalContext = CareerPlaybookBusinessContextSchema.parse({
+      mode: 'universal',
+      status: 'skipped',
+      skip_reason: 'User chose benchmark generation without company data',
+    });
+
+    expect(universalContext.digest).toBeNull();
+    expect(universalContext.source_ids).toEqual([]);
+  });
+
+  it('validates Career Playbook business context source records without course ownership', () => {
+    const source = CareerPlaybookBusinessContextSourceSchema.parse({
+      id: '00000000-0000-4000-8000-000000000010',
+      playbook_id: '00000000-0000-4000-8000-000000000011',
+      organization_id: '00000000-0000-4000-8000-000000000012',
+      source_type: 'file',
+      status: 'uploaded',
+      filename: 'sales-playbook.pdf',
+      file_catalog_id: '00000000-0000-4000-8000-000000000013',
+      created_at: '2026-06-03T00:00:00.000Z',
+    });
+
+    expect(source.status).toBe('uploaded');
+    expect(source.file_catalog_id).toBe('00000000-0000-4000-8000-000000000013');
+  });
+
+  it('validates Career Playbook business context source summaries for frontend drafts', () => {
+    const source = CareerPlaybookBusinessContextSourceSummarySchema.parse({
+      id: '00000000-0000-4000-8000-000000000010',
+      playbookId: '00000000-0000-4000-8000-000000000011',
+      sourceType: 'file',
+      status: 'processing',
+      filename: 'sales-playbook.pdf',
+      fileCatalogId: '00000000-0000-4000-8000-000000000013',
+      errorMessage: null,
+      createdAt: '2026-06-03T00:00:00.000Z',
+      updatedAt: '2026-06-03T00:01:00.000Z',
+    });
+
+    expect(source.status).toBe('processing');
+    expect(source.sourceType).toBe('file');
+  });
+
   it('validates Career Playbook queue jobs without requiring a courseId', () => {
     const result = JobDataSchema.safeParse({
       jobType: JobType.CAREER_PLAYBOOK,
@@ -161,6 +237,29 @@ describe('Career Playbook shared schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('validates Career Playbook source processing jobs without fake course ownership', () => {
+    const result = JobDataSchema.safeParse({
+      jobType: JobType.CAREER_PLAYBOOK,
+      operation: 'PROCESS_SOURCE',
+      playbookId: '00000000-0000-4000-8000-000000000014',
+      sourceId: '00000000-0000-4000-8000-000000000015',
+      fileId: '00000000-0000-4000-8000-000000000016',
+      filePath: 'uploads/career-playbooks/context.pdf',
+      mimeType: 'application/pdf',
+      userId: '00000000-0000-4000-8000-000000000017',
+      organizationId: '00000000-0000-4000-8000-000000000018',
+      language: 'ru',
+      locale: 'ru',
+      createdAt: '2026-06-03T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.error.format()));
+    }
+    expect('courseId' in result.data).toBe(false);
+  });
+
   it('rejects empty follow-up answers unless explicitly skipped', () => {
     expect(
       CareerPlaybookFollowupAnswerSchema.safeParse({
@@ -178,6 +277,28 @@ describe('Career Playbook shared schemas', () => {
         skipped: true,
       }).success
     ).toBe(true);
+  });
+
+  it('normalizes follow-up readiness recommendations below the completeness threshold', () => {
+    expect(CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD).toBe(0.75);
+
+    const lowCompletenessResponse = normalizeCareerPlaybookFollowupResponseReadiness({
+      questions: [],
+      completeness_score: 0.55,
+      stop_recommendation: 'ready_to_generate',
+    });
+
+    expect(lowCompletenessResponse.stop_recommendation).toBe('ask_more');
+    expect(isCareerPlaybookFollowupResponseReady(lowCompletenessResponse)).toBe(false);
+
+    const readyResponse = normalizeCareerPlaybookFollowupResponseReadiness({
+      questions: [],
+      completeness_score: 0.82,
+      stop_recommendation: 'ready_to_generate',
+    });
+
+    expect(readyResponse.stop_recommendation).toBe('ready_to_generate');
+    expect(isCareerPlaybookFollowupResponseReady(readyResponse)).toBe(true);
   });
 
   it('validates RoleProfileSpec with every Stage 6 content language and rejects unknown languages', () => {

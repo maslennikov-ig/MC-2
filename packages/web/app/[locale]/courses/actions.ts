@@ -447,7 +447,7 @@ export async function deleteCourse(courseSlug: string) {
       throw new Error('Insufficient permissions to delete this course')
     }
 
-    revalidatePath('/courses')
+    revalidatePath('/courses/library')
     return { success: true, deletedTitle: course.title }
   } catch (error) {
     logger.error('Error deleting course:', error)
@@ -477,7 +477,7 @@ export async function togglePublishCourse(courseSlug: string, isPublished: boole
       throw new Error('Failed to update course')
     }
 
-    revalidatePath('/courses')
+    revalidatePath('/courses/library')
     return { success: true }
   } catch (error) {
     logger.error('Error toggling publish status:', error)
@@ -692,7 +692,7 @@ export async function updateCourseVisibility(courseId: string, visibility: Cours
     logger.info(
       `updateCourseVisibility: Successfully updated courseId=${courseId} to visibility=${visibility}`
     )
-    revalidatePath('/courses')
+    revalidatePath('/courses/library')
     return { success: true, visibility }
   } catch (error) {
     logger.error('updateCourseVisibility: Error', error)

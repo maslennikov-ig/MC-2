@@ -376,6 +376,7 @@ export const CareerPlaybookJobOperationSchema = z.enum([
   'GENERATE_FOLLOWUPS',
   'GENERATE_PLAYBOOK',
   'REGENERATE_BLOCK',
+  'PROCESS_SOURCE',
 ]);
 export type CareerPlaybookJobOperation = z.infer<typeof CareerPlaybookJobOperationSchema>;
 
@@ -421,10 +422,23 @@ export type CareerPlaybookRegenerateBlockJobData = z.infer<
   typeof CareerPlaybookRegenerateBlockJobDataSchema
 >;
 
+export const CareerPlaybookProcessSourceJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('PROCESS_SOURCE'),
+  sourceId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  filePath: z.string().min(1),
+  mimeType: z.string().min(1),
+});
+
+export type CareerPlaybookProcessSourceJobData = z.infer<
+  typeof CareerPlaybookProcessSourceJobDataSchema
+>;
+
 export const CareerPlaybookOperationJobDataSchema = z.discriminatedUnion('operation', [
   CareerPlaybookGenerateFollowupsJobDataSchema,
   CareerPlaybookGeneratePlaybookJobDataSchema,
   CareerPlaybookRegenerateBlockJobDataSchema,
+  CareerPlaybookProcessSourceJobDataSchema,
 ]);
 
 export type CareerPlaybookJobData = z.infer<typeof CareerPlaybookOperationJobDataSchema>;

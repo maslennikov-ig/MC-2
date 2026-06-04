@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic'
 import Header from '@/components/layouts/header'
-import HomeMetadata from '@/components/common/home-metadata'
 
 // Dynamic imports for heavy components with shader effects
 const HeroContent = dynamic(() => import('@/components/common/hero-content'), {
@@ -20,7 +19,6 @@ const ShaderBackground = dynamic(() => import('@/components/layouts/shader-backg
 export default function HomePageClient() {
   return (
     <ShaderBackground>
-      <HomeMetadata />
       <Header darkMode={true} />
       <HeroContent />
     </ShaderBackground>

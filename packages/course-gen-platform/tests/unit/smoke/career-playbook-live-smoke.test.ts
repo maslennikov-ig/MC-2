@@ -20,10 +20,7 @@ function generatedBlock(content: string): CareerPlaybookBlockState {
 
 function buildCompleteBlocks(): Record<CareerPlaybookBlockId, CareerPlaybookBlockState> {
   const blocks = Object.fromEntries(
-    [
-      'header',
-      ...Array.from({ length: 26 }, (_, index) => `block_${index + 1}`),
-    ].map(blockId => [
+    ['header', ...Array.from({ length: 26 }, (_, index) => `block_${index + 1}`)].map(blockId => [
       blockId,
       generatedBlock(`## ${blockId}\n\nUseful smoke evidence for ${blockId}.`),
     ])
@@ -358,7 +355,7 @@ describe('Career Playbook live smoke cleanup manifest', () => {
       expectedUserId: '11111111-1111-1111-1111-111111111111',
       expectedOrganizationId: '22222222-2222-2222-2222-222222222222',
       playbookId: '33333333-3333-3333-3333-333333333333',
-      careerPlaybookJobId: 'career-playbook:33333333-3333-3333-3333-333333333333',
+      careerPlaybookJobId: 'career-playbook-33333333-3333-3333-3333-333333333333',
       shareSlug: 'cp-live-smoke',
       courseId: '44444444-4444-4444-4444-444444444444',
       sourceDocumentIds: ['55555555-5555-5555-5555-555555555555'],
@@ -372,8 +369,14 @@ describe('Career Playbook live smoke cleanup manifest', () => {
     expect(manifest.mutates).toBe(false);
     expect(manifest.items).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'career_playbook', id: '33333333-3333-3333-3333-333333333333' }),
-        expect.objectContaining({ type: 'bullmq_job', id: 'career-playbook:33333333-3333-3333-3333-333333333333' }),
+        expect.objectContaining({
+          type: 'career_playbook',
+          id: '33333333-3333-3333-3333-333333333333',
+        }),
+        expect.objectContaining({
+          type: 'bullmq_job',
+          id: 'career-playbook-33333333-3333-3333-3333-333333333333',
+        }),
         expect.objectContaining({ type: 'course', id: '44444444-4444-4444-4444-444444444444' }),
         expect.objectContaining({ type: 'upload_path', id: expect.stringContaining('demo.md') }),
       ])

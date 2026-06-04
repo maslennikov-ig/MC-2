@@ -55,7 +55,7 @@ export function StyleSection({ mounted, reorderedStyles }: StyleSectionProps) {
             return (
               <label
                 key={style.value}
-                className={`relative cursor-pointer transition-all ${
+                className={`relative cursor-pointer caret-transparent transition-all select-none ${
                   isSelected ? 'scale-105' : ''
                 }`}
               >

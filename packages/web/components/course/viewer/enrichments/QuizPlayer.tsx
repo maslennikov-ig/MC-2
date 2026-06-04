@@ -642,10 +642,13 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                     {getShuffledOptions(currentQuestion).map((option) => (
                       <div
                         key={option.id}
-                        className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 caret-transparent transition-colors select-none hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       >
                         <RadioGroupItem value={option.id} id={option.id} />
-                        <Label htmlFor={option.id} className="flex-1 cursor-pointer text-base">
+                        <Label
+                          htmlFor={option.id}
+                          className="flex-1 cursor-pointer text-base caret-transparent select-none"
+                        >
                           {option.text}
                         </Label>
                       </div>
@@ -674,7 +677,7 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                       <div
                         key={option.id}
                         className={cn(
-                          'flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors',
+                          'flex cursor-pointer items-center gap-3 rounded-lg border p-3 caret-transparent transition-colors select-none',
                           isSelected &&
                             !isReview &&
                             'border-purple-500 bg-purple-50 dark:bg-purple-900/20',
@@ -704,7 +707,10 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                             toggleMultiSelectOption(currentQuestion.id, option.id)
                           }
                         />
-                        <Label htmlFor={checkboxId} className="flex-1 cursor-pointer">
+                        <Label
+                          htmlFor={checkboxId}
+                          className="flex-1 cursor-pointer caret-transparent select-none"
+                        >
                           {option.text}
                         </Label>
                       </div>
@@ -723,20 +729,20 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                   aria-label={currentQuestion.question}
                 >
                   <div className="space-y-3">
-                    <div className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <div className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 caret-transparent transition-colors select-none hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <RadioGroupItem value="true" id={`${currentQuestion.id}-true`} />
                       <Label
                         htmlFor={`${currentQuestion.id}-true`}
-                        className="flex-1 cursor-pointer text-base"
+                        className="flex-1 cursor-pointer text-base caret-transparent select-none"
                       >
                         {t('viewer.true')}
                       </Label>
                     </div>
-                    <div className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <div className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 caret-transparent transition-colors select-none hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <RadioGroupItem value="false" id={`${currentQuestion.id}-false`} />
                       <Label
                         htmlFor={`${currentQuestion.id}-false`}
-                        className="flex-1 cursor-pointer text-base"
+                        className="flex-1 cursor-pointer text-base caret-transparent select-none"
                       >
                         {t('viewer.false')}
                       </Label>

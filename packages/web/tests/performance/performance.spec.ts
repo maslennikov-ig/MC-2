@@ -59,7 +59,7 @@ test.describe('Performance Monitoring', () => {
 
   test('should handle virtual scrolling efficiently', async ({ page }) => {
     // Navigate to a page with many courses (if available)
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
 
     // Check if virtual scrolling notice appears for large lists

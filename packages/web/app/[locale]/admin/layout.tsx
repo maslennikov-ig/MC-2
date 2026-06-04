@@ -14,9 +14,11 @@ interface AdminMessages {
   common?: {
     nav?: {
       catalog?: string
+      courseLibrary?: string
       createCourse?: string
       createRoleDescription?: string
       catalogAria?: string
+      courseLibraryAria?: string
       createCourseAria?: string
       createRoleDescriptionAria?: string
     }
@@ -68,12 +70,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             {/* Quick action buttons */}
             <div className="hidden items-center gap-2 sm:flex">
               <Link
-                href="/courses"
-                aria-label={nav?.catalogAria || 'Просмотреть доступные курсы'}
+                href="/courses/library"
+                aria-label={
+                  nav?.courseLibraryAria || nav?.catalogAria || 'Просмотреть каталог курсов'
+                }
                 className="group flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10 dark:hover:text-purple-400"
               >
                 <BookOpen className="h-4 w-4" />
-                <span>{nav?.catalog || 'Каталог'}</span>
+                <span>{nav?.courseLibrary || nav?.catalog || 'Каталог курсов'}</span>
               </Link>
               <Link
                 href="/career-playbook/new"

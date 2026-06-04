@@ -4,23 +4,35 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CareerPlaybookLibraryPageClient from '@/app/[locale]/career-playbook/library/page-client'
+import type { CareerPlaybookLibraryFilters } from '@/components/career-playbook/library/types'
 
 vi.mock('@/components/layouts/header', () => ({
   default: () => <header data-testid="shared-header" />,
 }))
 
-const deleteMany = vi.fn()
+const deletePlaybook = vi.fn()
 const fetchPage = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const toggleShare = vi.fn()
+const mockPush = vi.hoisted(() => vi.fn())
+const mockSearchParams = vi.hoisted(() => new URLSearchParams())
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
+  useSearchParams: () => mockSearchParams,
+}))
+
+vi.mock('@/src/i18n/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
   createCourseFromPlaybook: (...args: unknown[]) =>
     createCourseFromPlaybook(
       ...(args as [input: { playbookId: string; includeWebResearch: boolean }])
     ),
-  deleteCareerPlaybookMany: (...args: unknown[]) =>
-    deleteMany(...(args as [playbookIds: string[], locale: string])),
+  deleteCareerPlaybook: (...args: unknown[]) =>
+    deletePlaybook(...(args as [playbookId: string, locale: string])),
   fetchCareerPlaybookLibraryPage: (...args: unknown[]) =>
     fetchPage(
       ...(args as [
@@ -28,6 +40,10 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
           locale: string
           cursor?: string | null
           search?: string
+          status?: string
+          department?: string
+          level?: string
+          sort?: string
           limit?: number
         },
       ])
@@ -58,19 +74,33 @@ const messages = {
       emptyDescription: 'Create your first Career Playbook to build your library.',
       errorTitle: 'Library temporarily unavailable',
       errorDescription: 'Retry in a minute or create a new guide.',
-      selectedCount: '{count} selected',
-      bulkDelete: 'Delete selected',
-      deleting: 'Deleting...',
       loadMore: 'Load more',
       loadingMore: 'Loading...',
+      resultsCount: '{count} of {total}',
+      sort: 'Sort',
+      sortOptions: {
+        created_desc: 'Newest first',
+        created_asc: 'Oldest first',
+        title_asc: 'Title A-Z',
+        title_desc: 'Title Z-A',
+      },
+      statistics: {
+        title: 'Guide statistics',
+        total: 'Total guides',
+        completed: 'Completed guides',
+        inProgress: 'In progress',
+        public: 'Public guides',
+      },
       card: {
         createCourse: 'Create course',
         publicBadge: 'Public',
         privateBadge: 'Private',
-        makePublic: 'Make public',
+        share: 'Share',
         makePrivate: 'Make private',
         publicLink: 'Public link',
         open: 'Open',
+        openBuilder: 'Open constructor',
+        delete: 'Delete',
       },
       statusLabels: {
         draft: 'Draft',
@@ -83,10 +113,10 @@ const messages = {
         failed: 'Failed',
       },
       deleteDialog: {
-        title: 'Delete selected guides?',
-        description: 'This will delete {count} selected guides.',
+        title: 'Delete guide?',
+        description: 'This will delete "{title}".',
         cancel: 'Cancel',
-        confirm: 'Delete guides',
+        confirm: 'Delete guide',
       },
       createCourseDialog: {
         title: 'Create course from Role Guide',
@@ -104,13 +134,21 @@ const messages = {
 }
 
 function renderPage({
+  filters = {
+    search: undefined,
+    status: undefined,
+    department: undefined,
+    level: undefined,
+    sort: 'created_desc',
+  },
   initialData,
 }: {
+  filters?: CareerPlaybookLibraryFilters
   initialData: Parameters<typeof CareerPlaybookLibraryPageClient>[0]['initialData']
 }) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookLibraryPageClient locale="en" initialData={initialData} />
+      <CareerPlaybookLibraryPageClient locale="en" initialData={initialData} filters={filters} />
     </NextIntlClientProvider>
   )
 }
@@ -118,14 +156,14 @@ function renderPage({
 describe('CareerPlaybookLibraryPageClient', () => {
   beforeEach(() => {
     createCourseFromPlaybook.mockReset()
-    deleteMany.mockReset()
+    deletePlaybook.mockReset()
     fetchPage.mockReset()
+    mockPush.mockReset()
     toggleShare.mockReset()
+    mockSearchParams.forEach((_, key) => mockSearchParams.delete(key))
   })
 
-  it('renders cards, filters by search/status, and shows create CTA', async () => {
-    const user = userEvent.setup()
-
+  it('renders cards, shared catalog filters, statistics, and create CTA', () => {
     renderPage({
       initialData: {
         items: [
@@ -152,6 +190,18 @@ describe('CareerPlaybookLibraryPageClient', () => {
         ],
         nextCursor: null,
         error: null,
+        totalCount: 2,
+        statistics: {
+          totalCount: 2,
+          completedCount: 1,
+          inProgressCount: 1,
+          publicCount: 1,
+        },
+        facets: {
+          statuses: ['completed', 'generating'],
+          departments: ['engineering', 'sales'],
+          levels: ['lead', 'senior'],
+        },
       },
     })
 
@@ -159,21 +209,50 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByTestId('career-playbook-library-shell')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Create new' })).toHaveAttribute(
       'href',
-      '/en/career-playbook/new'
+      '/en/career-playbook/new?fresh=1'
     )
     expect(screen.getByRole('link', { name: 'Open Head of Sales' })).toHaveAttribute(
       'href',
       '/en/career-playbook/pb-1'
     )
-
-    await user.type(screen.getByPlaceholderText('Search by role title'), 'sales')
+    expect(screen.getByText('Guide statistics')).toBeInTheDocument()
+    expect(screen.getByText('Total guides')).toBeInTheDocument()
+    expect(screen.getByText('2 of 2')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search by role title')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
-    expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
-
-    await user.clear(screen.getByPlaceholderText('Search by role title'))
-    await user.selectOptions(screen.getByLabelText('All statuses'), 'generating')
-    expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
     expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
+  })
+
+  it('puts course-style item actions on each card and removes checkbox-only actions', () => {
+    renderPage({
+      initialData: {
+        items: [
+          {
+            id: 'pb-1',
+            title: 'Head of Sales',
+            department: 'sales',
+            level: 'lead',
+            status: 'completed',
+            createdAt: '2026-05-14T10:00:00.000Z',
+            isPublic: false,
+            shareSlug: null,
+          },
+        ],
+        nextCursor: null,
+        error: null,
+      },
+    })
+
+    const card = screen.getByRole('article')
+
+    expect(within(card).queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete selected' })).not.toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Open constructor' })).toHaveAttribute(
+      'href',
+      '/en/career-playbook/new?resume=pb-1'
+    )
+    expect(within(card).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it('shows course creation only for completed role guides', () => {
@@ -220,9 +299,9 @@ describe('CareerPlaybookLibraryPageClient', () => {
     ).toBeNull()
   })
 
-  it('supports multi-select and bulk delete', async () => {
+  it('deletes a guide directly from its card', async () => {
     const user = userEvent.setup()
-    deleteMany.mockResolvedValue({ deletedIds: ['pb-1', 'pb-2'] })
+    deletePlaybook.mockResolvedValue({ deletedId: 'pb-1' })
 
     renderPage({
       initialData: {
@@ -237,37 +316,21 @@ describe('CareerPlaybookLibraryPageClient', () => {
             isPublic: true,
             shareSlug: 'head-of-sales',
           },
-          {
-            id: 'pb-2',
-            title: 'DevOps Engineer',
-            department: 'engineering',
-            level: 'senior',
-            status: 'completed',
-            createdAt: '2026-05-12T10:00:00.000Z',
-            isPublic: false,
-            shareSlug: null,
-          },
         ],
         nextCursor: null,
         error: null,
       },
     })
 
-    const cards = screen.getAllByRole('article')
-    await user.click(within(cards[0]).getByRole('checkbox'))
-    await user.click(within(cards[1]).getByRole('checkbox'))
+    await user.click(within(screen.getByRole('article')).getByRole('button', { name: 'Delete' }))
 
-    expect(screen.getByText('2 selected')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Delete selected' }))
-    expect(deleteMany).not.toHaveBeenCalled()
+    expect(deletePlaybook).not.toHaveBeenCalled()
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
-    expect(screen.getByText('This will delete 2 selected guides.')).toBeInTheDocument()
+    expect(screen.getByText('This will delete "Head of Sales".')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Delete guides' }))
-    expect(deleteMany).toHaveBeenCalledWith(['pb-1', 'pb-2'], 'en')
+    await user.click(screen.getByRole('button', { name: 'Delete guide' }))
+    expect(deletePlaybook).toHaveBeenCalledWith('pb-1', 'en')
     expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
-    expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
     expect(screen.getByText('No role guides yet')).toBeInTheDocument()
   })
 
@@ -298,7 +361,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
       },
     })
 
-    await user.click(screen.getByRole('button', { name: 'Make public' }))
+    await user.click(screen.getByRole('button', { name: 'Share' }))
 
     expect(toggleShare).toHaveBeenCalledWith('pb-1', true, 'en')
     expect(screen.getByText('Public')).toBeInTheDocument()
@@ -308,9 +371,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
     )
   })
 
-  it('filters by department and level', async () => {
-    const user = userEvent.setup()
-
+  it('uses server-provided department and level facets for catalog filters', () => {
     renderPage({
       initialData: {
         items: [
@@ -337,22 +398,21 @@ describe('CareerPlaybookLibraryPageClient', () => {
         ],
         nextCursor: null,
         error: null,
+        facets: {
+          statuses: ['completed'],
+          departments: ['engineering', 'sales'],
+          levels: ['lead', 'senior'],
+        },
       },
     })
 
-    await user.selectOptions(screen.getByLabelText('Department'), 'engineering')
-    expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
-    expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
-
-    await user.selectOptions(screen.getByLabelText('Department'), 'all')
-    await user.selectOptions(screen.getByLabelText('Level'), 'lead')
+    expect(screen.getByLabelText('Department')).toBeInTheDocument()
+    expect(screen.getByLabelText('Level')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
-    expect(screen.queryByText('DevOps Engineer')).not.toBeInTheDocument()
+    expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
   })
 
-  it('renders localized labels and filters every library status', async () => {
-    const user = userEvent.setup()
-
+  it('renders localized labels for every library status in loaded cards', () => {
     renderPage({
       initialData: {
         items: [
@@ -384,10 +444,6 @@ describe('CareerPlaybookLibraryPageClient', () => {
 
     expect(screen.getAllByText('Answering follow-ups').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Ready to generate').length).toBeGreaterThan(0)
-
-    await user.selectOptions(screen.getByLabelText('All statuses'), 'ready_to_generate')
-    expect(screen.queryByText('Draft Role')).not.toBeInTheDocument()
-    expect(screen.getByText('Ready Role')).toBeInTheDocument()
   })
 
   it('loads the next library page when nextCursor is present', async () => {
@@ -410,6 +466,13 @@ describe('CareerPlaybookLibraryPageClient', () => {
     })
 
     renderPage({
+      filters: {
+        search: 'sales',
+        status: 'completed',
+        department: 'sales',
+        level: 'lead',
+        sort: 'title_asc',
+      },
       initialData: {
         items: [
           {
@@ -434,7 +497,11 @@ describe('CareerPlaybookLibraryPageClient', () => {
       locale: 'en',
       cursor: '2026-05-14T10:00:00.000Z',
       limit: 50,
-      search: undefined,
+      search: 'sales',
+      status: 'completed',
+      department: 'sales',
+      level: 'lead',
+      sort: 'title_asc',
     })
     expect(await screen.findByText('DevOps Engineer')).toBeInTheDocument()
   })
@@ -445,6 +512,13 @@ describe('CareerPlaybookLibraryPageClient', () => {
         <CareerPlaybookLibraryPageClient
           locale="en"
           initialData={{ items: [], nextCursor: null, error: null }}
+          filters={{
+            search: undefined,
+            status: undefined,
+            department: undefined,
+            level: undefined,
+            sort: 'created_desc',
+          }}
         />
       </NextIntlClientProvider>
     )
@@ -459,6 +533,13 @@ describe('CareerPlaybookLibraryPageClient', () => {
             items: [],
             nextCursor: null,
             error: 'careerPlaybook.library.list unavailable',
+          }}
+          filters={{
+            search: undefined,
+            status: undefined,
+            department: undefined,
+            level: undefined,
+            sort: 'created_desc',
           }}
         />
       </NextIntlClientProvider>

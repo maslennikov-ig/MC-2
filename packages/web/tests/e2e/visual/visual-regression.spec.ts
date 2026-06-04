@@ -37,7 +37,7 @@ test.describe('Visual Regression Tests', () => {
     })
   })
 
-  test('Courses page visual snapshot', async ({ page }) => {
+  test('Course landing page visual snapshot', async ({ page }) => {
     await page.goto('/courses')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000) // Wait for animations
@@ -114,7 +114,7 @@ test.describe('Visual Regression Tests', () => {
       animations: 'disabled',
     })
 
-    // Test courses page mobile
+    // Test course landing page mobile
     await page.goto('/courses')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
@@ -139,7 +139,7 @@ test.describe('Visual Regression Tests', () => {
   })
 
   test('Course cards visual consistency', async ({ page }) => {
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 
@@ -160,10 +160,12 @@ test.describe('Visual Regression Tests', () => {
     // Intercept network requests to simulate loading
     await page.route('**/api/**', (route) => {
       // Delay the response by 2 seconds
-      setTimeout(() => route.continue(), 2000)
+      setTimeout(() => {
+        void route.continue()
+      }, 2000)
     })
 
-    await page.goto('/courses')
+    await page.goto('/courses/library')
 
     // Capture loading state
     await expect(page).toHaveScreenshot('loading-state.png', {
@@ -174,14 +176,14 @@ test.describe('Visual Regression Tests', () => {
   test('Empty state visual snapshot', async ({ page }) => {
     // Mock empty response
     await page.route('**/api/courses**', (route) => {
-      route.fulfill({
+      void route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ courses: [] }),
       })
     })
 
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 
@@ -194,14 +196,14 @@ test.describe('Visual Regression Tests', () => {
   test('Error state visual snapshot', async ({ page }) => {
     // Mock error response
     await page.route('**/api/**', (route) => {
-      route.fulfill({
+      void route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Internal server error' }),
       })
     })
 
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 

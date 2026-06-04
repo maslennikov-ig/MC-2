@@ -581,7 +581,7 @@ export async function updateDraftAndStartGeneration(
       .eq('id', course.organization_id)
       .single()
 
-    revalidatePath('/courses')
+    revalidatePath('/courses/library')
     if (orgData?.slug) {
       revalidatePath(`/courses/${orgData.slug}/${course.slug}`)
     }
@@ -682,7 +682,7 @@ export async function cancelCourseGeneration(
     logger.info('Course generation cancelled', { courseId, userId: user.id })
 
     // Revalidate the course page
-    revalidatePath('/courses')
+    revalidatePath('/courses/library')
 
     return { success: true }
   } catch (error) {

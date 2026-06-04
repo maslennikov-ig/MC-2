@@ -1,84 +1,38 @@
-export type RoleTitleSuggestionLocale = 'ru' | 'en'
+import {
+  escoRoleTitleSuggestions,
+  roleTitleSuggestionSourceMetadata as escoRoleTitleSuggestionSourceMetadata,
+} from './role-title-suggestions-esco'
+import { mc2OverlayRoleTitleSuggestions } from './role-title-suggestions-mc2-overlay'
+import {
+  wikidataRoleTitleSuggestions,
+  wikidataRoleTitleSuggestionSourceMetadata,
+} from './role-title-suggestions-wikidata'
+import type {
+  LocalizedRoleTitleSuggestion,
+  RoleDepartment,
+  RoleMatchKind,
+  RoleTitleSuggestion,
+  RoleTitleSuggestionGroup,
+  RoleTitleSuggestionLocale,
+} from './role-title-suggestions.types'
 
-export type RoleDepartment =
-  | 'sales'
-  | 'marketing'
-  | 'product'
-  | 'engineering'
-  | 'design'
-  | 'data'
-  | 'operations'
-  | 'hr'
-  | 'finance'
-  | 'support'
-  | 'legal'
+export type {
+  LocalizedRoleTitleSuggestion,
+  RoleDepartment,
+  RoleGroup,
+  RoleMatchKind,
+  RoleSeniority,
+  RoleTitleSourceReferences,
+  RoleTitleSuggestion,
+  RoleTitleSuggestionGroup,
+  RoleTitleSuggestionLocale,
+  RoleTitleSuggestionSource,
+} from './role-title-suggestions.types'
 
-export type RoleGroup =
-  | 'account-management'
-  | 'analytics'
-  | 'business-operations'
-  | 'commercial-leadership'
-  | 'content-brand'
-  | 'customer-implementation'
-  | 'customer-support'
-  | 'data-platform'
-  | 'design-leadership'
-  | 'engineering-leadership'
-  | 'finance-control'
-  | 'growth-marketing'
-  | 'legal-compliance'
-  | 'people-operations'
-  | 'product-leadership'
-  | 'product-management'
-  | 'recruiting'
-  | 'software-engineering'
-
-export type RoleSeniority = 'individual_contributor' | 'lead' | 'manager' | 'head' | 'executive'
-
-export type RoleMatchKind = 'popular' | 'label' | 'alias' | 'acronym' | 'keyword'
-
-export type RoleTitleSuggestionSource = 'esco' | 'onet' | 'okz' | 'mc2_overlay'
-
-export interface RoleTitleSourceReferences {
-  escoUri?: string
-  onetSocCode?: string
-  okzCode?: string
-}
-
-export interface RoleTitleSuggestion {
-  id: string
-  department: RoleDepartment
-  group: RoleGroup
-  seniority?: RoleSeniority
-  labels: Record<RoleTitleSuggestionLocale, string>
-  aliases: Record<RoleTitleSuggestionLocale, string[]>
-  acronyms?: string[]
-  keywords?: Record<RoleTitleSuggestionLocale, string[]>
-  popularityRank: number
-  localePriority?: Partial<Record<RoleTitleSuggestionLocale, number>>
-  source: RoleTitleSuggestionSource
-  sourceReferences?: RoleTitleSourceReferences
-}
-
-export interface LocalizedRoleTitleSuggestion {
-  id: string
-  department: RoleDepartment
-  departmentLabel: string
-  group: RoleGroup
-  seniority?: RoleSeniority
-  label: string
-  alternateLabel: string
-  matchLabel: string
-  matchKind: RoleMatchKind
-  score: number
-  source: RoleTitleSuggestion['source']
-}
-
-export interface RoleTitleSuggestionGroup {
-  department: RoleDepartment
-  departmentLabel: string
-  suggestions: LocalizedRoleTitleSuggestion[]
-}
+export const roleTitleSuggestionSourceMetadata = {
+  ...escoRoleTitleSuggestionSourceMetadata,
+  ...wikidataRoleTitleSuggestionSourceMetadata,
+} as const
 
 const departmentLabels: Record<RoleDepartment, Record<RoleTitleSuggestionLocale, string>> = {
   sales: { ru: 'Продажи', en: 'Sales' },
@@ -94,1000 +48,54 @@ const departmentLabels: Record<RoleDepartment, Record<RoleTitleSuggestionLocale,
   legal: { ru: 'Право и соблюдение требований', en: 'Legal and Compliance' },
 }
 
-const role = (suggestion: Omit<RoleTitleSuggestion, 'source'>): RoleTitleSuggestion => ({
-  ...suggestion,
-  source: 'mc2_overlay',
-})
+export const roleTitleSuggestions: RoleTitleSuggestion[] = mergeRoleTitleSuggestionSources(
+  escoRoleTitleSuggestions,
+  wikidataRoleTitleSuggestions,
+  mc2OverlayRoleTitleSuggestions
+)
 
-export const roleTitleSuggestions: RoleTitleSuggestion[] = [
-  role({
-    id: 'product-manager',
-    department: 'product',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Менеджер продукта', en: 'Product Manager' },
-    aliases: { ru: ['продакт', 'менеджер продукта', 'product manager'], en: ['product lead'] },
-    acronyms: ['PM'],
-    keywords: { ru: ['продукт', 'роадмап', 'гипотезы'], en: ['roadmap', 'discovery'] },
-    popularityRank: 1,
-    localePriority: { ru: 1, en: 1 },
-  }),
-  role({
-    id: 'product-owner',
-    department: 'product',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Владелец продукта', en: 'Product Owner' },
-    aliases: { ru: ['владелец продукта'], en: ['po', 'scrum product owner'] },
-    acronyms: ['PO'],
-    keywords: { ru: ['бэклог', 'спринт'], en: ['backlog', 'scrum'] },
-    popularityRank: 12,
-    localePriority: { ru: 8, en: 8 },
-  }),
-  role({
-    id: 'head-of-product',
-    department: 'product',
-    group: 'product-leadership',
-    seniority: 'head',
-    labels: { ru: 'Руководитель продукта', en: 'Head of Product' },
-    aliases: { ru: ['руководитель продукта'], en: ['product lead'] },
-    keywords: { ru: ['портфель продуктов'], en: ['product portfolio'] },
-    popularityRank: 17,
-    localePriority: { ru: 10, en: 10 },
-  }),
-  role({
-    id: 'chief-product-officer',
-    department: 'product',
-    group: 'product-leadership',
-    seniority: 'executive',
-    labels: { ru: 'Директор по продукту', en: 'Chief Product Officer' },
-    aliases: { ru: ['cpo', 'директор по продукту'], en: ['cpo', 'vp product'] },
-    acronyms: ['CPO'],
-    keywords: { ru: ['продуктовая стратегия'], en: ['product strategy'] },
-    popularityRank: 34,
-    localePriority: { ru: 18, en: 18 },
-  }),
-  role({
-    id: 'technical-product-manager',
-    department: 'product',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Технический менеджер продукта', en: 'Technical Product Manager' },
-    aliases: { ru: ['технический продакт'], en: ['technical pm', 'platform product manager'] },
-    acronyms: ['TPM'],
-    keywords: { ru: ['api', 'платформа'], en: ['api', 'platform'] },
-    popularityRank: 26,
-    localePriority: { ru: 15, en: 15 },
-  }),
-  role({
-    id: 'growth-product-manager',
-    department: 'product',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Менеджер продукта по росту', en: 'Growth Product Manager' },
-    aliases: { ru: ['growth pm', 'продуктовый менеджер роста'], en: ['growth pm'] },
-    acronyms: ['GPM'],
-    keywords: { ru: ['активация', 'retention'], en: ['activation', 'retention'] },
-    popularityRank: 31,
-    localePriority: { ru: 20, en: 20 },
-  }),
-  role({
-    id: 'product-analyst',
-    department: 'product',
-    group: 'analytics',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Продуктовый аналитик', en: 'Product Analyst' },
-    aliases: { ru: ['product analyst', 'аналитик продукта'], en: ['product analytics'] },
-    keywords: { ru: ['метрики продукта', 'воронка'], en: ['product metrics', 'funnel'] },
-    popularityRank: 29,
-    localePriority: { ru: 12, en: 22 },
-  }),
-  role({
-    id: 'product-marketing-manager',
-    department: 'marketing',
-    group: 'content-brand',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер продуктового маркетинга', en: 'Product Marketing Manager' },
-    aliases: { ru: ['pmm', 'маркетолог продукта'], en: ['pmm', 'go-to-market manager'] },
-    acronyms: ['PMM'],
-    keywords: { ru: ['позиционирование', 'gtm'], en: ['positioning', 'gtm'] },
-    popularityRank: 38,
-    localePriority: { ru: 32, en: 28 },
-  }),
-  role({
-    id: 'software-engineer',
-    department: 'engineering',
-    group: 'software-engineering',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер-программист', en: 'Software Engineer' },
-    aliases: {
-      ru: ['разработчик', 'программист', 'инженер-программист'],
-      en: ['developer', 'programmer'],
-    },
-    keywords: { ru: ['код', 'разработка'], en: ['coding', 'software development'] },
-    popularityRank: 2,
-    localePriority: { ru: 2, en: 2 },
-  }),
-  role({
-    id: 'frontend-developer',
-    department: 'engineering',
-    group: 'software-engineering',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Фронтенд-разработчик', en: 'Frontend Developer' },
-    aliases: {
-      ru: ['фронтенд-разработчик', 'frontend engineer', 'разработчик интерфейсов'],
-      en: ['frontend engineer', 'front-end developer'],
-    },
-    keywords: { ru: ['react', 'интерфейс'], en: ['react', 'ui engineering'] },
-    popularityRank: 6,
-    localePriority: { ru: 4, en: 5 },
-  }),
-  role({
-    id: 'backend-developer',
-    department: 'engineering',
-    group: 'software-engineering',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Бэкенд-разработчик', en: 'Backend Developer' },
-    aliases: {
-      ru: ['бэкенд-разработчик', 'backend engineer', 'серверный разработчик'],
-      en: ['backend engineer', 'server-side developer'],
-    },
-    keywords: { ru: ['api', 'сервер'], en: ['api', 'server'] },
-    popularityRank: 7,
-    localePriority: { ru: 5, en: 6 },
-  }),
-  role({
-    id: 'fullstack-developer',
-    department: 'engineering',
-    group: 'software-engineering',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Фулстек-разработчик', en: 'Fullstack Developer' },
-    aliases: {
-      ru: ['фулстек-разработчик', 'full-stack engineer'],
-      en: ['full-stack engineer', 'full stack developer'],
-    },
-    keywords: { ru: ['frontend', 'backend'], en: ['frontend', 'backend'] },
-    popularityRank: 13,
-    localePriority: { ru: 7, en: 7 },
-  }),
-  role({
-    id: 'mobile-developer',
-    department: 'engineering',
-    group: 'software-engineering',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Мобильный разработчик', en: 'Mobile Developer' },
-    aliases: {
-      ru: ['мобильный разработчик', 'ios developer', 'android developer'],
-      en: ['ios developer', 'android developer'],
-    },
-    keywords: { ru: ['ios', 'android'], en: ['ios', 'android'] },
-    popularityRank: 41,
-    localePriority: { ru: 27, en: 27 },
-  }),
-  role({
-    id: 'qa-engineer',
-    department: 'engineering',
-    group: 'software-engineering',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер по тестированию', en: 'QA Engineer' },
-    aliases: {
-      ru: ['тестировщик', 'инженер по качеству'],
-      en: ['quality assurance engineer', 'tester'],
-    },
-    acronyms: ['QA'],
-    keywords: { ru: ['тестирование', 'качество'], en: ['testing', 'quality'] },
-    popularityRank: 20,
-    localePriority: { ru: 14, en: 14 },
-  }),
-  role({
-    id: 'devops-engineer',
-    department: 'engineering',
-    group: 'data-platform',
-    seniority: 'individual_contributor',
-    labels: { ru: 'DevOps-инженер', en: 'DevOps Engineer' },
-    aliases: {
-      ru: ['sre', 'platform engineer', 'инженер инфраструктуры'],
-      en: ['sre', 'platform engineer'],
-    },
-    acronyms: ['SRE'],
-    keywords: { ru: ['инфраструктура', 'ci cd'], en: ['infrastructure', 'ci cd'] },
-    popularityRank: 15,
-    localePriority: { ru: 11, en: 11 },
-  }),
-  role({
-    id: 'platform-engineer',
-    department: 'engineering',
-    group: 'data-platform',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер платформы', en: 'Platform Engineer' },
-    aliases: {
-      ru: ['инженер платформы', 'devops'],
-      en: ['devops engineer', 'infrastructure engineer'],
-    },
-    keywords: { ru: ['платформа разработки'], en: ['developer platform'] },
-    popularityRank: 37,
-    localePriority: { ru: 26, en: 24 },
-  }),
-  role({
-    id: 'engineering-manager',
-    department: 'engineering',
-    group: 'engineering-leadership',
-    seniority: 'manager',
-    labels: { ru: 'Руководитель инженерной команды', en: 'Engineering Manager' },
-    aliases: {
-      ru: ['руководитель разработки', 'менеджер инженеров'],
-      en: ['software development manager'],
-    },
-    keywords: { ru: ['команда разработки'], en: ['engineering team'] },
-    popularityRank: 14,
-    localePriority: { ru: 9, en: 9 },
-  }),
-  role({
-    id: 'tech-lead',
-    department: 'engineering',
-    group: 'engineering-leadership',
-    seniority: 'lead',
-    labels: { ru: 'Технический лидер', en: 'Tech Lead' },
-    aliases: { ru: ['техлид', 'technical lead'], en: ['technical lead'] },
-    keywords: { ru: ['архитектура', 'ревью кода'], en: ['architecture', 'code review'] },
-    popularityRank: 19,
-    localePriority: { ru: 13, en: 13 },
-  }),
-  role({
-    id: 'solution-architect',
-    department: 'engineering',
-    group: 'engineering-leadership',
-    seniority: 'lead',
-    labels: { ru: 'Архитектор решений', en: 'Solution Architect' },
-    aliases: { ru: ['архитектор решений', 'системный архитектор'], en: ['systems architect'] },
-    keywords: { ru: ['архитектура решений'], en: ['solution design'] },
-    popularityRank: 42,
-    localePriority: { ru: 28, en: 30 },
-  }),
-  role({
-    id: 'security-engineer',
-    department: 'engineering',
-    group: 'data-platform',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер по безопасности', en: 'Security Engineer' },
-    aliases: {
-      ru: ['инженер по безопасности', 'appsec'],
-      en: ['appsec engineer', 'cybersecurity engineer'],
-    },
-    keywords: { ru: ['безопасность', 'уязвимости'], en: ['security', 'vulnerabilities'] },
-    popularityRank: 49,
-    localePriority: { ru: 34, en: 34 },
-  }),
-  role({
-    id: 'data-analyst',
-    department: 'data',
-    group: 'analytics',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Аналитик данных', en: 'Data Analyst' },
-    aliases: { ru: ['аналитик данных', 'bi analyst'], en: ['bi analyst', 'analytics analyst'] },
-    keywords: { ru: ['дашборд', 'метрики'], en: ['dashboard', 'metrics'] },
-    popularityRank: 8,
-    localePriority: { ru: 6, en: 4 },
-  }),
-  role({
-    id: 'business-intelligence-analyst',
-    department: 'data',
-    group: 'analytics',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Аналитик бизнес-данных (BI)', en: 'BI Analyst' },
-    aliases: {
-      ru: ['бизнес-аналитик данных', 'аналитик bi'],
-      en: ['business intelligence analyst'],
-    },
-    acronyms: ['BI'],
-    keywords: { ru: ['отчеты', 'визуализация'], en: ['reports', 'visualization'] },
-    popularityRank: 27,
-    localePriority: { ru: 21, en: 19 },
-  }),
-  role({
-    id: 'data-scientist',
-    department: 'data',
-    group: 'analytics',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Специалист по анализу данных', en: 'Data Scientist' },
-    aliases: {
-      ru: ['специалист по данным', 'ml researcher'],
-      en: ['machine learning scientist', 'ml scientist'],
-    },
-    acronyms: ['ML'],
-    keywords: { ru: ['машинное обучение', 'модель'], en: ['machine learning', 'modeling'] },
-    popularityRank: 18,
-    localePriority: { ru: 16, en: 12 },
-  }),
-  role({
-    id: 'data-engineer',
-    department: 'data',
-    group: 'data-platform',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер данных', en: 'Data Engineer' },
-    aliases: { ru: ['инженер данных', 'etl engineer'], en: ['etl engineer', 'analytics engineer'] },
-    keywords: { ru: ['etl', 'пайплайн данных'], en: ['etl', 'data pipeline'] },
-    popularityRank: 21,
-    localePriority: { ru: 17, en: 16 },
-  }),
-  role({
-    id: 'machine-learning-engineer',
-    department: 'data',
-    group: 'data-platform',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер машинного обучения', en: 'Machine Learning Engineer' },
-    aliases: {
-      ru: ['ml engineer', 'инженер машинного обучения'],
-      en: ['ml engineer', 'ai engineer'],
-    },
-    acronyms: ['MLE', 'ML'],
-    keywords: { ru: ['mlops', 'модель'], en: ['mlops', 'model serving'] },
-    popularityRank: 44,
-    localePriority: { ru: 33, en: 31 },
-  }),
-  role({
-    id: 'analytics-engineer',
-    department: 'data',
-    group: 'analytics',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Инженер аналитики', en: 'Analytics Engineer' },
-    aliases: {
-      ru: ['инженер аналитики', 'dbt analyst'],
-      en: ['dbt developer', 'data modeling engineer'],
-    },
-    keywords: { ru: ['модель данных'], en: ['data modeling'] },
-    popularityRank: 51,
-    localePriority: { ru: 36, en: 36 },
-  }),
-  role({
-    id: 'head-of-data',
-    department: 'data',
-    group: 'data-platform',
-    seniority: 'head',
-    labels: { ru: 'Руководитель направления данных', en: 'Head of Data' },
-    aliases: { ru: ['руководитель данных', 'директор по данным'], en: ['data director'] },
-    keywords: { ru: ['data strategy'], en: ['data strategy'] },
-    popularityRank: 55,
-    localePriority: { ru: 40, en: 40 },
-  }),
-  role({
-    id: 'ux-ui-designer',
-    department: 'design',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Дизайнер интерфейсов (UX/UI)', en: 'UX/UI Designer' },
-    aliases: { ru: ['дизайнер интерфейсов', 'ui ux designer'], en: ['ui designer', 'ux designer'] },
-    keywords: { ru: ['интерфейс', 'макет'], en: ['interface', 'wireframe'] },
-    popularityRank: 11,
-    localePriority: { ru: 3, en: 18 },
-  }),
-  role({
-    id: 'product-designer',
-    department: 'design',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Продуктовый дизайнер', en: 'Product Designer' },
-    aliases: { ru: ['продуктовый дизайнер', 'дизайнер продукта'], en: ['ux ui designer'] },
-    keywords: { ru: ['прототип', 'ux'], en: ['prototype', 'ux'] },
-    popularityRank: 22,
-    localePriority: { ru: 19, en: 17 },
-  }),
-  role({
-    id: 'ux-researcher',
-    department: 'design',
-    group: 'product-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Исследователь пользовательского опыта (UX)', en: 'UX Researcher' },
-    aliases: { ru: ['исследователь пользователей', 'ux researcher'], en: ['user researcher'] },
-    keywords: { ru: ['интервью', 'исследования'], en: ['interviews', 'research'] },
-    popularityRank: 45,
-    localePriority: { ru: 31, en: 33 },
-  }),
-  role({
-    id: 'brand-designer',
-    department: 'design',
-    group: 'content-brand',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Бренд-дизайнер', en: 'Brand Designer' },
-    aliases: { ru: ['бренд-дизайнер', 'графический дизайнер'], en: ['graphic designer'] },
-    keywords: { ru: ['бренд', 'айдентика'], en: ['brand', 'identity'] },
-    popularityRank: 52,
-    localePriority: { ru: 38, en: 38 },
-  }),
-  role({
-    id: 'motion-designer',
-    department: 'design',
-    group: 'content-brand',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Моушн-дизайнер', en: 'Motion Designer' },
-    aliases: { ru: ['моушн-дизайнер', 'аниматор'], en: ['animator'] },
-    keywords: { ru: ['анимация', 'видео'], en: ['animation', 'video'] },
-    popularityRank: 67,
-    localePriority: { ru: 48, en: 50 },
-  }),
-  role({
-    id: 'design-lead',
-    department: 'design',
-    group: 'design-leadership',
-    seniority: 'lead',
-    labels: { ru: 'Руководитель дизайна', en: 'Design Lead' },
-    aliases: { ru: ['ведущий дизайнер', 'руководитель дизайна'], en: ['lead designer'] },
-    keywords: { ru: ['дизайн-система'], en: ['design system'] },
-    popularityRank: 46,
-    localePriority: { ru: 35, en: 35 },
-  }),
-  role({
-    id: 'sales-manager',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по продажам', en: 'Sales Manager' },
-    aliases: {
-      ru: ['sales manager', 'менеджер продаж', 'специалист по продажам'],
-      en: ['sales lead', 'sales team manager'],
-    },
-    keywords: {
-      ru: ['продажи', 'выручка', 'клиенты', 'воронка продаж'],
-      en: ['sales', 'revenue', 'customers', 'sales pipeline'],
-    },
-    popularityRank: 3,
-    localePriority: { ru: 2, en: 3 },
-    sourceReferences: {
-      escoUri: 'http://data.europa.eu/esco/occupation/a7594892-ff23-4e2a-aedf-2f967ebca15c',
-    },
-  }),
-  role({
-    id: 'b2b-sales-manager',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по корпоративным продажам (B2B)', en: 'B2B Sales Manager' },
-    aliases: {
-      ru: ['sales manager b2b', 'менеджер b2b продаж', 'менеджер по продажам для бизнеса'],
-      en: ['b2b account manager', 'business sales manager'],
-    },
-    keywords: { ru: ['воронка продаж', 'сделки'], en: ['sales pipeline', 'deals'] },
-    popularityRank: 4,
-    localePriority: { ru: 4, en: 4 },
-  }),
-  role({
-    id: 'b2c-sales-manager',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по продажам частным клиентам (B2C)', en: 'B2C Sales Manager' },
-    aliases: {
-      ru: ['sales manager b2c', 'менеджер b2c продаж', 'менеджер по продажам частным клиентам'],
-      en: ['consumer sales manager', 'direct sales manager'],
-    },
-    keywords: {
-      ru: ['b2c', 'частные клиенты', 'розница', 'прямые продажи'],
-      en: ['b2c', 'consumer sales', 'direct sales'],
-    },
-    popularityRank: 21,
-    localePriority: { ru: 5, en: 20 },
-  }),
-  role({
-    id: 'retail-sales-manager',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер розничных продаж', en: 'Retail Sales Manager' },
-    aliases: {
-      ru: ['retail sales manager', 'менеджер по продажам в рознице', 'менеджер розницы'],
-      en: ['retail manager', 'shop sales manager'],
-    },
-    keywords: { ru: ['розница', 'магазин', 'b2c'], en: ['retail', 'store', 'b2c'] },
-    popularityRank: 22,
-    localePriority: { ru: 6, en: 21 },
-  }),
-  role({
-    id: 'head-of-sales',
-    department: 'sales',
-    group: 'commercial-leadership',
-    seniority: 'head',
-    labels: { ru: 'Руководитель отдела продаж', en: 'Head of Sales' },
-    aliases: {
-      ru: ['директор по продажам', 'head of sales', 'sales director'],
-      en: ['sales director', 'vp sales'],
-    },
-    keywords: { ru: ['команда продаж'], en: ['sales team'] },
-    popularityRank: 4,
-    localePriority: { ru: 1, en: 4 },
-  }),
-  role({
-    id: 'account-executive',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Менеджер по клиентским сделкам', en: 'Account Executive' },
-    aliases: { ru: ['ae', 'менеджер по ключевым клиентам'], en: ['ae', 'sales executive'] },
-    acronyms: ['AE'],
-    keywords: { ru: ['клиенты', 'выручка'], en: ['customers', 'revenue'] },
-    popularityRank: 16,
-    localePriority: { ru: 16, en: 14 },
-  }),
-  role({
-    id: 'sales-development-representative',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Специалист по развитию продаж', en: 'Sales Development Representative' },
-    aliases: { ru: ['sdr', 'специалист лидогенерации'], en: ['sdr', 'lead generation specialist'] },
-    acronyms: ['SDR'],
-    keywords: { ru: ['лиды', 'исходящие продажи'], en: ['leads', 'outbound'] },
-    popularityRank: 25,
-    localePriority: { ru: 24, en: 23 },
-  }),
-  role({
-    id: 'key-account-manager',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по ключевым клиентам', en: 'Key Account Manager' },
-    aliases: {
-      ru: ['кам', 'менеджер ключевых клиентов'],
-      en: ['kam', 'strategic account manager'],
-    },
-    acronyms: ['KAM'],
-    keywords: { ru: ['ключевые клиенты'], en: ['key accounts'] },
-    popularityRank: 28,
-    localePriority: { ru: 23, en: 25 },
-  }),
-  role({
-    id: 'sales-operations-manager',
-    department: 'sales',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер операционных процессов продаж', en: 'Sales Operations Manager' },
-    aliases: {
-      ru: ['sales ops', 'менеджер операционной поддержки продаж'],
-      en: ['sales ops manager'],
-    },
-    keywords: { ru: ['crm', 'прогноз продаж'], en: ['crm', 'sales forecast'] },
-    popularityRank: 39,
-    localePriority: { ru: 30, en: 29 },
-  }),
-  role({
-    id: 'channel-sales-manager',
-    department: 'sales',
-    group: 'account-management',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер партнёрских продаж', en: 'Channel Sales Manager' },
-    aliases: {
-      ru: ['партнерские продажи', 'channel manager', 'менеджер по продажам через партнеров'],
-      en: ['partner sales manager', 'channel manager'],
-    },
-    keywords: { ru: ['партнеры', 'каналы'], en: ['partners', 'channels'] },
-    popularityRank: 57,
-    localePriority: { ru: 42, en: 42 },
-  }),
-  role({
-    id: 'revenue-operations-manager',
-    department: 'sales',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер операций выручки (RevOps)', en: 'Revenue Operations Manager' },
-    aliases: { ru: ['revops', 'менеджер revenue operations'], en: ['revops manager'] },
-    acronyms: ['RevOps'],
-    keywords: { ru: ['выручка', 'операции продаж'], en: ['revenue', 'go-to-market operations'] },
-    popularityRank: 43,
-    localePriority: { ru: 39, en: 32 },
-  }),
-  role({
-    id: 'marketing-manager',
-    department: 'marketing',
-    group: 'growth-marketing',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер маркетинга', en: 'Marketing Manager' },
-    aliases: { ru: ['marketing manager', 'менеджер маркетинга'], en: ['growth marketing manager'] },
-    keywords: { ru: ['кампании', 'лиды'], en: ['campaigns', 'leads'] },
-    popularityRank: 9,
-    localePriority: { ru: 9, en: 9 },
-  }),
-  role({
-    id: 'performance-marketing-manager',
-    department: 'marketing',
-    group: 'growth-marketing',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по результативной рекламе', en: 'Performance Marketing Manager' },
-    aliases: {
-      ru: ['перформанс-маркетолог', 'paid ads'],
-      en: ['paid marketing manager', 'ppc manager'],
-    },
-    keywords: { ru: ['реклама', 'cpa'], en: ['paid ads', 'cpa'] },
-    popularityRank: 23,
-    localePriority: { ru: 18, en: 21 },
-  }),
-  role({
-    id: 'content-marketing-manager',
-    department: 'marketing',
-    group: 'content-brand',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер контент-маркетинга', en: 'Content Marketing Manager' },
-    aliases: { ru: ['контент-маркетолог', 'content manager'], en: ['content manager'] },
-    keywords: { ru: ['контент', 'редакция'], en: ['content', 'editorial'] },
-    popularityRank: 30,
-    localePriority: { ru: 25, en: 26 },
-  }),
-  role({
-    id: 'brand-manager',
-    department: 'marketing',
-    group: 'content-brand',
-    seniority: 'manager',
-    labels: { ru: 'Бренд-менеджер', en: 'Brand Manager' },
-    aliases: { ru: ['бренд-менеджер'], en: ['brand lead'] },
-    keywords: { ru: ['бренд', 'позиционирование'], en: ['brand', 'positioning'] },
-    popularityRank: 40,
-    localePriority: { ru: 29, en: 37 },
-  }),
-  role({
-    id: 'growth-marketer',
-    department: 'marketing',
-    group: 'growth-marketing',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Маркетолог роста', en: 'Growth Marketer' },
-    aliases: { ru: ['маркетолог роста', 'growth manager'], en: ['growth manager'] },
-    keywords: { ru: ['эксперименты', 'активация'], en: ['experiments', 'activation'] },
-    popularityRank: 33,
-    localePriority: { ru: 28, en: 24 },
-  }),
-  role({
-    id: 'seo-specialist',
-    department: 'marketing',
-    group: 'growth-marketing',
-    seniority: 'individual_contributor',
-    labels: { ru: 'SEO-специалист', en: 'SEO Specialist' },
-    aliases: { ru: ['seo-специалист', 'специалист по seo'], en: ['seo manager'] },
-    acronyms: ['SEO'],
-    keywords: { ru: ['органический трафик', 'поиск'], en: ['organic traffic', 'search'] },
-    popularityRank: 36,
-    localePriority: { ru: 27, en: 34 },
-  }),
-  role({
-    id: 'crm-marketing-manager',
-    department: 'marketing',
-    group: 'growth-marketing',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер CRM-маркетинга', en: 'CRM Marketing Manager' },
-    aliases: {
-      ru: ['crm-маркетолог', 'email marketing manager'],
-      en: ['email marketing manager', 'lifecycle marketer'],
-    },
-    acronyms: ['CRM'],
-    keywords: { ru: ['рассылки', 'retention'], en: ['email', 'lifecycle'] },
-    popularityRank: 48,
-    localePriority: { ru: 41, en: 39 },
-  }),
-  role({
-    id: 'marketing-operations-manager',
-    department: 'marketing',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер маркетинговых операций', en: 'Marketing Operations Manager' },
-    aliases: { ru: ['marketing ops', 'операции маркетинга'], en: ['marketing ops manager'] },
-    keywords: { ru: ['маркетинг-стек', 'атрибуция'], en: ['marketing stack', 'attribution'] },
-    popularityRank: 53,
-    localePriority: { ru: 43, en: 41 },
-  }),
-  role({
-    id: 'customer-success-manager',
-    department: 'support',
-    group: 'customer-implementation',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по развитию клиентов', en: 'Customer Success Manager' },
-    aliases: { ru: ['csm', 'менеджер по успеху клиентов'], en: ['csm', 'client success manager'] },
-    acronyms: ['CSM'],
-    keywords: { ru: ['удержание клиентов', 'аккаунты'], en: ['retention', 'accounts'] },
-    popularityRank: 5,
-    localePriority: { ru: 6, en: 5 },
-  }),
-  role({
-    id: 'support-specialist',
-    department: 'support',
-    group: 'customer-support',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Специалист поддержки', en: 'Support Specialist' },
-    aliases: { ru: ['customer support', 'саппорт'], en: ['customer support specialist'] },
-    keywords: { ru: ['тикеты', 'клиенты'], en: ['tickets', 'customers'] },
-    popularityRank: 24,
-    localePriority: { ru: 22, en: 20 },
-  }),
-  role({
-    id: 'customer-support-lead',
-    department: 'support',
-    group: 'customer-support',
-    seniority: 'lead',
-    labels: { ru: 'Руководитель поддержки', en: 'Customer Support Lead' },
-    aliases: { ru: ['support lead', 'лид поддержки'], en: ['support lead', 'head of support'] },
-    keywords: { ru: ['sla', 'поддержка'], en: ['sla', 'support'] },
-    popularityRank: 35,
-    localePriority: { ru: 26, en: 31 },
-  }),
-  role({
-    id: 'implementation-manager',
-    department: 'support',
-    group: 'customer-implementation',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер внедрения', en: 'Implementation Manager' },
-    aliases: { ru: ['менеджер внедрения', 'onboarding manager'], en: ['onboarding manager'] },
-    keywords: {
-      ru: ['внедрение', 'онбординг клиента'],
-      en: ['implementation', 'customer onboarding'],
-    },
-    popularityRank: 50,
-    localePriority: { ru: 37, en: 36 },
-  }),
-  role({
-    id: 'technical-account-manager',
-    department: 'support',
-    group: 'customer-implementation',
-    seniority: 'manager',
-    labels: { ru: 'Технический менеджер по клиентам', en: 'Technical Account Manager' },
-    aliases: { ru: ['tam', 'технический аккаунт-менеджер'], en: ['tam'] },
-    acronyms: ['TAM'],
-    keywords: { ru: ['техническая поддержка клиента'], en: ['technical customer success'] },
-    popularityRank: 56,
-    localePriority: { ru: 44, en: 43 },
-  }),
-  role({
-    id: 'project-manager',
-    department: 'operations',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Руководитель проекта', en: 'Project Manager' },
-    aliases: { ru: ['менеджер проекта', 'руководитель проекта'], en: ['project lead'] },
-    acronyms: ['PM'],
-    keywords: { ru: ['сроки', 'план проекта'], en: ['timeline', 'project plan'] },
-    popularityRank: 10,
-    localePriority: { ru: 10, en: 12 },
-  }),
-  role({
-    id: 'program-manager',
-    department: 'operations',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Руководитель программы', en: 'Program Manager' },
-    aliases: { ru: ['менеджер программы', 'руководитель программы'], en: ['program lead'] },
-    acronyms: ['PM'],
-    keywords: { ru: ['портфель проектов'], en: ['program portfolio'] },
-    popularityRank: 32,
-    localePriority: { ru: 30, en: 28 },
-  }),
-  role({
-    id: 'operations-manager',
-    department: 'operations',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Операционный менеджер', en: 'Operations Manager' },
-    aliases: { ru: ['operations manager', 'операционный руководитель'], en: ['ops manager'] },
-    keywords: { ru: ['процессы', 'операции'], en: ['processes', 'operations'] },
-    popularityRank: 11,
-    localePriority: { ru: 8, en: 8 },
-  }),
-  role({
-    id: 'business-analyst',
-    department: 'operations',
-    group: 'business-operations',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Бизнес-аналитик', en: 'Business Analyst' },
-    aliases: { ru: ['business analyst', 'системный аналитик'], en: ['systems analyst'] },
-    keywords: { ru: ['требования', 'процессы'], en: ['requirements', 'processes'] },
-    popularityRank: 14,
-    localePriority: { ru: 11, en: 11 },
-  }),
-  role({
-    id: 'chief-operating-officer',
-    department: 'operations',
-    group: 'business-operations',
-    seniority: 'executive',
-    labels: { ru: 'Операционный директор', en: 'Chief Operating Officer' },
-    aliases: { ru: ['coo', 'операционный директор'], en: ['coo', 'operations director'] },
-    acronyms: ['COO'],
-    keywords: { ru: ['операционная система'], en: ['operating model'] },
-    popularityRank: 47,
-    localePriority: { ru: 32, en: 32 },
-  }),
-  role({
-    id: 'process-manager',
-    department: 'operations',
-    group: 'business-operations',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер процессов', en: 'Process Manager' },
-    aliases: { ru: ['менеджер процессов', 'process owner'], en: ['process owner'] },
-    keywords: { ru: ['регламенты', 'процессы'], en: ['process improvement'] },
-    popularityRank: 58,
-    localePriority: { ru: 41, en: 45 },
-  }),
-  role({
-    id: 'hr-business-partner',
-    department: 'hr',
-    group: 'people-operations',
-    seniority: 'manager',
-    labels: { ru: 'Партнёр по персоналу', en: 'HR Business Partner' },
-    aliases: {
-      ru: ['hrbp', 'people partner', 'эйчар бизнес партнер'],
-      en: ['hrbp', 'people partner'],
-    },
-    acronyms: ['HRBP'],
-    keywords: { ru: ['люди', 'команды'], en: ['people', 'teams'] },
-    popularityRank: 18,
-    localePriority: { ru: 15, en: 15 },
-  }),
-  role({
-    id: 'talent-acquisition-manager',
-    department: 'hr',
-    group: 'recruiting',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по подбору персонала', en: 'Talent Acquisition Manager' },
-    aliases: {
-      ru: ['рекрутер', 'talent acquisition', 'менеджер по найму'],
-      en: ['recruiting manager', 'recruiter'],
-    },
-    keywords: { ru: ['найм', 'подбор'], en: ['hiring', 'recruiting'] },
-    popularityRank: 16,
-    localePriority: { ru: 12, en: 18 },
-  }),
-  role({
-    id: 'recruiter',
-    department: 'hr',
-    group: 'recruiting',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Рекрутер', en: 'Recruiter' },
-    aliases: {
-      ru: ['специалист по подбору', 'talent acquisition specialist'],
-      en: ['talent acquisition specialist'],
-    },
-    keywords: { ru: ['кандидаты', 'сорсинг'], en: ['candidates', 'sourcing'] },
-    popularityRank: 28,
-    localePriority: { ru: 20, en: 22 },
-  }),
-  role({
-    id: 'people-operations-manager',
-    department: 'hr',
-    group: 'people-operations',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер процессов персонала', en: 'People Operations Manager' },
-    aliases: {
-      ru: ['people ops', 'менеджер hr-операций'],
-      en: ['people ops manager', 'hr operations manager'],
-    },
-    keywords: { ru: ['hr-процессы', 'people ops'], en: ['hr processes', 'people ops'] },
-    popularityRank: 54,
-    localePriority: { ru: 39, en: 40 },
-  }),
-  role({
-    id: 'learning-development-manager',
-    department: 'hr',
-    group: 'people-operations',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по обучению и развитию', en: 'Learning and Development Manager' },
-    aliases: { ru: ['l&d manager', 'менеджер обучения'], en: ['l&d manager', 'training manager'] },
-    acronyms: ['L&D'],
-    keywords: { ru: ['обучение', 'развитие'], en: ['learning', 'development'] },
-    popularityRank: 60,
-    localePriority: { ru: 45, en: 46 },
-  }),
-  role({
-    id: 'finance-manager',
-    department: 'finance',
-    group: 'finance-control',
-    seniority: 'manager',
-    labels: { ru: 'Финансовый менеджер', en: 'Finance Manager' },
-    aliases: { ru: ['finance manager', 'финансовый контролер'], en: ['financial manager'] },
-    keywords: { ru: ['бюджет', 'финансы'], en: ['budget', 'finance'] },
-    popularityRank: 20,
-    localePriority: { ru: 17, en: 17 },
-  }),
-  role({
-    id: 'financial-controller',
-    department: 'finance',
-    group: 'finance-control',
-    seniority: 'manager',
-    labels: { ru: 'Финансовый контролёр', en: 'Financial Controller' },
-    aliases: { ru: ['финансовый контролер', 'controller'], en: ['controller'] },
-    keywords: { ru: ['контроль', 'отчетность'], en: ['controls', 'reporting'] },
-    popularityRank: 37,
-    localePriority: { ru: 27, en: 29 },
-  }),
-  role({
-    id: 'accountant',
-    department: 'finance',
-    group: 'finance-control',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Бухгалтер', en: 'Accountant' },
-    aliases: { ru: ['accountant', 'специалист бухгалтерии'], en: ['bookkeeper'] },
-    keywords: { ru: ['учет', 'налоги'], en: ['accounting', 'taxes'] },
-    popularityRank: 50,
-    localePriority: { ru: 28, en: 44 },
-  }),
-  role({
-    id: 'fp-and-a-manager',
-    department: 'finance',
-    group: 'finance-control',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер финансового планирования и анализа (FP&A)', en: 'FP&A Manager' },
-    aliases: {
-      ru: ['финансовое планирование', 'financial planning manager'],
-      en: ['financial planning manager'],
-    },
-    acronyms: ['FP&A'],
-    keywords: { ru: ['планирование', 'прогноз'], en: ['planning', 'forecasting'] },
-    popularityRank: 62,
-    localePriority: { ru: 47, en: 47 },
-  }),
-  role({
-    id: 'chief-financial-officer',
-    department: 'finance',
-    group: 'finance-control',
-    seniority: 'executive',
-    labels: { ru: 'Финансовый директор', en: 'Chief Financial Officer' },
-    aliases: { ru: ['cfo', 'финансовый директор'], en: ['cfo', 'finance director'] },
-    acronyms: ['CFO'],
-    keywords: { ru: ['финансовая стратегия'], en: ['financial strategy'] },
-    popularityRank: 61,
-    localePriority: { ru: 44, en: 44 },
-  }),
-  role({
-    id: 'legal-counsel',
-    department: 'legal',
-    group: 'legal-compliance',
-    seniority: 'individual_contributor',
-    labels: { ru: 'Юрист', en: 'Legal Counsel' },
-    aliases: { ru: ['legal counsel', 'корпоративный юрист'], en: ['lawyer', 'corporate counsel'] },
-    keywords: { ru: ['договоры', 'право'], en: ['contracts', 'legal'] },
-    popularityRank: 30,
-    localePriority: { ru: 24, en: 30 },
-  }),
-  role({
-    id: 'compliance-manager',
-    department: 'legal',
-    group: 'legal-compliance',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер по соблюдению требований', en: 'Compliance Manager' },
-    aliases: { ru: ['комплаенс-менеджер', 'compliance officer'], en: ['compliance officer'] },
-    keywords: { ru: ['регуляторика', 'комплаенс'], en: ['regulation', 'compliance'] },
-    popularityRank: 64,
-    localePriority: { ru: 48, en: 48 },
-  }),
-  role({
-    id: 'contract-manager',
-    department: 'legal',
-    group: 'legal-compliance',
-    seniority: 'manager',
-    labels: { ru: 'Менеджер договоров', en: 'Contract Manager' },
-    aliases: { ru: ['менеджер договоров', 'специалист по договорам'], en: ['contracts manager'] },
-    keywords: { ru: ['договоры', 'согласование'], en: ['contracts', 'review'] },
-    popularityRank: 66,
-    localePriority: { ru: 49, en: 49 },
-  }),
-  role({
-    id: 'data-protection-officer',
-    department: 'legal',
-    group: 'legal-compliance',
-    seniority: 'lead',
-    labels: { ru: 'Ответственный за защиту данных', en: 'Data Protection Officer' },
-    aliases: { ru: ['dpo', 'специалист по персональным данным'], en: ['dpo', 'privacy officer'] },
-    acronyms: ['DPO'],
-    keywords: { ru: ['персональные данные', 'privacy'], en: ['privacy', 'personal data'] },
-    popularityRank: 70,
-    localePriority: { ru: 52, en: 52 },
-  }),
+const defaultPopularRoleTitleSuggestionLimit = 30
+
+const popularRoleTitleSuggestionIds = [
+  'product-manager',
+  'sales-manager',
+  'software-engineer',
+  'customer-success-manager',
+  'project-manager',
+  'marketing-manager',
+  'data-analyst',
+  'operations-manager',
+  'ux-ui-designer',
+  'hr-business-partner',
+  'finance-manager',
+  'frontend-developer',
+  'backend-developer',
+  'b2b-sales-manager',
+  'b2c-sales-manager',
+  'retail-sales-manager',
+  'product-owner',
+  'business-analyst',
+  'qa-engineer',
+  'devops-engineer',
+  'talent-acquisition-manager',
+  'recruiter',
+  'support-specialist',
+  'account-executive',
+  'key-account-manager',
+  'data-scientist',
+  'data-engineer',
+  'product-designer',
+  'content-marketing-manager',
+  'legal-counsel',
 ]
 
 export function getPopularRoleTitleSuggestions(
   locale: string,
-  limit = 8
+  limit = defaultPopularRoleTitleSuggestionLimit
 ): LocalizedRoleTitleSuggestion[] {
   const normalizedLocale = normalizeLocale(locale)
 
-  return [...roleTitleSuggestions]
-    .sort(
-      (left, right) =>
-        getLocalePriority(left, normalizedLocale) - getLocalePriority(right, normalizedLocale) ||
-        left.popularityRank - right.popularityRank ||
-        left.id.localeCompare(right.id)
-    )
+  return getPopularRoleTitleSuggestionCandidates(normalizedLocale)
     .slice(0, limit)
     .map((suggestion) =>
       localizeSuggestion(suggestion, normalizedLocale, {
@@ -1096,6 +104,26 @@ export function getPopularRoleTitleSuggestions(
         score: 0,
       })
     )
+}
+
+function getPopularRoleTitleSuggestionCandidates(
+  locale: RoleTitleSuggestionLocale
+): RoleTitleSuggestion[] {
+  const byId = new Map(roleTitleSuggestions.map((suggestion) => [suggestion.id, suggestion]))
+  const curatedSuggestions = popularRoleTitleSuggestionIds
+    .map((id) => byId.get(id))
+    .filter((suggestion): suggestion is RoleTitleSuggestion => Boolean(suggestion))
+  const curatedIds = new Set(curatedSuggestions.map((suggestion) => suggestion.id))
+  const rankedRemainder = [...roleTitleSuggestions]
+    .filter((suggestion) => !curatedIds.has(suggestion.id))
+    .sort(
+      (left, right) =>
+        getLocalePriority(left, locale) - getLocalePriority(right, locale) ||
+        left.popularityRank - right.popularityRank ||
+        left.id.localeCompare(right.id)
+    )
+
+  return [...curatedSuggestions, ...rankedRemainder]
 }
 
 export function searchRoleTitleSuggestions(
@@ -1295,4 +323,22 @@ function normalizeSearchText(value: string) {
     .replace(/&/g, ' and ')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
+}
+
+function mergeRoleTitleSuggestionSources(
+  ...sources: RoleTitleSuggestion[][]
+): RoleTitleSuggestion[] {
+  const merged: RoleTitleSuggestion[] = []
+  const seenIds = new Set<string>()
+
+  sources.forEach((source) => {
+    source.forEach((suggestion) => {
+      if (seenIds.has(suggestion.id)) return
+
+      seenIds.add(suggestion.id)
+      merged.push(suggestion)
+    })
+  })
+
+  return merged
 }

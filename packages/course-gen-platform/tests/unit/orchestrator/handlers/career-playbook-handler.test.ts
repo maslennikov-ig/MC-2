@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   generateCareerPlaybookFollowups: vi.fn(),
   regenerateCareerPlaybookBlock: vi.fn(),
+  processCareerPlaybookSource: vi.fn(),
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
@@ -25,6 +26,10 @@ vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
 
 vi.mock('@/stages/stage-career-playbook/nodes/block-regenerator', () => ({
   regenerateCareerPlaybookBlock: mocks.regenerateCareerPlaybookBlock,
+}));
+
+vi.mock('@/stages/stage-career-playbook/source-processing', () => ({
+  processCareerPlaybookSource: mocks.processCareerPlaybookSource,
 }));
 
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
@@ -143,7 +148,17 @@ describe('CareerPlaybookHandler', () => {
       stop_recommendation: 'ready_to_generate',
     });
     expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
-      qaData: { fixed: [], followups: [], freeform: [] },
+      qaData: {
+        fixed: [],
+        followups: [],
+        freeform: [],
+        business_context: {
+          mode: 'universal',
+          status: 'not_started',
+          digest: null,
+          source_ids: [],
+        },
+      },
       language: 'ru',
     });
   });
@@ -184,6 +199,43 @@ describe('CareerPlaybookHandler', () => {
         otherBlocks: { block_6: originalBlock },
       })
     );
+  });
+
+  it('routes PROCESS_SOURCE through the Career Playbook source processor', async () => {
+    mocks.processCareerPlaybookSource.mockResolvedValue({
+      sourceId: '00000000-0000-4000-8000-000000000015',
+      fileId: '00000000-0000-4000-8000-000000000016',
+      status: 'ready',
+    });
+
+    const sourceJob = job({
+      ...baseJobData(),
+      operation: 'PROCESS_SOURCE',
+      sourceId: '00000000-0000-4000-8000-000000000015',
+      fileId: '00000000-0000-4000-8000-000000000016',
+      filePath: '/tmp/uploads/career-playbooks/context.pdf',
+      mimeType: 'application/pdf',
+    });
+
+    const result = await new CareerPlaybookHandler().process(sourceJob);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Processed Career Playbook business context source');
+    expect(result.data).toEqual({
+      sourceId: '00000000-0000-4000-8000-000000000015',
+      fileId: '00000000-0000-4000-8000-000000000016',
+      status: 'ready',
+    });
+    expect(mocks.processCareerPlaybookSource).toHaveBeenCalledWith({
+      playbookId,
+      sourceId: '00000000-0000-4000-8000-000000000015',
+      fileId: '00000000-0000-4000-8000-000000000016',
+      filePath: '/tmp/uploads/career-playbooks/context.pdf',
+      mimeType: 'application/pdf',
+      organizationId,
+      language: 'ru',
+      job: sourceJob,
+    });
   });
 
   it('does not fail playbook generation only because retained judge verdicts contain warnings', async () => {

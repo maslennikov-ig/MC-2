@@ -4,12 +4,13 @@ import {
   inferRoleDepartmentFromTitle,
   getPopularRoleTitleSuggestions,
   getRoleTitleSuggestionGroups,
+  roleTitleSuggestionSourceMetadata,
   roleTitleSuggestions,
   searchRoleTitleSuggestions,
 } from '@/components/career-playbook/wizard/role-title-suggestions'
 
 describe('role title suggestions', () => {
-  it('returns a broad source-aware local index with stable ids', () => {
+  it('returns a broad source-aware ESCO-backed local index with stable ids', () => {
     const uniqueIds = new Set(roleTitleSuggestions.map((suggestion) => suggestion.id))
 
     expect(roleTitleSuggestions.length).toBeGreaterThanOrEqual(60)
@@ -17,9 +18,49 @@ describe('role title suggestions', () => {
     expect(
       roleTitleSuggestions.every((suggestion) => (suggestion.source as string) !== 'curated')
     ).toBe(true)
+    expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'esco')).toBe(true)
+    expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'wikidata')).toBe(true)
     expect(roleTitleSuggestions.some((suggestion) => suggestion.source === 'mc2_overlay')).toBe(
       true
     )
+    expect(
+      roleTitleSuggestions
+        .filter((suggestion) => suggestion.source === 'esco')
+        .every((suggestion) => Boolean(suggestion.sourceReferences?.escoUri))
+    ).toBe(true)
+    expect(
+      roleTitleSuggestions
+        .filter((suggestion) => suggestion.source === 'wikidata')
+        .every((suggestion) => Boolean(suggestion.sourceReferences?.wikidataQid))
+    ).toBe(true)
+  })
+
+  it('documents ESCO version, attribution, and Russian fallback policy', () => {
+    expect(roleTitleSuggestionSourceMetadata.esco.version).toBe('v1.2.1')
+    expect(roleTitleSuggestionSourceMetadata.esco.lastUpdate).toBe('2025-12-10')
+    expect(roleTitleSuggestionSourceMetadata.esco.attribution).toContain('European Commission')
+    expect(roleTitleSuggestionSourceMetadata.esco.languages).toContain('en')
+    expect(roleTitleSuggestionSourceMetadata.esco.languages).not.toContain('ru')
+    expect(roleTitleSuggestionSourceMetadata.esco.ruFallback).toContain('MC2')
+  })
+
+  it('documents Wikidata source license and allowlisted import policy', () => {
+    expect(roleTitleSuggestionSourceMetadata.wikidata.license).toBe('CC0 1.0')
+    expect(roleTitleSuggestionSourceMetadata.wikidata.apiUrl).toContain('wbgetentities')
+    expect(roleTitleSuggestionSourceMetadata.wikidata.importPolicy).toContain('allowlist')
+  })
+
+  it('uses ESCO-backed records with Russian MC2 fallback labels', () => {
+    const salesManager = roleTitleSuggestions.find(
+      (suggestion) => suggestion.id === 'sales-manager'
+    )
+
+    expect(salesManager?.source).toBe('esco')
+    expect(salesManager?.sourceReferences?.escoUri).toBe(
+      'http://data.europa.eu/esco/occupation/a7594892-ff23-4e2a-aedf-2f967ebca15c'
+    )
+    expect(salesManager?.labels.ru).toBe('Менеджер по продажам')
+    expect(salesManager?.labels.en).toBe('Sales Manager')
   })
 
   it('orders popular roles by locale-aware priority and popularity rank', () => {
@@ -31,6 +72,43 @@ describe('role title suggestions', () => {
     expect(popularEn[0]?.label).toBe('Product Manager')
     expect(popularRu[0]?.departmentLabel).toBe('Продукт')
     expect(popularEn[0]?.departmentLabel).toBe('Product')
+  })
+
+  it('shows a broad default popular set before the user searches', () => {
+    const popularRu = getPopularRoleTitleSuggestions('ru')
+    const ids = popularRu.map((suggestion) => suggestion.id)
+    const departments = new Set(popularRu.map((suggestion) => suggestion.department))
+
+    expect(popularRu).toHaveLength(30)
+    expect(new Set(ids).size).toBe(30)
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'product-manager',
+        'sales-manager',
+        'software-engineer',
+        'customer-success-manager',
+        'data-analyst',
+        'project-manager',
+        'marketing-manager',
+        'hr-business-partner',
+        'finance-manager',
+        'ux-ui-designer',
+      ])
+    )
+    expect([...departments]).toEqual(
+      expect.arrayContaining([
+        'product',
+        'sales',
+        'engineering',
+        'support',
+        'data',
+        'operations',
+        'marketing',
+        'hr',
+        'finance',
+        'design',
+      ])
+    )
   })
 
   it('ranks acronyms, aliases, and localized labels before loose keyword matches', () => {
@@ -79,8 +157,23 @@ describe('role title suggestions', () => {
     ).toBeGreaterThan(4)
   })
 
+  it('returns allowlisted Wikidata-backed Russian operational roles', () => {
+    expect(searchRoleTitleSuggestions('сисадмин', 'ru', 3)[0]?.id).toBe('system-administrator')
+    expect(searchRoleTitleSuggestions('администратор базы данных', 'ru', 3)[0]?.id).toBe(
+      'database-administrator'
+    )
+    expect(searchRoleTitleSuggestions('офис менеджер', 'ru', 3)[0]?.id).toBe('office-manager')
+    expect(searchRoleTitleSuggestions('секретарь', 'ru', 3)[0]?.id).toBe('secretary')
+    expect(searchRoleTitleSuggestions('техподдержка', 'ru', 3)[0]?.id).toBe(
+      'technical-support-specialist'
+    )
+  })
+
   it('infers a likely department from selected or typed role titles', () => {
     expect(inferRoleDepartmentFromTitle('Менеджер по продажам', 'ru')).toBe('sales')
+    expect(inferRoleDepartmentFromTitle('Менеджер по продажам в продуктовой компании', 'ru')).toBe(
+      'sales'
+    )
     expect(inferRoleDepartmentFromTitle('B2C Sales Manager', 'en')).toBe('sales')
     expect(inferRoleDepartmentFromTitle('DevOps Engineer', 'en')).toBe('engineering')
     expect(inferRoleDepartmentFromTitle('Completely unknown title', 'en')).toBeNull()

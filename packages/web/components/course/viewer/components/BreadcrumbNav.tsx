@@ -46,7 +46,7 @@ export function BreadcrumbNav({
       <ol className="hidden min-w-0 items-center gap-2 text-sm text-gray-600 md:flex dark:text-gray-400">
         <li>
           <Link
-            href="/courses"
+            href="/courses/library"
             className="flex items-center gap-1 transition-colors hover:text-purple-600 dark:hover:text-purple-400"
           >
             <BookOpen className="h-4 w-4" aria-hidden="true" />
@@ -98,7 +98,7 @@ export function BreadcrumbNav({
       {/* Mobile: compact back button */}
       <div className="md:hidden">
         <Link
-          href="/courses"
+          href="/courses/library"
           className="inline-flex items-center gap-2 text-sm text-gray-600 transition-colors hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />

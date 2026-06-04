@@ -1,16 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   BookCopy,
   BookOpen,
   BookOpenCheck,
+  CheckCircle2,
+  Clock3,
   FileText,
+  GitBranch,
   Link2,
+  Loader2,
   Plus,
-  Search,
   Share2,
   Trash2,
 } from 'lucide-react'
@@ -28,10 +31,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CatalogActionButton } from '@/components/catalog/catalog-action-button'
+import { CatalogFilters } from '@/components/catalog/catalog-filters'
+import { CatalogGrid } from '@/components/catalog/catalog-grid'
+import { CatalogStatistics } from '@/components/catalog/catalog-statistics'
 import {
-  deleteCareerPlaybookMany,
+  deleteCareerPlaybook,
   fetchCareerPlaybookLibraryPage,
   toggleCareerPlaybookShare,
 } from '@/components/career-playbook/library/client-adapter'
@@ -39,7 +45,9 @@ import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/doc
 import Header from '@/components/layouts/header'
 import type {
   CareerPlaybookLibraryData,
+  CareerPlaybookLibraryFilters,
   CareerPlaybookLibraryItem,
+  CareerPlaybookLibraryStatus,
 } from '@/components/career-playbook/library/types'
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import type { Locale } from '@/src/i18n/config'
@@ -47,10 +55,11 @@ import type { Locale } from '@/src/i18n/config'
 interface CareerPlaybookLibraryPageClientProps {
   locale: Locale
   initialData: CareerPlaybookLibraryData
+  filters: CareerPlaybookLibraryFilters
 }
 
 const EMPTY_ITEMS: CareerPlaybookLibraryItem[] = []
-const STATUS_OPTIONS: CareerPlaybookLibraryItem['status'][] = [
+const STATUS_OPTIONS: CareerPlaybookLibraryStatus[] = [
   'draft',
   'answering_fixed',
   'awaiting_followups',
@@ -94,77 +103,88 @@ function readShareToggleResult(value: unknown) {
   }
 }
 
+function buildFacetOptions(items: CareerPlaybookLibraryItem[], values: string[] | undefined) {
+  if (values && values.length > 0) return values
+  return Array.from(new Set(items.map((item) => item.department).filter(Boolean) as string[])).sort(
+    (a, b) => a.localeCompare(b)
+  )
+}
+
+function buildLevelOptions(items: CareerPlaybookLibraryItem[], values: string[] | undefined) {
+  if (values && values.length > 0) return values
+  return Array.from(new Set(items.map((item) => item.level).filter(Boolean) as string[])).sort(
+    (a, b) => a.localeCompare(b)
+  )
+}
+
+function defaultStatistics(items: CareerPlaybookLibraryItem[]) {
+  return {
+    totalCount: items.length,
+    completedCount: items.filter((item) => item.status === 'completed').length,
+    inProgressCount: items.filter((item) =>
+      [
+        'answering_fixed',
+        'awaiting_followups',
+        'answering_followups',
+        'ready_to_generate',
+        'generating',
+      ].includes(item.status)
+    ).length,
+    publicCount: items.filter((item) => item.isPublic).length,
+  }
+}
+
 export default function CareerPlaybookLibraryPageClient({
-  locale,
+  filters,
   initialData,
+  locale,
 }: CareerPlaybookLibraryPageClientProps) {
   const t = useTranslations('career-playbook.library')
   const [items, setItems] = useState<CareerPlaybookLibraryItem[]>(initialData.items ?? EMPTY_ITEMS)
   const [nextCursor, setNextCursor] = useState<string | null>(initialData.nextCursor)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [departmentFilter, setDepartmentFilter] = useState('all')
-  const [levelFilter, setLevelFilter] = useState('all')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [sharingIds, setSharingIds] = useState<Set<string>>(new Set())
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
 
+  useEffect(() => {
+    setItems(initialData.items ?? EMPTY_ITEMS)
+    setNextCursor(initialData.nextCursor)
+    setDeletingIds(new Set())
+  }, [initialData])
+
+  const statistics = initialData.statistics ?? defaultStatistics(items)
+  const totalCount = initialData.totalCount ?? items.length
+
+  const statusOptions = initialData.facets?.statuses?.length
+    ? initialData.facets.statuses
+    : STATUS_OPTIONS
   const departmentOptions = useMemo(
-    () =>
-      Array.from(new Set(items.map((item) => item.department).filter(Boolean) as string[])).sort(
-        (a, b) => a.localeCompare(b, locale)
-      ),
-    [items, locale]
+    () => buildFacetOptions(items, initialData.facets?.departments),
+    [initialData.facets?.departments, items]
   )
-
   const levelOptions = useMemo(
-    () =>
-      Array.from(new Set(items.map((item) => item.level).filter(Boolean) as string[])).sort(
-        (a, b) => a.localeCompare(b, locale)
-      ),
-    [items, locale]
+    () => buildLevelOptions(items, initialData.facets?.levels),
+    [initialData.facets?.levels, items]
   )
 
-  const filteredItems = useMemo(
-    () =>
-      items.filter((item) => {
-        const searchLower = search.trim().toLowerCase()
-        const matchesSearch =
-          searchLower.length === 0 ||
-          item.title.toLowerCase().includes(searchLower) ||
-          (item.department ?? '').toLowerCase().includes(searchLower)
-        const matchesStatus = statusFilter === 'all' || item.status === statusFilter
-        const matchesDepartment = departmentFilter === 'all' || item.department === departmentFilter
-        const matchesLevel = levelFilter === 'all' || item.level === levelFilter
-        return matchesSearch && matchesStatus && matchesDepartment && matchesLevel
-      }),
-    [departmentFilter, items, levelFilter, search, statusFilter]
-  )
+  const handleDeleteItem = async (item: CareerPlaybookLibraryItem) => {
+    if (deletingIds.has(item.id)) return
 
-  const handleToggleSelection = (playbookId: string, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (checked) {
-        next.add(playbookId)
-      } else {
-        next.delete(playbookId)
-      }
-      return next
-    })
-  }
+    setDeletingIds((prev) => new Set(prev).add(item.id))
+    setLoadMoreError(null)
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0 || isDeleting) return
-    setIsDeleting(true)
     try {
-      const { deletedIds } = await deleteCareerPlaybookMany(Array.from(selectedIds), locale)
-      const deletedSet = new Set(deletedIds)
-      setItems((prev) => prev.filter((item) => !deletedSet.has(item.id)))
-      setSelectedIds(new Set())
+      const { deletedId } = await deleteCareerPlaybook(item.id, locale)
+      setItems((prev) => prev.filter((current) => current.id !== deletedId))
+    } catch {
+      setLoadMoreError(t('errorDescription'))
     } finally {
-      setIsDeleting(false)
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
     }
   }
 
@@ -217,7 +237,11 @@ export default function CareerPlaybookLibraryPageClient({
         locale,
         cursor: nextCursor,
         limit: 50,
-        search: search.trim().length > 0 ? search.trim() : undefined,
+        search: filters.search,
+        status: filters.status,
+        department: filters.department,
+        level: filters.level,
+        sort: filters.sort,
       })
 
       if (page.error) {
@@ -234,6 +258,138 @@ export default function CareerPlaybookLibraryPageClient({
     } finally {
       setIsLoadingMore(false)
     }
+  }
+
+  const renderLibraryCard = (item: CareerPlaybookLibraryItem) => {
+    const isDeleting = deletingIds.has(item.id)
+    const isShareable = item.status === 'completed'
+    const shareHref =
+      item.isPublic && item.shareSlug ? `/${locale}/share/career-playbook/${item.shareSlug}` : null
+    const builderHref = `/${locale}/career-playbook/new?resume=${encodeURIComponent(item.id)}`
+
+    return (
+      <article className="career-playbook-panel flex h-full flex-col p-4">
+        <div className="flex items-start justify-between gap-3">
+          <Badge variant="secondary">
+            {item.isPublic ? t('card.publicBadge') : t('card.privateBadge')}
+          </Badge>
+          <Badge className={getStatusTone(item.status)}>{t(`statusLabels.${item.status}`)}</Badge>
+        </div>
+        <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          {formatDate(item.createdAt, locale)}
+        </p>
+        <div className="mt-3 flex items-center gap-2 text-xs">
+          {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
+          {item.department ? <Badge variant="outline">{item.department}</Badge> : null}
+        </div>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <div className="flex items-center gap-1">
+            <CatalogActionButton
+              icon={<Share2 className="h-3.5 w-3.5" aria-hidden />}
+              label={item.isPublic ? t('card.makePrivate') : t('card.share')}
+              className="text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300"
+              isActive={item.isPublic}
+              disabled={!isShareable || sharingIds.has(item.id)}
+              onClick={() => {
+                void handleShareToggle(item)
+              }}
+            />
+            {shareHref ? (
+              <CatalogActionButton
+                label={t('card.publicLink')}
+                className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                <Link href={shareHref}>
+                  <Link2 className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">{t('card.publicLink')}</span>
+                </Link>
+              </CatalogActionButton>
+            ) : null}
+            <CatalogActionButton
+              label={t('card.openBuilder')}
+              className="text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300"
+            >
+              <Link href={builderHref}>
+                <GitBranch className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">{t('card.openBuilder')}</span>
+              </Link>
+            </CatalogActionButton>
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                      disabled={isDeleting}
+                      aria-label={t('card.delete')}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      <span className="sr-only">{t('card.delete')}</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t('card.delete')}</p>
+                </TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('deleteDialog.description', { title: item.title })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>
+                    {t('deleteDialog.cancel')}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      void handleDeleteItem(item)
+                    }}
+                  >
+                    {t('deleteDialog.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {item.status === 'completed' ? (
+              <CreateCourseFromPlaybookDialog
+                playbookId={item.id}
+                trigger={
+                  <Button type="button" variant="outline" size="sm" className="rounded-md">
+                    <BookOpenCheck className="h-4 w-4" aria-hidden />
+                    {t('card.createCourse')}
+                  </Button>
+                }
+              />
+            ) : null}
+            <Button asChild variant="default" size="sm" className="rounded-md">
+              <Link
+                href={`/${locale}/career-playbook/${item.id}`}
+                aria-label={`${t('card.open')} ${item.title}`}
+              >
+                <BookOpen className="h-4 w-4" aria-hidden />
+                {t('card.open')}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </article>
+    )
   }
 
   return (
@@ -253,7 +409,7 @@ export default function CareerPlaybookLibraryPageClient({
               </p>
             </div>
             <Button asChild className="rounded-md">
-              <Link href={`/${locale}/career-playbook/new`}>
+              <Link href={`/${locale}/career-playbook/new?fresh=1`}>
                 <Plus className="h-4 w-4" aria-hidden />
                 {t('createNew')}
               </Link>
@@ -273,222 +429,122 @@ export default function CareerPlaybookLibraryPageClient({
             </div>
           ) : null}
 
-          <div className="career-playbook-panel grid gap-3 p-4 md:grid-cols-[minmax(16rem,1fr)_180px_180px_180px]">
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                <Search className="h-4 w-4" aria-hidden />
-              </span>
-              <Input
-                placeholder={t('searchPlaceholder')}
-                className="h-11 bg-[#fffdf8] pl-9 dark:bg-slate-950"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-            <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-              {t('filters.all')}
-              <select
-                className="h-11 rounded-md border border-[#d8c5aa] bg-[#fffdf8] px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                aria-label={t('filters.all')}
-              >
-                <option value="all">{t('filters.all')}</option>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {t(`statusLabels.${status}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-              {t('filters.department')}
-              <select
-                className="h-11 rounded-md border border-[#d8c5aa] bg-[#fffdf8] px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                value={departmentFilter}
-                onChange={(event) => setDepartmentFilter(event.target.value)}
-                aria-label={t('filters.department')}
-              >
-                <option value="all">{t('filters.departmentAll')}</option>
-                {departmentOptions.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-              {t('filters.level')}
-              <select
-                className="h-11 rounded-md border border-[#d8c5aa] bg-[#fffdf8] px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                value={levelFilter}
-                onChange={(event) => setLevelFilter(event.target.value)}
-                aria-label={t('filters.level')}
-              >
-                <option value="all">{t('filters.levelAll')}</option>
-                {levelOptions.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <CatalogStatistics
+            title={t('statistics.title')}
+            items={[
+              {
+                id: 'total',
+                label: t('statistics.total'),
+                value: statistics.totalCount,
+                icon: BookCopy,
+                tone: 'purple',
+              },
+              {
+                id: 'completed',
+                label: t('statistics.completed'),
+                value: statistics.completedCount,
+                icon: CheckCircle2,
+                tone: 'green',
+              },
+              {
+                id: 'progress',
+                label: t('statistics.inProgress'),
+                value: statistics.inProgressCount,
+                icon: Clock3,
+                tone: 'amber',
+              },
+              {
+                id: 'public',
+                label: t('statistics.public'),
+                value: statistics.publicCount,
+                icon: Share2,
+                tone: 'blue',
+              },
+            ]}
+          />
+
+          <div className="career-playbook-panel p-4">
+            <CatalogFilters
+              basePath="/career-playbook/library"
+              initialSearch={filters.search ?? ''}
+              loadingLabel={t('loadingMore')}
+              resultsLabel={t('resultsCount', { count: items.length, total: totalCount })}
+              searchPlaceholder={t('searchPlaceholder')}
+              totalCount={totalCount}
+              selectFilters={[
+                {
+                  key: 'status',
+                  value: filters.status ?? 'all',
+                  label: t('filters.all'),
+                  options: [
+                    { value: 'all', label: t('filters.all') },
+                    ...statusOptions.map((status) => ({
+                      value: status,
+                      label: t(`statusLabels.${status}`),
+                    })),
+                  ],
+                },
+                {
+                  key: 'department',
+                  value: filters.department ?? 'all',
+                  label: t('filters.department'),
+                  options: [
+                    { value: 'all', label: t('filters.departmentAll') },
+                    ...departmentOptions.map((department) => ({
+                      value: department,
+                      label: department,
+                    })),
+                  ],
+                },
+                {
+                  key: 'level',
+                  value: filters.level ?? 'all',
+                  label: t('filters.level'),
+                  options: [
+                    { value: 'all', label: t('filters.levelAll') },
+                    ...levelOptions.map((level) => ({
+                      value: level,
+                      label: level,
+                    })),
+                  ],
+                },
+              ]}
+              sortFilter={{
+                key: 'sort',
+                value: filters.sort,
+                label: t('sort'),
+                options: [
+                  { value: 'created_desc', label: t('sortOptions.created_desc') },
+                  { value: 'created_asc', label: t('sortOptions.created_asc') },
+                  { value: 'title_asc', label: t('sortOptions.title_asc') },
+                  { value: 'title_desc', label: t('sortOptions.title_desc') },
+                ],
+              }}
+            />
           </div>
 
-          {selectedIds.size > 0 ? (
-            <div className="career-playbook-panel flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium">
-                {t('selectedCount', { count: selectedIds.size })}
-              </span>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="rounded-md"
-                    disabled={isDeleting}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                    {isDeleting ? t('deleting') : t('bulkDelete')}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t('deleteDialog.description', { count: selectedIds.size })}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>
-                      {t('deleteDialog.cancel')}
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      disabled={isDeleting}
-                      onClick={() => {
-                        void handleBulkDelete()
-                      }}
-                    >
-                      {t('deleteDialog.confirm')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          ) : null}
-
-          {filteredItems.length === 0 ? (
-            <div className="career-playbook-document p-10 text-center">
-              <BookCopy className="mx-auto h-8 w-8 text-slate-400" aria-hidden />
-              <h2 className="mt-3 text-lg font-semibold">{t('emptyTitle')}</h2>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                {t('emptyDescription')}
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-              {filteredItems.map((item) => {
-                const isChecked = selectedIds.has(item.id)
-                const isShareable = item.status === 'completed'
-                const shareHref =
-                  item.isPublic && item.shareSlug
-                    ? `/${locale}/share/career-playbook/${item.shareSlug}`
-                    : null
-                return (
-                  <article key={item.id} className="career-playbook-panel p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={(checked) =>
-                          handleToggleSelection(item.id, Boolean(checked))
-                        }
-                        aria-label={item.title}
-                      />
-                      <Badge className={getStatusTone(item.status)}>
-                        {t(`statusLabels.${item.status}`)}
-                      </Badge>
-                    </div>
-                    <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                      {formatDate(item.createdAt, locale)}
-                    </p>
-                    <div className="mt-3 flex items-center gap-2 text-xs">
-                      <Badge variant="secondary">
-                        {item.isPublic ? t('card.publicBadge') : t('card.privateBadge')}
-                      </Badge>
-                      {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
-                      {item.department ? <Badge variant="outline">{item.department}</Badge> : null}
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-md"
-                        disabled={!isShareable || sharingIds.has(item.id)}
-                        onClick={() => {
-                          void handleShareToggle(item)
-                        }}
-                      >
-                        <Share2 className="h-4 w-4" aria-hidden />
-                        {item.isPublic ? t('card.makePrivate') : t('card.makePublic')}
-                      </Button>
-                      {shareHref ? (
-                        <Button asChild variant="ghost" size="sm" className="rounded-md">
-                          <Link href={shareHref}>
-                            <Link2 className="h-4 w-4" aria-hidden />
-                            {t('card.publicLink')}
-                          </Link>
-                        </Button>
-                      ) : null}
-                      <Button asChild variant="ghost" size="sm" className="rounded-md">
-                        <Link
-                          href={`/${locale}/career-playbook/${item.id}`}
-                          aria-label={`${t('card.open')} ${item.title}`}
-                        >
-                          <BookOpen className="h-4 w-4" aria-hidden />
-                          {t('card.open')}
-                        </Link>
-                      </Button>
-                      {item.status === 'completed' ? (
-                        <CreateCourseFromPlaybookDialog
-                          playbookId={item.id}
-                          trigger={
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="rounded-md"
-                            >
-                              <BookOpenCheck className="h-4 w-4" aria-hidden />
-                              {t('card.createCourse')}
-                            </Button>
-                          }
-                        />
-                      ) : null}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-
-          {nextCursor ? (
-            <div className="flex justify-center pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-md"
-                onClick={() => {
+          <TooltipProvider delayDuration={120}>
+            <CatalogGrid
+              items={items}
+              getKey={(item) => item.id}
+              renderItem={renderLibraryCard}
+              columnsClassName="gap-4 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3"
+              emptyState={{
+                title: t('emptyTitle'),
+                description: t('emptyDescription'),
+                icon: BookCopy,
+              }}
+              loadMore={{
+                hasMore: Boolean(nextCursor),
+                isLoading: isLoadingMore,
+                label: t('loadMore'),
+                loadingLabel: t('loadingMore'),
+                onLoadMore: () => {
                   void handleLoadMore()
-                }}
-                disabled={isLoadingMore}
-              >
-                {isLoadingMore ? t('loadingMore') : t('loadMore')}
-              </Button>
-            </div>
-          ) : null}
+                },
+              }}
+            />
+          </TooltipProvider>
         </CareerPlaybookWorkspace>
       </main>
     </>

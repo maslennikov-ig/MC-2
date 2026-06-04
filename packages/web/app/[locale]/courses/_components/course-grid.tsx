@@ -1,20 +1,23 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { CourseCard } from './course-card'
+import { Sparkles } from 'lucide-react'
+
+import { CatalogGrid } from '@/components/catalog/catalog-grid'
 import { Button } from '@/components/ui/button'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Loader2, Sparkles } from 'lucide-react'
-import { useState, useEffect } from 'react'
 import { useAuthModal } from '@/lib/hooks/use-auth-modal'
+import { logger } from '@/lib/client-logger'
+import type { Course } from '@/types/database'
+import { checkFavorites, getCourseCovers, getCourses } from '../actions'
+import { CourseCard } from './course-card'
+
 interface User {
   id: string
   email?: string
   role?: string
 }
-import { getCourses, checkFavorites, getCourseCovers } from '../actions'
-import type { Course } from '@/types/database'
-import { logger } from '@/lib/client-logger'
 
 interface CourseWithFavorite extends Course {
   orgSlug: string
@@ -31,14 +34,14 @@ interface CourseGridProps {
 
 export function CourseGrid({
   courses: initialCourses,
-  user,
   currentPage,
   hasMore,
+  user,
 }: CourseGridProps) {
+  const authModal = useAuthModal()
+  const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const pathname = usePathname()
-  const authModal = useAuthModal()
   const t = useTranslations('common.catalog')
   const tc = useTranslations('common')
   const [loadingMore, setLoadingMore] = useState(false)
@@ -47,12 +50,11 @@ export function CourseGrid({
   const [hasMoreToLoad, setHasMoreToLoad] = useState(hasMore)
   const isSuperAdmin = user?.role === 'superadmin'
 
-  // Reset when initial courses change (e.g., due to filters)
   useEffect(() => {
     setDisplayedCourses(initialCourses)
     setCurrentLoadedPage(currentPage)
     setHasMoreToLoad(hasMore)
-  }, [initialCourses, currentPage, hasMore])
+  }, [currentPage, hasMore, initialCourses])
 
   const handleLoadMore = async () => {
     setLoadingMore(true)
@@ -67,9 +69,7 @@ export function CourseGrid({
       })
 
       if (result.courses.length > 0) {
-        const courseIds = result.courses.map((c) => c.id)
-
-        // Fetch favorites and covers in parallel (not sequentially)
+        const courseIds = result.courses.map((course) => course.id)
         const [favoritesMap, coversMap] = await Promise.all([
           user ? checkFavorites(courseIds) : Promise.resolve({} as Record<string, boolean>),
           getCourseCovers(courseIds),
@@ -92,80 +92,61 @@ export function CourseGrid({
     }
   }
 
-  return (
-    <div>
-      {/* Course grid - responsive with fewer columns for wider cards */}
-      <div className="mb-8 grid auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {displayedCourses.map((course, index) => (
-          <CourseCard
-            key={course.id}
-            course={course}
-            user={user || null}
-            canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
-            isFavorited={course.isFavorited}
-            index={index}
-          />
-        ))}
-      </div>
-
-      {/* Load More Button */}
-      {hasMoreToLoad && (
-        <div className="flex justify-center gap-2">
-          <Button
-            onClick={() => void handleLoadMore()}
-            disabled={loadingMore}
-            variant="outline"
-            size="lg"
-            className="border-gray-300 bg-white text-gray-900 transition-colors duration-200 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white dark:hover:bg-slate-800"
-          >
-            {loadingMore ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {tc('loading')}
-              </>
-            ) : (
-              t('loadMore')
-            )}
-          </Button>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {displayedCourses.length === 0 && (
-        <div className="py-12 text-center">
-          <div className="mx-auto max-w-md rounded-lg border border-gray-200 bg-white p-12 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
-            <p className="mb-4 text-lg text-gray-600 dark:text-gray-400">{t('noCoursesFound')}</p>
-            {user ? (
-              <Button
-                onClick={() => router.push('/create')}
-                className="!rounded-full bg-purple-600 px-6 text-white hover:bg-purple-700"
-              >
-                {t('createFirstCourse')}
-              </Button>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t('startCreating')}</p>
-                <Button
-                  onClick={() => authModal.open('register', { returnTo: pathname })}
-                  className="!rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-6 text-white shadow-lg transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl"
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  {t('registerFree')}
-                </Button>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  {t('alreadyHaveAccount')}{' '}
-                  <button
-                    onClick={() => authModal.open('login', { returnTo: pathname })}
-                    className="font-medium text-purple-600 hover:underline dark:text-purple-400"
-                  >
-                    {tc('auth.signIn')}
-                  </button>
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+  const emptyAction = user ? (
+    <Button
+      onClick={() => router.push('/create')}
+      className="!rounded-full bg-purple-600 px-6 text-white hover:bg-purple-700"
+    >
+      {t('createFirstCourse')}
+    </Button>
+  ) : (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500 dark:text-gray-400">{t('startCreating')}</p>
+      <Button
+        onClick={() => authModal.open('register', { returnTo: pathname })}
+        className="!rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-6 text-white shadow-lg transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl"
+      >
+        <Sparkles className="mr-2 h-4 w-4" aria-hidden />
+        {t('registerFree')}
+      </Button>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        {t('alreadyHaveAccount')}{' '}
+        <button
+          onClick={() => authModal.open('login', { returnTo: pathname })}
+          className="font-medium text-purple-600 hover:underline dark:text-purple-400"
+        >
+          {tc('auth.signIn')}
+        </button>
+      </p>
     </div>
+  )
+
+  return (
+    <CatalogGrid
+      items={displayedCourses}
+      getKey={(course) => course.id}
+      renderItem={(course, index) => (
+        <CourseCard
+          course={course}
+          user={user || null}
+          canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
+          isFavorited={course.isFavorited}
+          index={index}
+        />
+      )}
+      loadMore={{
+        hasMore: hasMoreToLoad,
+        isLoading: loadingMore,
+        label: t('loadMore'),
+        loadingLabel: tc('loading'),
+        onLoadMore: () => {
+          void handleLoadMore()
+        },
+      }}
+      emptyState={{
+        title: t('noCoursesFound'),
+        action: emptyAction,
+      }}
+    />
   )
 }

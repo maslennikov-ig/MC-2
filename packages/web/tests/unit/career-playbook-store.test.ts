@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const trpcMocks = vi.hoisted(() => ({
   getBrowserTrpcClient: vi.fn(),
+  resolveDepartmentOptionsMutate: vi.fn(),
   requestFollowupsMutate: vi.fn(),
   approveAndGenerateMutate: vi.fn(),
   getStatusQuery: vi.fn(),
+  libraryGetQuery: vi.fn(),
   submitAnswerMutate: vi.fn(),
   exportPdfQuery: vi.fn(),
 }))
@@ -27,9 +29,11 @@ import {
 function resetStore() {
   useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
   setCareerPlaybookClientForTests(null)
+  trpcMocks.resolveDepartmentOptionsMutate.mockReset()
   trpcMocks.requestFollowupsMutate.mockReset()
   trpcMocks.approveAndGenerateMutate.mockReset()
   trpcMocks.getStatusQuery.mockReset()
+  trpcMocks.libraryGetQuery.mockReset()
   trpcMocks.submitAnswerMutate.mockReset()
   trpcMocks.exportPdfQuery.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReset()
@@ -40,11 +44,15 @@ function resetStore() {
         start: { mutate: vi.fn() },
         getDraft: { query: vi.fn() },
         submitAnswer: { mutate: trpcMocks.submitAnswerMutate },
+        resolveDepartmentOptions: { mutate: trpcMocks.resolveDepartmentOptionsMutate },
       },
       generation: {
         requestFollowups: { mutate: trpcMocks.requestFollowupsMutate },
         approveAndGenerate: { mutate: trpcMocks.approveAndGenerateMutate },
         getStatus: { query: trpcMocks.getStatusQuery },
+      },
+      library: {
+        get: { query: trpcMocks.libraryGetQuery },
       },
     },
   })
@@ -65,15 +73,7 @@ describe('useCareerPlaybookStore', () => {
       getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
         (q) => q.question_key
       )
-    ).toEqual([
-      'position',
-      'department',
-      'level',
-      'reporting',
-      'team_size',
-      'company_stage',
-      'content_language',
-    ])
+    ).toEqual(['position', 'level', 'reporting', 'team_size', 'company_stage', 'content_language'])
 
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '201-1000')
 
@@ -81,15 +81,7 @@ describe('useCareerPlaybookStore', () => {
       getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
         (q) => q.question_key
       )
-    ).toEqual([
-      'position',
-      'department',
-      'level',
-      'reporting',
-      'team_size',
-      'company_stage',
-      'content_language',
-    ])
+    ).toEqual(['position', 'level', 'reporting', 'team_size', 'company_stage', 'content_language'])
 
     const contentLanguageAnswer = useCareerPlaybookStore.getState().fixedAnswers.content_language
     expect(contentLanguageAnswer?.value).toBe('en')
@@ -113,9 +105,7 @@ describe('useCareerPlaybookStore', () => {
 
     const visibleQuestions = getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState())
     expect(visibleQuestions.map((q) => q.question_key)).toContain('company_stage')
-    expect(visibleQuestions.find((q) => q.question_key === 'department')?.question_text).toBe(
-      'Department or functional area'
-    )
+    expect(visibleQuestions.find((q) => q.question_key === 'department')).toBeUndefined()
   })
 
   it('uses understandable Russian labels for product stage options', () => {
@@ -147,16 +137,16 @@ describe('useCareerPlaybookStore', () => {
     useCareerPlaybookStore.getState().goToNextCareerPlaybookQuestion()
 
     expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
-      'department'
+      'level'
     )
 
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '1000+')
 
     expect(getCareerPlaybookProgress(useCareerPlaybookStore.getState())).toEqual({
       current: 2,
-      total: 7,
-      answered: 4,
-      percent: 29,
+      total: 6,
+      answered: 3,
+      percent: 33,
     })
 
     useCareerPlaybookStore.getState().goToPreviousCareerPlaybookQuestion()
@@ -182,19 +172,128 @@ describe('useCareerPlaybookStore', () => {
     useCareerPlaybookStore.getState().goToNextCareerPlaybookQuestion()
 
     expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
-      'department'
+      'level'
     )
-    expect(getCareerPlaybookProgress(useCareerPlaybookStore.getState()).answered).toBe(3)
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).not.toContain('department')
+    expect(useCareerPlaybookStore.getState().departmentResolution.status).toBe('resolved')
+    expect(getCareerPlaybookProgress(useCareerPlaybookStore.getState()).answered).toBe(2)
   })
 
-  it('moves from fixed questions into follow-ups once Phase A is complete', () => {
+  it('repairs a stale saved department when the role title has a confident local department', () => {
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      uiLanguage: 'ru',
+      contentLanguage: 'ru',
+      currentFixedIndex: 1,
+      fixedAnswers: [
+        {
+          question_key: 'position',
+          value: 'Менеджер по продажам',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+        {
+          question_key: 'department',
+          value: 'product',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      ],
+    })
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.department?.value).toBe('sales')
+    expect(useCareerPlaybookStore.getState().departmentResolution).toMatchObject({
+      status: 'resolved',
+      source: 'local',
+      selectedDepartment: 'sales',
+    })
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'level'
+    )
+  })
+
+  it('reveals only LLM-generated department candidates for an ambiguous role title', async () => {
+    const resolveDepartmentOptions = vi
+      .fn<NonNullable<CareerPlaybookClient['resolveDepartmentOptions']>>()
+      .mockResolvedValue({
+        status: 'needs_user_choice',
+        source: 'llm',
+        confidence: 0.54,
+        candidates: [
+          { value: 'operations', label: 'Операции', confidence: 0.74 },
+          { value: 'support', label: 'Поддержка и работа с клиентами', confidence: 0.68 },
+        ],
+      })
+    setCareerPlaybookClientForTests({ resolveDepartmentOptions, submitAnswer: vi.fn() })
+
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'ru', contentLanguage: 'ru' })
+    useCareerPlaybookStore
+      .getState()
+      .answerCareerPlaybookFixedQuestion('position', 'Координатор внедрения')
+
+    await expect(
+      useCareerPlaybookStore.getState().resolveCareerPlaybookDepartmentOptions()
+    ).resolves.toEqual({ ok: true, status: 'needs_user_choice' })
+
+    const departmentQuestion = getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())
+    expect(resolveDepartmentOptions).toHaveBeenCalledWith({
+      title: 'Координатор внедрения',
+      language: 'ru',
+    })
+    expect(departmentQuestion?.question_key).toBe('department')
+    expect(departmentQuestion?.options).toEqual([
+      { value: 'operations', label: 'Операции' },
+      { value: 'support', label: 'Поддержка и работа с клиентами' },
+    ])
+    expect(useCareerPlaybookStore.getState().fixedAnswers.department).toBeUndefined()
+  })
+
+  it('falls back to the general department list when LLM resolution fails', async () => {
+    const resolveDepartmentOptions = vi
+      .fn<NonNullable<CareerPlaybookClient['resolveDepartmentOptions']>>()
+      .mockRejectedValue(new Error('classifier unavailable'))
+    setCareerPlaybookClientForTests({ resolveDepartmentOptions, submitAnswer: vi.fn() })
+
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore
+      .getState()
+      .answerCareerPlaybookFixedQuestion('position', 'Unusual company role')
+
+    await expect(
+      useCareerPlaybookStore.getState().resolveCareerPlaybookDepartmentOptions()
+    ).resolves.toEqual({ ok: false, status: 'fallback', error: 'classifier unavailable' })
+
+    const departmentQuestion = getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())
+    expect(departmentQuestion?.question_key).toBe('department')
+    expect(departmentQuestion?.options?.map((option) => option.value)).toEqual([
+      'sales',
+      'marketing',
+      'product',
+      'engineering',
+      'design',
+      'data',
+      'operations',
+      'hr',
+      'finance',
+      'support',
+      'legal',
+      'other',
+    ])
+  })
+
+  it('moves from fixed questions into business context once Phase A is complete', () => {
     useCareerPlaybookStore
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
 
     useCareerPlaybookStore.getState().completeCareerPlaybookFixedPhase()
 
-    expect(useCareerPlaybookStore.getState().phase).toBe('followups')
+    expect(useCareerPlaybookStore.getState().phase).toBe('business_context')
     expect(useCareerPlaybookStore.getState().status).toBe('awaiting_followups')
   })
 
@@ -582,7 +681,7 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(false)
   })
 
-  it('filters legacy empty answers before requesting follow-up questions', async () => {
+  it('recovers from legacy empty department answers before requesting follow-up questions', async () => {
     const requestFollowups = vi
       .fn<NonNullable<CareerPlaybookClient['requestFollowups']>>()
       .mockResolvedValue({
@@ -637,8 +736,39 @@ describe('useCareerPlaybookStore', () => {
     const input = requestFollowups.mock.calls[0]?.[0]
 
     expect(input?.fixedAnswers.position?.value).toBe('Sales Manager')
-    expect(input?.fixedAnswers.department).toBeUndefined()
+    expect(input?.fixedAnswers.department?.value).toBe('sales')
     expect(input?.followupAnswers['00000000-0000-4000-8000-000000000416']).toBeUndefined()
+  })
+
+  it('does not request follow-ups without a saved department context', async () => {
+    const requestFollowups = vi.fn<NonNullable<CareerPlaybookClient['requestFollowups']>>()
+    setCareerPlaybookClientForTests({
+      requestFollowups,
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000017',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [{ question_key: 'position', value: 'Unusual company role' }],
+      phase: 'followups',
+      status: 'awaiting_followups',
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Department is required before follow-up generation',
+    })
+
+    expect(requestFollowups).not.toHaveBeenCalled()
+    expect(useCareerPlaybookStore.getState().phase).toBe('fixed')
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'department'
+    )
+    expect(useCareerPlaybookStore.getState().departmentResolution.status).toBe('fallback')
   })
 
   it('requests follow-up questions through the production tRPC generation transport', async () => {
@@ -846,6 +976,50 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().generationStatusError).toBe('worker failed')
   })
 
+  it('maps production library details into a viewer snapshot', async () => {
+    const playbookId = '00000000-0000-4000-8000-000000000930'
+    trpcMocks.libraryGetQuery.mockResolvedValue({
+      id: playbookId,
+      status: 'completed',
+      language: 'ru',
+      positionTitle: 'Менеджер по продажам',
+      department: 'sales',
+      level: 'junior',
+      isPublic: false,
+      shareSlug: null,
+      createdAt: '2026-06-03T09:00:00.000Z',
+      updatedAt: '2026-06-03T09:10:00.000Z',
+      completedAt: '2026-06-03T09:10:00.000Z',
+      finalMarkdown: '# Менеджер по продажам',
+      generatedBlocks: {
+        header: {
+          content: '# Менеджер по продажам',
+          status: 'generated',
+          attempt: 1,
+        },
+      },
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().loadCareerPlaybookViewer(playbookId)
+    ).resolves.toEqual({ ok: true })
+
+    expect(trpcMocks.libraryGetQuery).toHaveBeenCalledWith({ playbookId })
+    expect(useCareerPlaybookStore.getState().viewer).toMatchObject({
+      playbookId,
+      title: 'Менеджер по продажам',
+      contentLanguage: 'ru',
+      status: 'completed',
+      department: 'sales',
+      level: 'junior',
+      isPublic: false,
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.header?.content).toBe(
+      '# Менеджер по продажам'
+    )
+    expect(useCareerPlaybookStore.getState().viewerError).toBeNull()
+  })
+
   it('does not leave completion review while generation is active', () => {
     useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
       playbookId: '00000000-0000-4000-8000-000000000915',
@@ -980,6 +1154,10 @@ describe('useCareerPlaybookStore', () => {
       contentLanguage: 'en',
       phase: 'followups',
       status: 'answering_followups',
+      fixedAnswers: [
+        { question_key: 'position', value: 'Product Lead' },
+        { question_key: 'department', value: 'product' },
+      ],
       followupQuestions: [
         {
           question_id: '00000000-0000-4000-8000-000000000601',
@@ -1307,6 +1485,53 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().dirtyFollowupQuestionIds).toEqual([])
   })
 
+  it('flushes business context through submitAnswer using the business_context phase', async () => {
+    const submitAnswer = vi.fn<CareerPlaybookClient['submitAnswer']>().mockResolvedValue({})
+    setCareerPlaybookClientForTests({ submitAnswer })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000114',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'business_context',
+      status: 'awaiting_followups',
+    })
+
+    useCareerPlaybookStore.getState().saveCareerPlaybookBusinessContext({
+      mode: 'company_specific',
+      status: 'ready',
+      source_ids: ['00000000-0000-4000-8000-000000000115'],
+      digest: {
+        product: ['B2B SaaS for learning operations'],
+        customers: ['Enterprise HR teams'],
+        sales_channels: [],
+        processes: [],
+        metrics: ['Activation rate'],
+        org_structure: [],
+        constraints: [],
+        source_ids: ['00000000-0000-4000-8000-000000000115'],
+        missing_signals: ['Sales and channels'],
+        user_edited: true,
+      },
+    })
+
+    await expect(useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()).resolves.toEqual({
+      ok: true,
+    })
+
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000114',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'company_specific',
+          status: 'ready',
+        }),
+      },
+    })
+    expect(useCareerPlaybookStore.getState().dirtyBusinessContext).toBe(false)
+  })
+
   it('resumes a server draft through the injectable client', async () => {
     const getDraft = vi.fn<NonNullable<CareerPlaybookClient['getDraft']>>().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000003',
@@ -1338,8 +1563,9 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().fixedAnswers.position?.value).toBe(
       'Customer Success Manager'
     )
+    expect(useCareerPlaybookStore.getState().fixedAnswers.department?.value).toBe('support')
     expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
-      'department'
+      'level'
     )
   })
 
@@ -1373,7 +1599,7 @@ describe('useCareerPlaybookStore', () => {
       )
     ).toContain('company_stage')
     expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
-      'reporting'
+      'team_size'
     )
   })
 })

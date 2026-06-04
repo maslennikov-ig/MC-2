@@ -5,7 +5,7 @@ import CareerPlaybookNewPage from '@/app/[locale]/career-playbook/new/page'
 import { getCurrentUser } from '@/lib/auth-helpers'
 
 vi.mock('next-intl/server', () => ({
-  getTranslations: vi.fn(async () => (key: string) => key),
+  getTranslations: vi.fn(() => (key: string) => key),
   setRequestLocale: vi.fn(),
 }))
 
@@ -14,7 +14,21 @@ vi.mock('@/lib/auth-helpers', () => ({
 }))
 
 vi.mock('@/app/[locale]/career-playbook/new/page-client', () => ({
-  default: ({ locale }: { locale: string }) => <div data-testid="career-playbook-wizard">{locale}</div>,
+  default: ({
+    locale,
+    resetOnMount,
+    resumePlaybookId,
+  }: {
+    locale: string
+    resetOnMount?: boolean
+    resumePlaybookId?: string
+  }) => (
+    <div data-testid="career-playbook-wizard">
+      <span data-testid="career-playbook-wizard-locale">{locale}</span>
+      <span data-testid="career-playbook-wizard-fresh">{String(Boolean(resetOnMount))}</span>
+      <span data-testid="career-playbook-wizard-resume">{resumePlaybookId ?? ''}</span>
+    </div>
+  ),
 }))
 
 vi.mock('@/app/[locale]/career-playbook/new/auth-required-client', () => ({
@@ -48,6 +62,26 @@ describe('CareerPlaybookNewPage', () => {
 
     render(await CareerPlaybookNewPage({ params: Promise.resolve({ locale: 'en' }) }))
 
-    expect(screen.getByTestId('career-playbook-wizard')).toHaveTextContent('en')
+    expect(screen.getByTestId('career-playbook-wizard-locale')).toHaveTextContent('en')
+  })
+
+  it('passes a concrete playbook id to the constructor when resuming from the library', async () => {
+    mockedGetCurrentUser.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+      role: 'student',
+      organizationId: null,
+    })
+
+    render(
+      await CareerPlaybookNewPage({
+        params: Promise.resolve({ locale: 'en' }),
+        searchParams: Promise.resolve({ resume: 'pb-1' }),
+      })
+    )
+
+    expect(screen.getByTestId('career-playbook-wizard-resume')).toHaveTextContent('pb-1')
+    expect(screen.getByTestId('career-playbook-wizard-fresh')).toHaveTextContent('false')
   })
 })

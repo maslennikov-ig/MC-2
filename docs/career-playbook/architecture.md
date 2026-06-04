@@ -6,8 +6,102 @@
 - Web state: `packages/web/stores/use-career-playbook-store.ts`
 - Backend tRPC router: `packages/course-gen-platform/src/server/routers/career-playbook/**`
 - Generation stage: `packages/course-gen-platform/src/stages/stage-career-playbook/**`
+- Department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`
+- Business context helpers: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/business-context.ts`
+- Business context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`
 - Worker handler: `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts`
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
+- Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
+- Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
+
+## Department Resolution
+
+The fixed-question flow treats department as required internal context, not a
+mandatory standalone user step. The web store first uses local role-title
+inference from `role-title-suggestions.ts`. When a role title is unknown or
+ambiguous, the page calls `careerPlaybook.session.resolveDepartmentOptions` only
+from the Next action, never while the user types.
+
+The backend classifier renders `career_playbook_department_classifier`, calls
+the configured model for `stage_career_playbook_department_classifier`, validates
+the returned JSON with shared Career Playbook schemas, and keeps only 2-5
+allowed department candidates. Runtime LLM calls retry transient provider
+failures and can escalate from the configured primary model to the configured
+fallback model. Invalid classifier JSON is retried with fallback preference and
+larger token budget before the web flow reveals the static department list.
+
+Follow-up generation must receive a saved department answer. The store blocks a
+direct follow-up request without department context and sends the user back to
+the department question instead of starting generation with incomplete fixed
+answers.
+
+## Business Context Intake
+
+The constructor now has an intermediate Business Context phase between fixed
+questions and follow-up generation. The web step lives in
+`BusinessContextStep.tsx` and uses the document-first constructor shell: category
+navigation on the left, an editable digest in the center, and source guidance
+plus upload controls on the right.
+
+The shared `CareerPlaybookQADataSchema` stores `business_context` with:
+
+- `mode`: `company_specific` or `universal`
+- `status`: collection/readiness state
+- `digest`: product, customer, sales/channel, process, metric, organization,
+  and constraint signals, plus nested `source_ids`, `missing_signals`,
+  `user_edited`, and digest timestamps
+- `source_ids`: uploaded source record IDs mirrored at the context level for
+  quick access
+- `skip_reason`: optional explanation for universal/skipped mode
+- `updated_at`: last context edit timestamp
+
+`career_playbook_sources` is the domain owner for uploaded Business Context
+files and text snippets. It references `career_playbooks`, `organizations`,
+`auth.users`, and optional `file_catalog` rows. File storage still goes through
+the existing Stage 1 validation, quota, storage, and dedup primitives, but Career
+Playbook files use `uploads/<organization>/career-playbooks/<playbookId>/` and
+leave `file_catalog.course_id` null. This keeps course uploads unchanged and
+avoids creating fake draft courses just to attach Role Guide context.
+
+Business Context file uploads enqueue `JobType.CAREER_PLAYBOOK` with operation
+`PROCESS_SOURCE`. `source-processing.ts` reuses Docling conversion,
+processed-document storage, and summarization with the playbook ID as the
+markdown namespace instead of creating a fake course. Source rows move through
+`uploaded`, `processing`, `ready`, and `failed`; follow-up generation blocks
+while any selected source is still uploaded or processing.
+
+The tRPC source lifecycle surface is `careerPlaybook.sources.listSources`,
+`uploadFile`, and `removeSource`. Draft reads include
+`businessContextSources`, so the web store can render persisted filenames,
+source status, source errors, and removal actions across constructor resume.
+
+Follow-up and spec-builder prompts receive the formatted business digest,
+processed source excerpts, and missing signals as separate prompt variables.
+Company-specific mode may treat the digest and available processed source
+excerpts as client-provided facts. If an uploaded source has no processed text
+yet, the prompt receives an explicit unavailable-content warning rather than raw
+UUIDs. Universal mode explicitly instructs the model not to invent
+company/product/channel details; the generated Role Guide is a benchmark guide
+that names adaptation areas before operational rollout.
+
+## Course Bridge Sources
+
+`careerPlaybook.courseBridge.createCourseFromPlaybook` creates a draft course
+from a completed Role Guide and persists generated markdown sources through the
+Career Playbook bridge storage module:
+
+- `course-bridge.service.ts` owns playbook access, course creation, web-research
+  selection, and generation start.
+- `course-bridge-storage.ts` owns synthetic markdown file writes, `file_catalog`
+  rows, and storage-quota accounting.
+
+Bridge sources are still trusted generated markdown and keep
+`processing_method = 'career_playbook_bridge'`, `markdown_content`, and
+`processed_content` populated for the downstream course pipeline. They now
+reserve organization storage quota before writing the source file, release it if
+the write or `file_catalog` insert fails, and release quota during bridge course
+rollback after the course delete succeeds. If course rollback delete fails, the
+files and quota are left intact because database ownership may still exist.
 
 ## E2E Harness
 
@@ -83,7 +177,7 @@ Operator evidence should include a screenshot or exported trace from `/admin/gen
 
 Current runtime cost accounting estimates Career Playbook node costs as `0`, so the admin page proves `cost_breakdown` shape and access control but does not prove real OpenRouter spend. Operator evidence should include provider-side spend or improved runtime cost accounting when the acceptance criterion needs actual cost evidence.
 
-Staging model routing for Career Playbook is moving to the DeepSeek V4 pair through migration `20260523073000_update_career_playbook_v4_pro_routing`: `deepseek/deepseek-v4-pro` for `stage_career_playbook_spec`, `stage_career_playbook_group_5`, `stage_career_playbook_judge`, and `stage_career_playbook_regenerator`; `deepseek/deepseek-v4-flash` for follow-up generation and groups 1-4/6. Fallbacks stay within the same V4 pair, with Pro backing Flash phases and Flash backing Pro phases.
+Staging model routing for Career Playbook is moving to the DeepSeek V4 pair through migration `20260523073000_update_career_playbook_v4_pro_routing`: `deepseek/deepseek-v4-pro` for `stage_career_playbook_spec`, `stage_career_playbook_group_5`, `stage_career_playbook_judge`, and `stage_career_playbook_regenerator`; `deepseek/deepseek-v4-flash` for follow-up generation and groups 1-4/6. Migration `20260528193000_add_career_playbook_department_classifier` adds `stage_career_playbook_department_classifier` with Flash primary and Pro fallback. Fallbacks stay within the same V4 pair, with Pro backing Flash phases and Flash backing Pro phases.
 
 The 10-concurrent-generation load test should run against isolated staging resources:
 

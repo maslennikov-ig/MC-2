@@ -1,13 +1,18 @@
 import { TRPCError } from '@trpc/server';
 import {
+  CareerPlaybookBusinessContextSchema,
   CareerPlaybookFixedQuestionSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFollowupResponseSchema,
   CareerPlaybookQADataSchema,
   JobType,
+  isCareerPlaybookFollowupResponseReady,
+  normalizeCareerPlaybookFollowupResponseReadiness,
   type CareerPlaybookAnswerSubmission,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
+  type CareerPlaybookBusinessContext,
+  type CareerPlaybookBusinessContextSourceSummary,
   type CareerPlaybookFixedAnswer,
   type CareerPlaybookFixedQuestion,
   type CareerPlaybookFollowupAnswer,
@@ -21,6 +26,10 @@ import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { addJob, removeTerminalJobById } from '../../../orchestrator/queue';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
+import {
+  hasPendingCareerPlaybookBusinessContextSources,
+  refreshCareerPlaybookBusinessContextDigest,
+} from '@/stages/stage-career-playbook/nodes/business-context';
 import {
   freeformDraftFromQAData,
   generationProgress,
@@ -36,6 +45,8 @@ import {
   type StoredQAData,
   type WizardPhase,
 } from './service-mappers';
+import { getCareerPlaybookGenerationJobId } from './job-ids';
+import { listCareerPlaybookBusinessContextSourceSummaries } from './sources.service';
 
 export interface CareerPlaybookDraftResponse {
   playbookId: string;
@@ -47,6 +58,8 @@ export interface CareerPlaybookDraftResponse {
   completenessScore: number;
   followupGenerationCount: number;
   freeformDraft: string;
+  businessContext: CareerPlaybookBusinessContext;
+  businessContextSources?: CareerPlaybookBusinessContextSourceSummary[];
   status: CareerPlaybookPlaybookStatus;
   phase: WizardPhase;
 }
@@ -89,11 +102,14 @@ function throwOnDbError(error: unknown, message: string): never {
   });
 }
 
-function mapRowToDraft(row: CareerPlaybookRow): CareerPlaybookDraftResponse {
+function mapRowToDraft(
+  row: CareerPlaybookRow,
+  options: { businessContextSources?: CareerPlaybookBusinessContextSourceSummary[] } = {}
+): CareerPlaybookDraftResponse {
   const mapped = mapPlaybookRow(row);
   const qaData = normalizeStoredQAData(mapped.q_a_data);
 
-  return {
+  const draft: CareerPlaybookDraftResponse = {
     playbookId: mapped.id,
     uiLanguage: uiLanguageFromContent(mapped.language),
     contentLanguage: mapped.language,
@@ -103,9 +119,16 @@ function mapRowToDraft(row: CareerPlaybookRow): CareerPlaybookDraftResponse {
     completenessScore: qaData.completeness_score ?? 0,
     followupGenerationCount: qaData.followup_generation_count,
     freeformDraft: freeformDraftFromQAData(qaData),
+    businessContext: qaData.business_context,
     status: mapped.status,
-    phase: phaseFromStatus(mapped.status),
+    phase: phaseFromStatus(mapped.status, qaData),
   };
+
+  if (options.businessContextSources) {
+    draft.businessContextSources = options.businessContextSources;
+  }
+
+  return draft;
 }
 
 function assertReadable(row: CareerPlaybookRow, user: UserContext): void {
@@ -226,21 +249,33 @@ function capGeneratedQuestionsForResponse(
 }
 
 function isReadyForGeneration(row: CareerPlaybookRow, qaData: StoredQAData): boolean {
-  if (row.status === 'ready_to_generate') return true;
-  if (row.status === 'failed') return qaData.fixed.length > 0;
+  if (row.status === 'ready_to_generate') return hasCompletedBusinessContext(qaData);
+  if (row.status === 'failed') {
+    return qaData.fixed.length > 0 && hasCompletedBusinessContext(qaData);
+  }
   if (
     qaData.followup_questions.length === 0 &&
     (row.status === 'answering_fixed' ||
       row.status === 'awaiting_followups' ||
       row.status === 'answering_followups')
   ) {
-    return hasRequiredFixedAnswers(qaData);
+    return hasRequiredFixedAnswers(qaData) && hasCompletedBusinessContext(qaData);
   }
   if (row.status !== 'answering_followups') return false;
-  if (qaData.fixed.length === 0 || qaData.followup_questions.length === 0) return false;
+  if (
+    qaData.fixed.length === 0 ||
+    qaData.followup_questions.length === 0 ||
+    !hasCompletedBusinessContext(qaData)
+  ) {
+    return false;
+  }
 
   const answeredQuestionIds = new Set(qaData.followups.map(answer => answer.question_id));
   return qaData.followup_questions.every(question => answeredQuestionIds.has(question.question_id));
+}
+
+function hasCompletedBusinessContext(qaData: StoredQAData): boolean {
+  return qaData.business_context.status === 'ready' || qaData.business_context.status === 'skipped';
 }
 
 function hasRequiredFixedAnswers(qaData: StoredQAData): boolean {
@@ -263,6 +298,7 @@ function hasStoredAnswerValue(value: unknown): boolean {
 
 function assertCanRequestFollowups(
   row: CareerPlaybookRow,
+  qaData: StoredQAData,
   fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
 ): void {
   const allowedStatuses: CareerPlaybookPlaybookStatus[] = [
@@ -270,7 +306,13 @@ function assertCanRequestFollowups(
     'awaiting_followups',
     'answering_followups',
   ];
-  if (allowedStatuses.includes(row.status) && Object.keys(fixedAnswers).length > 0) return;
+  if (
+    allowedStatuses.includes(row.status) &&
+    Object.keys(fixedAnswers).length > 0 &&
+    hasCompletedBusinessContext(qaData)
+  ) {
+    return;
+  }
 
   throw new TRPCError({
     code: 'BAD_REQUEST',
@@ -304,6 +346,12 @@ export async function startCareerPlaybookSession(
         fixed: [],
         followups: [],
         freeform: [],
+        business_context: {
+          mode: 'universal',
+          status: 'not_started',
+          digest: null,
+          source_ids: [],
+        },
         followup_questions: [],
         followup_generation_count: 0,
       }),
@@ -314,7 +362,7 @@ export async function startCareerPlaybookSession(
 
   if (error || !data) throwOnDbError(error, 'Failed to start Career Playbook session');
 
-  return mapRowToDraft(data);
+  return mapRowToDraft(data, { businessContextSources: [] });
 }
 
 export async function getCareerPlaybookDraft(
@@ -322,14 +370,16 @@ export async function getCareerPlaybookDraft(
   input: { playbookId: string }
 ): Promise<CareerPlaybookDraftResponse> {
   const user = requireUser(ctx);
-  return mapRowToDraft(await loadPlaybook(input.playbookId, user, 'read'));
+  const row = await loadPlaybook(input.playbookId, user, 'read');
+  const businessContextSources = await listCareerPlaybookBusinessContextSourceSummaries(row.id);
+  return mapRowToDraft(row, { businessContextSources });
 }
 
 export async function submitCareerPlaybookAnswer(
   ctx: Context,
   input: {
     playbookId: string;
-    phase: 'fixed' | 'followup' | 'freeform';
+    phase: 'fixed' | 'followup' | 'freeform' | 'business_context';
     answer: CareerPlaybookAnswerSubmission;
   }
 ): Promise<CareerPlaybookDraftResponse> {
@@ -382,6 +432,20 @@ export async function submitCareerPlaybookAnswer(
     ];
   }
 
+  if (input.phase === 'business_context') {
+    if (!input.answer.business_context) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Business context answers require business_context',
+      });
+    }
+
+    qaData.business_context = CareerPlaybookBusinessContextSchema.parse({
+      ...input.answer.business_context,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
   updatePayload.q_a_data = toJson(qaData);
 
   const supabase = getCareerPlaybookSupabase();
@@ -421,7 +485,22 @@ export async function requestCareerPlaybookFollowups(
   const user = requireUser(ctx);
   const row = await loadPlaybook(input.playbookId, user, 'write');
   const existingQAData = normalizeStoredQAData(row.q_a_data);
-  assertCanRequestFollowups(row, input.fixedAnswers);
+  const refreshedBusinessContext = await refreshCareerPlaybookBusinessContextDigest({
+    playbookId: input.playbookId,
+    context: existingQAData.business_context,
+    freeformText: freeformDraftFromQAData(existingQAData),
+  });
+  if (hasPendingCareerPlaybookBusinessContextSources(refreshedBusinessContext)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Business context source files are still processing',
+    });
+  }
+  const existingQADataWithDigest: StoredQAData = {
+    ...existingQAData,
+    business_context: refreshedBusinessContext.context,
+  };
+  assertCanRequestFollowups(row, existingQADataWithDigest, input.fixedAnswers);
   if (existingQAData.followup_generation_count >= FOLLOWUP_GENERATION_LIMIT) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -433,16 +512,20 @@ export async function requestCareerPlaybookFollowups(
     fixed: Object.values(input.fixedAnswers),
     followups: Object.values(input.followupAnswers),
     freeform: existingQAData.freeform,
+    business_context: refreshedBusinessContext.context,
   });
   const result = await generateCareerPlaybookFollowups({
+    playbookId: input.playbookId,
     qaData,
     language: input.contentLanguage,
+    businessContextSourceExcerpts: refreshedBusinessContext.sourceExcerpts,
   });
-  const response = CareerPlaybookFollowupResponseSchema.parse(result.response);
-  const status =
-    response.stop_recommendation === 'ready_to_generate' && response.questions.length === 0
-      ? 'ready_to_generate'
-      : 'answering_followups';
+  const response = normalizeCareerPlaybookFollowupResponseReadiness(
+    CareerPlaybookFollowupResponseSchema.parse(result.response)
+  );
+  const status = isCareerPlaybookFollowupResponseReady(response)
+    ? 'ready_to_generate'
+    : 'answering_followups';
   const mergedQuestions = mergeGeneratedQuestions(
     existingQAData.followup_questions,
     response.questions
@@ -495,7 +578,7 @@ export async function approveCareerPlaybookGeneration(
     });
   }
 
-  const generationJobId = `career-playbook:${input.playbookId}`;
+  const generationJobId = getCareerPlaybookGenerationJobId(input.playbookId);
   await removeTerminalJobById(generationJobId);
   const qaDataForGeneration = qaDataWithoutGenerationError(qaData);
   const supabase = getCareerPlaybookSupabase();
@@ -591,7 +674,7 @@ function mapRowToGenerationStatus(row: CareerPlaybookRow): CareerPlaybookGenerat
   return {
     playbookId: mapped.id,
     status: mapped.status,
-    phase: phaseFromStatus(mapped.status),
+    phase: phaseFromStatus(mapped.status, qaData),
     progress: generationProgress(mapped.status),
     error: mapped.status === 'failed' ? qaData.generation_error : undefined,
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),

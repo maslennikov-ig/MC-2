@@ -6,6 +6,10 @@ const migrationPath = resolve(
   __dirname,
   '../../../../supabase/migrations/20260523073000_update_career_playbook_v4_pro_routing.sql'
 );
+const departmentClassifierMigrationPath = resolve(
+  __dirname,
+  '../../../../supabase/migrations/20260528193000_add_career_playbook_department_classifier.sql'
+);
 
 const EXPECTED_ROUTING = {
   stage_career_playbook_followup: {
@@ -77,5 +81,14 @@ describe('Career Playbook DeepSeek V4 Pro routing migration', () => {
 
     expect(sql).not.toContain('minimax/');
     expect(Object.fromEntries(rows)).toEqual(EXPECTED_ROUTING);
+  });
+
+  it('adds a classifier phase with fast primary and pro fallback routing', () => {
+    const sql = readFileSync(departmentClassifierMigrationPath, 'utf8');
+
+    expect(sql).toContain('stage_career_playbook_department_classifier');
+    expect(sql).toContain("'deepseek/deepseek-v4-flash'");
+    expect(sql).toContain("'deepseek/deepseek-v4-pro'");
+    expect(sql).toContain('max_retries');
   });
 });

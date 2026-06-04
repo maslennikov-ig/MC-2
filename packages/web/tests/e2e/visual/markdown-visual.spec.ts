@@ -16,10 +16,6 @@
 
 import { test, expect } from '@playwright/test'
 
-
-
-
-
 test.describe('Markdown Visual Regression Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to a page where we can test markdown rendering
@@ -41,7 +37,7 @@ test.describe('Markdown Visual Regression Tests', () => {
 test.describe('Markdown Component Visual Tests on Course Pages', () => {
   test.beforeEach(async ({ page }) => {
     // Try to navigate to a course detail page with lesson content
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
   })
 
@@ -102,7 +98,7 @@ test.describe('Dark Mode Markdown Rendering', () => {
   })
 
   test('Dark mode - courses page', async ({ page }) => {
-    await page.goto('/courses')
+    await page.goto('/courses/library')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 

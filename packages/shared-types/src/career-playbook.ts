@@ -57,6 +57,43 @@ export const CareerPlaybookOptionSchema = z.object({
 });
 export type CareerPlaybookOption = z.infer<typeof CareerPlaybookOptionSchema>;
 
+export const CareerPlaybookDepartmentValueSchema = z.enum([
+  'sales',
+  'marketing',
+  'product',
+  'engineering',
+  'design',
+  'data',
+  'operations',
+  'hr',
+  'finance',
+  'support',
+  'legal',
+  'other',
+]);
+export type CareerPlaybookDepartmentValue = z.infer<typeof CareerPlaybookDepartmentValueSchema>;
+
+export const CareerPlaybookDepartmentCandidateSchema = z.object({
+  value: CareerPlaybookDepartmentValueSchema,
+  label: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  rationale: z.string().min(1).optional(),
+});
+export type CareerPlaybookDepartmentCandidate = z.infer<
+  typeof CareerPlaybookDepartmentCandidateSchema
+>;
+
+export const CareerPlaybookDepartmentResolutionSchema = z.object({
+  status: z.enum(['resolved', 'needs_user_choice', 'fallback']),
+  source: z.enum(['local', 'llm', 'fallback']),
+  candidates: z.array(CareerPlaybookDepartmentCandidateSchema).max(5).default([]),
+  selectedDepartment: CareerPlaybookDepartmentValueSchema.optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+export type CareerPlaybookDepartmentResolution = z.infer<
+  typeof CareerPlaybookDepartmentResolutionSchema
+>;
+
 export const CareerPlaybookBranchingRulesSchema = z
   .object({
     when: z.object({
@@ -121,6 +158,34 @@ export const CareerPlaybookFollowupResponseSchema = z.object({
 });
 export type CareerPlaybookFollowupResponse = z.infer<typeof CareerPlaybookFollowupResponseSchema>;
 
+export const CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD = 0.75;
+
+export function isCareerPlaybookFollowupResponseReady(
+  response: Pick<
+    CareerPlaybookFollowupResponse,
+    'completeness_score' | 'questions' | 'stop_recommendation'
+  >
+): boolean {
+  return (
+    response.stop_recommendation === 'ready_to_generate' &&
+    response.questions.length === 0 &&
+    response.completeness_score >= CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD
+  );
+}
+
+export function normalizeCareerPlaybookFollowupResponseReadiness(
+  response: CareerPlaybookFollowupResponse
+): CareerPlaybookFollowupResponse {
+  if (
+    response.stop_recommendation === 'ready_to_generate' &&
+    !isCareerPlaybookFollowupResponseReady(response)
+  ) {
+    return { ...response, stop_recommendation: 'ask_more' };
+  }
+
+  return response;
+}
+
 export const CareerPlaybookFreeformAnswerSchema = z.object({
   text: z.string().min(1),
   parsed_signals: z.record(z.unknown()).optional(),
@@ -128,10 +193,109 @@ export const CareerPlaybookFreeformAnswerSchema = z.object({
 });
 export type CareerPlaybookFreeformAnswer = z.infer<typeof CareerPlaybookFreeformAnswerSchema>;
 
+export const CareerPlaybookBusinessContextModeSchema = z.enum(['company_specific', 'universal']);
+export type CareerPlaybookBusinessContextMode = z.infer<
+  typeof CareerPlaybookBusinessContextModeSchema
+>;
+
+export const CareerPlaybookBusinessContextStatusSchema = z.enum([
+  'not_started',
+  'collecting',
+  'ready',
+  'skipped',
+  'failed',
+]);
+export type CareerPlaybookBusinessContextStatus = z.infer<
+  typeof CareerPlaybookBusinessContextStatusSchema
+>;
+
+export const CareerPlaybookBusinessContextSourceStatusSchema = z.enum([
+  'uploaded',
+  'processing',
+  'ready',
+  'failed',
+  'removed',
+]);
+export type CareerPlaybookBusinessContextSourceStatus = z.infer<
+  typeof CareerPlaybookBusinessContextSourceStatusSchema
+>;
+
+export const CareerPlaybookBusinessContextSourceTypeSchema = z.enum(['file', 'text']);
+export type CareerPlaybookBusinessContextSourceType = z.infer<
+  typeof CareerPlaybookBusinessContextSourceTypeSchema
+>;
+
+export const CareerPlaybookBusinessContextDigestSchema = z.object({
+  product: z.array(z.string().min(1)).default([]),
+  customers: z.array(z.string().min(1)).default([]),
+  sales_channels: z.array(z.string().min(1)).default([]),
+  processes: z.array(z.string().min(1)).default([]),
+  metrics: z.array(z.string().min(1)).default([]),
+  org_structure: z.array(z.string().min(1)).default([]),
+  constraints: z.array(z.string().min(1)).default([]),
+  source_ids: z.array(z.string().uuid()).default([]),
+  missing_signals: z.array(z.string().min(1)).default([]),
+  user_edited: z.boolean().default(false),
+  generated_at: z.string().datetime().optional(),
+  updated_at: z.string().datetime().optional(),
+});
+export type CareerPlaybookBusinessContextDigest = z.infer<
+  typeof CareerPlaybookBusinessContextDigestSchema
+>;
+
+export const CareerPlaybookBusinessContextSchema = z.object({
+  mode: CareerPlaybookBusinessContextModeSchema.default('universal'),
+  status: CareerPlaybookBusinessContextStatusSchema.default('not_started'),
+  digest: CareerPlaybookBusinessContextDigestSchema.nullable().default(null),
+  source_ids: z.array(z.string().uuid()).default([]),
+  skip_reason: z.string().min(1).optional(),
+  updated_at: z.string().datetime().optional(),
+});
+export type CareerPlaybookBusinessContext = z.infer<typeof CareerPlaybookBusinessContextSchema>;
+
+export const CareerPlaybookBusinessContextSourceSchema = z.object({
+  id: z.string().uuid(),
+  playbook_id: z.string().uuid(),
+  organization_id: z.string().uuid(),
+  user_id: z.string().uuid().optional(),
+  source_type: CareerPlaybookBusinessContextSourceTypeSchema,
+  status: CareerPlaybookBusinessContextSourceStatusSchema,
+  filename: z.string().min(1).optional(),
+  file_catalog_id: z.string().uuid().nullable().optional(),
+  text: z.string().min(1).optional(),
+  error_message: z.string().min(1).nullable().optional(),
+  created_at: z.string().datetime().optional(),
+  updated_at: z.string().datetime().optional(),
+});
+export type CareerPlaybookBusinessContextSource = z.infer<
+  typeof CareerPlaybookBusinessContextSourceSchema
+>;
+
+export const CareerPlaybookBusinessContextSourceSummarySchema = z.object({
+  id: z.string().uuid(),
+  playbookId: z.string().uuid(),
+  sourceType: CareerPlaybookBusinessContextSourceTypeSchema,
+  status: CareerPlaybookBusinessContextSourceStatusSchema,
+  filename: z.string().min(1).nullable(),
+  fileCatalogId: z.string().uuid().nullable(),
+  errorMessage: z.string().min(1).nullable().optional(),
+  createdAt: z.string().datetime().or(z.literal('')),
+  updatedAt: z.string().datetime().or(z.literal('')),
+});
+export type CareerPlaybookBusinessContextSourceSummary = z.infer<
+  typeof CareerPlaybookBusinessContextSourceSummarySchema
+>;
+
 export const CareerPlaybookQADataSchema = z.object({
   fixed: z.array(CareerPlaybookFixedAnswerSchema).default([]),
   followups: z.array(CareerPlaybookFollowupAnswerSchema).default([]),
   freeform: z.array(CareerPlaybookFreeformAnswerSchema).default([]),
+  business_context: CareerPlaybookBusinessContextSchema.default({
+    mode: 'universal',
+    status: 'not_started',
+    digest: null,
+    source_ids: [],
+  }),
   completeness_score: z.number().min(0).max(1).optional(),
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
@@ -448,6 +612,13 @@ export const CareerPlaybookRoleProfileSpecSchema = z.object({
       sources: z.array(z.string().min(1)).default([]),
     })
     .nullable(),
+  business_context: z
+    .object({
+      mode: CareerPlaybookBusinessContextModeSchema,
+      digest: CareerPlaybookBusinessContextDigestSchema.nullable(),
+      source_ids: z.array(z.string().uuid()).default([]),
+    })
+    .optional(),
   block_boundaries: z.record(
     z.object({
       primary_topics: z.array(z.string().min(1)).default([]),
@@ -465,12 +636,17 @@ export const CareerPlaybookAnswerSubmissionSchema = z
     value: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     skipped: z.boolean().optional(),
     freeform_text: z.string().min(1).optional(),
+    business_context: CareerPlaybookBusinessContextSchema.optional(),
   })
   .refine(
     answer =>
-      answer.value !== undefined || answer.skipped === true || answer.freeform_text !== undefined,
+      answer.value !== undefined ||
+      answer.skipped === true ||
+      answer.freeform_text !== undefined ||
+      answer.business_context !== undefined,
     {
-      message: 'Answer submission must include a value, skip flag, or free-form text',
+      message:
+        'Answer submission must include a value, skip flag, free-form text, or business context',
     }
   );
 export type CareerPlaybookAnswerSubmission = z.infer<typeof CareerPlaybookAnswerSubmissionSchema>;

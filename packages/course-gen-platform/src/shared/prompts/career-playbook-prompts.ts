@@ -26,6 +26,45 @@ const groupHeadingVariables = [
 export const careerPlaybookPrompts: HardcodedPrompt[] = [
   {
     stage: 'stage_6',
+    promptKey: 'career_playbook_department_classifier',
+    promptName: 'Career Playbook - Department Classifier',
+    promptDescription:
+      'Classifies ambiguous role titles into a short list of Career Playbook functional areas.',
+    promptTemplate: `SYSTEM:
+You classify a role title into Career Playbook functional areas.
+Return only valid JSON.
+
+Rules:
+- Use only values from allowed_departments_json.
+- Return 2-5 candidates unless one department is extremely obvious.
+- Do not return the full generic list.
+- Labels must be written in the UI language.
+- Use "other" only when none of the concrete departments fits.
+
+JSON shape:
+{
+  "candidates": [
+    { "value": "sales", "label": "...", "confidence": 0.0, "rationale": "..." }
+  ]
+}
+
+USER:
+Role title: {{title}}
+UI language: {{ui_language}}
+Allowed departments:
+{{allowed_departments_json}}`,
+    variables: [
+      { name: 'title', description: 'Role title entered by the user', required: true },
+      { name: 'ui_language', description: 'UI language for candidate labels', required: true },
+      {
+        name: 'allowed_departments_json',
+        description: 'Allowed department values for the classifier',
+        required: true,
+      },
+    ],
+  },
+  {
+    stage: 'stage_6',
     promptKey: 'career_playbook_followup_generator',
     promptName: 'Career Playbook - Follow-up Question Generator',
     promptDescription:
@@ -36,7 +75,10 @@ Generate 3-7 additional questions that collect critical data for a high-quality 
 
 Rules:
 - Each question focuses on one concrete aspect.
+- If business_context_mode is "company_specific", ask 2-5 targeted questions only for missing or weak business signals.
+- If business_context_mode is "universal", ask role-specific benchmark questions and do not invent company-specific product, customer, sales, process, or metric facts.
 - Prefer single_choice or multi_choice when sensible options exist.
+- Use "ready_to_generate" only when completeness_score is at least 0.75 and no critical gaps remain; otherwise use "ask_more".
 - Return only valid JSON matching this shape:
 {
   "questions": [
@@ -61,6 +103,13 @@ Company stage: {{company_stage}}
 Reports to / subordinates: {{reporting}}
 Content language: {{content_language}}
 Free-form context: {{freeform_text}}
+Business context mode: {{business_context_mode}}
+Business context digest:
+{{business_context_digest}}
+Business context source excerpts:
+{{business_context_source_excerpts}}
+Business context missing signals:
+{{business_context_missing_signals}}
 Previous follow-ups answered: {{previous_followups_json}}`,
     variables: [
       { name: 'position', description: 'Position title', required: true },
@@ -71,6 +120,27 @@ Previous follow-ups answered: {{previous_followups_json}}`,
       { name: 'reporting', description: 'Reporting line and subordinates', required: true },
       contentLanguageVariable,
       { name: 'freeform_text', description: 'Optional free-form context', required: true },
+      {
+        name: 'business_context_mode',
+        description: 'Business context mode: company_specific or universal',
+        required: true,
+      },
+      {
+        name: 'business_context_digest',
+        description: 'Structured business context digest or universal mode warning',
+        required: true,
+      },
+      {
+        name: 'business_context_source_excerpts',
+        description:
+          'Sanitized excerpts from processed first-party source files, or an unavailable-content warning',
+        required: true,
+      },
+      {
+        name: 'business_context_missing_signals',
+        description: 'Missing business signals to drive targeted follow-up questions',
+        required: true,
+      },
       {
         name: 'previous_followups_json',
         description: 'Serialized previous follow-up answers',
@@ -91,12 +161,26 @@ This spec is the contract for generating 26 Role Guide blocks.
 Critical requirements:
 - Fill block_boundaries to prevent repetition between blocks.
 - Extract anti_goals and failure_patterns explicitly.
+- Keep client business_context separate from web research. Business context is first-party user/company data; web research is external benchmark data.
+- If business_context_mode is "universal", do not invent product, customer, sales, process, or metric facts. Build a benchmark Role Guide and mark company-specific details as adaptation points.
 - Keep content_language equal to {{content_language}}.
 - Return only valid JSON matching the RoleProfileSpec schema.
 
 USER:
 Q&A answers:
 {{qa_data_json}}
+
+Business context mode:
+{{business_context_mode}}
+
+Business context digest:
+{{business_context_digest}}
+
+Business context source excerpts:
+{{business_context_source_excerpts}}
+
+Business context missing signals:
+{{business_context_missing_signals}}
 
 Web research KPI insights:
 {{kpi_insights}}
@@ -111,6 +195,27 @@ Source URLs:
 {{source_urls}}`,
     variables: [
       { name: 'qa_data_json', description: 'Serialized Q&A data', required: true },
+      {
+        name: 'business_context_mode',
+        description: 'Business context mode: company_specific or universal',
+        required: true,
+      },
+      {
+        name: 'business_context_digest',
+        description: 'Structured first-party business context digest',
+        required: true,
+      },
+      {
+        name: 'business_context_source_excerpts',
+        description:
+          'Sanitized excerpts from processed first-party source files, or an unavailable-content warning',
+        required: true,
+      },
+      {
+        name: 'business_context_missing_signals',
+        description: 'Missing first-party business context signals',
+        required: true,
+      },
       { name: 'kpi_insights', description: 'KPI research insights', required: true },
       { name: 'trends_insights', description: 'Trends research insights', required: true },
       {

@@ -166,6 +166,38 @@ flowchart TB
     expect(parsed.needs_regeneration).toEqual(['block_5']);
   });
 
+  it('normalizes common LLM judge block id variants and drops invalid references', () => {
+    const parsed = parseCareerPlaybookJudgeVerdict(
+      JSON.stringify({
+        pass: false,
+        score: 70,
+        issues: [
+          {
+            block_id: 'Block 5',
+            severity: 'warning',
+            description: 'Decision matrix needs owner clarity.',
+            suggestion: '',
+          },
+          {
+            block_id: 'group_3',
+            severity: 'critical',
+            description: 'Invalid group-level reference should not fail parsing.',
+          },
+        ],
+        needs_regeneration: ['5', 'block_05', 'group_3', 'header'],
+      })
+    );
+
+    expect(parsed.issues).toEqual([
+      {
+        block_id: 'block_5',
+        severity: 'warning',
+        description: 'Decision matrix needs owner clarity.',
+      },
+    ]);
+    expect(parsed.needs_regeneration).toEqual(['block_5', 'header']);
+  });
+
   it('attaches deterministic and optional LLM verdicts to judged blocks', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
@@ -250,6 +282,64 @@ flowchart TB
         input_tokens: 50,
         output_tokens: 40,
         cost_usd: 0.004,
+      },
+    ]);
+  });
+
+  it('falls back to deterministic verdict when LLM judge output is unparsable', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: '',
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 1,
+      costUsd: 0.001,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node({
+      playbookId: 'playbook-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'ru',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: blocks([
+        [
+          'block_5',
+          `## 5. Матрица решений
+
+| Решение | Автономия | Действие |
+| --- | --- | --- |
+| Daily priorities | Full | Decide |
+| Discount 10% | Inform | Use policy |
+| Discount 20% | Recommend | Ask CRO |
+| Legal terms | Approval | Ask Legal |`,
+        ],
+      ]),
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'group2Generator',
+    });
+
+    expect(update.errors).toBeUndefined();
+    expect(update.warnings?.[0]).toContain('crossBlockJudge ignored LLM verdict');
+    expect(update.lastJudgeVerdict).toMatchObject({ pass: true, score: 100 });
+    expect(update.judgeVerdicts).toEqual([expect.objectContaining({ pass: true })]);
+    expect(update.generatedBlocks?.block_5?.judge_verdict).toMatchObject({ pass: true });
+    expect(update.nodeCosts).toEqual([
+      {
+        node: 'crossBlockJudge',
+        model: 'mock-judge-model',
+        input_tokens: 50,
+        output_tokens: 1,
+        cost_usd: 0.001,
       },
     ]);
   });

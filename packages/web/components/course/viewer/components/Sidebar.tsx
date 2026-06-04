@@ -111,7 +111,7 @@ export function Sidebar({
       <div className="border-b border-gray-200/60 p-6 dark:border-gray-800">
         <div className="mb-4 flex items-center justify-between">
           <Link
-            href={isMobile ? '/courses' : '/courses'}
+            href={isMobile ? '/courses/library' : '/courses/library'}
             className="group inline-flex items-center gap-2 text-gray-600 transition-colors hover:text-purple-600 dark:text-white/70 dark:hover:text-white"
           >
             {isMobile ? (

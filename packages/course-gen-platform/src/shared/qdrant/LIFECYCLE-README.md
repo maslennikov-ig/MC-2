@@ -69,17 +69,15 @@ CREATE INDEX idx_file_catalog_original_file_id ON file_catalog(original_file_id)
 WHERE original_file_id IS NOT NULL;
 ```
 
-**Helper Functions:**
+**Database Functions and Triggers:**
 
 ```sql
 -- Find duplicate file by hash
 find_duplicate_file(p_hash TEXT) → file_id, storage_path, vector_status, etc.
 
--- Increment reference count atomically
-increment_file_reference_count(p_file_id UUID) → new_count
-
--- Decrement reference count atomically
-decrement_file_reference_count(p_file_id UUID) → new_count
+-- Reference counts are maintained automatically by triggers
+trg_auto_increment_reference_count -- AFTER INSERT on reference rows
+trg_auto_decrement_reference_count -- AFTER DELETE on reference rows
 ```
 
 ### Code Structure
@@ -145,7 +143,10 @@ if (result.deduplicated) {
 
 ### `handleFileDelete(fileId): Promise<FileDeleteResult>`
 
-Handles file deletion with reference counting.
+Handles file deletion with trigger-owned reference counting. Reference-row deletes remove the
+`file_catalog` row first, then read the original row's persisted `reference_count` after the
+database trigger has run. Deleting an original row while active references still point at it is
+blocked until the product/data model defines original promotion or tombstoning semantics.
 
 **Parameters:**
 
@@ -511,7 +512,7 @@ try {
 
 ### Reference Count Integrity
 
-The system includes constraints and atomic operations to prevent reference count corruption:
+The system includes constraints and database triggers to prevent reference count corruption:
 
 ```sql
 -- Constraint: No self-references
@@ -519,9 +520,9 @@ ALTER TABLE file_catalog
 ADD CONSTRAINT check_no_self_reference
 CHECK (original_file_id IS NULL OR original_file_id != id);
 
--- Atomic increment/decrement via database functions
-SELECT increment_file_reference_count('uuid');
-SELECT decrement_file_reference_count('uuid');
+-- Trigger-owned reference count updates
+trg_auto_increment_reference_count -- increments original after reference INSERT
+trg_auto_decrement_reference_count -- decrements original after reference DELETE
 ```
 
 ## Multi-Tenancy Isolation

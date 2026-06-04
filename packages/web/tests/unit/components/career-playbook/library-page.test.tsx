@@ -25,9 +25,18 @@ vi.mock('@/app/[locale]/career-playbook/library/auth-required-client', () => ({
 }))
 
 vi.mock('@/app/[locale]/career-playbook/library/page-client', () => ({
-  default: ({ locale, initialData }: { locale: string; initialData: unknown }) => (
+  default: ({
+    filters,
+    initialData,
+    locale,
+  }: {
+    filters: unknown
+    initialData: unknown
+    locale: string
+  }) => (
     <div data-testid="career-playbook-library-page-client">
       <span data-testid="career-playbook-library-locale">{locale}</span>
+      <span data-testid="career-playbook-library-filters">{JSON.stringify(filters)}</span>
       <span data-testid="career-playbook-library-initial-data">{JSON.stringify(initialData)}</span>
     </div>
   ),
@@ -45,7 +54,12 @@ describe('CareerPlaybookLibraryPage', () => {
   it('renders auth-required state for unauthenticated visitors', async () => {
     mockedGetCurrentUser.mockResolvedValue(null)
 
-    render(await CareerPlaybookLibraryPage({ params: Promise.resolve({ locale: 'en' }) }))
+    render(
+      await CareerPlaybookLibraryPage({
+        params: Promise.resolve({ locale: 'en' }),
+        searchParams: Promise.resolve({}),
+      })
+    )
 
     expect(screen.getByTestId('career-playbook-library-auth-required')).toBeInTheDocument()
     expect(screen.queryByTestId('career-playbook-library-page-client')).not.toBeInTheDocument()
@@ -77,7 +91,12 @@ describe('CareerPlaybookLibraryPage', () => {
       error: null,
     })
 
-    render(await CareerPlaybookLibraryPage({ params: Promise.resolve({ locale: 'en' }) }))
+    render(
+      await CareerPlaybookLibraryPage({
+        params: Promise.resolve({ locale: 'en' }),
+        searchParams: Promise.resolve({}),
+      })
+    )
 
     expect(screen.getByTestId('career-playbook-library-page-client')).toBeInTheDocument()
     expect(screen.getByTestId('career-playbook-library-locale')).toHaveTextContent('en')
@@ -85,9 +104,52 @@ describe('CareerPlaybookLibraryPage', () => {
       '"playbook-1"'
     )
     expect(mockedGetCareerPlaybookLibrary).toHaveBeenCalledWith({
+      department: undefined,
       limit: 50,
+      level: undefined,
       search: undefined,
+      sort: 'created_desc',
+      status: undefined,
       userId: 'user-1',
     })
+  })
+
+  it('passes catalog filters from search params into the authenticated library query', async () => {
+    mockedGetCurrentUser.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+      role: 'student',
+      organizationId: null,
+    })
+    mockedGetCareerPlaybookLibrary.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      error: null,
+    })
+
+    render(
+      await CareerPlaybookLibraryPage({
+        params: Promise.resolve({ locale: 'en' }),
+        searchParams: Promise.resolve({
+          search: 'sales',
+          status: 'completed',
+          department: 'sales',
+          level: 'lead',
+          sort: 'title_asc',
+        }),
+      })
+    )
+
+    expect(mockedGetCareerPlaybookLibrary).toHaveBeenCalledWith({
+      department: 'sales',
+      limit: 50,
+      level: 'lead',
+      search: 'sales',
+      sort: 'title_asc',
+      status: 'completed',
+      userId: 'user-1',
+    })
+    expect(screen.getByTestId('career-playbook-library-filters')).toHaveTextContent('title_asc')
   })
 })

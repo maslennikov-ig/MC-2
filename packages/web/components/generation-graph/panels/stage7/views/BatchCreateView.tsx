@@ -447,7 +447,7 @@ function LessonSelectionStep({
                     <label
                       key={lesson.id}
                       className={cn(
-                        'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors',
+                        'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 caret-transparent transition-colors select-none',
                         isSelected && 'border-primary/30 bg-primary/5',
                         hasExisting && 'opacity-60'
                       )}
@@ -641,10 +641,13 @@ export function BatchCreateView({ initialType, className }: BatchCreateViewProps
   }, [initialType, store])
 
   // Handle type selection (step 1)
-  const handleSelectType = useCallback((type: CreateableEnrichmentType) => {
-    store.setEnrichmentType(type)
-    store.setSettings(getDefaultSettings(type))
-  }, [store])
+  const handleSelectType = useCallback(
+    (type: CreateableEnrichmentType) => {
+      store.setEnrichmentType(type)
+      store.setSettings(getDefaultSettings(type))
+    },
+    [store]
+  )
 
   // tRPC createBatch mutation
   const createBatchMutation = trpc.enrichment.createBatch.useMutation()

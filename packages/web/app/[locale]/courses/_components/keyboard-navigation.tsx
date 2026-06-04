@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/src/i18n/navigation'
 
 interface KeyboardNavigationProps {
   onSearch?: () => void
@@ -85,7 +85,7 @@ export function useKeyboardNavigation({
             const currentPage = parseInt(searchParams.get('page') || '1')
             if (currentPage > 1) {
               searchParams.set('page', (currentPage - 1).toString())
-              router.push(`/courses?${searchParams.toString()}`)
+              router.push(`/courses/library?${searchParams.toString()}`)
             }
           }
           break
@@ -97,7 +97,7 @@ export function useKeyboardNavigation({
             const searchParams = new URLSearchParams(window.location.search)
             const currentPage = parseInt(searchParams.get('page') || '1')
             searchParams.set('page', (currentPage + 1).toString())
-            router.push(`/courses?${searchParams.toString()}`)
+            router.push(`/courses/library?${searchParams.toString()}`)
           }
           break
 
