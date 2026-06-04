@@ -28,6 +28,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 ## Core Subsystems
 
 - Frontend app routes: `packages/web/app/[locale]/`.
+- Frontend mock/design routes: `packages/web/app/(mocks)/mocks/`; Career Playbook reader variant gallery: `packages/web/app/(mocks)/mocks/career-playbook-reader-variants/page.tsx`.
 - Frontend reusable UI: `packages/web/components/`.
 - Shared catalog UI primitives: `packages/web/components/catalog/` (filters, grids, statistics, reusable card action controls).
 - Frontend locale messages: `packages/web/messages/{ru,en}/`.
