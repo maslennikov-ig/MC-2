@@ -1,42 +1,44 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-03
-Stage: `mc2-ev2nq`
-Branch: `codex/career-playbook-viewer-library-snapshot`
+Updated: 2026-06-04
+Stage: `mc2-uv7n7.2`
+Branch: `codex/career-playbook-reader-variants`
 
 ## Current State
 
-- `mc2-ev2nq` fixes the authenticated Career Playbook viewer loading path.
-- Root cause: the web store called `careerPlaybook.library.get` but cast the library detail response directly to `CareerPlaybookViewerSnapshot`; the response has `id`/`positionTitle`/`generatedBlocks`, while the viewer expects `playbookId`/`title`/`blocks`.
-- The store now maps library details into a proper viewer snapshot and falls back to `finalMarkdown` in the header block if no normalized generated blocks are present.
-- Regression coverage was added in `packages/web/tests/unit/career-playbook-store.test.ts` for production `library.get` detail mapping.
-- Dev data for `656e70ac-0082-4f5a-94a6-f862244d2fbd` is intact: `status=completed`, 27 generated blocks, `final_markdown` length 52174.
-- Stage summary: `.codex/stages/mc2-ev2nq/summary.md`.
+- `mc2-uv7n7.2` converted `/mocks/career-playbook-reader-variants` from the five-card gallery into `Единый ридер: Документ руководителя`.
+- Scope is mock-only; production Career Playbook viewer and course viewer were not edited.
+- Standard mode has left contents, central executive document, and right inspector. Icon-only Lucide buttons control `toc=open|closed` and `panel=open|closed` independently.
+- `mode=reading` is the separate print-minimal reading mode; it hides side panels and mock explanatory chrome while keeping the document visible.
+- URL state is `theme=light|dark`, `toc=open|closed`, `panel=open|closed`, and `mode=standard|reading`.
+- Visible content stays Russian; tests guard against `Header`, `Role Guide`, `Contents`, `Mission and key results`, `Edit`, and `Regenerate`.
+- Visible read-only `frontend_specialist` subagent `Pixel` reviewed the old mock; implementation stayed local because the write zone was one tightly coupled mock route and test.
 
 ## Verification
 
-- RED observed before fix: new store test failed with `Career Playbook viewer request was superseded`.
-- Focused tests passed: `../../node_modules/.bin/vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/viewer-page-client.test.tsx` (44 tests).
-- `git diff --check` passed.
-- `pnpm --filter @megacampus/web lint` passed.
+- RED observed after updating tests for left/right panel controls: targeted Vitest failed on missing `Скрыть левую панель` and missing `toc` URL state.
+- Targeted Vitest passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/reader-variants-page.test.tsx` (5 tests).
+- Targeted ESLint and Prettier checks passed for the mock page and test.
 - `pnpm type-check` passed.
-- `pnpm build` passed; Next.js emitted existing Browserslist and `url.parse()` warnings.
-- `graphify update .` passed (57,062 nodes / 79,102 edges); `graphify-out` is local/untracked.
-- Dev delivery completed via GitHub Actions run `26899302080`; `megacampus-web-dev` and `megacampus-api-dev` both report revision `66032b29bddc5064737b2920f6574a750490a7b9`.
+- `pnpm build` passed; only existing Browserslist and `url.parse()` warnings appeared.
+- Browser smoke via Playwright CDP/Windows Chrome passed at 320/375/414/768/1440: no guarded English text, no horizontal overflow, left/right panel controls and reading mode work.
+- Dev server on `http://127.0.0.1:3107/mocks/career-playbook-reader-variants` must be restarted after `pnpm build` because build invalidates Turbopack dev manifests.
 
 ## Next recommended
 
 Next stage id: pick the next ready Beads task.
-Recommended action: continue from `develop`; no pending delivery remains for `mc2-ev2nq`.
+Recommended action: review the selected mock; if approved, create a separate production ReaderShell Beads task for Career Playbook viewer reuse.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-ev2nq/summary.md`, Beads, Graphify report, and `git status`. Continue from `develop`; `mc2-ev2nq` is delivered and closed.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads, Graphify report, and `git status`. If continuing this UX work, inspect `/mocks/career-playbook-reader-variants` on `codex/career-playbook-reader-variants`.
 
 ## Delivery
 
-- Dev delivery completed through `/push-dev`: `codex/career-playbook-viewer-library-snapshot` -> `develop` at `66032b29bddc5064737b2920f6574a750490a7b9`.
+- Local branch: `codex/career-playbook-reader-variants`; commit and push this feature branch only.
+- docs-reviewed: updated - `.codex/project-index.md` and this handoff describe the selected executive reader mock instead of the old gallery.
+- graph-reviewed: updated - Graphify was used for route/course-viewer orientation and refreshed during closeout; rerun after final commit to align report freshness.
 
 ## Explicit defers
 
-- Authenticated browser smoke with the user's session was not available from CLI; API data, deployed revision, page bundle, and unit coverage verify the fixed layer.
+- No production Career Playbook viewer or course viewer refactor was attempted; this branch is mock-only. Track production reuse as a new Beads task if approved.
