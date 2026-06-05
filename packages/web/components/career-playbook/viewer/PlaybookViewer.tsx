@@ -2,10 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import {
+  Building2,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
+  Globe,
+  Loader2,
+  Lock,
   Maximize2,
   Minimize2,
   PanelLeftClose,
@@ -15,12 +19,21 @@ import {
   Pencil,
   RefreshCw,
 } from 'lucide-react'
-import type { CareerPlaybookViewerSnapshot } from '@megacampus/shared-types'
+import type {
+  CareerPlaybookViewerSnapshot,
+  CareerPlaybookVisibility,
+} from '@megacampus/shared-types'
 
 import { MarkdownRendererFull } from '@/components/markdown/MarkdownRendererFull'
 import { PanelIconButton } from '@/components/common/panel-icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import type {
   CareerPlaybookBlockId,
@@ -55,6 +68,8 @@ export interface PlaybookViewerCopy {
   inspectorTitle?: string
   inspectorStatusTitle?: string
   inspectorReadinessTitle?: string
+  visibilityLabel?: string
+  visibilityValueLabel?: (visibility: CareerPlaybookVisibility) => string
   inspectorReadyBlocks?: (ready: number, total: number) => string
   inspectorLanguage?: (language: string) => string
   inspectorNextStep?: string
@@ -75,6 +90,8 @@ interface PlaybookViewerProps {
   onShare: () => void
   onCreateCourse: () => void
   onDelete: () => void
+  isUpdatingVisibility?: boolean
+  onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
 }
 
 const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
@@ -101,6 +118,8 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   inspectorTitle: 'Инспектор документа',
   inspectorStatusTitle: 'Состояние',
   inspectorReadinessTitle: 'Готовность',
+  visibilityLabel: 'Видимость',
+  visibilityValueLabel: (visibility) => DEFAULT_VISIBILITY_LABELS[visibility],
   inspectorReadyBlocks: (ready, total) => `Готово блоков: ${ready} из ${total}`,
   inspectorLanguage: (language) => `Язык документа: ${language}`,
   inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
@@ -175,6 +194,38 @@ const DEFAULT_BLOCK_TITLES: Partial<Record<CareerPlaybookBlockId, string>> = {
   block_26: 'Чеклист внедрения',
 }
 
+const DEFAULT_VISIBILITY_LABELS: Record<CareerPlaybookVisibility, string> = {
+  private: 'Приватный',
+  organization: 'Для организации',
+  public: 'Публичный',
+}
+
+const VISIBILITY_CONFIG: Record<
+  CareerPlaybookVisibility,
+  {
+    color: string
+    icon: typeof Lock
+  }
+> = {
+  private: {
+    color:
+      'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+    icon: Lock,
+  },
+  organization: {
+    color:
+      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-300/20 dark:bg-blue-300/10 dark:text-blue-100',
+    icon: Building2,
+  },
+  public: {
+    color:
+      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100',
+    icon: Globe,
+  },
+}
+
+const VISIBILITY_OPTIONS = Object.keys(VISIBILITY_CONFIG) as CareerPlaybookVisibility[]
+
 export function PlaybookViewer({
   snapshot,
   blocks,
@@ -188,6 +239,8 @@ export function PlaybookViewer({
   onShare,
   onCreateCourse,
   onDelete,
+  isUpdatingVisibility = false,
+  onVisibilityChange,
 }: PlaybookViewerProps) {
   const labels = {
     ...defaultCopy,
@@ -329,11 +382,15 @@ export function PlaybookViewer({
 
             {panelOpen ? (
               <InspectorRail
+                snapshot={snapshot}
                 labels={labels}
                 actionMessage={actionMessage}
                 readyBlocks={readyBlocks}
                 totalBlocks={blocks.length}
                 contentLanguage={snapshot.contentLanguage}
+                canManageVisibility={viewerPermissions.canManageVisibility}
+                isUpdatingVisibility={isUpdatingVisibility}
+                onVisibilityChange={onVisibilityChange}
                 onPdf={onPdf}
                 onShare={onShare}
                 onCreateCourse={onCreateCourse}
@@ -479,21 +536,29 @@ function ContentsRail({
 }
 
 function InspectorRail({
+  snapshot,
   labels,
   actionMessage,
   readyBlocks,
   totalBlocks,
   contentLanguage,
+  canManageVisibility,
+  isUpdatingVisibility,
+  onVisibilityChange,
   onPdf,
   onShare,
   onCreateCourse,
   onDelete,
 }: {
+  snapshot: CareerPlaybookViewerSnapshot
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
   actionMessage?: string | null
   readyBlocks: number
   totalBlocks: number
   contentLanguage: string
+  canManageVisibility: boolean
+  isUpdatingVisibility: boolean
+  onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
   onPdf: () => void
   onShare: () => void
   onCreateCourse: () => void
@@ -521,6 +586,15 @@ function InspectorRail({
           onDelete={onDelete}
         />
 
+        {canManageVisibility && onVisibilityChange ? (
+          <VisibilitySection
+            labels={labels}
+            snapshot={snapshot}
+            isUpdatingVisibility={isUpdatingVisibility}
+            onVisibilityChange={onVisibilityChange}
+          />
+        ) : null}
+
         <section className="career-playbook-muted-card p-3">
           <h2 className="text-sm font-semibold">{labels.inspectorReadinessTitle}</h2>
           <div className="mt-3 grid gap-2">
@@ -541,6 +615,69 @@ function InspectorRail({
         </section>
       </div>
     </aside>
+  )
+}
+
+function VisibilitySection({
+  labels,
+  snapshot,
+  isUpdatingVisibility,
+  onVisibilityChange,
+}: {
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  snapshot: CareerPlaybookViewerSnapshot
+  isUpdatingVisibility: boolean
+  onVisibilityChange: (visibility: CareerPlaybookVisibility) => void
+}) {
+  const visibility = getSnapshotVisibility(snapshot)
+  const currentVisibility = VISIBILITY_CONFIG[visibility]
+  const VisibilityIcon = currentVisibility.icon
+
+  return (
+    <section className="career-playbook-muted-card p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold">{labels.visibilityLabel}</h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={`h-8 gap-1.5 rounded-md border px-2.5 text-xs ${currentVisibility.color}`}
+              disabled={isUpdatingVisibility}
+              aria-label={`${labels.visibilityLabel}: ${labels.visibilityValueLabel(visibility)}`}
+            >
+              {isUpdatingVisibility ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : (
+                <VisibilityIcon className="h-3.5 w-3.5" aria-hidden />
+              )}
+              {labels.visibilityValueLabel(visibility)}
+              <ChevronDown className="h-3 w-3" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {VISIBILITY_OPTIONS.map((option) => {
+              const optionConfig = VISIBILITY_CONFIG[option]
+              const OptionIcon = optionConfig.icon
+              const disabled = option === 'public' && snapshot.status !== 'completed'
+
+              return (
+                <DropdownMenuItem
+                  key={option}
+                  disabled={disabled}
+                  className={cn('cursor-pointer gap-2', option === visibility && 'bg-accent')}
+                  onClick={() => onVisibilityChange(option)}
+                >
+                  <OptionIcon className="h-4 w-4" aria-hidden />
+                  {labels.visibilityValueLabel(option)}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </section>
   )
 }
 
@@ -743,6 +880,10 @@ function readInitialReaderMode(): ReaderMode {
   return new URLSearchParams(window.location.search).get('mode') === 'reading'
     ? 'reading'
     : 'standard'
+}
+
+function getSnapshotVisibility(snapshot: CareerPlaybookViewerSnapshot): CareerPlaybookVisibility {
+  return snapshot.visibility ?? (snapshot.isPublic ? 'public' : 'private')
 }
 
 function writeReaderUrl(toc: PanelState, panel: PanelState, mode: ReaderMode) {
