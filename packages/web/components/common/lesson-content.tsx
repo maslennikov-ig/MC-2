@@ -110,156 +110,162 @@ export default function LessonContent({
   }, [enrichments])
 
   return (
-    <div key={lesson.id} className="px-6 py-8 lg:px-10">
-      {/* Cover Hero Image - Displayed at the top if exists, with overlay containing lesson info */}
-      {coverImageUrl && (
-        <EnrichmentErrorBoundary
-          enrichmentType="Lesson Cover"
-          enrichmentId={lesson.id}
-          locale={locale}
-        >
-          <div className="mb-6">
-            <LessonCoverHero
-              imageUrl={coverImageUrl}
-              lessonTitle={lesson.title}
-              sectionTitle={section?.title}
-              sectionNumber={
-                section?.section_number != null ? Number(section.section_number) : undefined
-              }
-              readingTime={lesson.duration_minutes}
-              showOverlay={true}
-            />
-          </div>
-        </EnrichmentErrorBoundary>
-      )}
-
-      {/* Lesson Header - Only show if no cover image (info is on banner overlay when cover exists) */}
-      {!coverImageUrl && (
-        <div className="mb-8">
-          {section && (
-            <div
-              className="mb-2 text-sm font-medium text-purple-400"
-              data-section={section.section_number}
-            >
-              {t('viewer.section')} {section.section_number}: {section.title}
+    <div key={lesson.id} className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8 lg:py-8">
+      <article className="career-playbook-document px-5 py-6 md:px-8 md:py-8">
+        {/* Cover Hero Image - Displayed at the top if exists, with overlay containing lesson info */}
+        {coverImageUrl && (
+          <EnrichmentErrorBoundary
+            enrichmentType="Lesson Cover"
+            enrichmentId={lesson.id}
+            locale={locale}
+          >
+            <div className="mb-6">
+              <LessonCoverHero
+                imageUrl={coverImageUrl}
+                lessonTitle={lesson.title}
+                sectionTitle={section?.title}
+                sectionNumber={
+                  section?.section_number != null ? Number(section.section_number) : undefined
+                }
+                readingTime={lesson.duration_minutes}
+                showOverlay={true}
+              />
             </div>
-          )}
-          <h1 className="mb-4 text-3xl font-bold text-gray-900 lg:text-4xl dark:text-white">
-            {lesson.title}
-          </h1>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
-            <span className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              {t('lesson.duration', { minutes: lesson.duration_minutes ?? 0 })}
-            </span>
-          </div>
-        </div>
-      )}
+          </EnrichmentErrorBoundary>
+        )}
 
-      {/* Learning Objectives */}
-      {lesson.objectives && lesson.objectives.length > 0 && (
-        <div className="mb-8">
-          <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-purple-800/30 dark:from-purple-900/20 dark:to-purple-900/10">
-            <div className="mb-4 flex items-center gap-2">
-              <Target className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('lesson.objectives')}
-              </h2>
-            </div>
-            <ul className="space-y-2">
-              {lesson.objectives.map((objective, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-400" />
-                  <span className="text-gray-700 dark:text-gray-300">{objective}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Lesson Materials Switcher */}
-      <LessonMaterialsSwitcher lesson={lesson} assets={assets} enrichments={enrichments} />
-
-      {/* Lesson Introduction - if exists */}
-      {introText && (
-        <div className="mb-8">
-          <div className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 p-6 shadow-sm dark:border-blue-800/30 dark:from-blue-900/10 dark:via-indigo-900/10 dark:to-purple-900/10">
-            <div className="prose prose-lg dark:prose-invert prose-purple max-w-none">
-              <MarkdownRendererFull content={introText} preset="lesson" language={courseLanguage} />
+        {/* Lesson Header - Only show if no cover image (info is on banner overlay when cover exists) */}
+        {!coverImageUrl && (
+          <div className="mb-8">
+            {section && (
+              <div
+                className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400"
+                data-section={section.section_number}
+              >
+                {t('viewer.section')} {section.section_number}: {section.title}
+              </div>
+            )}
+            <h1 className="mb-4 text-3xl font-bold text-gray-900 lg:text-4xl dark:text-white">
+              {lesson.title}
+            </h1>
+            <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
+              <span className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                {t('lesson.duration', { minutes: lesson.duration_minutes ?? 0 })}
+              </span>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Main Content */}
-      <div className="prose prose-lg dark:prose-invert prose-purple max-w-none">
-        <MarkdownRendererFull content={mainContent} preset="lesson" language={courseLanguage} />
-      </div>
+        {/* Learning Objectives */}
+        {lesson.objectives && lesson.objectives.length > 0 && (
+          <div className="mb-8">
+            <div className="career-playbook-muted-card p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Target className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('lesson.objectives')}
+                </h2>
+              </div>
+              <ul className="space-y-2">
+                {lesson.objectives.map((objective, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-400" />
+                    <span className="text-gray-700 dark:text-gray-300">{objective}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
-      {/* Next Lesson Preview */}
-      {nextLesson && (
-        <div className="mt-12 mb-4">
-          {onNextLesson ? (
-            <button
-              type="button"
-              onClick={onNextLesson}
-              className="group w-full cursor-pointer rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 text-left shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10 dark:hover:border-emerald-700/50"
-            >
-              <div className="mb-3 flex items-center gap-2">
-                <ArrowRight
-                  aria-hidden="true"
-                  className="h-5 w-5 text-emerald-600 transition-transform group-hover:translate-x-1 dark:text-emerald-400"
+        {/* Lesson Materials Switcher */}
+        <LessonMaterialsSwitcher lesson={lesson} assets={assets} enrichments={enrichments} />
+
+        {/* Lesson Introduction - if exists */}
+        {introText && (
+          <div className="mb-8">
+            <div className="career-playbook-muted-card p-5">
+              <div className="prose prose-lg dark:prose-invert prose-slate max-w-none">
+                <MarkdownRendererFull
+                  content={introText}
+                  preset="lesson"
+                  language={courseLanguage}
                 />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('lesson.nextLesson')}
-                </h2>
               </div>
-              <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
-                {nextLesson.title}
-              </p>
-              {nextLesson.objectives && nextLesson.objectives.length > 0 && (
-                <ul className="space-y-1.5">
-                  {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
-                    >
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                      {obj}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </button>
-          ) : (
-            <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10">
-              <div className="mb-3 flex items-center gap-2">
-                <ArrowRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('lesson.nextLesson')}
-                </h2>
-              </div>
-              <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
-                {nextLesson.title}
-              </p>
-              {nextLesson.objectives && nextLesson.objectives.length > 0 && (
-                <ul className="space-y-1.5">
-                  {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
-                    >
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                      {obj}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Main Content */}
+        <div className="prose prose-lg dark:prose-invert prose-slate max-w-none">
+          <MarkdownRendererFull content={mainContent} preset="lesson" language={courseLanguage} />
         </div>
-      )}
+
+        {/* Next Lesson Preview */}
+        {nextLesson && (
+          <div className="mt-12 mb-4">
+            {onNextLesson ? (
+              <button
+                type="button"
+                onClick={onNextLesson}
+                className="career-playbook-muted-card group w-full cursor-pointer p-5 text-left transition-colors hover:border-slate-400 dark:hover:border-slate-500"
+              >
+                <div className="mb-3 flex items-center gap-2">
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="h-5 w-5 text-slate-700 transition-transform group-hover:translate-x-1 dark:text-slate-200"
+                  />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {t('lesson.nextLesson')}
+                  </h2>
+                </div>
+                <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
+                  {nextLesson.title}
+                </p>
+                {nextLesson.objectives && nextLesson.objectives.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                      >
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                        {obj}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </button>
+            ) : (
+              <div className="career-playbook-muted-card p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <ArrowRight className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {t('lesson.nextLesson')}
+                  </h2>
+                </div>
+                <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
+                  {nextLesson.title}
+                </p>
+                {nextLesson.objectives && nextLesson.objectives.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                      >
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                        {obj}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </article>
     </div>
   )
 }

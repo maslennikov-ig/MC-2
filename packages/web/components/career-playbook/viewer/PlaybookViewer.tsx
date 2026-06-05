@@ -1,10 +1,24 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, Pencil, RefreshCw } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Pencil,
+  RefreshCw,
+} from 'lucide-react'
 import type { CareerPlaybookViewerSnapshot } from '@megacampus/shared-types'
 
 import { MarkdownRendererFull } from '@/components/markdown/MarkdownRendererFull'
+import { PanelIconButton } from '@/components/common/panel-icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -13,6 +27,9 @@ import type {
   CareerPlaybookViewerBlock,
 } from '@/stores/use-career-playbook-store'
 import { ActionsBar, type ActionsBarCopy } from './ActionsBar'
+
+type PanelState = 'open' | 'closed'
+type ReaderMode = 'standard' | 'reading'
 
 export interface PlaybookViewerCopy {
   productLabel?: string
@@ -27,6 +44,21 @@ export interface PlaybookViewerCopy {
   regenerateBlock?: (title: string) => string
   collapseBlock?: (title: string) => string
   expandBlock?: (title: string) => string
+  hideContents?: string
+  showContents?: string
+  hideInspector?: string
+  showInspector?: string
+  readingMode?: string
+  exitReadingMode?: string
+  readingHint?: string
+  inspectorLabel?: string
+  inspectorTitle?: string
+  inspectorStatusTitle?: string
+  inspectorReadinessTitle?: string
+  inspectorReadyBlocks?: (ready: number, total: number) => string
+  inspectorLanguage?: (language: string) => string
+  inspectorNextStep?: string
+  inspectorPrepare?: string
   actions?: ActionsBarCopy
 }
 
@@ -35,6 +67,8 @@ interface PlaybookViewerProps {
   blocks: CareerPlaybookViewerBlock[]
   actionMessage?: string | null
   copy?: PlaybookViewerCopy
+  readerMode?: ReaderMode
+  onReaderModeChange?: (mode: ReaderMode) => void
   onEditBlock: (blockId: CareerPlaybookBlockId) => void
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
   onPdf: () => void
@@ -44,18 +78,101 @@ interface PlaybookViewerProps {
 }
 
 const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
-  productLabel: 'Role Guide',
-  contents: 'Contents',
-  contentsAriaLabel: 'Role guide contents',
-  waitingBlock: 'This block is waiting for generation.',
-  statusLabel: (status) => status.replaceAll('_', ' '),
-  blockTitle: (_blockId, fallback) => fallback,
-  blockGroupLabel: (_groupKey, fallback) => fallback,
-  blockStatusLabel: (status) => status,
-  editBlock: (title) => `Edit ${title}`,
-  regenerateBlock: (title) => `Regenerate ${title}`,
-  collapseBlock: (title) => `Collapse ${title}`,
-  expandBlock: (title) => `Expand ${title}`,
+  productLabel: 'Должностная инструкция',
+  contents: 'Содержание',
+  contentsAriaLabel: 'Содержание должностной инструкции',
+  waitingBlock: 'Этот блок ожидает генерации.',
+  statusLabel: (status) => DEFAULT_STATUS_LABELS[status] ?? status.replaceAll('_', ' '),
+  blockTitle: (blockId, fallback) => DEFAULT_BLOCK_TITLES[blockId] ?? fallback,
+  blockGroupLabel: (groupKey, fallback) => DEFAULT_GROUP_LABELS[groupKey] ?? fallback,
+  blockStatusLabel: (status) => DEFAULT_BLOCK_STATUS_LABELS[status] ?? status,
+  editBlock: (title) => `Редактировать ${title}`,
+  regenerateBlock: (title) => `Сгенерировать заново ${title}`,
+  collapseBlock: (title) => `Свернуть ${title}`,
+  expandBlock: (title) => `Развернуть ${title}`,
+  hideContents: 'Скрыть левую панель',
+  showContents: 'Показать левую панель',
+  hideInspector: 'Скрыть правый блок',
+  showInspector: 'Показать правый блок',
+  readingMode: 'Режим чтения',
+  exitReadingMode: 'Выйти из режима чтения',
+  readingHint: 'Чистое чтение без боковых панелей',
+  inspectorLabel: 'Инспектор документа',
+  inspectorTitle: 'Инспектор документа',
+  inspectorStatusTitle: 'Состояние',
+  inspectorReadinessTitle: 'Готовность',
+  inspectorReadyBlocks: (ready, total) => `Готово блоков: ${ready} из ${total}`,
+  inspectorLanguage: (language) => `Язык документа: ${language}`,
+  inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
+  inspectorPrepare: 'Подготовить к внедрению',
+}
+
+const defaultActionsCopy: Required<ActionsBarCopy> = {
+  actionsLabel: 'Действия с должностной инструкцией',
+  pdf: 'PDF',
+  share: 'Поделиться',
+  createCourse: 'Создать курс из инструкции',
+  delete: 'Удалить',
+}
+
+const DEFAULT_STATUS_LABELS: Partial<Record<CareerPlaybookViewerSnapshot['status'], string>> = {
+  draft: 'Черновик',
+  answering_fixed: 'Ответы на основные вопросы',
+  awaiting_followups: 'Ожидает уточнений',
+  answering_followups: 'Ответы на уточнения',
+  ready_to_generate: 'Готово к генерации',
+  generating: 'Генерируется',
+  completed: 'Готово',
+  failed: 'Ошибка',
+}
+
+const DEFAULT_BLOCK_STATUS_LABELS: Partial<
+  Record<CareerPlaybookViewerBlock['state']['status'], string>
+> = {
+  pending: 'Ожидает',
+  generating: 'Генерируется',
+  generated: 'Готово',
+  failed: 'Ошибка',
+  regenerating: 'Генерируется заново',
+}
+
+const DEFAULT_GROUP_LABELS: Partial<Record<CareerPlaybookViewerBlock['groupKey'], string>> = {
+  group_1_foundation: 'Основа',
+  group_2_operations: 'Работа',
+  group_3_people: 'Люди и навыки',
+  group_4_growth: 'Рост',
+  group_5_system: 'Система',
+  group_6_wrap: 'Итог',
+}
+
+const DEFAULT_BLOCK_TITLES: Partial<Record<CareerPlaybookBlockId, string>> = {
+  header: 'Шапка документа',
+  block_1: 'Миссия и ключевые результаты',
+  block_2: 'Что не входит в роль',
+  block_3: 'Зоны ответственности',
+  block_4: 'Обязанности',
+  block_5: 'Матрица полномочий',
+  block_6: 'Показатели эффективности',
+  block_7: 'Компетенции',
+  block_8: 'Инструменты и технологии',
+  block_9: 'Работа человека и цифровых инструментов',
+  block_10: 'Зависимости',
+  block_11: 'Карьерный путь',
+  block_12: 'Профиль кандидата',
+  block_13: 'День в роли',
+  block_14: 'Адаптация',
+  block_15: 'Мотивация',
+  block_16: 'Основной процесс',
+  block_17: 'Красные флаги',
+  block_18: 'Частые вопросы',
+  block_19: 'Контекст отрасли',
+  block_20: 'Бизнес-модель',
+  block_21: 'Сценарии сбоев',
+  block_22: 'Памятка роли',
+  block_23: 'План преемственности',
+  block_24: 'Карта роли',
+  block_25: 'Заключение',
+  block_26: 'Чеклист внедрения',
 }
 
 export function PlaybookViewer({
@@ -63,6 +180,8 @@ export function PlaybookViewer({
   blocks,
   actionMessage,
   copy,
+  readerMode,
+  onReaderModeChange,
   onEditBlock,
   onRegenerateBlock,
   onPdf,
@@ -70,132 +189,456 @@ export function PlaybookViewer({
   onCreateCourse,
   onDelete,
 }: PlaybookViewerProps) {
-  const labels = { ...defaultCopy, ...copy }
+  const labels = {
+    ...defaultCopy,
+    ...copy,
+    actions: { ...defaultActionsCopy, ...copy?.actions },
+  }
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<CareerPlaybookBlockId>>(new Set())
+  const [toc, setToc] = useState<PanelState>(() => readInitialPanelState('toc'))
+  const [panel, setPanel] = useState<PanelState>(() => readInitialPanelState('panel'))
+  const [internalMode, setInternalMode] = useState<ReaderMode>(readInitialReaderMode)
+  const mode = readerMode ?? internalMode
+  const tocOpen = mode === 'standard' && toc === 'open'
+  const panelOpen = mode === 'standard' && panel === 'open'
   const groupedBlocks = useMemo(() => groupBlocks(blocks), [blocks])
+  const readyBlocks = useMemo(
+    () => blocks.filter((block) => block.state.content.trim().length > 0).length,
+    [blocks]
+  )
+
+  const updateToc = (next: PanelState) => {
+    setToc(next)
+    writeReaderUrl(next, panel, mode)
+  }
+
+  const updatePanel = (next: PanelState) => {
+    setPanel(next)
+    writeReaderUrl(toc, next, mode)
+  }
+
+  const updateMode = (next: ReaderMode) => {
+    setInternalMode(next)
+    onReaderModeChange?.(next)
+    writeReaderUrl(toc, panel, next)
+  }
 
   return (
-    <main className="career-playbook-zone" data-testid="career-playbook-viewer-shell">
-      <section className="career-playbook-topbar">
-        <div className="mx-auto grid max-w-[1760px] gap-5 px-4 py-5 md:px-6 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md">
-                <FileText className="mr-1 h-3.5 w-3.5" aria-hidden />
-                {labels.productLabel}
-              </Badge>
-              <Badge variant="outline" className="rounded-md capitalize">
-                {labels.statusLabel(snapshot.status)}
-              </Badge>
-              {snapshot.department ? (
-                <Badge variant="outline" className="rounded-md">
-                  {snapshot.department}
-                </Badge>
-              ) : null}
-              {snapshot.level ? (
-                <Badge variant="outline" className="rounded-md">
-                  {snapshot.level}
-                </Badge>
-              ) : null}
-            </div>
-            <h1 className="text-[32px] leading-10 font-semibold tracking-normal md:text-[42px] md:leading-[3.2rem]">
-              {snapshot.title}
-            </h1>
-          </div>
-
-          <ActionsBar
-            actionMessage={actionMessage}
-            copy={labels.actions}
-            onPdf={onPdf}
-            onShare={onShare}
-            onCreateCourse={onCreateCourse}
-            onDelete={onDelete}
+    <main
+      className="career-playbook-zone"
+      data-testid="career-playbook-viewer-shell"
+      data-mode={mode}
+      data-toc={toc}
+      data-panel={panel}
+    >
+      {mode === 'reading' ? (
+        <>
+          <ReadingTopbar
+            label={labels.productLabel}
+            hint={labels.readingHint}
+            exitLabel={labels.exitReadingMode}
+            onExit={() => updateMode('standard')}
           />
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-[1760px] gap-6 px-4 py-6 md:px-6 lg:grid-cols-[18rem_minmax(0,1fr)] 2xl:grid-cols-[20rem_minmax(0,1fr)]">
-        <nav
-          aria-label={labels.contentsAriaLabel}
-          className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
-        >
-          <div className="career-playbook-panel p-3">
-            <p className="px-2 pb-2 text-xs font-semibold tracking-normal text-slate-500 uppercase dark:text-slate-400">
-              {labels.contents}
-            </p>
-            <div className="grid gap-3">
-              {groupedBlocks.map((group) => (
-                <div key={group.groupKey} className="grid gap-1">
-                  <p className="px-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {labels.blockGroupLabel(group.groupKey, group.groupLabel)}
-                  </p>
-                  {group.blocks.map((block) => (
-                    <a
-                      key={block.blockId}
-                      href={`#${block.blockId}`}
-                      className="block min-w-0 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-[#f6efe4] hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
-                    >
-                      <span className="block truncate">
-                        {labels.blockTitle(block.blockId, block.title)}
-                      </span>
-                    </a>
-                  ))}
+          <section className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-10">
+            <DocumentPaper
+              snapshot={snapshot}
+              blocks={blocks}
+              labels={labels}
+              collapsedBlocks={collapsedBlocks}
+              onToggleBlock={setCollapsedBlocks}
+              onEditBlock={onEditBlock}
+              onRegenerateBlock={onRegenerateBlock}
+              interactive={false}
+              titleHeading="h1"
+              spacious
+            />
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="career-playbook-topbar">
+            <div className="mx-auto grid max-w-[1760px] gap-5 px-4 py-5 md:px-6 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div className="min-w-0 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="rounded-md">
+                    <FileText className="mr-1 h-3.5 w-3.5" aria-hidden />
+                    {labels.productLabel}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-md capitalize">
+                    {labels.statusLabel(snapshot.status)}
+                  </Badge>
                 </div>
+                <h1 className="text-[32px] leading-10 font-semibold tracking-normal md:text-[42px] md:leading-[3.2rem]">
+                  {snapshot.title}
+                </h1>
+              </div>
+            </div>
+          </section>
+
+          <section
+            className={cn(
+              'mx-auto grid max-w-[1760px] gap-5 px-4 py-6 md:px-6',
+              tocOpen && panelOpen
+                ? 'xl:grid-cols-[18rem_minmax(0,1fr)_25rem] 2xl:grid-cols-[20rem_minmax(0,1fr)_28rem]'
+                : tocOpen
+                  ? 'xl:grid-cols-[18rem_minmax(0,1fr)] 2xl:grid-cols-[20rem_minmax(0,1fr)]'
+                  : panelOpen
+                    ? 'xl:grid-cols-[minmax(0,1fr)_25rem] 2xl:grid-cols-[minmax(0,1fr)_28rem]'
+                    : 'xl:grid-cols-[minmax(0,1fr)]'
+            )}
+          >
+            {tocOpen ? <ContentsRail groupedBlocks={groupedBlocks} labels={labels} /> : null}
+
+            <section className="min-w-0 overflow-hidden rounded-md border border-[#d6c2a6] bg-[#fbfaf7] shadow-xl shadow-stone-300/30 dark:border-slate-700 dark:bg-slate-950">
+              <ReaderTopbar
+                title={labels.productLabel}
+                subtitle={buildSubtitle(snapshot, labels)}
+                tocOpen={tocOpen}
+                panelOpen={panelOpen}
+                labels={labels}
+                onTocChange={updateToc}
+                onPanelChange={updatePanel}
+                onReadingMode={() => updateMode('reading')}
+              />
+              <div className="min-w-0 bg-[#ece7dd] p-4 md:p-7 dark:bg-slate-900">
+                <DocumentPaper
+                  snapshot={snapshot}
+                  blocks={blocks}
+                  labels={labels}
+                  collapsedBlocks={collapsedBlocks}
+                  onToggleBlock={setCollapsedBlocks}
+                  onEditBlock={onEditBlock}
+                  onRegenerateBlock={onRegenerateBlock}
+                  titleHeading="p"
+                />
+              </div>
+            </section>
+
+            {panelOpen ? (
+              <InspectorRail
+                labels={labels}
+                actionMessage={actionMessage}
+                readyBlocks={readyBlocks}
+                totalBlocks={blocks.length}
+                contentLanguage={snapshot.contentLanguage}
+                onPdf={onPdf}
+                onShare={onShare}
+                onCreateCourse={onCreateCourse}
+                onDelete={onDelete}
+              />
+            ) : null}
+          </section>
+        </>
+      )}
+    </main>
+  )
+}
+
+function ReaderTopbar({
+  title,
+  subtitle,
+  tocOpen,
+  panelOpen,
+  labels,
+  onTocChange,
+  onPanelChange,
+  onReadingMode,
+}: {
+  title: string
+  subtitle: string
+  tocOpen: boolean
+  panelOpen: boolean
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  onTocChange: (panel: PanelState) => void
+  onPanelChange: (panel: PanelState) => void
+  onReadingMode: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d6c2a6] bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
+      <div className="flex min-w-0 items-center gap-3">
+        <PanelIconButton
+          label={tocOpen ? labels.hideContents : labels.showContents}
+          Icon={tocOpen ? PanelLeftClose : PanelLeftOpen}
+          onClick={() => onTocChange(tocOpen ? 'closed' : 'open')}
+          expanded={tocOpen}
+          className="hidden xl:inline-flex"
+        />
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+          <FileText className="h-4 w-4" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">{title}</div>
+          <div className="truncate text-xs text-slate-500 dark:text-slate-400">{subtitle}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onReadingMode}>
+          <Maximize2 className="h-4 w-4" aria-hidden />
+          {labels.readingMode}
+        </Button>
+        <PanelIconButton
+          label={panelOpen ? labels.hideInspector : labels.showInspector}
+          Icon={panelOpen ? PanelRightClose : PanelRightOpen}
+          onClick={() => onPanelChange(panelOpen ? 'closed' : 'open')}
+          expanded={panelOpen}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ReadingTopbar({
+  label,
+  hint,
+  exitLabel,
+  onExit,
+}: {
+  label: string
+  hint: string
+  exitLabel: string
+  onExit: () => void
+}) {
+  return (
+    <div className="sticky top-0 z-20 border-b border-[#d6c2a6] bg-[#f3f0ea]/90 px-4 py-3 backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/90">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+            <FileText className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="hidden min-w-0 sm:block">
+            <div className="truncate text-sm font-semibold">{label}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{hint}</div>
+          </div>
+        </div>
+        <Button type="button" size="sm" onClick={onExit}>
+          <Minimize2 className="h-4 w-4" aria-hidden />
+          {exitLabel}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ContentsRail({
+  groupedBlocks,
+  labels,
+}: {
+  groupedBlocks: ReturnType<typeof groupBlocks>
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+}) {
+  return (
+    <nav
+      aria-label={labels.contentsAriaLabel}
+      className="hidden xl:sticky xl:top-20 xl:block xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto"
+    >
+      <div className="career-playbook-panel p-3">
+        <p className="px-2 pb-2 text-xs font-semibold tracking-normal text-slate-500 uppercase dark:text-slate-400">
+          {labels.contents}
+        </p>
+        <div className="grid gap-3">
+          {groupedBlocks.map((group) => (
+            <div key={group.groupKey} className="grid gap-1">
+              <p className="px-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {labels.blockGroupLabel(group.groupKey, group.groupLabel)}
+              </p>
+              {group.blocks.map((block) => (
+                <a
+                  key={block.blockId}
+                  href={`#${block.blockId}`}
+                  className="block min-w-0 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-[#f6efe4] hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+                >
+                  <span className="block truncate">
+                    {labels.blockTitle(block.blockId, block.title)}
+                  </span>
+                </a>
               ))}
             </div>
-          </div>
-        </nav>
+          ))}
+        </div>
+      </div>
+    </nav>
+  )
+}
 
-        <div className="grid min-w-0 gap-4">
-          {blocks.map((block) => {
-            const isCollapsed = collapsedBlocks.has(block.blockId)
-            const hasContent = block.state.content.trim().length > 0
-            const title = labels.blockTitle(block.blockId, block.title)
-            const groupLabel = labels.blockGroupLabel(block.groupKey, block.groupLabel)
-            const statusLabel = labels.blockStatusLabel(block.state.status)
+function InspectorRail({
+  labels,
+  actionMessage,
+  readyBlocks,
+  totalBlocks,
+  contentLanguage,
+  onPdf,
+  onShare,
+  onCreateCourse,
+  onDelete,
+}: {
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  actionMessage?: string | null
+  readyBlocks: number
+  totalBlocks: number
+  contentLanguage: string
+  onPdf: () => void
+  onShare: () => void
+  onCreateCourse: () => void
+  onDelete: () => void
+}) {
+  return (
+    <aside
+      role="complementary"
+      aria-label={labels.inspectorLabel}
+      className="career-playbook-panel xl:sticky xl:top-20 xl:self-start"
+    >
+      <div className="border-b border-[#d6c2a6] p-4 dark:border-slate-700">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden />
+          {labels.inspectorTitle}
+        </div>
+      </div>
+      <div className="grid gap-4 p-4">
+        <ActionsBar
+          actionMessage={actionMessage}
+          copy={labels.actions}
+          onPdf={onPdf}
+          onShare={onShare}
+          onCreateCourse={onCreateCourse}
+          onDelete={onDelete}
+        />
 
-            return (
-              <article
-                key={block.blockId}
-                id={block.blockId}
-                aria-label={title}
-                className="career-playbook-document scroll-mt-24"
+        <section className="career-playbook-muted-card p-3">
+          <h2 className="text-sm font-semibold">{labels.inspectorReadinessTitle}</h2>
+          <div className="mt-3 grid gap-2">
+            {[
+              labels.inspectorReadyBlocks(readyBlocks, totalBlocks),
+              labels.inspectorLanguage(contentLanguage.toUpperCase()),
+              labels.inspectorNextStep,
+            ].map((item) => (
+              <div
+                key={item}
+                className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300"
               >
-                <header className="career-playbook-document-rule flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        aria-label={
-                          isCollapsed ? labels.expandBlock(title) : labels.collapseBlock(title)
-                        }
-                        onClick={() =>
-                          setCollapsedBlocks((current) => {
-                            const next = new Set(current)
-                            if (next.has(block.blockId)) next.delete(block.blockId)
-                            else next.add(block.blockId)
-                            return next
-                          })
-                        }
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4" aria-hidden />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" aria-hidden />
-                        )}
-                      </Button>
-                      <div className="min-w-0">
-                        <h2 className="truncate text-xl font-semibold">{title}</h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {groupLabel} · {statusLabel}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </aside>
+  )
+}
 
+function DocumentPaper({
+  snapshot,
+  blocks,
+  labels,
+  collapsedBlocks,
+  onToggleBlock,
+  onEditBlock,
+  onRegenerateBlock,
+  interactive = true,
+  titleHeading = 'p',
+  spacious = false,
+}: {
+  snapshot: CareerPlaybookViewerSnapshot
+  blocks: CareerPlaybookViewerBlock[]
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  collapsedBlocks: Set<CareerPlaybookBlockId>
+  onToggleBlock: (
+    updater: (current: Set<CareerPlaybookBlockId>) => Set<CareerPlaybookBlockId>
+  ) => void
+  onEditBlock: (blockId: CareerPlaybookBlockId) => void
+  onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
+  interactive?: boolean
+  titleHeading?: 'h1' | 'p'
+  spacious?: boolean
+}) {
+  const TitleTag = titleHeading
+  return (
+    <div
+      id="reader-document"
+      className={cn(
+        'career-playbook-document mx-auto max-w-4xl',
+        spacious ? 'px-6 py-8 md:px-12 md:py-12' : 'px-5 py-6 md:px-8 md:py-8'
+      )}
+    >
+      <header className="career-playbook-document-rule mb-7 flex flex-wrap items-start justify-between gap-4 border-b pb-5">
+        <div className="min-w-0">
+          <div className="career-playbook-pill mb-3 inline-flex px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            {labels.productLabel}
+          </div>
+          <TitleTag className="text-3xl leading-tight font-semibold md:text-4xl">
+            {snapshot.title}
+          </TitleTag>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+            {buildSubtitle(snapshot, labels)}
+          </p>
+        </div>
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100">
+          {labels.statusLabel(snapshot.status)}
+        </div>
+      </header>
+
+      <div className="grid gap-8">
+        {blocks.map((block) => {
+          const isCollapsed = interactive && collapsedBlocks.has(block.blockId)
+          const title = labels.blockTitle(block.blockId, block.title)
+          const groupLabel = labels.blockGroupLabel(block.groupKey, block.groupLabel)
+          const statusLabel = labels.blockStatusLabel(block.state.status)
+          const content = getDisplayContent(block, title)
+          const hasContent = content.trim().length > 0
+          const BlockHeadingTag = titleHeading === 'h1' ? 'h2' : 'h3'
+
+          return (
+            <article
+              key={block.blockId}
+              id={block.blockId}
+              aria-label={title}
+              className="scroll-mt-24"
+            >
+              <header className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-start gap-2">
+                  {interactive ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      aria-label={
+                        isCollapsed ? labels.expandBlock(title) : labels.collapseBlock(title)
+                      }
+                      onClick={() =>
+                        onToggleBlock((current) => {
+                          const next = new Set(current)
+                          if (next.has(block.blockId)) next.delete(block.blockId)
+                          else next.add(block.blockId)
+                          return next
+                        })
+                      }
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" aria-hidden />
+                      )}
+                    </Button>
+                  ) : null}
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-300" />
+                      <span className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
+                        {groupLabel}
+                      </span>
+                    </div>
+                    <BlockHeadingTag className="text-xl leading-7 font-semibold">
+                      {title}
+                    </BlockHeadingTag>
+                    {interactive ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{statusLabel}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                {interactive ? (
                   <div className="flex shrink-0 items-center gap-2">
                     <Button
                       type="button"
@@ -216,28 +659,33 @@ export function PlaybookViewer({
                       <RefreshCw className="h-4 w-4" aria-hidden />
                     </Button>
                   </div>
-                </header>
-
-                {!isCollapsed ? (
-                  <div className={cn('overflow-x-auto p-4', !hasContent && 'text-slate-500')}>
-                    {hasContent ? (
-                      <MarkdownRendererFull
-                        content={block.state.content}
-                        preset="preview"
-                        features={{ mermaid: true }}
-                        language={snapshot.contentLanguage}
-                      />
-                    ) : (
-                      <p className="text-sm leading-6">{labels.waitingBlock}</p>
-                    )}
-                  </div>
                 ) : null}
-              </article>
-            )
-          })}
-        </div>
-      </section>
-    </main>
+              </header>
+
+              {!isCollapsed ? (
+                <div
+                  className={cn(
+                    'career-playbook-document-rule overflow-x-auto border-b pb-6',
+                    !hasContent && 'text-slate-500'
+                  )}
+                >
+                  {hasContent ? (
+                    <MarkdownRendererFull
+                      content={content}
+                      preset="preview"
+                      features={{ mermaid: true }}
+                      language={snapshot.contentLanguage}
+                    />
+                  ) : (
+                    <p className="text-sm leading-6">{labels.waitingBlock}</p>
+                  )}
+                </div>
+              ) : null}
+            </article>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -257,6 +705,7 @@ function groupBlocks(blocks: CareerPlaybookViewerBlock[]) {
       existing.blocks.push(block)
       continue
     }
+
     groups.set(block.groupKey, {
       groupKey: block.groupKey,
       groupLabel: block.groupLabel,
@@ -264,5 +713,51 @@ function groupBlocks(blocks: CareerPlaybookViewerBlock[]) {
     })
   }
 
-  return [...groups.values()]
+  return Array.from(groups.values())
+}
+
+function readInitialPanelState(key: 'toc' | 'panel'): PanelState {
+  if (typeof window === 'undefined') return 'open'
+  return new URLSearchParams(window.location.search).get(key) === 'closed' ? 'closed' : 'open'
+}
+
+function readInitialReaderMode(): ReaderMode {
+  if (typeof window === 'undefined') return 'standard'
+  return new URLSearchParams(window.location.search).get('mode') === 'reading'
+    ? 'reading'
+    : 'standard'
+}
+
+function writeReaderUrl(toc: PanelState, panel: PanelState, mode: ReaderMode) {
+  if (typeof window === 'undefined') return
+  const params = new URLSearchParams(window.location.search)
+  params.set('toc', toc)
+  params.set('panel', panel)
+  params.set('mode', mode)
+  window.history.replaceState(
+    null,
+    '',
+    `${window.location.pathname}?${params.toString()}${window.location.hash}`
+  )
+}
+
+function buildSubtitle(
+  snapshot: CareerPlaybookViewerSnapshot,
+  labels: Pick<Required<Omit<PlaybookViewerCopy, 'actions'>>, 'statusLabel'>
+) {
+  return labels.statusLabel(snapshot.status)
+}
+
+function getDisplayContent(block: CareerPlaybookViewerBlock, title: string) {
+  const content = block.state.content.trimStart()
+  const match = /^(#{1,2})\s+(.+?)\s*(?:\n+|$)/.exec(content)
+  if (!match) return block.state.content
+
+  const heading = normalizeHeading(match[2] ?? '')
+  const shouldStrip = block.blockId === 'header' || heading === normalizeHeading(title)
+  return shouldStrip ? content.slice(match[0].length).trimStart() : block.state.content
+}
+
+function normalizeHeading(value: string) {
+  return value.replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
 }

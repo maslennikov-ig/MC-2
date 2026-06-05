@@ -29,6 +29,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 
 - Frontend app routes: `packages/web/app/[locale]/`.
 - Frontend mock/design routes: `packages/web/app/(mocks)/mocks/`; selected Career Playbook executive reader mock: `packages/web/app/(mocks)/mocks/career-playbook-reader-variants/page.tsx`.
+- Shared document-reader panel control: `packages/web/components/common/panel-icon-button.tsx`.
 - Frontend reusable UI: `packages/web/components/`.
 - Shared catalog UI primitives: `packages/web/components/catalog/` (filters, grids, statistics, reusable card action controls).
 - Frontend locale messages: `packages/web/messages/{ru,en}/`.
@@ -38,12 +39,14 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Product header navigation: `packages/web/components/layouts/header.tsx`.
 - Course landing route: `packages/web/app/[locale]/courses/page.tsx`.
 - Course library route: `packages/web/app/[locale]/courses/library/page.tsx`.
+- Course reader route: `packages/web/app/[locale]/courses/[orgSlug]/[courseSlug]/page.tsx` with shell in `packages/web/components/course/course-viewer-enhanced.tsx`, toolbar controls in `packages/web/components/course/viewer/components/Toolbar.tsx`, and document lesson surface in `packages/web/components/common/lesson-content.tsx`.
 - Course creation route: `packages/web/app/[locale]/create/`.
 - Career Playbook wizard route: `packages/web/app/[locale]/career-playbook/new/`.
 - Career Playbook business-context upload route: `packages/web/app/api/career-playbook/upload/route.ts`.
 - Career Playbook landing route: `packages/web/app/[locale]/career-playbook/`.
 - Career Playbook library route: `packages/web/app/[locale]/career-playbook/library/`.
 - Career Playbook public share route: `packages/web/app/[locale]/share/career-playbook/[slug]/`.
+- Career Playbook production reader route: `packages/web/app/[locale]/career-playbook/[id]/page-client.tsx` with executive document shell in `packages/web/components/career-playbook/viewer/PlaybookViewer.tsx`.
 - Career Playbook wizard UI: `packages/web/components/career-playbook/wizard/`.
 - Career Playbook library UI: `packages/web/components/career-playbook/library/`.
 - Career Playbook public viewer UI: `packages/web/components/career-playbook/viewer/`.

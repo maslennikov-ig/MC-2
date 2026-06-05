@@ -93,6 +93,13 @@
       "media": "Media"
     },
     "hideSidebar": "Hide sidebar",
+    "showInspector": "Show right panel",
+    "hideInspector": "Hide right panel",
+    "inspectorTitle": "Lesson panel",
+    "inspectorCurrentLesson": "Current lesson",
+    "inspectorNextStep": "Keep reading or open the course structure to move to another lesson.",
+    "markComplete": "Mark complete",
+    "markedComplete": "Lesson completed",
     "structureDescription": "Full overview of all sections and lessons",
     "lessonsProgress": "{completed}/{total} lessons",
     "current": "Current",
