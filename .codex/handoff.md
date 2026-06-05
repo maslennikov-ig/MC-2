@@ -1,42 +1,41 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-05
-Stage: `mc2-yfhm6`
-Branch: `codex/career-playbook-visibility-owner`
+Stage: `mc2-saz6x`
+Branch: `develop`
 
 ## Current State
 
-- `career_playbooks.visibility` is now canonical with values `private`, `organization`, and `public`; `is_public` remains a synchronized compatibility mirror for public links.
-- Canonical mutation added: `careerPlaybook.library.updateVisibility({ playbookId, visibility })`; legacy `careerPlaybook.share.shareToggle` maps to `public`/`private`.
-- Library listing is scoped at the database query level and selects only library-card columns, avoiding all-tenant `select('*')` through the admin client.
-- Business-context source rows are owner/superadmin-only because they may contain raw private company context.
-- Library/viewer responses include `visibility`, `ownerId`, `viewerPermissions`; organization readers get read-only library cards and a clean reader without edit/management layers.
+- Career Playbook visibility and owner-only access shipped to dev and staging/master.
+- `career_playbooks.visibility` is canonical: `private | organization | public`; `is_public` remains a synchronized public-link compatibility mirror.
+- Library/viewer responses include `visibility`, `ownerId`, and `viewerPermissions`; organization readers get read-only cards and reader UI without edit/management layers.
+- Legacy `careerPlaybook.share.shareToggle` remains a compatibility wrapper over canonical visibility.
+- Feature branch `codex/career-playbook-visibility-owner` remains pushed with implementation commit `c22caf99` and CI test hotfix `8813cfb6`.
 - Follow-up `mc2-k2qih` remains open for panel animation, active TOC section, and TOC auto-scroll polish.
 
 ## Verification
 
-- Passed targeted backend unit tests: `career-playbook-library-service.test.ts` and `career-playbook-visibility-migration.test.ts`.
-- Passed targeted web unit tests: `library-page-client.test.tsx` and `viewer.test.tsx`.
-- Passed targeted Prettier, web ESLint, and backend ESLint with one non-blocking warning: `library-service.ts` exceeds `max-lines`.
-- Passed `pnpm type-check` and `pnpm build`; only existing Browserslist and `url.parse()` warnings appeared.
-- Visible read-only reviewer agents completed; must-fix findings were addressed before final gates.
+- Local deploy script passed `pnpm type-check` and `pnpm build` before merging `develop` into `master`.
+- Dev delivery: `develop` `367e4c77`, GitHub Actions run `27028026312` completed success; `https://dev.ai.megacampus.ru/api/health` returned `200` with `{"status":"ok"}`.
+- Staging delivery: `master` `9893ea29`, GitHub Actions run `27029012143` completed success; `https://ai.megacampus.ru/api/health` returned `200` with `{"status":"ok"}`.
+- First dev run `27027456907` failed full backend unit tests because an older router transport test missed the new `.or()` query builder and visibility payload expectations; fixed in `8813cfb6` and rerun passed.
+- Master `Integration Tests` job failed non-blocking while the overall workflow and `Deploy to Production` succeeded; this matches tracked follow-up `mc2-yyxzc`.
 
 ## Next recommended
 
-Next stage id: pick the next ready Beads task.
-Recommended action: merge/deploy only after explicit user request; otherwise continue with `mc2-k2qih` panel/TOC polish.
+Next stage id: `mc2-k2qih`.
+Recommended action: polish Career Playbook reader panel animation and TOC sync.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-yfhm6`, stage summary `.codex/stages/mc2-yfhm6/summary.md`, and Graphify report. Inspect the feature branch `codex/career-playbook-visibility-owner`. Do not touch the separate worktree `/home/me/code/mc2-worktrees/career-playbook-business-context`.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-k2qih`, stage summary `.codex/stages/mc2-saz6x/summary.md`, and Graphify report. Do not touch the separate worktree `/home/me/code/mc2-worktrees/career-playbook-business-context` unless the user explicitly asks.
 
 ## Delivery
 
-- No merge/deploy has been requested for this feature branch yet.
-- docs-reviewed: updated - Career Playbook README/architecture, project index, stage summary, and handoff reflect the new access model.
-- graph-reviewed: updated - Graphify refreshed with `graphify update .` and `graphify cluster-only . --no-viz`.
+- docs-reviewed: updated - handoff and stage summary now record the delivered dev/staging state; stable Career Playbook docs were already updated in stage `mc2-yfhm6`.
+- graph-reviewed: no-change-needed - delivery/test-only hotfix did not change code architecture or module boundaries after the implementation graph refresh in `mc2-yfhm6`.
 
 ## Explicit defers
 
-- Browser smoke for owner/non-owner authenticated Career Playbook records is deferred until suitable test data/session is available.
-- Reader panel animation and TOC scroll polish is tracked separately in Beads task `mc2-k2qih`.
+- Browser smoke for owner/non-owner authenticated Career Playbook records remains deferred until suitable test data/session is available.
+- Non-blocking master Integration Tests failure remains tracked in Beads task `mc2-yyxzc`.
