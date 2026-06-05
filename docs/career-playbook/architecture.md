@@ -11,8 +11,43 @@
 - Business context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`
 - Worker handler: `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts`
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
+- Visibility/access migration: `packages/course-gen-platform/supabase/migrations/20260605150000_career_playbook_visibility.sql`
 - Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
 - Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
+
+## Visibility And Owner-Only Management
+
+Career Playbooks use the same visibility vocabulary as courses:
+`private`, `organization`, and `public`. The canonical database field is
+`career_playbooks.visibility`; the legacy `is_public` flag remains only as a
+compatibility mirror for public-link behavior and is synchronized from
+`visibility`.
+
+Read access and management access are separate:
+
+- `private`: readable by the owner only.
+- `organization`: readable by the owner and authenticated members of the same
+  organization.
+- `public`: readable through the public share link when the playbook is
+  completed and has generated content.
+- Edit, regenerate, delete, visibility changes, public-link management, and
+  creating a course from the playbook are owner-only management actions.
+
+Backend library responses include `visibility`, `ownerId`, and
+`viewerPermissions`. The production reader uses `viewerPermissions` to hide the
+right management inspector and block edit/regenerate controls for organization
+members and public/read-only viewers. The library shows owner cards with the
+course-style visibility dropdown; non-owner organization-visible cards show a
+read-only badge and only open the reader.
+
+Business-context source rows can contain raw private company text, so
+`career_playbook_sources` remains owner/superadmin-only even when the generated
+playbook is visible to the organization. Organization readers see the generated
+Role Guide, not its raw source material.
+
+The compatibility mutation `careerPlaybook.share.shareToggle` maps to
+`private`/`public`, while the canonical protected mutation is
+`careerPlaybook.library.updateVisibility({ playbookId, visibility })`.
 
 ## Department Resolution
 

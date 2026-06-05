@@ -199,8 +199,19 @@ export function PlaybookViewer({
   const [panel, setPanel] = useState<PanelState>(() => readInitialPanelState('panel'))
   const [internalMode, setInternalMode] = useState<ReaderMode>(readInitialReaderMode)
   const mode = readerMode ?? internalMode
+  const viewerPermissions = snapshot.viewerPermissions ?? {
+    canEdit: true,
+    canManageVisibility: true,
+    canCreateCourse: true,
+    canDelete: true,
+  }
+  const inspectorAvailable =
+    viewerPermissions.canEdit ||
+    viewerPermissions.canManageVisibility ||
+    viewerPermissions.canCreateCourse ||
+    viewerPermissions.canDelete
   const tocOpen = mode === 'standard' && toc === 'open'
-  const panelOpen = mode === 'standard' && panel === 'open'
+  const panelOpen = mode === 'standard' && inspectorAvailable && panel === 'open'
   const groupedBlocks = useMemo(() => groupBlocks(blocks), [blocks])
   const readyBlocks = useMemo(
     () => blocks.filter((block) => block.state.content.trim().length > 0).length,
@@ -299,6 +310,7 @@ export function PlaybookViewer({
                 onTocChange={updateToc}
                 onPanelChange={updatePanel}
                 onReadingMode={() => updateMode('reading')}
+                inspectorAvailable={inspectorAvailable}
               />
               <div className="min-w-0 bg-[#ece7dd] p-4 md:p-7 dark:bg-slate-900">
                 <DocumentPaper
@@ -309,6 +321,7 @@ export function PlaybookViewer({
                   onToggleBlock={setCollapsedBlocks}
                   onEditBlock={onEditBlock}
                   onRegenerateBlock={onRegenerateBlock}
+                  interactive={viewerPermissions.canEdit}
                   titleHeading="p"
                 />
               </div>
@@ -343,6 +356,7 @@ function ReaderTopbar({
   onTocChange,
   onPanelChange,
   onReadingMode,
+  inspectorAvailable,
 }: {
   title: string
   subtitle: string
@@ -352,6 +366,7 @@ function ReaderTopbar({
   onTocChange: (panel: PanelState) => void
   onPanelChange: (panel: PanelState) => void
   onReadingMode: () => void
+  inspectorAvailable: boolean
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d6c2a6] bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
@@ -377,12 +392,14 @@ function ReaderTopbar({
           <Maximize2 className="h-4 w-4" aria-hidden />
           {labels.readingMode}
         </Button>
-        <PanelIconButton
-          label={panelOpen ? labels.hideInspector : labels.showInspector}
-          Icon={panelOpen ? PanelRightClose : PanelRightOpen}
-          onClick={() => onPanelChange(panelOpen ? 'closed' : 'open')}
-          expanded={panelOpen}
-        />
+        {inspectorAvailable ? (
+          <PanelIconButton
+            label={panelOpen ? labels.hideInspector : labels.showInspector}
+            Icon={panelOpen ? PanelRightClose : PanelRightOpen}
+            onClick={() => onPanelChange(panelOpen ? 'closed' : 'open')}
+            expanded={panelOpen}
+          />
+        ) : null}
       </div>
     </div>
   )

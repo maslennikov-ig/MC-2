@@ -6,6 +6,7 @@ import {
   CareerPlaybookFixedAnswerSchema,
   CareerPlaybookFixedQuestionLanguageSchema,
   CareerPlaybookFollowupAnswerSchema,
+  CareerPlaybookVisibilitySchema,
   languageSchema,
 } from '@megacampus/shared-types';
 
@@ -98,6 +99,10 @@ export const regenerateBlockInputSchema = blockInputSchema.extend({
 
 export const shareToggleInputSchema = playbookIdInputSchema.extend({
   isPublic: z.boolean(),
+});
+
+export const visibilityInputSchema = playbookIdInputSchema.extend({
+  visibility: CareerPlaybookVisibilitySchema,
 });
 
 export const publicShareInputSchema = z.object({

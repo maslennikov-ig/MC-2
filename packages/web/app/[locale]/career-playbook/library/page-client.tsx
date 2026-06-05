@@ -1,18 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   BookCopy,
   BookOpen,
   BookOpenCheck,
+  Building2,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   FileText,
   GitBranch,
+  Globe,
   Link2,
   Loader2,
+  Lock,
   Plus,
   Share2,
   Trash2,
@@ -39,15 +43,23 @@ import { CatalogStatistics } from '@/components/catalog/catalog-statistics'
 import {
   deleteCareerPlaybook,
   fetchCareerPlaybookLibraryPage,
-  toggleCareerPlaybookShare,
+  updateCareerPlaybookVisibility,
 } from '@/components/career-playbook/library/client-adapter'
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
 import Header from '@/components/layouts/header'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type {
   CareerPlaybookLibraryData,
   CareerPlaybookLibraryFilters,
   CareerPlaybookLibraryItem,
   CareerPlaybookLibraryStatus,
+  CareerPlaybookVisibility,
+  CareerPlaybookViewerPermissions,
 } from '@/components/career-playbook/library/types'
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import type { Locale } from '@/src/i18n/config'
@@ -87,19 +99,80 @@ function getStatusTone(status: CareerPlaybookLibraryItem['status']) {
   return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
 }
 
-function readShareToggleResult(value: unknown) {
+const visibilityConfig: Record<
+  CareerPlaybookVisibility,
+  {
+    color: string
+    icon: ComponentType<{ className?: string }>
+  }
+> = {
+  private: {
+    color:
+      'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+    icon: Lock,
+  },
+  organization: {
+    color:
+      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-300/20 dark:bg-blue-300/10 dark:text-blue-100',
+    icon: Building2,
+  },
+  public: {
+    color:
+      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100',
+    icon: Globe,
+  },
+}
+
+const visibilityOptions = Object.keys(visibilityConfig) as CareerPlaybookVisibility[]
+
+function readViewerPermissions(value: unknown): CareerPlaybookViewerPermissions | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const canEdit = typeof record.canEdit === 'boolean' ? record.canEdit : null
+  const canManageVisibility =
+    typeof record.canManageVisibility === 'boolean' ? record.canManageVisibility : null
+  const canCreateCourse =
+    typeof record.canCreateCourse === 'boolean' ? record.canCreateCourse : null
+  const canDelete = typeof record.canDelete === 'boolean' ? record.canDelete : null
+
+  if (
+    canEdit === null ||
+    canManageVisibility === null ||
+    canCreateCourse === null ||
+    canDelete === null
+  ) {
+    return null
+  }
+
+  return {
+    canEdit,
+    canManageVisibility,
+    canCreateCourse,
+    canDelete,
+  }
+}
+
+function readVisibilityResult(value: unknown) {
   if (!value || typeof value !== 'object') return null
   const record = value as Record<string, unknown>
   const playbookId = typeof record.playbookId === 'string' ? record.playbookId : null
   const isPublic = typeof record.isPublic === 'boolean' ? record.isPublic : null
+  const visibility: CareerPlaybookVisibility | null =
+    record.visibility === 'private' ||
+    record.visibility === 'organization' ||
+    record.visibility === 'public'
+      ? record.visibility
+      : null
   const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
 
-  if (!playbookId || isPublic === null) return null
+  if (!playbookId || isPublic === null || !visibility) return null
 
   return {
     playbookId,
     isPublic,
+    visibility,
     shareSlug,
+    viewerPermissions: readViewerPermissions(record.viewerPermissions),
   }
 }
 
@@ -140,10 +213,11 @@ export default function CareerPlaybookLibraryPageClient({
   locale,
 }: CareerPlaybookLibraryPageClientProps) {
   const t = useTranslations('career-playbook.library')
+  const tc = useTranslations('common')
   const [items, setItems] = useState<CareerPlaybookLibraryItem[]>(initialData.items ?? EMPTY_ITEMS)
   const [nextCursor, setNextCursor] = useState<string | null>(initialData.nextCursor)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
-  const [sharingIds, setSharingIds] = useState<Set<string>>(new Set())
+  const [visibilityUpdatingIds, setVisibilityUpdatingIds] = useState<Set<string>>(new Set())
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
 
@@ -151,6 +225,7 @@ export default function CareerPlaybookLibraryPageClient({
     setItems(initialData.items ?? EMPTY_ITEMS)
     setNextCursor(initialData.nextCursor)
     setDeletingIds(new Set())
+    setVisibilityUpdatingIds(new Set())
   }, [initialData])
 
   const statistics = initialData.statistics ?? defaultStatistics(items)
@@ -188,16 +263,19 @@ export default function CareerPlaybookLibraryPageClient({
     }
   }
 
-  const handleShareToggle = async (item: CareerPlaybookLibraryItem) => {
-    if (sharingIds.has(item.id)) return
-    const nextIsPublic = !item.isPublic
+  const handleVisibilityChange = async (
+    item: CareerPlaybookLibraryItem,
+    visibility: CareerPlaybookVisibility
+  ) => {
+    const currentVisibility = item.visibility ?? (item.isPublic ? 'public' : 'private')
+    if (visibilityUpdatingIds.has(item.id) || visibility === currentVisibility) return
 
-    setSharingIds((prev) => new Set(prev).add(item.id))
+    setVisibilityUpdatingIds((prev) => new Set(prev).add(item.id))
     setLoadMoreError(null)
 
     try {
-      const result = readShareToggleResult(
-        await toggleCareerPlaybookShare(item.id, nextIsPublic, locale)
+      const result = readVisibilityResult(
+        await updateCareerPlaybookVisibility(item.id, visibility, locale)
       )
 
       if (!result) {
@@ -211,7 +289,9 @@ export default function CareerPlaybookLibraryPageClient({
             ? {
                 ...current,
                 isPublic: result.isPublic,
+                visibility: result.visibility,
                 shareSlug: result.shareSlug,
+                viewerPermissions: result.viewerPermissions ?? current.viewerPermissions,
               }
             : current
         )
@@ -219,7 +299,7 @@ export default function CareerPlaybookLibraryPageClient({
     } catch {
       setLoadMoreError(t('errorDescription'))
     } finally {
-      setSharingIds((prev) => {
+      setVisibilityUpdatingIds((prev) => {
         const next = new Set(prev)
         next.delete(item.id)
         return next
@@ -262,17 +342,80 @@ export default function CareerPlaybookLibraryPageClient({
 
   const renderLibraryCard = (item: CareerPlaybookLibraryItem) => {
     const isDeleting = deletingIds.has(item.id)
+    const isUpdatingVisibility = visibilityUpdatingIds.has(item.id)
     const isShareable = item.status === 'completed'
+    const visibility = item.visibility ?? (item.isPublic ? 'public' : 'private')
+    const permissions = item.viewerPermissions ?? {
+      canEdit: true,
+      canManageVisibility: true,
+      canCreateCourse: true,
+      canDelete: true,
+    }
+    const canEdit = permissions.canEdit
+    const canManageVisibility = permissions.canManageVisibility
+    const canCreateCourse = permissions.canCreateCourse && item.status === 'completed'
+    const canDelete = permissions.canDelete
+    const currentVisibility = visibilityConfig[visibility]
+    const VisibilityIcon = currentVisibility.icon
     const shareHref =
-      item.isPublic && item.shareSlug ? `/${locale}/share/career-playbook/${item.shareSlug}` : null
+      canManageVisibility && visibility === 'public' && item.shareSlug
+        ? `/${locale}/share/career-playbook/${item.shareSlug}`
+        : null
     const builderHref = `/${locale}/career-playbook/new?resume=${encodeURIComponent(item.id)}`
 
     return (
       <article className="career-playbook-panel flex h-full flex-col p-4">
         <div className="flex items-start justify-between gap-3">
-          <Badge variant="secondary">
-            {item.isPublic ? t('card.publicBadge') : t('card.privateBadge')}
-          </Badge>
+          {canManageVisibility ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`h-8 gap-1.5 rounded-md border px-2.5 text-xs ${currentVisibility.color}`}
+                  disabled={isUpdatingVisibility}
+                  aria-label={`${tc('visibility.label')}: ${tc(`visibility.${visibility}`)}`}
+                >
+                  {isUpdatingVisibility ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <VisibilityIcon className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  {tc(`visibility.${visibility}`)}
+                  <ChevronDown className="h-3 w-3" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {visibilityOptions.map((option) => {
+                  const config = visibilityConfig[option]
+                  const OptionIcon = config.icon
+                  const disabled = option === 'public' && !isShareable
+                  return (
+                    <DropdownMenuItem
+                      key={option}
+                      disabled={disabled}
+                      className="cursor-pointer gap-2"
+                      onClick={() => void handleVisibilityChange(item, option)}
+                    >
+                      <OptionIcon className="h-4 w-4" aria-hidden />
+                      {tc(`visibility.${option}`)}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className={`rounded-md border ${currentVisibility.color}`}>
+                <VisibilityIcon className="mr-1 h-3.5 w-3.5" aria-hidden />
+                {tc(`visibility.${visibility}`)}
+              </Badge>
+              <Badge variant="outline" className="rounded-md">
+                {t('card.readonlyBadge')}
+              </Badge>
+            </div>
+          )}
           <Badge className={getStatusTone(item.status)}>{t(`statusLabels.${item.status}`)}</Badge>
         </div>
         <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
@@ -285,16 +428,6 @@ export default function CareerPlaybookLibraryPageClient({
         </div>
         <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
           <div className="flex items-center gap-1">
-            <CatalogActionButton
-              icon={<Share2 className="h-3.5 w-3.5" aria-hidden />}
-              label={item.isPublic ? t('card.makePrivate') : t('card.share')}
-              className="text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300"
-              isActive={item.isPublic}
-              disabled={!isShareable || sharingIds.has(item.id)}
-              onClick={() => {
-                void handleShareToggle(item)
-              }}
-            />
             {shareHref ? (
               <CatalogActionButton
                 label={t('card.publicLink')}
@@ -306,67 +439,71 @@ export default function CareerPlaybookLibraryPageClient({
                 </Link>
               </CatalogActionButton>
             ) : null}
-            <CatalogActionButton
-              label={t('card.openBuilder')}
-              className="text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300"
-            >
-              <Link href={builderHref}>
-                <GitBranch className="h-3.5 w-3.5" aria-hidden />
-                <span className="sr-only">{t('card.openBuilder')}</span>
-              </Link>
-            </CatalogActionButton>
-            <AlertDialog>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+            {canEdit ? (
+              <CatalogActionButton
+                label={t('card.openBuilder')}
+                className="text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300"
+              >
+                <Link href={builderHref}>
+                  <GitBranch className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">{t('card.openBuilder')}</span>
+                </Link>
+              </CatalogActionButton>
+            ) : null}
+            {canDelete ? (
+              <AlertDialog>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                        disabled={isDeleting}
+                        aria-label={t('card.delete')}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        <span className="sr-only">{t('card.delete')}</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('card.delete')}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t('deleteDialog.description', { title: item.title })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>
+                      {t('deleteDialog.cancel')}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       disabled={isDeleting}
-                      aria-label={t('card.delete')}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={() => {
+                        void handleDeleteItem(item)
+                      }}
                     >
-                      {isDeleting ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                      )}
-                      <span className="sr-only">{t('card.delete')}</span>
-                    </Button>
-                  </AlertDialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t('card.delete')}</p>
-                </TooltipContent>
-              </Tooltip>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t('deleteDialog.description', { title: item.title })}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>
-                    {t('deleteDialog.cancel')}
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={isDeleting}
-                    onClick={() => {
-                      void handleDeleteItem(item)
-                    }}
-                  >
-                    {t('deleteDialog.confirm')}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                      {t('deleteDialog.confirm')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {item.status === 'completed' ? (
+            {canCreateCourse ? (
               <CreateCourseFromPlaybookDialog
                 playbookId={item.id}
                 trigger={

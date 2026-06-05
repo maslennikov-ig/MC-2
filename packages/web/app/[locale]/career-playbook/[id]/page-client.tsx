@@ -225,7 +225,8 @@ export default function CareerPlaybookViewerPageClient({
     )
   }
 
-  const commonEditor = (
+  const canEditViewer = state.viewer.viewerPermissions?.canEdit ?? true
+  const commonEditor = canEditViewer ? (
     <BlockEditor
       open={Boolean(selectedBlock)}
       block={selectedBlock}
@@ -257,7 +258,7 @@ export default function CareerPlaybookViewerPageClient({
         }
       }}
     />
-  )
+  ) : null
 
   if (state.viewer.status === 'generating') {
     return (
@@ -285,8 +286,12 @@ export default function CareerPlaybookViewerPageClient({
         copy={playbookCopy}
         readerMode={readerMode}
         onReaderModeChange={setReaderMode}
-        onEditBlock={setSelectedBlockId}
-        onRegenerateBlock={setSelectedBlockId}
+        onEditBlock={(blockId) => {
+          if (canEditViewer) setSelectedBlockId(blockId)
+        }}
+        onRegenerateBlock={(blockId) => {
+          if (canEditViewer) setSelectedBlockId(blockId)
+        }}
         onPdf={() =>
           void state.requestCareerPlaybookPdf().then((result) => {
             if (!result.ok) setBackendPendingMessage(t('pdfPending'))
@@ -316,6 +321,14 @@ function createPendingViewerSnapshot(
     level: null,
     contentLanguage: locale,
     status: 'completed',
+    visibility: 'private',
+    ownerId: null,
+    viewerPermissions: {
+      canEdit: true,
+      canManageVisibility: true,
+      canCreateCourse: true,
+      canDelete: true,
+    },
     blocks: Object.fromEntries(
       CAREER_PLAYBOOK_BLOCK_CATALOG.map((block) => [
         block.blockId,

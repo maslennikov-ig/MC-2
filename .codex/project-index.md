@@ -56,6 +56,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend Career Playbook business-context helpers: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/business-context.ts`.
 - Backend Career Playbook business-context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`.
 - Backend Career Playbook business-context sources: `packages/course-gen-platform/src/server/routers/career-playbook/sources.router.ts` and `sources.service.ts`.
+- Backend Career Playbook library/access service: `packages/course-gen-platform/src/server/routers/career-playbook/library-service.ts` owns library listing, viewer snapshots, canonical visibility updates, public-link compatibility, and owner/read-only permissions.
 - Backend Career Playbook course bridge: `packages/course-gen-platform/src/server/routers/career-playbook/course-bridge.service.ts` with storage/quota helpers in `course-bridge-storage.ts`.
 - Backend Career Playbook PDF service: `packages/course-gen-platform/src/services/career-playbook-pdf.ts`.
 - Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.

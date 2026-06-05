@@ -14,6 +14,7 @@ const deletePlaybook = vi.fn()
 const fetchPage = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const toggleShare = vi.fn()
+const updateVisibility = vi.fn()
 const mockPush = vi.hoisted(() => vi.fn())
 const mockSearchParams = vi.hoisted(() => new URLSearchParams())
 
@@ -50,9 +51,27 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
     ),
   toggleCareerPlaybookShare: (...args: unknown[]) =>
     toggleShare(...(args as [playbookId: string, isPublic: boolean, locale: string])),
+  updateCareerPlaybookVisibility: (...args: unknown[]) =>
+    updateVisibility(
+      ...(args as [
+        playbookId: string,
+        visibility: 'private' | 'organization' | 'public',
+        locale: string,
+      ])
+    ),
 }))
 
 const messages = {
+  common: {
+    visibility: {
+      private: 'Private',
+      organization: 'Organization',
+      public: 'Public',
+      label: 'Visibility',
+      changeSuccess: 'Visibility updated',
+      changeError: 'Failed to update visibility',
+    },
+  },
   'career-playbook': {
     library: {
       productLabel: 'Role Guide',
@@ -93,8 +112,7 @@ const messages = {
       },
       card: {
         createCourse: 'Create course',
-        publicBadge: 'Public',
-        privateBadge: 'Private',
+        readonlyBadge: 'Read-only',
         share: 'Share',
         makePrivate: 'Make private',
         publicLink: 'Public link',
@@ -160,6 +178,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
     fetchPage.mockReset()
     mockPush.mockReset()
     toggleShare.mockReset()
+    updateVisibility.mockReset()
     mockSearchParams.forEach((_, key) => mockSearchParams.delete(key))
   })
 
@@ -175,7 +194,15 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: true,
+            visibility: 'public',
             shareSlug: 'head-of-sales',
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: true,
+              canDelete: true,
+            },
           },
           {
             id: 'pb-2',
@@ -185,7 +212,15 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'generating',
             createdAt: '2026-05-12T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: false,
+              canDelete: true,
+            },
           },
         ],
         nextCursor: null,
@@ -223,7 +258,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
   })
 
-  it('puts course-style item actions on each card and removes checkbox-only actions', () => {
+  it('puts owner-only course-style visibility and item actions on each card', () => {
     renderPage({
       initialData: {
         items: [
@@ -235,7 +270,15 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: true,
+              canDelete: true,
+            },
           },
         ],
         nextCursor: null,
@@ -247,12 +290,54 @@ describe('CareerPlaybookLibraryPageClient', () => {
 
     expect(within(card).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete selected' })).not.toBeInTheDocument()
-    expect(within(card).getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: /Private/ })).toBeInTheDocument()
     expect(within(card).getByRole('link', { name: 'Open constructor' })).toHaveAttribute(
       'href',
       '/en/career-playbook/new?resume=pb-1'
     )
     expect(within(card).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('renders organization-visible non-owner cards as read-only', () => {
+    renderPage({
+      initialData: {
+        items: [
+          {
+            id: 'pb-1',
+            title: 'Head of Sales',
+            department: 'sales',
+            level: 'lead',
+            status: 'completed',
+            createdAt: '2026-05-14T10:00:00.000Z',
+            isPublic: false,
+            visibility: 'organization',
+            shareSlug: null,
+            ownerId: 'other-user',
+            viewerPermissions: {
+              canEdit: false,
+              canManageVisibility: false,
+              canCreateCourse: false,
+              canDelete: false,
+            },
+          },
+        ],
+        nextCursor: null,
+        error: null,
+      },
+    })
+
+    const card = screen.getByRole('article')
+
+    expect(within(card).getByText('Organization')).toBeInTheDocument()
+    expect(within(card).getByText('Read-only')).toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: /Organization/ })).not.toBeInTheDocument()
+    expect(within(card).queryByRole('link', { name: 'Open constructor' })).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: 'Create course' })).not.toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Open Head of Sales' })).toHaveAttribute(
+      'href',
+      '/en/career-playbook/pb-1'
+    )
   })
 
   it('shows course creation only for completed role guides', () => {
@@ -267,7 +352,15 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: true,
+            visibility: 'public',
             shareSlug: 'head-of-sales',
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: true,
+              canDelete: true,
+            },
           },
           {
             id: 'pb-2',
@@ -277,7 +370,15 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'generating',
             createdAt: '2026-05-12T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: false,
+              canDelete: true,
+            },
           },
         ],
         nextCursor: null,
@@ -334,12 +435,19 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByText('No role guides yet')).toBeInTheDocument()
   })
 
-  it('toggles public sharing and exposes the public link from the card', async () => {
+  it('updates visibility to public and exposes the public link from the card', async () => {
     const user = userEvent.setup()
-    toggleShare.mockResolvedValue({
+    updateVisibility.mockResolvedValue({
       playbookId: 'pb-1',
       isPublic: true,
+      visibility: 'public',
       shareSlug: 'head-of-sales',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
     })
 
     renderPage({
@@ -353,7 +461,15 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: true,
+              canDelete: true,
+            },
           },
         ],
         nextCursor: null,
@@ -361,9 +477,10 @@ describe('CareerPlaybookLibraryPageClient', () => {
       },
     })
 
-    await user.click(screen.getByRole('button', { name: 'Share' }))
+    await user.click(screen.getByRole('button', { name: /Private/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Public' }))
 
-    expect(toggleShare).toHaveBeenCalledWith('pb-1', true, 'en')
+    expect(updateVisibility).toHaveBeenCalledWith('pb-1', 'public', 'en')
     expect(screen.getByText('Public')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Public link' })).toHaveAttribute(
       'href',
@@ -383,6 +500,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: true,
+            visibility: 'public',
             shareSlug: 'head-of-sales',
           },
           {
@@ -393,6 +511,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-12T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
           },
         ],
@@ -424,6 +543,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'answering_followups',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
           },
           {
@@ -434,6 +554,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'ready_to_generate',
             createdAt: '2026-05-12T10:00:00.000Z',
             isPublic: false,
+            visibility: 'private',
             shareSlug: null,
           },
         ],
@@ -458,6 +579,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
           status: 'completed',
           createdAt: '2026-05-12T10:00:00.000Z',
           isPublic: false,
+          visibility: 'private',
           shareSlug: null,
         },
       ],
@@ -483,6 +605,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
             status: 'completed',
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: true,
+            visibility: 'public',
             shareSlug: 'head-of-sales',
           },
         ],

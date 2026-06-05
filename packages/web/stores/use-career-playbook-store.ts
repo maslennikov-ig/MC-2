@@ -29,7 +29,9 @@ import type {
   CareerPlaybookFollowupQuestion,
   CareerPlaybookFollowupResponse,
   CareerPlaybookPlaybookStatus,
+  CareerPlaybookVisibility,
   CareerPlaybookViewerSnapshot,
+  CareerPlaybookViewerPermissions,
   Language,
 } from '@megacampus/shared-types'
 
@@ -85,6 +87,9 @@ interface CareerPlaybookLibraryDetail {
   finalMarkdown?: string | null
   shareSlug?: string | null
   isPublic?: boolean
+  visibility?: CareerPlaybookVisibility
+  ownerId?: string | null
+  viewerPermissions?: CareerPlaybookViewerPermissions
 }
 
 export type CareerPlaybookDepartmentResolutionState =
@@ -843,8 +848,17 @@ function viewerBlocksFromSnapshot(
 function normalizeViewerSnapshot(
   snapshot: CareerPlaybookViewerSnapshot
 ): CareerPlaybookViewerSnapshot {
+  const visibility = snapshot.visibility ?? (snapshot.isPublic ? 'public' : 'private')
   return {
     ...snapshot,
+    visibility,
+    isPublic: visibility === 'public',
+    viewerPermissions: snapshot.viewerPermissions ?? {
+      canEdit: true,
+      canManageVisibility: true,
+      canCreateCourse: true,
+      canDelete: true,
+    },
     blocks: { ...snapshot.blocks },
   }
 }
@@ -889,7 +903,15 @@ function libraryDetailToViewerSnapshot(
     status: detail.status,
     blocks: generatedBlocksToViewerBlocks(detail.generatedBlocks, detail.finalMarkdown),
     shareSlug: detail.shareSlug ?? null,
-    isPublic: detail.isPublic ?? false,
+    isPublic: detail.visibility === 'public' || detail.isPublic === true,
+    visibility: detail.visibility ?? (detail.isPublic ? 'public' : 'private'),
+    ownerId: detail.ownerId ?? null,
+    viewerPermissions: detail.viewerPermissions ?? {
+      canEdit: true,
+      canManageVisibility: true,
+      canCreateCourse: true,
+      canDelete: true,
+    },
   }
 }
 

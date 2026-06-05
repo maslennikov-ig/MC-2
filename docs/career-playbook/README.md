@@ -4,7 +4,8 @@ Career Playbook is the Role Guide generation track for MC2. The MVP flow is:
 
 1. Authenticated user answers fixed and adaptive wizard questions.
 2. Backend generates the 26-block Role Guide through the Career Playbook LangGraph stage.
-3. User reviews, edits/regenerates blocks, exports PDF, shares a public viewer link, or starts course generation from a completed playbook.
+3. Owner reviews, edits/regenerates blocks, exports PDF, manages visibility, shares a public viewer link, or starts course generation from a completed playbook.
+4. Organization members can read `organization` Role Guides in read-only mode without owner management controls.
 
 ## Product UI Direction
 
@@ -72,6 +73,35 @@ external web research. Company-specific mode may use the digest as client facts.
 Universal mode must not invent company details and should produce a benchmark
 guide with explicit adaptation notes.
 
+## Visibility And Permissions
+
+As of 2026-06-05, Career Playbook visibility matches course visibility:
+`private`, `organization`, and `public`.
+
+`career_playbooks.visibility` is the source of truth. `is_public` remains a
+legacy compatibility mirror for public links and is synchronized from
+`visibility` by migration `20260605150000_career_playbook_visibility.sql`.
+
+Access model:
+
+- `private`: only the creator/owner can read.
+- `organization`: the owner and organization members can read.
+- `public`: the public share route can read completed playbooks with generated
+  content.
+- Management is owner-only: edit/regenerate/delete, visibility changes, public
+  link management, PDF/export actions exposed in the management inspector, and
+  course creation from the Role Guide.
+- Business-context source rows remain owner/superadmin-only because they may
+  contain raw private company text; organization readers see the generated Role
+  Guide, not uploaded/source material.
+
+Backend viewer/library payloads include `visibility`, `ownerId`, and
+`viewerPermissions`. The web library renders the same visibility dropdown style
+as course cards for owners, while non-owner organization cards render a
+read-only state. The production reader hides the right management inspector and
+block edit controls when `viewerPermissions.canEdit` and the related management
+permissions are false.
+
 ## Verification Entrypoints
 
 Local read-only checks:
@@ -89,6 +119,7 @@ Targeted unit checks:
 pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/public-playbook-viewer.test.tsx
 pnpm --filter @megacampus/shared-types exec vitest run tests/career-playbook.test.ts
+pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/career-playbook-library-service.test.ts tests/unit/career-playbook-visibility-migration.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/stages/stage-career-playbook/followup-questions.test.ts tests/unit/stages/stage-career-playbook/spec-builder.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/page-client.test.tsx tests/unit/api/career-playbook/upload.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts

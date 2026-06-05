@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type {
   CareerPlaybookBlockState,
   CareerPlaybookPlaybookStatus,
+  CareerPlaybookVisibility,
+  CareerPlaybookViewerPermissions,
   Language,
 } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
@@ -24,6 +26,9 @@ export interface CareerPlaybookLibraryItem {
   specialization: string | null;
   level: string | null;
   isPublic: boolean;
+  visibility: CareerPlaybookVisibility;
+  ownerId: string;
+  viewerPermissions: CareerPlaybookViewerPermissions;
   shareSlug: string | null;
   createdAt: string;
   updatedAt: string;
@@ -80,8 +85,12 @@ export interface CareerPlaybookDeleteResponse {
 export interface CareerPlaybookShareToggleResponse {
   playbookId: string;
   isPublic: boolean;
+  visibility: CareerPlaybookVisibility;
   shareSlug: string | null;
+  viewerPermissions: CareerPlaybookViewerPermissions;
 }
+
+export type CareerPlaybookVisibilityUpdateResponse = CareerPlaybookShareToggleResponse;
 
 export interface CareerPlaybookPdfExportResponse {
   pdfBase64: string;
@@ -110,14 +119,62 @@ function throwOnDbError(error: unknown, message: string): never {
   });
 }
 
-function assertWritable(row: CareerPlaybookRow, user: UserContext): void {
-  if (user.role === 'superadmin' || row.user_id === user.id) return;
+const OWNER_PERMISSIONS: CareerPlaybookViewerPermissions = {
+  canEdit: true,
+  canManageVisibility: true,
+  canCreateCourse: true,
+  canDelete: true,
+};
+
+const READONLY_PERMISSIONS: CareerPlaybookViewerPermissions = {
+  canEdit: false,
+  canManageVisibility: false,
+  canCreateCourse: false,
+  canDelete: false,
+};
+
+function isOwner(row: CareerPlaybookRow, user: UserContext): boolean {
+  return user.role === 'superadmin' || row.user_id === user.id;
+}
+
+function isOrganizationMember(row: CareerPlaybookRow, user: UserContext): boolean {
+  return Boolean(row.organization_id && row.organization_id === user.organizationId);
+}
+
+function getVisibility(row: CareerPlaybookRow): CareerPlaybookVisibility {
+  return row.visibility ?? (row.is_public ? 'public' : 'private');
+}
+
+function canReadPlaybook(row: CareerPlaybookRow, user: UserContext): boolean {
+  const visibility = getVisibility(row);
+  if (isOwner(row, user)) return true;
+  if (visibility === 'organization' && isOrganizationMember(row, user)) return true;
+  return visibility === 'public';
+}
+
+function canListPlaybook(row: CareerPlaybookRow, user: UserContext): boolean {
+  const visibility = getVisibility(row);
+  if (isOwner(row, user)) return true;
+  return visibility === 'organization' && isOrganizationMember(row, user);
+}
+
+function assertReadable(row: CareerPlaybookRow, user: UserContext): void {
+  if (canReadPlaybook(row, user)) return;
 
   throw new TRPCError({ code: 'FORBIDDEN', message: 'Career Playbook access denied' });
 }
 
-function isOwnedByUser(row: CareerPlaybookRow, user: UserContext): boolean {
-  return user.role === 'superadmin' || row.user_id === user.id;
+function assertManageable(row: CareerPlaybookRow, user: UserContext): void {
+  if (isOwner(row, user)) return;
+
+  throw new TRPCError({ code: 'FORBIDDEN', message: 'Career Playbook access denied' });
+}
+
+function getViewerPermissions(
+  row: CareerPlaybookRow,
+  user: UserContext
+): CareerPlaybookViewerPermissions {
+  return isOwner(row, user) ? { ...OWNER_PERMISSIONS } : { ...READONLY_PERMISSIONS };
 }
 
 function buildShareSlug(): string {
@@ -138,6 +195,25 @@ const PUBLIC_PLAYBOOK_COLUMNS = [
   'final_markdown',
   'share_slug',
   'is_public',
+  'visibility',
+  'created_at',
+  'updated_at',
+  'completed_at',
+].join(',');
+
+const LIBRARY_PLAYBOOK_COLUMNS = [
+  'id',
+  'user_id',
+  'organization_id',
+  'status',
+  'language',
+  'position_title',
+  'department',
+  'specialization',
+  'level',
+  'share_slug',
+  'is_public',
+  'visibility',
   'created_at',
   'updated_at',
   'completed_at',
@@ -152,7 +228,7 @@ function assertShareable(row: CareerPlaybookRow): void {
   });
 }
 
-async function loadOwnedPlaybook(playbookId: string, user: UserContext) {
+async function loadReadablePlaybook(playbookId: string, user: UserContext) {
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
@@ -169,11 +245,21 @@ async function loadOwnedPlaybook(playbookId: string, user: UserContext) {
   }
 
   const row = mapPlaybookRow(data);
-  assertWritable(row, user);
+  assertReadable(row, user);
   return row;
 }
 
-function toLibraryItemFromMappedRow(mapped: CareerPlaybookRow): CareerPlaybookLibraryItem {
+async function loadManageablePlaybook(playbookId: string, user: UserContext) {
+  const row = await loadReadablePlaybook(playbookId, user);
+  assertManageable(row, user);
+  return row;
+}
+
+function toLibraryItemFromMappedRow(
+  mapped: CareerPlaybookRow,
+  user: UserContext
+): CareerPlaybookLibraryItem {
+  const visibility = getVisibility(mapped);
   return {
     id: mapped.id,
     status: mapped.status,
@@ -182,17 +268,20 @@ function toLibraryItemFromMappedRow(mapped: CareerPlaybookRow): CareerPlaybookLi
     department: mapped.department,
     specialization: mapped.specialization,
     level: mapped.level,
-    isPublic: mapped.is_public,
-    shareSlug: mapped.share_slug,
+    isPublic: visibility === 'public',
+    visibility,
+    ownerId: mapped.user_id,
+    viewerPermissions: getViewerPermissions(mapped, user),
+    shareSlug: visibility === 'public' ? mapped.share_slug : null,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
   };
 }
 
-function mapRowToLibraryItem(row: CareerPlaybookRow): CareerPlaybookLibraryItem {
+function mapRowToLibraryItem(row: CareerPlaybookRow, user: UserContext): CareerPlaybookLibraryItem {
   const mapped = mapPlaybookRow(row);
-  return toLibraryItemFromMappedRow(mapped);
+  return toLibraryItemFromMappedRow(mapped, user);
 }
 
 function parseOffsetCursor(cursor: string | undefined): number {
@@ -221,7 +310,7 @@ function buildStatistics(rows: CareerPlaybookRow[]): CareerPlaybookLibraryStatis
     totalCount: rows.length,
     completedCount: rows.filter(row => row.status === 'completed').length,
     inProgressCount: rows.filter(row => inProgressStatuses.has(row.status)).length,
-    publicCount: rows.filter(row => row.is_public).length,
+    publicCount: rows.filter(row => getVisibility(row) === 'public').length,
   };
 }
 
@@ -259,10 +348,13 @@ function sortRows(
   });
 }
 
-function mapRowToLibraryDetail(row: CareerPlaybookRow): CareerPlaybookLibraryDetailResponse {
+function mapRowToLibraryDetail(
+  row: CareerPlaybookRow,
+  user: UserContext
+): CareerPlaybookLibraryDetailResponse {
   const mapped = mapPlaybookRow(row);
   return {
-    ...toLibraryItemFromMappedRow(mapped),
+    ...toLibraryItemFromMappedRow(mapped, user),
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown,
   };
@@ -270,8 +362,23 @@ function mapRowToLibraryDetail(row: CareerPlaybookRow): CareerPlaybookLibraryDet
 
 function mapRowToPublicShare(row: CareerPlaybookRow): CareerPlaybookPublicShareResponse {
   const mapped = mapPlaybookRow(row);
+  const visibility = getVisibility(mapped);
   return {
-    ...toLibraryItemFromMappedRow(mapped),
+    id: mapped.id,
+    status: mapped.status,
+    language: mapped.language,
+    positionTitle: mapped.position_title,
+    department: mapped.department,
+    specialization: mapped.specialization,
+    level: mapped.level,
+    isPublic: visibility === 'public',
+    visibility,
+    ownerId: mapped.user_id,
+    viewerPermissions: { ...READONLY_PERMISSIONS },
+    shareSlug: visibility === 'public' ? mapped.share_slug : null,
+    createdAt: mapped.created_at,
+    updatedAt: mapped.updated_at,
+    completedAt: mapped.completed_at,
     finalMarkdown: mapped.final_markdown ?? '',
   };
 }
@@ -282,18 +389,22 @@ export async function listCareerPlaybooks(
 ): Promise<CareerPlaybookLibraryListResponse> {
   const user = requireUser(ctx);
   const supabase = getCareerPlaybookSupabase();
-  const { data, error } = await supabase
-    .from('career_playbooks')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  let query = supabase.from('career_playbooks').select(LIBRARY_PLAYBOOK_COLUMNS);
+
+  if (user.role !== 'superadmin') {
+    query = query.or(
+      `user_id.eq.${user.id},and(visibility.eq.organization,organization_id.eq.${user.organizationId})`
+    );
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) throwOnDbError(error, 'Failed to list Career Playbooks');
 
   const lowerSearch = input.search?.trim().toLowerCase();
-  const ownedRows = (data ?? []).map(mapPlaybookRow).filter(row => isOwnedByUser(row, user));
+  const readableRows = (data ?? []).map(mapPlaybookRow).filter(row => canListPlaybook(row, user));
 
-  const scopedRows = ownedRows
+  const scopedRows = readableRows
     .filter(row => {
       if (!lowerSearch) return true;
       const fields = [row.position_title, row.department, row.specialization, row.level];
@@ -308,14 +419,14 @@ export async function listCareerPlaybooks(
   const page = sortedRows.slice(offset, offset + input.limit + 1);
   const pageRows = page.slice(0, input.limit);
   const hasMore = page.length > input.limit;
-  const items = pageRows.map(mapRowToLibraryItem);
+  const items = pageRows.map(row => mapRowToLibraryItem(row, user));
 
   return {
     items,
     nextCursor: hasMore ? `offset:${offset + input.limit}` : undefined,
     totalCount: scopedRows.length,
-    statistics: buildStatistics(ownedRows),
-    facets: buildFacets(ownedRows),
+    statistics: buildStatistics(readableRows),
+    facets: buildFacets(readableRows),
   };
 }
 
@@ -324,8 +435,8 @@ export async function getCareerPlaybookFromLibrary(
   input: { playbookId: string }
 ): Promise<CareerPlaybookLibraryDetailResponse> {
   const user = requireUser(ctx);
-  const row = await loadOwnedPlaybook(input.playbookId, user);
-  return mapRowToLibraryDetail(row);
+  const row = await loadReadablePlaybook(input.playbookId, user);
+  return mapRowToLibraryDetail(row, user);
 }
 
 export async function deleteCareerPlaybookFromLibrary(
@@ -333,7 +444,7 @@ export async function deleteCareerPlaybookFromLibrary(
   input: { playbookId: string }
 ): Promise<CareerPlaybookDeleteResponse> {
   const user = requireUser(ctx);
-  const row = await loadOwnedPlaybook(input.playbookId, user);
+  const row = await loadManageablePlaybook(input.playbookId, user);
   const supabase = getCareerPlaybookSupabase();
   const { error } = await supabase
     .from('career_playbooks')
@@ -355,15 +466,27 @@ export async function toggleCareerPlaybookShare(
   ctx: Context,
   input: { playbookId: string; isPublic: boolean }
 ): Promise<CareerPlaybookShareToggleResponse> {
+  return updateCareerPlaybookVisibility(ctx, {
+    playbookId: input.playbookId,
+    visibility: input.isPublic ? 'public' : 'private',
+  });
+}
+
+export async function updateCareerPlaybookVisibility(
+  ctx: Context,
+  input: { playbookId: string; visibility: CareerPlaybookVisibility }
+): Promise<CareerPlaybookVisibilityUpdateResponse> {
   const user = requireUser(ctx);
-  const row = await loadOwnedPlaybook(input.playbookId, user);
-  if (input.isPublic) assertShareable(row);
-  const shareSlug = input.isPublic ? (row.share_slug ?? buildShareSlug()) : row.share_slug;
+  const row = await loadManageablePlaybook(input.playbookId, user);
+  const isPublic = input.visibility === 'public';
+  if (isPublic) assertShareable(row);
+  const shareSlug = isPublic ? (row.share_slug ?? buildShareSlug()) : row.share_slug;
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
     .update({
-      is_public: input.isPublic,
+      visibility: input.visibility,
+      is_public: isPublic,
       share_slug: shareSlug,
     })
     .eq('id', row.id)
@@ -374,10 +497,13 @@ export async function toggleCareerPlaybookShare(
   if (error || !data) throwOnDbError(error, 'Failed to update Career Playbook sharing');
 
   const mapped = mapPlaybookRow(data);
+  const visibility = getVisibility(mapped);
   return {
     playbookId: mapped.id,
-    isPublic: mapped.is_public,
-    shareSlug: mapped.is_public ? mapped.share_slug : null,
+    isPublic: visibility === 'public',
+    visibility,
+    shareSlug: visibility === 'public' ? mapped.share_slug : null,
+    viewerPermissions: getViewerPermissions(mapped, user),
   };
 }
 
@@ -389,7 +515,7 @@ export async function getPublicCareerPlaybookBySlug(input: {
     .from('career_playbooks')
     .select(PUBLIC_PLAYBOOK_COLUMNS)
     .eq('share_slug', input.shareSlug)
-    .eq('is_public', true)
+    .eq('visibility', 'public')
     .eq('status', 'completed')
     .single();
 
@@ -401,7 +527,11 @@ export async function getPublicCareerPlaybookBySlug(input: {
   }
 
   const mapped = mapPlaybookRow(data);
-  if (!mapped.is_public || mapped.status !== 'completed' || !mapped.final_markdown?.trim()) {
+  if (
+    getVisibility(mapped) !== 'public' ||
+    mapped.status !== 'completed' ||
+    !mapped.final_markdown?.trim()
+  ) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Career Playbook not found',
@@ -416,7 +546,7 @@ export async function exportCareerPlaybookPdf(
   input: { playbookId: string }
 ): Promise<CareerPlaybookPdfExportResponse> {
   const user = requireUser(ctx);
-  const row = await loadOwnedPlaybook(input.playbookId, user);
+  const row = await loadManageablePlaybook(input.playbookId, user);
   if (row.status !== 'completed') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
