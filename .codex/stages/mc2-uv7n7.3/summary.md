@@ -45,8 +45,15 @@ Beads: `mc2-uv7n7.3`
 - Visible read-only `correctness_reviewer` agent `Ledger` reported four P2 findings; fixed before final verification.
 - Visible read-only `improvement_reviewer` agent `Craft` reported UX improvements; addressed the high-value issues in scope.
 
+## Delivery Follow-Up
+
+- Delivered in follow-up stage `mc2-uv7n7.4`.
+- `/push-dev --yes` merged into `develop` at `c119345d`.
+- `/deploy --yes` merged `develop` into `master` at `f6d2d911`.
+- Dev run `27012369726` and master run `27012495550` completed successfully; the master non-blocking `Integration Tests` job failed while `Deploy to Production` passed.
+
 ## Closeout Markers
 
 - docs-reviewed: updated
 - graph-reviewed: updated
-- Explicit defers: no live dev merge or deploy performed; production browser smoke for authenticated `/career-playbook/[id]` deferred because it requires a real playbook session.
+- Explicit defers: production browser smoke for authenticated `/career-playbook/[id]` deferred because it requires a real playbook session.
