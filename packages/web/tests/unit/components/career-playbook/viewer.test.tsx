@@ -31,6 +31,14 @@ const snapshot: CareerPlaybookViewerSnapshot = {
   level: 'lead',
   contentLanguage: 'en',
   status: 'completed',
+  visibility: 'private',
+  ownerId: 'owner-user',
+  viewerPermissions: {
+    canEdit: true,
+    canManageVisibility: true,
+    canCreateCourse: true,
+    canDelete: true,
+  },
   blocks: {
     header: {
       content:
@@ -206,6 +214,52 @@ describe('Career Playbook viewer components', () => {
     ).not.toBeInTheDocument()
     expect(window.location.search).toContain('mode=reading')
     expect(window.location.hash).toBe('#block_1')
+  })
+
+  it('renders organization readers without the owner management layer', () => {
+    render(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          visibility: 'organization',
+          ownerId: 'other-user',
+          viewerPermissions: {
+            canEdit: false,
+            canManageVisibility: false,
+            canCreateCourse: false,
+            canDelete: false,
+          },
+        }}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: 'Head of Sales' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: 'Содержание должностной инструкции' })
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('complementary', { name: 'Инспектор документа' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Поделиться' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Создать курс из инструкции' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Удалить' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Редактировать Миссия и ключевые результаты' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Сгенерировать заново Миссия и ключевые результаты' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Показать правый блок' })).not.toBeInTheDocument()
   })
 
   it('edits markdown and submits regeneration instructions from the block editor sheet', async () => {

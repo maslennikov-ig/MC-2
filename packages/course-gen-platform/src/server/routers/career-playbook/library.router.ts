@@ -6,11 +6,13 @@ import {
   playbookIdInputSchema,
   regenerateBlockInputSchema,
   throwCareerPlaybookNotImplemented,
+  visibilityInputSchema,
 } from './_shared';
 import {
   deleteCareerPlaybookFromLibrary,
   getCareerPlaybookFromLibrary,
   listCareerPlaybooks,
+  updateCareerPlaybookVisibility,
 } from './library-service';
 
 export const careerPlaybookLibraryRouter = router({
@@ -24,6 +26,10 @@ export const careerPlaybookLibraryRouter = router({
 
   delete: protectedProcedure.input(playbookIdInputSchema).mutation(({ ctx, input }) => {
     return deleteCareerPlaybookFromLibrary(ctx, input);
+  }),
+
+  updateVisibility: protectedProcedure.input(visibilityInputSchema).mutation(({ ctx, input }) => {
+    return updateCareerPlaybookVisibility(ctx, input);
   }),
 
   regenerateBlock: protectedProcedure.input(regenerateBlockInputSchema).mutation(() => {

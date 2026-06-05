@@ -1,44 +1,42 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-05
-Stage: `mc2-uv7n7.3`
-Branch: `codex/production-reader-shell`
+Stage: `mc2-yfhm6`
+Branch: `codex/career-playbook-visibility-owner`
 
 ## Current State
 
-- `mc2-uv7n7.3` moves the approved `Документ руководителя` reader concept from mock into production Career Playbook viewer.
-- Production `/[locale]/career-playbook/[id]` now uses an executive document shell with document paper, left contents rail, right inspector, independent panel icon controls, URL sync, and clean reading mode.
-- Reader URL state now includes `toc=open|closed`, `panel=open|closed`, and `mode=standard|reading`; hash anchors are preserved during panel/mode changes.
-- Reading mode hides side panels and per-block edit/regenerate/collapse controls while keeping a semantic document `h1`.
-- Course lesson viewer now uses the same document surface: left course sidebar remains, the center lesson is a document paper, and a right lesson inspector is available on `xl+`.
-- Shared `PanelIconButton` provides Lucide panel icon buttons with labels, titles, and optional `aria-expanded`.
+- `career_playbooks.visibility` is now canonical with values `private`, `organization`, and `public`; `is_public` remains a synchronized compatibility mirror for public links.
+- Canonical mutation added: `careerPlaybook.library.updateVisibility({ playbookId, visibility })`; legacy `careerPlaybook.share.shareToggle` maps to `public`/`private`.
+- Library listing is scoped at the database query level and selects only library-card columns, avoiding all-tenant `select('*')` through the admin client.
+- Business-context source rows are owner/superadmin-only because they may contain raw private company context.
+- Library/viewer responses include `visibility`, `ownerId`, `viewerPermissions`; organization readers get read-only library cards and a clean reader without edit/management layers.
+- Follow-up `mc2-k2qih` remains open for panel animation, active TOC section, and TOC auto-scroll polish.
 
 ## Verification
 
-- Targeted Vitest passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx components/course/viewer/__tests__/Toolbar.test.tsx` (9 tests).
-- Targeted Prettier check passed for changed web files.
-- Targeted ESLint passed for changed web files.
-- `pnpm type-check` passed.
-- `pnpm build` passed; only existing Browserslist and `url.parse()` warnings appeared.
-- Browser smoke passed on `http://127.0.0.1:3117/mocks/career-playbook-reader-variants` for 320/375/414/768/1440: no horizontal overflow, right panel toggle works, reading mode works.
-- Visible read-only reviewer agents `Ledger` and `Craft` reviewed correctness and UX; P2 findings were addressed before final verification.
+- Passed targeted backend unit tests: `career-playbook-library-service.test.ts` and `career-playbook-visibility-migration.test.ts`.
+- Passed targeted web unit tests: `library-page-client.test.tsx` and `viewer.test.tsx`.
+- Passed targeted Prettier, web ESLint, and backend ESLint with one non-blocking warning: `library-service.ts` exceeds `max-lines`.
+- Passed `pnpm type-check` and `pnpm build`; only existing Browserslist and `url.parse()` warnings appeared.
+- Visible read-only reviewer agents completed; must-fix findings were addressed before final gates.
 
 ## Next recommended
 
 Next stage id: pick the next ready Beads task.
-Recommended action: merge/push this feature branch through the normal dev delivery flow if accepted; no deploy has been performed in this stage.
+Recommended action: merge/deploy only after explicit user request; otherwise continue with `mc2-k2qih` panel/TOC polish.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads, Graphify report, and `git status`. If continuing this work, inspect branch `codex/production-reader-shell`, Beads task `mc2-uv7n7.3`, and the production viewer/course viewer files listed in `.codex/project-index.md`.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-yfhm6`, stage summary `.codex/stages/mc2-yfhm6/summary.md`, and Graphify report. Inspect the feature branch `codex/career-playbook-visibility-owner`. Do not touch the separate worktree `/home/me/code/mc2-worktrees/career-playbook-business-context`.
 
 ## Delivery
 
-- Local branch: `codex/production-reader-shell`; commit and push this feature branch only.
-- docs-reviewed: updated - handoff, project index, and stage summary now describe the production reader shell and course viewer adaptation.
-- graph-reviewed: updated - Graphify local graph refreshed with `graphify update .` and `graphify cluster-only . --no-viz`; focused queries locate `PlaybookViewer`, `DocumentPaper`, `CourseViewerEnhanced`, `CourseReaderInspector`, and `Toolbar`.
+- No merge/deploy has been requested for this feature branch yet.
+- docs-reviewed: updated - Career Playbook README/architecture, project index, stage summary, and handoff reflect the new access model.
+- graph-reviewed: updated - Graphify refreshed with `graphify update .` and `graphify cluster-only . --no-viz`.
 
 ## Explicit defers
 
-- No live dev merge, staging deploy, or production deploy was performed in this stage.
-- Production browser smoke for `/career-playbook/[id]` was not run because it depends on a real authenticated playbook record; production components are covered by unit tests, type-check, and build.
+- Browser smoke for owner/non-owner authenticated Career Playbook records is deferred until suitable test data/session is available.
+- Reader panel animation and TOC scroll polish is tracked separately in Beads task `mc2-k2qih`.

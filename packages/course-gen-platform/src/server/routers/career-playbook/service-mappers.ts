@@ -10,6 +10,7 @@ import {
   type CareerPlaybookFollowupQuestion,
   type CareerPlaybookPlaybookStatus,
   type CareerPlaybookQAData,
+  type CareerPlaybookVisibility,
   type Json,
   type Language,
 } from '@megacampus/shared-types';
@@ -41,6 +42,7 @@ export interface CareerPlaybookRow {
   cost_breakdown: Json | null;
   share_slug: string | null;
   is_public: boolean;
+  visibility?: CareerPlaybookVisibility;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -62,6 +64,7 @@ interface CareerPlaybookQueryBuilder<T> {
   delete: () => CareerPlaybookQueryBuilder<T>;
   select: (columns?: string) => CareerPlaybookQueryBuilder<T>;
   eq: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
+  or: (filters: string) => CareerPlaybookQueryBuilder<T>;
   order: (column: string, options?: { ascending?: boolean }) => Promise<ListQueryResult<T>>;
   single: () => Promise<QueryResult<T>>;
   maybeSingle: () => Promise<QueryResult<T>>;
@@ -178,9 +181,18 @@ export function generationProgress(status: CareerPlaybookPlaybookStatus): number
 
 export function mapPlaybookRow(row: CareerPlaybookRow): CareerPlaybookRow {
   const parsedStatus = CareerPlaybookPlaybookStatusSchema.safeParse(row.status);
+  const visibility =
+    row.visibility === 'private' || row.visibility === 'organization' || row.visibility === 'public'
+      ? row.visibility
+      : row.is_public
+        ? 'public'
+        : 'private';
+
   return {
     ...row,
     status: parsedStatus.success ? parsedStatus.data : 'draft',
     language: normalizeLanguage(row.language),
+    visibility,
+    is_public: visibility === 'public',
   };
 }

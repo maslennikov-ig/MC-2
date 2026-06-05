@@ -544,6 +544,7 @@
       "createCourse": "Create course",
       "publicBadge": "Public",
       "privateBadge": "Private",
+      "readonlyBadge": "Read-only",
       "share": "Share",
       "makePrivate": "Make private",
       "publicLink": "Public link",

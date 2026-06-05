@@ -28,6 +28,16 @@ export const CareerPlaybookPlaybookStatusSchema = z.enum([
 ]);
 export type CareerPlaybookPlaybookStatus = z.infer<typeof CareerPlaybookPlaybookStatusSchema>;
 
+export const CareerPlaybookVisibilitySchema = z.enum(['private', 'organization', 'public']);
+export type CareerPlaybookVisibility = z.infer<typeof CareerPlaybookVisibilitySchema>;
+
+export interface CareerPlaybookViewerPermissions {
+  canEdit: boolean;
+  canManageVisibility: boolean;
+  canCreateCourse: boolean;
+  canDelete: boolean;
+}
+
 export const CareerPlaybookRoleLevelSchema = z.enum([
   'junior',
   'middle',
@@ -561,6 +571,9 @@ export interface CareerPlaybookViewerSnapshot {
   blocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   shareSlug?: string | null;
   isPublic?: boolean;
+  visibility?: CareerPlaybookVisibility;
+  ownerId?: string | null;
+  viewerPermissions?: CareerPlaybookViewerPermissions;
   thinkingStream?: string | null;
   currentGenerationGroup?: string | null;
 }

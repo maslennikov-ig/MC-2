@@ -544,6 +544,7 @@
       "createCourse": "Создать курс из инструкции",
       "publicBadge": "Публичный",
       "privateBadge": "Приватный",
+      "readonlyBadge": "Только чтение",
       "share": "Поделиться",
       "makePrivate": "Сделать приватным",
       "publicLink": "Публичная ссылка",
