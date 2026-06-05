@@ -104,6 +104,9 @@ const otherUserContext: Context = {
 const playbookId = '33333333-3333-4333-8333-333333333333';
 
 function playbookRow(overrides: Record<string, unknown> = {}) {
+  const isPublic = typeof overrides.is_public === 'boolean' ? overrides.is_public : false;
+  const visibility = overrides.visibility ?? (isPublic ? 'public' : 'private');
+
   return {
     id: playbookId,
     user_id: authenticatedContext.user!.id,
@@ -122,7 +125,8 @@ function playbookRow(overrides: Record<string, unknown> = {}) {
     web_research: null,
     cost_breakdown: null,
     share_slug: null,
-    is_public: false,
+    is_public: isPublic,
+    visibility,
     created_at: '2026-05-14T00:00:00.000Z',
     updated_at: '2026-05-14T00:00:00.000Z',
     completed_at: null,
@@ -138,6 +142,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    or: vi.fn(() => builder),
     order: vi.fn(() => builder),
     single: vi.fn(() => {
       const result = singleResults.shift();
@@ -153,6 +158,7 @@ function createListBuilder(data: unknown[], error: unknown = null) {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    or: vi.fn(() => builder),
     order: vi.fn(() => Promise.resolve({ data, error })),
   };
 
@@ -162,6 +168,7 @@ function createListBuilder(data: unknown[], error: unknown = null) {
 describe('careerPlaybookRouter transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.from.mockReset();
     mocks.validateFile.mockReturnValue({ valid: true });
     mocks.runPhase2Storage.mockResolvedValue({
       fileId: '55555555-5555-4555-8555-555555555555',
@@ -895,7 +902,10 @@ describe('careerPlaybookRouter transport', () => {
     const result = await caller.library.list({ limit: 20 });
 
     expect(mocks.from).toHaveBeenCalledWith('career_playbooks');
-    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
+    expect(builder.or).toHaveBeenCalledWith(
+      expect.stringContaining(`user_id.eq.${authenticatedContext.user!.id}`)
+    );
+    expect(builder.or).toHaveBeenCalledWith(expect.stringContaining('visibility.eq.organization'));
     expect(result.items).toHaveLength(1);
     expect(result.items.map(item => item.id)).toEqual([ownPlaybook.id]);
     expect(result.items.every(item => item.id !== sameOrgPlaybook.id)).toBe(true);
@@ -1090,10 +1100,17 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update.mock.calls[0][0].share_slug).not.toBe(predictableSlug);
     expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
     expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       playbookId,
       isPublic: true,
       shareSlug: 'cp-1234567890abcdef12345678',
+      visibility: 'public',
+      viewerPermissions: {
+        canCreateCourse: true,
+        canDelete: true,
+        canEdit: true,
+        canManageVisibility: true,
+      },
     });
   });
 
@@ -1122,11 +1139,13 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update).toHaveBeenCalledWith({
       is_public: false,
       share_slug: 'existing-share-slug',
+      visibility: 'private',
     });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       playbookId,
       isPublic: false,
       shareSlug: null,
+      visibility: 'private',
     });
   });
 
@@ -1159,8 +1178,10 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update).toHaveBeenCalledWith({
       is_public: true,
       share_slug: 'existing-share-slug',
+      visibility: 'public',
     });
     expect(result.shareSlug).toBe('existing-share-slug');
+    expect(result.visibility).toBe('public');
   });
 
   it('returns a public playbook by share slug without authentication', async () => {
@@ -1253,7 +1274,9 @@ describe('careerPlaybookRouter transport', () => {
     const publicCaller = careerPlaybookRouter.createCaller(unauthenticatedContext);
 
     const otherUserLibrary = await otherUserCaller.library.list({ limit: 20 });
-    expect(listBuilder.eq).toHaveBeenCalledWith('user_id', otherUserContext.user!.id);
+    expect(listBuilder.or).toHaveBeenCalledWith(
+      expect.stringContaining(`user_id.eq.${otherUserContext.user!.id}`)
+    );
     expect(otherUserLibrary.items).toEqual([]);
 
     const sharedPlaybook = await publicCaller.share.getPublicBySlug({
