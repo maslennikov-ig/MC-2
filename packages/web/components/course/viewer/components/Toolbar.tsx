@@ -9,7 +9,10 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   GraduationCap,
   Clock,
   Trophy,
@@ -18,6 +21,7 @@ import {
   LayoutGrid,
 } from 'lucide-react'
 import ThemeToggle from '@/components/common/theme-toggle'
+import { PanelIconButton } from '@/components/common/panel-icon-button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Section, Lesson, Course } from '@/types/database'
 import { buildCourseLessonsUrl, buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
@@ -28,6 +32,7 @@ interface ToolbarProps {
   course: Course
   isMobile: boolean
   sidebarOpen: boolean
+  inspectorOpen?: boolean
   focusMode: boolean
   totalLessons: number
   totalTime: string
@@ -40,6 +45,7 @@ interface ToolbarProps {
   orgSlug: string
   onToggleSidebar: () => void
   onToggleMobileSidebar: () => void
+  onToggleInspector?: () => void
   onToggleFocusMode: () => void
   onPrev: () => void
   onNext: () => void
@@ -51,6 +57,7 @@ export function Toolbar({
   course,
   isMobile,
   sidebarOpen,
+  inspectorOpen = true,
   focusMode,
   totalLessons,
   totalTime,
@@ -61,26 +68,30 @@ export function Toolbar({
   orgSlug,
   onToggleSidebar,
   onToggleMobileSidebar,
+  onToggleInspector,
   onToggleFocusMode,
   onPrev,
   onNext,
 }: ToolbarProps) {
   const t = useTranslations('course.viewer')
+  const sidebarLabel = isMobile
+    ? t('showSidebar')
+    : sidebarOpen
+      ? t('hideSidebar')
+      : t('showSidebar')
 
   return (
     <div className="border-b border-gray-200/60 bg-white shadow-sm backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/70">
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {(isMobile || !sidebarOpen) && (
-              <button
-                onClick={isMobile ? onToggleMobileSidebar : onToggleSidebar}
-                className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:text-white/70 dark:hover:bg-gray-800 dark:hover:text-white"
-                title={t('showSidebar')}
-              >
-                <PanelLeft className="h-5 w-5" />
-              </button>
-            )}
+            <PanelIconButton
+              label={sidebarLabel}
+              Icon={isMobile || !sidebarOpen ? PanelLeftOpen : PanelLeftClose}
+              onClick={isMobile ? onToggleMobileSidebar : onToggleSidebar}
+              expanded={isMobile ? undefined : sidebarOpen}
+              className="border-gray-200 bg-white text-gray-600 hover:text-purple-700 dark:border-gray-700 dark:bg-gray-900 dark:text-white/70 dark:hover:text-white"
+            />
             {currentSection && currentLesson && (
               <div className="text-sm font-medium text-gray-600 dark:text-white/70">
                 <span className="hidden sm:inline">
@@ -155,6 +166,16 @@ export function Toolbar({
             </Button>
 
             {!focusMode && <ThemeToggle />}
+
+            {!focusMode && onToggleInspector ? (
+              <PanelIconButton
+                label={inspectorOpen ? t('hideInspector') : t('showInspector')}
+                Icon={inspectorOpen ? PanelRightClose : PanelRightOpen}
+                onClick={onToggleInspector}
+                expanded={inspectorOpen}
+                className="hidden border-gray-200 bg-white text-gray-600 hover:text-purple-700 xl:inline-flex dark:border-gray-700 dark:bg-gray-900 dark:text-white/70 dark:hover:text-white"
+              />
+            ) : null}
 
             <Button
               onClick={onPrev}

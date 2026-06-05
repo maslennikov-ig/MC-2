@@ -20,6 +20,8 @@ import {
   type CareerPlaybookViewerBlock,
 } from '@/stores/use-career-playbook-store'
 
+type ReaderMode = 'standard' | 'reading'
+
 interface CareerPlaybookViewerPageClientProps {
   locale: Locale
   playbookId: string
@@ -76,6 +78,12 @@ export default function CareerPlaybookViewerPageClient({
   const t = useTranslations('career-playbook.viewer')
   const state = useCareerPlaybookStore()
   const [selectedBlockId, setSelectedBlockId] = useState<CareerPlaybookBlockId | null>(null)
+  const [readerMode, setReaderMode] = useState<ReaderMode>(() => {
+    if (typeof window === 'undefined') return 'standard'
+    return new URLSearchParams(window.location.search).get('mode') === 'reading'
+      ? 'reading'
+      : 'standard'
+  })
   const playbookCopy = useMemo(
     () => ({
       productLabel: t('productLabel'),
@@ -95,6 +103,22 @@ export default function CareerPlaybookViewerPageClient({
       regenerateBlock: (title: string) => t('regenerateBlock', { title }),
       collapseBlock: (title: string) => t('collapseBlock', { title }),
       expandBlock: (title: string) => t('expandBlock', { title }),
+      hideContents: t('hideContents'),
+      showContents: t('showContents'),
+      hideInspector: t('hideInspector'),
+      showInspector: t('showInspector'),
+      readingMode: t('readingMode'),
+      exitReadingMode: t('exitReadingMode'),
+      readingHint: t('readingHint'),
+      inspectorLabel: t('inspectorLabel'),
+      inspectorTitle: t('inspectorTitle'),
+      inspectorStatusTitle: t('inspectorStatusTitle'),
+      inspectorReadinessTitle: t('inspectorReadinessTitle'),
+      inspectorReadyBlocks: (ready: number, total: number) =>
+        t('inspectorReadyBlocks', { ready, total }),
+      inspectorLanguage: (language: string) => t('inspectorLanguage', { language }),
+      inspectorNextStep: t('inspectorNextStep'),
+      inspectorPrepare: t('inspectorPrepare'),
       actions: {
         actionsLabel: t('actionsLabel'),
         pdf: t('pdf'),
@@ -253,12 +277,14 @@ export default function CareerPlaybookViewerPageClient({
 
   return (
     <>
-      <Header sticky surface="glass" />
+      {readerMode === 'standard' ? <Header sticky surface="glass" /> : null}
       <PlaybookViewer
         snapshot={state.viewer}
         blocks={state.viewerBlocks}
         actionMessage={state.viewerActionMessage}
         copy={playbookCopy}
+        readerMode={readerMode}
+        onReaderModeChange={setReaderMode}
         onEditBlock={setSelectedBlockId}
         onRegenerateBlock={setSelectedBlockId}
         onPdf={() =>

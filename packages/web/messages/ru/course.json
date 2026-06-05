@@ -93,6 +93,13 @@
       "media": "Медиа"
     },
     "hideSidebar": "Скрыть боковую панель",
+    "showInspector": "Показать правую панель",
+    "hideInspector": "Скрыть правую панель",
+    "inspectorTitle": "Панель урока",
+    "inspectorCurrentLesson": "Текущий урок",
+    "inspectorNextStep": "Продолжайте чтение или откройте структуру курса для перехода к другому уроку.",
+    "markComplete": "Отметить пройденным",
+    "markedComplete": "Урок пройден",
     "structureDescription": "Полный обзор всех модулей и уроков курса",
     "lessonsProgress": "{completed}/{total} уроков",
     "current": "Текущий",

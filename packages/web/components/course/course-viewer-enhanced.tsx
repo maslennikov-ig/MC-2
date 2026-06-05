@@ -1,10 +1,14 @@
 'use client'
 
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useTranslations } from 'next-intl'
+import { BookOpen, CheckCircle2, Clock, GitBranch, LayoutGrid, TimerReset } from 'lucide-react'
 import { usePrevious } from '@/lib/hooks/use-previous'
 import { motion } from 'framer-motion'
 import Header from '@/components/layouts/header'
 import ContentGenerationPanel from '@/components/common/content-generation-panel'
+import { Button } from '@/components/ui/button'
 import { useSwipe } from '@/lib/hooks/use-swipe'
 import { toast } from 'sonner'
 import { useViewerState } from './viewer/hooks/useViewerState'
@@ -19,7 +23,10 @@ import { useServerData } from '@/lib/hooks/useServerData'
 import { getLessonEnrichments } from '@/app/actions/enrichment-actions'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'
 import { createLogger } from '@/lib/client-logger'
+import { buildCourseGeneratingUrl, buildCourseLessonsUrl } from '@/lib/helpers/course-urls'
+import { cn } from '@/lib/utils'
 import type { Database } from '@/types/database.generated'
+import type { Course, Lesson, Section } from '@/types/database'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -90,6 +97,7 @@ export default function CourseViewerEnhanced({
   const localEnrichmentsRef = useRef(localEnrichments)
   const currentLessonIdRef = useRef(currentLessonId)
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(true)
 
   useEffect(() => {
     localEnrichmentsRef.current = localEnrichments
@@ -313,12 +321,9 @@ export default function CourseViewerEnhanced({
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      {/* Subtle gradient overlay */}
-      {!focusMode && (
-        <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-transparent via-purple-50/10 to-purple-100/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950" />
-      )}
-
+    <div
+      className={cn('career-playbook-zone min-h-screen', focusMode && 'bg-white dark:bg-gray-950')}
+    >
       {!focusMode && <Header />}
 
       {/* Shared Course Banner - shown when readOnly is true */}
@@ -379,59 +384,85 @@ export default function CourseViewerEnhanced({
             hasNext={!!nextLesson}
             readOnly={readOnly}
             orgSlug={orgSlug}
-            onToggleSidebar={() => setSidebarOpen(true)}
+            inspectorOpen={inspectorOpen}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
+            onToggleInspector={() => setInspectorOpen((open) => !open)}
             onToggleFocusMode={() => setFocusMode(!focusMode)}
             onPrev={() => prevLesson && setCurrentLessonId(prevLesson.id)}
             onNext={() => nextLesson && setCurrentLessonId(nextLesson.id)}
           />
 
-          <div className="flex-1 overflow-y-auto">
-            {currentLesson ? (
-              <Suspense
-                fallback={
-                  <div className="flex min-h-[400px] items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600" />
-                  </div>
-                }
-              >
-                <LessonView
-                  currentLesson={currentLesson}
-                  currentSection={currentSection}
-                  assets={currentLessonId ? assets?.[currentLessonId] : undefined}
-                  enrichments={currentLessonId ? localEnrichments?.[currentLessonId] : undefined}
-                  enrichmentsLoadError={enrichmentsLoadError}
-                  isEnrichmentsLoading={isEnrichmentsRefetching}
-                  lessonContent={currentLessonId ? lessonContents?.[currentLessonId] : undefined}
-                  focusMode={focusMode}
-                  currentIndex={currentIndex}
-                  totalLessonsOrdered={allLessonsOrdered.length}
-                  completedLessons={completedLessons}
-                  allLessonsOrdered={allLessonsOrdered}
-                  sections={sections}
-                  lessonsBySection={lessonsBySection}
-                  completedCount={completedCount}
-                  remainingTime={formatTime(remainingMinutes)}
-                  progressPercentage={progressPercentage}
-                  swipeHandlers={swipeHandlers}
-                  onPrev={() => prevLesson && setCurrentLessonId(prevLesson.id)}
-                  onNext={() => nextLesson && setCurrentLessonId(nextLesson.id)}
-                  onSelectLesson={setCurrentLessonId}
-                  onMarkComplete={markLessonComplete}
-                  onExitFocus={() => setFocusMode(false)}
-                  onRefreshEnrichments={() => void refreshEnrichments()}
-                  courseLanguage={
-                    (course.request_data?.language as string) || course.language || 'ru'
-                  }
-                />
-              </Suspense>
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <div className="text-center text-gray-500 dark:text-white/50">
-                  <p>Выберите урок для начала обучения</p>
-                </div>
-              </div>
+          <div
+            className={cn(
+              'grid min-h-0 flex-1 grid-cols-1',
+              inspectorOpen && !focusMode && currentLesson
+                ? 'xl:grid-cols-[minmax(0,1fr)_22rem]'
+                : ''
             )}
+          >
+            <div className="min-w-0 overflow-y-auto">
+              {currentLesson ? (
+                <Suspense
+                  fallback={
+                    <div className="flex min-h-[400px] items-center justify-center">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600" />
+                    </div>
+                  }
+                >
+                  <LessonView
+                    currentLesson={currentLesson}
+                    currentSection={currentSection}
+                    assets={currentLessonId ? assets?.[currentLessonId] : undefined}
+                    enrichments={currentLessonId ? localEnrichments?.[currentLessonId] : undefined}
+                    enrichmentsLoadError={enrichmentsLoadError}
+                    isEnrichmentsLoading={isEnrichmentsRefetching}
+                    lessonContent={currentLessonId ? lessonContents?.[currentLessonId] : undefined}
+                    focusMode={focusMode}
+                    currentIndex={currentIndex}
+                    totalLessonsOrdered={allLessonsOrdered.length}
+                    completedLessons={completedLessons}
+                    allLessonsOrdered={allLessonsOrdered}
+                    sections={sections}
+                    lessonsBySection={lessonsBySection}
+                    completedCount={completedCount}
+                    remainingTime={formatTime(remainingMinutes)}
+                    progressPercentage={progressPercentage}
+                    swipeHandlers={swipeHandlers}
+                    onPrev={() => prevLesson && setCurrentLessonId(prevLesson.id)}
+                    onNext={() => nextLesson && setCurrentLessonId(nextLesson.id)}
+                    onSelectLesson={setCurrentLessonId}
+                    onMarkComplete={markLessonComplete}
+                    onExitFocus={() => setFocusMode(false)}
+                    onRefreshEnrichments={() => void refreshEnrichments()}
+                    courseLanguage={
+                      (course.request_data?.language as string) || course.language || 'ru'
+                    }
+                  />
+                </Suspense>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-center text-gray-500 dark:text-white/50">
+                    <p>Выберите урок для начала обучения</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            {inspectorOpen && !focusMode && currentLesson ? (
+              <CourseReaderInspector
+                course={course}
+                currentLesson={currentLesson}
+                currentSection={currentSection}
+                completedLessons={completedLessons}
+                completedCount={completedCount}
+                totalLessons={totalLessons}
+                progressPercentage={progressPercentage}
+                remainingTime={formatTime(remainingMinutes)}
+                readOnly={readOnly}
+                orgSlug={orgSlug}
+                onMarkComplete={markLessonComplete}
+              />
+            ) : null}
           </div>
         </motion.div>
       </div>
@@ -455,5 +486,130 @@ export default function CourseViewerEnhanced({
         />
       )}
     </div>
+  )
+}
+
+interface CourseReaderInspectorProps {
+  course: Course
+  currentLesson: Lesson
+  currentSection?: Section
+  completedLessons: Set<string>
+  completedCount: number
+  totalLessons: number
+  progressPercentage: number
+  remainingTime: string
+  readOnly: boolean
+  orgSlug: string
+  onMarkComplete: (lessonId: string) => void
+}
+
+function CourseReaderInspector({
+  course,
+  currentLesson,
+  currentSection,
+  completedLessons,
+  completedCount,
+  totalLessons,
+  progressPercentage,
+  remainingTime,
+  readOnly,
+  orgSlug,
+  onMarkComplete,
+}: CourseReaderInspectorProps) {
+  const t = useTranslations('course.viewer')
+  const isCompleted = completedLessons.has(currentLesson.id)
+  const courseKey = course.slug || course.id
+
+  return (
+    <aside
+      role="complementary"
+      aria-label={t('inspectorTitle')}
+      className="career-playbook-panel m-4 hidden min-w-0 space-y-4 p-4 xl:sticky xl:top-24 xl:block xl:self-start"
+    >
+      <div className="space-y-1">
+        <p className="text-xs font-semibold tracking-[0.08em] text-purple-700 uppercase dark:text-purple-300">
+          {t('inspectorTitle')}
+        </p>
+        <h2 className="text-lg leading-snug font-semibold text-gray-950 dark:text-white">
+          {currentLesson.title}
+        </h2>
+        {currentSection ? (
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t('section')} {currentSection.section_number}: {currentSection.title}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="career-playbook-muted-card space-y-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('overallProgress')}
+          </span>
+          <span className="text-sm font-semibold text-gray-950 dark:text-white">
+            {Math.round(progressPercentage)}%
+          </span>
+        </div>
+        <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-800">
+          <div
+            className="h-2 rounded-full bg-purple-600 transition-all dark:bg-purple-400"
+            style={{ width: `${Math.min(100, Math.max(0, progressPercentage))}%` }}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="career-playbook-soft-card p-2">
+            <CheckCircle2 className="mb-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <p className="font-semibold text-gray-950 dark:text-white">
+              {completedCount}/{totalLessons}
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">{t('completed')}</p>
+          </div>
+          <div className="career-playbook-soft-card p-2">
+            <TimerReset className="mb-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <p className="font-semibold text-gray-950 dark:text-white">{remainingTime}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">{t('timeRemaining')}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="career-playbook-muted-card space-y-3 p-3">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+          {t('inspectorCurrentLesson')}
+        </p>
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <Clock className="h-4 w-4" />
+          {t('readingTime', { minutes: currentLesson.duration_minutes ?? 0 })}
+        </div>
+        <Button
+          type="button"
+          onClick={() => onMarkComplete(currentLesson.id)}
+          variant={isCompleted ? 'secondary' : 'default'}
+          className="w-full justify-center"
+        >
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+          {isCompleted ? t('markedComplete') : t('markComplete')}
+        </Button>
+      </div>
+
+      <div className="grid gap-2">
+        <Button asChild variant="outline" className="justify-start">
+          <Link href={buildCourseLessonsUrl(orgSlug, courseKey)}>
+            <LayoutGrid className="mr-2 h-4 w-4" />
+            {t('allLessons')}
+          </Link>
+        </Button>
+        {!readOnly ? (
+          <Button asChild variant="outline" className="justify-start">
+            <Link href={buildCourseGeneratingUrl(orgSlug, courseKey, true)} target="_blank">
+              <GitBranch className="mr-2 h-4 w-4" />
+              {t('constructor')}
+            </Link>
+          </Button>
+        ) : null}
+        <div className="career-playbook-muted-card flex items-center gap-2 p-3 text-sm text-gray-600 dark:text-gray-400">
+          <BookOpen className="h-4 w-4" />
+          <span>{t('inspectorNextStep')}</span>
+        </div>
+      </div>
+    </aside>
   )
 }
