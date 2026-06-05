@@ -1,25 +1,25 @@
 ---
 stage_id: mc2-zwou5
 task_id: mc2-zwou5
-status: in_progress
+status: closed
 branch: codex/fix-career-playbook-dev-visibility
-delivery_method: local-feature-branch
+delivery_method: feature-branch-plus-dev-db-migration
 ---
 
 # Stage Summary
 
-Investigated the Dev Career Playbook library fallback and added the missing
-owner-only visibility control to the production reader.
+Investigated and repaired the Dev Career Playbook library fallback, then added
+the missing owner-only visibility control to the production reader.
 
 ## Root Cause
 
-- Dev Supabase schema has `public.career_playbooks.is_public` but does not have
-  `public.career_playbooks.visibility`.
+- Dev Supabase schema initially had `public.career_playbooks.is_public` but did
+  not have `public.career_playbooks.visibility`.
 - The existing migration
   `packages/course-gen-platform/supabase/migrations/20260605150000_career_playbook_visibility.sql`
   was not present in the remote migration list.
-- The deployed frontend/backend expects `visibility`, so library loading falls
-  back to "temporarily unavailable" until the remote migration is applied.
+- The deployed frontend/backend expected `visibility`, so library loading fell
+  back to "temporarily unavailable" before the remote migration was applied.
 
 ## Local Code Changes
 
@@ -31,6 +31,27 @@ owner-only visibility control to the production reader.
   visibility controls, course creation, delete, or public-link management.
 - Added unit coverage for the viewer component and page client visibility
   mutation flow.
+- Added follow-up migration
+  `20260605183000_fix_career_playbook_visibility_advisors.sql` to set the
+  visibility sync function `search_path` and add an index for
+  `career_playbook_sources.user_id`.
+
+## Dev Database Repair
+
+- Applied prerequisite migration
+  `20260603110000_add_career_playbook_sources`.
+- Applied prerequisite migration
+  `20260603123000_cascade_career_playbook_source_file_catalog`.
+- Applied visibility migration `20260605150000_career_playbook_visibility`.
+- Applied advisor follow-up migration
+  `20260605183000_fix_career_playbook_visibility_advisors`.
+- Verified `career_playbooks.visibility` exists as `course_visibility NOT NULL`
+  with default `'private'::course_visibility`.
+- Verified existing rows backfilled to `visibility='private'` and
+  `is_public=false`.
+- Verified visibility sync trigger, owner-only source read policy, function
+  `search_path`, and `idx_career_playbook_sources_user`.
+- Dev health endpoint returned HTTP 200 with `{"status":"ok"}`.
 
 ## Verification
 
@@ -44,16 +65,18 @@ owner-only visibility control to the production reader.
 All local gates passed. Build emitted existing Browserslist and Node
 `url.parse()` deprecation warnings only.
 
-## Blocker
+## Remaining Notes
 
-Remote Dev repair requires applying
-`20260605150000_career_playbook_visibility.sql` to the Supabase project. This is
-an external DDL/database mutation and is intentionally not applied without
-explicit confirmation.
+- Authenticated browser smoke of the library page remains unverified in this
+  process because no authenticated browser session was available to the CLI.
+- Supabase advisors still report pre-existing project-wide warnings unrelated to
+  this DDL. The new in-scope advisor findings from this migration were fixed.
+- Follow-up `mc2-mrjag` tracks remaining Career Playbook migration-list drift for
+  model/config migrations that were not needed to restore the library.
 
 ## Closeout
 
 - docs-reviewed: updated - handoff and this stage summary record the root cause,
-  local fix, verification, and required migration.
+  local fix, applied Dev migrations, verification, and remaining follow-up.
 - graph-reviewed: updated - ran `graphify update .` and
   `graphify cluster-only . --no-viz` after the reader visibility-control change.
