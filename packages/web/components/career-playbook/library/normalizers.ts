@@ -4,6 +4,8 @@ import type {
   CareerPlaybookLibraryItem,
   CareerPlaybookLibraryStatistics,
   CareerPlaybookLibraryStatus,
+  CareerPlaybookVisibility,
+  CareerPlaybookViewerPermissions,
 } from './types'
 
 type RawRecord = Record<string, unknown>
@@ -19,6 +21,10 @@ function isLibraryStatus(value: unknown): value is CareerPlaybookLibraryStatus {
     value === 'completed' ||
     value === 'failed'
   )
+}
+
+function isVisibility(value: unknown): value is CareerPlaybookVisibility {
+  return value === 'private' || value === 'organization' || value === 'public'
 }
 
 function readString(record: RawRecord, ...keys: string[]): string | null {
@@ -59,6 +65,26 @@ function readRecord(record: RawRecord, ...keys: string[]): RawRecord | null {
     }
   }
   return null
+}
+
+function normalizeViewerPermissions(raw: unknown): CareerPlaybookViewerPermissions {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      canEdit: true,
+      canManageVisibility: true,
+      canCreateCourse: true,
+      canDelete: true,
+    }
+  }
+
+  const record = raw as RawRecord
+  return {
+    canEdit: readBoolean(record, 'canEdit', 'can_edit') ?? false,
+    canManageVisibility:
+      readBoolean(record, 'canManageVisibility', 'can_manage_visibility') ?? false,
+    canCreateCourse: readBoolean(record, 'canCreateCourse', 'can_create_course') ?? false,
+    canDelete: readBoolean(record, 'canDelete', 'can_delete') ?? false,
+  }
 }
 
 function uniqueStrings(values: Array<string | null | undefined>): string[] {
@@ -138,6 +164,13 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
   const statusRaw = readString(row, 'status')
   const status: CareerPlaybookLibraryStatus = isLibraryStatus(statusRaw) ? statusRaw : 'draft'
   const createdAt = readString(row, 'created_at', 'createdAt') ?? new Date(0).toISOString()
+  const isPublic = readBoolean(row, 'is_public', 'isPublic') ?? false
+  const visibilityRaw = readString(row, 'visibility')
+  const visibility: CareerPlaybookVisibility = isVisibility(visibilityRaw)
+    ? visibilityRaw
+    : isPublic
+      ? 'public'
+      : 'private'
 
   return {
     id,
@@ -146,7 +179,10 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
     level: readString(row, 'level'),
     status,
     createdAt,
-    isPublic: readBoolean(row, 'is_public', 'isPublic') ?? false,
+    isPublic: visibility === 'public',
+    visibility,
+    ownerId: readString(row, 'ownerId', 'owner_id', 'userId', 'user_id'),
+    viewerPermissions: normalizeViewerPermissions(readRecord(row, 'viewerPermissions')),
     shareSlug: readString(row, 'share_slug', 'shareSlug'),
     language: readString(row, 'language'),
   }

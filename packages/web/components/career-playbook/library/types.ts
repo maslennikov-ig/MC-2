@@ -1,3 +1,10 @@
+import type {
+  CareerPlaybookViewerPermissions,
+  CareerPlaybookVisibility,
+} from '@megacampus/shared-types'
+
+export type { CareerPlaybookViewerPermissions, CareerPlaybookVisibility }
+
 export type CareerPlaybookLibraryStatus =
   | 'draft'
   | 'answering_fixed'
@@ -16,6 +23,9 @@ export interface CareerPlaybookLibraryItem {
   status: CareerPlaybookLibraryStatus
   createdAt: string
   isPublic: boolean
+  visibility?: CareerPlaybookVisibility
+  ownerId?: string | null
+  viewerPermissions?: CareerPlaybookViewerPermissions
   shareSlug: string | null
   language?: string | null
 }

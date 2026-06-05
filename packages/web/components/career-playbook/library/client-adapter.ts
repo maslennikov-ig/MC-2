@@ -5,6 +5,7 @@ import { normalizeLibraryResponse } from './normalizers'
 import type {
   CareerPlaybookLibraryData,
   CareerPlaybookLibraryFilters,
+  CareerPlaybookVisibility,
   CreateCourseFromPlaybookInput,
   CreateCourseFromPlaybookResult,
 } from './types'
@@ -14,6 +15,12 @@ type BrowserCareerPlaybookClient = {
     library?: {
       delete?: {
         mutate: (input: { playbookId: string }) => Promise<unknown>
+      }
+      updateVisibility?: {
+        mutate: (input: {
+          playbookId: string
+          visibility: CareerPlaybookVisibility
+        }) => Promise<unknown>
       }
       list?: {
         query: (
@@ -101,6 +108,21 @@ export async function toggleCareerPlaybookShare(
   }
 
   return procedure.mutate({ playbookId, isPublic })
+}
+
+export async function updateCareerPlaybookVisibility(
+  playbookId: string,
+  visibility: CareerPlaybookVisibility,
+  locale: string
+) {
+  const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
+  const procedure = client.careerPlaybook?.library?.updateVisibility
+
+  if (!procedure) {
+    throw new Error(`careerPlaybook.library.updateVisibility unavailable (${locale})`)
+  }
+
+  return procedure.mutate({ playbookId, visibility })
 }
 
 export async function createCourseFromPlaybook(
