@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run tests/integration",
+    "test:integration:ci": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:career-playbook": "playwright test tests/e2e/career-playbook --project=chromium",
     "test:e2e:ui": "playwright test --ui",

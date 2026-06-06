@@ -79,6 +79,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Stage closeout: `python3 scripts/orchestration/run_stage_closeout.py --stage <stage_id>`.
 - Common code gates: `pnpm type-check` and `pnpm build`.
 - Backend targeted unit tests: `pnpm --filter @megacampus/course-gen-platform test -- <test-files>`.
+- CI integration smoke: `QDRANT_URL=http://localhost:6333 QDRANT_API_KEY=test-qdrant-key pnpm test:integration:ci`; full integration remains `pnpm test:integration`.
 - Web targeted unit tests: `pnpm --filter @megacampus/web exec vitest run <test-files>`.
 - Web targeted e2e: `pnpm --filter @megacampus/web exec playwright test <spec> --project=chromium`.
 - Career Playbook web e2e harness: `pnpm --filter @megacampus/web test:e2e:career-playbook`.

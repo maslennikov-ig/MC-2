@@ -420,12 +420,14 @@ jobs:
           curl -v -H 'api-key: test-qdrant-key' http://localhost:6333/readyz || true
           exit 1
 
-      - name: Run integration tests
+      - name: Run CI integration smoke tests
         run: |
-          timeout 900 pnpm test:integration
+          set +e
+          timeout 300 pnpm test:integration:ci
           EXIT_CODE=$?
+          set -e
           if [ $EXIT_CODE -eq 124 ]; then
-            echo "::warning::Integration tests timed out after 15 minutes"
+            echo "::error::CI integration smoke tests timed out after 5 minutes"
             exit 1
           fi
           exit $EXIT_CODE
