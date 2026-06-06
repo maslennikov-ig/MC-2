@@ -36,6 +36,7 @@
     "test:full": "vitest run",
     "test:contract": "vitest run --config vitest.config.contract.ts",
     "test:integration": "vitest run tests/integration",
+    "test:integration:ci": "vitest run --config vitest.config.integration-ci.ts",
     "test:fixtures": "vitest run tests/fixtures/seed-database.test.ts",
     "test:rls": "cd ../.. && supabase test db --workdir packages/course-gen-platform",
     "test:all": "pnpm test:full && pnpm test:rls",
