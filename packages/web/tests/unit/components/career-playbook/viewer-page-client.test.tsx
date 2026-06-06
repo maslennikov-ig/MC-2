@@ -15,6 +15,7 @@ vi.mock('@/components/layouts/header', () => ({
 }))
 
 const updateVisibility = vi.fn()
+const copyToClipboard = vi.hoisted(() => vi.fn())
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
   updateCareerPlaybookVisibility: (...args: unknown[]) =>
@@ -25,6 +26,10 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
         locale: string,
       ])
     ),
+}))
+
+vi.mock('@/lib/utils/clipboard', () => ({
+  copyToClipboard,
 }))
 
 const messages = {
@@ -85,6 +90,8 @@ const messages = {
       localPreviewTitle: 'Role Guide preview',
       localPreviewContent: '# Role Guide preview\n\nBackend viewer transport is not connected yet.',
       sharePending: 'Share links are unavailable until the backend action is connected',
+      shareCopied: 'Public link copied',
+      shareUnavailable: 'Make the guide public before sharing',
       coursePending: 'Course creation is unavailable until the backend action is connected',
       deletePending: 'Delete is unavailable until the backend action is connected',
       pdfPending: 'PDF export is unavailable until the backend action is connected',
@@ -269,6 +276,8 @@ describe('CareerPlaybookViewerPageClient', () => {
     useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     setCareerPlaybookClientForTests(null)
     updateVisibility.mockReset()
+    copyToClipboard.mockReset()
+    copyToClipboard.mockResolvedValue(true)
     localStorage.clear()
   })
 
@@ -363,6 +372,46 @@ describe('CareerPlaybookViewerPageClient', () => {
       expect(useCareerPlaybookStore.getState().viewer?.visibility).toBe('organization')
     })
     expect(screen.getByRole('button', { name: /Видимость: Для организации/ })).toBeInTheDocument()
+  })
+
+  it('copies the canonical public URL from the reader inspector', async () => {
+    const user = userEvent.setup()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Head of Sales',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      visibility: 'public',
+      isPublic: true,
+      shareSlug: 'head-of-sales-a1b2c3',
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Head of Sales',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'en' })
+
+    await user.click(await screen.findByRole('button', { name: 'Share' }))
+
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      'http://localhost:3000/en/career-playbooks/mega-campus/head-of-sales-a1b2c3'
+    )
+    expect(screen.getByText('Public link copied')).toBeInTheDocument()
   })
 
   it('clears a previous viewer when the URL points at another playbook', async () => {

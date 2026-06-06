@@ -45,7 +45,8 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Career Playbook business-context upload route: `packages/web/app/api/career-playbook/upload/route.ts`.
 - Career Playbook landing route: `packages/web/app/[locale]/career-playbook/`.
 - Career Playbook library route: `packages/web/app/[locale]/career-playbook/library/`.
-- Career Playbook public share route: `packages/web/app/[locale]/share/career-playbook/[slug]/`.
+- Career Playbook canonical public route: `packages/web/app/[locale]/career-playbooks/[orgSlug]/[playbookSlug]/`.
+- Career Playbook legacy public share route: `packages/web/app/[locale]/share/career-playbook/[slug]/`.
 - Career Playbook production reader route: `packages/web/app/[locale]/career-playbook/[id]/page-client.tsx` with executive document shell in `packages/web/components/career-playbook/viewer/PlaybookViewer.tsx`.
 - Career Playbook wizard UI: `packages/web/components/career-playbook/wizard/`.
 - Career Playbook library UI: `packages/web/components/career-playbook/library/`.

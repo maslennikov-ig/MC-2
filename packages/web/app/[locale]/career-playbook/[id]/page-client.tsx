@@ -11,10 +11,12 @@ import type {
 
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
 import { updateCareerPlaybookVisibility } from '@/components/career-playbook/library/client-adapter'
+import { buildCareerPlaybookPublicUrl } from '@/components/career-playbook/library/public-url'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
 import Header from '@/components/layouts/header'
 import { Button } from '@/components/ui/button'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 import type { Locale } from '@/src/i18n/config'
 import {
   CAREER_PLAYBOOK_BLOCK_CATALOG,
@@ -113,6 +115,8 @@ function readVisibilityUpdateResult(value: unknown) {
       ? record.visibility
       : null
   const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
+  const organizationSlug =
+    typeof record.organizationSlug === 'string' ? record.organizationSlug : null
 
   if (!playbookId || isPublic === null || !visibility) return null
 
@@ -121,6 +125,7 @@ function readVisibilityUpdateResult(value: unknown) {
     isPublic,
     visibility,
     shareSlug,
+    organizationSlug,
     viewerPermissions: readViewerPermissions(record.viewerPermissions),
   }
 }
@@ -282,6 +287,7 @@ export default function CareerPlaybookViewerPageClient({
         isPublic: result.isPublic,
         visibility: result.visibility,
         shareSlug: result.shareSlug,
+        organizationSlug: result.organizationSlug ?? currentViewer.organizationSlug ?? null,
         viewerPermissions: result.viewerPermissions ?? currentViewer.viewerPermissions,
       })
       setBackendPendingMessage(tc('visibility.changeSuccess'))
@@ -290,6 +296,23 @@ export default function CareerPlaybookViewerPageClient({
     } finally {
       setIsUpdatingVisibility(false)
     }
+  }
+
+  const handleShare = async () => {
+    const viewer = useCareerPlaybookStore.getState().viewer
+    if (!viewer || viewer.visibility !== 'public') {
+      setBackendPendingMessage(t('shareUnavailable'))
+      return
+    }
+
+    const url = buildCareerPlaybookPublicUrl(locale, viewer.organizationSlug, viewer.shareSlug)
+    if (!url) {
+      setBackendPendingMessage(t('shareUnavailable'))
+      return
+    }
+
+    const copied = await copyToClipboard(url)
+    setBackendPendingMessage(copied ? t('shareCopied') : t('shareCopyError'))
   }
 
   if (state.isLoadingViewer && !state.viewer) {
@@ -394,7 +417,7 @@ export default function CareerPlaybookViewerPageClient({
             if (!result.ok) setBackendPendingMessage(t('pdfPending'))
           })
         }
-        onShare={() => setBackendPendingMessage(t('sharePending'))}
+        onShare={() => void handleShare()}
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
         isUpdatingVisibility={isUpdatingVisibility}
@@ -423,6 +446,7 @@ function createPendingViewerSnapshot(
     contentLanguage: locale,
     status: 'completed',
     visibility: 'private',
+    organizationSlug: null,
     ownerId: null,
     viewerPermissions: {
       canEdit: true,

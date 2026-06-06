@@ -184,6 +184,7 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
     ownerId: readString(row, 'ownerId', 'owner_id', 'userId', 'user_id'),
     viewerPermissions: normalizeViewerPermissions(readRecord(row, 'viewerPermissions')),
     shareSlug: readString(row, 'share_slug', 'shareSlug'),
+    organizationSlug: readString(row, 'organization_slug', 'organizationSlug', 'orgSlug'),
     language: readString(row, 'language'),
   }
 }

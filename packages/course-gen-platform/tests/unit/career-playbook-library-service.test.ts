@@ -162,22 +162,37 @@ describe('career-playbook library visibility service', () => {
   });
 
   it('updates visibility and keeps isPublic/shareSlug compatibility for owner', async () => {
+    const update = chainUpdateResult({
+      data: {
+        ...baseRow,
+        user_id: owner.id,
+        visibility: 'public',
+        is_public: true,
+        share_slug: 'menedzher-po-prodazham-000000',
+      },
+      error: null,
+    });
     fromMock
-      .mockReturnValueOnce(chainResult({ data: { ...baseRow, user_id: owner.id }, error: null }))
       .mockReturnValueOnce(
-        chainUpdateResult({
-          data: { ...baseRow, user_id: owner.id, visibility: 'public', is_public: true },
-          error: null,
-        }).chain
-      );
+        chainResult({ data: { ...baseRow, user_id: owner.id, share_slug: null }, error: null })
+      )
+      .mockReturnValueOnce(update.chain)
+      .mockReturnValueOnce(chainResult({ data: { slug: 'mega-campus' }, error: null }));
 
     const result = await updateCareerPlaybookVisibility(ctx(owner), {
       playbookId: baseRow.id,
       visibility: 'public',
     });
 
+    expect(update.updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        share_slug: expect.stringMatching(/^menedzher-po-prodazham-[a-f0-9]{6}$/),
+      })
+    );
     expect(result.visibility).toBe('public');
     expect(result.isPublic).toBe(true);
+    expect(result.shareSlug).toBe('menedzher-po-prodazham-000000');
+    expect(result.organizationSlug).toBe('mega-campus');
     expect(result.viewerPermissions.canManageVisibility).toBe(true);
   });
 
@@ -188,7 +203,8 @@ describe('career-playbook library visibility service', () => {
     });
     fromMock
       .mockReturnValueOnce(chainResult({ data: { ...baseRow, user_id: owner.id }, error: null }))
-      .mockReturnValueOnce(update.chain);
+      .mockReturnValueOnce(update.chain)
+      .mockReturnValueOnce(chainResult({ data: { slug: 'mega-campus' }, error: null }));
 
     const result = await toggleCareerPlaybookShare(ctx(owner), {
       playbookId: baseRow.id,
