@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CareerPlaybookViewerPageClient from '@/app/[locale]/career-playbook/[id]/page-client'
@@ -13,7 +14,30 @@ vi.mock('@/components/layouts/header', () => ({
   default: () => <header data-testid="shared-header" />,
 }))
 
+const updateVisibility = vi.fn()
+
+vi.mock('@/components/career-playbook/library/client-adapter', () => ({
+  updateCareerPlaybookVisibility: (...args: unknown[]) =>
+    updateVisibility(
+      ...(args as [
+        playbookId: string,
+        visibility: 'private' | 'organization' | 'public',
+        locale: string,
+      ])
+    ),
+}))
+
 const messages = {
+  common: {
+    visibility: {
+      private: 'Private',
+      organization: 'Organization',
+      public: 'Public',
+      label: 'Visibility',
+      changeSuccess: 'Visibility updated',
+      changeError: 'Failed to update visibility',
+    },
+  },
   'career-playbook': {
     viewer: {
       productLabel: 'Role Guide',
@@ -129,6 +153,16 @@ const messages = {
 }
 
 const ruMessages = {
+  common: {
+    visibility: {
+      private: 'Приватный',
+      organization: 'Для организации',
+      public: 'Публичный',
+      label: 'Видимость',
+      changeSuccess: 'Видимость обновлена',
+      changeError: 'Не удалось обновить видимость',
+    },
+  },
   'career-playbook': {
     viewer: {
       ...messages['career-playbook'].viewer,
@@ -234,6 +268,7 @@ describe('CareerPlaybookViewerPageClient', () => {
   beforeEach(() => {
     useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     setCareerPlaybookClientForTests(null)
+    updateVisibility.mockReset()
     localStorage.clear()
   })
 
@@ -271,6 +306,63 @@ describe('CareerPlaybookViewerPageClient', () => {
       screen.getByRole('navigation', { name: 'Содержание должностной инструкции' })
     ).toHaveTextContent('Миссия и ключевые результаты')
     expect(screen.queryByRole('link', { name: 'Mission and key results' })).not.toBeInTheDocument()
+  })
+
+  it('updates owner visibility from the reader inspector', async () => {
+    const user = userEvent.setup()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    updateVisibility.mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      isPublic: false,
+      visibility: 'organization',
+      shareSlug: null,
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    await user.click(await screen.findByRole('button', { name: /Видимость: Приватный/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Для организации' }))
+
+    expect(updateVisibility).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000002001',
+      'organization',
+      'ru'
+    )
+    await waitFor(() => {
+      expect(useCareerPlaybookStore.getState().viewer?.visibility).toBe('organization')
+    })
+    expect(screen.getByRole('button', { name: /Видимость: Для организации/ })).toBeInTheDocument()
   })
 
   it('clears a previous viewer when the URL points at another playbook', async () => {

@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentProps, ReactElement } from 'react'
 import type { CareerPlaybookViewerSnapshot } from '@megacampus/shared-types'
 
 import { ActionsBar } from '@/components/career-playbook/viewer/ActionsBar'
@@ -78,6 +79,13 @@ const ruViewerCopy = {
   exitReadingMode: 'Выйти из режима чтения',
   inspectorLabel: 'Инспектор документа',
   inspectorTitle: 'Инспектор документа',
+  visibilityLabel: 'Видимость',
+  visibilityValueLabel: (visibility: string) =>
+    visibility === 'organization'
+      ? 'Для организации'
+      : visibility === 'public'
+        ? 'Публичный'
+        : 'Приватный',
   actions: {
     actionsLabel: 'Действия с должностной инструкцией',
     pdf: 'PDF',
@@ -86,6 +94,13 @@ const ruViewerCopy = {
     delete: 'Удалить',
   },
 }
+
+const PlaybookViewerWithVisibility = PlaybookViewer as unknown as (
+  props: ComponentProps<typeof PlaybookViewer> & {
+    isUpdatingVisibility?: boolean
+    onVisibilityChange?: (visibility: 'private' | 'organization' | 'public') => void
+  }
+) => ReactElement
 
 function makeBlocks(): CareerPlaybookViewerBlock[] {
   return CAREER_PLAYBOOK_BLOCK_CATALOG.map((block) => ({
@@ -216,6 +231,34 @@ describe('Career Playbook viewer components', () => {
     expect(window.location.hash).toBe('#block_1')
   })
 
+  it('lets the owner update document visibility from the right inspector', async () => {
+    const user = userEvent.setup()
+    const handleVisibilityChange = vi.fn()
+
+    render(
+      <PlaybookViewerWithVisibility
+        snapshot={snapshot}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onVisibilityChange={handleVisibilityChange}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    expect(within(inspector).getByText('Видимость')).toBeInTheDocument()
+
+    await user.click(within(inspector).getByRole('button', { name: /Видимость: Приватный/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Для организации' }))
+
+    expect(handleVisibilityChange).toHaveBeenCalledWith('organization')
+  })
+
   it('renders organization readers without the owner management layer', () => {
     render(
       <PlaybookViewer
@@ -260,6 +303,7 @@ describe('Career Playbook viewer components', () => {
       screen.queryByRole('button', { name: 'Сгенерировать заново Миссия и ключевые результаты' })
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Показать правый блок' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Видимость')).not.toBeInTheDocument()
   })
 
   it('edits markdown and submits regeneration instructions from the block editor sheet', async () => {

@@ -4,10 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type {
   CareerPlaybookBlockGroupKey,
+  CareerPlaybookViewerPermissions,
   CareerPlaybookViewerSnapshot,
+  CareerPlaybookVisibility,
 } from '@megacampus/shared-types'
 
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
+import { updateCareerPlaybookVisibility } from '@/components/career-playbook/library/client-adapter'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
 import Header from '@/components/layouts/header'
@@ -71,13 +74,66 @@ function getViewerBlockTitleKey(blockId: CareerPlaybookBlockId) {
   return VIEWER_BLOCK_TITLE_KEYS[key]
 }
 
+function readViewerPermissions(value: unknown): CareerPlaybookViewerPermissions | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const canEdit = typeof record.canEdit === 'boolean' ? record.canEdit : null
+  const canManageVisibility =
+    typeof record.canManageVisibility === 'boolean' ? record.canManageVisibility : null
+  const canCreateCourse =
+    typeof record.canCreateCourse === 'boolean' ? record.canCreateCourse : null
+  const canDelete = typeof record.canDelete === 'boolean' ? record.canDelete : null
+
+  if (
+    canEdit === null ||
+    canManageVisibility === null ||
+    canCreateCourse === null ||
+    canDelete === null
+  ) {
+    return null
+  }
+
+  return {
+    canEdit,
+    canManageVisibility,
+    canCreateCourse,
+    canDelete,
+  }
+}
+
+function readVisibilityUpdateResult(value: unknown) {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const playbookId = typeof record.playbookId === 'string' ? record.playbookId : null
+  const isPublic = typeof record.isPublic === 'boolean' ? record.isPublic : null
+  const visibility: CareerPlaybookVisibility | null =
+    record.visibility === 'private' ||
+    record.visibility === 'organization' ||
+    record.visibility === 'public'
+      ? record.visibility
+      : null
+  const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
+
+  if (!playbookId || isPublic === null || !visibility) return null
+
+  return {
+    playbookId,
+    isPublic,
+    visibility,
+    shareSlug,
+    viewerPermissions: readViewerPermissions(record.viewerPermissions),
+  }
+}
+
 export default function CareerPlaybookViewerPageClient({
   locale,
   playbookId,
 }: CareerPlaybookViewerPageClientProps) {
   const t = useTranslations('career-playbook.viewer')
+  const tc = useTranslations('common')
   const state = useCareerPlaybookStore()
   const [selectedBlockId, setSelectedBlockId] = useState<CareerPlaybookBlockId | null>(null)
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
   const [readerMode, setReaderMode] = useState<ReaderMode>(() => {
     if (typeof window === 'undefined') return 'standard'
     return new URLSearchParams(window.location.search).get('mode') === 'reading'
@@ -114,6 +170,9 @@ export default function CareerPlaybookViewerPageClient({
       inspectorTitle: t('inspectorTitle'),
       inspectorStatusTitle: t('inspectorStatusTitle'),
       inspectorReadinessTitle: t('inspectorReadinessTitle'),
+      visibilityLabel: tc('visibility.label'),
+      visibilityValueLabel: (visibility: CareerPlaybookVisibility) =>
+        tc(`visibility.${visibility}`),
       inspectorReadyBlocks: (ready: number, total: number) =>
         t('inspectorReadyBlocks', { ready, total }),
       inspectorLanguage: (language: string) => t('inspectorLanguage', { language }),
@@ -127,7 +186,7 @@ export default function CareerPlaybookViewerPageClient({
         delete: t('delete'),
       },
     }),
-    [t]
+    [t, tc]
   )
   const editorCopy = useMemo(
     () => ({
@@ -193,6 +252,44 @@ export default function CareerPlaybookViewerPageClient({
 
   const setBackendPendingMessage = (message: string) => {
     useCareerPlaybookStore.setState({ viewerActionMessage: message })
+  }
+
+  const handleVisibilityChange = async (visibility: CareerPlaybookVisibility) => {
+    const viewer = useCareerPlaybookStore.getState().viewer
+    if (!viewer || isUpdatingVisibility) return
+
+    const currentVisibility = viewer.visibility ?? (viewer.isPublic ? 'public' : 'private')
+    if (visibility === currentVisibility) return
+
+    setIsUpdatingVisibility(true)
+    useCareerPlaybookStore.setState({ viewerActionMessage: null })
+
+    try {
+      const result = readVisibilityUpdateResult(
+        await updateCareerPlaybookVisibility(viewer.playbookId, visibility, locale)
+      )
+
+      if (!result || result.playbookId !== viewer.playbookId) {
+        setBackendPendingMessage(tc('visibility.changeError'))
+        return
+      }
+
+      const currentViewer = useCareerPlaybookStore.getState().viewer
+      if (!currentViewer || currentViewer.playbookId !== result.playbookId) return
+
+      useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+        ...currentViewer,
+        isPublic: result.isPublic,
+        visibility: result.visibility,
+        shareSlug: result.shareSlug,
+        viewerPermissions: result.viewerPermissions ?? currentViewer.viewerPermissions,
+      })
+      setBackendPendingMessage(tc('visibility.changeSuccess'))
+    } catch {
+      setBackendPendingMessage(tc('visibility.changeError'))
+    } finally {
+      setIsUpdatingVisibility(false)
+    }
   }
 
   if (state.isLoadingViewer && !state.viewer) {
@@ -300,6 +397,10 @@ export default function CareerPlaybookViewerPageClient({
         onShare={() => setBackendPendingMessage(t('sharePending'))}
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
+        isUpdatingVisibility={isUpdatingVisibility}
+        onVisibilityChange={(visibility) => {
+          void handleVisibilityChange(visibility)
+        }}
       />
       {commonEditor}
     </>
