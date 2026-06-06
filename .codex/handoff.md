@@ -1,56 +1,41 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-06
-Stage: `mc2-mrjag`
-Branch: `codex/fix-career-playbook-dev-visibility`
+Stage: `mc2-yyxzc`
+Branch: `codex/fix-qdrant-integration-service`
 
 ## Current State
 
-- Career Playbook visibility and owner-only access shipped to dev and staging/master.
-- `career_playbooks.visibility` is canonical: `private | organization | public`; `is_public` remains a synchronized public-link compatibility mirror.
-- Library/viewer responses include `visibility`, `ownerId`, and `viewerPermissions`; organization readers get read-only cards and reader UI without edit/management layers.
-- Legacy `careerPlaybook.share.shareToggle` remains a compatibility wrapper over canonical visibility.
-- Dev Career Playbook library DB blocker is repaired: applied `20260603110000_add_career_playbook_sources`, `20260603123000_cascade_career_playbook_source_file_catalog`, `20260605150000_career_playbook_visibility`, and `20260605183000_fix_career_playbook_visibility_advisors`; `public.career_playbooks.visibility` now exists and existing rows were backfilled to `private`.
-- Remaining Dev Career Playbook model/config migration drift is repaired: applied `20260523073000_update_career_playbook_v4_pro_routing` and `20260528193000_add_career_playbook_department_classifier`; `stage_career_playbook_department_classifier` is allowed by `llm_model_config_phase_name_check` and has the expected active global config.
-- Local branch `codex/fix-career-playbook-dev-visibility` adds the owner-only visibility dropdown to the production Career Playbook reader right inspector, matching the existing library-card/course visibility pattern. Non-owners still receive the clean read-only reader without edit/manage controls.
-- Feature branch `codex/career-playbook-visibility-owner` remains pushed with implementation commit `c22caf99` and CI test hotfix `8813cfb6`.
+- Qdrant CI root cause is identified: master `Integration Tests` waits on `localhost:6333/readyz`, but the job previously declared only `redis`.
+- Local branch adds the missing `qdrant` service to `.github/workflows/ci-cd.yml` `test-integration`, with `QDRANT__SERVICE__API_KEY=test-qdrant-key` and `6333:6333` port mapping.
+- Previous failing master runs `26950380871` and `27055076683` skipped integration tests because readiness failed before `pnpm test:integration`.
+- Career Playbook visibility and owner-only access are already shipped to dev/staging; `career_playbooks.visibility` is canonical and `is_public` remains the public-link mirror.
+- Dev Career Playbook DB/model-config migration drift was repaired in stage `mc2-mrjag`.
 - Follow-up `mc2-k2qih` remains open for panel animation, active TOC section, and TOC auto-scroll polish.
-- Beads task `mc2-mrjag` closed after Dev migration drift repair.
 
 ## Verification
 
-- Local branch verification for `mc2-zwou5`:
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx`
-  - `pnpm --filter @megacampus/web exec eslint app/[locale]/career-playbook/[id]/page-client.tsx components/career-playbook/viewer/PlaybookViewer.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx`
-  - `pnpm --filter @megacampus/web exec prettier --check app/[locale]/career-playbook/[id]/page-client.tsx components/career-playbook/viewer/PlaybookViewer.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx`
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx`
-  - `pnpm type-check`
-  - `pnpm build`
-- Supabase schema checks now confirm `career_playbooks.visibility course_visibility NOT NULL DEFAULT 'private'::course_visibility`, visibility sync trigger, owner-only source read policy, and source user FK index.
-- Supabase model/config checks confirm the two drift migrations are recorded and key Career Playbook phases use the expected DeepSeek V4 Pro/Flash routing.
-- Dev health check after DB repair returned HTTP 200 with `{"status":"ok"}`; unauthenticated library route returned HTTP 307 redirect as expected.
-- Local deploy script passed `pnpm type-check` and `pnpm build` before merging `develop` into `master`.
-- Dev delivery: `develop` `367e4c77`, GitHub Actions run `27028026312` completed success; `https://dev.ai.megacampus.ru/api/health` returned `200` with `{"status":"ok"}`.
-- Staging delivery: `master` `9893ea29`, GitHub Actions run `27029012143` completed success; `https://ai.megacampus.ru/api/health` returned `200` with `{"status":"ok"}`.
-- First dev run `27027456907` failed full backend unit tests because an older router transport test missed the new `.or()` query builder and visibility payload expectations; fixed in `8813cfb6` and rerun passed.
-- Master `Integration Tests` job failed non-blocking while the overall workflow and `Deploy to Production` succeeded; this matches tracked follow-up `mc2-yyxzc`.
+- Workflow structural check passed: parsed `.github/workflows/ci-cd.yml` and asserted `test-integration` has `qdrant`, `/readyz` wait step, and matching `QDRANT_URL/QDRANT_API_KEY`.
+- `git diff --check` passed.
+- `actionlint` is not installed locally.
+- GitHub Actions evidence is still needed after push because local Docker/GitHub service-container execution is not available here.
 
 ## Next recommended
 
-Next stage id: `mc2-k2qih`.
-Recommended action: polish Career Playbook reader panel animation and TOC sync.
-Recommended action: deliver branch `codex/fix-career-playbook-dev-visibility` through `/push-dev --yes`, then `/deploy --yes --sync` after local gates.
+Next stage id: `mc2-yyxzc`.
+Recommended action: commit and push `codex/fix-qdrant-integration-service`, then observe GitHub Actions until `Wait for Qdrant` passes and `Run integration tests` executes.
+Recommended action: if the job then reaches test failures, continue `mc2-yyxzc` with the new logs instead of treating it as the same readiness issue.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-mrjag`, stage summary `.codex/stages/mc2-mrjag/summary.md`, and Graphify report. Do not touch the separate worktree `/home/me/code/mc2-worktrees/career-playbook-business-context` unless the user explicitly asks.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-yyxzc`, stage summary `.codex/stages/mc2-yyxzc/summary.md`, and Graphify report. Do not touch `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
 
 ## Delivery
 
-- docs-reviewed: updated - handoff and stage summaries record the Dev library root cause, local reader visibility-control fix, applied DB repair, migration-drift repair, and verification.
-- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz` after the reader visibility-control change.
+- docs-reviewed: updated - handoff records the Qdrant CI root cause, local workflow fix, verification, and required GitHub Actions evidence.
+- graph-reviewed: no-change-needed - workflow/handoff-only change; no repo code structure, API, or module boundary changed.
 
 ## Explicit defers
 
-- Browser smoke for owner/non-owner authenticated Career Playbook records remains deferred until suitable test data/session is available.
-- Non-blocking master Integration Tests failure remains tracked in Beads task `mc2-yyxzc`.
+- Browser/user-flow smoke is not applicable to this CI workflow fix.
+- GitHub Actions validation remains pending until the branch is pushed.
