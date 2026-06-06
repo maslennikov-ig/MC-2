@@ -86,6 +86,7 @@ interface CareerPlaybookLibraryDetail {
   generatedBlocks?: Record<string, CareerPlaybookBlockState> | null
   finalMarkdown?: string | null
   shareSlug?: string | null
+  organizationSlug?: string | null
   isPublic?: boolean
   visibility?: CareerPlaybookVisibility
   ownerId?: string | null
@@ -903,6 +904,7 @@ function libraryDetailToViewerSnapshot(
     status: detail.status,
     blocks: generatedBlocksToViewerBlocks(detail.generatedBlocks, detail.finalMarkdown),
     shareSlug: detail.shareSlug ?? null,
+    organizationSlug: detail.organizationSlug ?? null,
     isPublic: detail.visibility === 'public' || detail.isPublic === true,
     visibility: detail.visibility ?? (detail.isPublic ? 'public' : 'private'),
     ownerId: detail.ownerId ?? null,

@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SharedCareerPlaybookPage, {
   generateMetadata,
 } from '@/app/[locale]/share/career-playbook/[slug]/page'
+import PublicCareerPlaybookPage, {
+  generateMetadata as generatePublicMetadata,
+} from '@/app/[locale]/career-playbooks/[orgSlug]/[playbookSlug]/page'
 import { getPublicCareerPlaybookBySlug } from '@/app/[locale]/share/career-playbook/[slug]/data'
 
 const notFound = vi.fn(() => {
@@ -43,6 +46,7 @@ describe('SharedCareerPlaybookPage', () => {
       playbook: {
         id: 'pb-1',
         slug: 'head-of-sales',
+        organizationSlug: 'mega-campus',
         title: 'Head of Sales',
         summary: 'Role Guide summary',
         markdown: '# Head of Sales',
@@ -122,6 +126,7 @@ describe('generateMetadata for shared career playbook', () => {
       playbook: {
         id: 'pb-1',
         slug: 'head-of-sales',
+        organizationSlug: 'mega-campus',
         title: 'Head of Sales',
         summary: 'Role Guide summary',
         markdown: '# Head of Sales',
@@ -143,5 +148,106 @@ describe('generateMetadata for shared career playbook', () => {
       'https://megacampusai.com/en/share/career-playbook/head-of-sales'
     )
     expect(metadata.twitter?.title).toBe('Head of Sales')
+  })
+})
+
+describe('PublicCareerPlaybookPage canonical route', () => {
+  beforeEach(() => {
+    notFound.mockClear()
+    mockedGetPublicCareerPlaybookBySlug.mockReset()
+  })
+
+  it('renders public viewer only when the organization slug matches', async () => {
+    mockedGetPublicCareerPlaybookBySlug.mockResolvedValue({
+      status: 'ok',
+      playbook: {
+        id: 'pb-1',
+        slug: 'head-of-sales-a1b2c3',
+        organizationSlug: 'mega-campus',
+        title: 'Head of Sales',
+        summary: 'Role Guide summary',
+        markdown: '# Head of Sales',
+        department: 'sales',
+        level: 'lead',
+        language: 'en',
+        createdAt: '2026-05-14T10:00:00.000Z',
+      },
+    })
+
+    render(
+      await PublicCareerPlaybookPage({
+        params: Promise.resolve({
+          locale: 'en',
+          orgSlug: 'mega-campus',
+          playbookSlug: 'head-of-sales-a1b2c3',
+        }),
+      })
+    )
+
+    expect(screen.getByTestId('public-playbook-viewer')).toHaveTextContent('Head of Sales')
+    expect(mockedGetPublicCareerPlaybookBySlug).toHaveBeenCalledWith({
+      slug: 'head-of-sales-a1b2c3',
+    })
+  })
+
+  it('returns 404 when the organization slug does not match', async () => {
+    mockedGetPublicCareerPlaybookBySlug.mockResolvedValue({
+      status: 'ok',
+      playbook: {
+        id: 'pb-1',
+        slug: 'head-of-sales-a1b2c3',
+        organizationSlug: 'mega-campus',
+        title: 'Head of Sales',
+        summary: 'Role Guide summary',
+        markdown: '# Head of Sales',
+        department: 'sales',
+        level: 'lead',
+        language: 'en',
+        createdAt: '2026-05-14T10:00:00.000Z',
+      },
+    })
+
+    await expect(
+      PublicCareerPlaybookPage({
+        params: Promise.resolve({
+          locale: 'en',
+          orgSlug: 'other-org',
+          playbookSlug: 'head-of-sales-a1b2c3',
+        }),
+      })
+    ).rejects.toThrow('NEXT_NOT_FOUND')
+  })
+
+  it('returns canonical metadata for the organization-scoped public URL', async () => {
+    mockedGetPublicCareerPlaybookBySlug.mockResolvedValue({
+      status: 'ok',
+      playbook: {
+        id: 'pb-1',
+        slug: 'head-of-sales-a1b2c3',
+        organizationSlug: 'mega-campus',
+        title: 'Head of Sales',
+        summary: 'Role Guide summary',
+        markdown: '# Head of Sales',
+        department: 'sales',
+        level: 'lead',
+        language: 'en',
+        createdAt: '2026-05-14T10:00:00.000Z',
+      },
+    })
+
+    const metadata = await generatePublicMetadata({
+      params: Promise.resolve({
+        locale: 'en',
+        orgSlug: 'mega-campus',
+        playbookSlug: 'head-of-sales-a1b2c3',
+      }),
+    })
+
+    expect(metadata.openGraph?.url).toBe(
+      'https://megacampusai.com/en/career-playbooks/mega-campus/head-of-sales-a1b2c3'
+    )
+    expect(metadata.alternates?.canonical).toBe(
+      '/en/career-playbooks/mega-campus/head-of-sales-a1b2c3'
+    )
   })
 })

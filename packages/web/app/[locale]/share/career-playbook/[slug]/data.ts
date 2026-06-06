@@ -52,6 +52,7 @@ function normalizePublicPlaybook(
   return {
     id,
     slug: readString(row, 'share_slug', 'shareSlug', 'slug') ?? slug,
+    organizationSlug: readString(row, 'organization_slug', 'organizationSlug', 'orgSlug'),
     title,
     summary,
     markdown,

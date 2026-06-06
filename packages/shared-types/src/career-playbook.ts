@@ -570,6 +570,7 @@ export interface CareerPlaybookViewerSnapshot {
   status: CareerPlaybookPlaybookStatus;
   blocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   shareSlug?: string | null;
+  organizationSlug?: string | null;
   isPublic?: boolean;
   visibility?: CareerPlaybookVisibility;
   ownerId?: string | null;
