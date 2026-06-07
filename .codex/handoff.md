@@ -1,45 +1,45 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-07
-Stage: `mc2-db696.53`
-Branch: `codex/career-playbook-resume-text-header`
+Stage: `mc2-db696.55`
+Branch: `develop` / `master` delivered from `codex/career-playbook-resume-text-header`
 
 ## Current State
 
-- Career Playbook wizard progress is persisted in `career_playbooks.q_a_data.ui_progress` through `careerPlaybook.session.saveProgress`.
-- Resume/hydration restores the last active wizard step by fixed `question_key` or follow-up `question_id`, with indices as fallback.
-- Terminal statuses (`ready_to_generate`, `generating`, `completed`, `failed`) remain in the completion phase even if old progress points to an earlier step.
-- Business Context now includes an autosaved pasted text/notes textarea next to file upload.
-- Empty `freeform_text` clears stored notes; changing notes or structured business context invalidates persisted follow-up questions, answers, completeness, generation count, and non-user-edited generated digest data.
-- Career Playbook source upload continues to reuse Stage 1 storage plus Stage 2 Docling, processed-document storage, and summarization through `PROCESS_SOURCE`; no separate Docling pipeline was added.
-- Sticky headers now use fixed positioning with a spacer when `sticky=true`; header product/profile dropdowns open below their triggers with viewport collision padding.
-- Playwright config supports local fallback env vars: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` and `PLAYWRIGHT_DISABLE_VIDEO=1`.
+- Career Playbook wizard progress, pasted business notes/freeform autosave, Docling reuse regression coverage, and sticky header dropdown fixes are implemented and delivered.
+- Feature branch latest commit: `dfba4dbe fix(deploy): avoid orphan removal during rollback`.
+- Dev delivery merged the feature branch into `develop` at `0aac7729 dev: merge codex/career-playbook-resume-text-header into develop`.
+- Staging deployment merged `develop` into `master` at `8a78628c deploy: merge develop into master`.
+- Rollback now uses `docker compose ... up -d --force-recreate`; no `--remove-orphans` remains in `scripts/rollback_blue_green.sh`, matching `.claude/docs/deployment-guide.md`.
+- GitHub Actions completed successfully for develop run `27093940858` and master run `27093994629`.
+- Health checks returned `ok` for `https://dev.ai.megacampus.ru/api/health` and `https://ai.megacampus.ru/api/health`.
+- Beads delivery task `mc2-db696.55` is closed and pushed via `bd dolt push`.
 - Other worktree `/home/me/code/mc2-worktrees/career-playbook-business-context` remains untouched.
 
 ## Verification
 
-- Passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/career-playbook-store-progress.test.ts`.
-- Passed: `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/server/routers/career-playbook-progress.router.test.ts`.
-- Passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx`.
-- Passed: `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/source-processing.test.ts`.
-- Passed: `DEBUG=pw:webserver PLAYWRIGHT_PORT=3017 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome PLAYWRIGHT_DISABLE_VIDEO=1 pnpm --filter @megacampus/web exec playwright test tests/e2e/header-dropdown-position.spec.ts --project=chromium --workers=1`; profile-menu case skipped because `TOKEN` is not set.
-- Passed: `pnpm type-check`.
-- Passed: `pnpm build`.
+- Passed: `bash -n scripts/rollback_blue_green.sh`.
+- Passed: `rg "remove-orphans" scripts/rollback_blue_green.sh scripts/deploy_blue_green.sh .claude/docs/deployment-guide.md .claude/scripts/deploy.sh .claude/scripts/push-dev.sh` verified rollback no longer uses `--remove-orphans`.
+- Passed through `.claude/scripts/deploy.sh --yes`: `pnpm type-check`.
+- Passed through `.claude/scripts/deploy.sh --yes`: `pnpm build`.
+- Passed: GitHub Actions develop run `27093940858`.
+- Passed: GitHub Actions master run `27093994629`.
+- Passed: dev and production `/api/health` checks.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.53`.
-Recommended action: finish closeout, refresh Graphify, commit and push the feature branch after final gates pass.
+Next stage id: choose the next ready Beads task under `mc2-db696` if more Career Playbook work remains.
+Recommended action: monitor the deployed Career Playbook flow as needed; otherwise start the next ready Beads item.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-db696.53`, stage summary `.codex/stages/mc2-db696.53/summary.md`, and Graphify report. Continue from branch `codex/career-playbook-resume-text-header`. Do not touch `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.55/summary.md`, Beads epic `mc2-db696`, and Graphify report. Current delivery is on `develop` and `master`; avoid touching `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
 
 ## Delivery
 
-- docs-reviewed: updated - handoff, Career Playbook architecture docs, and stage summary record progress persistence, freeform clearing/invalidation, Docling reuse, sticky header dropdowns, and Playwright local env opt-ins.
-- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz`; report shows 57378 nodes, 79570 edges, and 3681 communities after clustering.
+- docs-reviewed: updated - handoff and stage summary now reflect completed push/merge/deploy; existing deployment guide already documents the `--remove-orphans` prohibition.
+- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz` during delivery closeout.
 
 ## Explicit defers
 
-- Freeform text size limiting is deferred pending a product limit decision; tracked in Beads `mc2-db696.54`. Authenticated profile-menu e2e is present but skipped locally because `TOKEN` is not set.
+- None for this delivery. Authenticated profile-menu e2e remains locally skipped when `TOKEN` is not set, but the deployed CI/CD runs completed successfully.
