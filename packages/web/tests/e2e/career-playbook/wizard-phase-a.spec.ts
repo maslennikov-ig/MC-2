@@ -22,13 +22,12 @@ test.describe('Career Playbook Phase A wizard', () => {
   })
 
   test.describe('authenticated flow', () => {
-    test.use(process.env.TOKEN ? { storageState: authenticatedStorageState } : {})
+    test.use({ storageState: authenticatedStorageState })
 
     test('answers fixed questions, resumes the draft, and saves pasted business notes', async ({
       page,
     }) => {
       test.setTimeout(90000)
-      test.skip(!process.env.TOKEN, 'TOKEN is required for authenticated Career Playbook e2e flow')
 
       await page.goto('/ru/career-playbook/new?fresh=1')
       await page.waitForLoadState('networkidle')
@@ -40,7 +39,7 @@ test.describe('Career Playbook Phase A wizard', () => {
 
       await page.getByLabel('Какую должность вы хотите оформить?').fill('Руководитель продаж')
       await page.getByRole('button', { name: 'Далее' }).click()
-      await page.getByRole('radio', { name: /Продажи/ }).click()
+      await expect(page.getByText(/Функциональная область: Продажи/)).toBeVisible()
       await page.getByRole('button', { name: 'Далее' }).click()
       await page.getByRole('radio', { name: /Ведущий специалист/ }).click()
       await page.getByRole('button', { name: 'Далее' }).click()
@@ -49,20 +48,15 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.getByRole('radio', { name: /201-1000 человек/ }).click()
       await page.getByRole('button', { name: 'Далее' }).click()
 
-      await expect(page.getByText('Какая стадия компании / продукта?')).toBeVisible()
+      const questionPanel = page.getByTestId('career-playbook-question-panel')
+      await expect(questionPanel.getByText('Какая стадия компании / продукта?')).toBeVisible()
 
       await page.reload()
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('Какая стадия компании / продукта?')).toBeVisible()
+      await expect(questionPanel.getByText('Какая стадия компании / продукта?')).toBeVisible()
       await page.getByRole('radio', { name: /Спрос подтверждён/ }).click()
-      await page.getByRole('button', { name: 'Далее' }).click()
-      await expect(
-        page.getByText('На каком языке сгенерировать должностную инструкцию?')
-      ).toBeVisible()
-      await page.getByRole('radio', { name: 'Русский' }).click()
-      await page.getByRole('button', { name: 'Назад' }).click()
-      await page.getByRole('button', { name: 'Назад' }).click()
+      await expect(page.getByRole('button', { name: 'Завершить базовые вопросы' })).toBeVisible()
       await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()
       await page.getByRole('button', { name: 'Назад' }).click()

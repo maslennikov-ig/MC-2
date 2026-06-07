@@ -243,7 +243,10 @@ describe('Career Playbook business context backend guards', () => {
             text: expect.stringContaining('AI role guides'),
           }),
         ],
-        business_context: expect.objectContaining({ status: 'not_started' }),
+        business_context: expect.objectContaining({
+          status: 'skipped',
+          skip_reason: 'freeform_business_context',
+        }),
       }),
       language: 'en',
       businessContextSourceExcerpts: '- none',
@@ -252,6 +255,10 @@ describe('Career Playbook business context backend guards', () => {
       expect.objectContaining({
         status: 'answering_followups',
         q_a_data: expect.objectContaining({
+          business_context: expect.objectContaining({
+            status: 'skipped',
+            skip_reason: 'freeform_business_context',
+          }),
           completeness_score: 0.71,
           followup_questions: followupResponse.questions,
         }),

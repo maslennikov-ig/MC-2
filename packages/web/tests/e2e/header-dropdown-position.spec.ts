@@ -63,11 +63,9 @@ test.describe('Header dropdown positioning', () => {
   })
 
   test.describe('authenticated profile menu', () => {
-    test.use(process.env.TOKEN ? { storageState: authenticatedStorageState } : {})
+    test.use({ storageState: authenticatedStorageState })
 
     test('keeps the profile menu visible after scrolling down', async ({ page }) => {
-      test.skip(!process.env.TOKEN, 'TOKEN is required for authenticated header profile e2e flow')
-
       await page.goto('/en/courses')
       await page.waitForLoadState('networkidle')
 

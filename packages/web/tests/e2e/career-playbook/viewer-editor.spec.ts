@@ -17,17 +17,15 @@ test.describe('Career Playbook viewer editor', () => {
   })
 
   test.describe('authenticated flow', () => {
-    test.use(process.env.TOKEN ? { storageState: authenticatedStorageState } : {})
+    test.use({ storageState: authenticatedStorageState })
 
     test('edits a block and regenerates another block through the viewer fallback', async ({
       page,
     }) => {
-      test.skip(!process.env.TOKEN, 'TOKEN is required for authenticated Career Playbook e2e flow')
-
       await page.goto(`/en/career-playbook/${playbookId}`)
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByRole('heading', { name: 'Role Guide preview' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Sales Director' })).toBeVisible()
 
       await page.getByRole('button', { name: 'Edit Role guide header' }).click()
       await page.getByLabel('Block markdown').fill('# Edited viewer block')

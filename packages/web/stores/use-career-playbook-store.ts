@@ -1910,6 +1910,9 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: false, error: message }
         }
 
+        const previousPhase = snapshot.phase
+        const previousStatus = snapshot.status
+
         try {
           const client = getClient()
           if (!client.requestFollowups) {
@@ -1917,8 +1920,11 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           }
 
           set((state) => {
+            state.phase = 'followups'
+            state.status = 'awaiting_followups'
             state.isGeneratingFollowups = true
             state.followupGenerationError = null
+            markProgressDirty(state)
           })
 
           const response = normalizeCareerPlaybookFollowupResponseReadiness(
@@ -1957,6 +1963,14 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Follow-up generation failed'
           set((state) => {
+            if (snapshot.phase === 'business_context') {
+              state.phase = 'business_context'
+              state.status = 'awaiting_followups'
+              markProgressDirty(state)
+            } else {
+              state.phase = previousPhase
+              state.status = previousStatus
+            }
             state.isGeneratingFollowups = false
             state.followupGenerationError = message
           })

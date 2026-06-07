@@ -293,6 +293,25 @@ function hasCompletedBusinessContext(qaData: StoredQAData): boolean {
   );
 }
 
+function businessContextForFollowupRequest(
+  context: CareerPlaybookBusinessContext,
+  freeformText: string
+): CareerPlaybookBusinessContext {
+  if (
+    freeformText.trim().length === 0 ||
+    context.status === 'ready' ||
+    context.status === 'skipped'
+  ) {
+    return context;
+  }
+
+  return CareerPlaybookBusinessContextSchema.parse({
+    ...context,
+    status: 'skipped',
+    skip_reason: context.skip_reason ?? 'freeform_business_context',
+  });
+}
+
 function hasRequiredFixedAnswers(qaData: StoredQAData): boolean {
   const answeredFixedKeys = new Set(
     qaData.fixed
@@ -552,9 +571,13 @@ export async function requestCareerPlaybookFollowups(
       message: 'Business context source files are still processing',
     });
   }
+  const businessContext = businessContextForFollowupRequest(
+    refreshedBusinessContext.context,
+    freeformDraftFromQAData(existingQAData)
+  );
   const existingQADataWithDigest: StoredQAData = {
     ...existingQAData,
-    business_context: refreshedBusinessContext.context,
+    business_context: businessContext,
   };
   assertCanRequestFollowups(row, existingQADataWithDigest, input.fixedAnswers);
   if (existingQAData.followup_generation_count >= FOLLOWUP_GENERATION_LIMIT) {
@@ -568,7 +591,7 @@ export async function requestCareerPlaybookFollowups(
     fixed: Object.values(input.fixedAnswers),
     followups: Object.values(input.followupAnswers),
     freeform: existingQAData.freeform,
-    business_context: refreshedBusinessContext.context,
+    business_context: businessContext,
   });
   const result = await generateCareerPlaybookFollowups({
     playbookId: input.playbookId,

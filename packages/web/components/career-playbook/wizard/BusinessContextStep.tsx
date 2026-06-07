@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -94,6 +95,7 @@ interface BusinessContextStepProps {
   onContinue: () => Promise<void> | void
   onUniversal: () => Promise<void> | void
   isSaving?: boolean
+  errorMessage?: string | null
   tier?: TierKey
   copy?: BusinessContextStepCopy
 }
@@ -271,6 +273,7 @@ export function BusinessContextStep({
   onContinue,
   onUniversal,
   isSaving = false,
+  errorMessage = null,
   tier = 'standard',
   copy,
 }: BusinessContextStepProps) {
@@ -696,6 +699,18 @@ export function BusinessContextStep({
               <p className="leading-6">{labels.universalDescription}</p>
             </div>
           </div>
+
+          {errorMessage ? (
+            <div
+              role="alert"
+              className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-950 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"
+            >
+              <div className="flex gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <p className="leading-6">{errorMessage}</p>
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-3">
             <Button
