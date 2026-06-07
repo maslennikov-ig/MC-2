@@ -117,6 +117,32 @@ describe('careerPlaybookRouter progress and context persistence', () => {
     mocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
+  it('rejects freeform business notes above the product limit', async () => {
+    const existingRow = playbookRow();
+    const updatedRow = playbookRow({
+      q_a_data: {
+        fixed: [],
+        followups: [],
+        freeform: [{ text: 'x'.repeat(20_001), submitted_at: '2026-06-07T10:00:00.000Z' }],
+      },
+    });
+    const builder = createBuilder([
+      { data: existingRow, error: null },
+      { data: updatedRow, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(
+      caller.session.submitAnswer({
+        playbookId,
+        phase: 'freeform',
+        answer: { freeform_text: 'x'.repeat(20_001) },
+      })
+    ).rejects.toThrow(/20,?000/);
+  });
+
   it('clears persisted follow-up context when freeform business notes change', async () => {
     const staleFollowupQuestion = {
       question_id: '00000000-0000-4000-8000-000000000301',

@@ -108,6 +108,9 @@ avoids creating fake draft courses just to attach Role Guide context.
 Business Context also accepts pasted text notes through the freeform answer
 path. Saving `freeform_text: ""` is a deliberate clear operation, not a no-op;
 it removes stored notes so deleted pasted context does not return after refresh.
+`CareerPlaybookAnswerSubmissionSchema` caps pasted notes at 20,000 characters;
+the Business Context textarea uses the same shared constant for `maxLength` and
+its visible character counter.
 Changing pasted notes or the structured business context invalidates stored
 follow-up questions, follow-up answers, completeness, and non-user-edited
 generated digest data before the next follow-up generation.

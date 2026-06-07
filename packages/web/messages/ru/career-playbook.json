@@ -295,7 +295,7 @@
     "businessContextFilesTitle": "Файлы",
     "businessContextFilesDescription": "Файлы сохраняются как источники этого Role Guide, не как материалы курса.",
     "businessContextFreeformTitle": "Текст и заметки",
-    "businessContextFreeformDescription": "Вставьте регламенты, переписку, тезисы интервью или любой контекст без загрузки файла.",
+    "businessContextFreeformDescription": "Вставьте регламенты, переписку, тезисы интервью или любой контекст без загрузки файла. До 20 000 символов.",
     "businessContextFreeformPlaceholder": "Вставьте текст, который важно учесть в должностной инструкции...",
     "businessContextUploadMissingSession": "Сначала создайте сессию Career Playbook",
     "businessContextUploadMaxFilesTemplate": "Максимум {maxFiles} источников",

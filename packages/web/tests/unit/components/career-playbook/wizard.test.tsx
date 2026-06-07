@@ -644,11 +644,14 @@ describe('BusinessContextStep', () => {
     const textarea = screen.getByRole('textbox', { name: 'Текст и заметки' })
 
     expect(textarea).toHaveValue('CRM migration context')
+    expect(textarea).toHaveAttribute('maxlength', '20000')
+    expect(screen.getByText('21 / 20 000')).toBeInTheDocument()
 
     await user.clear(textarea)
     await user.type(textarea, 'Новый контекст отдела')
 
     expect(handleFreeformChange).toHaveBeenLastCalledWith('Новый контекст отдела')
+    expect(screen.getByText('21 / 20 000')).toBeInTheDocument()
 
     rerender(<BusinessContextHarness key="remounted" initialText={persistedText} />)
 

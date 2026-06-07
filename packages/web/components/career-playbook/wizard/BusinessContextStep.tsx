@@ -12,11 +12,12 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import type {
-  CareerPlaybookBusinessContext,
-  CareerPlaybookBusinessContextDigest,
-  CareerPlaybookBusinessContextSourceSummary,
-  TierKey,
+import {
+  CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH,
+  type CareerPlaybookBusinessContext,
+  type CareerPlaybookBusinessContextDigest,
+  type CareerPlaybookBusinessContextSourceSummary,
+  type TierKey,
 } from '@megacampus/shared-types'
 
 import {
@@ -163,7 +164,7 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
   filesDescription: 'Файлы сохраняются как источники этого Role Guide, не как материалы курса.',
   freeformTitle: 'Текст и заметки',
   freeformDescription:
-    'Вставьте регламенты, переписку, тезисы интервью или любой контекст без загрузки файла.',
+    'Вставьте регламенты, переписку, тезисы интервью или любой контекст без загрузки файла. До 20 000 символов.',
   freeformPlaceholder: 'Вставьте текст, который важно учесть в должностной инструкции...',
   uploadMissingSession: 'Career Playbook session is required before upload',
   uploadMaxFilesTemplate: 'Максимум {maxFiles} источников',
@@ -214,6 +215,10 @@ function linesFromText(value: string): string[] {
 
 function textFromLines(values: string[]): string {
   return values.join('\n')
+}
+
+function formatCharacterCount(value: number): string {
+  return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 function buildMissingSignals(
@@ -290,6 +295,11 @@ export function BusinessContextStep({
   )
   const pendingFiles = uploadedFiles.filter((file) => file.status === 'pending')
   const hasContext = hasDigestSignal(digest) || pendingFiles.length > 0 || activeSources.length > 0
+  const freeformLength = freeformText.length
+  const freeformCounter = `${formatCharacterCount(freeformLength)} / ${formatCharacterCount(
+    CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH
+  )}`
+  const isFreeformOverLimit = freeformLength > CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH
 
   useEffect(() => {
     contextRef.current = context
@@ -552,9 +562,21 @@ export function BusinessContextStep({
               value={freeformText}
               onChange={(event) => onFreeformTextChange?.(event.target.value)}
               placeholder={labels.freeformPlaceholder}
+              maxLength={CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH}
               className="min-h-40 resize-y bg-white/80 text-sm leading-6 dark:bg-slate-950/40"
               aria-label={labels.freeformTitle}
+              aria-describedby="career-playbook-freeform-counter"
             />
+            <p
+              id="career-playbook-freeform-counter"
+              className={`text-right text-xs leading-5 ${
+                isFreeformOverLimit
+                  ? 'text-red-600 dark:text-red-300'
+                  : 'text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              {freeformCounter}
+            </p>
           </div>
 
           <div className="space-y-3">

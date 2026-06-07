@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { languageSchema, SUPPORTED_LANGUAGES } from './common-enums';
 
 export const SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES = SUPPORTED_LANGUAGES;
+export const CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH = 20_000;
 
 export const CareerPlaybookQuestionTypeSchema = z.enum(['open', 'single_choice', 'multi_choice']);
 export type CareerPlaybookQuestionType = z.infer<typeof CareerPlaybookQuestionTypeSchema>;
@@ -668,7 +669,7 @@ export const CareerPlaybookAnswerSubmissionSchema = z
     question_id: z.string().uuid().optional(),
     value: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     skipped: z.boolean().optional(),
-    freeform_text: z.string().optional(),
+    freeform_text: z.string().max(CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH).optional(),
     business_context: CareerPlaybookBusinessContextSchema.optional(),
   })
   .refine(
