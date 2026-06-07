@@ -4,6 +4,7 @@ import {
   fixedQuestionsInputSchema,
   playbookIdInputSchema,
   resolveDepartmentOptionsInputSchema,
+  saveProgressInputSchema,
   startSessionInputSchema,
   submitAnswerInputSchema,
 } from './_shared';
@@ -11,6 +12,7 @@ import { resolveCareerPlaybookDepartmentOptions } from '@/stages/stage-career-pl
 import {
   getCareerPlaybookDraft,
   getCareerPlaybookFixedQuestions,
+  saveCareerPlaybookProgress,
   startCareerPlaybookSession,
   submitCareerPlaybookAnswer,
 } from './service';
@@ -26,6 +28,10 @@ export const careerPlaybookSessionRouter = router({
 
   submitAnswer: protectedProcedure.input(submitAnswerInputSchema).mutation(({ ctx, input }) => {
     return submitCareerPlaybookAnswer(ctx, input);
+  }),
+
+  saveProgress: protectedProcedure.input(saveProgressInputSchema).mutation(({ ctx, input }) => {
+    return saveCareerPlaybookProgress(ctx, input);
   }),
 
   getDraft: protectedProcedure.input(playbookIdInputSchema).query(({ ctx, input }) => {

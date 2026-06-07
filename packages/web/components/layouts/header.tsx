@@ -41,6 +41,8 @@ type ProductNavItemProps = {
     icon: ReactNode
     primary?: boolean
   }>
+  menuTriggerTestId?: string
+  menuContentTestId?: string
 }
 
 export default function Header({
@@ -52,8 +54,8 @@ export default function Header({
   const { isLoading } = useSupabase()
   const t = useTranslations('common.nav')
   const headerClassName = cn(
-    'relative z-20 flex items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-4',
-    sticky ? 'sticky top-0 z-50' : null,
+    'flex items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-4',
+    sticky ? 'fixed inset-x-0 top-0 z-50 w-full' : 'relative z-20',
     surface === 'glass'
       ? darkMode
         ? 'border-b border-white/10 bg-slate-950/70 backdrop-blur-md'
@@ -107,50 +109,57 @@ export default function Header({
   ]
 
   return (
-    <header className={headerClassName}>
-      <div className="sm:hidden">
-        <Logo variant="icon" showText={false} forceWhite={darkMode} />
-      </div>
-      <div className="hidden sm:block">
-        <Logo variant="compact" size="md" forceWhite={darkMode} />
-      </div>
+    <>
+      <header className={headerClassName} data-testid="site-header">
+        <div className="sm:hidden">
+          <Logo variant="icon" showText={false} forceWhite={darkMode} />
+        </div>
+        <div className="hidden sm:block">
+          <Logo variant="compact" size="md" forceWhite={darkMode} />
+        </div>
 
-      <nav
-        className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2"
-        role="navigation"
-        aria-label={t('mainMenu')}
-      >
-        {!isLoading && (
-          <>
-            <ProductNavItem
-              darkMode={darkMode}
-              href="/career-playbook"
-              label={t('roleDescriptions')}
-              ariaLabel={t('roleDescriptionsAria')}
-              menuLabel={t('roleDescriptions')}
-              menuAriaLabel={t('roleDescriptionsMenuAria')}
-              icon={<FileText className="h-4 w-4" aria-hidden="true" />}
-              actions={roleActions}
-            />
-            <ProductNavItem
-              darkMode={darkMode}
-              href="/courses"
-              label={t('courses')}
-              ariaLabel={t('coursesAria')}
-              menuLabel={t('courses')}
-              menuAriaLabel={t('coursesMenuAria')}
-              icon={<BookOpen className="h-4 w-4" aria-hidden="true" />}
-              actions={courseActions}
-            />
-          </>
-        )}
-      </nav>
+        <nav
+          className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2"
+          role="navigation"
+          aria-label={t('mainMenu')}
+        >
+          {!isLoading && (
+            <>
+              <ProductNavItem
+                darkMode={darkMode}
+                href="/career-playbook"
+                label={t('roleDescriptions')}
+                ariaLabel={t('roleDescriptionsAria')}
+                menuLabel={t('roleDescriptions')}
+                menuAriaLabel={t('roleDescriptionsMenuAria')}
+                icon={<FileText className="h-4 w-4" aria-hidden="true" />}
+                actions={roleActions}
+                menuTriggerTestId="header-role-guides-menu-trigger"
+                menuContentTestId="header-role-guides-menu"
+              />
+              <ProductNavItem
+                darkMode={darkMode}
+                href="/courses"
+                label={t('courses')}
+                ariaLabel={t('coursesAria')}
+                menuLabel={t('courses')}
+                menuAriaLabel={t('coursesMenuAria')}
+                icon={<BookOpen className="h-4 w-4" aria-hidden="true" />}
+                actions={courseActions}
+                menuTriggerTestId="header-courses-menu-trigger"
+                menuContentTestId="header-courses-menu"
+              />
+            </>
+          )}
+        </nav>
 
-      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-        <LanguageSwitcher darkMode={darkMode} compact showChevron={false} />
-        <AuthButton darkMode={darkMode} forceWhiteDropdown={darkMode} />
-      </div>
-    </header>
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <LanguageSwitcher darkMode={darkMode} compact showChevron={false} />
+          <AuthButton darkMode={darkMode} forceWhiteDropdown={darkMode} />
+        </div>
+      </header>
+      {sticky ? <div className="h-[68px] sm:h-[76px]" aria-hidden="true" /> : null}
+    </>
   )
 }
 
@@ -163,6 +172,8 @@ function ProductNavItem({
   menuAriaLabel,
   icon,
   actions,
+  menuTriggerTestId,
+  menuContentTestId,
 }: ProductNavItemProps) {
   const shellClass = darkMode
     ? 'border-white/10 bg-white/5 text-white/90 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-200'
@@ -187,6 +198,7 @@ function ProductNavItem({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={menuAriaLabel}
+          data-testid={menuTriggerTestId}
           className={cn(
             'flex min-h-[44px] min-w-[36px] items-center justify-center border-l px-2 transition outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
             darkMode ? 'border-white/10' : 'border-gray-200 dark:border-slate-700'
@@ -196,8 +208,11 @@ function ProductNavItem({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="center"
+          side="bottom"
+          sideOffset={20}
           collisionPadding={16}
-          className="w-[calc(100vw-2rem)] max-w-72 p-2"
+          data-testid={menuContentTestId}
+          className="z-[80] w-[calc(100vw-2rem)] max-w-72 p-2"
         >
           <DropdownMenuLabel className="px-3 py-2 text-xs tracking-[0.14em] text-gray-500 uppercase dark:text-gray-400">
             {menuLabel}

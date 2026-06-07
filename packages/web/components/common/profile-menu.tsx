@@ -162,6 +162,7 @@ export default function ProfileMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
+          data-testid="header-profile-menu-trigger"
           className={cn(
             'relative h-10 min-h-[44px] w-10 min-w-[44px] rounded-full md:h-10 md:w-10',
             darkMode && 'text-white hover:bg-white/10',
@@ -186,9 +187,12 @@ export default function ProfileMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className={cn('w-72 p-2', forceWhiteDropdown && 'border-slate-700 bg-slate-800')}
+        className={cn('z-[80] w-72 p-2', forceWhiteDropdown && 'border-slate-700 bg-slate-800')}
         align="end"
-        sideOffset={8}
+        side="bottom"
+        sideOffset={20}
+        collisionPadding={16}
+        data-testid="header-profile-menu"
         role="menu"
         aria-label="Меню профиля"
       >
