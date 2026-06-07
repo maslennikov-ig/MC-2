@@ -7,7 +7,7 @@ test.describe('Career Playbook landing', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'Turn role context into a structured operating manual',
+        name: 'A role guide your team will use',
       })
     ).toBeVisible()
     await expect(
@@ -17,9 +17,10 @@ test.describe('Career Playbook landing', () => {
       'href',
       '#example'
     )
-    await expect(page.getByText('Netflix Context over Control')).toBeVisible()
+    await expect(page.getByText('Netflix Context over Control').first()).toBeVisible()
     await expect(page.getByText('26-block map')).toBeVisible()
     await expect(page.getByRole('button', { name: /Decision matrix/ })).toBeVisible()
+    await page.getByRole('button', { name: /Decision matrix/ }).click()
     await expect(page.getByText(/Small discounts can move quickly/)).toBeVisible()
     await expect(page.getByText(/sharing, and course reuse/)).not.toBeVisible()
 

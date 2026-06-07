@@ -294,7 +294,11 @@ export function BusinessContextStep({
     [categories, digest]
   )
   const pendingFiles = uploadedFiles.filter((file) => file.status === 'pending')
-  const hasContext = hasDigestSignal(digest) || pendingFiles.length > 0 || activeSources.length > 0
+  const hasContext =
+    Boolean(freeformText.trim()) ||
+    hasDigestSignal(digest) ||
+    pendingFiles.length > 0 ||
+    activeSources.length > 0
   const freeformLength = freeformText.length
   const freeformCounter = `${formatCharacterCount(freeformLength)} / ${formatCharacterCount(
     CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH

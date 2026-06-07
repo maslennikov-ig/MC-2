@@ -1,45 +1,44 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-07
-Stage: `mc2-db696.55`
-Branch: `develop` / `master` delivered from `codex/career-playbook-resume-text-header`
+Stage: `mc2-db696.56`
+Branch: `codex/career-playbook-e2e-audit`
 
 ## Current State
 
-- Career Playbook wizard progress, pasted business notes/freeform autosave, Docling reuse regression coverage, and sticky header dropdown fixes are implemented and delivered.
-- Feature branch latest commit: `dfba4dbe fix(deploy): avoid orphan removal during rollback`.
-- Dev delivery merged the feature branch into `develop` at `0aac7729 dev: merge codex/career-playbook-resume-text-header into develop`.
-- Staging deployment merged `develop` into `master` at `8a78628c deploy: merge develop into master`.
-- Rollback now uses `docker compose ... up -d --force-recreate`; no `--remove-orphans` remains in `scripts/rollback_blue_green.sh`, matching `.claude/docs/deployment-guide.md`.
-- GitHub Actions completed successfully for develop run `27093940858` and master run `27093994629`.
-- Health checks returned `ok` for `https://dev.ai.megacampus.ru/api/health` and `https://ai.megacampus.ru/api/health`.
-- Beads delivery task `mc2-db696.55` is closed and pushed via `bd dolt push`.
+- Local E2E audit for Career Playbook delivery is closing on branch `codex/career-playbook-e2e-audit`.
+- Durable test plan is recorded in `docs/career-playbook/e2e-test-plan.md`.
+- Public landing E2E now matches current copy and interactive demo behavior.
+- Authenticated wizard E2E now covers the current Business Context/freeform notes flow when `TOKEN` is available.
+- Product defect found by E2E planning was fixed: pasted freeform business notes now count as enough context in UI and backend follow-up generation.
+- `mobile-chrome` Playwright project now honors `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`, matching desktop Chromium fallback behavior.
+- Local full authenticated E2E remains blocked without `TOKEN` and disposable auth fixtures.
+- Backend source-processing regression passed; follow-ups `mc2-db696.57`/`.58` track README cleanup and auth fixtures.
 - Other worktree `/home/me/code/mc2-worktrees/career-playbook-business-context` remains untouched.
 
 ## Verification
 
-- Passed: `bash -n scripts/rollback_blue_green.sh`.
-- Passed: `rg "remove-orphans" scripts/rollback_blue_green.sh scripts/deploy_blue_green.sh .claude/docs/deployment-guide.md .claude/scripts/deploy.sh .claude/scripts/push-dev.sh` verified rollback no longer uses `--remove-orphans`.
-- Passed through `.claude/scripts/deploy.sh --yes`: `pnpm type-check`.
-- Passed through `.claude/scripts/deploy.sh --yes`: `pnpm build`.
-- Passed: GitHub Actions develop run `27093940858`.
-- Passed: GitHub Actions master run `27093994629`.
-- Passed: dev and production `/api/health` checks.
+- Passed: backend guard/progress unit — 7 tests; source router unit — 10 tests; web wizard/store unit — 79 tests.
+- Passed: Chromium E2E — 4 passed, 3 skipped because `TOKEN` is not set.
+- Passed: mobile-chrome header E2E — 1 passed, 1 skipped because `TOKEN` is not set.
+- Passed: `pnpm type-check`.
+- Passed: `pnpm build`.
 
 ## Next recommended
 
-Next stage id: choose the next ready Beads task under `mc2-db696` if more Career Playbook work remains.
-Recommended action: monitor the deployed Career Playbook flow as needed; otherwise start the next ready Beads item.
+Next stage id: `mc2-db696.56`.
+Recommended action: commit, push, and close `mc2-db696.56`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.55/summary.md`, Beads epic `mc2-db696`, and Graphify report. Current delivery is on `develop` and `master`; avoid touching `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.56/summary.md`, `docs/career-playbook/e2e-test-plan.md`, Beads task `mc2-db696.56`, follow-up `mc2-db696.57`, and Graphify report. Continue from branch `codex/career-playbook-e2e-audit`. Do not touch `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
 
 ## Delivery
 
-- docs-reviewed: updated - handoff and stage summary now reflect completed push/merge/deploy; existing deployment guide already documents the `--remove-orphans` prohibition.
-- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz` during delivery closeout.
+- docs-reviewed: updated - handoff and Career Playbook E2E test plan record scenarios, blockers, mobile Chrome fallback, and explicit README defer.
+- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz` during closeout.
 
 ## Explicit defers
 
-- None for this delivery. Authenticated profile-menu e2e remains locally skipped when `TOKEN` is not set, but the deployed CI/CD runs completed successfully.
+- Full authenticated Career Playbook autosave/profile-menu E2E remains skipped locally until `TOKEN` and disposable auth fixtures are provided.
+- Broad E2E README cleanup is deferred to Beads `mc2-db696.57`; auth fixtures and deterministic autosave waits to `mc2-db696.58`.

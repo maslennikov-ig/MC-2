@@ -286,7 +286,11 @@ function isReadyForGeneration(row: CareerPlaybookRow, qaData: StoredQAData): boo
 }
 
 function hasCompletedBusinessContext(qaData: StoredQAData): boolean {
-  return qaData.business_context.status === 'ready' || qaData.business_context.status === 'skipped';
+  return (
+    qaData.business_context.status === 'ready' ||
+    qaData.business_context.status === 'skipped' ||
+    freeformDraftFromQAData(qaData).trim().length > 0
+  );
 }
 
 function hasRequiredFixedAnswers(qaData: StoredQAData): boolean {

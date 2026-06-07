@@ -659,6 +659,33 @@ describe('BusinessContextStep', () => {
       'Новый контекст отдела'
     )
   })
+
+  it('treats pasted freeform text as enough business context to continue', () => {
+    const handleContinue = vi.fn()
+
+    render(
+      <BusinessContextStep
+        playbookId="00000000-0000-4000-8000-000000002001"
+        context={{
+          mode: 'company_specific',
+          status: 'collecting',
+          digest: null,
+          source_ids: [],
+        }}
+        freeformText="Публичный сектор, длинный цикл сделки, обязательный пилот."
+        onContextChange={vi.fn()}
+        onBack={vi.fn()}
+        onContinue={handleContinue}
+        onUniversal={vi.fn()}
+        copy={{
+          continue: 'Продолжить к уточнениям',
+          freeformTitle: 'Текст и заметки',
+        }}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Продолжить к уточнениям' })).toBeEnabled()
+  })
 })
 
 describe('FollowupPhase', () => {

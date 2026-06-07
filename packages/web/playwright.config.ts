@@ -177,7 +177,7 @@ export default defineConfig({
     // Mobile browsers
     {
       name: 'mobile-chrome',
-      use: { ...devices['Pixel 5'] },
+      use: withOptionalChromiumExecutable({ ...devices['Pixel 5'] }),
     },
     {
       name: 'mobile-safari',
