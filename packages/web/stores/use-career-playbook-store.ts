@@ -32,6 +32,7 @@ import type {
   CareerPlaybookVisibility,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookViewerPermissions,
+  CareerPlaybookWizardProgress,
   Language,
 } from '@megacampus/shared-types'
 
@@ -62,8 +63,10 @@ export interface CareerPlaybookDraft {
   dirtyFollowupQuestionIds?: string[]
   dirtyFreeformDraft?: boolean
   dirtyBusinessContext?: boolean
+  dirtyProgress?: boolean
   generationProgress?: number | null
   finalMarkdown?: string | null
+  progress?: CareerPlaybookWizardProgress
 }
 
 export interface CareerPlaybookGenerationStatus {
@@ -86,6 +89,7 @@ interface CareerPlaybookLibraryDetail {
   generatedBlocks?: Record<string, CareerPlaybookBlockState> | null
   finalMarkdown?: string | null
   shareSlug?: string | null
+  organizationSlug?: string | null
   isPublic?: boolean
   visibility?: CareerPlaybookVisibility
   ownerId?: string | null
@@ -155,6 +159,10 @@ export interface CareerPlaybookClient {
   }) => Promise<CareerPlaybookDepartmentResolution>
   approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   getGenerationStatus?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
+  saveProgress?: (input: {
+    playbookId: string
+    progress: CareerPlaybookWizardProgress
+  }) => Promise<unknown>
   listSources?: (input: {
     playbookId: string
   }) => Promise<CareerPlaybookBusinessContextSourceSummary[]>
@@ -212,6 +220,7 @@ interface CareerPlaybookStoreState {
   dirtyFollowupQuestionIds: string[]
   dirtyFreeformDraft: boolean
   dirtyBusinessContext: boolean
+  dirtyProgress: boolean
   lastAutosavedAt: string | null
   viewer: CareerPlaybookViewerSnapshot | null
   viewerBlocks: CareerPlaybookViewerBlock[]
@@ -678,6 +687,7 @@ function initialState(): Omit<
     dirtyFollowupQuestionIds: [],
     dirtyFreeformDraft: false,
     dirtyBusinessContext: false,
+    dirtyProgress: false,
     lastAutosavedAt: null,
     viewer: null,
     viewerBlocks: [],
@@ -691,9 +701,13 @@ function initialState(): Omit<
 }
 
 let testClient: CareerPlaybookClient | null = null
+let careerPlaybookAutosaveInFlight: Promise<CareerPlaybookAutosaveResult> | null = null
+let careerPlaybookAutosaveQueued = false
 
 export function setCareerPlaybookClientForTests(client: CareerPlaybookClient | null) {
   testClient = client
+  careerPlaybookAutosaveInFlight = null
+  careerPlaybookAutosaveQueued = false
 }
 
 function normalizeUiLanguage(language: string): CareerPlaybookFixedQuestionLanguage {
@@ -743,6 +757,14 @@ function mergeRemoteDraftWithDirtyLocal(
     | 'dirtyFreeformDraft'
     | 'businessContext'
     | 'dirtyBusinessContext'
+    | 'dirtyProgress'
+    | 'phase'
+    | 'fixedQuestions'
+    | 'currentFixedIndex'
+    | 'departmentQuestionVisible'
+    | 'departmentResolution'
+    | 'followupQuestions'
+    | 'currentFollowupIndex'
   >
 ) {
   const fixedAnswers = recordFromFixedAnswers(remoteDraft.fixedAnswers)
@@ -775,6 +797,10 @@ function mergeRemoteDraftWithDirtyLocal(
     dirtyFollowupQuestionIds: localState.dirtyFollowupQuestionIds,
     dirtyFreeformDraft: localState.dirtyFreeformDraft,
     dirtyBusinessContext: localState.dirtyBusinessContext,
+    dirtyProgress: localState.dirtyProgress,
+    progress: localState.dirtyProgress
+      ? buildCareerPlaybookProgress(localState)
+      : remoteDraft.progress,
   }
 }
 
@@ -802,12 +828,118 @@ function businessContextsEqual(
   return JSON.stringify(left ?? null) === JSON.stringify(right ?? null)
 }
 
+function careerPlaybookProgressesEqual(
+  left: CareerPlaybookWizardProgress | undefined,
+  right: CareerPlaybookWizardProgress | undefined
+) {
+  if (!left || !right) return left === right
+  return (
+    left.phase === right.phase &&
+    left.current_fixed_question_key === right.current_fixed_question_key &&
+    left.current_fixed_index === right.current_fixed_index &&
+    left.current_followup_question_id === right.current_followup_question_id &&
+    left.current_followup_index === right.current_followup_index
+  )
+}
+
+function isCompletionPlaybookStatus(status: CareerPlaybookPlaybookStatus) {
+  return (
+    status === 'ready_to_generate' ||
+    status === 'generating' ||
+    status === 'completed' ||
+    status === 'failed'
+  )
+}
+
+function hasPendingCareerPlaybookAutosaveWork(state: CareerPlaybookStoreState) {
+  return (
+    state.dirtyFixedQuestionKeys.length > 0 ||
+    state.dirtyFollowupQuestionIds.length > 0 ||
+    state.dirtyFreeformDraft ||
+    state.dirtyBusinessContext ||
+    state.dirtyProgress
+  )
+}
+
 function hasSubmittableAnswerValue(value: CareerPlaybookAnswerValue | undefined) {
   if (Array.isArray(value)) {
     return value.some((item) => item.trim().length > 0)
   }
 
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function buildCareerPlaybookProgress(
+  state: Pick<
+    CareerPlaybookStoreState,
+    | 'phase'
+    | 'fixedQuestions'
+    | 'fixedAnswers'
+    | 'departmentQuestionVisible'
+    | 'departmentResolution'
+    | 'currentFixedIndex'
+    | 'followupQuestions'
+    | 'currentFollowupIndex'
+  >
+): CareerPlaybookWizardProgress {
+  const visibleQuestions = visibleQuestionsFromState(state)
+  const currentFixedQuestion = visibleQuestions[state.currentFixedIndex]
+  const currentFollowupQuestion = state.followupQuestions[state.currentFollowupIndex]
+
+  return {
+    phase: state.phase,
+    current_fixed_question_key: currentFixedQuestion?.question_key,
+    current_fixed_index: state.currentFixedIndex,
+    current_followup_question_id: currentFollowupQuestion?.question_id,
+    current_followup_index: state.currentFollowupIndex,
+    updated_at: nowIso(),
+  }
+}
+
+function applyCareerPlaybookProgress(
+  state: CareerPlaybookStoreState,
+  progress: CareerPlaybookWizardProgress | undefined
+) {
+  if (!progress) return
+
+  if (isCompletionPlaybookStatus(state.status)) {
+    state.phase = 'completion'
+    return
+  }
+
+  state.phase = progress.phase
+
+  if (progress.phase === 'fixed') {
+    const visibleQuestions = visibleQuestionsFromState(state)
+    const questionIndex = progress.current_fixed_question_key
+      ? visibleQuestions.findIndex(
+          (question) => question.question_key === progress.current_fixed_question_key
+        )
+      : -1
+
+    state.currentFixedIndex =
+      questionIndex >= 0 ? questionIndex : (progress.current_fixed_index ?? state.currentFixedIndex)
+    clampCurrentFixedIndex(state)
+    return
+  }
+
+  if (progress.phase === 'followups') {
+    const questionIndex = progress.current_followup_question_id
+      ? state.followupQuestions.findIndex(
+          (question) => question.question_id === progress.current_followup_question_id
+        )
+      : -1
+
+    state.currentFollowupIndex =
+      questionIndex >= 0
+        ? questionIndex
+        : (progress.current_followup_index ?? state.currentFollowupIndex)
+  }
+}
+
+function markProgressDirty(state: CareerPlaybookStoreState) {
+  if (isCompletionPlaybookStatus(state.status)) return
+  state.dirtyProgress = true
 }
 
 function submittableFixedAnswers(
@@ -903,6 +1035,7 @@ function libraryDetailToViewerSnapshot(
     status: detail.status,
     blocks: generatedBlocksToViewerBlocks(detail.generatedBlocks, detail.finalMarkdown),
     shareSlug: detail.shareSlug ?? null,
+    organizationSlug: detail.organizationSlug ?? null,
     isPublic: detail.visibility === 'public' || detail.isPublic === true,
     visibility: detail.visibility ?? (detail.isPublic ? 'public' : 'private'),
     ownerId: detail.ownerId ?? null,
@@ -991,6 +1124,7 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.generation.getStatus.query(
         input
       )) as unknown as CareerPlaybookGenerationStatus,
+    saveProgress: (input) => client.careerPlaybook.session.saveProgress.mutate(input),
     listSources: (input) =>
       (
         client as unknown as CareerPlaybookSourcesClient
@@ -1091,6 +1225,19 @@ function clearDependentFollowupContext(state: CareerPlaybookStoreState) {
   state.dirtyFollowupQuestionIds = []
 }
 
+function clearGeneratedBusinessContextDigest(state: CareerPlaybookStoreState) {
+  if (state.businessContext.mode !== 'company_specific') return
+  if (!state.businessContext.digest || state.businessContext.digest.user_edited) return
+
+  state.businessContext = CareerPlaybookBusinessContextSchema.parse({
+    ...state.businessContext,
+    status: 'collecting',
+    digest: null,
+    updated_at: nowIso(),
+  })
+  state.dirtyBusinessContext = true
+}
+
 function markDirtyFollowupId(state: CareerPlaybookStoreState, questionId: string) {
   if (!state.dirtyFollowupQuestionIds.includes(questionId)) {
     state.dirtyFollowupQuestionIds.push(questionId)
@@ -1182,6 +1329,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           inferMissingDepartmentFromPosition(state)
           state.currentFixedIndex = draft.currentFixedIndex ?? 0
           state.currentFollowupIndex = draft.currentFollowupIndex ?? state.currentFollowupIndex
+          applyCareerPlaybookProgress(state, draft.progress)
           state.completenessScore = draft.completenessScore ?? state.completenessScore
           state.followupGenerationCount =
             draft.followupGenerationCount ?? state.followupGenerationCount
@@ -1205,6 +1353,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             draft.dirtyFollowupQuestionIds ?? state.dirtyFollowupQuestionIds
           state.dirtyFreeformDraft = draft.dirtyFreeformDraft ?? false
           state.dirtyBusinessContext = draft.dirtyBusinessContext ?? false
+          state.dirtyProgress = draft.dirtyProgress ?? false
           removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
           state.currentFollowupIndex = Math.max(
@@ -1619,6 +1768,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             )
             state.currentFixedIndex =
               departmentIndex >= 0 ? departmentIndex : state.currentFixedIndex
+            markProgressDirty(state)
           })
         }
 
@@ -1686,6 +1836,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
               )
               state.currentFixedIndex =
                 departmentIndex >= 0 ? departmentIndex : state.currentFixedIndex
+              markProgressDirty(state)
             })
             return { ok: true, status: 'needs_user_choice' }
           }
@@ -1711,11 +1862,13 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.currentFixedIndex + 1,
             visibleQuestions.length - 1
           )
+          markProgressDirty(state)
         }),
 
       goToPreviousCareerPlaybookQuestion: () =>
         set((state) => {
           state.currentFixedIndex = Math.max(state.currentFixedIndex - 1, 0)
+          markProgressDirty(state)
         }),
 
       requestCareerPlaybookFollowups: async () => {
@@ -1752,6 +1905,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             )
             state.currentFixedIndex =
               departmentIndex >= 0 ? departmentIndex : state.currentFixedIndex
+            markProgressDirty(state)
           })
           return { ok: false, error: message }
         }
@@ -1796,6 +1950,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.followupGenerationCount += 1
             state.isGeneratingFollowups = false
             state.followupGenerationError = null
+            markProgressDirty(state)
           })
 
           return { ok: true }
@@ -1852,11 +2007,13 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.currentFollowupIndex + 1,
             state.followupQuestions.length - 1
           )
+          markProgressDirty(state)
         }),
 
       goToPreviousCareerPlaybookFollowup: () =>
         set((state) => {
           state.currentFollowupIndex = Math.max(state.currentFollowupIndex - 1, 0)
+          markProgressDirty(state)
         }),
 
       completeCareerPlaybookFollowups: () =>
@@ -1864,6 +2021,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           markUnansweredFollowupsSkipped(state)
           state.phase = 'completion'
           state.status = 'ready_to_generate'
+          markProgressDirty(state)
         }),
 
       approveCareerPlaybookGeneration: async () => {
@@ -2002,6 +2160,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.status = 'answering_fixed'
           state.currentFixedIndex = questionIndex >= 0 ? questionIndex : state.currentFixedIndex
           clampCurrentFixedIndex(state)
+          markProgressDirty(state)
         }),
 
       editCareerPlaybookFollowupAnswer: (questionId) =>
@@ -2027,12 +2186,18 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.phase = 'followups'
           state.status = 'answering_followups'
           state.currentFollowupIndex = Math.max(0, questionIndex)
+          markProgressDirty(state)
         }),
 
       saveCareerPlaybookFreeformDraft: (text) =>
         set((state) => {
+          const changed = state.freeformDraft !== text
           state.freeformDraft = text
           state.dirtyFreeformDraft = true
+          if (changed) {
+            clearDependentFollowupContext(state)
+            clearGeneratedBusinessContextDigest(state)
+          }
         }),
 
       saveCareerPlaybookBusinessContext: (context) =>
@@ -2136,12 +2301,14 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.businessContextSources = []
           state.dirtyBusinessContext = true
           clearDependentFollowupContext(state)
+          markProgressDirty(state)
         }),
 
       completeCareerPlaybookFixedPhase: () =>
         set((state) => {
           state.phase = 'business_context'
           state.status = 'awaiting_followups'
+          markProgressDirty(state)
         }),
 
       startCareerPlaybookSession: async () => {
@@ -2167,6 +2334,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             ],
             dirtyFreeformDraft: snapshot.dirtyFreeformDraft || latest.dirtyFreeformDraft,
             dirtyBusinessContext: snapshot.dirtyBusinessContext || latest.dirtyBusinessContext,
+            dirtyProgress: snapshot.dirtyProgress || latest.dirtyProgress,
           })
           get().hydrateCareerPlaybookDraft({
             ...remoteDraft,
@@ -2180,10 +2348,12 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             businessContext: mergedDraft.businessContext,
             status: remoteDraft.status ?? latest.status,
             phase: remoteDraft.phase ?? latest.phase,
+            progress: mergedDraft.progress,
             dirtyFixedQuestionKeys: mergedDraft.dirtyFixedQuestionKeys,
             dirtyFollowupQuestionIds: mergedDraft.dirtyFollowupQuestionIds,
             dirtyFreeformDraft: mergedDraft.dirtyFreeformDraft,
             dirtyBusinessContext: mergedDraft.dirtyBusinessContext,
+            dirtyProgress: mergedDraft.dirtyProgress,
             generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
             finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
@@ -2215,10 +2385,12 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             followupAnswers: mergedDraft.followupAnswers,
             freeformDraft: mergedDraft.freeformDraft,
             businessContext: mergedDraft.businessContext,
+            progress: mergedDraft.progress,
             dirtyFixedQuestionKeys: mergedDraft.dirtyFixedQuestionKeys,
             dirtyFollowupQuestionIds: mergedDraft.dirtyFollowupQuestionIds,
             dirtyFreeformDraft: mergedDraft.dirtyFreeformDraft,
             dirtyBusinessContext: mergedDraft.dirtyBusinessContext,
+            dirtyProgress: mergedDraft.dirtyProgress,
             generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
             finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
@@ -2234,129 +2406,173 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       },
 
       flushCareerPlaybookAutosave: async () => {
-        const snapshot = get()
-        if (!snapshot.playbookId) {
-          return { ok: true }
+        if (careerPlaybookAutosaveInFlight) {
+          careerPlaybookAutosaveQueued = true
+          return careerPlaybookAutosaveInFlight
         }
 
-        set((state) => {
-          state.isAutosaving = true
-          state.autosaveError = null
+        const flushOnce = async (): Promise<CareerPlaybookAutosaveResult> => {
+          const snapshot = get()
+          if (!snapshot.playbookId) {
+            return { ok: true }
+          }
+
+          set((state) => {
+            state.isAutosaving = true
+            state.autosaveError = null
+          })
+
+          try {
+            const client = getClient()
+            const dirtyFixedQuestionKeys = [...snapshot.dirtyFixedQuestionKeys]
+            const submittedFixedValues = new Map(
+              dirtyFixedQuestionKeys.map((questionKey) => {
+                const answerValue = snapshot.fixedAnswers[questionKey]?.value
+                return [questionKey, Array.isArray(answerValue) ? [...answerValue] : answerValue]
+              })
+            )
+            const dirtyFollowupQuestionIds = [...snapshot.dirtyFollowupQuestionIds]
+            const submittedFollowupAnswers = new Map(
+              dirtyFollowupQuestionIds.map((questionId) => [
+                questionId,
+                snapshot.followupAnswers[questionId]
+                  ? { ...snapshot.followupAnswers[questionId] }
+                  : undefined,
+              ])
+            )
+            const submittedBusinessContext = snapshot.dirtyBusinessContext
+              ? (JSON.parse(
+                  JSON.stringify(snapshot.businessContext)
+                ) as CareerPlaybookBusinessContext)
+              : undefined
+            const submittedProgress = snapshot.dirtyProgress
+              ? buildCareerPlaybookProgress(snapshot)
+              : undefined
+            let didSubmitProgress = false
+
+            for (const questionKey of dirtyFixedQuestionKeys) {
+              const answer = snapshot.fixedAnswers[questionKey]
+              if (!answer) continue
+              if (!hasSubmittableAnswerValue(answer.value)) continue
+
+              await client.submitAnswer({
+                playbookId: snapshot.playbookId,
+                phase: 'fixed',
+                answer: {
+                  question_key: answer.question_key,
+                  value: answer.value,
+                },
+              })
+            }
+
+            for (const questionId of dirtyFollowupQuestionIds) {
+              const answer = snapshot.followupAnswers[questionId]
+              if (!answer) continue
+              if (!answer.skipped && !hasSubmittableAnswerValue(answer.value)) continue
+
+              await client.submitAnswer({
+                playbookId: snapshot.playbookId,
+                phase: 'followup',
+                answer: {
+                  question_id: answer.question_id,
+                  value: answer.value,
+                  skipped: answer.skipped || undefined,
+                },
+              })
+            }
+
+            if (snapshot.dirtyFreeformDraft) {
+              await client.submitAnswer({
+                playbookId: snapshot.playbookId,
+                phase: 'freeform',
+                answer: {
+                  freeform_text: snapshot.freeformDraft,
+                },
+              })
+            }
+
+            if (snapshot.dirtyBusinessContext && submittedBusinessContext) {
+              await client.submitAnswer({
+                playbookId: snapshot.playbookId,
+                phase: 'business_context',
+                answer: {
+                  business_context: submittedBusinessContext,
+                },
+              })
+            }
+
+            if (submittedProgress && client.saveProgress) {
+              await client.saveProgress({
+                playbookId: snapshot.playbookId,
+                progress: submittedProgress,
+              })
+              didSubmitProgress = true
+            }
+
+            set((state) => {
+              state.isAutosaving = false
+              state.autosaveError = null
+              state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter((key) => {
+                if (!submittedFixedValues.has(key)) return true
+                return !answerValuesEqual(
+                  state.fixedAnswers[key]?.value,
+                  submittedFixedValues.get(key)
+                )
+              })
+              state.dirtyFollowupQuestionIds = state.dirtyFollowupQuestionIds.filter((id) => {
+                if (!submittedFollowupAnswers.has(id)) return true
+                return !followupAnswersEqual(
+                  state.followupAnswers[id],
+                  submittedFollowupAnswers.get(id)
+                )
+              })
+              if (snapshot.dirtyFreeformDraft && state.freeformDraft === snapshot.freeformDraft) {
+                state.dirtyFreeformDraft = false
+              }
+              if (
+                submittedBusinessContext &&
+                businessContextsEqual(state.businessContext, submittedBusinessContext)
+              ) {
+                state.dirtyBusinessContext = false
+              }
+              if (
+                didSubmitProgress &&
+                submittedProgress &&
+                careerPlaybookProgressesEqual(buildCareerPlaybookProgress(state), submittedProgress)
+              ) {
+                state.dirtyProgress = false
+              }
+              state.lastAutosavedAt = nowIso()
+            })
+
+            return { ok: true }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Autosave failed'
+            set((state) => {
+              state.isAutosaving = false
+              state.autosaveError = message
+            })
+            return { ok: false, error: message }
+          }
+        }
+
+        const flushQueued = async () => {
+          let result: CareerPlaybookAutosaveResult = { ok: true }
+
+          do {
+            careerPlaybookAutosaveQueued = false
+            result = await flushOnce()
+          } while (careerPlaybookAutosaveQueued && hasPendingCareerPlaybookAutosaveWork(get()))
+
+          return result
+        }
+
+        careerPlaybookAutosaveInFlight = flushQueued().finally(() => {
+          careerPlaybookAutosaveInFlight = null
+          careerPlaybookAutosaveQueued = false
         })
 
-        try {
-          const client = getClient()
-          const dirtyFixedQuestionKeys = [...snapshot.dirtyFixedQuestionKeys]
-          const submittedFixedValues = new Map(
-            dirtyFixedQuestionKeys.map((questionKey) => {
-              const answerValue = snapshot.fixedAnswers[questionKey]?.value
-              return [questionKey, Array.isArray(answerValue) ? [...answerValue] : answerValue]
-            })
-          )
-          const dirtyFollowupQuestionIds = [...snapshot.dirtyFollowupQuestionIds]
-          const submittedFollowupAnswers = new Map(
-            dirtyFollowupQuestionIds.map((questionId) => [
-              questionId,
-              snapshot.followupAnswers[questionId]
-                ? { ...snapshot.followupAnswers[questionId] }
-                : undefined,
-            ])
-          )
-          const submittedBusinessContext = snapshot.dirtyBusinessContext
-            ? (JSON.parse(
-                JSON.stringify(snapshot.businessContext)
-              ) as CareerPlaybookBusinessContext)
-            : undefined
-
-          for (const questionKey of dirtyFixedQuestionKeys) {
-            const answer = snapshot.fixedAnswers[questionKey]
-            if (!answer) continue
-            if (!hasSubmittableAnswerValue(answer.value)) continue
-
-            await client.submitAnswer({
-              playbookId: snapshot.playbookId,
-              phase: 'fixed',
-              answer: {
-                question_key: answer.question_key,
-                value: answer.value,
-              },
-            })
-          }
-
-          for (const questionId of dirtyFollowupQuestionIds) {
-            const answer = snapshot.followupAnswers[questionId]
-            if (!answer) continue
-            if (!answer.skipped && !hasSubmittableAnswerValue(answer.value)) continue
-
-            await client.submitAnswer({
-              playbookId: snapshot.playbookId,
-              phase: 'followup',
-              answer: {
-                question_id: answer.question_id,
-                value: answer.value,
-                skipped: answer.skipped || undefined,
-              },
-            })
-          }
-
-          if (snapshot.dirtyFreeformDraft && snapshot.freeformDraft.trim()) {
-            await client.submitAnswer({
-              playbookId: snapshot.playbookId,
-              phase: 'freeform',
-              answer: {
-                freeform_text: snapshot.freeformDraft,
-              },
-            })
-          }
-
-          if (snapshot.dirtyBusinessContext && submittedBusinessContext) {
-            await client.submitAnswer({
-              playbookId: snapshot.playbookId,
-              phase: 'business_context',
-              answer: {
-                business_context: submittedBusinessContext,
-              },
-            })
-          }
-
-          set((state) => {
-            state.isAutosaving = false
-            state.autosaveError = null
-            state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter((key) => {
-              if (!submittedFixedValues.has(key)) return true
-              return !answerValuesEqual(
-                state.fixedAnswers[key]?.value,
-                submittedFixedValues.get(key)
-              )
-            })
-            state.dirtyFollowupQuestionIds = state.dirtyFollowupQuestionIds.filter((id) => {
-              if (!submittedFollowupAnswers.has(id)) return true
-              return !followupAnswersEqual(
-                state.followupAnswers[id],
-                submittedFollowupAnswers.get(id)
-              )
-            })
-            if (snapshot.dirtyFreeformDraft && state.freeformDraft === snapshot.freeformDraft) {
-              state.dirtyFreeformDraft = false
-            }
-            if (
-              submittedBusinessContext &&
-              businessContextsEqual(state.businessContext, submittedBusinessContext)
-            ) {
-              state.dirtyBusinessContext = false
-            }
-            state.lastAutosavedAt = nowIso()
-          })
-
-          return { ok: true }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Autosave failed'
-          set((state) => {
-            state.isAutosaving = false
-            state.autosaveError = message
-          })
-          return { ok: false, error: message }
-        }
+        return careerPlaybookAutosaveInFlight
       },
 
       resetCareerPlaybookWizard: () =>
@@ -2390,6 +2606,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         dirtyFixedQuestionKeys: state.dirtyFixedQuestionKeys,
         dirtyFreeformDraft: state.dirtyFreeformDraft,
         dirtyBusinessContext: state.dirtyBusinessContext,
+        dirtyProgress: state.dirtyProgress,
         generationProgress: state.generationProgress,
         lastAutosavedAt: state.lastAutosavedAt,
       }),

@@ -58,7 +58,7 @@ echo ""
 
 # 5. Start Target Application Environment (if not running)
 echo "Ensuring $TARGET_COLOR application environment is running..."
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --remove-orphans
+docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --force-recreate
 
 # 6. Health Check
 echo "Performing Health Checks on $TARGET_COLOR..."

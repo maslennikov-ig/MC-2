@@ -80,6 +80,7 @@ export default function CareerPlaybookNewPageClient({
         dirtyFollowupQuestionIds: snapshot.dirtyFollowupQuestionIds,
         dirtyFreeformDraft: snapshot.dirtyFreeformDraft,
         dirtyBusinessContext: snapshot.dirtyBusinessContext,
+        dirtyProgress: snapshot.dirtyProgress,
         generationProgress: snapshot.generationProgress,
         finalMarkdown: snapshot.finalMarkdown,
       })
@@ -110,6 +111,22 @@ export default function CareerPlaybookNewPageClient({
 
     return () => window.clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (!state.playbookId || !state.dirtyProgress) return
+
+    const timeout = window.setTimeout(() => {
+      void useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
+    }, 750)
+
+    return () => window.clearTimeout(timeout)
+  }, [
+    state.currentFixedIndex,
+    state.currentFollowupIndex,
+    state.dirtyProgress,
+    state.phase,
+    state.playbookId,
+  ])
 
   useEffect(() => {
     if (state.phase !== 'completion' && generationHandoffVisible) {
@@ -398,6 +415,9 @@ export default function CareerPlaybookNewPageClient({
     panelDescription: t('businessContextPanelDescription'),
     filesTitle: t('businessContextFilesTitle'),
     filesDescription: t('businessContextFilesDescription'),
+    freeformTitle: t('businessContextFreeformTitle'),
+    freeformDescription: t('businessContextFreeformDescription'),
+    freeformPlaceholder: t('businessContextFreeformPlaceholder'),
     uploadMissingSession: t('businessContextUploadMissingSession'),
     uploadMaxFilesTemplate: t.raw('businessContextUploadMaxFilesTemplate') as string,
     uploadPending: t('businessContextUploadPending'),
@@ -651,7 +671,9 @@ export default function CareerPlaybookNewPageClient({
               playbookId={state.playbookId}
               context={state.businessContext}
               sources={state.businessContextSources}
+              freeformText={state.freeformDraft}
               onContextChange={state.saveCareerPlaybookBusinessContext}
+              onFreeformTextChange={state.saveCareerPlaybookFreeformDraft}
               onRemoveSource={state.removeCareerPlaybookBusinessContextSource}
               onSourceUploaded={state.upsertCareerPlaybookBusinessContextSource}
               onBack={() =>

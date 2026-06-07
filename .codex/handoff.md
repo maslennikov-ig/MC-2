@@ -1,43 +1,45 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-06
-Stage: `mc2-9ayox`
-Branch: `codex/fix-integration-ci-timeout`
+Updated: 2026-06-07
+Stage: `mc2-db696.53`
+Branch: `codex/career-playbook-resume-text-header`
 
 ## Current State
 
-- Root cause for master Integration Tests timeout is identified: `.github/workflows/ci-cd.yml` ran full `pnpm test:integration`, which expands to 42 backend integration files/681 backend tests plus web integration.
-- Master run `27060414181` reached `document-processing-worker.test.ts` `Embedding Validation` and then external `timeout 900` killed `pnpm test:integration`; this is a full-suite sizing issue, not Qdrant readiness.
-- Local branch adds bounded `pnpm test:integration:ci`: backend deploy-gate subset via `vitest.config.integration-ci.ts` plus web integration tests.
-- The backend CI subset includes static Career Playbook migration contract tests and a small Qdrant smoke test that creates a temporary collection, writes one point, reads it back, and cleans up.
-- Full `pnpm test:integration` remains available for manual/nightly/release-candidate full validation.
-- Career Playbook visibility and owner-only access are already shipped to dev/staging; `career_playbooks.visibility` is canonical and `is_public` remains the public-link mirror.
-- Dev Career Playbook DB/model-config migration drift was repaired in stage `mc2-mrjag`.
-- Follow-up `mc2-k2qih` remains open for panel animation, active TOC section, and TOC auto-scroll polish.
+- Career Playbook wizard progress is persisted in `career_playbooks.q_a_data.ui_progress` through `careerPlaybook.session.saveProgress`.
+- Resume/hydration restores the last active wizard step by fixed `question_key` or follow-up `question_id`, with indices as fallback.
+- Terminal statuses (`ready_to_generate`, `generating`, `completed`, `failed`) remain in the completion phase even if old progress points to an earlier step.
+- Business Context now includes an autosaved pasted text/notes textarea next to file upload.
+- Empty `freeform_text` clears stored notes; changing notes or structured business context invalidates persisted follow-up questions, answers, completeness, generation count, and non-user-edited generated digest data.
+- Career Playbook source upload continues to reuse Stage 1 storage plus Stage 2 Docling, processed-document storage, and summarization through `PROCESS_SOURCE`; no separate Docling pipeline was added.
+- Sticky headers now use fixed positioning with a spacer when `sticky=true`; header product/profile dropdowns open below their triggers with viewport collision padding.
+- Playwright config supports local fallback env vars: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` and `PLAYWRIGHT_DISABLE_VIDEO=1`.
+- Other worktree `/home/me/code/mc2-worktrees/career-playbook-business-context` remains untouched.
 
 ## Verification
 
-- Workflow structural check passed: parsed `.github/workflows/ci-cd.yml` and asserted `test-integration` runs `timeout 300 pnpm test:integration:ci`, preserves the Qdrant service, and captures timeout exit code.
-- `QDRANT_URL=http://localhost:6333 QDRANT_API_KEY=test-qdrant-key pnpm test:integration:ci` passed locally: backend 5 tests, web 19 tests.
-- `pnpm type-check` passed.
-- `pnpm build` passed.
+- Passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/career-playbook-store-progress.test.ts`.
+- Passed: `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/server/routers/career-playbook-progress.router.test.ts`.
+- Passed: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx`.
+- Passed: `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/source-processing.test.ts`.
+- Passed: `DEBUG=pw:webserver PLAYWRIGHT_PORT=3017 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome PLAYWRIGHT_DISABLE_VIDEO=1 pnpm --filter @megacampus/web exec playwright test tests/e2e/header-dropdown-position.spec.ts --project=chromium --workers=1`; profile-menu case skipped because `TOKEN` is not set.
+- Passed: `pnpm type-check`.
+- Passed: `pnpm build`.
 
 ## Next recommended
 
-Next stage id: `mc2-9ayox`.
-Recommended action: commit and push `codex/fix-integration-ci-timeout`, then observe GitHub Actions until `Run CI integration smoke tests` completes under the 5-minute timeout.
-Recommended action: keep full integration validation outside the deploy job as manual/nightly/release-candidate validation unless a later tracked task changes release policy.
+Next stage id: `mc2-db696.53`.
+Recommended action: finish closeout, refresh Graphify, commit and push the feature branch after final gates pass.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-9ayox`, stage summary `.codex/stages/mc2-9ayox/summary.md`, and Graphify report. Do not touch `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads task `mc2-db696.53`, stage summary `.codex/stages/mc2-db696.53/summary.md`, and Graphify report. Continue from branch `codex/career-playbook-resume-text-header`. Do not touch `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
 
 ## Delivery
 
-- docs-reviewed: updated - handoff and project index record the new CI integration smoke entrypoint and full-suite policy.
-- graph-reviewed: no-change-needed - workflow/test harness change; no application architecture/API/module boundary changed.
+- docs-reviewed: updated - handoff, Career Playbook architecture docs, and stage summary record progress persistence, freeform clearing/invalidation, Docling reuse, sticky header dropdowns, and Playwright local env opt-ins.
+- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz`; report shows 57378 nodes, 79570 edges, and 3681 communities after clustering.
 
 ## Explicit defers
 
-- Browser/user-flow smoke is not applicable to this CI workflow fix.
-- GitHub Actions validation remains pending until the branch is pushed/merged; local smoke and build gates passed.
+- Freeform text size limiting is deferred pending a product limit decision; tracked in Beads `mc2-db696.54`. Authenticated profile-menu e2e is present but skipped locally because `TOKEN` is not set.

@@ -15,6 +15,7 @@ const fetchPage = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const toggleShare = vi.fn()
 const updateVisibility = vi.fn()
+const copyToClipboard = vi.hoisted(() => vi.fn())
 const mockPush = vi.hoisted(() => vi.fn())
 const mockSearchParams = vi.hoisted(() => new URLSearchParams())
 
@@ -59,6 +60,10 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
         locale: string,
       ])
     ),
+}))
+
+vi.mock('@/lib/utils/clipboard', () => ({
+  copyToClipboard,
 }))
 
 const messages = {
@@ -114,6 +119,9 @@ const messages = {
         createCourse: 'Create course',
         readonlyBadge: 'Read-only',
         share: 'Share',
+        copyPublicLink: 'Copy public link',
+        publicLinkCopied: 'Public link copied',
+        publicLinkCopyError: 'Could not copy public link',
         makePrivate: 'Make private',
         publicLink: 'Public link',
         open: 'Open',
@@ -179,6 +187,8 @@ describe('CareerPlaybookLibraryPageClient', () => {
     mockPush.mockReset()
     toggleShare.mockReset()
     updateVisibility.mockReset()
+    copyToClipboard.mockReset()
+    copyToClipboard.mockResolvedValue(true)
     mockSearchParams.forEach((_, key) => mockSearchParams.delete(key))
   })
 
@@ -442,6 +452,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
       isPublic: true,
       visibility: 'public',
       shareSlug: 'head-of-sales',
+      organizationSlug: 'mega-campus',
       viewerPermissions: {
         canEdit: true,
         canManageVisibility: true,
@@ -463,6 +474,7 @@ describe('CareerPlaybookLibraryPageClient', () => {
             isPublic: false,
             visibility: 'private',
             shareSlug: null,
+            organizationSlug: 'mega-campus',
             ownerId: 'owner-user',
             viewerPermissions: {
               canEdit: true,
@@ -484,8 +496,14 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByText('Public')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Public link' })).toHaveAttribute(
       'href',
-      '/en/share/career-playbook/head-of-sales'
+      '/en/career-playbooks/mega-campus/head-of-sales'
     )
+
+    await user.click(screen.getByRole('button', { name: 'Copy public link' }))
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      'http://localhost:3000/en/career-playbooks/mega-campus/head-of-sales'
+    )
+    expect(screen.getByText('Public link copied')).toBeInTheDocument()
   })
 
   it('uses server-provided department and level facets for catalog filters', () => {

@@ -45,6 +45,10 @@ import {
   fetchCareerPlaybookLibraryPage,
   updateCareerPlaybookVisibility,
 } from '@/components/career-playbook/library/client-adapter'
+import {
+  buildCareerPlaybookPublicPath,
+  buildCareerPlaybookPublicUrl,
+} from '@/components/career-playbook/library/public-url'
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
 import Header from '@/components/layouts/header'
 import {
@@ -62,6 +66,7 @@ import type {
   CareerPlaybookViewerPermissions,
 } from '@/components/career-playbook/library/types'
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 import type { Locale } from '@/src/i18n/config'
 
 interface CareerPlaybookLibraryPageClientProps {
@@ -164,6 +169,8 @@ function readVisibilityResult(value: unknown) {
       ? record.visibility
       : null
   const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
+  const organizationSlug =
+    typeof record.organizationSlug === 'string' ? record.organizationSlug : null
 
   if (!playbookId || isPublic === null || !visibility) return null
 
@@ -172,6 +179,7 @@ function readVisibilityResult(value: unknown) {
     isPublic,
     visibility,
     shareSlug,
+    organizationSlug,
     viewerPermissions: readViewerPermissions(record.viewerPermissions),
   }
 }
@@ -218,6 +226,9 @@ export default function CareerPlaybookLibraryPageClient({
   const [nextCursor, setNextCursor] = useState<string | null>(initialData.nextCursor)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [visibilityUpdatingIds, setVisibilityUpdatingIds] = useState<Set<string>>(new Set())
+  const [publicLinkMessages, setPublicLinkMessages] = useState<Record<string, 'success' | 'error'>>(
+    {}
+  )
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
 
@@ -226,6 +237,7 @@ export default function CareerPlaybookLibraryPageClient({
     setNextCursor(initialData.nextCursor)
     setDeletingIds(new Set())
     setVisibilityUpdatingIds(new Set())
+    setPublicLinkMessages({})
   }, [initialData])
 
   const statistics = initialData.statistics ?? defaultStatistics(items)
@@ -291,6 +303,7 @@ export default function CareerPlaybookLibraryPageClient({
                 isPublic: result.isPublic,
                 visibility: result.visibility,
                 shareSlug: result.shareSlug,
+                organizationSlug: result.organizationSlug ?? current.organizationSlug ?? null,
                 viewerPermissions: result.viewerPermissions ?? current.viewerPermissions,
               }
             : current
@@ -305,6 +318,17 @@ export default function CareerPlaybookLibraryPageClient({
         return next
       })
     }
+  }
+
+  const handleCopyPublicLink = async (item: CareerPlaybookLibraryItem) => {
+    const url = buildCareerPlaybookPublicUrl(locale, item.organizationSlug, item.shareSlug)
+    if (!url) {
+      setPublicLinkMessages((prev) => ({ ...prev, [item.id]: 'error' }))
+      return
+    }
+
+    const copied = await copyToClipboard(url)
+    setPublicLinkMessages((prev) => ({ ...prev, [item.id]: copied ? 'success' : 'error' }))
   }
 
   const handleLoadMore = async () => {
@@ -358,9 +382,10 @@ export default function CareerPlaybookLibraryPageClient({
     const currentVisibility = visibilityConfig[visibility]
     const VisibilityIcon = currentVisibility.icon
     const shareHref =
-      canManageVisibility && visibility === 'public' && item.shareSlug
-        ? `/${locale}/share/career-playbook/${item.shareSlug}`
+      canManageVisibility && visibility === 'public'
+        ? buildCareerPlaybookPublicPath(locale, item.organizationSlug, item.shareSlug)
         : null
+    const publicLinkMessage = publicLinkMessages[item.id]
     const builderHref = `/${locale}/career-playbook/new?resume=${encodeURIComponent(item.id)}`
 
     return (
@@ -429,15 +454,35 @@ export default function CareerPlaybookLibraryPageClient({
         <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
           <div className="flex items-center gap-1">
             {shareHref ? (
-              <CatalogActionButton
-                label={t('card.publicLink')}
-                className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-              >
-                <Link href={shareHref}>
-                  <Link2 className="h-3.5 w-3.5" aria-hidden />
-                  <span className="sr-only">{t('card.publicLink')}</span>
-                </Link>
-              </CatalogActionButton>
+              <>
+                <CatalogActionButton
+                  label={t('card.publicLink')}
+                  className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                >
+                  <Link href={shareHref}>
+                    <Link2 className="h-3.5 w-3.5" aria-hidden />
+                    <span className="sr-only">{t('card.publicLink')}</span>
+                  </Link>
+                </CatalogActionButton>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                      aria-label={t('card.copyPublicLink')}
+                      onClick={() => void handleCopyPublicLink(item)}
+                    >
+                      <Share2 className="h-3.5 w-3.5" aria-hidden />
+                      <span className="sr-only">{t('card.copyPublicLink')}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('card.copyPublicLink')}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
             ) : null}
             {canEdit ? (
               <CatalogActionButton
@@ -525,6 +570,13 @@ export default function CareerPlaybookLibraryPageClient({
             </Button>
           </div>
         </div>
+        {publicLinkMessage ? (
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400" role="status">
+            {t(
+              publicLinkMessage === 'success' ? 'card.publicLinkCopied' : 'card.publicLinkCopyError'
+            )}
+          </p>
+        ) : null}
       </article>
     )
   }

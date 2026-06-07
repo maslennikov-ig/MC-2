@@ -16,6 +16,7 @@ import {
   type CareerPlaybookRow,
   type CareerPlaybookSupabase,
 } from './service-mappers';
+import { buildSlug } from './course-bridge-helpers';
 
 export interface CareerPlaybookLibraryItem {
   id: string;
@@ -30,6 +31,7 @@ export interface CareerPlaybookLibraryItem {
   ownerId: string;
   viewerPermissions: CareerPlaybookViewerPermissions;
   shareSlug: string | null;
+  organizationSlug: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -87,6 +89,7 @@ export interface CareerPlaybookShareToggleResponse {
   isPublic: boolean;
   visibility: CareerPlaybookVisibility;
   shareSlug: string | null;
+  organizationSlug: string | null;
   viewerPermissions: CareerPlaybookViewerPermissions;
 }
 
@@ -177,8 +180,56 @@ function getViewerPermissions(
   return isOwner(row, user) ? { ...OWNER_PERMISSIONS } : { ...READONLY_PERMISSIONS };
 }
 
-function buildShareSlug(): string {
-  return `cp-${randomUUID().replaceAll('-', '').slice(0, 24)}`;
+function buildShareSlug(positionTitle: string | null | undefined): string {
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 6);
+  return buildSlug(positionTitle?.trim() || 'role-guide', suffix);
+}
+
+function isLegacyShareSlug(shareSlug: string | null): boolean {
+  return Boolean(shareSlug?.match(/^cp-[a-f0-9]{24,32}$/i));
+}
+
+async function loadOrganizationSlug(
+  organizationId: string | null | undefined
+): Promise<string | null> {
+  if (!organizationId) return null;
+
+  const supabase = getCareerPlaybookSupabase() as unknown as {
+    from: (table: 'organizations') => {
+      select: (columns: string) => {
+        eq: (
+          column: string,
+          value: unknown
+        ) => {
+          single: () => Promise<{
+            data: { slug?: string | null } | null;
+            error: unknown;
+          }>;
+        };
+      };
+    };
+  };
+
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('slug')
+    .eq('id', organizationId)
+    .single();
+
+  if (error || typeof data?.slug !== 'string' || data.slug.trim().length === 0) return null;
+  return data.slug;
+}
+
+async function loadOrganizationSlugMap(
+  rows: CareerPlaybookRow[]
+): Promise<Map<string, string | null>> {
+  const organizationIds = Array.from(new Set(rows.map(row => row.organization_id).filter(Boolean)));
+  const entries = await Promise.all(
+    organizationIds.map(
+      async organizationId => [organizationId, await loadOrganizationSlug(organizationId)] as const
+    )
+  );
+  return new Map(entries);
 }
 
 const PUBLIC_PLAYBOOK_COLUMNS = [
@@ -257,7 +308,8 @@ async function loadManageablePlaybook(playbookId: string, user: UserContext) {
 
 function toLibraryItemFromMappedRow(
   mapped: CareerPlaybookRow,
-  user: UserContext
+  user: UserContext,
+  organizationSlug: string | null = null
 ): CareerPlaybookLibraryItem {
   const visibility = getVisibility(mapped);
   return {
@@ -273,15 +325,20 @@ function toLibraryItemFromMappedRow(
     ownerId: mapped.user_id,
     viewerPermissions: getViewerPermissions(mapped, user),
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
+    organizationSlug,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
   };
 }
 
-function mapRowToLibraryItem(row: CareerPlaybookRow, user: UserContext): CareerPlaybookLibraryItem {
+function mapRowToLibraryItem(
+  row: CareerPlaybookRow,
+  user: UserContext,
+  organizationSlug: string | null = null
+): CareerPlaybookLibraryItem {
   const mapped = mapPlaybookRow(row);
-  return toLibraryItemFromMappedRow(mapped, user);
+  return toLibraryItemFromMappedRow(mapped, user, organizationSlug);
 }
 
 function parseOffsetCursor(cursor: string | undefined): number {
@@ -350,17 +407,21 @@ function sortRows(
 
 function mapRowToLibraryDetail(
   row: CareerPlaybookRow,
-  user: UserContext
+  user: UserContext,
+  organizationSlug: string | null = null
 ): CareerPlaybookLibraryDetailResponse {
   const mapped = mapPlaybookRow(row);
   return {
-    ...toLibraryItemFromMappedRow(mapped, user),
+    ...toLibraryItemFromMappedRow(mapped, user, organizationSlug),
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown,
   };
 }
 
-function mapRowToPublicShare(row: CareerPlaybookRow): CareerPlaybookPublicShareResponse {
+function mapRowToPublicShare(
+  row: CareerPlaybookRow,
+  organizationSlug: string | null
+): CareerPlaybookPublicShareResponse {
   const mapped = mapPlaybookRow(row);
   const visibility = getVisibility(mapped);
   return {
@@ -376,6 +437,7 @@ function mapRowToPublicShare(row: CareerPlaybookRow): CareerPlaybookPublicShareR
     ownerId: mapped.user_id,
     viewerPermissions: { ...READONLY_PERMISSIONS },
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
+    organizationSlug,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
@@ -419,7 +481,10 @@ export async function listCareerPlaybooks(
   const page = sortedRows.slice(offset, offset + input.limit + 1);
   const pageRows = page.slice(0, input.limit);
   const hasMore = page.length > input.limit;
-  const items = pageRows.map(row => mapRowToLibraryItem(row, user));
+  const organizationSlugById = await loadOrganizationSlugMap(pageRows);
+  const items = pageRows.map(row =>
+    mapRowToLibraryItem(row, user, organizationSlugById.get(row.organization_id) ?? null)
+  );
 
   return {
     items,
@@ -436,7 +501,8 @@ export async function getCareerPlaybookFromLibrary(
 ): Promise<CareerPlaybookLibraryDetailResponse> {
   const user = requireUser(ctx);
   const row = await loadReadablePlaybook(input.playbookId, user);
-  return mapRowToLibraryDetail(row, user);
+  const organizationSlug = await loadOrganizationSlug(row.organization_id);
+  return mapRowToLibraryDetail(row, user, organizationSlug);
 }
 
 export async function deleteCareerPlaybookFromLibrary(
@@ -480,7 +546,10 @@ export async function updateCareerPlaybookVisibility(
   const row = await loadManageablePlaybook(input.playbookId, user);
   const isPublic = input.visibility === 'public';
   if (isPublic) assertShareable(row);
-  const shareSlug = isPublic ? (row.share_slug ?? buildShareSlug()) : row.share_slug;
+  const shareSlug =
+    isPublic && (!row.share_slug || isLegacyShareSlug(row.share_slug))
+      ? buildShareSlug(row.position_title)
+      : row.share_slug;
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
@@ -498,11 +567,13 @@ export async function updateCareerPlaybookVisibility(
 
   const mapped = mapPlaybookRow(data);
   const visibility = getVisibility(mapped);
+  const organizationSlug = await loadOrganizationSlug(mapped.organization_id);
   return {
     playbookId: mapped.id,
     isPublic: visibility === 'public',
     visibility,
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
+    organizationSlug,
     viewerPermissions: getViewerPermissions(mapped, user),
   };
 }
@@ -538,7 +609,8 @@ export async function getPublicCareerPlaybookBySlug(input: {
     });
   }
 
-  return mapRowToPublicShare(mapped);
+  const organizationSlug = await loadOrganizationSlug(mapped.organization_id);
+  return mapRowToPublicShare(mapped, organizationSlug);
 }
 
 export async function exportCareerPlaybookPdf(

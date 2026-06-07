@@ -27,6 +27,7 @@ export interface CareerPlaybookLibraryItem {
   ownerId?: string | null
   viewerPermissions?: CareerPlaybookViewerPermissions
   shareSlug: string | null
+  organizationSlug?: string | null
   language?: string | null
 }
 
@@ -78,6 +79,7 @@ export interface CreateCourseFromPlaybookResult {
 export interface CareerPlaybookPublicSharePlaybook {
   id: string
   slug: string
+  organizationSlug: string | null
   title: string
   summary: string
   markdown: string

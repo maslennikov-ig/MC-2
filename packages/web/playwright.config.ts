@@ -5,6 +5,8 @@ const require = createRequire(import.meta.url)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'test-anon-key'
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'test-service-role-key'
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim()
+const disableVideo = process.env.PLAYWRIGHT_DISABLE_VIDEO === '1'
 
 type PlaywrightWebServerEnv = NodeJS.ProcessEnv | Record<string, string | undefined>
 
@@ -88,6 +90,18 @@ export function resolvePlaywrightWebServer(
 }
 
 const webServer = resolvePlaywrightWebServer()
+function withOptionalChromiumExecutable<TUse extends Record<string, unknown>>(use: TUse): TUse {
+  if (!chromiumExecutablePath) return use
+
+  return {
+    ...use,
+    launchOptions: {
+      ...((use.launchOptions as Record<string, unknown> | undefined) ?? {}),
+      executablePath: chromiumExecutablePath,
+    },
+  }
+}
+
 const managedWebServer = webServer.isManaged
   ? {
       command: 'pnpm run dev',
@@ -127,7 +141,7 @@ export default defineConfig({
     baseURL: webServer.url,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: disableVideo ? 'off' : 'retain-on-failure',
     actionTimeout: 10000,
     navigationTimeout: 30000,
 
@@ -149,7 +163,7 @@ export default defineConfig({
     // Desktop browsers
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: withOptionalChromiumExecutable({ ...devices['Desktop Chrome'] }),
     },
     {
       name: 'firefox',
@@ -174,7 +188,7 @@ export default defineConfig({
     {
       name: 'dark-mode',
       use: {
-        ...devices['Desktop Chrome'],
+        ...withOptionalChromiumExecutable({ ...devices['Desktop Chrome'] }),
         colorScheme: 'dark',
       },
     },
@@ -183,9 +197,10 @@ export default defineConfig({
     {
       name: 'performance',
       use: {
-        ...devices['Desktop Chrome'],
+        ...withOptionalChromiumExecutable({ ...devices['Desktop Chrome'] }),
         // Slow network simulation
         launchOptions: {
+          ...(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : {}),
           args: ['--disable-web-security', '--disable-features=VizDisplayCompositor'],
         },
       },
@@ -195,7 +210,7 @@ export default defineConfig({
     // Accessibility testing
     {
       name: 'accessibility',
-      use: { ...devices['Desktop Chrome'] },
+      use: withOptionalChromiumExecutable({ ...devices['Desktop Chrome'] }),
       testMatch: ['**/*a11y*.spec.ts', '**/*accessibility*/**/*.test.ts'],
     },
 
@@ -203,9 +218,10 @@ export default defineConfig({
     {
       name: 'axe-accessibility',
       use: {
-        ...devices['Desktop Chrome'],
+        ...withOptionalChromiumExecutable({ ...devices['Desktop Chrome'] }),
         // Enable experimental features for better axe integration
         launchOptions: {
+          ...(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : {}),
           args: ['--enable-experimental-web-platform-features'],
         },
       },
@@ -216,7 +232,7 @@ export default defineConfig({
     {
       name: 'markdown-visual',
       use: {
-        ...devices['Desktop Chrome'],
+        ...withOptionalChromiumExecutable({ ...devices['Desktop Chrome'] }),
         // Consistent rendering for visual tests
         viewport: { width: 1280, height: 720 },
         colorScheme: 'light',

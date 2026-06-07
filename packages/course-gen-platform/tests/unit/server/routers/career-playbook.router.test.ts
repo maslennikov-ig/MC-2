@@ -165,6 +165,30 @@ function createListBuilder(data: unknown[], error: unknown = null) {
   return builder;
 }
 
+type SupabaseMockBuilder = ReturnType<typeof createBuilder> | ReturnType<typeof createListBuilder>;
+
+function createOrganizationBuilder(slug = 'mega-campus') {
+  return createBuilder([{ data: { slug }, error: null }]);
+}
+
+function mockCareerPlaybookTable(builder: SupabaseMockBuilder, organizationSlug = 'mega-campus') {
+  mocks.from.mockImplementation((table: string) => {
+    if (table === 'organizations') return createOrganizationBuilder(organizationSlug);
+    return builder;
+  });
+}
+
+function mockCareerPlaybookTablesInOrder(
+  builders: SupabaseMockBuilder[],
+  organizationSlug = 'mega-campus'
+) {
+  let careerPlaybookCallIndex = 0;
+  mocks.from.mockImplementation((table: string) => {
+    if (table === 'organizations') return createOrganizationBuilder(organizationSlug);
+    return builders[Math.min(careerPlaybookCallIndex++, builders.length - 1)];
+  });
+}
+
 describe('careerPlaybookRouter transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -188,6 +212,7 @@ describe('careerPlaybookRouter transport', () => {
   it('is wired into the app router under careerPlaybook', () => {
     expect(appRouter._def.procedures['careerPlaybook.exportPdf']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.session.start']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.session.saveProgress']).toBeDefined();
     expect(
       appRouter._def.procedures['careerPlaybook.session.resolveDepartmentOptions']
     ).toBeDefined();
@@ -896,7 +921,7 @@ describe('careerPlaybookRouter transport', () => {
       created_at: '2026-05-14T01:00:00.000Z',
     });
     const builder = createListBuilder([ownPlaybook, sameOrgPlaybook, foreignPlaybook]);
-    mocks.from.mockReturnValue(builder);
+    mockCareerPlaybookTable(builder);
 
     const caller = careerPlaybookRouter.createCaller(authenticatedContext);
     const result = await caller.library.list({ limit: 20 });
@@ -949,7 +974,7 @@ describe('careerPlaybookRouter transport', () => {
       }),
     ];
     const builder = createListBuilder(rows);
-    mocks.from.mockReturnValue(builder);
+    mockCareerPlaybookTable(builder);
 
     const caller = careerPlaybookRouter.createCaller(authenticatedContext);
     const result = await caller.library.list({
@@ -1065,7 +1090,7 @@ describe('careerPlaybookRouter transport', () => {
   });
 
   it('enables public sharing with an unguessable generated share slug', async () => {
-    const predictableSlug = 'cp-33333333333343338333333333333333';
+    const predictableSlug = 'role-guide-333333';
     const builder = createBuilder([
       {
         data: playbookRow({
@@ -1078,7 +1103,7 @@ describe('careerPlaybookRouter transport', () => {
       },
       {
         data: playbookRow({
-          share_slug: 'cp-1234567890abcdef12345678',
+          share_slug: 'role-guide-123456',
           is_public: true,
           status: 'completed',
           final_markdown: '# Sales Manager',
@@ -1086,7 +1111,7 @@ describe('careerPlaybookRouter transport', () => {
         error: null,
       },
     ]);
-    mocks.from.mockReturnValue(builder);
+    mockCareerPlaybookTable(builder);
 
     const caller = careerPlaybookRouter.createCaller(authenticatedContext);
     const result = await caller.share.shareToggle({ playbookId, isPublic: true });
@@ -1094,7 +1119,7 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         is_public: true,
-        share_slug: expect.stringMatching(/^cp-[a-f0-9]{24}$/),
+        share_slug: expect.stringMatching(/^role-guide-[a-f0-9]{6}$/),
       })
     );
     expect(builder.update.mock.calls[0][0].share_slug).not.toBe(predictableSlug);
@@ -1103,7 +1128,8 @@ describe('careerPlaybookRouter transport', () => {
     expect(result).toMatchObject({
       playbookId,
       isPublic: true,
-      shareSlug: 'cp-1234567890abcdef12345678',
+      shareSlug: 'role-guide-123456',
+      organizationSlug: 'mega-campus',
       visibility: 'public',
       viewerPermissions: {
         canCreateCourse: true,
@@ -1197,7 +1223,7 @@ describe('careerPlaybookRouter transport', () => {
         error: null,
       },
     ]);
-    mocks.from.mockReturnValue(builder);
+    mockCareerPlaybookTable(builder);
 
     const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
     const result = await caller.share.getPublicBySlug({ shareSlug: 'sales-guide' });
@@ -1211,6 +1237,7 @@ describe('careerPlaybookRouter transport', () => {
       id: '66666666-6666-4666-8666-666666666666',
       shareSlug: 'sales-guide',
       isPublic: true,
+      organizationSlug: 'mega-campus',
       finalMarkdown: '# Sales Manager',
     });
     expect(result).not.toHaveProperty('generatedBlocks');
@@ -1268,7 +1295,7 @@ describe('careerPlaybookRouter transport', () => {
     });
     const listBuilder = createListBuilder([publicPlaybook]);
     const publicShareBuilder = createBuilder([{ data: publicPlaybook, error: null }]);
-    mocks.from.mockReturnValueOnce(listBuilder).mockReturnValueOnce(publicShareBuilder);
+    mockCareerPlaybookTablesInOrder([listBuilder, publicShareBuilder]);
 
     const otherUserCaller = careerPlaybookRouter.createCaller(otherUserContext);
     const publicCaller = careerPlaybookRouter.createCaller(unauthenticatedContext);
@@ -1286,6 +1313,7 @@ describe('careerPlaybookRouter transport', () => {
       id: publicPlaybook.id,
       shareSlug: 'public-sales-guide',
       isPublic: true,
+      organizationSlug: 'mega-campus',
       finalMarkdown: '# Sales Manager',
     });
   });
