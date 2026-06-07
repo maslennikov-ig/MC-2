@@ -55,6 +55,9 @@ export interface BusinessContextStepCopy {
   panelDescription?: string
   filesTitle?: string
   filesDescription?: string
+  freeformTitle?: string
+  freeformDescription?: string
+  freeformPlaceholder?: string
   uploadMissingSession?: string
   uploadMaxFilesTemplate?: string
   uploadPending?: string
@@ -81,7 +84,9 @@ interface BusinessContextStepProps {
   playbookId: string | null
   context: CareerPlaybookBusinessContext
   sources?: CareerPlaybookBusinessContextSourceSummary[]
+  freeformText?: string
   onContextChange: (context: CareerPlaybookBusinessContext) => void
+  onFreeformTextChange?: (text: string) => void
   onRemoveSource?: (sourceId: string) => Promise<unknown> | void
   onSourceUploaded?: (source: CareerPlaybookBusinessContextSourceSummary) => void
   onBack: () => void
@@ -156,6 +161,10 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
     'Подойдут коммерческие предложения, описания продукта, регламенты продаж, KPI отдела, оргструктура и инструкции похожих ролей.',
   filesTitle: 'Файлы',
   filesDescription: 'Файлы сохраняются как источники этого Role Guide, не как материалы курса.',
+  freeformTitle: 'Текст и заметки',
+  freeformDescription:
+    'Вставьте регламенты, переписку, тезисы интервью или любой контекст без загрузки файла.',
+  freeformPlaceholder: 'Вставьте текст, который важно учесть в должностной инструкции...',
   uploadMissingSession: 'Career Playbook session is required before upload',
   uploadMaxFilesTemplate: 'Максимум {maxFiles} источников',
   uploadPending: 'Загрузить выбранные файлы',
@@ -248,7 +257,9 @@ export function BusinessContextStep({
   playbookId,
   context,
   sources = [],
+  freeformText = '',
   onContextChange,
+  onFreeformTextChange,
   onRemoveSource,
   onSourceUploaded,
   onBack,
@@ -522,6 +533,28 @@ export function BusinessContextStep({
             <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
               {labels.panelDescription}
             </p>
+          </div>
+
+          <div className="career-playbook-soft-card space-y-3 p-3">
+            <div>
+              <label
+                htmlFor="career-playbook-freeform-context"
+                className="text-sm font-semibold text-slate-900 dark:text-slate-100"
+              >
+                {labels.freeformTitle}
+              </label>
+              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {labels.freeformDescription}
+              </p>
+            </div>
+            <Textarea
+              id="career-playbook-freeform-context"
+              value={freeformText}
+              onChange={(event) => onFreeformTextChange?.(event.target.value)}
+              placeholder={labels.freeformPlaceholder}
+              className="min-h-40 resize-y bg-white/80 text-sm leading-6 dark:bg-slate-950/40"
+              aria-label={labels.freeformTitle}
+            />
           </div>
 
           <div className="space-y-3">

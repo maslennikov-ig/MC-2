@@ -212,6 +212,7 @@ describe('careerPlaybookRouter transport', () => {
   it('is wired into the app router under careerPlaybook', () => {
     expect(appRouter._def.procedures['careerPlaybook.exportPdf']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.session.start']).toBeDefined();
+    expect(appRouter._def.procedures['careerPlaybook.session.saveProgress']).toBeDefined();
     expect(
       appRouter._def.procedures['careerPlaybook.session.resolveDepartmentOptions']
     ).toBeDefined();

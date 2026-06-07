@@ -90,6 +90,13 @@ The shared `CareerPlaybookQADataSchema` stores `business_context` with:
 - `skip_reason`: optional explanation for universal/skipped mode
 - `updated_at`: last context edit timestamp
 
+The same `q_a_data` JSON stores `ui_progress`, which is the wizard resume
+position persisted by `careerPlaybook.session.saveProgress`. The frontend saves
+the active phase plus the current fixed `question_key` or follow-up
+`question_id`; indices are retained only as fallback when the question list
+changes. Terminal generation statuses still hydrate into the completion phase
+even if an older `ui_progress` value points at an earlier wizard step.
+
 `career_playbook_sources` is the domain owner for uploaded Business Context
 files and text snippets. It references `career_playbooks`, `organizations`,
 `auth.users`, and optional `file_catalog` rows. File storage still goes through
@@ -97,6 +104,13 @@ the existing Stage 1 validation, quota, storage, and dedup primitives, but Caree
 Playbook files use `uploads/<organization>/career-playbooks/<playbookId>/` and
 leave `file_catalog.course_id` null. This keeps course uploads unchanged and
 avoids creating fake draft courses just to attach Role Guide context.
+
+Business Context also accepts pasted text notes through the freeform answer
+path. Saving `freeform_text: ""` is a deliberate clear operation, not a no-op;
+it removes stored notes so deleted pasted context does not return after refresh.
+Changing pasted notes or the structured business context invalidates stored
+follow-up questions, follow-up answers, completeness, and non-user-edited
+generated digest data before the next follow-up generation.
 
 Business Context file uploads enqueue `JobType.CAREER_PLAYBOOK` with operation
 `PROCESS_SOURCE`. `source-processing.ts` reuses Docling conversion,
@@ -149,6 +163,18 @@ Use a non-default port when another app is already running on `3000`:
 ```bash
 PLAYWRIGHT_PORT=3101 pnpm --filter @megacampus/web test:e2e:career-playbook
 ```
+
+Local WSL environments that cannot install the exact Playwright browser bundle
+can opt into a system Chrome binary for Chromium projects:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome \
+PLAYWRIGHT_DISABLE_VIDEO=1 \
+pnpm --filter @megacampus/web exec playwright test tests/e2e/header-dropdown-position.spec.ts --project=chromium
+```
+
+`PLAYWRIGHT_DISABLE_VIDEO=1` is only a local fallback for environments missing
+Playwright's ffmpeg bundle; default reporting still retains failure videos.
 
 Authenticated browser tests still require a valid `TOKEN` storage-state input. Without `TOKEN`, only unauthenticated/public checks run.
 

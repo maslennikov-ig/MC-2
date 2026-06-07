@@ -7,6 +7,7 @@ import type {
   CareerPlaybookFollowupQuestion,
 } from '@megacampus/shared-types'
 import { CompletionScreen } from '@/components/career-playbook/wizard/CompletionScreen'
+import { BusinessContextStep } from '@/components/career-playbook/wizard/BusinessContextStep'
 import { FollowupPhase } from '@/components/career-playbook/wizard/FollowupPhase'
 import { ProgressIndicator } from '@/components/career-playbook/wizard/ProgressIndicator'
 import { QuestionRenderer } from '@/components/career-playbook/wizard/QuestionRenderer'
@@ -598,6 +599,62 @@ describe('Wizard', () => {
 
     expect(screen.getByRole('button', { name: 'Завершить' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Далее' })).not.toBeInTheDocument()
+  })
+})
+
+describe('BusinessContextStep', () => {
+  it('renders an autosaved freeform text area for pasted notes', async () => {
+    const user = userEvent.setup()
+    const handleFreeformChange = vi.fn()
+    let persistedText = 'CRM migration context'
+
+    function BusinessContextHarness({ initialText }: { initialText: string }) {
+      const [freeformText, setFreeformText] = useState(initialText)
+
+      return (
+        <BusinessContextStep
+          playbookId="00000000-0000-4000-8000-000000002001"
+          context={{
+            mode: 'company_specific',
+            status: 'collecting',
+            digest: null,
+            source_ids: [],
+          }}
+          freeformText={freeformText}
+          onFreeformTextChange={(nextText) => {
+            persistedText = nextText
+            setFreeformText(nextText)
+            handleFreeformChange(nextText)
+          }}
+          onContextChange={vi.fn()}
+          onBack={vi.fn()}
+          onContinue={vi.fn()}
+          onUniversal={vi.fn()}
+          copy={{
+            freeformTitle: 'Текст и заметки',
+            freeformDescription: 'Можно вставить регламенты, переписку или любые заметки.',
+            freeformPlaceholder: 'Вставьте текст...',
+          }}
+        />
+      )
+    }
+
+    const { rerender } = render(<BusinessContextHarness initialText={persistedText} />)
+
+    const textarea = screen.getByRole('textbox', { name: 'Текст и заметки' })
+
+    expect(textarea).toHaveValue('CRM migration context')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Новый контекст отдела')
+
+    expect(handleFreeformChange).toHaveBeenLastCalledWith('Новый контекст отдела')
+
+    rerender(<BusinessContextHarness key="remounted" initialText={persistedText} />)
+
+    expect(screen.getByRole('textbox', { name: 'Текст и заметки' })).toHaveValue(
+      'Новый контекст отдела'
+    )
   })
 })
 

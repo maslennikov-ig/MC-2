@@ -7,6 +7,7 @@ import {
   CareerPlaybookFixedQuestionLanguageSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookVisibilitySchema,
+  CareerPlaybookWizardProgressSchema,
   languageSchema,
 } from '@megacampus/shared-types';
 
@@ -42,6 +43,10 @@ export const startSessionInputSchema = z.object({
 export const submitAnswerInputSchema = playbookIdInputSchema.extend({
   phase: z.enum(['fixed', 'followup', 'freeform', 'business_context']),
   answer: CareerPlaybookAnswerSubmissionSchema,
+});
+
+export const saveProgressInputSchema = playbookIdInputSchema.extend({
+  progress: CareerPlaybookWizardProgressSchema,
 });
 
 export const uploadBusinessContextSourceInputSchema = playbookIdInputSchema.extend({

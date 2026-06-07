@@ -28,6 +28,14 @@ export const CareerPlaybookPlaybookStatusSchema = z.enum([
 ]);
 export type CareerPlaybookPlaybookStatus = z.infer<typeof CareerPlaybookPlaybookStatusSchema>;
 
+export const CareerPlaybookWizardPhaseSchema = z.enum([
+  'fixed',
+  'business_context',
+  'followups',
+  'completion',
+]);
+export type CareerPlaybookWizardPhase = z.infer<typeof CareerPlaybookWizardPhaseSchema>;
+
 export const CareerPlaybookVisibilitySchema = z.enum(['private', 'organization', 'public']);
 export type CareerPlaybookVisibility = z.infer<typeof CareerPlaybookVisibilitySchema>;
 
@@ -296,6 +304,16 @@ export type CareerPlaybookBusinessContextSourceSummary = z.infer<
   typeof CareerPlaybookBusinessContextSourceSummarySchema
 >;
 
+export const CareerPlaybookWizardProgressSchema = z.object({
+  phase: CareerPlaybookWizardPhaseSchema,
+  current_fixed_question_key: z.string().min(1).optional(),
+  current_fixed_index: z.number().int().nonnegative().optional(),
+  current_followup_question_id: z.string().uuid().optional(),
+  current_followup_index: z.number().int().nonnegative().optional(),
+  updated_at: z.string().datetime().optional(),
+});
+export type CareerPlaybookWizardProgress = z.infer<typeof CareerPlaybookWizardProgressSchema>;
+
 export const CareerPlaybookQADataSchema = z.object({
   fixed: z.array(CareerPlaybookFixedAnswerSchema).default([]),
   followups: z.array(CareerPlaybookFollowupAnswerSchema).default([]),
@@ -307,6 +325,7 @@ export const CareerPlaybookQADataSchema = z.object({
     source_ids: [],
   }),
   completeness_score: z.number().min(0).max(1).optional(),
+  ui_progress: CareerPlaybookWizardProgressSchema.optional(),
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
 
@@ -649,7 +668,7 @@ export const CareerPlaybookAnswerSubmissionSchema = z
     question_id: z.string().uuid().optional(),
     value: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     skipped: z.boolean().optional(),
-    freeform_text: z.string().min(1).optional(),
+    freeform_text: z.string().optional(),
     business_context: CareerPlaybookBusinessContextSchema.optional(),
   })
   .refine(

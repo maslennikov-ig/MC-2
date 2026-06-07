@@ -5,6 +5,7 @@ import {
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFollowupResponseSchema,
   CareerPlaybookQADataSchema,
+  CareerPlaybookWizardProgressSchema,
   JobType,
   isCareerPlaybookFollowupResponseReady,
   normalizeCareerPlaybookFollowupResponseReadiness,
@@ -20,6 +21,7 @@ import {
   type CareerPlaybookFollowupResponse,
   type CareerPlaybookPlaybookStatus,
   type CareerPlaybookGeneratePlaybookJobData,
+  type CareerPlaybookWizardProgress,
   type Language,
 } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
@@ -62,6 +64,7 @@ export interface CareerPlaybookDraftResponse {
   businessContextSources?: CareerPlaybookBusinessContextSourceSummary[];
   status: CareerPlaybookPlaybookStatus;
   phase: WizardPhase;
+  progress?: CareerPlaybookWizardProgress;
 }
 
 export interface CareerPlaybookGenerationStatusResponse {
@@ -122,6 +125,7 @@ function mapRowToDraft(
     businessContext: qaData.business_context,
     status: mapped.status,
     phase: phaseFromStatus(mapped.status, qaData),
+    progress: qaData.ui_progress,
   };
 
   if (options.businessContextSources) {
@@ -246,6 +250,13 @@ function capGeneratedQuestionsForResponse(
   return generated.filter(
     question => !existingIds.has(question.question_id) && mergedIds.has(question.question_id)
   );
+}
+
+function clearStoredFollowupContext(qaData: StoredQAData): void {
+  qaData.followups = [];
+  qaData.followup_questions = [];
+  qaData.completeness_score = 0;
+  qaData.followup_generation_count = 0;
 }
 
 function isReadyForGeneration(row: CareerPlaybookRow, qaData: StoredQAData): boolean {
@@ -420,16 +431,23 @@ export async function submitCareerPlaybookAnswer(
   }
 
   if (input.phase === 'freeform') {
-    if (!input.answer.freeform_text) {
+    if (input.answer.freeform_text === undefined) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Free-form answers require text' });
     }
 
-    qaData.freeform = [
-      {
-        text: input.answer.freeform_text,
-        submitted_at: new Date().toISOString(),
-      },
-    ];
+    const previousFreeformText = freeformDraftFromQAData(qaData);
+    qaData.freeform = input.answer.freeform_text.trim()
+      ? [
+          {
+            text: input.answer.freeform_text,
+            submitted_at: new Date().toISOString(),
+          },
+        ]
+      : [];
+    if (previousFreeformText !== input.answer.freeform_text) {
+      clearStoredFollowupContext(qaData);
+      updatePayload.status = 'awaiting_followups';
+    }
   }
 
   if (input.phase === 'business_context') {
@@ -444,6 +462,8 @@ export async function submitCareerPlaybookAnswer(
       ...input.answer.business_context,
       updated_at: new Date().toISOString(),
     });
+    clearStoredFollowupContext(qaData);
+    updatePayload.status = 'awaiting_followups';
   }
 
   updatePayload.q_a_data = toJson(qaData);
@@ -457,6 +477,38 @@ export async function submitCareerPlaybookAnswer(
     .single();
 
   if (error || !data) throwOnDbError(error, 'Failed to save Career Playbook answer');
+
+  return mapRowToDraft(data);
+}
+
+export async function saveCareerPlaybookProgress(
+  ctx: Context,
+  input: { playbookId: string; progress: CareerPlaybookWizardProgress }
+): Promise<CareerPlaybookDraftResponse> {
+  const user = requireUser(ctx);
+  const row = await loadPlaybook(input.playbookId, user, 'write');
+  if (row.status === 'generating') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook generation is already in progress',
+    });
+  }
+
+  const qaData = normalizeStoredQAData(row.q_a_data);
+  qaData.ui_progress = CareerPlaybookWizardProgressSchema.parse({
+    ...input.progress,
+    updated_at: input.progress.updated_at ?? new Date().toISOString(),
+  });
+
+  const supabase = getCareerPlaybookSupabase();
+  const { data, error } = await supabase
+    .from('career_playbooks')
+    .update({ q_a_data: toJson(qaData) })
+    .eq('id', input.playbookId)
+    .select('*')
+    .single();
+
+  if (error || !data) throwOnDbError(error, 'Failed to save Career Playbook progress');
 
   return mapRowToDraft(data);
 }

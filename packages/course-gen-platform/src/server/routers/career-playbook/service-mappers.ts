@@ -4,6 +4,7 @@ import {
   CareerPlaybookFollowupQuestionSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookPlaybookStatusSchema,
+  CareerPlaybookWizardProgressSchema,
   languageSchema,
   type CareerPlaybookBlockState,
   type CareerPlaybookFixedQuestion,
@@ -11,6 +12,7 @@ import {
   type CareerPlaybookPlaybookStatus,
   type CareerPlaybookQAData,
   type CareerPlaybookVisibility,
+  type CareerPlaybookWizardProgress,
   type Json,
   type Language,
 } from '@megacampus/shared-types';
@@ -20,6 +22,7 @@ export type WizardPhase = 'fixed' | 'business_context' | 'followups' | 'completi
 export interface StoredQAData extends CareerPlaybookQAData {
   followup_questions: CareerPlaybookFollowupQuestion[];
   followup_generation_count: number;
+  ui_progress?: CareerPlaybookWizardProgress;
   generation_error?: string;
 }
 
@@ -99,6 +102,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
           skip_reason: 'legacy_draft_without_business_context',
         },
     completeness_score: value.completeness_score,
+    ui_progress: value.ui_progress,
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(
     value.followup_questions
@@ -134,8 +138,24 @@ export function toJson(value: unknown): Json {
 
 export function phaseFromStatus(
   status: CareerPlaybookPlaybookStatus,
-  qaData?: Pick<StoredQAData, 'business_context' | 'followup_questions'>
+  qaData?: Pick<StoredQAData, 'business_context' | 'followup_questions' | 'ui_progress'>
 ): WizardPhase {
+  if (
+    status === 'ready_to_generate' ||
+    status === 'generating' ||
+    status === 'completed' ||
+    status === 'failed'
+  ) {
+    return 'completion';
+  }
+
+  const progress = qaData?.ui_progress
+    ? CareerPlaybookWizardProgressSchema.safeParse(qaData.ui_progress)
+    : null;
+  if (progress?.success) {
+    return progress.data.phase;
+  }
+
   if (status === 'awaiting_followups') {
     if (
       qaData &&
@@ -149,10 +169,6 @@ export function phaseFromStatus(
     return 'followups';
   }
   if (status === 'answering_followups') return 'followups';
-  if (status === 'ready_to_generate' || status === 'generating' || status === 'completed') {
-    return 'completion';
-  }
-  if (status === 'failed') return 'completion';
   return 'fixed';
 }
 
