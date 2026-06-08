@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   CareerPlaybookBlockStateSchema,
   CareerPlaybookFollowupQuestionSchema,
+  CareerPlaybookGenerationProgressSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookPlaybookStatusSchema,
   CareerPlaybookWizardProgressSchema,
@@ -9,6 +10,7 @@ import {
   type CareerPlaybookBlockState,
   type CareerPlaybookFixedQuestion,
   type CareerPlaybookFollowupQuestion,
+  type CareerPlaybookGenerationProgress,
   type CareerPlaybookPlaybookStatus,
   type CareerPlaybookQAData,
   type CareerPlaybookVisibility,
@@ -103,6 +105,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
         },
     completeness_score: value.completeness_score,
     ui_progress: value.ui_progress,
+    generation_progress: value.generation_progress,
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(
     value.followup_questions
@@ -180,14 +183,28 @@ export function freeformDraftFromQAData(qaData: StoredQAData): string {
   return qaData.freeform.map(answer => answer.text).join('\n\n');
 }
 
-export function generationProgress(status: CareerPlaybookPlaybookStatus): number {
+export function normalizeGenerationProgress(
+  raw: unknown
+): CareerPlaybookGenerationProgress | undefined {
+  const parsed = CareerPlaybookGenerationProgressSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
+}
+
+export function generationProgress(
+  status: CareerPlaybookPlaybookStatus,
+  progressDetails?: CareerPlaybookGenerationProgress
+): number {
+  if (status === 'generating' && progressDetails) {
+    return Math.min(Math.max(Math.round(progressDetails.percent), 0), 99);
+  }
+
   const progressByStatus: Record<CareerPlaybookPlaybookStatus, number> = {
     draft: 0,
     answering_fixed: 20,
     awaiting_followups: 35,
     answering_followups: 50,
     ready_to_generate: 65,
-    generating: 80,
+    generating: 66,
     completed: 100,
     failed: 100,
   };

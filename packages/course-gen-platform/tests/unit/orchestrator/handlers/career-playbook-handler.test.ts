@@ -306,6 +306,8 @@ describe('CareerPlaybookHandler', () => {
     const builder = createBuilder([
       { data: { q_a_data: existingQAData }, error: null },
       { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
     ]);
     mocks.from.mockReturnValue(builder);
     getCareerPlaybookGraphMock.mockReturnValue({
@@ -339,11 +341,65 @@ describe('CareerPlaybookHandler', () => {
           fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
           followups: [],
           freeform: [],
+          generation_progress: expect.objectContaining({
+            stage: 'completed',
+            percent: 100,
+            updated_at: expect.any(String),
+          }),
         },
         completed_at: expect.any(String),
       })
     );
     expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+  });
+
+  it('persists generation progress reported by the graph', async () => {
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+      followups: [],
+      freeform: [],
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockImplementation(((options: {
+      progressReporter?: (progress: { stage: string; percent: number }) => Promise<void> | void;
+    }) => ({
+      invoke: vi.fn().mockImplementation(async () => {
+        await options.progressReporter?.({ stage: 'building_profile', percent: 72 });
+        return {
+          errors: [],
+          generatedBlocks: {},
+          finalMarkdown: '# B2B Sales Manager',
+          roleProfileSpec,
+        };
+      }),
+    })) as unknown as typeof getCareerPlaybookGraphMock);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'generating',
+        q_a_data: expect.objectContaining({
+          generation_progress: expect.objectContaining({
+            stage: 'building_profile',
+            percent: 72,
+            updated_at: expect.any(String),
+          }),
+        }),
+      })
+    );
   });
 
   it('retries playbook generation without persisting failed status before the final attempt', async () => {
@@ -369,7 +425,18 @@ describe('CareerPlaybookHandler', () => {
       )
     ).rejects.toThrow('LLM provider unavailable');
 
-    expect(builder.update).not.toHaveBeenCalled();
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'generating',
+        q_a_data: expect.objectContaining({
+          generation_progress: expect.objectContaining({
+            stage: 'preparing_context',
+            percent: 70,
+          }),
+        }),
+      })
+    );
+    expect(builder.update).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 
   it('persists failed status and preserves existing QA data on final graph errors', async () => {
@@ -389,6 +456,8 @@ describe('CareerPlaybookHandler', () => {
       ],
     };
     const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
       { data: { q_a_data: existingQAData }, error: null },
       { data: { id: playbookId }, error: null },
     ]);
@@ -415,6 +484,11 @@ describe('CareerPlaybookHandler', () => {
         q_a_data: {
           ...existingQAData,
           generation_error: 'specBuilder failed: missing role profile',
+          generation_progress: expect.objectContaining({
+            stage: 'failed',
+            percent: 100,
+            updated_at: expect.any(String),
+          }),
         },
       })
     );
@@ -422,6 +496,8 @@ describe('CareerPlaybookHandler', () => {
 
   it('persists failed status and generation_error when graph throws on the final attempt', async () => {
     const builder = createBuilder([
+      { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
+      { data: { id: playbookId }, error: null },
       { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
       { data: { id: playbookId }, error: null },
     ]);
@@ -448,6 +524,11 @@ describe('CareerPlaybookHandler', () => {
           followups: [],
           freeform: [],
           generation_error: 'LLM provider unavailable',
+          generation_progress: expect.objectContaining({
+            stage: 'failed',
+            percent: 100,
+            updated_at: expect.any(String),
+          }),
         },
       })
     );

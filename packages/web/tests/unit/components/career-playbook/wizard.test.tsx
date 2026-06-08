@@ -1061,4 +1061,45 @@ describe('CompletionScreen', () => {
     )
     expect(screen.getAllByText(longAnswer)[0]).toHaveClass('break-words')
   })
+
+  it('shows the active generation progress in the central review area', () => {
+    render(
+      <CompletionScreen
+        fixedAnswers={[
+          {
+            id: 'position',
+            title: 'Role source',
+            value: 'Product Lead',
+          },
+        ]}
+        followupAnswers={[]}
+        freeformNotes={[]}
+        onEditFixedAnswer={vi.fn()}
+        onEditFollowupAnswer={vi.fn()}
+        onGenerate={vi.fn()}
+        generationStatus="generating"
+        generationProgress={72}
+        generationProgressDetails={{
+          stage: 'building_profile',
+          percent: 72,
+          updated_at: '2026-06-08T17:00:00.000Z',
+        }}
+        copy={{
+          generationStepLabels: {
+            building_profile: 'Уточняем профиль роли',
+          },
+          generationRedirectHint: 'После завершения откроем инструкцию автоматически.',
+        }}
+      />
+    )
+
+    expect(screen.getByText('Уточняем профиль роли')).toBeInTheDocument()
+    expect(
+      screen.getByText('После завершения откроем инструкцию автоматически.')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '72')
+    expect(
+      screen.getByRole('button', { name: 'Сгенерировать должностную инструкцию' })
+    ).toBeDisabled()
+  })
 })

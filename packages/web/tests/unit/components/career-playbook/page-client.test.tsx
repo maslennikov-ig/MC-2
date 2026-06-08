@@ -52,6 +52,8 @@ const messages = {
       documentPreviewSubtitle: 'Answers are placed into the future document structure as you work.',
       documentPreviewEmpty: 'Appears after an answer',
       questionPanelLabel: 'Current question',
+      summaryLabel: 'Summary',
+      summaryTitle: 'Collected answers',
       businessContextNavigationLabel: 'Context',
       businessContextDocumentLabel: 'Business context',
       businessContextTitle: 'Business context',
@@ -61,6 +63,15 @@ const messages = {
       businessContextPanelTitle: 'Sources',
       businessContextPanelDescription:
         'Useful inputs include proposals, product descriptions, sales playbooks, KPIs, org charts, and similar role guides.',
+      businessContextMaterialsTitle: 'Materials and notes',
+      businessContextMaterialsHelper:
+        'Paste general context and attach files. This is the single place for anything that does not fit a specific category.',
+      businessContextFilledTemplate: 'Filled {count} of {total}',
+      businessContextSourcesReady: 'Sources ready',
+      businessContextSourcesProcessing: 'Sources processing',
+      businessContextSourcesEmpty: 'No sources added',
+      businessContextPreviousStep: 'Previous step',
+      businessContextNextStep: 'Next step',
       businessContextFilesTitle: 'Files',
       businessContextFilesDescription:
         'Files are saved as sources for this Role Guide, not as course materials.',
@@ -88,6 +99,7 @@ const messages = {
         'Without company context the system creates a benchmark guide and marks what must be adapted before rollout.',
       businessContextUniversalSummary: 'Universal benchmark mode selected.',
       businessContextUploading: 'Uploading files...',
+      businessContextSaving: 'Saving changes...',
       businessContextProductTitle: 'Product',
       businessContextProductHelper: 'What you sell or deliver and the value proposition.',
       businessContextProductPlaceholder: 'For example: B2B SaaS for learning automation...',
@@ -168,6 +180,29 @@ const messages = {
       generationFailedDescription: 'Try again after checking the collected context.',
       generationStarting: 'Starting generation...',
       generationErrorTitle: 'Generation could not start',
+      generationRedirectHint:
+        'When generation finishes, we will open the Role Guide automatically.',
+      generationCanLeaveHint:
+        'You can keep this page open or come back later: the status is saved.',
+      generationStepQueued: 'Queueing generation',
+      generationStepPreparingContext: 'Preparing the saved context',
+      generationStepBuildingProfile: 'Refining the role profile',
+      generationStepGeneratingFoundation: 'Generating the instruction foundation',
+      generationStepReviewingFoundation: 'Reviewing the instruction foundation',
+      generationStepGeneratingOperations: 'Generating operational sections',
+      generationStepReviewingOperations: 'Reviewing operational sections',
+      generationStepGeneratingPeople: 'Generating people and competency sections',
+      generationStepReviewingPeople: 'Reviewing people and competency sections',
+      generationStepGeneratingGrowth: 'Generating growth and onboarding sections',
+      generationStepReviewingGrowth: 'Reviewing growth and onboarding sections',
+      generationStepGeneratingSystem: 'Generating process and dependency sections',
+      generationStepReviewingSystem: 'Reviewing process and dependency sections',
+      generationStepGeneratingWrap: 'Generating final sections',
+      generationStepReviewingWrap: 'Reviewing final sections',
+      generationStepAssembling: 'Assembling the final document',
+      generationStepFinalReview: 'Running the final review',
+      generationStepCompleted: 'Ready, opening the Role Guide',
+      generationStepFailed: 'Generation stopped',
       viewGenerated: 'Open Role Guide',
       emptySummary: 'No data yet',
     },
@@ -250,13 +285,23 @@ describe('CareerPlaybookNewPageClient', () => {
       playbookId: '00000000-0000-4000-8000-000000000901',
       status: 'generating',
       phase: 'completion',
-      progress: 80,
+      progress: 72,
+      progressDetails: {
+        stage: 'building_profile',
+        percent: 72,
+        updated_at: '2026-06-08T17:00:00.000Z',
+      },
     })
     getGenerationStatus = vi.fn().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000901',
       status: 'generating',
       phase: 'completion',
-      progress: 80,
+      progress: 72,
+      progressDetails: {
+        stage: 'building_profile',
+        percent: 72,
+        updated_at: '2026-06-08T17:00:00.000Z',
+      },
     })
     getDraft = vi.fn().mockResolvedValue({
       playbookId: '00000000-0000-4000-8000-000000000777',
@@ -363,7 +408,7 @@ describe('CareerPlaybookNewPageClient', () => {
     ).toBeInTheDocument()
     expect(await screen.findByLabelText('Which role do you want to define?')).toBeInTheDocument()
     expect(screen.getByTestId('career-playbook-workspace')).toHaveClass('max-w-[1760px]')
-    expect(screen.getByText('Question 1 of 6')).toBeInTheDocument()
+    expect(screen.getAllByText('Question 1 of 6').length).toBeGreaterThan(0)
 
     await user.type(screen.getByLabelText('Which role do you want to define?'), 'Head of Sales')
     await user.click(screen.getByRole('button', { name: 'Next' }))
@@ -441,15 +486,15 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Question 1 of 6')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('Question 1 of 6').length).toBeGreaterThan(0))
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
-    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
     expect(requestFollowups).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Generate a universal guide' }))
 
     expect(requestFollowups).toHaveBeenCalled()
-    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('Follow-up 1 of 1').length).toBeGreaterThan(0))
     expect(submitAnswer).toHaveBeenCalledWith({
       playbookId: '00000000-0000-4000-8000-000000000831',
       phase: 'business_context',
@@ -473,10 +518,10 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
 
-    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('Follow-up 1 of 1').length).toBeGreaterThan(0))
     expect(requestFollowups).toHaveBeenCalled()
     expect(submitAnswer).toHaveBeenCalledWith({
       playbookId: '00000000-0000-4000-8000-000000000836',
@@ -510,11 +555,11 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Follow-up generation failed')
-    expect(screen.getByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue to follow-ups' })).toBeEnabled()
   })
 
@@ -593,11 +638,12 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
-    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Product' }))
     await user.type(screen.getByLabelText('Product'), 'B2B SaaS for sales enablement')
     await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
 
-    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('Follow-up 1 of 1').length).toBeGreaterThan(0))
     expect(requestFollowups).toHaveBeenCalled()
     expect(submitAnswer).toHaveBeenCalledWith({
       playbookId: '00000000-0000-4000-8000-000000000006',
@@ -657,7 +703,7 @@ describe('CareerPlaybookNewPageClient', () => {
 
     const { container } = renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(input, [
       new File(['product'], 'product.pdf', { type: 'application/pdf' }),
@@ -761,12 +807,13 @@ describe('CareerPlaybookNewPageClient', () => {
 
     const { container } = renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materials and notes' })).toBeInTheDocument()
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(input, [new File(['product'], 'product.pdf', { type: 'application/pdf' })])
 
     const continueClick = user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: 'Product' }))
     fireEvent.change(screen.getByRole('textbox', { name: 'Product' }), {
       target: { value: 'B2B learning platform' },
     })
@@ -785,6 +832,9 @@ describe('CareerPlaybookNewPageClient', () => {
     )
 
     await continueClick
+    await waitFor(() =>
+      expect(useCareerPlaybookStore.getState().businessContext.source_ids).toContain(sourceId)
+    )
     expect(requestFollowups).not.toHaveBeenCalled()
     expect(useCareerPlaybookStore.getState().businessContext).toEqual(
       expect.objectContaining({
@@ -933,7 +983,7 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('Follow-up 1 of 1').length).toBeGreaterThan(0))
     expect(screen.getByLabelText('Which KPIs define success in this role?')).toHaveValue('Win rate')
     expect(useCareerPlaybookStore.getState().dirtyFollowupQuestionIds).toEqual([
       '00000000-0000-4000-8000-000000000802',
@@ -1018,8 +1068,8 @@ describe('CareerPlaybookNewPageClient', () => {
       playbookId: '00000000-0000-4000-8000-000000000901',
     })
     expect(await screen.findByRole('status')).toHaveTextContent('Generation in progress')
-    expect(screen.getByRole('status')).toHaveTextContent('80%')
-    expect(screen.getByText('The Role Guide is being assembled.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('72%')
+    expect(screen.getByRole('status')).toHaveTextContent('Refining the role profile')
   })
 
   it('polls generation status while generating and stops after completion', async () => {
@@ -1077,7 +1127,7 @@ describe('CareerPlaybookNewPageClient', () => {
 
     expect(getGenerationStatus).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('status')).toHaveTextContent('Generation completed')
-    expect(screen.getByText('The Role Guide is ready.')).toBeInTheDocument()
+    expect(screen.getAllByText('The Role Guide is ready.').length).toBeGreaterThan(0)
     const viewerLink = screen.getByRole('link', { name: 'Open Role Guide' })
     expect(viewerLink).toHaveAttribute(
       'href',

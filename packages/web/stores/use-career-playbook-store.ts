@@ -28,6 +28,7 @@ import type {
   CareerPlaybookFollowupAnswer,
   CareerPlaybookFollowupQuestion,
   CareerPlaybookFollowupResponse,
+  CareerPlaybookGenerationProgress,
   CareerPlaybookPlaybookStatus,
   CareerPlaybookVisibility,
   CareerPlaybookViewerSnapshot,
@@ -65,6 +66,7 @@ export interface CareerPlaybookDraft {
   dirtyBusinessContext?: boolean
   dirtyProgress?: boolean
   generationProgress?: number | null
+  progressDetails?: CareerPlaybookGenerationProgress | null
   finalMarkdown?: string | null
   progress?: CareerPlaybookWizardProgress
 }
@@ -74,6 +76,7 @@ export interface CareerPlaybookGenerationStatus {
   status: CareerPlaybookPlaybookStatus
   phase?: CareerPlaybookWizardPhase
   progress?: number
+  progressDetails?: CareerPlaybookGenerationProgress | null
   error?: string
   finalMarkdown?: string
   completedAt?: string
@@ -210,6 +213,7 @@ interface CareerPlaybookStoreState {
   generationStartError: string | null
   generationStatusError: string | null
   generationProgress: number | null
+  generationProgressDetails: CareerPlaybookGenerationProgress | null
   finalMarkdown: string | null
   freeformDraft: string
   businessContext: CareerPlaybookBusinessContext
@@ -677,6 +681,7 @@ function initialState(): Omit<
     generationStartError: null,
     generationStatusError: null,
     generationProgress: null,
+    generationProgressDetails: null,
     finalMarkdown: null,
     freeformDraft: '',
     businessContext: createDefaultBusinessContext(),
@@ -1347,6 +1352,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.generationStartError = null
           state.generationStatusError = null
           state.generationProgress = draft.generationProgress ?? state.generationProgress
+          state.generationProgressDetails = draft.progressDetails ?? state.generationProgressDetails
           state.finalMarkdown = draft.finalMarkdown ?? state.finalMarkdown
           state.dirtyFixedQuestionKeys = draft.dirtyFixedQuestionKeys ?? []
           state.dirtyFollowupQuestionIds =
@@ -2090,6 +2096,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.status = response.status
             state.phase = response.phase ?? 'completion'
             state.generationProgress = response.progress ?? state.generationProgress
+            state.generationProgressDetails =
+              response.progressDetails ?? state.generationProgressDetails
             state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
             state.isStartingGeneration = false
             state.generationStartError = response.error ?? null
@@ -2138,6 +2146,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.status = response.status
             state.phase = response.phase ?? 'completion'
             state.generationProgress = response.progress ?? state.generationProgress
+            state.generationProgressDetails =
+              response.progressDetails ?? state.generationProgressDetails
             state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
             state.generationStatusError = response.error ?? null
           })
@@ -2369,6 +2379,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             dirtyBusinessContext: mergedDraft.dirtyBusinessContext,
             dirtyProgress: mergedDraft.dirtyProgress,
             generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
+            progressDetails: remoteDraft.progressDetails ?? latest.generationProgressDetails,
             finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
 
@@ -2406,6 +2417,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             dirtyBusinessContext: mergedDraft.dirtyBusinessContext,
             dirtyProgress: mergedDraft.dirtyProgress,
             generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
+            progressDetails: remoteDraft.progressDetails ?? latest.generationProgressDetails,
             finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
 
@@ -2622,6 +2634,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         dirtyBusinessContext: state.dirtyBusinessContext,
         dirtyProgress: state.dirtyProgress,
         generationProgress: state.generationProgress,
+        generationProgressDetails: state.generationProgressDetails,
         lastAutosavedAt: state.lastAutosavedAt,
       }),
     }
