@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, ClipboardCheck, Loader2 } from 'lucide-react'
 import {
-  CareerPlaybookDocumentPreview,
   CareerPlaybookDocumentShell,
   type CareerPlaybookPreviewSection,
 } from '@/components/career-playbook/layout/document-workspace'
@@ -32,6 +31,8 @@ interface WizardCopy extends QuestionRendererCopy {
   documentPreviewSubtitle?: string
   documentPreviewEmpty?: string
   questionPanelLabel?: string
+  summaryLabel?: string
+  summaryTitle?: string
 }
 
 export interface WizardProps {
@@ -63,6 +64,8 @@ const defaultCopy: Required<WizardCopy> = {
   documentPreviewSubtitle: 'Ответы собираются в структуру будущего документа.',
   documentPreviewEmpty: 'Появится после ответа',
   questionPanelLabel: 'Текущий вопрос',
+  summaryLabel: 'Сводка',
+  summaryTitle: 'Собранные ответы',
   openPlaceholder: 'Введите ответ',
   chooseOneLabel: 'Выберите один вариант',
   chooseManyLabel: 'Можно выбрать несколько',
@@ -172,24 +175,65 @@ export function Wizard({
         </aside>
       }
       document={
-        <CareerPlaybookDocumentPreview
-          label={labels.documentPreviewLabel}
-          title={labels.documentPreviewTitle}
-          subtitle={labels.documentPreviewSubtitle}
-          emptyLabel={labels.documentPreviewEmpty}
-          sections={previewSections}
-          footer={
-            isSaving ? (
-              <p className="text-[13px] leading-5 text-slate-500 dark:text-slate-400">
-                {labels.draftSaved}
-              </p>
-            ) : null
-          }
-        />
+        <article
+          data-testid="career-playbook-question-workspace"
+          className="career-playbook-document min-h-[34rem] px-5 py-6 md:px-8 md:py-8"
+        >
+          <header className="career-playbook-document-rule space-y-5 border-b pb-5">
+            <span className="career-playbook-pill inline-flex items-center gap-2 px-3 py-1.5 text-[13px] leading-5 font-medium text-slate-600 dark:text-slate-300">
+              <ClipboardCheck
+                className="h-4 w-4 text-purple-600 dark:text-purple-300"
+                aria-hidden
+              />
+              {labels.questionPanelLabel}
+            </span>
+            <div className="max-w-3xl space-y-2">
+              <h2 className="text-[18px] leading-7 font-semibold tracking-normal text-slate-950 dark:text-slate-50">
+                {labels.questionLabel} {safeIndex + 1} {labels.ofLabel} {questions.length}
+              </h2>
+            </div>
+          </header>
+
+          <div className="mt-6">
+            <QuestionRenderer
+              question={currentQuestion}
+              value={currentValue}
+              onValueChange={(value) => onAnswerChange(currentQuestionKey, value)}
+              copy={labels}
+            />
+          </div>
+
+          <footer className="career-playbook-document-rule mt-8 flex min-h-11 flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onPrevious}
+              disabled={safeIndex === 0}
+              className="w-full min-w-28 sm:w-auto"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+              {labels.back}
+            </Button>
+
+            <Button
+              type="button"
+              onClick={onNext}
+              disabled={!canGoNext || isNextLoading}
+              className="w-full min-w-28 sm:w-auto"
+            >
+              {isNextLoading ? labels.nextLoading : primaryActionLabel}
+              {isNextLoading ? (
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+              )}
+            </Button>
+          </footer>
+        </article>
       }
       panel={
         <aside
-          data-testid="career-playbook-question-panel"
+          data-testid="career-playbook-summary-panel"
           className="career-playbook-panel space-y-4 p-4"
         >
           <div className="career-playbook-soft-card p-3">
@@ -205,43 +249,40 @@ export function Wizard({
 
           <div className="flex items-center gap-2 text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
             <ClipboardCheck className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
-            {labels.questionPanelLabel}
+            {labels.summaryLabel}
           </div>
 
-          <div className="career-playbook-soft-card p-4">
-            <QuestionRenderer
-              question={currentQuestion}
-              value={currentValue}
-              onValueChange={(value) => onAnswerChange(currentQuestionKey, value)}
-              copy={labels}
-            />
-          </div>
+          <div className="career-playbook-soft-card space-y-3 p-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {labels.summaryTitle}
+            </h3>
+            <ol className="grid gap-3">
+              {previewSections.map((section) => {
+                const value = section.value?.trim()
 
-          <div className="flex min-h-11 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between xl:flex-col 2xl:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onPrevious}
-              disabled={safeIndex === 0}
-              className="w-full min-w-28 2xl:w-auto"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
-              {labels.back}
-            </Button>
-
-            <Button
-              type="button"
-              onClick={onNext}
-              disabled={!canGoNext || isNextLoading}
-              className="w-full min-w-28 2xl:w-auto"
-            >
-              {isNextLoading ? labels.nextLoading : primaryActionLabel}
-              {isNextLoading ? (
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-              )}
-            </Button>
+                return (
+                  <li key={section.id} className="min-w-0">
+                    <p className="line-clamp-2 text-xs leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                      {section.title}
+                    </p>
+                    <p
+                      className={`mt-1 line-clamp-3 text-sm leading-6 break-words whitespace-pre-wrap ${
+                        value && !section.muted
+                          ? 'text-slate-800 dark:text-slate-100'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {value || labels.documentPreviewEmpty}
+                    </p>
+                  </li>
+                )
+              })}
+            </ol>
+            {isSaving ? (
+              <p className="text-[13px] leading-5 text-slate-500 dark:text-slate-400">
+                {labels.draftSaved}
+              </p>
+            ) : null}
           </div>
         </aside>
       }

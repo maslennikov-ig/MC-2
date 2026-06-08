@@ -39,6 +39,8 @@ type DigestCategoryKey =
   | 'org_structure'
   | 'constraints'
 
+type BusinessContextWizardStepKey = 'materials' | DigestCategoryKey
+
 export interface BusinessContextCategoryCopy {
   key: DigestCategoryKey
   title: string
@@ -55,6 +57,15 @@ export interface BusinessContextStepCopy {
   empty?: string
   panelTitle?: string
   panelDescription?: string
+  materialsTitle?: string
+  materialsHelper?: string
+  summaryTitle?: string
+  filledTemplate?: string
+  sourcesReady?: string
+  sourcesProcessing?: string
+  sourcesEmpty?: string
+  previousStep?: string
+  nextStep?: string
   filesTitle?: string
   filesDescription?: string
   freeformTitle?: string
@@ -79,6 +90,7 @@ export interface BusinessContextStepCopy {
   universal?: string
   universalDescription?: string
   uploading?: string
+  saving?: string
   categories?: BusinessContextCategoryCopy[]
 }
 
@@ -162,6 +174,16 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
   panelTitle: 'Источники',
   panelDescription:
     'Подойдут коммерческие предложения, описания продукта, регламенты продаж, KPI отдела, оргструктура и инструкции похожих ролей.',
+  materialsTitle: 'Материалы и заметки',
+  materialsHelper:
+    'Вставьте общий контекст и приложите файлы. Это единый вход для всего, что не помещается в отдельные категории.',
+  summaryTitle: 'Сводка',
+  filledTemplate: 'Заполнено {count} из {total}',
+  sourcesReady: 'Источники готовы',
+  sourcesProcessing: 'Источники обрабатываются',
+  sourcesEmpty: 'Источники не добавлены',
+  previousStep: 'Предыдущий шаг',
+  nextStep: 'Следующий шаг',
   filesTitle: 'Файлы',
   filesDescription: 'Файлы сохраняются как источники этого Role Guide, не как материалы курса.',
   freeformTitle: 'Текст и заметки',
@@ -188,6 +210,7 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
   universalDescription:
     'Без контекста компании система создаст benchmark-документ и отметит, что нужно адаптировать перед внедрением.',
   uploading: 'Загрузка файлов...',
+  saving: 'Сохраняем изменения...',
   categories: defaultCategories,
 }
 
@@ -283,6 +306,7 @@ export function BusinessContextStep({
     categories: copy?.categories ?? defaultCopy.categories,
   }
   const categories = labels.categories
+  const [activeStepKey, setActiveStepKey] = useState<BusinessContextWizardStepKey>('materials')
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploadingFiles, setIsUploadingFiles] = useState(false)
   const [removingSourceId, setRemovingSourceId] = useState<string | null>(null)
@@ -307,6 +331,50 @@ export function BusinessContextStep({
     CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH
   )}`
   const isFreeformOverLimit = freeformLength > CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH
+  const filledCategoryCount = categories.filter(
+    (category) => digest[category.key].length > 0
+  ).length
+  const stepItems = useMemo(
+    () => [
+      {
+        key: 'materials' as const,
+        title: labels.materialsTitle,
+        filled: Boolean(freeformText.trim()) || pendingFiles.length > 0 || activeSources.length > 0,
+      },
+      ...categories.map((category) => ({
+        key: category.key,
+        title: category.title,
+        filled: digest[category.key].length > 0,
+      })),
+    ],
+    [
+      activeSources.length,
+      categories,
+      digest,
+      freeformText,
+      labels.materialsTitle,
+      pendingFiles.length,
+    ]
+  )
+  const activeStepIndex = Math.max(
+    stepItems.findIndex((step) => step.key === activeStepKey),
+    0
+  )
+  const activeCategory =
+    activeStepKey === 'materials'
+      ? null
+      : (categories.find((category) => category.key === activeStepKey) ?? categories[0])
+  const sourceReadinessLabel = hasProcessingSources
+    ? labels.sourcesProcessing
+    : activeSources.length > 0
+      ? labels.sourcesReady
+      : labels.sourcesEmpty
+  const filledSummary = labels.filledTemplate
+    .replace('{count}', String(filledCategoryCount))
+    .replace('{total}', String(categories.length))
+  const isLastStep = activeStepIndex >= stepItems.length - 1
+  const isContinueBusy = isSaving || isUploadingFiles
+  const isContinueDisabled = !hasContext || hasProcessingSources || isContinueBusy
 
   useEffect(() => {
     contextRef.current = context
@@ -453,6 +521,13 @@ export function BusinessContextStep({
     await onContinue()
   }
 
+  const goToStep = (nextIndex: number) => {
+    const nextStep = stepItems[Math.min(Math.max(nextIndex, 0), stepItems.length - 1)]
+    if (nextStep) {
+      setActiveStepKey(nextStep.key)
+    }
+  }
+
   return (
     <CareerPlaybookDocumentShell
       navigation={
@@ -461,16 +536,22 @@ export function BusinessContextStep({
             {labels.navigationLabel}
           </p>
           <ol className="grid gap-2">
-            {categories.map((category) => {
-              const filled = digest[category.key].length > 0
+            {stepItems.map((step) => {
+              const active = step.key === activeStepKey
 
               return (
-                <li key={category.key}>
-                  <a
-                    href={`#business-context-${category.key}`}
-                    className="career-playbook-rail-item grid min-h-[52px] grid-cols-[auto_1fr] items-start gap-2 px-3 py-2.5 text-left text-[15px] text-slate-700 transition-colors hover:border-purple-200 hover:bg-purple-50/60 dark:text-slate-300 dark:hover:border-purple-500/40 dark:hover:bg-purple-950/20"
+                <li key={step.key}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveStepKey(step.key)}
+                    aria-current={active ? 'step' : undefined}
+                    className={`career-playbook-rail-item grid min-h-[52px] w-full grid-cols-[auto_1fr] items-start gap-2 px-3 py-2.5 text-left text-[15px] transition-colors ${
+                      active
+                        ? 'career-playbook-rail-item-active text-slate-950 dark:text-slate-50'
+                        : 'text-slate-700 hover:border-purple-200 hover:bg-purple-50/60 dark:text-slate-300 dark:hover:border-purple-500/40 dark:hover:bg-purple-950/20'
+                    }`}
                   >
-                    {filled ? (
+                    {step.filled ? (
                       <CheckCircle2
                         className="mt-0.5 h-4 w-4 text-emerald-600 dark:text-emerald-400"
                         aria-hidden
@@ -478,8 +559,8 @@ export function BusinessContextStep({
                     ) : (
                       <Circle className="mt-0.5 h-4 w-4 text-slate-400" aria-hidden />
                     )}
-                    <span className="line-clamp-2 leading-5">{category.title}</span>
-                  </a>
+                    <span className="line-clamp-2 leading-5">{step.title}</span>
+                  </button>
                 </li>
               )
             })}
@@ -487,143 +568,178 @@ export function BusinessContextStep({
         </aside>
       }
       document={
-        <article className="career-playbook-document min-h-[34rem] px-5 py-6 md:px-8 md:py-8">
+        <article
+          data-testid="career-playbook-business-context-workspace"
+          className="career-playbook-document min-h-[34rem] px-5 py-6 md:px-8 md:py-8"
+        >
           <header className="career-playbook-document-rule space-y-5 border-b pb-5">
             <span className="career-playbook-pill inline-flex items-center gap-2 px-3 py-1.5 text-[13px] leading-5 font-medium text-slate-600 dark:text-slate-300">
               <Building2 className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
               {labels.documentLabel}
             </span>
             <div className="max-w-3xl space-y-2">
+              <p className="text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                {activeStepIndex + 1} / {stepItems.length}
+              </p>
               <h2 className="text-[28px] leading-9 font-semibold tracking-normal text-slate-950 md:text-[34px] md:leading-[2.65rem] dark:text-slate-50">
-                {labels.title}
+                {activeCategory?.title ?? labels.materialsTitle}
               </h2>
               <p className="text-[15px] leading-7 text-slate-600 dark:text-slate-300">
-                {labels.description}
+                {activeCategory?.helper ?? labels.materialsHelper}
               </p>
             </div>
           </header>
 
-          <div className="mt-6 grid gap-4">
-            {categories.map((category) => (
-              <section
-                key={category.key}
-                id={`business-context-${category.key}`}
-                className="career-playbook-muted-card p-4"
-              >
-                <div className="flex flex-col gap-2">
-                  <h3 className="text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                    {category.title}
-                  </h3>
+          <div className="mt-6">
+            {activeCategory ? (
+              <section className="grid gap-3">
+                <label
+                  htmlFor={`business-context-${activeCategory.key}`}
+                  className="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                >
+                  {activeCategory.title}
+                </label>
+                <Textarea
+                  id={`business-context-${activeCategory.key}`}
+                  value={textFromLines(digest[activeCategory.key])}
+                  onChange={(event) => updateDigest(activeCategory.key, event.target.value)}
+                  placeholder={activeCategory.placeholder}
+                  className="min-h-60 resize-y bg-white/80 text-[15px] leading-6 dark:bg-slate-950/40"
+                  aria-label={activeCategory.title}
+                />
+              </section>
+            ) : (
+              <section className="grid gap-6">
+                <div className="grid gap-3">
+                  <label
+                    htmlFor="career-playbook-freeform-context"
+                    className="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                  >
+                    {labels.freeformTitle}
+                  </label>
                   <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    {category.helper}
+                    {labels.freeformDescription}
                   </p>
                   <Textarea
-                    value={textFromLines(digest[category.key])}
-                    onChange={(event) => updateDigest(category.key, event.target.value)}
-                    placeholder={category.placeholder}
-                    className="min-h-24 resize-y bg-white/80 text-[15px] leading-6 dark:bg-slate-950/40"
-                    aria-label={category.title}
+                    id="career-playbook-freeform-context"
+                    value={freeformText}
+                    onChange={(event) => onFreeformTextChange?.(event.target.value)}
+                    placeholder={labels.freeformPlaceholder}
+                    maxLength={CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH}
+                    className="min-h-56 resize-y bg-white/80 text-[15px] leading-6 dark:bg-slate-950/40"
+                    aria-label={labels.freeformTitle}
+                    aria-describedby="career-playbook-freeform-counter"
                   />
-                  <div className="flex flex-wrap gap-2">
-                    {category.hints.map((hint) => (
-                      <span
-                        key={hint}
-                        className="career-playbook-pill px-2.5 py-1 text-xs text-slate-600 dark:text-slate-300"
-                      >
-                        {hint}
-                      </span>
-                    ))}
+                  <p
+                    id="career-playbook-freeform-counter"
+                    className={`text-right text-xs leading-5 ${
+                      isFreeformOverLimit
+                        ? 'text-red-600 dark:text-red-300'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {freeformCounter}
+                  </p>
+                </div>
+
+                <div className="grid gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {labels.filesTitle}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {labels.filesDescription}
+                    </p>
                   </div>
+                  <FileUpload
+                    courseId={playbookId}
+                    uploadedFiles={uploadedFiles}
+                    onFilesChange={setUploadedFiles}
+                    onUploadFile={uploadFile}
+                    disabled={!playbookId || isUploadingFiles || isSaving}
+                    maxFiles={5}
+                    tier={tier}
+                    copy={{
+                      missingOwner: labels.uploadMissingSession,
+                      idleTitle: labels.filesTitle,
+                      maxFilesTemplate: labels.uploadMaxFilesTemplate,
+                    }}
+                  />
+                  {pendingFiles.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void uploadPendingFiles()}
+                      disabled={isUploadingFiles || !playbookId}
+                      className="w-full sm:w-fit"
+                    >
+                      {isUploadingFiles ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                      ) : (
+                        <FileSearch className="mr-2 h-4 w-4" aria-hidden />
+                      )}
+                      {isUploadingFiles ? labels.uploading : labels.uploadPending}
+                    </Button>
+                  ) : null}
                 </div>
               </section>
-            ))}
-          </div>
-        </article>
-      }
-      panel={
-        <aside className="career-playbook-panel space-y-4 p-4">
-          <div className="career-playbook-soft-card space-y-2 p-3">
-            <div className="flex items-center gap-2 text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-              <FileSearch className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
-              {labels.panelTitle}
-            </div>
-            <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {labels.panelDescription}
-            </p>
+            )}
           </div>
 
-          <div className="career-playbook-soft-card space-y-3 p-3">
-            <div>
-              <label
-                htmlFor="career-playbook-freeform-context"
-                className="text-sm font-semibold text-slate-900 dark:text-slate-100"
-              >
-                {labels.freeformTitle}
-              </label>
-              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {labels.freeformDescription}
-              </p>
-            </div>
-            <Textarea
-              id="career-playbook-freeform-context"
-              value={freeformText}
-              onChange={(event) => onFreeformTextChange?.(event.target.value)}
-              placeholder={labels.freeformPlaceholder}
-              maxLength={CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH}
-              className="min-h-40 resize-y bg-white/80 text-sm leading-6 dark:bg-slate-950/40"
-              aria-label={labels.freeformTitle}
-              aria-describedby="career-playbook-freeform-counter"
-            />
-            <p
-              id="career-playbook-freeform-counter"
-              className={`text-right text-xs leading-5 ${
-                isFreeformOverLimit
-                  ? 'text-red-600 dark:text-red-300'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
+          <footer className="career-playbook-document-rule mt-8 flex min-h-11 flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => goToStep(activeStepIndex - 1)}
+              disabled={activeStepIndex === 0}
+              className="w-full sm:w-auto"
             >
-              {freeformCounter}
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {labels.filesTitle}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {labels.filesDescription}
-              </p>
-            </div>
-            <FileUpload
-              courseId={playbookId}
-              uploadedFiles={uploadedFiles}
-              onFilesChange={setUploadedFiles}
-              onUploadFile={uploadFile}
-              disabled={!playbookId || isUploadingFiles || isSaving}
-              maxFiles={5}
-              tier={tier}
-              copy={{
-                missingOwner: labels.uploadMissingSession,
-                idleTitle: labels.filesTitle,
-                maxFilesTemplate: labels.uploadMaxFilesTemplate,
-              }}
-            />
-            {pendingFiles.length > 0 ? (
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+              {labels.previousStep}
+            </Button>
+            {isLastStep ? (
+              <Button
+                type="button"
+                onClick={() => void handleContinue()}
+                disabled={isContinueDisabled}
+                className="w-full sm:w-auto"
+              >
+                {isContinueBusy ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <ArrowRight className="mr-2 h-4 w-4" aria-hidden />
+                )}
+                {labels.continue}
+              </Button>
+            ) : (
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => void uploadPendingFiles()}
-                disabled={isUploadingFiles || !playbookId}
-                className="w-full"
+                onClick={() => goToStep(activeStepIndex + 1)}
+                className="w-full sm:w-auto"
               >
-                {isUploadingFiles ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <FileSearch className="mr-2 h-4 w-4" aria-hidden />
-                )}
-                {isUploadingFiles ? labels.uploading : labels.uploadPending}
+                {labels.nextStep}
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
               </Button>
+            )}
+          </footer>
+        </article>
+      }
+      panel={
+        <aside
+          data-testid="career-playbook-summary-panel"
+          className="career-playbook-panel space-y-4 p-4"
+        >
+          <div className="career-playbook-soft-card space-y-2 p-3">
+            <div className="flex items-center gap-2 text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+              <FileSearch className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
+              {labels.summaryTitle}
+            </div>
+            <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{filledSummary}</p>
+            {isSaving ? (
+              <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {labels.saving}
+              </p>
             ) : null}
           </div>
 
@@ -631,8 +747,9 @@ export function BusinessContextStep({
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {labels.uploadedSources}
             </p>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              {labels.sourceCountTemplate.replace('{count}', String(context.source_ids.length))}
+            <p className="text-sm text-slate-600 dark:text-slate-300">{sourceReadinessLabel}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {labels.sourceCountTemplate.replace('{count}', String(activeSources.length))}
             </p>
             {activeSources.length > 0 ? (
               <ul className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -716,9 +833,9 @@ export function BusinessContextStep({
             <Button
               type="button"
               onClick={() => void handleContinue()}
-              disabled={!hasContext || hasProcessingSources || isSaving || isUploadingFiles}
+              disabled={isContinueDisabled}
             >
-              {isSaving || isUploadingFiles ? (
+              {isContinueBusy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
               ) : (
                 <ArrowRight className="mr-2 h-4 w-4" aria-hidden />
