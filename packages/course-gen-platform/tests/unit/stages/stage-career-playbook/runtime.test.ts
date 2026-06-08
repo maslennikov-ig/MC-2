@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/nodes/runtime';
 
 describe('Career Playbook runtime', () => {
@@ -73,5 +74,44 @@ describe('Career Playbook runtime', () => {
     });
 
     expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1250);
+  });
+
+  it('uses LangChain structured output when a schema is provided', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'plain text should not be used' });
+    const structuredInvoke = vi.fn().mockResolvedValue({ answer: 'ok' });
+    const withStructuredOutput = vi.fn(() => ({ invoke: structuredInvoke }));
+    const createModel = vi.fn(() => ({ invoke, withStructuredOutput }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 0,
+        }),
+      },
+      createModel,
+    });
+
+    const result = await runtime.invokeLLM('prompt', {
+      phaseName: 'stage_career_playbook_followup',
+      promptKey: 'career_playbook_followup_generator',
+      node: 'followupGenerator',
+      structuredOutputSchema: z.object({ answer: z.string() }),
+      structuredOutputName: 'career_playbook_followups',
+      structuredOutputMethod: 'jsonSchema',
+      structuredOutputStrict: true,
+    });
+
+    expect(result.content).toBe(JSON.stringify({ answer: 'ok' }));
+    expect(invoke).not.toHaveBeenCalled();
+    expect(withStructuredOutput).toHaveBeenCalledWith(expect.any(Object), {
+      name: 'career_playbook_followups',
+      method: 'jsonSchema',
+      strict: true,
+    });
+    expect(structuredInvoke).toHaveBeenCalledWith('prompt');
   });
 });

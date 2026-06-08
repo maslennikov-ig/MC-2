@@ -2,6 +2,7 @@ import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
 import { createPromptService } from '@/shared/prompts/prompt-service';
+import type { z } from 'zod';
 
 export interface CareerPlaybookLLMCallOptions {
   phaseName: string;
@@ -13,6 +14,10 @@ export interface CareerPlaybookLLMCallOptions {
   maxTokens?: number;
   preferFallbackModel?: boolean;
   maxTokensMultiplier?: number;
+  structuredOutputSchema?: z.ZodTypeAny | Record<string, unknown>;
+  structuredOutputName?: string;
+  structuredOutputMethod?: 'functionCalling' | 'jsonMode' | 'jsonSchema';
+  structuredOutputStrict?: boolean;
 }
 
 export interface CareerPlaybookLLMResult {
@@ -48,6 +53,14 @@ interface CareerPlaybookModelConfigService {
 
 interface CareerPlaybookModel {
   invoke: (prompt: string) => Promise<{ content: unknown }>;
+  withStructuredOutput?: (
+    schema: z.ZodTypeAny | Record<string, unknown>,
+    config?: {
+      name?: string;
+      method?: 'functionCalling' | 'jsonMode' | 'jsonSchema';
+      strict?: boolean;
+    }
+  ) => { invoke: (prompt: string) => Promise<unknown> };
 }
 
 export interface CareerPlaybookRuntimeDependencies {
@@ -88,11 +101,7 @@ export function createCareerPlaybookRuntime(
 
         try {
           const model = createModel(modelId, temperature, maxTokens);
-          const response = await model.invoke(prompt);
-          const content =
-            typeof response.content === 'string'
-              ? response.content
-              : JSON.stringify(response.content);
+          const content = await invokeModelWithOptionalStructuredOutput(model, prompt, options);
 
           return {
             content,
@@ -109,6 +118,31 @@ export function createCareerPlaybookRuntime(
       throw lastError instanceof Error ? lastError : new Error('Career Playbook LLM call failed');
     },
   };
+}
+
+async function invokeModelWithOptionalStructuredOutput(
+  model: CareerPlaybookModel,
+  prompt: string,
+  options: CareerPlaybookLLMCallOptions
+): Promise<string> {
+  if (options.structuredOutputSchema) {
+    if (!model.withStructuredOutput) {
+      throw new Error(
+        'Structured output requested but current Career Playbook model does not support it'
+      );
+    }
+
+    const structuredModel = model.withStructuredOutput(options.structuredOutputSchema, {
+      name: options.structuredOutputName,
+      method: options.structuredOutputMethod,
+      strict: options.structuredOutputStrict,
+    });
+    const response = await structuredModel.invoke(prompt);
+    return typeof response === 'string' ? response : JSON.stringify(response);
+  }
+
+  const response = await model.invoke(prompt);
+  return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 }
 
 async function resolvePhaseConfig(
