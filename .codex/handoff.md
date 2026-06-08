@@ -1,45 +1,43 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-07
-Stage: `mc2-db696.55`
-Branch: `develop` / `master` delivered from `codex/career-playbook-resume-text-header`
+Stage: `mc2-db696.58`
+Branch: `codex/career-playbook-e2e-audit`
 
 ## Current State
 
-- Career Playbook wizard progress, pasted business notes/freeform autosave, Docling reuse regression coverage, and sticky header dropdown fixes are implemented and delivered.
-- Feature branch latest commit: `dfba4dbe fix(deploy): avoid orphan removal during rollback`.
-- Dev delivery merged the feature branch into `develop` at `0aac7729 dev: merge codex/career-playbook-resume-text-header into develop`.
-- Staging deployment merged `develop` into `master` at `8a78628c deploy: merge develop into master`.
-- Rollback now uses `docker compose ... up -d --force-recreate`; no `--remove-orphans` remains in `scripts/rollback_blue_green.sh`, matching `.claude/docs/deployment-guide.md`.
-- GitHub Actions completed successfully for develop run `27093940858` and master run `27093994629`.
-- Health checks returned `ok` for `https://dev.ai.megacampus.ru/api/health` and `https://ai.megacampus.ru/api/health`.
-- Beads delivery task `mc2-db696.55` is closed and pushed via `bd dolt push`.
+- Career Playbook authenticated E2E fixture work is ready for closeout.
+- Playwright global setup signs in server test user `test-instructor1@megacampus.com`; `TOKEN` remains only a legacy fallback.
+- Stable viewer fixture: `00000000-0000-4000-8000-000000002001`.
+- Freeform-only business context persists as `business_context.status=skipped` before follow-up requests on frontend and backend.
+- Follow-up loading is visible immediately; failures return to Business Context with an alert and retry path.
+- Role suggestion dropdown no longer overlays the wizard CTA during E2E role entry.
+- Fully local API E2E is blocked by `mc2-zt4ju`; browser E2E used local Next with `COURSEGEN_BACKEND_URL=https://dev.ai.megacampus.ru/api` and `NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api`.
 - Other worktree `/home/me/code/mc2-worktrees/career-playbook-business-context` remains untouched.
 
 ## Verification
 
-- Passed: `bash -n scripts/rollback_blue_green.sh`.
-- Passed: `rg "remove-orphans" scripts/rollback_blue_green.sh scripts/deploy_blue_green.sh .claude/docs/deployment-guide.md .claude/scripts/deploy.sh .claude/scripts/push-dev.sh` verified rollback no longer uses `--remove-orphans`.
-- Passed through `.claude/scripts/deploy.sh --yes`: `pnpm type-check`.
-- Passed through `.claude/scripts/deploy.sh --yes`: `pnpm build`.
-- Passed: GitHub Actions develop run `27093940858`.
-- Passed: GitHub Actions master run `27093994629`.
-- Passed: dev and production `/api/health` checks.
+- Passed: backend business-context guard, progress router, and source-processing regression tests.
+- Passed: web store unit — 38 tests; web store progress — 10 tests; page-client — 20 tests.
+- Passed: no-`TOKEN` authenticated Chromium E2E — Career Playbook 5 tests, header dropdown 2 tests.
+- Passed: no-`TOKEN` authenticated mobile Chrome header dropdown E2E — 2 tests.
+- Passed: `pnpm type-check` and `pnpm build`.
 
 ## Next recommended
 
-Next stage id: choose the next ready Beads task under `mc2-db696` if more Career Playbook work remains.
-Recommended action: monitor the deployed Career Playbook flow as needed; otherwise start the next ready Beads item.
+Next stage id: `mc2-db696.58`
+Recommended action: commit, push, and close `mc2-db696.58`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-db696.55/summary.md`, Beads epic `mc2-db696`, and Graphify report. Current delivery is on `develop` and `master`; avoid touching `/home/me/code/mc2-worktrees/career-playbook-business-context` unless explicitly requested.
+Use $orchestrator-stage in `/home/me/code/mc2`. Read stage `mc2-db696.58`, Beads `mc2-db696.58`, follow-up `mc2-zt4ju`, and Graphify report. Continue branch `codex/career-playbook-e2e-audit`; do not touch `/home/me/code/mc2-worktrees/career-playbook-business-context`.
 
 ## Delivery
 
-- docs-reviewed: updated - handoff and stage summary now reflect completed push/merge/deploy; existing deployment guide already documents the `--remove-orphans` prohibition.
-- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz` during delivery closeout.
+- docs-reviewed: updated - handoff and stage summary record fixture work, E2E coverage, and local API blocker.
+- graph-reviewed: updated - ran `graphify update .` and `graphify cluster-only . --no-viz`.
 
 ## Explicit defers
 
-- None for this delivery. Authenticated profile-menu e2e remains locally skipped when `TOKEN` is not set, but the deployed CI/CD runs completed successfully.
+- `mc2-zt4ju` tracks restoring runnable local `course-gen-platform` API for fully local Playwright E2E.
+- No staging/production deploy has been performed.

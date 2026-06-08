@@ -64,6 +64,10 @@ const messages = {
       businessContextFilesTitle: 'Files',
       businessContextFilesDescription:
         'Files are saved as sources for this Role Guide, not as course materials.',
+      businessContextFreeformTitle: 'Text and notes',
+      businessContextFreeformDescription:
+        'Paste sales playbooks, interview notes, or any context without uploading a file.',
+      businessContextFreeformPlaceholder: 'Paste context that should shape the role guide...',
       businessContextUploadMissingSession: 'Create the Career Playbook session before upload',
       businessContextUploadMaxFilesTemplate: 'Maximum {maxFiles} sources',
       businessContextUploadPending: 'Upload selected files',
@@ -456,6 +460,62 @@ describe('CareerPlaybookNewPageClient', () => {
         }),
       },
     })
+  })
+
+  it('marks pasted business notes as completed context before requesting follow-ups', async () => {
+    const user = userEvent.setup()
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000836')
+    useCareerPlaybookStore.setState({
+      freeformDraft: 'B2B SaaS, enterprise sales cycle, strict implementation SLA.',
+      dirtyFreeformDraft: true,
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+
+    expect(await screen.findByText('Follow-up 1 of 1')).toBeInTheDocument()
+    expect(requestFollowups).toHaveBeenCalled()
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000836',
+      phase: 'freeform',
+      answer: {
+        freeform_text: 'B2B SaaS, enterprise sales cycle, strict implementation SLA.',
+      },
+    })
+    expect(submitAnswer).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000836',
+      phase: 'business_context',
+      answer: {
+        business_context: expect.objectContaining({
+          mode: 'universal',
+          status: 'skipped',
+          skip_reason: 'freeform_business_context',
+        }),
+      },
+    })
+  })
+
+  it('keeps business context retryable when follow-up generation fails', async () => {
+    const user = userEvent.setup()
+    requestFollowups.mockRejectedValueOnce(new Error('Follow-up generation failed'))
+
+    setBusinessContextState('00000000-0000-4000-8000-000000000837')
+    useCareerPlaybookStore.setState({
+      freeformDraft: 'B2B SaaS, enterprise sales cycle, strict implementation SLA.',
+      dirtyFreeformDraft: true,
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Continue to follow-ups' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Follow-up generation failed')
+    expect(screen.getByRole('heading', { name: 'Business context' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue to follow-ups' })).toBeEnabled()
   })
 
   it('does not request follow-ups without a saved department context', async () => {

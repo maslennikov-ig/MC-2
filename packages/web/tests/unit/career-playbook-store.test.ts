@@ -523,11 +523,12 @@ describe('useCareerPlaybookStore', () => {
       status: 'awaiting_followups',
     })
 
-    await expect(
-      useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
-    ).resolves.toEqual({
-      ok: true,
-    })
+    const requestPromise = useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
+    expect(useCareerPlaybookStore.getState().phase).toBe('followups')
+    expect(useCareerPlaybookStore.getState().status).toBe('awaiting_followups')
+    expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(true)
+
+    await expect(requestPromise).resolves.toEqual({ ok: true })
 
     expect(requestFollowups).toHaveBeenCalledWith({
       playbookId: '00000000-0000-4000-8000-000000000011',
@@ -543,6 +544,45 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().completenessScore).toBe(0.62)
     expect(useCareerPlaybookStore.getState().followupGenerationCount).toBe(1)
     expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(false)
+  })
+
+  it('returns to business context when follow-up generation fails after continuing', async () => {
+    const requestFollowups = vi
+      .fn<NonNullable<CareerPlaybookClient['requestFollowups']>>()
+      .mockRejectedValue(new Error('Follow-up generation failed'))
+    setCareerPlaybookClientForTests({
+      requestFollowups,
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000019',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [
+        { question_key: 'position', value: 'Sales Manager' },
+        { question_key: 'department', value: 'sales' },
+      ],
+      freeformDraft: 'Enterprise sales notes.',
+      phase: 'business_context',
+      status: 'awaiting_followups',
+    })
+
+    const requestPromise = useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
+    expect(useCareerPlaybookStore.getState().phase).toBe('followups')
+    expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(true)
+
+    await expect(requestPromise).resolves.toEqual({
+      ok: false,
+      error: 'Follow-up generation failed',
+    })
+
+    expect(useCareerPlaybookStore.getState().phase).toBe('business_context')
+    expect(useCareerPlaybookStore.getState().status).toBe('awaiting_followups')
+    expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(false)
+    expect(useCareerPlaybookStore.getState().followupGenerationError).toBe(
+      'Follow-up generation failed'
+    )
   })
 
   it('recovers from legacy empty department answers before requesting follow-up questions', async () => {

@@ -44,6 +44,7 @@ export default function CareerPlaybookNewPageClient({
   useEffect(() => {
     if (resetOnMount) {
       useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
+      consumeFreshQueryParam()
     }
 
     if (resumePlaybookId && useCareerPlaybookStore.getState().playbookId !== resumePlaybookId) {
@@ -551,6 +552,7 @@ export default function CareerPlaybookNewPageClient({
   }
 
   const continueAfterBusinessContext = async () => {
+    markFreeformBusinessContextForFollowups()
     await useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
     const result = await useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
     if (result.ok && useCareerPlaybookStore.getState().status === 'ready_to_generate') {
@@ -685,6 +687,7 @@ export default function CareerPlaybookNewPageClient({
                 void continueAfterBusinessContext()
               }}
               isSaving={state.isAutosaving || state.isGeneratingFollowups}
+              errorMessage={state.followupGenerationError}
               copy={businessContextCopy}
             />
           ) : null}
@@ -764,6 +767,36 @@ export default function CareerPlaybookNewPageClient({
       </main>
     </>
   )
+}
+
+function consumeFreshQueryParam() {
+  if (typeof window === 'undefined') return
+
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('fresh') !== '1') return
+
+  url.searchParams.delete('fresh')
+  const nextPath = `${url.pathname}${url.search}${url.hash}`
+  window.history.replaceState(window.history.state, '', nextPath)
+}
+
+function markFreeformBusinessContextForFollowups() {
+  const snapshot = useCareerPlaybookStore.getState()
+  if (!snapshot.freeformDraft.trim()) return
+  if (
+    snapshot.businessContext.status === 'ready' ||
+    snapshot.businessContext.status === 'skipped'
+  ) {
+    return
+  }
+  if (snapshot.businessContext.source_ids.length > 0) return
+
+  snapshot.saveCareerPlaybookBusinessContext({
+    ...snapshot.businessContext,
+    mode: 'universal',
+    status: 'skipped',
+    skip_reason: snapshot.businessContext.skip_reason ?? 'freeform_business_context',
+  })
 }
 
 function PhaseBStatus({

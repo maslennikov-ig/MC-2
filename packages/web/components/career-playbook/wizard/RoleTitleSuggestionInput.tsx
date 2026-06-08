@@ -152,7 +152,7 @@ export function RoleTitleSuggestionInput({
           id={listId}
           role="listbox"
           aria-label={headline}
-          className="absolute right-0 left-0 z-20 overflow-hidden rounded-md border border-[#d8c5aa] bg-[#fffdf8] shadow-lg dark:border-slate-800 dark:bg-slate-950"
+          className="relative z-20 overflow-hidden rounded-md border border-[#d8c5aa] bg-[#fffdf8] shadow-lg dark:border-slate-800 dark:bg-slate-950"
         >
           <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
             <p className="text-xs font-medium tracking-normal text-slate-500 uppercase dark:text-slate-400">
