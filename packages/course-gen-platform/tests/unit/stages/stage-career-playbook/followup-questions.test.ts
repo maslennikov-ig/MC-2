@@ -91,7 +91,7 @@ function createFileRowsBuilder(data: unknown[], error: unknown = null) {
   return builder;
 }
 
-function mockBusinessContextSourceExcerpt(content: string) {
+function mockBusinessContextSourceExcerpt(content: string, markdownContent: string | null = null) {
   const sourceBuilder = createSourceRowsBuilder([
     {
       id: '00000000-0000-4000-8000-000000000010',
@@ -105,7 +105,7 @@ function mockBusinessContextSourceExcerpt(content: string) {
       id: '00000000-0000-4000-8000-000000000020',
       filename: 'sales-deck.pdf',
       processed_content: content,
-      markdown_content: null,
+      markdown_content: markdownContent,
     },
   ]);
 
@@ -201,8 +201,11 @@ describe('Career Playbook follow-up questions helper', () => {
     }
   });
 
-  it('renders the follow-up prompt, invokes runtime, and returns parsed response with cost', async () => {
-    mockBusinessContextSourceExcerpt('Sales deck: enterprise onboarding requires security review.');
+  it('renders the follow-up prompt with Career Playbook source evidence, invokes runtime, and returns parsed response with cost', async () => {
+    mockBusinessContextSourceExcerpt(
+      'Summary: enterprise onboarding requires security review.',
+      'Full markdown: expansion handoff requires a renewal manager approval gate.'
+    );
     const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
       content: JSON.stringify(followupResponse),
@@ -226,10 +229,15 @@ describe('Career Playbook follow-up questions helper', () => {
       expect.objectContaining({
         position: 'B2B Sales Manager',
         content_language: 'ru',
-        business_context_source_excerpts: expect.stringContaining(
-          'enterprise onboarding requires security review'
-        ),
+        business_context_source_excerpts: expect.stringContaining('Source evidence pack'),
       })
+    );
+    const promptVariables = renderPrompt.mock.calls[0]?.[1] as Record<string, string>;
+    expect(promptVariables.business_context_source_excerpts).toContain(
+      'Summary: enterprise onboarding requires security review'
+    );
+    expect(promptVariables.business_context_source_excerpts).toContain(
+      'expansion handoff requires a renewal manager approval gate'
     );
     expect(invokeLLM).toHaveBeenCalledWith(
       'rendered followup prompt',

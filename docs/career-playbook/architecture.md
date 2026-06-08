@@ -126,17 +126,28 @@ markdown namespace instead of creating a fake course. Source rows move through
 `uploaded`, `processing`, `ready`, and `failed`; follow-up generation blocks
 while any selected source is still uploaded or processing.
 
+Career Playbook treats Stage 2/6 summarization as an overview layer, not as the
+only source of truth for uploaded files. The full Docling markdown remains in
+`file_catalog.markdown_content`; Phase 6 writes the summary or small-document
+full text to `file_catalog.processed_content`. When follow-up and spec-builder
+prompts need first-party source context, Career Playbook builds a source
+evidence pack that prefers `markdown_content` as authoritative content and
+includes `processed_content` only as a summary overview or fallback. The pack is
+trimmed by an aggregate 250,000 estimated-token budget across all selected
+sources, preserving source boundaries and explicit unavailable-content warnings.
+
 The tRPC source lifecycle surface is `careerPlaybook.sources.listSources`,
 `uploadFile`, and `removeSource`. Draft reads include
 `businessContextSources`, so the web store can render persisted filenames,
 source status, source errors, and removal actions across constructor resume.
 
 Follow-up and spec-builder prompts receive the formatted business digest,
-processed source excerpts, and missing signals as separate prompt variables.
-Company-specific mode may treat the digest and available processed source
-excerpts as client-provided facts. If an uploaded source has no processed text
-yet, the prompt receives an explicit unavailable-content warning rather than raw
-UUIDs. Universal mode explicitly instructs the model not to invent
+source evidence pack, and missing signals as separate prompt variables.
+Company-specific mode may treat the digest and authoritative source content as
+client-provided facts. If an uploaded source has no source content available
+through markdown or processed fallback yet, the prompt receives an explicit
+unavailable-content warning rather than raw UUIDs.
+Universal mode explicitly instructs the model not to invent
 company/product/channel details; the generated Role Guide is a benchmark guide
 that names adaptation areas before operational rollout.
 
