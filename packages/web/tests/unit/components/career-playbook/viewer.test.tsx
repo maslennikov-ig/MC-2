@@ -14,8 +14,28 @@ import {
 } from '@/stores/use-career-playbook-store'
 
 vi.mock('@/components/markdown/MarkdownRendererFull', () => ({
-  MarkdownRendererFull: ({ content }: { content: string }) => (
-    <div data-testid="markdown-renderer">{content}</div>
+  MarkdownRendererFull: ({
+    content,
+    numericFacts,
+    onNumericFactClick,
+  }: {
+    content: string
+    numericFacts?: Array<{ id: string; raw_text: string }>
+    onNumericFactClick?: (fact: { id: string; raw_text: string }) => void
+  }) => (
+    <div data-testid="markdown-renderer">
+      {content}
+      {numericFacts?.map((fact) => (
+        <button
+          key={fact.id}
+          type="button"
+          data-testid={`numeric-fact-${fact.id}`}
+          onClick={() => onNumericFactClick?.(fact)}
+        >
+          {fact.raw_text}
+        </button>
+      ))}
+    </div>
   ),
 }))
 
@@ -304,6 +324,80 @@ describe('Career Playbook viewer components', () => {
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Показать правый блок' })).not.toBeInTheDocument()
     expect(screen.queryByText('Видимость')).not.toBeInTheDocument()
+  })
+
+  it('shows pastel numeric provenance summary and lets owners correct a numeric fact', async () => {
+    const user = userEvent.setup()
+    const handleUpdateNumericFact = vi.fn().mockResolvedValue(undefined)
+    const blocks = makeBlocks()
+    const blockSix = blocks.find((block) => block.blockId === 'block_6')
+    if (blockSix) {
+      blockSix.state = {
+        content: '## 6. KPI\n\nWin rate: 18%. Pipeline coverage: 3x.',
+        status: 'generated',
+        attempt: 1,
+        numeric_facts: [
+          {
+            id: 'block_6-18-percent-0',
+            block_id: 'block_6',
+            raw_text: '18%',
+            normalized_value: '18%',
+            status: 'needs_review',
+            source: 'model_suggestion',
+            confidence: 0.45,
+            occurrence_index: 0,
+            explanation: 'Точное значение не найдено в источниках.',
+          },
+          {
+            id: 'block_6-3x-0',
+            block_id: 'block_6',
+            raw_text: '3x',
+            normalized_value: '3x',
+            status: 'benchmark',
+            source: 'web_benchmark',
+            confidence: 0.7,
+            occurrence_index: 1,
+            explanation: 'Benchmark из внешнего исследования.',
+          },
+        ],
+      }
+    }
+
+    render(
+      <PlaybookViewer
+        snapshot={snapshot}
+        blocks={blocks}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onUpdateNumericFact={handleUpdateNumericFact}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    expect(within(inspector).getByText('Цифры')).toBeInTheDocument()
+    expect(within(inspector).getByText('Требует проверки: 1')).toBeInTheDocument()
+    expect(within(inspector).getByText('Benchmark: 1')).toBeInTheDocument()
+    expect(within(inspector).getByText('2 числовых значения')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('numeric-fact-block_6-18-percent-0'))
+    expect(screen.getByRole('dialog', { name: 'Проверить цифру' })).toBeInTheDocument()
+    expect(screen.getByText('Точное значение не найдено в источниках.')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Новое значение'))
+    await user.type(screen.getByLabelText('Новое значение'), '21%')
+    await user.click(screen.getByRole('button', { name: 'Сохранить цифру' }))
+
+    expect(handleUpdateNumericFact).toHaveBeenCalledWith({
+      blockId: 'block_6',
+      factId: 'block_6-18-percent-0',
+      replacementText: '21%',
+      scope: 'occurrence',
+    })
   })
 
   it('edits markdown and submits regeneration instructions from the block editor sheet', async () => {

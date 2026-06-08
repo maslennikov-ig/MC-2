@@ -183,6 +183,22 @@ export default function CareerPlaybookViewerPageClient({
       inspectorLanguage: (language: string) => t('inspectorLanguage', { language }),
       inspectorNextStep: t('inspectorNextStep'),
       inspectorPrepare: t('inspectorPrepare'),
+      numericFactsTitle: t('numericFactsTitle'),
+      numericFactTotal: (count: number) => t('numericFactTotal', { count }),
+      numericFactVerified: (count: number) => t('numericFactVerified', { count }),
+      numericFactBenchmark: (count: number) => t('numericFactBenchmark', { count }),
+      numericFactNeedsReview: (count: number) => t('numericFactNeedsReview', { count }),
+      numericFactSuggested: (count: number) => t('numericFactSuggested', { count }),
+      numericFactStructural: (count: number) => t('numericFactStructural', { count }),
+      numericFactConflict: (count: number) => t('numericFactConflict', { count }),
+      numericEditTitle: t('numericEditTitle'),
+      numericEditDescription: (value: string) => t('numericEditDescription', { value }),
+      numericReplacementLabel: t('numericReplacementLabel'),
+      numericScopeLabel: t('numericScopeLabel'),
+      numericScopeOccurrence: t('numericScopeOccurrence'),
+      numericScopeBlock: t('numericScopeBlock'),
+      numericSave: t('numericSave'),
+      numericCancel: t('numericCancel'),
       actions: {
         actionsLabel: t('actionsLabel'),
         pdf: t('pdf'),
@@ -421,8 +437,21 @@ export default function CareerPlaybookViewerPageClient({
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
         isUpdatingVisibility={isUpdatingVisibility}
+        isUpdatingNumericFact={state.isUpdatingViewerBlock}
         onVisibilityChange={(visibility) => {
           void handleVisibilityChange(visibility)
+        }}
+        onUpdateNumericFact={async (input) => {
+          if (!canEditViewer) return false
+          const result = await useCareerPlaybookStore
+            .getState()
+            .updateCareerPlaybookNumericFact(input)
+          if (!result.ok) {
+            setBackendPendingMessage(result.error ?? t('numericSaveError'))
+            return false
+          }
+          setBackendPendingMessage(t('numericSaved'))
+          return true
         }}
       />
       {commonEditor}

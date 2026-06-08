@@ -254,6 +254,7 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
 {{heading_header}}
 {{heading_block_1}}
@@ -289,6 +290,7 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
 {{heading_block_3}}
 {{heading_block_4}}
@@ -325,6 +327,7 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
 ## 7. Необходимые компетенции
 ## 9. Как AI меняет эту роль
@@ -354,6 +357,7 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Include a Mermaid flowchart TB career diagram in Block 11.
 - Use exactly these top-level headings:
 ## 11. Карьерный рост
@@ -385,6 +389,7 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Include Mermaid diagrams in Blocks 10 and 16.
 - Use exactly these top-level headings:
 ## 10. Взаимодействие и зависимости
@@ -418,6 +423,7 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
 ## 18. FAQ
 ## 22. "Как со мной работать" (заполняется сотрудником)
@@ -509,6 +515,7 @@ User edit instruction:
 {{user_instruction}}
 
 Return only markdown for this one block.
+Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 
 USER:
 RoleProfileSpec:

@@ -15,6 +15,7 @@ const {
   getCareerPlaybookFromLibrary,
   listCareerPlaybooks,
   toggleCareerPlaybookShare,
+  updateCareerPlaybookNumericFact,
   updateCareerPlaybookVisibility,
 } = await import('../../src/server/routers/career-playbook/library-service');
 
@@ -216,5 +217,159 @@ describe('career-playbook library visibility service', () => {
     );
     expect(result.visibility).toBe('public');
     expect(result.isPublic).toBe(true);
+  });
+
+  it('persists owner numeric fact corrections and refreshes final markdown', async () => {
+    const rowWithNumericFact: CareerPlaybookRow = {
+      ...baseRow,
+      generated_blocks: {
+        block_6: {
+          content: '## 6. KPI\n\nWin rate: 18%. Pipeline coverage: 3x.',
+          status: 'generated',
+          attempt: 1,
+          numeric_facts: [
+            {
+              id: 'block_6-18-percent-0',
+              block_id: 'block_6',
+              raw_text: '18%',
+              normalized_value: '18%',
+              status: 'needs_review',
+              source: 'model_suggestion',
+              confidence: 0.45,
+              occurrence_index: 0,
+              explanation: 'Точное значение не найдено в источниках.',
+            },
+          ],
+        },
+      },
+      final_markdown: '## 6. KPI\n\nWin rate: 18%. Pipeline coverage: 3x.',
+    };
+    const update = chainUpdateResult({
+      data: {
+        ...rowWithNumericFact,
+        generated_blocks: {
+          block_6: {
+            content: '## 6. KPI\n\nWin rate: 21%. Pipeline coverage: 3x.',
+            status: 'generated',
+            attempt: 1,
+            numeric_facts: [
+              {
+                id: 'block_6-21-percent-0',
+                block_id: 'block_6',
+                raw_text: '21%',
+                normalized_value: '21%',
+                status: 'verified',
+                source: 'user_input',
+                confidence: 1,
+                occurrence_index: 0,
+                explanation: 'Исправлено пользователем.',
+              },
+            ],
+          },
+        },
+        final_markdown: '## 6. KPI\n\nWin rate: 21%. Pipeline coverage: 3x.',
+      },
+      error: null,
+    });
+    fromMock.mockReturnValueOnce(chainResult({ data: rowWithNumericFact, error: null }));
+    fromMock.mockReturnValueOnce(update.chain);
+
+    const result = await updateCareerPlaybookNumericFact(ctx(owner), {
+      playbookId: baseRow.id,
+      blockId: 'block_6',
+      factId: 'block_6-18-percent-0',
+      replacementText: '21%',
+      scope: 'occurrence',
+    });
+
+    expect(update.updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        final_markdown: '## 6. KPI\n\nWin rate: 21%. Pipeline coverage: 3x.',
+      })
+    );
+    const payload = update.updateSpy.mock.calls[0]?.[0] as {
+      generated_blocks?: Record<string, { content?: string; numeric_facts?: unknown[] }>;
+    };
+    expect(payload.generated_blocks?.block_6.content).toContain('21%');
+    expect(payload.generated_blocks?.block_6.numeric_facts?.[0]).toMatchObject({
+      raw_text: '21%',
+      status: 'verified',
+      source: 'user_input',
+    });
+    expect(result.content).toContain('21%');
+    expect(result.numeric_facts?.[0]?.raw_text).toBe('21%');
+  });
+
+  it('patches the edited block in final markdown when the same number appears earlier', async () => {
+    const oldBlock = '## 6. KPI\n\nWin rate: 18%.';
+    const rowWithEarlierNumber: CareerPlaybookRow = {
+      ...baseRow,
+      generated_blocks: {
+        block_6: {
+          content: oldBlock,
+          status: 'generated',
+          attempt: 1,
+          numeric_facts: [
+            {
+              id: 'block_6-18-percent-0',
+              block_id: 'block_6',
+              raw_text: '18%',
+              normalized_value: '18%',
+              status: 'needs_review',
+              source: 'model_suggestion',
+              confidence: 0.45,
+              occurrence_index: 0,
+              explanation: 'Точное значение не найдено в источниках.',
+            },
+          ],
+        },
+      },
+      final_markdown: `## Intro\n\nCompany benchmark: 18%.\n\n${oldBlock}`,
+    };
+    const update = chainUpdateResult({
+      data: {
+        ...rowWithEarlierNumber,
+        generated_blocks: {
+          block_6: {
+            content: '## 6. KPI\n\nWin rate: 21%.',
+            status: 'generated',
+            attempt: 1,
+            numeric_facts: [],
+          },
+        },
+        final_markdown: '## Intro\n\nCompany benchmark: 18%.\n\n## 6. KPI\n\nWin rate: 21%.',
+      },
+      error: null,
+    });
+    fromMock.mockReturnValueOnce(chainResult({ data: rowWithEarlierNumber, error: null }));
+    fromMock.mockReturnValueOnce(update.chain);
+
+    await updateCareerPlaybookNumericFact(ctx(owner), {
+      playbookId: baseRow.id,
+      blockId: 'block_6',
+      factId: 'block_6-18-percent-0',
+      replacementText: '21%',
+      scope: 'occurrence',
+    });
+
+    expect(update.updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        final_markdown: '## Intro\n\nCompany benchmark: 18%.\n\n## 6. KPI\n\nWin rate: 21%.',
+      })
+    );
+  });
+
+  it('rejects numeric fact corrections for organization readers', async () => {
+    fromMock.mockReturnValue(chainResult({ data: baseRow, error: null }));
+
+    await expect(
+      updateCareerPlaybookNumericFact(ctx(orgMember), {
+        playbookId: baseRow.id,
+        blockId: 'block_6',
+        factId: 'block_6-18-percent-0',
+        replacementText: '21%',
+        scope: 'occurrence',
+      })
+    ).rejects.toMatchObject<Partial<TRPCError>>({ code: 'FORBIDDEN' });
   });
 });
