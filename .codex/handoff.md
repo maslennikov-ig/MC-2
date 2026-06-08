@@ -8,10 +8,8 @@ Branch: `codex/career-playbook-generation-progress`
 
 - Career Playbook generation progress UX is implemented in the current branch.
 - Generation progress is persisted in existing `career_playbooks.q_a_data.generation_progress`.
-- Backend generation graph reports staged progress from queued/preparing through block groups,
-  review, final assembly, completion, and failure.
-- Frontend final review now shows the primary generation CTA/progress in the center, with
-  clear stage text, percentage, auto-open hint, and disabled duplicate action while generating.
+- Backend generation graph reports staged progress through block generation, review, assembly, completion, and failure.
+- Frontend final review shows the primary generation CTA/progress in the center with stage text, percentage, and auto-open hint.
 - Completed generation auto-opens the generated Role Guide in production after a short delay.
 - Userback widget load failures no longer create unhandled promise console errors.
 - PWA install prompt suppression avoids preventDefault noise when installed/recently dismissed.
@@ -26,25 +24,21 @@ Branch: `codex/career-playbook-generation-progress`
 - Passed: `pnpm build` with web env sourced from `/home/me/code/mc2/packages/web/.env.local`.
 - Passed: `git diff --check`.
 
-## Next Recommended
+## Next recommended
 
-Recommended action: review/pull `codex/career-playbook-generation-progress`; merge/deploy only
-after explicit delivery request.
+Next stage id: none.
+Recommended action: review/pull `codex/career-playbook-generation-progress`; merge/deploy only after explicit delivery request.
 
-## Starter Prompt For Next Orchestrator
+## Starter prompt for next orchestrator
 
 Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`,
-`.codex/stages/mc2-db696.66/summary.md`, Beads `mc2-db696.66`, and Graphify report. Continue from
-branch `codex/career-playbook-generation-progress`.
+`.codex/stages/mc2-db696.66/summary.md`, Beads `mc2-db696.66`, and Graphify report.
 
 ## Delivery
 
-- docs-reviewed: no-change-needed - no public docs, API docs, migrations, deployment docs, or durable
-  operator docs require updates.
-- graph-reviewed: used - worktree graph artifacts were absent; main repo `graphify-out/GRAPH_REPORT.md`
-  was read and focused `graphify query` was used for Career Playbook frontend/backend dependencies.
-- Delivery requested: not yet.
+- docs-reviewed: no-change-needed - no public/API/migration/deploy/operator docs require updates.
+- graph-reviewed: used - main repo `GRAPH_REPORT.md` was read and focused `graphify query` was used.
 
-## Explicit Defers
+## Explicit defers
 
 - None.
