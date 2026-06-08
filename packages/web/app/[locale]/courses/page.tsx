@@ -223,14 +223,14 @@ export default async function CoursesLandingPage({ params }: Props) {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/career-playbook"
-                  className="inline-flex min-h-12 items-center justify-center gap-3 rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition hover:bg-purple-700"
+                  className="inline-flex min-h-12 items-center justify-center gap-3 rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition hover:bg-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7f1e8] focus-visible:outline-none dark:focus-visible:ring-offset-slate-950"
                 >
                   {t('primaryCta')}
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
                 </Link>
                 <Link
                   href="/create"
-                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 bg-white/70 px-6 py-3 font-semibold text-slate-900 transition hover:border-purple-300 hover:bg-white hover:text-purple-700 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 bg-white/70 px-6 py-3 font-semibold text-slate-900 transition hover:border-purple-300 hover:bg-white hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7f1e8] focus-visible:outline-none dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
                 >
                   {t('createCourseCta')}
                 </Link>

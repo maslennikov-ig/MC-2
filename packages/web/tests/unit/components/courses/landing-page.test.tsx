@@ -84,6 +84,31 @@ describe('CoursesLandingPage', () => {
     expect(screen.queryByRole('heading', { name: 'Каталог курсов' })).not.toBeInTheDocument()
   })
 
+  it('keeps the final CTA light by default and dark only in dark mode', async () => {
+    render(await CoursesLandingPage({ params: Promise.resolve({ locale: 'ru' }) }))
+
+    const heading = screen.getByRole('heading', {
+      name: 'Начните с роли, чтобы курс был точным',
+    })
+    const ctaSection = heading.closest('section')
+    const ctaSurface = ctaSection?.querySelector('div')
+
+    expect(ctaSurface).toHaveClass('bg-white/75', 'text-slate-950', 'dark:bg-slate-900/85')
+    expect(ctaSurface).not.toHaveClass('bg-slate-950', 'dark:bg-white', 'dark:text-slate-950')
+  })
+
+  it('gives final CTA links a visible keyboard focus state', async () => {
+    render(await CoursesLandingPage({ params: Promise.resolve({ locale: 'ru' }) }))
+
+    const primaryLink = screen.getAllByRole('link', {
+      name: 'Начать с должностной инструкции',
+    })[1]
+    const secondaryLink = screen.getByRole('link', { name: 'Создать курс' })
+
+    expect(primaryLink).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-purple-500')
+    expect(secondaryLink).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-purple-500')
+  })
+
   it('generates landing metadata for /courses', async () => {
     const metadata = await generateMetadata({ params: Promise.resolve({ locale: 'en' }) })
 
