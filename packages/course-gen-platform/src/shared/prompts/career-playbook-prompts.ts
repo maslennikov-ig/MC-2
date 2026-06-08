@@ -12,6 +12,12 @@ const contentLanguageVariable = {
   required: true,
 };
 
+const contentLanguageNameVariable = {
+  name: 'content_language_name',
+  description: 'Target content language full English name for prompt clarity',
+  required: true,
+};
+
 const groupHeadingVariables = [
   { name: 'heading_header', description: 'Localized Header heading', required: true },
   { name: 'heading_block_1', description: 'Localized Block 1 heading', required: true },
@@ -79,6 +85,9 @@ Rules:
 - If business_context_mode is "universal", ask role-specific benchmark questions and do not invent company-specific product, customer, sales, process, or metric facts.
 - Prefer single_choice or multi_choice when sensible options exist.
 - Use "ready_to_generate" only when completeness_score is at least 0.75 and no critical gaps remain; otherwise use "ask_more".
+- Write every user-facing string in questions[].question_text, questions[].options[].label, and questions[].rationale in {{content_language_name}}.
+- Do not write user-facing strings in English unless content_language_name is English. Product names, acronyms, role titles, and technical terms supplied by the user may remain unchanged.
+- Keep options[].value as stable machine-readable snake_case identifiers; do not localize options[].value.
 - Return only valid JSON matching this shape:
 {
   "questions": [
@@ -101,7 +110,8 @@ Level: {{level}}
 Team size: {{team_size}}
 Company stage: {{company_stage}}
 Reports to / subordinates: {{reporting}}
-Content language: {{content_language}}
+Content language code: {{content_language}}
+Content language name: {{content_language_name}}
 Free-form context: {{freeform_text}}
 Business context mode: {{business_context_mode}}
 Business context digest:
@@ -119,6 +129,7 @@ Previous follow-ups answered: {{previous_followups_json}}`,
       { name: 'company_stage', description: 'Company stage', required: true },
       { name: 'reporting', description: 'Reporting line and subordinates', required: true },
       contentLanguageVariable,
+      contentLanguageNameVariable,
       { name: 'freeform_text', description: 'Optional free-form context', required: true },
       {
         name: 'business_context_mode',
