@@ -158,7 +158,7 @@ export default function ProfileMenu({
   const allActions = [...defaultActions, ...customActions]
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu modal={false} open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

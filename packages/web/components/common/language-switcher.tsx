@@ -167,7 +167,7 @@ export function LanguageSwitcher({
   // For menu-item variant, render a simpler trigger for embedding
   if (variant === 'menu-item') {
     return (
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <div
             className={cn(
@@ -192,7 +192,13 @@ export function LanguageSwitcher({
             <ChevronDown className="h-4 w-4 opacity-50" />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[160px]">
+        <DropdownMenuContent
+          align="end"
+          side="bottom"
+          sideOffset={24}
+          collisionPadding={16}
+          className="min-w-[160px]"
+        >
           {locales.map((loc) => {
             const Flag = FLAGS[loc]
             const isSelected = loc === locale
@@ -215,7 +221,7 @@ export function LanguageSwitcher({
 
   // Button variant for header
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -227,13 +233,21 @@ export function LanguageSwitcher({
             className
           )}
           aria-label={t('metadata.title')} // Using existing translation as fallback
+          data-testid="header-language-menu-trigger"
         >
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CurrentFlag />}
           {!compact && <span className="text-xs font-medium uppercase">{locale}</span>}
           {showChevron && <ChevronDown className="h-3 w-3 opacity-50" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[180px]">
+      <DropdownMenuContent
+        align="end"
+        side="bottom"
+        sideOffset={24}
+        collisionPadding={16}
+        className="min-w-[180px]"
+        data-testid="header-language-menu"
+      >
         {locales.map((loc) => {
           const Flag = FLAGS[loc]
           const isSelected = loc === locale

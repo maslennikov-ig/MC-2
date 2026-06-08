@@ -72,11 +72,15 @@ answers.
 
 ## Business Context Intake
 
-The constructor now has an intermediate Business Context phase between fixed
+The constructor has an intermediate Business Context phase between fixed
 questions and follow-up generation. The web step lives in
-`BusinessContextStep.tsx` and uses the document-first constructor shell: category
-navigation on the left, an editable digest in the center, and source guidance
-plus upload controls on the right.
+`BusinessContextStep.tsx` and uses the document-first constructor shell as a
+guided mini-wizard: category navigation on the left, one active input workspace
+in the center, and summary/status/source readiness on the right. The
+`Материалы и заметки` / `Materials and notes` step is the central place for
+pasted freeform text and file upload. Product, customer, sales/channel, process,
+metric, organization, and constraint signals are separate center steps rather
+than competing right-panel inputs.
 
 The shared `CareerPlaybookQADataSchema` stores `business_context` with:
 
@@ -179,7 +183,10 @@ pnpm --filter @megacampus/web exec playwright test tests/e2e/header-dropdown-pos
 `PLAYWRIGHT_DISABLE_VIDEO=1` is only a local fallback for environments missing
 Playwright's ffmpeg bundle; default reporting still retains failure videos.
 
-Authenticated browser tests still require a valid `TOKEN` storage-state input. Without `TOKEN`, only unauthenticated/public checks run.
+Authenticated browser tests use Playwright global setup to sign in the server
+fixture user `test-instructor1@megacampus.com` and write
+`packages/web/tests/.auth/user.json`. A `TOKEN` storage-state input remains only
+as a legacy fallback for environments that cannot use the server fixture.
 
 ## Backend Read-Only Smoke
 

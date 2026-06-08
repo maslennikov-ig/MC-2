@@ -195,7 +195,7 @@ function ProductNavItem({
         {icon}
         <span className="hidden lg:inline">{label}</span>
       </Link>
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           aria-label={menuAriaLabel}
           data-testid={menuTriggerTestId}

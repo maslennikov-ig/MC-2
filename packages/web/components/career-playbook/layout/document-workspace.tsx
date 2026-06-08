@@ -56,9 +56,9 @@ export function CareerPlaybookDocumentShell({
         className
       )}
     >
-      <div className="order-3 xl:order-1">{navigation}</div>
+      <div className="order-1 xl:order-1">{navigation}</div>
       <div className="order-2 min-w-0 xl:order-2">{document}</div>
-      <div className="order-1 min-w-0 xl:order-3">{panel}</div>
+      <div className="order-3 min-w-0 xl:order-3">{panel}</div>
     </section>
   )
 }
