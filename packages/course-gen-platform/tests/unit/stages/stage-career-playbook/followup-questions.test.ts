@@ -71,6 +71,40 @@ const followupResponse = {
   stop_recommendation: 'ask_more',
 };
 
+const mixedLanguageFollowupResponse = {
+  questions: [
+    {
+      question_id: '00000000-0000-4000-8000-000000000004',
+      question_text: 'Which CRM-метрика should define success?',
+      question_type: 'single_choice',
+      options: [
+        { value: 'pipeline_coverage', label: 'Pipeline покрытие' },
+        { value: 'win_rate', label: 'Win rate ставка' },
+      ],
+      rationale: 'The инструкция needs one measurable anchor.',
+    },
+  ],
+  completeness_score: 0.82,
+  stop_recommendation: 'ask_more',
+};
+
+const russianFollowupResponse = {
+  questions: [
+    {
+      question_id: '00000000-0000-4000-8000-000000000003',
+      question_text: 'Какая CRM-метрика должна определять успех роли?',
+      question_type: 'single_choice',
+      options: [
+        { value: 'pipeline_coverage', label: 'Покрытие воронки' },
+        { value: 'win_rate', label: 'Процент выигранных сделок' },
+      ],
+      rationale: 'Должностная инструкция должна опираться на один измеримый критерий.',
+    },
+  ],
+  completeness_score: 0.82,
+  stop_recommendation: 'ask_more',
+};
+
 function createSourceRowsBuilder(data: unknown[], error: unknown = null) {
   const builder = {
     select: vi.fn(() => builder),
@@ -134,6 +168,7 @@ describe('Career Playbook follow-up questions helper', () => {
         company_stage: 'growth',
         reporting: 'Reports to CRO. Leads 3 SDRs.',
         content_language: 'ru',
+        content_language_name: 'Russian',
         freeform_text: 'Enterprise sales, consultative deals, CRM discipline.',
         business_context_mode: 'company_specific',
       })
@@ -208,7 +243,7 @@ describe('Career Playbook follow-up questions helper', () => {
     );
     const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
-      content: JSON.stringify(followupResponse),
+      content: JSON.stringify(russianFollowupResponse),
       model: 'mock-career-model',
       inputTokens: 90,
       outputTokens: 110,
@@ -245,10 +280,11 @@ describe('Career Playbook follow-up questions helper', () => {
         phaseName: 'stage_career_playbook_followup',
         promptKey: 'career_playbook_followup_generator',
         node: 'followupGenerator',
+        language: 'ru',
       })
     );
     expect(result.response.questions[0]?.question_text).toBe(
-      'Which CRM metric should define success?'
+      'Какая CRM-метрика должна определять успех роли?'
     );
     expect(result.nodeCost).toEqual({
       node: 'followupGenerator',
@@ -257,5 +293,118 @@ describe('Career Playbook follow-up questions helper', () => {
       output_tokens: 110,
       cost_usd: 0.01,
     });
+  });
+
+  it('requests structured follow-up JSON from the runtime', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: JSON.stringify(russianFollowupResponse),
+      model: 'mock-career-model',
+      inputTokens: 90,
+      outputTokens: 110,
+      costUsd: 0.01,
+    });
+
+    await generateCareerPlaybookFollowups(
+      {
+        qaData,
+        language: 'ru',
+        businessContextSourceExcerpts: '- none',
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(invokeLLM).toHaveBeenCalledWith(
+      'rendered followup prompt',
+      expect.objectContaining({
+        structuredOutputName: 'career_playbook_followups',
+        structuredOutputMethod: 'jsonSchema',
+        structuredOutputStrict: true,
+      })
+    );
+  });
+
+  it('repairs English-heavy follow-up output before returning Russian follow-ups', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
+    const invokeLLM = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: JSON.stringify(followupResponse),
+        model: 'fast-model',
+        inputTokens: 90,
+        outputTokens: 110,
+        costUsd: 0.01,
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(russianFollowupResponse),
+        model: 'fallback-model',
+        inputTokens: 120,
+        outputTokens: 130,
+        costUsd: 0.02,
+      });
+
+    const result = await generateCareerPlaybookFollowups(
+      {
+        qaData,
+        language: 'ru',
+        businessContextSourceExcerpts: '- none',
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(result.response.questions[0]?.question_text).toBe(
+      'Какая CRM-метрика должна определять успех роли?'
+    );
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
+    expect(invokeLLM).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('Previous follow-up response failed target-language validation'),
+      expect.objectContaining({
+        preferFallbackModel: true,
+        maxTokensMultiplier: 1.1,
+        structuredOutputName: 'career_playbook_followups',
+      })
+    );
+    expect(result.nodeCost).toEqual({
+      node: 'followupGenerator',
+      model: 'fallback-model',
+      input_tokens: 210,
+      output_tokens: 240,
+      cost_usd: 0.03,
+    });
+  });
+
+  it('repairs mostly English mixed-language Russian follow-up fields', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered followup prompt');
+    const invokeLLM = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: JSON.stringify(mixedLanguageFollowupResponse),
+        model: 'fast-model',
+        inputTokens: 90,
+        outputTokens: 110,
+        costUsd: 0.01,
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(russianFollowupResponse),
+        model: 'fallback-model',
+        inputTokens: 120,
+        outputTokens: 130,
+        costUsd: 0.02,
+      });
+
+    const result = await generateCareerPlaybookFollowups(
+      {
+        qaData,
+        language: 'ru',
+        businessContextSourceExcerpts: '- none',
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(result.response.questions[0]?.question_text).toBe(
+      'Какая CRM-метрика должна определять успех роли?'
+    );
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
   });
 });
