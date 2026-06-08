@@ -6,6 +6,7 @@ import {
 } from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
 import { getCareerPlaybookBusinessContextSupabase } from '@/shared/career-playbook/source-db';
+import { tokenEstimator } from '@/shared/llm/token-estimator';
 
 type DigestArrayKey =
   | 'product'
@@ -26,9 +27,10 @@ const DIGEST_LABELS: Array<[DigestArrayKey, string]> = [
   ['constraints', 'Constraints'],
 ];
 
-const DEFAULT_MAX_SOURCE_EXCERPTS = 4;
-const DEFAULT_MAX_SOURCE_CHARS = 1_200;
+const DEFAULT_SOURCE_EVIDENCE_TOKEN_BUDGET = 250_000;
 const DIGEST_TEXT_LIMIT = 6_000;
+const TRUNCATION_NOTICE = '[truncated to fit Career Playbook source budget]';
+const SOURCE_EVIDENCE_TOKEN_LANGUAGE = 'rus';
 
 interface CareerPlaybookSourceRecord {
   id: string;
@@ -54,6 +56,7 @@ export interface RefreshCareerPlaybookBusinessContextDigestInput {
   freeformText?: string;
   maxSources?: number;
   maxCharsPerSource?: number;
+  maxAggregateTokens?: number;
 }
 
 export interface RefreshCareerPlaybookBusinessContextDigestResult {
@@ -121,9 +124,51 @@ function truncateSourceText(value: string, maxChars: number): string {
   return normalized.length > maxChars ? `${normalized.slice(0, maxChars).trim()}...` : normalized;
 }
 
-function firstAvailableContent(file: FileCatalogSourceRecord | undefined): string | null {
+function authoritativeSourceContent(file: FileCatalogSourceRecord | undefined): string | null {
   if (!file) return null;
-  return file.processed_content || file.markdown_content || null;
+  return file.markdown_content || file.processed_content || null;
+}
+
+function digestSourceContent(file: FileCatalogSourceRecord | undefined): string | null {
+  if (!file) return null;
+  const parts = [file.processed_content, file.markdown_content]
+    .filter((content): content is string => Boolean(content?.trim()))
+    .filter((content, index, values) => values.indexOf(content) === index);
+
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
+function estimateTokens(value: string): number {
+  return tokenEstimator.estimateTokens(value, SOURCE_EVIDENCE_TOKEN_LANGUAGE);
+}
+
+function trimToTokenBudget(value: string, tokenBudget: number): string {
+  if (tokenBudget <= 0) return '';
+  const estimatedTokens = estimateTokens(value);
+  if (estimatedTokens <= tokenBudget) return value;
+
+  const ratio = value.length / Math.max(estimatedTokens, 1);
+  const maxChars = Math.max(0, Math.floor(tokenBudget * ratio));
+  if (maxChars <= 0) return '';
+
+  return `${value.slice(0, maxChars).trimEnd()}\n${TRUNCATION_NOTICE}`;
+}
+
+function appendWithinBudget(parts: string[], value: string, budget: { remaining: number }): void {
+  if (!value.trim() || budget.remaining <= 0) return;
+
+  const valueTokens = estimateTokens(value);
+  if (valueTokens <= budget.remaining) {
+    parts.push(value);
+    budget.remaining -= valueTokens;
+    return;
+  }
+
+  const trimmed = trimToTokenBudget(value, budget.remaining);
+  if (!trimmed) return;
+
+  parts.push(trimmed);
+  budget.remaining = 0;
 }
 
 function normalizeDigestValue(value: string): string {
@@ -257,32 +302,71 @@ function buildDigestFromText(input: {
   return digest;
 }
 
-function formatLoadedSourceExcerpts(
+function formatLoadedSourceEvidence(
   sources: LoadedCareerPlaybookSourceRecord[],
-  maxCharsPerSource: number
+  options: {
+    maxCharsPerSource?: number;
+    maxAggregateTokens?: number;
+  } = {}
 ): string {
   if (sources.length === 0) return '- none';
 
-  return sources
-    .map((source, index) => {
-      const content = firstAvailableContent(source.file);
-      const filename = source.filename || source.file?.filename || `source-${index + 1}`;
+  const maxAggregateTokens = options.maxAggregateTokens ?? DEFAULT_SOURCE_EVIDENCE_TOKEN_BUDGET;
+  const parts = [
+    [
+      'Source evidence pack.',
+      `Aggregate budget: ${maxAggregateTokens} estimated tokens across all selected sources.`,
+      'Use authoritative source content for company-specific facts. Treat summaries as overview only.',
+    ].join('\n'),
+  ];
+  const budget = {
+    remaining: Math.max(0, maxAggregateTokens - estimateTokens(parts[0] ?? '')),
+  };
 
-      if (!content) {
-        return [
+  for (const [index, source] of sources.entries()) {
+    if (budget.remaining <= 0) {
+      parts.push(TRUNCATION_NOTICE);
+      break;
+    }
+
+    const filename = source.filename || source.file?.filename || `source-${index + 1}`;
+    const authoritativeContent = authoritativeSourceContent(source.file);
+    const summaryOverview =
+      source.file?.processed_content &&
+      source.file.markdown_content &&
+      source.file.processed_content !== source.file.markdown_content
+        ? source.file.processed_content
+        : null;
+
+    if (!authoritativeContent) {
+      appendWithinBudget(
+        parts,
+        [
           `[Source ${index + 1}: ${filename}]`,
           `Status: ${source.status}. Processed text is not available yet.`,
           'Do not infer facts from this file. Ask the user targeted questions if these facts are needed.',
-        ].join('\n');
-      }
+        ].join('\n'),
+        budget
+      );
+      continue;
+    }
 
-      return [
-        `[Source ${index + 1}: ${filename}]`,
-        `Status: ${source.status}.`,
-        truncateSourceText(content, maxCharsPerSource),
-      ].join('\n');
-    })
-    .join('\n\n');
+    const sourceContent = options.maxCharsPerSource
+      ? truncateSourceText(authoritativeContent, options.maxCharsPerSource)
+      : authoritativeContent;
+    const sourceParts = [
+      `[Source ${index + 1}: ${filename}]`,
+      `Status: ${source.status}.`,
+      `Authoritative source content (${source.file?.markdown_content ? 'Docling markdown' : 'processed content fallback'}):\n${sourceContent}`,
+      summaryOverview
+        ? `Summary overview (not authoritative when it conflicts with source content):\n${summaryOverview}`
+        : null,
+    ].filter((part): part is string => Boolean(part));
+
+    appendWithinBudget(parts, sourceParts.join('\n\n'), budget);
+  }
+
+  return parts.join('\n\n');
 }
 
 async function loadBusinessContextSources(input: {
@@ -294,7 +378,7 @@ async function loadBusinessContextSources(input: {
 
   const selectedSourceIds = Array.from(new Set(input.sourceIds))
     .filter(Boolean)
-    .slice(0, input.maxSources ?? DEFAULT_MAX_SOURCE_EXCERPTS);
+    .slice(0, input.maxSources);
   if (selectedSourceIds.length === 0) return [];
 
   const supabase = getCareerPlaybookBusinessContextSupabase();
@@ -337,7 +421,7 @@ async function loadBusinessContextSources(input: {
           playbookId: input.playbookId,
           fileCount: fileCatalogIds.length,
         },
-        'Failed to load Career Playbook business context file excerpts'
+        'Failed to load Career Playbook business context source evidence'
       );
     } else {
       for (const file of (fileRows ?? []) as FileCatalogSourceRecord[]) {
@@ -381,7 +465,7 @@ export async function refreshCareerPlaybookBusinessContextDigest(
   );
   const hasFailedSources = sources.some(source => source.status === 'failed');
   const sourceTexts = sources
-    .map(source => firstAvailableContent(source.file))
+    .map(source => digestSourceContent(source.file))
     .filter((content): content is string => Boolean(content));
   const digest = buildDigestFromText({
     context,
@@ -401,10 +485,10 @@ export async function refreshCareerPlaybookBusinessContextDigest(
 
   return {
     context: refreshedContext,
-    sourceExcerpts: formatLoadedSourceExcerpts(
-      sources,
-      input.maxCharsPerSource ?? DEFAULT_MAX_SOURCE_CHARS
-    ),
+    sourceExcerpts: formatLoadedSourceEvidence(sources, {
+      maxCharsPerSource: input.maxCharsPerSource,
+      maxAggregateTokens: input.maxAggregateTokens,
+    }),
     hasPendingSources,
     hasFailedSources,
   };
@@ -415,38 +499,41 @@ export async function loadCareerPlaybookBusinessContextSourceExcerpts(input: {
   context: CareerPlaybookBusinessContext;
   maxSources?: number;
   maxCharsPerSource?: number;
+  maxAggregateTokens?: number;
 }): Promise<string> {
   const sourceIds = Array.from(new Set(input.context.source_ids)).filter(Boolean);
   if (input.context.mode === 'universal' || sourceIds.length === 0) return '- none';
 
   if (!input.playbookId) {
     return [
-      'Uploaded source files are recorded, but source excerpts were not loaded because playbook_id is missing.',
+      'Uploaded source files are recorded, but source evidence was not loaded because playbook_id is missing.',
       'Do not infer company facts from source ids. Ask targeted follow-up questions for missing details.',
     ].join('\n');
   }
 
-  const maxCharsPerSource = input.maxCharsPerSource ?? DEFAULT_MAX_SOURCE_CHARS;
-  const sources = await loadBusinessContextSources({
-    playbookId: input.playbookId,
-    sourceIds,
-    maxSources: input.maxSources,
-  });
-
   try {
+    const sources = await loadBusinessContextSources({
+      playbookId: input.playbookId,
+      sourceIds,
+      maxSources: input.maxSources,
+    });
+
     if (sources.length === 0) {
       return 'Uploaded source ids were provided, but no matching source records were found for this playbook. Do not infer facts from source ids.';
     }
 
-    return formatLoadedSourceExcerpts(sources, maxCharsPerSource);
+    return formatLoadedSourceEvidence(sources, {
+      maxCharsPerSource: input.maxCharsPerSource,
+      maxAggregateTokens: input.maxAggregateTokens,
+    });
   } catch (error) {
     logger.warn(
       {
         err: error instanceof Error ? error.message : String(error),
         playbookId: input.playbookId,
       },
-      'Unexpected error while loading Career Playbook business context source excerpts'
+      'Unexpected error while loading Career Playbook business context source evidence'
     );
-    return 'Uploaded source files are recorded, but source excerpts could not be loaded. Do not infer facts from source ids.';
+    return 'Uploaded source files are recorded, but source evidence could not be loaded. Do not infer facts from source ids.';
   }
 }

@@ -106,7 +106,7 @@ Free-form context: {{freeform_text}}
 Business context mode: {{business_context_mode}}
 Business context digest:
 {{business_context_digest}}
-Business context source excerpts:
+Business context source evidence pack:
 {{business_context_source_excerpts}}
 Business context missing signals:
 {{business_context_missing_signals}}
@@ -133,7 +133,7 @@ Previous follow-ups answered: {{previous_followups_json}}`,
       {
         name: 'business_context_source_excerpts',
         description:
-          'Sanitized excerpts from processed first-party source files, or an unavailable-content warning',
+          'Career Playbook source evidence pack from first-party files. Prefer authoritative Docling markdown; summaries are overview only.',
         required: true,
       },
       {
@@ -176,7 +176,7 @@ Business context mode:
 Business context digest:
 {{business_context_digest}}
 
-Business context source excerpts:
+Business context source evidence pack:
 {{business_context_source_excerpts}}
 
 Business context missing signals:
@@ -208,7 +208,7 @@ Source URLs:
       {
         name: 'business_context_source_excerpts',
         description:
-          'Sanitized excerpts from processed first-party source files, or an unavailable-content warning',
+          'Career Playbook source evidence pack from first-party files. Prefer authoritative Docling markdown; summaries are overview only.',
         required: true,
       },
       {
