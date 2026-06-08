@@ -36,7 +36,7 @@ Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orches
 
 - docs-reviewed: updated - `docs/career-playbook/architecture.md`, `docs/career-playbook/e2e-test-plan.md`, this handoff, and stage summary record the new UX and verification state.
 - graph-reviewed: updated - Graphify refresh commands completed; no tracked graph diff remained.
-- No staging/production deploy was performed for this stage.
+- Delivery requested: merge to `develop`, deploy to `master` / staging, and sync `develop` after deploy.
 
 ## Explicit defers
 

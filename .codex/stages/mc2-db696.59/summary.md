@@ -41,4 +41,4 @@
 ## Explicit Defers
 
 - `mc2-db696.60` tracks a split deterministic browser E2E for Business Context → follow-ups once local backend/session sync timing is stable enough for that long transition.
-- No merge or staging/production deploy was performed in this stage.
+- Delivery requested: merge to `develop`, deploy to `master` / staging, and sync `develop` after deploy.
