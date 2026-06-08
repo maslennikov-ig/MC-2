@@ -40,21 +40,30 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.getByLabel('Какую должность вы хотите оформить?').fill('Руководитель продаж')
       await page.getByRole('button', { name: 'Далее' }).click()
       await expect(page.getByText(/Функциональная область: Продажи/)).toBeVisible()
-      await page.getByRole('button', { name: 'Далее' }).click()
-      await page.getByRole('radio', { name: /Ведущий специалист/ }).click()
+      const levelRadio = page.getByRole('radio', { name: /Ведущий специалист/ })
+      await expect(async () => {
+        if (!(await levelRadio.isVisible())) {
+          const nextButton = page.getByRole('button', { name: 'Далее' })
+          if (await nextButton.isEnabled()) {
+            await nextButton.click()
+          }
+        }
+        await expect(levelRadio).toBeVisible({ timeout: 1000 })
+      }).toPass({ timeout: 15000, intervals: [500, 1000] })
+      await levelRadio.click()
       await page.getByRole('button', { name: 'Далее' }).click()
       await page.getByLabel('Кому подчиняется и есть ли подчинённые?').fill('Подчиняется CRO.')
       await page.getByRole('button', { name: 'Далее' }).click()
       await page.getByRole('radio', { name: /201-1000 человек/ }).click()
       await page.getByRole('button', { name: 'Далее' }).click()
 
-      const questionPanel = page.getByTestId('career-playbook-question-panel')
-      await expect(questionPanel.getByText('Какая стадия компании / продукта?')).toBeVisible()
+      const questionWorkspace = page.getByTestId('career-playbook-question-workspace')
+      await expect(questionWorkspace.getByText('Какая стадия компании / продукта?')).toBeVisible()
 
       await page.reload()
       await page.waitForLoadState('networkidle')
 
-      await expect(questionPanel.getByText('Какая стадия компании / продукта?')).toBeVisible()
+      await expect(questionWorkspace.getByText('Какая стадия компании / продукта?')).toBeVisible()
       await page.getByRole('radio', { name: /Спрос подтверждён/ }).click()
       await expect(page.getByRole('button', { name: 'Завершить базовые вопросы' })).toBeVisible()
       await page.getByRole('button', { name: 'Назад' }).click()
@@ -67,7 +76,11 @@ test.describe('Career Playbook Phase A wizard', () => {
 
       await page.getByRole('button', { name: 'Завершить базовые вопросы' }).click()
 
-      await expect(page.getByRole('heading', { name: 'Контекст бизнеса' })).toBeVisible()
+      await expect(page.getByTestId('career-playbook-business-context-workspace')).toContainText(
+        'Материалы и заметки'
+      )
+      await expect(page.getByRole('heading', { name: 'Материалы и заметки' })).toBeVisible()
+      await expect(page.getByTestId('career-playbook-summary-panel')).toContainText('Сводка')
 
       const continueButton = page.getByRole('button', { name: 'Продолжить к уточнениям' })
       const notesInput = page.getByRole('textbox', { name: 'Текст и заметки' })
@@ -90,7 +103,7 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.reload()
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByRole('heading', { name: 'Контекст бизнеса' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Материалы и заметки' })).toBeVisible()
       await expect(page.getByRole('textbox', { name: 'Текст и заметки' })).toHaveValue(
         businessNotes
       )
@@ -105,15 +118,18 @@ test.describe('Career Playbook Phase A wizard', () => {
 
       await page.getByRole('textbox', { name: 'Текст и заметки' }).fill(businessNotes)
       await expect(page.getByRole('button', { name: 'Продолжить к уточнениям' })).toBeEnabled()
-      await page.getByRole('button', { name: 'Продолжить к уточнениям' }).click()
 
-      await expect(
-        page
-          .getByRole('heading', { name: 'Готовим уточнения' })
-          .or(page.getByRole('heading', { name: 'Адаптивные уточнения пока недоступны' }))
-          .or(page.getByRole('heading', { name: 'Уточнение' }))
-          .or(page.getByRole('heading', { name: 'Готовы создать?' }))
-      ).toBeVisible()
+      await page.getByRole('button', { name: 'Продукт' }).click()
+      await expect(page.getByRole('heading', { name: 'Продукт' })).toBeVisible()
+      await page.getByRole('textbox', { name: 'Продукт' }).fill('B2B SaaS platform')
+
+      await page.waitForTimeout(6000)
+      await page.reload()
+      await page.waitForLoadState('networkidle')
+
+      await expect(page.getByRole('heading', { name: 'Материалы и заметки' })).toBeVisible()
+      await page.getByRole('button', { name: 'Продукт' }).click()
+      await expect(page.getByRole('textbox', { name: 'Продукт' })).toHaveValue('B2B SaaS platform')
     })
   })
 })

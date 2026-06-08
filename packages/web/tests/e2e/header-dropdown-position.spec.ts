@@ -2,6 +2,36 @@ import { expect, test } from '@playwright/test'
 
 const authenticatedStorageState = './tests/.auth/user.json'
 
+type HorizontalLayoutSnapshot = {
+  headerLeft: number
+  contentLeft: number
+}
+
+async function getHorizontalLayoutSnapshot(page: import('@playwright/test').Page) {
+  return page.evaluate<HorizontalLayoutSnapshot>(() => {
+    const headerElement = document.querySelector('[data-testid="site-header"]')
+    const contentElement =
+      document.querySelector('main') ??
+      document.querySelector('[data-testid="career-playbook-workspace"]') ??
+      document.body
+    const headerRect = headerElement?.getBoundingClientRect()
+    const contentRect = contentElement?.getBoundingClientRect()
+
+    return {
+      headerLeft: headerRect?.left ?? Number.NaN,
+      contentLeft: contentRect?.left ?? Number.NaN,
+    }
+  })
+}
+
+function expectNoHorizontalShift(
+  before: HorizontalLayoutSnapshot,
+  after: HorizontalLayoutSnapshot
+) {
+  expect(Math.abs(after.headerLeft - before.headerLeft)).toBeLessThanOrEqual(1)
+  expect(Math.abs(after.contentLeft - before.contentLeft)).toBeLessThanOrEqual(1)
+}
+
 async function expectDropdownBelowStickyHeader(
   page: import('@playwright/test').Page,
   ids: {
@@ -13,10 +43,12 @@ async function expectDropdownBelowStickyHeader(
   const trigger = page.getByTestId(ids.trigger)
 
   await expect(header).toBeVisible()
+  const beforeOpen = await getHorizontalLayoutSnapshot(page)
   await trigger.click()
 
   const content = page.getByTestId(ids.content)
   await expect(content).toBeVisible()
+  expectNoHorizontalShift(beforeOpen, await getHorizontalLayoutSnapshot(page))
 
   const geometry = await page.evaluate(
     ({ contentTestId }) => {
@@ -40,6 +72,10 @@ async function expectDropdownBelowStickyHeader(
   expect(geometry.headerTop).toBeLessThanOrEqual(1)
   expect(geometry.contentTop).toBeGreaterThanOrEqual(geometry.headerBottom - 1)
   expect(geometry.contentBottom).toBeLessThanOrEqual(geometry.viewportHeight)
+
+  await page.keyboard.press('Escape')
+  await expect(content).not.toBeVisible()
+  expectNoHorizontalShift(beforeOpen, await getHorizontalLayoutSnapshot(page))
 }
 
 test.describe('Header dropdown positioning', () => {
@@ -54,11 +90,14 @@ test.describe('Header dropdown positioning', () => {
       content: 'header-role-guides-menu',
     })
 
-    await page.keyboard.press('Escape')
-
     await expectDropdownBelowStickyHeader(page, {
       trigger: 'header-courses-menu-trigger',
       content: 'header-courses-menu',
+    })
+
+    await expectDropdownBelowStickyHeader(page, {
+      trigger: 'header-language-menu-trigger',
+      content: 'header-language-menu',
     })
   })
 

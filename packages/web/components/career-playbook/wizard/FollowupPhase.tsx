@@ -4,7 +4,6 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Circle, ClipboardCheck, Gauge } fr
 import type { CareerPlaybookFollowupQuestion } from '@megacampus/shared-types'
 
 import {
-  CareerPlaybookDocumentPreview,
   CareerPlaybookDocumentShell,
   type CareerPlaybookPreviewSection,
 } from '@/components/career-playbook/layout/document-workspace'
@@ -33,6 +32,8 @@ interface FollowupPhaseCopy extends QuestionRendererCopy {
   documentPreviewSubtitle?: string
   documentPreviewEmpty?: string
   questionPanelLabel?: string
+  summaryLabel?: string
+  summaryTitle?: string
 }
 
 interface FollowupPhaseProps {
@@ -66,6 +67,8 @@ const defaultCopy: Required<FollowupPhaseCopy> = {
   documentPreviewSubtitle: 'Дополнительный контекст попадёт в будущий документ.',
   documentPreviewEmpty: 'Можно ответить или пропустить',
   questionPanelLabel: 'Текущий вопрос',
+  summaryLabel: 'Сводка',
+  summaryTitle: 'Уточняющие ответы',
   openPlaceholder: 'Введите ответ',
   chooseOneLabel: 'Выберите один вариант',
   chooseManyLabel: 'Можно выбрать несколько',
@@ -161,35 +164,77 @@ export function FollowupPhase({
         </aside>
       }
       document={
-        <CareerPlaybookDocumentPreview
-          label={labels.documentPreviewLabel}
-          title={labels.documentPreviewTitle}
-          subtitle={labels.documentPreviewSubtitle}
-          emptyLabel={labels.documentPreviewEmpty}
-          sections={previewSections}
-          footer={
-            <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-3 dark:text-slate-400">
-              <Milestone
-                percent={60}
-                label={labels.milestone60}
-                active={completenessPercent >= 60}
+        <article
+          data-testid="career-playbook-followup-workspace"
+          className="career-playbook-document min-h-[34rem] px-5 py-6 md:px-8 md:py-8"
+        >
+          <header className="career-playbook-document-rule space-y-5 border-b pb-5">
+            <span className="career-playbook-pill inline-flex items-center gap-2 px-3 py-1.5 text-[13px] leading-5 font-medium text-slate-600 dark:text-slate-300">
+              <ClipboardCheck
+                className="h-4 w-4 text-purple-600 dark:text-purple-300"
+                aria-hidden
               />
-              <Milestone
-                percent={80}
-                label={labels.milestone80}
-                active={completenessPercent >= 80}
-              />
-              <Milestone
-                percent={100}
-                label={labels.milestone100}
-                active={completenessPercent >= 100}
-              />
+              {labels.questionPanelLabel}
+            </span>
+            <div className="max-w-3xl space-y-2">
+              <h2 className="text-[18px] leading-7 font-semibold tracking-normal text-slate-950 dark:text-slate-50">
+                {labels.title} {safeIndex + 1} {labels.ofLabel} {questions.length}
+              </h2>
             </div>
-          }
-        />
+          </header>
+
+          <div className="mt-6">
+            <QuestionRenderer
+              question={currentQuestion}
+              value={currentAnswer}
+              onValueChange={(value) => onAnswerChange(currentQuestion.question_id, value)}
+              copy={labels}
+            />
+          </div>
+
+          <footer className="career-playbook-document-rule mt-8 grid gap-3 border-t pt-5">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onPrevious}
+                disabled={safeIndex === 0}
+                className="min-w-28 flex-1"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+                {labels.back}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onSkip(currentQuestion.question_id)}
+                className="flex-1"
+              >
+                {labels.skip}
+              </Button>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" variant="outline" onClick={onForceGenerate} className="flex-1">
+                {labels.enough}
+              </Button>
+              <Button
+                type="button"
+                onClick={onNext}
+                disabled={!canGoNext}
+                className="min-w-28 flex-1"
+              >
+                {labels.next}
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+              </Button>
+            </div>
+          </footer>
+        </article>
       }
       panel={
-        <aside className="career-playbook-panel space-y-4 p-4">
+        <aside
+          data-testid="career-playbook-summary-panel"
+          className="career-playbook-panel space-y-4 p-4"
+        >
           <div className="career-playbook-soft-card space-y-3 p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -214,53 +259,45 @@ export function FollowupPhase({
 
           <div className="flex items-center gap-2 text-[13px] leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
             <ClipboardCheck className="h-4 w-4 text-purple-600 dark:text-purple-300" aria-hidden />
-            {labels.questionPanelLabel}
+            {labels.summaryLabel}
           </div>
 
-          <div className="career-playbook-soft-card p-4">
-            <QuestionRenderer
-              question={currentQuestion}
-              value={currentAnswer}
-              onValueChange={(value) => onAnswerChange(currentQuestion.question_id, value)}
-              copy={labels}
+          <div className="career-playbook-soft-card space-y-3 p-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {labels.summaryTitle}
+            </h3>
+            <ol className="grid gap-3">
+              {previewSections.map((section) => {
+                const value = section.value?.trim()
+
+                return (
+                  <li key={section.id} className="min-w-0">
+                    <p className="line-clamp-2 text-xs leading-5 font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                      {section.title}
+                    </p>
+                    <p
+                      className={`mt-1 line-clamp-3 text-sm leading-6 break-words whitespace-pre-wrap ${
+                        value && !section.muted
+                          ? 'text-slate-800 dark:text-slate-100'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {value || labels.documentPreviewEmpty}
+                    </p>
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
+
+          <div className="grid gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <Milestone percent={60} label={labels.milestone60} active={completenessPercent >= 60} />
+            <Milestone percent={80} label={labels.milestone80} active={completenessPercent >= 80} />
+            <Milestone
+              percent={100}
+              label={labels.milestone100}
+              active={completenessPercent >= 100}
             />
-          </div>
-
-          <div className="flex min-h-11 flex-col gap-3">
-            <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onPrevious}
-                disabled={safeIndex === 0}
-                className="min-w-28 flex-1"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
-                {labels.back}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onSkip(currentQuestion.question_id)}
-                className="flex-1"
-              >
-                {labels.skip}
-              </Button>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
-              <Button type="button" variant="outline" onClick={onForceGenerate} className="flex-1">
-                {labels.enough}
-              </Button>
-              <Button
-                type="button"
-                onClick={onNext}
-                disabled={!canGoNext}
-                className="min-w-28 flex-1"
-              >
-                {labels.next}
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-              </Button>
-            </div>
           </div>
         </aside>
       }

@@ -472,7 +472,7 @@ describe('QuestionRenderer', () => {
 })
 
 describe('Wizard', () => {
-  it('renders the document-first shell with a live draft preview', () => {
+  it('renders the active question in the center workspace and keeps the right panel as a summary', () => {
     render(
       <Wizard
         questions={[fixedOpenQuestion, fixedSingleChoiceQuestion]}
@@ -485,12 +485,13 @@ describe('Wizard', () => {
     )
 
     expect(screen.getByTestId('career-playbook-document-shell')).toBeInTheDocument()
-    expect(screen.getByTestId('career-playbook-document-preview')).toHaveTextContent(
-      'Менеджер по продажам'
-    )
-    expect(screen.getByTestId('career-playbook-question-panel')).toHaveTextContent(
+    expect(screen.getByTestId('career-playbook-question-workspace')).toHaveTextContent(
       'Какую должность вы хотите оформить?'
     )
+    expect(screen.getByTestId('career-playbook-summary-panel')).toHaveTextContent(
+      'Менеджер по продажам'
+    )
+    expect(screen.getByTestId('career-playbook-summary-panel')).toHaveTextContent('Отвечено')
   })
 
   it('keeps navigation disabled until the current question is answered', async () => {
@@ -603,6 +604,88 @@ describe('Wizard', () => {
 })
 
 describe('BusinessContextStep', () => {
+  it('uses a mini-wizard with materials in the center and summary in the right panel', () => {
+    render(
+      <BusinessContextStep
+        playbookId="00000000-0000-4000-8000-000000002001"
+        context={{
+          mode: 'company_specific',
+          status: 'collecting',
+          digest: null,
+          source_ids: [],
+        }}
+        freeformText="CRM migration context"
+        onContextChange={vi.fn()}
+        onBack={vi.fn()}
+        onContinue={vi.fn()}
+        onUniversal={vi.fn()}
+        copy={{
+          materialsTitle: 'Материалы и заметки',
+          summaryTitle: 'Сводка',
+          filledTemplate: 'Заполнено {count} из {total}',
+          freeformTitle: 'Текст и заметки',
+        }}
+      />
+    )
+
+    expect(screen.getByTestId('career-playbook-business-context-workspace')).toHaveTextContent(
+      'Материалы и заметки'
+    )
+    expect(screen.getByTestId('career-playbook-business-context-workspace')).toHaveTextContent(
+      'CRM migration context'
+    )
+    expect(screen.getByTestId('career-playbook-summary-panel')).toHaveTextContent('Сводка')
+    expect(screen.getByTestId('career-playbook-summary-panel')).toHaveTextContent(
+      'Заполнено 0 из 7'
+    )
+  })
+
+  it('switches category steps in the center without showing pseudo-field chips', async () => {
+    const user = userEvent.setup()
+    const handleContextChange = vi.fn()
+
+    function BusinessContextHarness() {
+      const [context, setContext] = useState({
+        mode: 'company_specific' as const,
+        status: 'collecting' as const,
+        digest: null,
+        source_ids: [],
+      })
+
+      return (
+        <BusinessContextStep
+          playbookId="00000000-0000-4000-8000-000000002001"
+          context={context}
+          freeformText=""
+          onContextChange={(nextContext) => {
+            setContext(nextContext)
+            handleContextChange(nextContext)
+          }}
+          onBack={vi.fn()}
+          onContinue={vi.fn()}
+          onUniversal={vi.fn()}
+        />
+      )
+    }
+
+    render(<BusinessContextHarness />)
+
+    await user.click(screen.getByRole('button', { name: 'Продукт' }))
+
+    const workspace = screen.getByTestId('career-playbook-business-context-workspace')
+    expect(workspace).toHaveTextContent('Продукт')
+    expect(workspace).not.toHaveTextContent('коммерческое предложение')
+
+    await user.type(screen.getByRole('textbox', { name: 'Продукт' }), 'B2B-SaaS')
+
+    expect(handleContextChange).toHaveBeenCalled()
+    expect(handleContextChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        digest: expect.objectContaining({ product: ['B2B-SaaS'] }),
+      })
+    )
+  })
+
   it('renders an autosaved freeform text area for pasted notes', async () => {
     const user = userEvent.setup()
     const handleFreeformChange = vi.fn()
@@ -710,12 +793,14 @@ describe('FollowupPhase', () => {
       />
     )
 
-    expect(screen.getByText('Уточнение 5 из 6')).toBeInTheDocument()
+    expect(screen.getByTestId('career-playbook-summary-panel')).toHaveTextContent(
+      'Уточнение 5 из 6'
+    )
     expect(screen.getByText('Полнота: 30%')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '83')
   })
 
-  it('renders one focused follow-up at a time with completeness labels and enough CTA', async () => {
+  it('renders one focused follow-up in the center with completeness summary and enough CTA', async () => {
     const user = userEvent.setup()
     const handleAnswerChange = vi.fn()
     const handleForceGenerate = vi.fn()
@@ -734,7 +819,12 @@ describe('FollowupPhase', () => {
       />
     )
 
-    expect(screen.getByText('Уточнение 1 из 2')).toBeInTheDocument()
+    expect(screen.getByTestId('career-playbook-followup-workspace')).toHaveTextContent(
+      followupOpenQuestion.question_text
+    )
+    expect(screen.getByTestId('career-playbook-summary-panel')).toHaveTextContent(
+      'Уточнение 1 из 2'
+    )
     expect(screen.queryByText(/ИИ-уточнение/)).not.toBeInTheDocument()
     expect(screen.getAllByText('60%').length).toBeGreaterThan(0)
     expect(screen.getByText('Можно собрать основу')).toBeInTheDocument()
