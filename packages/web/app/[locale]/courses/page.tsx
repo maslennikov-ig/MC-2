@@ -212,25 +212,25 @@ export default async function CoursesLandingPage({ params }: Props) {
         </section>
 
         <section className="px-5 pb-20 sm:px-8 lg:px-12 xl:px-16">
-          <div className="mx-auto max-w-[1680px] rounded-3xl bg-slate-950 p-8 text-white shadow-2xl shadow-slate-950/20 md:p-12 dark:bg-white dark:text-slate-950">
+          <div className="mx-auto max-w-[1680px] rounded-3xl border border-[#e3d7c6] bg-white/75 p-8 text-slate-950 shadow-2xl shadow-stone-300/30 md:p-12 dark:border-white/10 dark:bg-slate-900/85 dark:text-white dark:shadow-purple-950/20">
             <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
                 <h2 className="text-4xl font-bold tracking-normal md:text-5xl">{t('ctaTitle')}</h2>
-                <p className="mt-4 max-w-3xl text-lg leading-8 text-white/75 dark:text-slate-700">
+                <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-700 dark:text-slate-300">
                   {t('ctaDescription')}
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/career-playbook"
-                  className="inline-flex min-h-12 items-center justify-center gap-3 rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition hover:bg-purple-700"
+                  className="inline-flex min-h-12 items-center justify-center gap-3 rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition hover:bg-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7f1e8] focus-visible:outline-none dark:focus-visible:ring-offset-slate-950"
                 >
                   {t('primaryCta')}
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
                 </Link>
                 <Link
                   href="/create"
-                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 px-6 py-3 font-semibold text-white transition hover:bg-white/10 dark:border-slate-300 dark:text-slate-950 dark:hover:bg-slate-100"
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 bg-white/70 px-6 py-3 font-semibold text-slate-900 transition hover:border-purple-300 hover:bg-white hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7f1e8] focus-visible:outline-none dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
                 >
                   {t('createCourseCta')}
                 </Link>
