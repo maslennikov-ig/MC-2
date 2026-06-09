@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import {
   CareerPlaybookBusinessContextSchema,
+  CareerPlaybookGenerationProgressSchema,
   CareerPlaybookFixedQuestionSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFollowupResponseSchema,
@@ -21,6 +22,8 @@ import {
   type CareerPlaybookFollowupResponse,
   type CareerPlaybookPlaybookStatus,
   type CareerPlaybookGeneratePlaybookJobData,
+  type CareerPlaybookGenerationProgress,
+  type CareerPlaybookGenerationProgressStage,
   type CareerPlaybookWizardProgress,
   type Language,
 } from '@megacampus/shared-types';
@@ -37,6 +40,7 @@ import {
   generationProgress,
   mapPlaybookRow,
   normalizeGeneratedBlocks,
+  normalizeGenerationProgress,
   normalizeLanguage,
   normalizeStoredQAData,
   phaseFromStatus,
@@ -65,6 +69,8 @@ export interface CareerPlaybookDraftResponse {
   status: CareerPlaybookPlaybookStatus;
   phase: WizardPhase;
   progress?: CareerPlaybookWizardProgress;
+  generationProgress?: number | null;
+  progressDetails?: CareerPlaybookGenerationProgress;
 }
 
 export interface CareerPlaybookGenerationStatusResponse {
@@ -72,6 +78,7 @@ export interface CareerPlaybookGenerationStatusResponse {
   status: CareerPlaybookPlaybookStatus;
   phase: WizardPhase;
   progress: number;
+  progressDetails?: CareerPlaybookGenerationProgress;
   error?: string;
   generatedBlocks?: Record<string, CareerPlaybookBlockState>;
   finalMarkdown?: string;
@@ -111,6 +118,7 @@ function mapRowToDraft(
 ): CareerPlaybookDraftResponse {
   const mapped = mapPlaybookRow(row);
   const qaData = normalizeStoredQAData(mapped.q_a_data);
+  const progressDetails = normalizeGenerationProgress(qaData.generation_progress);
 
   const draft: CareerPlaybookDraftResponse = {
     playbookId: mapped.id,
@@ -126,6 +134,8 @@ function mapRowToDraft(
     status: mapped.status,
     phase: phaseFromStatus(mapped.status, qaData),
     progress: qaData.ui_progress,
+    generationProgress: generationProgress(mapped.status, progressDetails),
+    progressDetails,
   };
 
   if (options.businessContextSources) {
@@ -357,6 +367,20 @@ function assertCanRequestFollowups(
 function qaDataWithoutGenerationError(qaData: StoredQAData): StoredQAData {
   const { generation_error: _generationError, ...cleanQAData } = qaData;
   return cleanQAData;
+}
+
+function buildGenerationProgress(
+  stage: CareerPlaybookGenerationProgressStage,
+  percent: number,
+  previous?: CareerPlaybookGenerationProgress
+): CareerPlaybookGenerationProgress {
+  const now = new Date().toISOString();
+  return CareerPlaybookGenerationProgressSchema.parse({
+    stage,
+    percent,
+    started_at: previous?.started_at ?? now,
+    updated_at: now,
+  });
 }
 
 function errorMessageFrom(error: unknown): string {
@@ -659,7 +683,11 @@ export async function approveCareerPlaybookGeneration(
 
   const generationJobId = getCareerPlaybookGenerationJobId(input.playbookId);
   await removeTerminalJobById(generationJobId);
-  const qaDataForGeneration = qaDataWithoutGenerationError(qaData);
+  const queuedProgress = buildGenerationProgress('queued', 66, qaData.generation_progress);
+  const qaDataForGeneration = {
+    ...qaDataWithoutGenerationError(qaData),
+    generation_progress: queuedProgress,
+  };
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
@@ -697,6 +725,7 @@ export async function approveCareerPlaybookGeneration(
         q_a_data: toJson({
           ...qaDataForGeneration,
           generation_error: message,
+          generation_progress: buildGenerationProgress('failed', 100, queuedProgress),
         }),
       })
       .eq('id', input.playbookId)
@@ -749,12 +778,14 @@ export async function getCareerPlaybookBlock(
 function mapRowToGenerationStatus(row: CareerPlaybookRow): CareerPlaybookGenerationStatusResponse {
   const mapped = mapPlaybookRow(row);
   const qaData = normalizeStoredQAData(mapped.q_a_data);
+  const progressDetails = normalizeGenerationProgress(qaData.generation_progress);
 
   return {
     playbookId: mapped.id,
     status: mapped.status,
     phase: phaseFromStatus(mapped.status, qaData),
-    progress: generationProgress(mapped.status),
+    progress: generationProgress(mapped.status, progressDetails),
+    progressDetails,
     error: mapped.status === 'failed' ? qaData.generation_error : undefined,
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown ?? undefined,

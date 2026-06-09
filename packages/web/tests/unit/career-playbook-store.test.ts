@@ -751,7 +751,12 @@ describe('useCareerPlaybookStore', () => {
         playbookId: '00000000-0000-4000-8000-000000000913',
         status: 'generating',
         phase: 'completion',
-        progress: 80,
+        progress: 72,
+        progressDetails: {
+          stage: 'building_profile',
+          percent: 72,
+          updated_at: '2026-06-08T17:00:00.000Z',
+        },
       })
     const getGenerationStatus = vi
       .fn<NonNullable<CareerPlaybookClient['getGenerationStatus']>>()
@@ -781,7 +786,10 @@ describe('useCareerPlaybookStore', () => {
       useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
     ).resolves.toEqual({ ok: true })
     expect(useCareerPlaybookStore.getState().status).toBe('generating')
-    expect(useCareerPlaybookStore.getState().generationProgress).toBe(80)
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(72)
+    expect(useCareerPlaybookStore.getState().generationProgressDetails?.stage).toBe(
+      'building_profile'
+    )
 
     await expect(
       useCareerPlaybookStore.getState().refreshCareerPlaybookGenerationStatus()

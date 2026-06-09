@@ -11,10 +11,15 @@ import {
   Loader2,
   Pencil,
 } from 'lucide-react'
-import type { CareerPlaybookPlaybookStatus } from '@megacampus/shared-types'
+import type {
+  CareerPlaybookGenerationProgress,
+  CareerPlaybookGenerationProgressStage,
+  CareerPlaybookPlaybookStatus,
+} from '@megacampus/shared-types'
 
 import { CareerPlaybookDocumentShell } from '@/components/career-playbook/layout/document-workspace'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 
 export interface CompletionScreenCopy {
   title?: string
@@ -37,6 +42,9 @@ export interface CompletionScreenCopy {
   generationFailedDescription?: string
   generationStarting?: string
   generationErrorTitle?: string
+  generationRedirectHint?: string
+  generationCanLeaveHint?: string
+  generationStepLabels?: Partial<Record<CareerPlaybookGenerationProgressStage, string>>
   viewGenerated?: string
   empty?: string
   reviewPanelTitle?: string
@@ -55,6 +63,7 @@ interface CompletionScreenProps {
   generationHandoffVisible?: boolean
   generationStatus?: CareerPlaybookPlaybookStatus
   generationProgress?: number | null
+  generationProgressDetails?: CareerPlaybookGenerationProgress | null
   completenessScore?: number | null
   generationError?: string | null
   isGenerationStarting?: boolean
@@ -92,6 +101,29 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   generationFailedDescription: 'Проверьте собранный контекст и попробуйте снова.',
   generationStarting: 'Запускаем генерацию...',
   generationErrorTitle: 'Не удалось запустить генерацию',
+  generationRedirectHint: 'После завершения мы автоматически откроем готовую инструкцию.',
+  generationCanLeaveHint: 'Можно оставить страницу открытой или вернуться позже: статус сохранён.',
+  generationStepLabels: {
+    queued: 'Ставим генерацию в очередь',
+    preparing_context: 'Подготавливаем сохранённый контекст',
+    building_profile: 'Уточняем профиль роли',
+    generating_foundation: 'Генерируем основу инструкции',
+    reviewing_foundation: 'Проверяем основу инструкции',
+    generating_operations: 'Генерируем операционные разделы',
+    reviewing_operations: 'Проверяем операционные разделы',
+    generating_people: 'Генерируем разделы про людей и компетенции',
+    reviewing_people: 'Проверяем разделы про людей и компетенции',
+    generating_growth: 'Генерируем развитие и онбординг',
+    reviewing_growth: 'Проверяем развитие и онбординг',
+    generating_system: 'Генерируем процессы и зависимости',
+    reviewing_system: 'Проверяем процессы и зависимости',
+    generating_wrap: 'Генерируем финальные разделы',
+    reviewing_wrap: 'Проверяем финальные разделы',
+    assembling: 'Собираем финальный документ',
+    final_review: 'Финально проверяем инструкцию',
+    completed: 'Готово, открываем инструкцию',
+    failed: 'Генерация остановилась',
+  },
   viewGenerated: 'Открыть должностную инструкцию',
   empty: 'Пока нет данных',
   reviewPanelTitle: 'Проверка',
@@ -110,6 +142,7 @@ export function CompletionScreen({
   generationHandoffVisible = false,
   generationStatus,
   generationProgress = null,
+  generationProgressDetails = null,
   completenessScore = null,
   generationError = null,
   isGenerationStarting = false,
@@ -117,7 +150,14 @@ export function CompletionScreen({
   viewGeneratedHref,
   copy,
 }: CompletionScreenProps) {
-  const labels = { ...defaultCopy, ...copy }
+  const labels = {
+    ...defaultCopy,
+    ...copy,
+    generationStepLabels: {
+      ...defaultCopy.generationStepLabels,
+      ...copy?.generationStepLabels,
+    },
+  }
   const isGenerating = generationStatus === 'generating'
   const isCompleted = generationStatus === 'completed'
   const isFailed = generationStatus === 'failed'
@@ -133,7 +173,25 @@ export function CompletionScreen({
       ? labels.generationInProgressDescription
       : labels.generationHandoffDescription
   const generationStatusProgress =
-    typeof generationProgress === 'number' ? `${Math.round(generationProgress)}%` : null
+    typeof generationProgressDetails?.percent === 'number'
+      ? `${Math.round(generationProgressDetails.percent)}%`
+      : typeof generationProgress === 'number'
+        ? `${Math.round(generationProgress)}%`
+        : null
+  const generationProgressValue =
+    typeof generationProgressDetails?.percent === 'number'
+      ? generationProgressDetails.percent
+      : generationProgress
+  const activeGenerationStep =
+    generationProgressDetails?.stage && labels.generationStepLabels[generationProgressDetails.stage]
+      ? labels.generationStepLabels[generationProgressDetails.stage]
+      : isCompleted
+        ? labels.generationStepLabels.completed
+        : isFailed
+          ? labels.generationStepLabels.failed
+          : isGenerating
+            ? labels.generationInProgressDescription
+            : labels.generationHandoffDescription
   const completenessPercent =
     typeof completenessScore === 'number'
       ? `${Math.min(Math.max(Math.round(completenessScore * 100), 0), 100)}%`
@@ -186,6 +244,57 @@ export function CompletionScreen({
               </div>
             </div>
           </header>
+
+          <div className="mt-6">
+            {shouldShowStatus || isFailed ? (
+              <GenerationProgressCard
+                title={generationStatusTitle}
+                description={activeGenerationStep ?? generationStatusDescription}
+                percent={generationProgressValue}
+                percentLabel={generationStatusProgress}
+                redirectHint={
+                  isFailed
+                    ? labels.generationFailedDescription
+                    : isCompleted
+                      ? labels.generationCompletedDescription
+                      : labels.generationRedirectHint
+                }
+                canLeaveHint={labels.generationCanLeaveHint}
+                isCompleted={isCompleted}
+                isFailed={isFailed}
+                isStarting={isGenerationStarting}
+                generateLabel={labels.generate}
+                generationStartingLabel={labels.generationStarting}
+                viewGeneratedLabel={labels.viewGenerated}
+                viewGeneratedHref={viewGeneratedHref}
+                onGenerate={onGenerate}
+              />
+            ) : (
+              <div className="career-playbook-muted-card grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {labels.generationHandoffTitle}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {labels.description}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={onGenerate}
+                  disabled={isGenerationStarting || isGenerating || isCompleted}
+                  className="w-full sm:w-auto"
+                >
+                  {isGenerationStarting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
+                  )}
+                  {isGenerationStarting ? labels.generationStarting : labels.generate}
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="mt-6 space-y-6">
             <SummarySection title={labels.fixedTitle} empty={labels.empty}>
@@ -254,10 +363,7 @@ export function CompletionScreen({
         <aside className="career-playbook-panel p-4">
           <div className="space-y-3">
             {shouldShowStatus ? (
-              <div
-                role="status"
-                className="flex gap-2 rounded-md border border-purple-200 bg-purple-50/80 p-3 text-sm text-purple-950 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-100"
-              >
+              <div className="flex gap-2 rounded-md border border-purple-200 bg-purple-50/80 p-3 text-sm text-purple-950 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-100">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 <div className="space-y-1">
                   <p className="font-semibold">
@@ -282,32 +388,110 @@ export function CompletionScreen({
                 </div>
               </div>
             ) : null}
-
-            <Button
-              type="button"
-              onClick={onGenerate}
-              disabled={isGenerationStarting || isGenerating || isCompleted}
-              className="w-full"
-            >
-              {isGenerationStarting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
-              )}
-              {isGenerationStarting ? labels.generationStarting : labels.generate}
-            </Button>
-            {isCompleted && viewGeneratedHref ? (
-              <Button asChild variant="secondary" className="w-full">
-                <Link href={viewGeneratedHref}>
-                  <BookOpen className="mr-2 h-4 w-4" aria-hidden />
-                  {labels.viewGenerated}
-                </Link>
-              </Button>
-            ) : null}
           </div>
         </aside>
       }
     />
+  )
+}
+
+function GenerationProgressCard({
+  title,
+  description,
+  percent,
+  percentLabel,
+  redirectHint,
+  canLeaveHint,
+  isCompleted,
+  isFailed,
+  isStarting,
+  generateLabel,
+  generationStartingLabel,
+  viewGeneratedLabel,
+  viewGeneratedHref,
+  onGenerate,
+}: {
+  title: string
+  description: string
+  percent: number | null
+  percentLabel: string | null
+  redirectHint: string
+  canLeaveHint: string
+  isCompleted: boolean
+  isFailed: boolean
+  isStarting: boolean
+  generateLabel: string
+  generationStartingLabel: string
+  viewGeneratedLabel: string
+  viewGeneratedHref?: string
+  onGenerate: () => void
+}) {
+  const percentValue =
+    typeof percent === 'number'
+      ? Math.min(Math.max(Math.round(percent), 0), 100)
+      : isCompleted || isFailed
+        ? 100
+        : 66
+  const isActive = !isCompleted && !isFailed
+
+  return (
+    <section
+      role="status"
+      className="rounded-md border border-purple-200 bg-purple-50/70 p-4 text-purple-950 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-100"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="flex items-center gap-2">
+            {isCompleted ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+            ) : isFailed ? (
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+            ) : (
+              <Loader2 className="h-4 w-4 animate-spin text-purple-600 dark:text-purple-300" />
+            )}
+            <p className="text-sm font-semibold">{title}</p>
+            {percentLabel ? <span className="text-sm font-medium">{percentLabel}</span> : null}
+          </div>
+          <p className="text-sm leading-6">{description}</p>
+          {!isFailed ? (
+            <p className="text-xs leading-5 text-purple-800 dark:text-purple-200">{redirectHint}</p>
+          ) : null}
+          {!isCompleted && !isFailed ? (
+            <p className="text-xs leading-5 text-purple-800 dark:text-purple-200">{canLeaveHint}</p>
+          ) : null}
+        </div>
+
+        <div className="w-full shrink-0 space-y-3 sm:w-72">
+          <Progress
+            value={percentValue}
+            aria-label={title}
+            className="h-2 bg-purple-200/80 dark:bg-purple-900/60"
+          />
+          {isCompleted && viewGeneratedHref ? (
+            <Button asChild className="w-full">
+              <Link href={viewGeneratedHref}>
+                <BookOpen className="mr-2 h-4 w-4" aria-hidden />
+                {viewGeneratedLabel}
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={onGenerate}
+              disabled={isStarting || isActive}
+              className="w-full"
+            >
+              {isStarting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
+              )}
+              {isStarting ? generationStartingLabel : generateLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }
 

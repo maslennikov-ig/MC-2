@@ -1,8 +1,10 @@
 import type { Job } from 'bullmq';
 import {
+  CareerPlaybookGenerationProgressSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookOperationJobDataSchema,
   type CareerPlaybookCostBreakdown,
+  type CareerPlaybookGenerationProgress,
   type CareerPlaybookGenerateFollowupsJobData,
   type CareerPlaybookGeneratePlaybookJobData,
   type CareerPlaybookJobData,
@@ -10,6 +12,7 @@ import {
   type CareerPlaybookRegenerateBlockJobData,
 } from '@megacampus/shared-types';
 import type { JobResult } from './base-handler';
+import { logger } from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import type {
   CareerPlaybookRow,
@@ -85,8 +88,17 @@ export class CareerPlaybookHandler {
     jobData: CareerPlaybookGeneratePlaybookJobData,
     job: Job<CareerPlaybookJobData>
   ): Promise<JobResult> {
-    const graph = getCareerPlaybookGraph();
+    const graph = getCareerPlaybookGraph({
+      progressReporter: async progress => {
+        await this.persistGenerationProgressBestEffort(jobData, progress);
+      },
+    });
     let result: CareerPlaybookGraphResult;
+
+    await this.persistGenerationProgressBestEffort(jobData, {
+      stage: 'preparing_context',
+      percent: 70,
+    });
 
     try {
       result = (await graph.invoke({
@@ -167,13 +179,21 @@ export class CareerPlaybookHandler {
     const costBreakdown = buildCostBreakdown(result);
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
+    const completedProgress = this.buildGenerationProgress(
+      jobData,
+      { stage: 'completed', percent: 100 },
+      qaDataWithoutGenerationError
+    );
     const updatePayload: Partial<CareerPlaybookRow> = {
       status: 'completed',
       generated_blocks: toJson(
         result.generatedBlocks ?? {}
       ) as CareerPlaybookRow['generated_blocks'],
       final_markdown: result.finalMarkdown ?? null,
-      q_a_data: toJson(qaDataWithoutGenerationError) as CareerPlaybookRow['q_a_data'],
+      q_a_data: toJson({
+        ...qaDataWithoutGenerationError,
+        generation_progress: completedProgress,
+      }) as CareerPlaybookRow['q_a_data'],
       completed_at: new Date().toISOString(),
     };
 
@@ -194,13 +214,69 @@ export class CareerPlaybookHandler {
 
   private async persistFailed(jobData: CareerPlaybookGeneratePlaybookJobData, error: string) {
     const storedQAData = await this.loadStoredQAData(jobData);
+    const failedProgress = this.buildGenerationProgress(
+      jobData,
+      { stage: 'failed', percent: 100 },
+      storedQAData
+    );
 
     await this.updatePlaybook(jobData.playbookId, {
       status: 'failed',
       q_a_data: toJson({
         ...storedQAData,
         generation_error: error,
+        generation_progress: failedProgress,
       }) as CareerPlaybookRow['q_a_data'],
+    });
+  }
+
+  private async persistGenerationProgressBestEffort(
+    jobData: CareerPlaybookGeneratePlaybookJobData,
+    progress: Pick<CareerPlaybookGenerationProgress, 'stage' | 'percent'>
+  ) {
+    try {
+      const storedQAData = await this.loadStoredQAData(jobData);
+      const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
+      const generationProgress = this.buildGenerationProgress(
+        jobData,
+        progress,
+        qaDataWithoutGenerationError
+      );
+
+      await this.updatePlaybook(jobData.playbookId, {
+        status: 'generating',
+        q_a_data: toJson({
+          ...qaDataWithoutGenerationError,
+          generation_progress: generationProgress,
+        }) as CareerPlaybookRow['q_a_data'],
+      });
+    } catch (error) {
+      logger.warn(
+        {
+          playbookId: jobData.playbookId,
+          progress,
+          error: errorMessageFrom(error),
+        },
+        'Career Playbook generation progress update failed'
+      );
+    }
+  }
+
+  private buildGenerationProgress(
+    jobData: CareerPlaybookGeneratePlaybookJobData,
+    progress: Pick<CareerPlaybookGenerationProgress, 'stage' | 'percent'>,
+    storedQAData: Record<string, unknown>
+  ): CareerPlaybookGenerationProgress {
+    const previous = CareerPlaybookGenerationProgressSchema.safeParse(
+      storedQAData.generation_progress
+    );
+    const now = new Date().toISOString();
+
+    return CareerPlaybookGenerationProgressSchema.parse({
+      stage: progress.stage,
+      percent: progress.percent,
+      started_at: previous.success ? previous.data.started_at : jobData.createdAt || now,
+      updated_at: now,
     });
   }
 

@@ -7,6 +7,7 @@ import {
   CareerPlaybookBusinessContextSourceSummarySchema,
   CAREER_PLAYBOOK_COMPLETENESS_READY_THRESHOLD,
   CareerPlaybookCostBreakdownSchema,
+  CareerPlaybookGenerationProgressSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFixedQuestionSchema,
   CareerPlaybookPlaybookStatusSchema,
@@ -327,6 +328,24 @@ describe('Career Playbook shared schemas', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('stores generation progress metadata inside QA data', () => {
+    const progress = CareerPlaybookGenerationProgressSchema.parse({
+      stage: 'generating_foundation',
+      percent: 76,
+      updated_at: '2026-06-08T17:00:00.000Z',
+    });
+
+    const result = CareerPlaybookQADataSchema.parse({
+      fixed: [],
+      followups: [],
+      freeform: [],
+      generation_progress: progress,
+    });
+
+    expect(result.generation_progress?.stage).toBe('generating_foundation');
+    expect(result.generation_progress?.percent).toBe(76);
   });
 
   it('validates node cost breakdown for LangGraph telemetry', () => {
