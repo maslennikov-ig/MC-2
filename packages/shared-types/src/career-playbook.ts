@@ -315,6 +315,42 @@ export const CareerPlaybookWizardProgressSchema = z.object({
 });
 export type CareerPlaybookWizardProgress = z.infer<typeof CareerPlaybookWizardProgressSchema>;
 
+export const CareerPlaybookGenerationProgressStageSchema = z.enum([
+  'queued',
+  'preparing_context',
+  'building_profile',
+  'generating_foundation',
+  'reviewing_foundation',
+  'generating_operations',
+  'reviewing_operations',
+  'generating_people',
+  'reviewing_people',
+  'generating_growth',
+  'reviewing_growth',
+  'generating_system',
+  'reviewing_system',
+  'generating_wrap',
+  'reviewing_wrap',
+  'assembling',
+  'final_review',
+  'completed',
+  'failed',
+]);
+export type CareerPlaybookGenerationProgressStage = z.infer<
+  typeof CareerPlaybookGenerationProgressStageSchema
+>;
+
+export const CareerPlaybookGenerationProgressSchema = z.object({
+  stage: CareerPlaybookGenerationProgressStageSchema,
+  percent: z.number().min(0).max(100),
+  message: z.string().min(1).optional(),
+  started_at: z.string().datetime().optional(),
+  updated_at: z.string().datetime().optional(),
+});
+export type CareerPlaybookGenerationProgress = z.infer<
+  typeof CareerPlaybookGenerationProgressSchema
+>;
+
 export const CareerPlaybookQADataSchema = z.object({
   fixed: z.array(CareerPlaybookFixedAnswerSchema).default([]),
   followups: z.array(CareerPlaybookFollowupAnswerSchema).default([]),
@@ -327,6 +363,7 @@ export const CareerPlaybookQADataSchema = z.object({
   }),
   completeness_score: z.number().min(0).max(1).optional(),
   ui_progress: CareerPlaybookWizardProgressSchema.optional(),
+  generation_progress: CareerPlaybookGenerationProgressSchema.optional(),
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
 

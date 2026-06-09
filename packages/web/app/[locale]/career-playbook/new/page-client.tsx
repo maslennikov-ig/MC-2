@@ -39,6 +39,7 @@ export default function CareerPlaybookNewPageClient({
   const state = useCareerPlaybookStore()
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
   const sessionStartTargetRef = useRef<string | null>(null)
+  const generationAutoOpenRef = useRef<string | null>(null)
   const [generationHandoffVisible, setGenerationHandoffVisible] = useState(false)
 
   useEffect(() => {
@@ -484,6 +485,29 @@ export default function CareerPlaybookNewPageClient({
     generationFailedDescription: t('generationFailedDescription'),
     generationStarting: t('generationStarting'),
     generationErrorTitle: t('generationErrorTitle'),
+    generationRedirectHint: t('generationRedirectHint'),
+    generationCanLeaveHint: t('generationCanLeaveHint'),
+    generationStepLabels: {
+      queued: t('generationStepQueued'),
+      preparing_context: t('generationStepPreparingContext'),
+      building_profile: t('generationStepBuildingProfile'),
+      generating_foundation: t('generationStepGeneratingFoundation'),
+      reviewing_foundation: t('generationStepReviewingFoundation'),
+      generating_operations: t('generationStepGeneratingOperations'),
+      reviewing_operations: t('generationStepReviewingOperations'),
+      generating_people: t('generationStepGeneratingPeople'),
+      reviewing_people: t('generationStepReviewingPeople'),
+      generating_growth: t('generationStepGeneratingGrowth'),
+      reviewing_growth: t('generationStepReviewingGrowth'),
+      generating_system: t('generationStepGeneratingSystem'),
+      reviewing_system: t('generationStepReviewingSystem'),
+      generating_wrap: t('generationStepGeneratingWrap'),
+      reviewing_wrap: t('generationStepReviewingWrap'),
+      assembling: t('generationStepAssembling'),
+      final_review: t('generationStepFinalReview'),
+      completed: t('generationStepCompleted'),
+      failed: t('generationStepFailed'),
+    },
     viewGenerated: t('viewGenerated'),
     empty: t('emptySummary'),
     reviewPanelTitle: t('reviewBadge'),
@@ -493,6 +517,18 @@ export default function CareerPlaybookNewPageClient({
     state.status === 'completed' && state.playbookId
       ? `/${locale}/career-playbook/${state.playbookId}`
       : undefined
+
+  useEffect(() => {
+    if (!completedViewerHref || generationAutoOpenRef.current === completedViewerHref) return
+    if (process.env.NODE_ENV === 'test') return
+
+    generationAutoOpenRef.current = completedViewerHref
+    const timeout = window.setTimeout(() => {
+      window.location.assign(completedViewerHref)
+    }, 900)
+
+    return () => window.clearTimeout(timeout)
+  }, [completedViewerHref])
 
   const draftStatus = state.autosaveError
     ? t('draftUnsynced')
@@ -769,6 +805,7 @@ export default function CareerPlaybookNewPageClient({
               }
               generationStatus={state.status}
               generationProgress={state.generationProgress}
+              generationProgressDetails={state.generationProgressDetails}
               completenessScore={state.completenessScore}
               generationError={state.generationStatusError ?? state.generationStartError}
               isGenerationStarting={state.isStartingGeneration || state.isAutosaving}

@@ -155,6 +155,10 @@ export function useInstallPrompt(): UseInstallPromptReturn {
   // Listen for beforeinstallprompt event
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
+      if (isStandalone() || isDismissedRecently()) {
+        return
+      }
+
       // Prevent Chrome 67+ from automatically showing the prompt
       event.preventDefault()
 

@@ -38,24 +38,27 @@ export function UserbackProvider() {
             : undefined,
         help_message: locale === 'ru' ? 'Оставьте отзыв или сообщите об ошибке' : undefined,
       },
-    }).then((instance) => {
-      ubRef.current = instance
-
-      // identify() — рекомендованный способ для SPA (docs.userback.io/docs/react)
-      // Одновременно идентифицирует пользователя И заполняет поля формы
-      if (user) {
-        instance.identify(user.id, {
-          name: userName || '',
-          email: user.email || '',
-        })
-      }
     })
+      .then((instance) => {
+        ubRef.current = instance
+
+        // identify() — рекомендованный способ для SPA (docs.userback.io/docs/react)
+        // Одновременно идентифицирует пользователя И заполняет поля формы
+        if (user) {
+          instance.identify(user.id, {
+            name: userName || '',
+            email: user.email || '',
+          })
+        }
+      })
+      .catch((error) => {
+        console.warn('[Userback] widget failed to load', error)
+      })
 
     return () => {
       ubRef.current?.destroy()
       ubRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- session?.user object is unstable; using session?.user?.id for stable identity tracking
   }, [session?.user?.id, locale])
 
   useEffect(() => {

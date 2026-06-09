@@ -261,6 +261,42 @@ describe('Career Playbook graph', () => {
     }
   });
 
+  it('reports user-visible generation progress before long-running graph stages', async () => {
+    const progressReporter = vi.fn();
+    const runtime = {
+      renderPrompt: vi.fn().mockImplementation((promptKey: string) => Promise.resolve(promptKey)),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) =>
+        Promise.resolve({
+          content:
+            prompt === 'career_playbook_spec_builder'
+              ? JSON.stringify(roleProfileSpec)
+              : (groupMarkdownByPromptKey[prompt] ?? JSON.stringify({ pass: true, score: 95 })),
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        })
+      ),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+      progressReporter,
+    });
+
+    await graph.invoke(initialGraphState());
+
+    expect(progressReporter).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'building_profile', percent: 72 })
+    );
+    expect(progressReporter).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'generating_foundation', percent: 76 })
+    );
+    expect(progressReporter).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'assembling', percent: 98 })
+    );
+  });
+
   it('routes failed group judge verdicts through targeted block regeneration before the next group', async () => {
     const invokedPrompts: string[] = [];
     let judgeCalls = 0;
