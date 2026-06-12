@@ -236,16 +236,19 @@ function normalizeFillablePlaceholders(content: string, language: string): strin
       }
       if (insideFence) return line;
 
-      const withBrackets = line.replace(/\[([^\]\n]{2,80})\]/g, (match, label, offset) => {
-        const nextChar = line[offset + match.length];
-        if (nextChar === '(' || !shouldTreatBracketAsFillableField(label)) {
-          return match;
+      const withBrackets = line.replace(
+        /\[([^\]\n]{2,80})\]/g,
+        (match: string, label: string, offset: number) => {
+          const nextChar = line[offset + match.length];
+          if (nextChar === '(' || !shouldTreatBracketAsFillableField(label)) {
+            return match;
+          }
+
+          return formatFillableField(label, language);
         }
+      );
 
-        return formatFillableField(label, language);
-      });
-
-      return withBrackets.replace(/\{([^}\n]{2,100})\}/g, (match, label) => {
+      return withBrackets.replace(/\{([^}\n]{2,100})\}/g, (match: string, label: string) => {
         if (!shouldTreatBraceAsFillableField(label)) {
           return match;
         }
