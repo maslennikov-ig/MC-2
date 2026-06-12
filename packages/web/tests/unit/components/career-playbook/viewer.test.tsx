@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps, ReactElement } from 'react'
@@ -196,6 +196,89 @@ describe('Career Playbook viewer components', () => {
     expect(within(antiGoalsBlock).getByTestId('markdown-renderer')).toHaveTextContent('Anti-goals')
   })
 
+  it('highlights and scrolls the active contents item as document blocks enter the viewport', async () => {
+    const originalIntersectionObserver = globalThis.IntersectionObserver
+    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      'scrollIntoView'
+    )
+    const scrollIntoView = vi.fn()
+    let observerCallback: IntersectionObserverCallback | null = null
+
+    class TestIntersectionObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = ''
+      readonly thresholds: ReadonlyArray<number> = []
+
+      constructor(callback: IntersectionObserverCallback) {
+        observerCallback = callback
+      }
+
+      disconnect = vi.fn()
+      observe = vi.fn()
+      takeRecords = vi.fn(() => [])
+      unobserve = vi.fn()
+    }
+
+    globalThis.IntersectionObserver =
+      TestIntersectionObserver as unknown as typeof IntersectionObserver
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+
+    try {
+      render(
+        <PlaybookViewer
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      const contents = screen.getByRole('navigation', {
+        name: 'Содержание должностной инструкции',
+      })
+      const missionLink = within(contents).getByRole('link', {
+        name: 'Миссия и ключевые результаты',
+      })
+      const missionBlock = screen.getByRole('article', {
+        name: 'Миссия и ключевые результаты',
+      })
+
+      await waitFor(() => expect(observerCallback).not.toBeNull())
+
+      act(() => {
+        observerCallback?.(
+          [
+            {
+              target: missionBlock,
+              isIntersecting: true,
+              intersectionRatio: 0.75,
+            } as IntersectionObserverEntry,
+          ],
+          {} as IntersectionObserver
+        )
+      })
+
+      expect(missionLink).toHaveAttribute('aria-current', 'true')
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    } finally {
+      globalThis.IntersectionObserver = originalIntersectionObserver
+      if (originalScrollIntoViewDescriptor) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor)
+      } else {
+        delete (Element.prototype as Partial<Element>).scrollIntoView
+      }
+    }
+  })
+
   it('hides side panels independently and switches to reading mode', async () => {
     const user = userEvent.setup()
     window.history.replaceState(
@@ -277,6 +360,59 @@ describe('Career Playbook viewer components', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Для организации' }))
 
     expect(handleVisibilityChange).toHaveBeenCalledWith('organization')
+  })
+
+  it('does not let the visibility dropdown close focus jump the sticky rails to the top', async () => {
+    const user = userEvent.setup()
+    const handleVisibilityChange = vi.fn()
+    const originalScrollYDescriptor = Object.getOwnPropertyDescriptor(window, 'scrollY')
+    const originalFocusDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'focus')
+    let scrollY = 820
+
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      get: () => scrollY,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'focus', {
+      configurable: true,
+      value: vi.fn(function focus(this: HTMLElement, options?: FocusOptions) {
+        const isVisibilityTrigger = this.getAttribute('aria-label')?.startsWith('Видимость:')
+        if (isVisibilityTrigger && !options?.preventScroll) scrollY = 0
+      }),
+    })
+
+    try {
+      render(
+        <PlaybookViewerWithVisibility
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onVisibilityChange={handleVisibilityChange}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+
+      await user.click(within(inspector).getByRole('button', { name: /Видимость: Приватный/ }))
+      scrollY = 820
+      await user.click(await screen.findByRole('menuitem', { name: 'Публичный' }))
+
+      expect(handleVisibilityChange).toHaveBeenCalledWith('public')
+      expect(window.scrollY).toBe(820)
+    } finally {
+      if (originalFocusDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'focus', originalFocusDescriptor)
+      }
+      if (originalScrollYDescriptor) {
+        Object.defineProperty(window, 'scrollY', originalScrollYDescriptor)
+      }
+    }
   })
 
   it('shows generation quality warnings in the inspector rail', () => {

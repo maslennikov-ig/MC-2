@@ -12,7 +12,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, within, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MermaidDirect } from '@/components/markdown/components/MermaidDirect'
 
 // Mock mermaid library - must use factory function for hoisting
@@ -138,6 +139,26 @@ describe('MermaidDirect', () => {
         expect(innerDiv).toBeInTheDocument()
         expect(innerDiv).toHaveClass('mermaid-diagram')
       })
+    })
+
+    it('should open rendered diagrams fullscreen with zoom controls and wheel zoom', async () => {
+      const user = userEvent.setup()
+      render(<MermaidDirect chart="graph TD\n  A-->B" ariaLabel="Sales process" />)
+
+      await user.click(await screen.findByRole('button', { name: 'Open diagram fullscreen' }))
+
+      const dialog = screen.getByRole('dialog', { name: 'Diagram fullscreen' })
+      expect(within(dialog).getByRole('img', { name: 'Sales process' })).toBeInTheDocument()
+      expect(within(dialog).getByText('100%')).toBeInTheDocument()
+
+      await user.click(within(dialog).getByRole('button', { name: 'Zoom in' }))
+      expect(within(dialog).getByText('125%')).toBeInTheDocument()
+
+      fireEvent.wheel(within(dialog).getByLabelText('Fullscreen diagram viewport'), {
+        deltaY: -100,
+      })
+
+      expect(within(dialog).getByText('150%')).toBeInTheDocument()
     })
   })
 
@@ -678,9 +699,9 @@ describe('MermaidDirect', () => {
       })
 
       // First call takes longer
-      mockRender.mockImplementationOnce(() => firstRenderPromise)
+      mockRender.mockReturnValueOnce(firstRenderPromise)
       // Second call resolves faster
-      mockRender.mockImplementationOnce(() => secondRenderPromise)
+      mockRender.mockReturnValueOnce(secondRenderPromise)
 
       const { container, rerender } = render(<MermaidDirect chart="graph TD\n  A-->B" />)
 

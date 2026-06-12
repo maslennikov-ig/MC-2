@@ -3,10 +3,17 @@
 import * as React from 'react'
 import { useEffect, useRef, useState, useId } from 'react'
 import mermaid from 'mermaid'
+import { Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { MermaidDiagramProps } from '../types'
 
 const MERMAID_RENDER_FAILURE_EVENT = 'mermaid-render-failed'
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 3
+const ZOOM_STEP = 0.25
 const MERMAID_FALLBACK_COMMENT_REGEX =
   /^\s*<!--\s*(Mermaid\s+[^>]*could not be rendered\.\s*Please review manually\.)\s*-->\s*$/i
 const MERMAID_FALLBACK_PLAIN_TEXT_REGEX =
@@ -33,6 +40,10 @@ function emitMermaidRenderFailed(detail: MermaidRenderFailedDetail): void {
       detail,
     })
   )
+}
+
+function clampZoom(value: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
 }
 
 function getMermaidFallbackMessage(chart: string): string | null {
@@ -529,6 +540,9 @@ const lightThemeVariables = {
 export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [renderedSvg, setRenderedSvg] = useState<string | null>(null)
+  const [fullscreenOpen, setFullscreenOpen] = useState(false)
+  const [zoom, setZoom] = useState(1)
   const fallbackMessage = getMermaidFallbackMessage(chart)
   const [isDark, setIsDark] = useState(() =>
     typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false
@@ -558,11 +572,15 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
 
     if (fallbackMessage) {
       containerRef.current.innerHTML = ''
+      setRenderedSvg(null)
       setError(null)
       return
     }
 
-    if (!chart?.trim()) return
+    if (!chart?.trim()) {
+      setRenderedSvg(null)
+      return
+    }
 
     // Increment render counter to track the current render.
     // If a new render starts before this one completes, the stale render
@@ -616,8 +634,11 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
 
           if (!hasRenderableGraphContent(containerRef.current)) {
             containerRef.current.innerHTML = ''
+            setRenderedSvg(null)
             throw new Error('Mermaid rendered empty SVG without graph content')
           }
+
+          setRenderedSvg(containerRef.current.innerHTML)
         }
 
         setError(null)
@@ -628,6 +649,7 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
 
         console.error('Mermaid rendering error:', err)
+        setRenderedSvg(null)
         setError(errorMessage)
         emitMermaidRenderFailed({
           message: errorMessage,
@@ -639,33 +661,119 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
     void renderDiagram()
   }, [chart, fallbackMessage, isDark, uniqueId])
 
+  const updateZoom = (delta: number) => {
+    setZoom((current) => clampZoom(current + delta))
+  }
+
+  const handleFullscreenOpenChange = (open: boolean) => {
+    setFullscreenOpen(open)
+    if (open) setZoom(1)
+  }
+
+  const handleFullscreenWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    updateZoom(event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)
+  }
+
+  const diagramLabel = ariaLabel || 'Mermaid diagram'
+  const canOpenFullscreen = Boolean(renderedSvg && !error && !fallbackMessage)
+  const zoomPercent = `${Math.round(zoom * 100)}%`
+
   return (
-    <figure
-      className={cn(error ? 'mermaid-error' : 'mermaid-container', 'not-prose my-6', className)}
-      role={error || fallbackMessage ? undefined : 'img'}
-      aria-label={error || fallbackMessage ? undefined : ariaLabel || 'Mermaid diagram'}
-    >
-      {error && (
-        <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
-          <div className="text-destructive mb-2 font-medium">Diagram Error</div>
-          <div className="text-muted-foreground mb-2 text-sm">{error}</div>
-          <pre className="bg-muted overflow-x-auto rounded p-2 text-xs whitespace-pre-wrap">
-            {chart}
-          </pre>
-        </div>
-      )}
-      {fallbackMessage && !error && (
-        <div className="bg-muted/40 border-border rounded-lg border border-dashed p-4">
-          <div className="text-muted-foreground text-sm">{fallbackMessage}</div>
-        </div>
-      )}
-      <div
-        ref={containerRef}
-        className={cn(
-          'mermaid-diagram bg-card border-border flex justify-center overflow-x-auto rounded-lg border p-4',
-          (error || fallbackMessage) && 'hidden'
+    <div className="not-prose relative my-6">
+      <figure
+        className={cn(error ? 'mermaid-error' : 'mermaid-container', className)}
+        role={error || fallbackMessage ? undefined : 'img'}
+        aria-label={error || fallbackMessage ? undefined : diagramLabel}
+      >
+        {error && (
+          <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
+            <div className="text-destructive mb-2 font-medium">Diagram Error</div>
+            <div className="text-muted-foreground mb-2 text-sm">{error}</div>
+            <pre className="bg-muted overflow-x-auto rounded p-2 text-xs whitespace-pre-wrap">
+              {chart}
+            </pre>
+          </div>
         )}
-      />
-    </figure>
+        {fallbackMessage && !error && (
+          <div className="bg-muted/40 border-border rounded-lg border border-dashed p-4">
+            <div className="text-muted-foreground text-sm">{fallbackMessage}</div>
+          </div>
+        )}
+        <div
+          ref={containerRef}
+          className={cn(
+            'mermaid-diagram bg-card border-border flex justify-center overflow-x-auto rounded-lg border p-4',
+            (error || fallbackMessage) && 'hidden'
+          )}
+        />
+      </figure>
+
+      {canOpenFullscreen ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          className="bg-background/90 absolute top-2 right-2 shadow-sm backdrop-blur"
+          aria-label="Open diagram fullscreen"
+          onClick={() => handleFullscreenOpenChange(true)}
+        >
+          <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+        </Button>
+      ) : null}
+
+      <Dialog open={fullscreenOpen} onOpenChange={handleFullscreenOpenChange}>
+        <DialogContent className="flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-none grid-rows-[auto_minmax(0,1fr)] flex-col gap-3 overflow-hidden p-3 sm:rounded-lg">
+          <DialogTitle className="sr-only">Diagram fullscreen</DialogTitle>
+          <div className="flex shrink-0 items-center gap-2 pr-10">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Zoom out"
+              disabled={zoom <= MIN_ZOOM}
+              onClick={() => updateZoom(-ZOOM_STEP)}
+            >
+              <Minus className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+            <span className="min-w-12 text-center text-xs font-medium tabular-nums">
+              {zoomPercent}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Zoom in"
+              disabled={zoom >= MAX_ZOOM}
+              onClick={() => updateZoom(ZOOM_STEP)}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Reset zoom"
+              onClick={() => setZoom(1)}
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </div>
+          <div
+            aria-label="Fullscreen diagram viewport"
+            className="bg-card border-border min-h-0 flex-1 overflow-auto rounded-md border p-4"
+            onWheel={handleFullscreenWheel}
+          >
+            <div
+              role="img"
+              aria-label={diagramLabel}
+              className="inline-block min-w-full [&_svg]:h-auto [&_svg]:w-full [&_svg]:max-w-none"
+              style={{ width: `${zoom * 100}%` }}
+              dangerouslySetInnerHTML={{ __html: renderedSvg ?? '' }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
