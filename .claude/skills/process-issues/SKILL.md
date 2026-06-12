@@ -106,7 +106,8 @@ gh issue view <number>
 **ALWAYS query documentation before implementing:**
 
 ```
-mcp__context7__resolve-library-id → mcp__context7__query-docs
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
+@neuledge/context MCP first; mcp__context7__resolve-library-id -> mcp__context7__query-docs only as L2 fallback
 ```
 
 **When to use:**
@@ -281,7 +282,7 @@ For each issue, generate:
 - Subagent: <name> | Execute directly
 - Complexity: Simple | Medium | Complex
 
-### Context7 Queries Needed
+### Docs L1/L2 Queries Needed
 
 - [ ] Next.js: <topic>
 - [ ] Supabase: <topic>
@@ -357,10 +358,10 @@ Present to user:
    bd update <task_id> --status=in_progress
    ```
 
-2. **Query Context7** (if needed):
+2. **Query Docs L1/L2** (if needed):
 
    ```
-   mcp__context7__resolve-library-id → mcp__context7__query-docs
+   @neuledge/context MCP first; mcp__context7__resolve-library-id -> mcp__context7__query-docs only as L2 fallback
    ```
 
 3. **Delegate or Execute**:
@@ -445,7 +446,7 @@ Before marking ANY issue as fixed:
 - [ ] Useful suggestions considered (adopted/rejected with reason)
 - [ ] Similar issues searched (Beads + GitHub)
 - [ ] Beads task exists for this issue
-- [ ] Context7 queried for relevant docs
+- [ ] Docs L1/L2 queried for relevant docs
 - [ ] Root cause identified (not just symptom)
 - [ ] Modified files reviewed with Read tool
 - [ ] `pnpm type-check` passes

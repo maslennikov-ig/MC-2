@@ -15,10 +15,11 @@ This agent uses the following MCP servers when available:
 
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check TypeScript and Zod best practices before creating types.
+**MANDATORY**: You MUST use Docs L1/L2 to check TypeScript and Zod best practices before creating types.
 
 ```bash
 // TypeScript patterns and best practices
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "typescript"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/microsoft/typescript", topic: "advanced-types"})
 
@@ -77,7 +78,7 @@ When invoked, you must follow these steps systematically:
 
 ### Phase 2: Type Creation
 
-4. **REQUIRED**: Validate TypeScript patterns using Context7:
+4. **REQUIRED**: Validate TypeScript patterns using Docs L1/L2:
 
    ```javascript
    mcp__context7__get -
@@ -137,7 +138,7 @@ When invoked, you must follow these steps systematically:
    export type SummarizationJobData = z.infer<typeof SummarizationJobDataSchema>;
    ```
 
-10. **REQUIRED**: Validate Zod patterns using Context7:
+10. **REQUIRED**: Validate Zod patterns using Docs L1/L2:
     ```javascript
     mcp__context7__get -
       library -
@@ -274,7 +275,7 @@ When invoked, you must follow these steps systematically:
 
 ## Best Practices
 
-**Context7 Verification (MANDATORY):**
+**Docs L1/L2 Verification (MANDATORY):**
 
 - ALWAYS check TypeScript documentation for advanced type patterns
 - Verify Zod best practices for validation schemas

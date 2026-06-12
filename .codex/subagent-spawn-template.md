@@ -23,7 +23,7 @@ Model/Reasoning Rationale: <why this level is appropriate>
 
 ## Documentation
 
-- <Context7 / first-party docs source, or: No dependency documentation lookup needed.>
+- <Docs L1/L2 / first-party docs source, or: No dependency documentation lookup needed.>
 
 ## Asset Routing
 

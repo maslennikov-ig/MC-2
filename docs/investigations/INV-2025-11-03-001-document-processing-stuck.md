@@ -727,7 +727,7 @@ TEST PASSES ✅
 
 **Tier 2/3 Sources Used**:
 
-- None required - Context7 documentation was sufficient for understanding BullMQ patterns
+- None required - Docs L1/L2 documentation was sufficient for understanding BullMQ patterns
 
 ### MCP Server Usage
 
@@ -813,6 +813,7 @@ TEST PASSES ✅
 
 ### MCP Calls Made
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 1. `mcp__context7__resolve-library-id({libraryName: "bullmq"})`
    - Purpose: Find BullMQ documentation
    - Result: `/taskforcesh/bullmq` with Trust Score 8.8

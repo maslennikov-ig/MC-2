@@ -14,7 +14,7 @@ Use `.codex/subagent-spawn-template.md` as the concrete prompt shape.
 - Model/reasoning: inherit by default; choose reasoning by complexity/risk; set explicit model only with current user authorization or a clear task-specific reason; record the rationale.
 - Goal: finished outcome in one short paragraph.
 - Success criteria: observable checks that decide acceptance.
-- Documentation: Context7 or first-party docs when dependencies, APIs, CLIs, or platform behavior matter; otherwise state `No dependency documentation lookup needed.`
+- Documentation: Docs L1/L2 or first-party docs when dependencies, APIs, CLIs, or platform behavior matter; otherwise state `No dependency documentation lookup needed.`
 - Asset Routing: selected docs, skills, agents/personas, agent type to spawn, skill items to attach, catalog candidates, or `none - <reason>` for each category. Do not omit this block.
 - Skill items to attach: exact selected `SKILL.md` paths for structured `skill` items when the runtime supports them; text-only mentions are fallback.
 - Parallel context: matrix stream id, sibling streams, and any sequencing/dependency boundaries.

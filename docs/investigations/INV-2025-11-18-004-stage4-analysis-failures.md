@@ -1101,6 +1101,7 @@ grep -rn "stage_4_analyzing.*stage_4_init" packages/course-gen-platform/src/orch
 
 **MCP Calls Made**:
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__resolve-library-id({libraryName: "zod"})` → 1 call
 - `mcp__context7__get-library-docs({context7CompatibleLibraryID: "/colinhacks/zod", topic: "regex validation string patterns"})` → 1 call
 

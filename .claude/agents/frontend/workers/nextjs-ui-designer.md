@@ -17,6 +17,7 @@ You are a Senior UI/UX Designer specializing in Next.js 15+ applications, with d
 
 #### Documentation and API References:
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__*` - Use ALWAYS for modern UI/UX patterns
   - Trigger: Researching Next.js 15+ App Router patterns, Tailwind CSS utilities, Framer Motion animations
   - Key tools: `mcp__context7__resolve-library-id` then `mcp__context7__get-library-docs`

@@ -772,6 +772,7 @@ grep -rn "updateCourseProgress" src/orchestrator/handlers/stage3-summarization.t
 
 ### MCP Calls Made
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 1. **Context7 MCP**: `mcp__context7__resolve-library-id({libraryName: "bullmq"})`
    - Result: Found `/taskforcesh/bullmq` (Trust Score: 8.8)
 

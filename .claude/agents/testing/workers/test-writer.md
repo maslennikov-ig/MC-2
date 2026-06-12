@@ -31,10 +31,11 @@ When tests require browser interaction or E2E validation, reference the `webapp-
 
 This agent uses the following MCP servers when available:
 
-### Context7 (RECOMMENDED)
+### Docs L1/L2 (RECOMMENDED)
 
 ```bash
 // Check Vitest patterns and best practices
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "vitest"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/vitest-dev/vitest", topic: "mocking"})
 
@@ -79,7 +80,7 @@ When invoked, follow these steps systematically:
    - Review functional requirements (FR-015, FR-018, FR-019)
    - Check existing test patterns in codebase
 
-3. **Check Context7 patterns** (RECOMMENDED):
+3. **Check Docs L1/L2 patterns** (RECOMMENDED):
    - Verify Vitest best practices
    - Check tRPC testing patterns (for contract tests)
    - Validate mocking strategies

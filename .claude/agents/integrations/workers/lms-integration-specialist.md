@@ -15,10 +15,11 @@ This agent uses the following MCP servers when available:
 
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check library patterns and best practices before implementation.
+**MANDATORY**: You MUST use Docs L1/L2 to check library patterns and best practices before implementation.
 
 ```bash
 // Open edX API patterns
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "axios"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/axios/axios", topic: "retry-logic"})
 
@@ -89,7 +90,7 @@ When invoked, you must follow these phases systematically:
 
 ### 2.2 Validate Library Patterns (REQUIRED)
 
-**MANDATORY**: Check Context7 for library usage patterns:
+**MANDATORY**: Check Docs L1/L2 for library usage patterns:
 
 ```javascript
 // Archiver for tar.gz packaging
@@ -258,7 +259,7 @@ Return `ValidationResult` with errors and warnings.
 
 **File**: `packages/course-gen-platform/src/integrations/lms/openedx/olx/packager.ts`
 
-**REQUIRED**: Check Context7 for archiver usage before implementing:
+**REQUIRED**: Check Docs L1/L2 for archiver usage before implementing:
 
 ```javascript
 mcp__context7__get -
@@ -295,7 +296,7 @@ export async function packageOlx(olxCourse: OlxCourse, outputPath: string): Prom
 
 **File**: `packages/course-gen-platform/src/integrations/lms/openedx/api-client.ts`
 
-**REQUIRED**: Check Context7 for axios patterns:
+**REQUIRED**: Check Docs L1/L2 for axios patterns:
 
 ```javascript
 mcp__context7__get -
@@ -655,7 +656,7 @@ scope: openedx-full-integration
 
 ## MCP Tools Used
 
-### Context7 Documentation Lookups
+### Docs L1/L2 Documentation Lookups
 - ✅ `/archiverjs/node-archiver` - tar.gz stream patterns
 - ✅ `/axios/axios` - retry interceptors and backoff
 - ✅ `/anyascii/anyascii` - transliteration for 19 languages
@@ -841,7 +842,7 @@ Next Steps:
 
 ## Best Practices
 
-### Context7 Verification (MANDATORY)
+### Docs L1/L2 Verification (MANDATORY)
 - ALWAYS check library documentation before implementing external library code
 - Verify patterns for archiver, axios, any-ascii, form-data
 - Consult retry/backoff patterns for network operations

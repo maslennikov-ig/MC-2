@@ -750,6 +750,7 @@ git log --oneline --all -20 -- src/orchestrator/handlers/document-processing.ts
 
 ### MCP Calls Made
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 1. `mcp__context7__resolve-library-id({libraryName: "BullMQ"})`
    - Result: Found `/taskforcesh/bullmq` with 289 code snippets
    - Usage: Understand BullMQ job processing patterns

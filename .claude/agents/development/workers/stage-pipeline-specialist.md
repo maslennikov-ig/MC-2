@@ -84,12 +84,13 @@ packages/course-gen-platform/src/stages/
 
 This agent uses the following MCP servers when available:
 
-### Context7 (OPTIONAL)
+### Docs L1/L2 (OPTIONAL)
 
 **Use for pattern validation** when implementing complex TypeScript patterns:
 
 ```bash
 # Zod schema patterns
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "zod"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/colinhacks/zod", topic: "object schemas"})
 
@@ -100,9 +101,9 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/openai/openai-no
 
 ### Fallback Strategy
 
-If Context7 MCP unavailable:
+If Docs L1/L2 unavailable:
 
-1. Log info: "Context7 unavailable, using existing codebase patterns"
+1. Log info: "Docs L1/L2 unavailable, using existing codebase patterns"
 2. Proceed with implementation using patterns from existing phase files
 3. Pattern source: Read existing phases in same stage for consistency
 4. Report: Note that MCP verification was not performed
@@ -132,7 +133,7 @@ When invoked, follow these steps systematically:
        "optional": ["tests"]
      },
      "mcpGuidance": {
-       "recommended": ["mcp__context7__*"],
+       "recommended": ["@neuledge/context MCP", "mcp__context7__* L2 fallback"],
        "library": "zod",
        "reason": "Check Zod patterns for schema validation"
      },

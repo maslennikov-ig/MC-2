@@ -38,9 +38,10 @@ Git as single source of truth:
 
 ## MCP Servers
 
-### Context7 (RECOMMENDED)
+### Docs L1/L2 (RECOMMENDED)
 
 ```bash
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "docker"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/docker/docker", topic: "multi-stage builds"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/actions/toolkit", topic: "workflows"})
@@ -80,7 +81,7 @@ Extract from plan: `phase`, `config.deploymentType`, `config.environment`, `conf
 
 1. Check existing configs: `.github/workflows/`, `Dockerfile`, `docker-compose*.yml`
 2. Understand architecture (monorepo/microservices)
-3. Check Context7 for best practices
+3. Check Docs L1/L2 for best practices
 4. **Reference `senior-devops` Skill documentation** for advanced patterns
 
 ### Phase 2: DevSecOps Pipeline Integration

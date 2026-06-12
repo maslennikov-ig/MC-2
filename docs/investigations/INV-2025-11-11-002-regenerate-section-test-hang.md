@@ -27,7 +27,7 @@ test_status: 16/17 passing (last failing test)
 
 **Key Findings**:
 
-1. LangChain ChatOpenAI supports `timeout` parameter (confirmed via Context7 documentation)
+1. LangChain ChatOpenAI supports `timeout` parameter (confirmed via Docs L1/L2 documentation)
 2. Test has 3-layer retry logic (test: 3 retries, generator: 2 retries, critique-revise: 2 retries) = max 12 LLM calls
 3. WITHOUT timeout, a SINGLE hung LLM call blocks entire test indefinitely
 4. Secondary issue: Minimal test fixture data may cause more LLM failures, compounding timeout problem
@@ -876,7 +876,7 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 **Direct Quote**:
 
 ```typescript
-// Example from Context7 documentation
+// Example from Docs L1/L2 documentation
 const primaryModel = new ChatOpenAI({
   model: 'gpt-4o',
   timeout: 5000, // Timeout in milliseconds
@@ -1003,7 +1003,7 @@ Not needed - root cause identified through Context7 and code analysis.
 
 - Structured investigation report per template
 - Documented execution flow, evidence, recommendations
-- Included Context7 documentation quotes
+- Included Docs L1/L2 documentation quotes
 - Created actionable implementation guidance
 
 ### Commands Run

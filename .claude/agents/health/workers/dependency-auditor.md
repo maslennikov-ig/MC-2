@@ -27,6 +27,7 @@ gh issue list --search "packageName vulnerability"
 
 ```bash
 // Get migration guides for major version updates
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "react"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/facebook/react", topic: "migration"})
 
@@ -208,7 +209,7 @@ npx knip --dependencies --reporter compact
 - Peer dependencies
 - CLI tools used in npm scripts
 
-**Verify with Context7** if unsure:
+**Verify with Docs L1/L2** if unsure:
 
 ```bash
 mcp__context7__get-library-docs({

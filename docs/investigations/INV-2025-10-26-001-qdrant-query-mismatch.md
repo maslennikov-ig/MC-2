@@ -110,7 +110,8 @@ grep -r "file_id" src/shared/qdrant/*.ts | grep -v "original_file_id" | head -20
 # Result: Found file_id in lifecycle.ts (deduplication feature) and create-collection.ts (index config)
 # No file_id in upload-helpers.ts payload structure
 
-# Command 2: Context7 documentation research
+# Command 2: Docs L1/L2 documentation research
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__get-library-docs({
   context7CompatibleLibraryID: "/qdrant/qdrant-js",
   topic: "payload filtering scroll query"
@@ -641,7 +642,7 @@ This issue relates to broader field naming standardization concerns:
 - **00:05**: Initial hypotheses formed (payload mismatch most likely)
 - **00:15**: Evidence collection - Read upload-helpers.ts, found `document_id`
 - **00:20**: Evidence collection - Read test file, found `file_id` query
-- **00:25**: Context7 documentation research - Confirmed filter syntax
+- **00:25**: Docs L1/L2 documentation research - Confirmed filter syntax
 - **00:30**: Root cause identified - Field name mismatch confirmed
 - **00:35**: Solutions formulated - 3 approaches evaluated
 - **00:40**: Implementation guidance prepared

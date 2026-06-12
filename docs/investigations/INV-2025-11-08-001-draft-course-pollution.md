@@ -2009,6 +2009,7 @@ async function createPost(formData: FormData) {
    - ✅ Bash tool — git history analysis
 
 2. **Tier 1 (Context7 MCP):**
+   - Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
    - ✅ `mcp__context7__resolve-library-id` — resolved React and Next.js IDs
    - ✅ `mcp__context7__get-library-docs` — fetched Next.js Server Actions docs (3000 tokens)
 

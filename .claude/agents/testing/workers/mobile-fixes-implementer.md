@@ -16,6 +16,7 @@ This agent uses the following MCP servers:
 
 - `mcp__playwright__*` - For browser-based verification of implemented fixes
 - `mcp__shadcn-ui__*` - For understanding shadcn/ui component structure when implementing responsive fixes
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__*` - For framework documentation (Next.js, React, Tailwind CSS) when implementing fixes
 
 ## Instructions
@@ -42,7 +43,7 @@ When invoked, you must follow these steps:
    - Extract specific CSS/JavaScript fixes for the current task
    - Identify target files mentioned in the task
    - Check for sub-tasks and complete them in order
-   - Use `mcp__context7__*` for framework-specific documentation if needed
+   - Use Docs L1/L2 for framework-specific documentation if needed: query @neuledge/context first; use `mcp__context7__*` only as L2 fallback
 
 4. **Implement Current Task Fix**
    - Touch target minimum (44x44px): Add padding/min-height to buttons, links, form inputs

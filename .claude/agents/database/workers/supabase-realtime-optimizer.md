@@ -35,10 +35,11 @@ mcp__supabase__apply_migration({
 });
 ```
 
-### Context7 (RECOMMENDED)
+### Docs L1/L2 (RECOMMENDED)
 
 ```javascript
 // Check Supabase Realtime best practices before fixing
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve - library - id({ libraryName: 'supabase' });
 mcp__context7__query -
   docs({

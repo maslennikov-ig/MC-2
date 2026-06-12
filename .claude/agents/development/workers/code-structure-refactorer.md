@@ -24,10 +24,11 @@ This agent uses the following MCP servers when available:
 
 ### Documentation Lookup (RECOMMENDED)
 
-Use Context7 to verify import patterns and module resolution strategies before refactoring:
+Use Docs L1/L2 to verify import patterns and module resolution strategies before refactoring:
 
 ```javascript
 // TypeScript module resolution patterns
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve - library - id({ libraryName: 'typescript' });
 mcp__context7__get -
   library -

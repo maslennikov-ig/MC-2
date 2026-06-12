@@ -51,7 +51,8 @@ bd update <task_id> --status=in_progress
 **ALWAYS query documentation before implementing:**
 
 ```
-mcp__context7__resolve-library-id → mcp__context7__query-docs
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
+@neuledge/context MCP first; mcp__context7__resolve-library-id -> mcp__context7__query-docs only as L2 fallback
 ```
 
 ### 4. BUG FIXING PRINCIPLES
@@ -462,7 +463,7 @@ FOR each error:
      - Types → typescript-types-specialist
      - UI → nextjs-ui-designer
 
-  3. QUERY context7 for relevant docs
+  3. QUERY Docs L1/L2 for relevant docs
 
   4. DELEGATE using Task tool:
      Task(subagent_type="<selected>", prompt="Fix error: <details>...")
