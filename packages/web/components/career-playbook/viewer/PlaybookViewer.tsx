@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Building2,
   CheckCircle2,
@@ -251,6 +251,9 @@ export function PlaybookViewer({
   const [toc, setToc] = useState<PanelState>(() => readInitialPanelState('toc'))
   const [panel, setPanel] = useState<PanelState>(() => readInitialPanelState('panel'))
   const [internalMode, setInternalMode] = useState<ReaderMode>(readInitialReaderMode)
+  const [activeBlockId, setActiveBlockId] = useState<CareerPlaybookBlockId | null>(() =>
+    readInitialActiveBlockId(blocks)
+  )
   const mode = readerMode ?? internalMode
   const viewerPermissions = snapshot.viewerPermissions ?? {
     canEdit: true,
@@ -266,10 +269,69 @@ export function PlaybookViewer({
   const tocOpen = mode === 'standard' && toc === 'open'
   const panelOpen = mode === 'standard' && inspectorAvailable && panel === 'open'
   const groupedBlocks = useMemo(() => groupBlocks(blocks), [blocks])
+  const blockIds = useMemo(() => blocks.map((block) => block.blockId), [blocks])
   const readyBlocks = useMemo(
     () => blocks.filter((block) => block.state.content.trim().length > 0).length,
     [blocks]
   )
+  const visibleBlocksRef = useRef(new Map<CareerPlaybookBlockId, { ratio: number; top: number }>())
+
+  useEffect(() => {
+    if (blockIds.length === 0) {
+      setActiveBlockId(null)
+      return
+    }
+
+    setActiveBlockId((current) =>
+      current && blockIds.includes(current) ? current : (blockIds[0] ?? null)
+    )
+  }, [blockIds])
+
+  useEffect(() => {
+    visibleBlocksRef.current.clear()
+    if (mode !== 'standard') return
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
+
+    const blockIdSet = new Set<CareerPlaybookBlockId>(blockIds)
+    const elements = blockIds
+      .map((blockId) => document.getElementById(blockId))
+      .filter((element): element is HTMLElement => Boolean(element))
+
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const blockId = entry.target.id
+          if (!blockIdSet.has(blockId)) continue
+
+          if (entry.isIntersecting) {
+            visibleBlocksRef.current.set(blockId, {
+              ratio: entry.intersectionRatio,
+              top: entry.boundingClientRect?.top ?? 0,
+            })
+          } else {
+            visibleBlocksRef.current.delete(blockId)
+          }
+        }
+
+        const [nextActiveBlockId] =
+          Array.from(visibleBlocksRef.current.entries()).sort(([, a], [, b]) => {
+            if (b.ratio !== a.ratio) return b.ratio - a.ratio
+            return Math.abs(a.top) - Math.abs(b.top)
+          })[0] ?? []
+
+        if (nextActiveBlockId) setActiveBlockId(nextActiveBlockId)
+      },
+      {
+        rootMargin: '-18% 0px -55% 0px',
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+      }
+    )
+
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [blockIds, mode])
 
   const updateToc = (next: PanelState) => {
     setToc(next)
@@ -351,7 +413,14 @@ export function PlaybookViewer({
                     : 'xl:grid-cols-[minmax(0,1fr)]'
             )}
           >
-            {tocOpen ? <ContentsRail groupedBlocks={groupedBlocks} labels={labels} /> : null}
+            {tocOpen ? (
+              <ContentsRail
+                groupedBlocks={groupedBlocks}
+                labels={labels}
+                activeBlockId={activeBlockId}
+                onActiveBlockChange={setActiveBlockId}
+              />
+            ) : null}
 
             <section className="min-w-0 overflow-hidden rounded-md border border-[#d6c2a6] bg-[#fbfaf7] shadow-xl shadow-stone-300/30 dark:border-slate-700 dark:bg-slate-950">
               <ReaderTopbar
@@ -497,10 +566,21 @@ function ReadingTopbar({
 function ContentsRail({
   groupedBlocks,
   labels,
+  activeBlockId,
+  onActiveBlockChange,
 }: {
   groupedBlocks: ReturnType<typeof groupBlocks>
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  activeBlockId: CareerPlaybookBlockId | null
+  onActiveBlockChange: (blockId: CareerPlaybookBlockId) => void
 }) {
+  const activeLinkRef = useRef<HTMLAnchorElement | null>(null)
+
+  useEffect(() => {
+    if (typeof activeLinkRef.current?.scrollIntoView !== 'function') return
+    activeLinkRef.current.scrollIntoView({ block: 'nearest' })
+  }, [activeBlockId])
+
   return (
     <nav
       aria-label={labels.contentsAriaLabel}
@@ -516,17 +596,29 @@ function ContentsRail({
               <p className="px-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {labels.blockGroupLabel(group.groupKey, group.groupLabel)}
               </p>
-              {group.blocks.map((block) => (
-                <a
-                  key={block.blockId}
-                  href={`#${block.blockId}`}
-                  className="block min-w-0 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-[#f6efe4] hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
-                >
-                  <span className="block truncate">
-                    {labels.blockTitle(block.blockId, block.title)}
-                  </span>
-                </a>
-              ))}
+              {group.blocks.map((block) => {
+                const isActive = block.blockId === activeBlockId
+
+                return (
+                  <a
+                    key={block.blockId}
+                    ref={isActive ? activeLinkRef : undefined}
+                    href={`#${block.blockId}`}
+                    aria-current={isActive ? 'true' : undefined}
+                    onClick={() => onActiveBlockChange(block.blockId)}
+                    className={cn(
+                      'block min-w-0 rounded-md px-2 py-1.5 text-sm transition-colors',
+                      isActive
+                        ? 'bg-[#f6efe4] font-medium text-slate-950 ring-1 ring-[#dcc7a6] dark:bg-slate-800 dark:text-slate-50 dark:ring-slate-700'
+                        : 'text-slate-700 hover:bg-[#f6efe4] hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50'
+                    )}
+                  >
+                    <span className="block truncate">
+                      {labels.blockTitle(block.blockId, block.title)}
+                    </span>
+                  </a>
+                )
+              })}
             </div>
           ))}
         </div>
@@ -880,6 +972,17 @@ function readInitialReaderMode(): ReaderMode {
   return new URLSearchParams(window.location.search).get('mode') === 'reading'
     ? 'reading'
     : 'standard'
+}
+
+function readInitialActiveBlockId(
+  blocks: CareerPlaybookViewerBlock[]
+): CareerPlaybookBlockId | null {
+  const firstBlockId = blocks[0]?.blockId
+  if (!firstBlockId) return null
+  if (typeof window === 'undefined') return firstBlockId
+
+  const hashBlockId = window.location.hash.replace(/^#/, '')
+  return blocks.some((block) => block.blockId === hashBlockId) ? hashBlockId : firstBlockId
 }
 
 function getSnapshotVisibility(snapshot: CareerPlaybookViewerSnapshot): CareerPlaybookVisibility {

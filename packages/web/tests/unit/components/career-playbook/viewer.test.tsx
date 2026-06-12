@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps, ReactElement } from 'react'
@@ -174,6 +174,89 @@ describe('Career Playbook viewer components', () => {
 
     const antiGoalsBlock = screen.getByRole('article', { name: 'Что не входит в роль' })
     expect(within(antiGoalsBlock).getByTestId('markdown-renderer')).toHaveTextContent('Anti-goals')
+  })
+
+  it('highlights and scrolls the active contents item as document blocks enter the viewport', async () => {
+    const originalIntersectionObserver = globalThis.IntersectionObserver
+    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      'scrollIntoView'
+    )
+    const scrollIntoView = vi.fn()
+    let observerCallback: IntersectionObserverCallback | null = null
+
+    class TestIntersectionObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = ''
+      readonly thresholds: ReadonlyArray<number> = []
+
+      constructor(callback: IntersectionObserverCallback) {
+        observerCallback = callback
+      }
+
+      disconnect = vi.fn()
+      observe = vi.fn()
+      takeRecords = vi.fn(() => [])
+      unobserve = vi.fn()
+    }
+
+    globalThis.IntersectionObserver =
+      TestIntersectionObserver as unknown as typeof IntersectionObserver
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+
+    try {
+      render(
+        <PlaybookViewer
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      const contents = screen.getByRole('navigation', {
+        name: 'Содержание должностной инструкции',
+      })
+      const missionLink = within(contents).getByRole('link', {
+        name: 'Миссия и ключевые результаты',
+      })
+      const missionBlock = screen.getByRole('article', {
+        name: 'Миссия и ключевые результаты',
+      })
+
+      await waitFor(() => expect(observerCallback).not.toBeNull())
+
+      act(() => {
+        observerCallback?.(
+          [
+            {
+              target: missionBlock,
+              isIntersecting: true,
+              intersectionRatio: 0.75,
+            } as IntersectionObserverEntry,
+          ],
+          {} as IntersectionObserver
+        )
+      })
+
+      expect(missionLink).toHaveAttribute('aria-current', 'true')
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    } finally {
+      globalThis.IntersectionObserver = originalIntersectionObserver
+      if (originalScrollIntoViewDescriptor) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor)
+      } else {
+        delete (Element.prototype as Partial<Element>).scrollIntoView
+      }
+    }
   })
 
   it('hides side panels independently and switches to reading mode', async () => {
