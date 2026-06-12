@@ -729,7 +729,7 @@ function VisibilitySection({
     <section className="career-playbook-muted-card p-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">{labels.visibilityLabel}</h2>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -748,7 +748,7 @@ function VisibilitySection({
               <ChevronDown className="h-3 w-3" aria-hidden />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" onCloseAutoFocus={(event) => event.preventDefault()}>
             {VISIBILITY_OPTIONS.map((option) => {
               const optionConfig = VISIBILITY_CONFIG[option]
               const OptionIcon = optionConfig.icon

@@ -342,6 +342,59 @@ describe('Career Playbook viewer components', () => {
     expect(handleVisibilityChange).toHaveBeenCalledWith('organization')
   })
 
+  it('does not let the visibility dropdown close focus jump the sticky rails to the top', async () => {
+    const user = userEvent.setup()
+    const handleVisibilityChange = vi.fn()
+    const originalScrollYDescriptor = Object.getOwnPropertyDescriptor(window, 'scrollY')
+    const originalFocusDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'focus')
+    let scrollY = 820
+
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      get: () => scrollY,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'focus', {
+      configurable: true,
+      value: vi.fn(function focus(this: HTMLElement, options?: FocusOptions) {
+        const isVisibilityTrigger = this.getAttribute('aria-label')?.startsWith('Видимость:')
+        if (isVisibilityTrigger && !options?.preventScroll) scrollY = 0
+      }),
+    })
+
+    try {
+      render(
+        <PlaybookViewerWithVisibility
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onVisibilityChange={handleVisibilityChange}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+
+      await user.click(within(inspector).getByRole('button', { name: /Видимость: Приватный/ }))
+      scrollY = 820
+      await user.click(await screen.findByRole('menuitem', { name: 'Публичный' }))
+
+      expect(handleVisibilityChange).toHaveBeenCalledWith('public')
+      expect(window.scrollY).toBe(820)
+    } finally {
+      if (originalFocusDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'focus', originalFocusDescriptor)
+      }
+      if (originalScrollYDescriptor) {
+        Object.defineProperty(window, 'scrollY', originalScrollYDescriptor)
+      }
+    }
+  })
+
   it('renders organization readers without the owner management layer', () => {
     render(
       <PlaybookViewer
