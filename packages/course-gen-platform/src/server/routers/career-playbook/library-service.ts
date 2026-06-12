@@ -266,7 +266,6 @@ const PUBLIC_PLAYBOOK_COLUMNS = [
   'department',
   'specialization',
   'level',
-  'q_a_data',
   'final_markdown',
   'share_slug',
   'is_public',
@@ -450,7 +449,6 @@ function mapRowToPublicShare(
 ): CareerPlaybookPublicShareResponse {
   const mapped = mapPlaybookRow(row);
   const visibility = getVisibility(mapped);
-  const qaData = normalizeStoredQAData(mapped.q_a_data);
   return {
     id: mapped.id,
     status: mapped.status,
@@ -469,7 +467,7 @@ function mapRowToPublicShare(
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
     finalMarkdown: mapped.final_markdown ?? '',
-    qualityWarnings: qaData.generation_warnings,
+    qualityWarnings: [],
   };
 }
 

@@ -7,12 +7,21 @@ function isObject(value: unknown): value is RuntimeObject {
   return Boolean(value) && typeof value === 'object';
 }
 
-function isLogger(value: unknown): value is Logger {
-  return isObject(value) && typeof value.debug === 'function' && typeof value.child === 'function';
+function coerceLogger(value: unknown): Logger | null {
+  if (!isObject(value) || typeof value.debug !== 'function') return null;
+  const logger = value as unknown as Logger;
+  if (typeof logger.child === 'function') return logger;
+
+  const compatibleLogger = {
+    ...logger,
+    child: () => compatibleLogger,
+  } as unknown as Logger;
+  return compatibleLogger;
 }
 
 function resolveLogger(value: unknown, seen = new Set<unknown>()): Logger | null {
-  if (isLogger(value)) return value;
+  const logger = coerceLogger(value);
+  if (logger) return logger;
   if (!isObject(value) || seen.has(value)) return null;
 
   seen.add(value);

@@ -2,37 +2,63 @@ import * as sharedUtils from '@megacampus/shared-utils';
 
 export type { LanguageCode } from '@megacampus/shared-utils';
 
-const sharedUtilsRuntime = sharedUtils as typeof sharedUtils & { default?: typeof sharedUtils };
-const hasNamedRuntimeExports =
-  typeof (sharedUtils as unknown as Record<string, unknown>).formatFileSize === 'function';
-const utils = hasNamedRuntimeExports ? sharedUtils : (sharedUtilsRuntime.default ?? sharedUtils);
+type RuntimeObject = Record<string, unknown>;
 
-export const LANGUAGE_FALLBACK = utils.LANGUAGE_FALLBACK;
-export const LANGUAGE_NAME_TO_CODE = utils.LANGUAGE_NAME_TO_CODE;
-export const formatDuration = utils.formatDuration;
-export const formatFileSize = utils.formatFileSize;
-export const formatNumber = utils.formatNumber;
-export const getDocumentDisplayName = utils.getDocumentDisplayName;
-export const hasHumanReadableName = utils.hasHumanReadableName;
-export const normalizeLanguageCode = utils.normalizeLanguageCode;
-export const normalizeLanguageForReserve = utils.normalizeLanguageForReserve;
-export const truncateDisplayName = utils.truncateDisplayName;
-export const getErrorMessage = utils.getErrorMessage;
-export const fixFieldNames = utils.fixFieldNames;
-export const fixFieldNamesWithLogging = utils.fixFieldNamesWithLogging;
-export const findAvailablePort = utils.findAvailablePort;
-export const generateGenerationCode = utils.generateGenerationCode;
-export const JSONRepairError = utils.JSONRepairError;
-export const extractJSON = utils.extractJSON;
-export const safeJSONParse = utils.safeJSONParse;
-export const stripThinkingTags = utils.stripThinkingTags;
-export const setNestedValue = utils.setNestedValue;
-export const retryWithBackoff = utils.retryWithBackoff;
-export const hasDangerousContent = utils.hasDangerousContent;
-export const sanitizeLLMFields = utils.sanitizeLLMFields;
-export const sanitizeLLMOutput = utils.sanitizeLLMOutput;
-export const normalizePhase1Output = utils.normalizePhase1Output;
-export const quickValidatePhase1Structure = utils.quickValidatePhase1Structure;
-export const estimateSchemaTokens = utils.estimateSchemaTokens;
-export const formatSchemaForPrompt = utils.formatSchemaForPrompt;
-export const zodToPromptSchema = utils.zodToPromptSchema;
+function isObject(value: unknown): value is RuntimeObject {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function readRuntimeProperty(value: unknown, key: string): unknown {
+  if (!isObject(value)) return undefined;
+  try {
+    return value[key];
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveRuntimeObject(value: unknown): Partial<typeof sharedUtils> {
+  const namedFormatFileSize = readRuntimeProperty(value, 'formatFileSize');
+  if (typeof namedFormatFileSize === 'function') return value as Partial<typeof sharedUtils>;
+
+  const defaultValue = readRuntimeProperty(value, 'default');
+  if (isObject(defaultValue)) return defaultValue as Partial<typeof sharedUtils>;
+
+  return isObject(value) ? (value as Partial<typeof sharedUtils>) : {};
+}
+
+const utils = resolveRuntimeObject(sharedUtils);
+
+function readUtilsExport<K extends keyof typeof sharedUtils>(key: K): (typeof sharedUtils)[K] {
+  return readRuntimeProperty(utils, key as string) as (typeof sharedUtils)[K];
+}
+
+export const LANGUAGE_FALLBACK = readUtilsExport('LANGUAGE_FALLBACK');
+export const LANGUAGE_NAME_TO_CODE = readUtilsExport('LANGUAGE_NAME_TO_CODE');
+export const formatDuration = readUtilsExport('formatDuration');
+export const formatFileSize = readUtilsExport('formatFileSize');
+export const formatNumber = readUtilsExport('formatNumber');
+export const getDocumentDisplayName = readUtilsExport('getDocumentDisplayName');
+export const hasHumanReadableName = readUtilsExport('hasHumanReadableName');
+export const normalizeLanguageCode = readUtilsExport('normalizeLanguageCode');
+export const normalizeLanguageForReserve = readUtilsExport('normalizeLanguageForReserve');
+export const truncateDisplayName = readUtilsExport('truncateDisplayName');
+export const getErrorMessage = readUtilsExport('getErrorMessage');
+export const fixFieldNames = readUtilsExport('fixFieldNames');
+export const fixFieldNamesWithLogging = readUtilsExport('fixFieldNamesWithLogging');
+export const findAvailablePort = readUtilsExport('findAvailablePort');
+export const generateGenerationCode = readUtilsExport('generateGenerationCode');
+export const JSONRepairError = readUtilsExport('JSONRepairError');
+export const extractJSON = readUtilsExport('extractJSON');
+export const safeJSONParse = readUtilsExport('safeJSONParse');
+export const stripThinkingTags = readUtilsExport('stripThinkingTags');
+export const setNestedValue = readUtilsExport('setNestedValue');
+export const retryWithBackoff = readUtilsExport('retryWithBackoff');
+export const hasDangerousContent = readUtilsExport('hasDangerousContent');
+export const sanitizeLLMFields = readUtilsExport('sanitizeLLMFields');
+export const sanitizeLLMOutput = readUtilsExport('sanitizeLLMOutput');
+export const normalizePhase1Output = readUtilsExport('normalizePhase1Output');
+export const quickValidatePhase1Structure = readUtilsExport('quickValidatePhase1Structure');
+export const estimateSchemaTokens = readUtilsExport('estimateSchemaTokens');
+export const formatSchemaForPrompt = readUtilsExport('formatSchemaForPrompt');
+export const zodToPromptSchema = readUtilsExport('zodToPromptSchema');

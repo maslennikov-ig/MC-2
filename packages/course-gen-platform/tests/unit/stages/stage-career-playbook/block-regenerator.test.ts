@@ -102,6 +102,7 @@ describe('Career Playbook block regenerator', () => {
       content: '## 6. KPI и метрики\n\n| Metric | Target |\n| --- | --- |',
       status: 'generated',
       judge_verdict: null,
+      numeric_facts: [],
       generated_at: '2026-05-13T10:15:30.000Z',
       llm_model: 'mock-career-model',
       attempt: 3,
