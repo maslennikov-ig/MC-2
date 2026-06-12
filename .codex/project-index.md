@@ -78,6 +78,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 
 - Process verification: `scripts/orchestration/run_process_verification.sh`.
 - Stage closeout: `python3 scripts/orchestration/run_stage_closeout.py --stage <stage_id>`.
+- CI/CD deploy change detector: `scripts/ci/detect_deploy_changes.sh`; local coverage: `scripts/ci/test_detect_deploy_changes.sh`.
 - Common code gates: `pnpm type-check` and `pnpm build`.
 - Backend targeted unit tests: `pnpm --filter @megacampus/course-gen-platform test -- <test-files>`.
 - CI integration smoke: `QDRANT_URL=http://localhost:6333 QDRANT_API_KEY=test-qdrant-key pnpm test:integration:ci`; full integration remains `pnpm test:integration`.
@@ -97,5 +98,5 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Keep `.codex/handoff.md` under the configured current-state line limit.
 - Keep this file navigation-only; do not add stage logs, blockers, or task queues.
 - Update this file when stable entrypoints, routes, directories, integrations, verification commands, or ownership boundaries change.
-- Use Context7 for version-sensitive library/framework docs before implementation.
+- Use Docs L1/L2: query @neuledge/context first with the lockfile-routed package/version; use Docs L1/L2 MCP only when L1 is missing, stale, or insufficient.
 - Use visible spawned Codex subagents when justified and explicitly allowed; inline-only delegation is not acceptable for this repo workflow.

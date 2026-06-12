@@ -75,9 +75,9 @@ const LESSON_RAG_CONFIG = {
 
 ## Tools and Skills
 
-**IMPORTANT**: MUST use Context7 MCP for Qdrant documentation before implementation.
+**IMPORTANT**: MUST use Docs L1/L2 MCP for Qdrant documentation before implementation.
 
-### Primary Tool: Context7 MCP (REQUIRED)
+### Primary Tool: Docs L1/L2 (REQUIRED)
 
 **MANDATORY usage for**:
 
@@ -129,9 +129,9 @@ mcp**supabase**apply_migration - Create cache tables
 
 ### Fallback Strategy
 
-1. **Primary**: Context7 MCP for Qdrant documentation
+1. **Primary**: Docs L1/L2 for Qdrant documentation
 2. **Fallback**: If MCP unavailable, use cached knowledge BUT:
-   - Log warning in report: "Context7 unavailable, using cached knowledge"
+   - Log warning in report: "Docs L1/L2 unavailable, using cached knowledge"
    - Mark implementation as "requires MCP verification"
    - Include disclaimer about potential API changes
 3. **Always**: Document which documentation source was used
@@ -145,6 +145,8 @@ When invoked, follow these phases:
 Check for `.tmp/current/plans/.rag-plan.json` or similar:
 
 ```json
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 {
   "workflow": "rag-implementation",
   "phase": 1,
@@ -159,7 +161,7 @@ Check for `.tmp/current/plans/.rag-plan.json` or similar:
     "optional": ["unit-tests"]
   },
   "mcpGuidance": {
-    "recommended": ["mcp__context7__*"],
+    "recommended": ["@neuledge/context MCP", "mcp__context7__* fallback"],
     "library": "qdrant",
     "reason": "Check current Qdrant patterns before implementing retrieval"
   },
@@ -169,32 +171,32 @@ Check for `.tmp/current/plans/.rag-plan.json` or similar:
 
 If no plan file, proceed with user-provided context.
 
-### Phase 1: Use Context7 for Qdrant Documentation
+### Phase 1: Use Docs L1/L2 for Qdrant Documentation
 
-**ALWAYS start with Context7 lookup**:
+**ALWAYS start with Docs L1/L2 lookup**:
 
 1. **For Retrieval Implementation**:
 
    ```markdown
-   Use mcp**context7**resolve-library-id: "qdrant"
-   Then mcp**context7**get-library-docs with topic: "search"
+   Use @neuledge/context MCP first with package@version from the lockfile; L2 fallback resolves "qdrant" in Context7 MCP only if L1 misses/stale
+   Then, only if L1 misses/stale, use Context7 MCP query-docs/get-library-docs with topic: "search"
    Validate: search API, filters, scoring
    ```
 
 2. **For MMR Implementation**:
 
    ```markdown
-   Use mcp**context7**get-library-docs with topic: "mmr" or "diversity"
+   If L1 misses/stale, use Docs L1/L2 query-docs/get-library-docs with topic: "mmr" or "diversity"
    Validate: MMR algorithm parameters, lambda values
    ```
 
 3. **For Batch Operations**:
    ```markdown
-   Use mcp**context7**get-library-docs with topic: "batch"
+   If L1 misses/stale, use Docs L1/L2 query-docs/get-library-docs with topic: "batch"
    Validate: batch search patterns, performance
    ```
 
-**Document Context7 findings**:
+**Document Docs L1/L2 findings**:
 
 - Which library docs were consulted
 - Relevant API patterns discovered
@@ -234,7 +236,7 @@ export class SectionRAGRetrievalService {
           { key: 'course_id', match: { value: params.courseId } },
         ],
       },
-      // MMR diversity parameters (validate with Context7)
+      // MMR diversity parameters (validate with Docs L1/L2)
       // ... additional params
     });
 
@@ -481,7 +483,7 @@ tasks_completed: N
 - **Tasks Completed**: N/N
 - **Files Created/Modified**: N
 - **Validation Status**: PASSED/FAILED
-- **Context7 Documentation Used**: Yes/No
+- **Docs L1/L2 Documentation Used**: Yes/No
 
 ### Highlights
 
@@ -569,7 +571,7 @@ tasks_completed: N
 
 ---
 
-## Context7 Documentation Used
+## Docs L1/L2 Documentation Used
 
 ### Qdrant Documentation
 
@@ -582,7 +584,7 @@ tasks_completed: N
 
 ### Implementation Decisions
 
-{Decisions made based on Context7 documentation}
+{Decisions made based on Docs L1/L2 documentation}
 
 ---
 
@@ -635,7 +637,7 @@ Tasks Completed:
 Validation Status: {PASSED/FAILED}
 Report: {report file path}
 
-Context7 Documentation Used:
+Docs L1/L2 Documentation Used:
 - qdrant-js: search, filters, mmr
 - Key patterns validated
 
@@ -761,22 +763,22 @@ async function safeRetrieve(params: RetrievalParams): Promise<RAGChunk[]> {
 
 **ALWAYS**:
 
-- Start with Context7 lookup before implementation
+- Start with Docs L1/L2 lookup before implementation
 - Document which library docs were consulted
 - Validate API patterns against official docs
-- Include Context7 references in reports
+- Include Docs L1/L2 references in reports
 - Log MCP availability status
 
 **NEVER**:
 
-- Skip Context7 lookup for Qdrant operations
+- Skip Docs L1/L2 lookup for Qdrant operations
 - Implement search without validating filter syntax
 - Assume API patterns without verification
-- Forget to document Context7 findings
+- Forget to document Docs L1/L2 findings
 
 **FALLBACK**:
 
-- If Context7 unavailable, use cached knowledge
+- If Docs L1/L2 unavailable, use cached knowledge
 - Add prominent warning in report
 - Mark implementation as "requires MCP verification"
 - Recommend re-validation once MCP available
@@ -805,7 +807,7 @@ Always provide structured implementation reports following the template in Phase
 
 **Include**:
 
-- Context7 documentation consulted (MANDATORY)
+- Docs L1/L2 documentation consulted (MANDATORY)
 - Implementation details with code snippets
 - Validation results (type-check, build, tests)
 - Files created/modified
@@ -813,7 +815,7 @@ Always provide structured implementation reports following the template in Phase
 
 **Never**:
 
-- Skip Context7 documentation lookup
+- Skip Docs L1/L2 documentation lookup
 - Report completion without validation
 - Omit MCP usage details
 - Forget to document implementation decisions

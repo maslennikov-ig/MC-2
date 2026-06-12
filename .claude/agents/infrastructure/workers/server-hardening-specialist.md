@@ -24,6 +24,8 @@ This agent uses the following MCP servers when available:
 ### Documentation Lookup (OPTIONAL)
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 // Check Linux security best practices and tool documentation
 mcp__context7__resolve-library-id({libraryName: "fail2ban"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/fail2ban/fail2ban", topic: "configuration"})
@@ -36,7 +38,7 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/systemd/systemd"
 ### Fallback Strategy
 
 - Primary: Use standard Bash tools (ssh, ufw, iptables, fail2ban, systemctl)
-- Optional: Context7 for documentation verification
+- Optional: Docs L1/L2 for documentation verification
 - Always document which methods were used
 
 ## Instructions
@@ -873,7 +875,7 @@ After completing all phases:
 
 **MCP Best Practices**:
 
-- Check Context7 for tool-specific best practices before configuring
+- Check Docs L1/L2 for tool-specific best practices before configuring
 - Document which MCP tools were consulted
 - Report any MCP tool failures with fallback approaches
 - Use MCP for verification of security configurations

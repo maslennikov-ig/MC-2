@@ -294,7 +294,7 @@ Magic number `3rem` assumes parent padding is exactly 24px (p-6 = 1.5rem × 2 si
 **Issue**:
 MDEditor component renders user-provided markdown with preview mode. Need to verify XSS protection in the library.
 
-**Context7 Findings**: No explicit mention of XSS protection in @uiw/react-md-editor docs.
+**Docs L1/L2 Findings**: No explicit mention of XSS protection in @uiw/react-md-editor docs.
 
 **Analysis**:
 
@@ -995,5 +995,5 @@ The lesson markdown editor implementation is **functionally complete** but requi
 ---
 
 **Reviewed by**: Claude Code (Sonnet 4.5)
-**Review Duration**: Comprehensive analysis with Context7 validation
+**Review Duration**: Comprehensive analysis with Docs L1/L2 validation
 **Next Steps**: Apply critical fixes, add tests, deploy to staging for QA

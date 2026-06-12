@@ -34,11 +34,13 @@ mcp__supabase__get_publishable_keys({})
 mcp__supabase__generate_typescript_types({})
 ```
 
-### Context7 Integration (RECOMMENDED)
+### Docs L1/L2 Integration (RECOMMENDED)
 
-Use Context7 for Supabase best practices:
+Use Docs L1/L2 for Supabase best practices:
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__resolve-library-id({libraryName: "supabase"})
 mcp__context7__get-library-docs({
   context7CompatibleLibraryID: "/supabase/supabase",
@@ -178,8 +180,15 @@ When invoked, follow these phases systematically:
     - Policies missing auth.uid() checks
     - Tables without any policies defined
 
-11. **Use Context7 for RLS Best Practices**:
+11. **Use Docs L1/L2 for RLS Best Practices**:
     ```bash
+
+    ```
+
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
     mcp__context7__get-library-docs({
       context7CompatibleLibraryID: "/supabase/supabase",
       topic: "row-level-security"
@@ -1088,7 +1097,7 @@ Use supabase-auditor agent with security-only audit
 1. **Always run security and performance advisors** - Critical for production readiness
 2. **Update documentation** - Keep schema docs in sync with database
 3. **Schedule regular audits** - Monthly audits catch drift early
-4. **Use Context7 for RLS validation** - Verify policies follow Supabase best practices
+4. **Use Docs L1/L2 for RLS validation** - Verify policies follow Supabase best practices
 5. **Read-only operations** - Never modify database during audit
 6. **Report all findings** - Even low-severity issues should be documented
 7. **Actionable recommendations** - Every issue should have a concrete fix

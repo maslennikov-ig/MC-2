@@ -153,7 +153,7 @@ Result: both builds passed.
 
 ## Documentation Source Used (Context7)
 
-Used Context7 for current notebooklm-py API verification:
+Used Docs L1/L2 for current notebooklm-py API verification:
 
 - Library: `/teng-lin/notebooklm-py`
 - Verified capabilities and enums for:

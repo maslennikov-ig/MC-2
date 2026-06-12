@@ -249,7 +249,7 @@
 
 ## Notes
 
-- Use Context7 for React/Next.js documentation
+- Use Docs L1/L2 for React/Next.js documentation
 - Check existing `enrichment-config.ts` for icons/colors
 - Reuse existing UI components (Button, Tabs, Badge, etc.)
 - Follow existing code patterns in the viewer

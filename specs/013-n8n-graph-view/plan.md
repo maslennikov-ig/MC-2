@@ -272,7 +272,7 @@ See `quickstart.md` for:
 
 | Risk                       | Mitigation                                              |
 | -------------------------- | ------------------------------------------------------- |
-| React Flow learning curve  | Use Context7 docs, start with basic example             |
+| React Flow learning curve  | Use Docs L1/L2 docs, start with basic example           |
 | ElkJS layout performance   | Web Worker from start, benchmark early                  |
 | Real-time update batching  | Implement 100ms debounce, test with mock high-frequency |
 | Large graph performance    | Semantic zoom + virtualization early                    |

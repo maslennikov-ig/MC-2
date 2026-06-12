@@ -12,6 +12,15 @@ ENV=${1:-production}
 TAG=${2:-latest}
 BASE_PATH="/opt/megacampus"
 NGINX_CONFIG_PATH="/etc/nginx/sites-enabled/megacampus"
+DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
+DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}
+DEPLOY_BRIDGE_CHANGED=${DEPLOY_BRIDGE_CHANGED:-true}
+DEPLOY_CONFIG_CHANGED=${DEPLOY_CONFIG_CHANGED:-true}
+APP_DEPLOY_NEEDED=false
+
+if [ "$DEPLOY_WEB_CHANGED" = "true" ] || [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+    APP_DEPLOY_NEEDED=true
+fi
 
 # 1. Determine Active Color (Default to blue if first run)
 if [ -f "$BASE_PATH/active_color" ]; then
@@ -34,6 +43,7 @@ echo "Starting Blue/Green Deployment"
 echo "   Environment: $ENV"
 echo "   Current: $CURRENT_COLOR"
 echo "   Target:  $NEW_COLOR (web:$NEW_WEB_PORT, api:$NEW_API_PORT)"
+echo "   Changes: web=$DEPLOY_WEB_CHANGED api=$DEPLOY_API_CHANGED bridge=$DEPLOY_BRIDGE_CHANGED config=$DEPLOY_CONFIG_CHANGED"
 echo ""
 
 # 2. Check docling-mcp image exists (manually built, 8GB)
@@ -90,112 +100,135 @@ if [ -n "$GITHUB_TOKEN" ]; then
     echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
 fi
 
-# 7. Deploy Application to New Color
-echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
-# Force remove containers by name (handles orphans from different project names)
-docker stop "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
-docker rm -f "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
-# Also try compose down for proper cleanup
-# NOTE: do NOT use --remove-orphans here, it kills shared infra (Redis, docling-mcp)!
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down 2>/dev/null || true
+if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    # 7. Deploy Application to New Color
+    echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
+    # Force remove containers by name (handles orphans from different project names)
+    docker stop "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
+    docker rm -f "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
+    # Also try compose down for proper cleanup
+    # NOTE: do NOT use --remove-orphans here, it kills shared infra (Redis, docling-mcp)!
+    docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down 2>/dev/null || true
 
-echo "Pulling and starting $NEW_COLOR containers..."
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull
-# NOTE: do NOT use --remove-orphans, it kills shared infra containers (Redis, workers, etc.)
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --force-recreate
+    PULL_SERVICES=()
+    [ "$DEPLOY_WEB_CHANGED" = "true" ] && PULL_SERVICES+=("web")
+    [ "$DEPLOY_API_CHANGED" = "true" ] && PULL_SERVICES+=("api")
 
-# 8. Health Check (check both web and api)
-echo "Performing Health Checks..."
-
-# Check API health
-API_HEALTHY=false
-echo "   Checking API on localhost:$NEW_API_PORT..."
-for i in {1..12}; do
-    if curl -s -f "http://localhost:$NEW_API_PORT/health" > /dev/null 2>&1; then
-        echo "   API health check passed!"
-        API_HEALTHY=true
-        break
-    fi
-    echo "   Waiting for API... ($i/12)"
-    sleep 5
-done
-
-# Check Web health
-WEB_HEALTHY=false
-echo "   Checking Web on localhost:$NEW_WEB_PORT..."
-for i in {1..12}; do
-    if curl -s -f "http://localhost:$NEW_WEB_PORT" > /dev/null 2>&1; then
-        echo "   Web health check passed!"
-        WEB_HEALTHY=true
-        break
-    fi
-    echo "   Waiting for Web... ($i/12)"
-    sleep 5
-done
-
-if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
-    echo ""
-    echo "Health check failed!"
-    [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
-    [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
-    echo ""
-    echo "Rolling back (stopping $NEW_COLOR)..."
-    docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down
-    exit 1
-fi
-
-echo ""
-
-# 9. Switch Traffic
-echo "Switching traffic to $NEW_COLOR..."
-
-if [ -f "$BASE_PATH/nginx.conf.template" ]; then
-    # Replace both WEB_PORT and API_PORT in template
-    sed -e "s/{{WEB_PORT}}/$NEW_WEB_PORT/g" \
-        -e "s/{{API_PORT}}/$NEW_API_PORT/g" \
-        -e "s/{{COLOR}}/$NEW_COLOR/g" \
-        "$BASE_PATH/nginx.conf.template" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
-
-    # Test nginx config before reload
-    if sudo nginx -t 2>/dev/null; then
-        sudo nginx -s reload
-        echo "   Traffic switched successfully!"
+    if [ "${#PULL_SERVICES[@]}" -gt 0 ]; then
+        echo "Pulling changed app images: ${PULL_SERVICES[*]}"
+        docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull "${PULL_SERVICES[@]}"
     else
-        echo "   Nginx config test failed! Traffic NOT switched."
+        echo "No app image changes; using locally cached app images."
+    fi
+
+    echo "Starting $NEW_COLOR containers..."
+    # NOTE: do NOT use --remove-orphans, it kills shared infra containers (Redis, workers, etc.)
+    docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --force-recreate web api
+
+    # 8. Health Check (check both web and api)
+    echo "Performing Health Checks..."
+
+    # Check API health
+    API_HEALTHY=false
+    echo "   Checking API on localhost:$NEW_API_PORT..."
+    for i in {1..12}; do
+        if curl -s -f "http://localhost:$NEW_API_PORT/health" > /dev/null 2>&1; then
+            echo "   API health check passed!"
+            API_HEALTHY=true
+            break
+        fi
+        echo "   Waiting for API... ($i/12)"
+        sleep 5
+    done
+
+    # Check Web health
+    WEB_HEALTHY=false
+    echo "   Checking Web on localhost:$NEW_WEB_PORT..."
+    for i in {1..12}; do
+        if curl -s -f "http://localhost:$NEW_WEB_PORT" > /dev/null 2>&1; then
+            echo "   Web health check passed!"
+            WEB_HEALTHY=true
+            break
+        fi
+        echo "   Waiting for Web... ($i/12)"
+        sleep 5
+    done
+
+    if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
+        echo ""
+        echo "Health check failed!"
+        [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
+        [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
+        echo ""
+        echo "Rolling back (stopping $NEW_COLOR)..."
+        docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down
         exit 1
     fi
+
+    echo ""
+
+    # 9. Switch Traffic
+    echo "Switching traffic to $NEW_COLOR..."
+
+    if [ -f "$BASE_PATH/nginx.conf.template" ]; then
+        # Replace both WEB_PORT and API_PORT in template
+        sed -e "s/{{WEB_PORT}}/$NEW_WEB_PORT/g" \
+            -e "s/{{API_PORT}}/$NEW_API_PORT/g" \
+            -e "s/{{COLOR}}/$NEW_COLOR/g" \
+            "$BASE_PATH/nginx.conf.template" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
+
+        # Test nginx config before reload
+        if sudo nginx -t 2>/dev/null; then
+            sudo nginx -s reload
+            echo "   Traffic switched successfully!"
+        else
+            echo "   Nginx config test failed! Traffic NOT switched."
+            exit 1
+        fi
+    else
+        echo "   Nginx template not found at $BASE_PATH/nginx.conf.template"
+        echo "   Traffic NOT switched."
+        exit 1
+    fi
+
+    # 10. Update State
+    echo "$NEW_COLOR" > "$BASE_PATH/active_color"
+
+    # 11. Cleanup Old Application Environment
+    echo ""
+    echo "Stopping old application environment ($CURRENT_COLOR)..."
+    docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 else
-    echo "   Nginx template not found at $BASE_PATH/nginx.conf.template"
-    echo "   Traffic NOT switched."
-    exit 1
+    echo "No web/api/config changes; skipping Blue/Green app switch."
 fi
-
-# 10. Update State
-echo "$NEW_COLOR" > "$BASE_PATH/active_color"
-
-# 11. Cleanup Old Application Environment
-echo ""
-echo "Stopping old application environment ($CURRENT_COLOR)..."
-docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 
 # 12. Update Workers with New Image
 # Workers use the same api image but are NOT part of Blue/Green (no traffic switching needed).
 # They must be restarted to pick up new code after each deploy.
-echo "Updating workers with new image..."
 WORKER_COMPOSE="$BASE_PATH/docker-compose.production.yml"
 INFRA_COMPOSE="$BASE_PATH/docker-compose.infra.yml"
-# Pull latest api image for stages 1-6 workers
-docker compose -f "$WORKER_COMPOSE" pull worker worker-stage6 2>/dev/null || true
-# Restart stages 1-6 workers one at a time to minimize job processing gaps
-for SVC in worker worker-stage6; do
-    echo "   Restarting $SVC..."
-    docker compose -f "$WORKER_COMPOSE" up -d --force-recreate --no-deps "$SVC"
-done
-# Stage 7 worker lives in infra.yml (has notebooklm-bridge dependency)
-echo "   Updating worker-stage7 and notebooklm-bridge..."
-docker compose -f "$INFRA_COMPOSE" pull worker-stage7 notebooklm-bridge 2>/dev/null || true
-docker compose -f "$INFRA_COMPOSE" up -d --force-recreate worker-stage7 notebooklm-bridge
-echo "   Workers updated!"
+
+if [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+    echo "Updating API-backed workers..."
+    docker compose -f "$WORKER_COMPOSE" pull worker worker-stage6 2>/dev/null || true
+    for SVC in worker worker-stage6; do
+        echo "   Restarting $SVC..."
+        docker compose -f "$WORKER_COMPOSE" up -d --force-recreate --no-deps "$SVC"
+    done
+    echo "   Updating worker-stage7..."
+    docker compose -f "$INFRA_COMPOSE" pull worker-stage7 2>/dev/null || true
+    docker compose -f "$INFRA_COMPOSE" up -d --force-recreate --no-deps worker-stage7
+else
+    echo "API image unchanged; skipping API-backed worker restarts."
+fi
+
+if [ "$DEPLOY_BRIDGE_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+    echo "Updating notebooklm-bridge..."
+    docker compose -f "$INFRA_COMPOSE" pull notebooklm-bridge 2>/dev/null || true
+    docker compose -f "$INFRA_COMPOSE" up -d --force-recreate notebooklm-bridge
+else
+    echo "NotebookLM bridge unchanged; skipping bridge restart."
+fi
 echo ""
 
 # 13. Docker Cleanup (prevent disk space exhaustion)
@@ -226,6 +259,10 @@ fi
 
 echo ""
 echo "Deployment Complete!"
-echo "   Active: $NEW_COLOR"
-echo "   Web:    http://localhost:$NEW_WEB_PORT"
-echo "   API:    http://localhost:$NEW_API_PORT"
+if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    echo "   Active: $NEW_COLOR"
+    echo "   Web:    http://localhost:$NEW_WEB_PORT"
+    echo "   API:    http://localhost:$NEW_API_PORT"
+else
+    echo "   Active: $CURRENT_COLOR (unchanged)"
+fi

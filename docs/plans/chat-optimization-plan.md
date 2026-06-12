@@ -166,7 +166,7 @@ export async function classifyIntent(
 
   const systemPrompt = CLASSIFICATION_SYSTEM_PROMPT.replace('{nodeContext}', contextDescription);
 
-  // Using OpenRouter Structured Output (Context7 documentation)
+  // Using OpenRouter Structured Output (Docs L1/L2 documentation)
   const response = await openai.chat.completions.create({
     model: process.env.CHAT_FALLBACK_MODEL || 'xiaomi/mimo-v2-flash',
     messages: [

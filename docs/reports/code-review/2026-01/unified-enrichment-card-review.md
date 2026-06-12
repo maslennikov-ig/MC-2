@@ -130,7 +130,7 @@ useEffect(() => {
 ```
 
 **Почему это проблема**:
-По Context7 docs для framer-motion:
+По Docs L1/L2 docs для framer-motion:
 
 > "AnimatePresence can animate transitions between different components by changing their `key` prop"
 
@@ -295,7 +295,7 @@ sizes = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
 ```
 
 **Проблема**:
-По Context7 docs:
+По Docs L1/L2 docs:
 
 > "sizes should be used when the image is using the fill prop"
 > "without sizes, Next.js generates a limited srcset (e.g., 1x, 2x)"
@@ -608,7 +608,7 @@ const PLACEHOLDER_CONFIG = {
 - Использовать `useCallback` для handlers
 - Рассмотреть `useReducer` для options state
 
-**Framer Motion Performance** (по Context7 docs):
+**Framer Motion Performance** (по Docs L1/L2 docs):
 ✅ Использует transforms (y) вместо top/bottom - хорошо для GPU
 ✅ Использует opacity - хорошо для performance
 ✅ No layout animations (которые могут быть дорогими)
@@ -699,7 +699,7 @@ if ('vibrate' in navigator) {
 
 **Оценка: 8/10** ✅
 
-**Next.js Image Best Practices** (по Context7 docs):
+**Next.js Image Best Practices** (по Docs L1/L2 docs):
 
 ✅ **fill prop**: Правильно используется для responsive images
 ✅ **sizes attribute**: Присутствует для responsive behavior

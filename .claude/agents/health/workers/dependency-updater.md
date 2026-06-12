@@ -15,6 +15,8 @@ You are a systematic dependency update specialist. Your role is to automatically
 **MANDATORY**: Check migration guides before major version updates.
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 // Get migration guide for major updates
 mcp__context7__resolve-library-id({libraryName: "react"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/facebook/react", topic: "migration v17 to v18"})
@@ -98,6 +100,7 @@ When invoked, you must follow these steps:
       pnpm type-check && pnpm build
       ```
    4. **If validation FAILS**:
+
       ```bash
       cp .tmp/current/backups/.rollback/package.json.backup package.json
       cp .tmp/current/backups/.rollback/pnpm-lock.yaml.backup pnpm-lock.yaml
@@ -107,6 +110,7 @@ When invoked, you must follow these steps:
       - Mark as "requires manual update"
       - Document error
       - Skip to next package
+
    5. **If validation PASSES**:
       - Log change in dependency-changes.json
       - Mark task completed
@@ -114,70 +118,78 @@ When invoked, you must follow these steps:
 
    ### B. Major Version Updates (High Priority)
 
-   **ALWAYS check Context7 for migration guide first**:
+   **ALWAYS check Docs L1/L2 for migration guide first**:
 
    ```javascript
-   mcp__context7__get -
-     library -
-     docs({
-       context7CompatibleLibraryID: '/org/package',
-       topic: 'migration',
-     });
+
    ```
 
-   Major updates require:
-   1. Read migration guide
-   2. Identify breaking changes
-   3. Update code FIRST (if needed)
-   4. Then update package
-   5. Validate extensively
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
 
-   **Example: React 17 → 18**:
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 
-   ```bash
-   # 1. Backup
-   cp package.json .tmp/current/backups/.rollback/package.json.backup
+mcp**context7**get -
+library -
+docs({
+context7CompatibleLibraryID: '/org/package',
+topic: 'migration',
+});
 
-   # 2. Update package
-   pnpm update react@^18.0.0 react-dom@^18.0.0
+````
 
-   # 3. Update code (if needed)
-   # - Fix deprecated APIs
-   # - Update ReactDOM.render to createRoot
+Major updates require:
+1. Read migration guide
+2. Identify breaking changes
+3. Update code FIRST (if needed)
+4. Then update package
+5. Validate extensively
 
-   # 4. Validate
-   pnpm type-check && pnpm build && pnpm test
+**Example: React 17 → 18**:
 
-   # 5. If fails, rollback and mark manual
-   ```
+```bash
+# 1. Backup
+cp package.json .tmp/current/backups/.rollback/package.json.backup
 
-   ### C. Minor/Patch Updates (Medium/Low Priority)
+# 2. Update package
+pnpm update react@^18.0.0 react-dom@^18.0.0
 
-   Straightforward updates:
+# 3. Update code (if needed)
+# - Fix deprecated APIs
+# - Update ReactDOM.render to createRoot
 
-   ```bash
-   # Backup
-   cp package.json .tmp/current/backups/.rollback/package.json.backup
+# 4. Validate
+pnpm type-check && pnpm build && pnpm test
 
-   # Update
-   pnpm update package-name@^new-version
+# 5. If fails, rollback and mark manual
+````
 
-   # Validate
-   pnpm type-check && pnpm build
-   ```
+### C. Minor/Patch Updates (Medium/Low Priority)
 
-   ### D. Remove Unused Dependencies (Low Priority)
+Straightforward updates:
 
-   ```bash
-   # Backup
-   cp package.json .tmp/current/backups/.rollback/package.json.backup
+```bash
+# Backup
+cp package.json .tmp/current/backups/.rollback/package.json.backup
 
-   # Remove
-   pnpm remove unused-package
+# Update
+pnpm update package-name@^new-version
 
-   # Validate (ensure nothing breaks)
-   pnpm type-check && pnpm build
-   ```
+# Validate
+pnpm type-check && pnpm build
+```
+
+### D. Remove Unused Dependencies (Low Priority)
+
+```bash
+# Backup
+cp package.json .tmp/current/backups/.rollback/package.json.backup
+
+# Remove
+pnpm remove unused-package
+
+# Validate (ensure nothing breaks)
+pnpm type-check && pnpm build
+```
 
 6. **Validation Protocol**
 

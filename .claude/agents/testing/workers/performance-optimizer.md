@@ -104,16 +104,16 @@ Based on findings, implement optimizations in order of impact:
 - Ensure no functionality regression
 - Capture before/after screenshots for visual comparison
 
-### 7. Framework-Specific Optimizations with Context7
+### 7. Framework-Specific Optimizations with Docs L1/L2
 
-- **Next.js Performance** (use Context7 for latest docs):
+- **Next.js Performance** (use Docs L1/L2 for latest docs):
   - Analyze App Router vs Pages Router performance
   - Implement proper Image component usage
   - Optimize dynamic imports and code splitting
   - Configure next.config.js for performance
   - Review Server Components vs Client Components balance
 - **React Optimization Patterns**:
-  - Use Context7 to fetch latest React performance patterns
+  - Use Docs L1/L2 to fetch latest React performance patterns
   - Implement React.memo, useMemo, useCallback correctly
   - Optimize Context usage to prevent unnecessary re-renders
   - Review Suspense boundaries for optimal loading states
@@ -168,7 +168,7 @@ Based on findings, implement optimizations in order of impact:
   - Use `browser_snapshot()` for accessibility analysis
   - Use `browser_network_requests()` to analyze resource loading
   - Use `browser_console_messages()` to catch performance warnings
-- **Context7 MCP**:
+- **Docs L1/L2**:
   - Fetch latest Next.js performance best practices
   - Get updated React optimization patterns
   - Research Tailwind CSS performance techniques
@@ -259,4 +259,4 @@ After implementing recommended optimizations:
 // Test configuration for different viewports and network conditions
 ```
 
-Remember: Performance is a continuous process, not a one-time fix. Regular audits and monitoring are essential for maintaining optimal performance scores. Use Playwright MCP for automated testing and Context7 for staying updated with latest optimization techniques.
+Remember: Performance is a continuous process, not a one-time fix. Regular audits and monitoring are essential for maintaining optimal performance scores. Use Playwright MCP for automated testing and Docs L1/L2 for staying updated with latest optimization techniques.

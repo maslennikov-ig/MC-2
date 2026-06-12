@@ -15,9 +15,11 @@ This agent uses the following MCP servers when available:
 
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check TypeScript and Zod best practices before creating types.
+**MANDATORY**: You MUST use Docs L1/L2 to check TypeScript and Zod best practices before creating types.
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 // TypeScript patterns and best practices
 mcp__context7__resolve-library-id({libraryName: "typescript"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/microsoft/typescript", topic: "advanced-types"})
@@ -77,48 +79,56 @@ When invoked, you must follow these steps systematically:
 
 ### Phase 2: Type Creation
 
-4. **REQUIRED**: Validate TypeScript patterns using Context7:
+4. **REQUIRED**: Validate TypeScript patterns using Docs L1/L2:
 
    ```javascript
-   mcp__context7__get -
-     library -
-     docs({
-       context7CompatibleLibraryID: '/microsoft/typescript',
-       topic: 'utility-types',
-     });
+
    ```
 
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
+mcp**context7**get -
+library -
+docs({
+context7CompatibleLibraryID: '/microsoft/typescript',
+topic: 'utility-types',
+});
+
+````
+
 5. **Create new type files** based on plan configuration:
-   - **Job payload interfaces** (BullMQ schemas)
-   - **Database JSONB interfaces** (metadata schemas)
-   - **Result interfaces** (processing results)
+- **Job payload interfaces** (BullMQ schemas)
+- **Database JSONB interfaces** (metadata schemas)
+- **Result interfaces** (processing results)
 
 6. **Use proper TypeScript patterns**:
-   - Discriminated unions for type safety
-   - Branded types for nominal typing
-   - Utility types (`Pick`, `Omit`, `Partial`, `Required`)
-   - Generics for reusable types
-   - `as const` for literal types
+- Discriminated unions for type safety
+- Branded types for nominal typing
+- Utility types (`Pick`, `Omit`, `Partial`, `Required`)
+- Generics for reusable types
+- `as const` for literal types
 
 ### Phase 3: Type Extension
 
 7. **Extend existing types** (if specified in plan):
-   - Read existing type file
-   - Add new fields while preserving existing
-   - Maintain backward compatibility
-   - Use intersection types (`&`) or `extends` appropriately
+- Read existing type file
+- Add new fields while preserving existing
+- Maintain backward compatibility
+- Use intersection types (`&`) or `extends` appropriately
 
 8. **Example extension pattern**:
-   ```typescript
-   // Existing: FileCatalog from Stage 0-2
-   // Extension: Add Stage 3 fields
-   export interface FileCatalog extends BaseFileCatalog {
-     // Stage 3 additions
-     processed_content?: string;
-     processing_method?: ProcessingMethod;
-     summary_metadata?: SummaryMetadata;
-   }
-   ```
+```typescript
+// Existing: FileCatalog from Stage 0-2
+// Extension: Add Stage 3 fields
+export interface FileCatalog extends BaseFileCatalog {
+  // Stage 3 additions
+  processed_content?: string;
+  processing_method?: ProcessingMethod;
+  summary_metadata?: SummaryMetadata;
+}
+````
 
 ### Phase 4: Validation Schema Creation (Optional)
 
@@ -137,8 +147,15 @@ When invoked, you must follow these steps systematically:
    export type SummarizationJobData = z.infer<typeof SummarizationJobDataSchema>;
    ```
 
-10. **REQUIRED**: Validate Zod patterns using Context7:
+10. **REQUIRED**: Validate Zod patterns using Docs L1/L2:
     ```javascript
+
+    ```
+
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
     mcp__context7__get -
       library -
       docs({
@@ -274,7 +291,7 @@ When invoked, you must follow these steps systematically:
 
 ## Best Practices
 
-**Context7 Verification (MANDATORY):**
+**Docs L1/L2 Verification (MANDATORY):**
 
 - ALWAYS check TypeScript documentation for advanced type patterns
 - Verify Zod best practices for validation schemas
