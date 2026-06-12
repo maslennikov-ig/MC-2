@@ -32,12 +32,12 @@
     "eslint": "^9.0.0",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
+    "lint-staged": "^17.0.7",
     "prettier": "^3.1.0",
-    "supabase": "^2.58.5",
+    "supabase": "^2.106.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^4.0.15"
+    "vitest": "^4.1.8"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -48,22 +48,44 @@
     "overrides": {
       "esbuild": ">=0.25.0",
       "jws": ">=4.0.1",
-      "qs": ">=6.14.2",
       "body-parser": ">=2.2.1",
       "mdast-util-to-hast": ">=13.2.1",
-      "@langchain/core": ">=1.1.8",
-      "@modelcontextprotocol/sdk": ">=1.26.0",
-      "tar": ">=7.5.7",
-      "undici": ">=6.23.0",
-      "lodash": ">=4.17.23",
-      "lodash-es": ">=4.17.23",
+      "@babel/plugin-transform-modules-systemjs": "7.29.7",
+      "@langchain/core": "1.1.48",
+      "@modelcontextprotocol/sdk": "1.29.0",
+      "ajv@<6.14.0": "6.15.0",
+      "ajv@>=7.0.0-alpha.0 <8.18.0": "8.20.0",
+      "brace-expansion@<1.1.13": "1.1.15",
+      "brace-expansion@>=2.0.0 <2.0.3": "2.1.1",
       "diff": ">=5.2.2",
+      "fast-uri": "3.1.2",
+      "flatted": "3.4.2",
+      "lodash": "4.18.1",
+      "lodash-es": "4.18.1",
+      "minimatch@<3.1.4": "3.1.5",
+      "minimatch@>=5.0.0 <5.1.8": "5.1.9",
+      "minimatch@>=9.0.0 <9.0.7": "9.0.9",
+      "path-to-regexp@<0.1.13": "0.1.13",
+      "path-to-regexp@>=8.0.0 <8.4.0": "8.4.2",
+      "picomatch@>=4.0.0 <4.0.4": "4.0.4",
+      "postcss@<8.5.10": "8.5.15",
+      "qs": "6.15.2",
+      "rollup@<2.80.0": "2.80.0",
+      "rollup@>=4.0.0 <4.59.0": "4.61.1",
+      "serialize-javascript": "7.0.5",
+      "tar": "7.5.16",
+      "undici@>=7.0.0 <7.24.0": "7.27.2",
+      "uuid@<11.1.1": "11.1.1",
+      "uuid@>=13.0.0 <13.0.1": "13.0.2",
+      "webpack@>=5.49.0 <=5.104.0": "5.107.2",
+      "ws@>=8.0.0 <8.20.1": "8.21.0",
+      "yaml@>=1.0.0 <1.10.3": "1.10.3",
       "zustand": ">=5.0.0",
       "shiki": "^3.19.0"
     }
   },
   "dependencies": {
-    "jsdom": "^27.2.0"
+    "jsdom": "^29.1.1"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -128,10 +128,7 @@ const demoChrome = {
   shownBlocksLabel: 'First 6 sections shown',
   remainingBlocksLabel: '20 more sections complete the instruction',
   outlineLabel: 'Document outline',
-  allBlocksButtonLabel: 'All 26 sections',
-  allBlocksTitle: 'All 26 instruction sections',
-  allBlocksDescription:
-    'The full structure is grouped by purpose. The first six sections include examples from the demo.',
+  blockLabelPrefix: 'Block',
   exampleLabel: 'Example',
 }
 
@@ -213,14 +210,12 @@ describe('InteractiveDemo', () => {
       })
     ).toHaveClass('w-full', 'min-w-0', 'whitespace-normal')
     expect(screen.getByTestId('career-playbook-demo-selector-list')).toHaveClass(
-      'max-h-[20rem]',
+      'max-h-[28rem]',
       'overflow-y-auto'
     )
   })
 
-  it('opens the full 26-section structure with examples', async () => {
-    const user = userEvent.setup()
-
+  it('renders the full 26-section structure with examples', () => {
     render(
       <InteractiveDemo
         eyebrow="Interactive demo"
@@ -233,13 +228,13 @@ describe('InteractiveDemo', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: /all 26 sections/i }))
+    const selectorButtons = screen.getAllByTestId('career-playbook-demo-section-button')
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('All 26 instruction sections')).toBeInTheDocument()
-    expect(screen.getAllByText('1. Foundation 1').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('6. Foundation 6').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Example').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/pipeline is always/i).length).toBeGreaterThan(1)
+    expect(selectorButtons).toHaveLength(26)
+    expect(selectorButtons[0]).toHaveTextContent('Mission and key results')
+    expect(selectorButtons[5]).toHaveTextContent('Foundation 6')
+    expect(selectorButtons[25]).toHaveTextContent('Block 26')
+    expect(screen.getByText('Example')).toBeInTheDocument()
+    expect(screen.getByText(/pipeline is always/i)).toBeInTheDocument()
   })
 })

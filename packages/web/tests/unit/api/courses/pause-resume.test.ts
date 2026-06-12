@@ -101,6 +101,16 @@ function mockUnauthenticatedUser() {
   })
 }
 
+function mockUserProfileLookup(profile: { organization_id: string | null } | null = null) {
+  const query = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({ data: profile, error: null }),
+  }
+
+  mockSupabaseClient.from.mockReturnValue(query)
+}
+
 /**
  * Helper to mock course lookup via getCourseByOrgAndSlug
  */
@@ -110,6 +120,7 @@ async function mockCourseLookup(
   course: {
     id: string
     user_id: string
+    organization_id?: string
     generation_status?: string
     generation_paused_at?: string | null
   } | null
@@ -121,6 +132,7 @@ async function mockCourseLookup(
 describe('Pause/Resume API Endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUserProfileLookup()
   })
 
   // ============================================================================
@@ -160,6 +172,7 @@ describe('Pause/Resume API Endpoints', () => {
       await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'other-user-789', // Different user
+        organization_id: 'course-org',
       })
 
       const request = createMockRequest()
@@ -321,6 +334,7 @@ describe('Pause/Resume API Endpoints', () => {
       await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'other-user-789', // Different user
+        organization_id: 'course-org',
         generation_paused_at: '2024-01-14T10:00:00Z',
       })
 

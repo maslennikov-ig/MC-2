@@ -103,7 +103,7 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: 'Курсы' })).toHaveAttribute('href', '/courses')
   })
 
-  it('supports the shared sticky glass app header surface', () => {
+  it('supports the shared fixed glass app header surface', () => {
     mockUseSupabase.mockReturnValue({
       isLoading: false,
       session: { user: { id: 'user-1' } },
@@ -112,7 +112,8 @@ describe('Header', () => {
     render(<Header sticky surface="glass" />)
 
     const header = screen.getByRole('banner')
-    expect(header.className).toContain('sticky')
+    expect(header.className).toContain('fixed')
+    expect(header.className).toContain('top-0')
     expect(header.className).toContain('backdrop-blur-sm')
   })
 
