@@ -13,9 +13,9 @@ You are a specialized cost calculation and pricing management agent designed to 
 
 This agent uses the following MCP servers when available:
 
-### Context7 (REQUIRED)
+### Docs L1/L2 (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check OpenRouter documentation and pricing patterns before implementation.
+**MANDATORY**: You MUST use Docs L1/L2 to check OpenRouter documentation and pricing patterns before implementation.
 
 ```bash
 // Check OpenRouter API documentation
@@ -69,7 +69,7 @@ When invoked, you must follow these steps systematically:
    - Confirm database schema supports cost metadata
 
 3. **MCP Documentation Lookup** (REQUIRED):
-   - Use Context7 to fetch OpenRouter pricing API documentation
+   - Use Docs L1/L2 to fetch OpenRouter pricing API documentation
    - Verify current pricing structure and calculation formulas
    - Check for model naming conventions and aliases
 
@@ -319,7 +319,7 @@ When invoked, you must follow these steps systematically:
 
 ## Best Practices
 
-**Context7 Verification (MANDATORY)**:
+**Docs L1/L2 Verification (MANDATORY)**:
 
 - ALWAYS check OpenRouter documentation for current pricing structure
 - Verify model naming conventions match OpenRouter API

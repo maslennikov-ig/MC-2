@@ -10,6 +10,7 @@ import {
   Circle,
   FileSearch,
   Loader2,
+  RotateCcw,
   Sparkles,
   Trash2,
 } from 'lucide-react'
@@ -63,6 +64,7 @@ export interface BusinessContextStepCopy {
   filledTemplate?: string
   sourcesReady?: string
   sourcesProcessing?: string
+  sourcesFailed?: string
   sourcesEmpty?: string
   previousStep?: string
   nextStep?: string
@@ -83,6 +85,7 @@ export interface BusinessContextStepCopy {
   sourceStatusRemoved?: string
   sourceTextFallback?: string
   removeSourceTemplate?: string
+  retrySourceTemplate?: string
   missingTitle?: string
   missingEmpty?: string
   back?: string
@@ -102,6 +105,7 @@ interface BusinessContextStepProps {
   onContextChange: (context: CareerPlaybookBusinessContext) => void
   onFreeformTextChange?: (text: string) => void
   onRemoveSource?: (sourceId: string) => Promise<unknown> | void
+  onRetrySource?: (sourceId: string) => Promise<unknown> | void
   onSourceUploaded?: (source: CareerPlaybookBusinessContextSourceSummary) => void
   onBack: () => void
   onContinue: () => Promise<void> | void
@@ -181,6 +185,7 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
   filledTemplate: 'Заполнено {count} из {total}',
   sourcesReady: 'Источники готовы',
   sourcesProcessing: 'Источники обрабатываются',
+  sourcesFailed: 'Есть источники с ошибкой. Можно повторить обработку, удалить файл или продолжить только с текстом и готовыми источниками.',
   sourcesEmpty: 'Источники не добавлены',
   previousStep: 'Предыдущий шаг',
   nextStep: 'Следующий шаг',
@@ -202,6 +207,7 @@ const defaultCopy: Required<BusinessContextStepCopy> = {
   sourceStatusRemoved: 'Удалён',
   sourceTextFallback: 'Текстовый источник',
   removeSourceTemplate: 'Удалить {name}',
+  retrySourceTemplate: 'Повторить обработку {name}',
   missingTitle: 'Пробелы',
   missingEmpty: 'Ключевые категории заполнены',
   back: 'Назад',
@@ -291,6 +297,7 @@ export function BusinessContextStep({
   onContextChange,
   onFreeformTextChange,
   onRemoveSource,
+  onRetrySource,
   onSourceUploaded,
   onBack,
   onContinue,
@@ -310,12 +317,14 @@ export function BusinessContextStep({
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploadingFiles, setIsUploadingFiles] = useState(false)
   const [removingSourceId, setRemovingSourceId] = useState<string | null>(null)
+  const [retryingSourceId, setRetryingSourceId] = useState<string | null>(null)
   const contextRef = useRef(context)
   const digest = ensureDigest(context)
   const activeSources = sources.filter((source) => source.status !== 'removed')
   const hasProcessingSources = activeSources.some((source) =>
     ['uploaded', 'processing'].includes(source.status)
   )
+  const hasFailedSources = activeSources.some((source) => source.status === 'failed')
   const missingSignals = useMemo(
     () => buildMissingSignals(digest, categories),
     [categories, digest]
@@ -366,6 +375,8 @@ export function BusinessContextStep({
       : (categories.find((category) => category.key === activeStepKey) ?? categories[0])
   const sourceReadinessLabel = hasProcessingSources
     ? labels.sourcesProcessing
+    : hasFailedSources
+      ? labels.sourcesFailed
     : activeSources.length > 0
       ? labels.sourcesReady
       : labels.sourcesEmpty
@@ -467,6 +478,17 @@ export function BusinessContextStep({
       await onRemoveSource(sourceId)
     } finally {
       setRemovingSourceId((current) => (current === sourceId ? null : current))
+    }
+  }
+
+  const handleRetrySource = async (sourceId: string) => {
+    if (!onRetrySource) return
+
+    setRetryingSourceId(sourceId)
+    try {
+      await onRetrySource(sourceId)
+    } finally {
+      setRetryingSourceId((current) => (current === sourceId ? null : current))
     }
   }
 
@@ -758,7 +780,9 @@ export function BusinessContextStep({
                     source.filename ||
                     (source.sourceType === 'text' ? labels.sourceTextFallback : source.id)
                   const isRemoving = removingSourceId === source.id
+                  const isRetrying = retryingSourceId === source.id
                   const removeLabel = labels.removeSourceTemplate.replace('{name}', title)
+                  const retryLabel = labels.retrySourceTemplate.replace('{name}', title)
 
                   return (
                     <li
@@ -778,22 +802,40 @@ export function BusinessContextStep({
                           </p>
                         ) : null}
                       </div>
-                      {onRemoveSource ? (
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
-                          aria-label={removeLabel}
-                          title={removeLabel}
-                          disabled={isRemoving}
-                          onClick={() => void handleRemoveSource(source.id)}
-                        >
-                          {isRemoving ? (
-                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                          ) : (
-                            <Trash2 className="h-4 w-4" aria-hidden />
-                          )}
-                        </button>
-                      ) : null}
+                      <div className="flex items-center gap-1">
+                        {source.status === 'failed' && onRetrySource ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-purple-50 hover:text-purple-700 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-purple-950/30 dark:hover:text-purple-200"
+                            aria-label={retryLabel}
+                            title={retryLabel}
+                            disabled={isRetrying || isRemoving}
+                            onClick={() => void handleRetrySource(source.id)}
+                          >
+                            {isRetrying ? (
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" aria-hidden />
+                            )}
+                          </button>
+                        ) : null}
+                        {onRemoveSource ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                            aria-label={removeLabel}
+                            title={removeLabel}
+                            disabled={isRemoving || isRetrying}
+                            onClick={() => void handleRemoveSource(source.id)}
+                          >
+                            {isRemoving ? (
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                            ) : (
+                              <Trash2 className="h-4 w-4" aria-hidden />
+                            )}
+                          </button>
+                        ) : null}
+                      </div>
                     </li>
                   )
                 })}

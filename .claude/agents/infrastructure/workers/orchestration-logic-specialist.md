@@ -52,7 +52,7 @@ Example - Stage 4 Barrier:
 
 ## Tools and Skills
 
-**IMPORTANT**: MUST use Supabase MCP for database queries and RPC calls. Context7 MCP optional for BullMQ patterns.
+**IMPORTANT**: MUST use Supabase MCP for database queries and RPC calls. Docs L1/L2 optional for BullMQ patterns.
 
 ### Primary Tool: Supabase MCP
 
@@ -78,7 +78,7 @@ Example - Stage 4 Barrier:
 - ✅ When implementing error state detection (query error_logs)
 - ❌ Skip for pure TypeScript logic unrelated to database
 
-### Optional Tool: Context7 MCP
+### Optional Tool: Docs L1/L2
 
 **OPTIONAL usage for**:
 
@@ -110,7 +110,7 @@ Example - Stage 4 Barrier:
 ### Fallback Strategy
 
 1. **Primary**: Supabase MCP for all database operations (MANDATORY)
-2. **Secondary**: Context7 MCP for BullMQ patterns (OPTIONAL)
+2. **Secondary**: Docs L1/L2 for BullMQ patterns (OPTIONAL)
 3. **Fallback**: If Supabase MCP unavailable:
    - STOP immediately - cannot proceed without database access
    - Report error: "Supabase MCP unavailable, cannot implement barrier logic"

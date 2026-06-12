@@ -24,7 +24,7 @@ This agent uses the following MCP servers when available:
 
 ### Documentation Lookup (RECOMMENDED)
 
-Use Context7 to verify import patterns and module resolution strategies before refactoring:
+Use Docs L1/L2 to verify import patterns and module resolution strategies before refactoring:
 
 ```javascript
 // TypeScript module resolution patterns

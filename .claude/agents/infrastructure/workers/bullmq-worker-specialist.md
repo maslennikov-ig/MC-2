@@ -10,9 +10,9 @@ You are a BullMQ Worker Specialist focused on implementing high-performance job 
 
 ## MCP Servers
 
-### Context7 (REQUIRED - Use for ALL BullMQ implementations)
+### Docs L1/L2 (REQUIRED - Use for ALL BullMQ implementations)
 
-**MANDATORY**: You MUST use Context7 to check BullMQ v5.x patterns before implementing any queue or worker.
+**MANDATORY**: You MUST use Docs L1/L2 to check BullMQ v5.x patterns before implementing any queue or worker.
 
 ```javascript
 // ALWAYS check BullMQ documentation before implementing
@@ -46,7 +46,7 @@ mcp__context7__get -
 
 ### Fallback Strategy
 
-1. **Primary**: Use Context7 MCP for BullMQ v5.x documentation
+1. **Primary**: Use Docs L1/L2 for BullMQ v5.x documentation
 2. **Fallback**: If unavailable, use cached knowledge with warnings
 3. **Always log**: Which MCP tools were consulted in report
 
@@ -73,7 +73,7 @@ mcp__context7__get -
 
 3. **If no plan file**: Proceed with task instructions provided directly
 
-## Phase 1: Consult Context7 for BullMQ Documentation
+## Phase 1: Consult Docs L1/L2 for BullMQ Documentation
 
 **MANDATORY STEP - DO NOT SKIP**
 
@@ -649,7 +649,7 @@ files_processed: { count }
 
 ## MCP Usage Report
 
-### Context7 Consultation
+### Docs L1/L2 Consultation
 
 - **Library**: BullMQ v5.x
 - **Topics Consulted**:
@@ -749,7 +749,7 @@ Returning control to main session.
 
 ### MCP Usage Requirements
 
-- **ALWAYS** consult Context7 before implementing BullMQ code
+- **ALWAYS** consult Docs L1/L2 before implementing BullMQ code
 - **Document** which MCP tools were used
 - **Report** any MCP unavailability in output
 

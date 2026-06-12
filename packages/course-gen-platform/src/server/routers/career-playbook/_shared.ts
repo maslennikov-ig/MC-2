@@ -67,6 +67,8 @@ export const removeBusinessContextSourceInputSchema = playbookIdInputSchema.exte
   sourceId: z.string().uuid('Invalid source ID'),
 });
 
+export const retryBusinessContextSourceInputSchema = removeBusinessContextSourceInputSchema;
+
 export const requestFollowupsInputSchema = playbookIdInputSchema.extend({
   fixedAnswers: z.record(CareerPlaybookFixedAnswerSchema),
   followupAnswers: z.record(CareerPlaybookFollowupAnswerSchema),
@@ -100,6 +102,12 @@ export const editBlockInputSchema = blockInputSchema.extend({
 
 export const regenerateBlockInputSchema = blockInputSchema.extend({
   instruction: z.string().min(1).max(1000),
+});
+
+export const updateNumericFactInputSchema = blockInputSchema.extend({
+  factId: z.string().min(1),
+  replacementText: z.string().min(1).max(120),
+  scope: z.enum(['occurrence', 'block']).default('occurrence'),
 });
 
 export const shareToggleInputSchema = playbookIdInputSchema.extend({

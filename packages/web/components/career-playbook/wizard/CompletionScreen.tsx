@@ -44,6 +44,7 @@ export interface CompletionScreenCopy {
   generationErrorTitle?: string
   generationRedirectHint?: string
   generationCanLeaveHint?: string
+  generationFinalizingHint?: string
   generationStepLabels?: Partial<Record<CareerPlaybookGenerationProgressStage, string>>
   viewGenerated?: string
   empty?: string
@@ -103,6 +104,8 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   generationErrorTitle: 'Не удалось запустить генерацию',
   generationRedirectHint: 'После завершения мы автоматически откроем готовую инструкцию.',
   generationCanLeaveHint: 'Можно оставить страницу открытой или вернуться позже: статус сохранён.',
+  generationFinalizingHint:
+    'Завершаем финальную проверку и сохранение. Это может занять несколько минут.',
   generationStepLabels: {
     queued: 'Ставим генерацию в очередь',
     preparing_context: 'Подготавливаем сохранённый контекст',
@@ -182,6 +185,8 @@ export function CompletionScreen({
     typeof generationProgressDetails?.percent === 'number'
       ? generationProgressDetails.percent
       : generationProgress
+  const isNearCompleteGeneration =
+    isGenerating && typeof generationProgressValue === 'number' && generationProgressValue >= 95
   const activeGenerationStep =
     generationProgressDetails?.stage && labels.generationStepLabels[generationProgressDetails.stage]
       ? labels.generationStepLabels[generationProgressDetails.stage]
@@ -260,6 +265,8 @@ export function CompletionScreen({
                       : labels.generationRedirectHint
                 }
                 canLeaveHint={labels.generationCanLeaveHint}
+                finalizingHint={labels.generationFinalizingHint}
+                isNearComplete={isNearCompleteGeneration}
                 isCompleted={isCompleted}
                 isFailed={isFailed}
                 isStarting={isGenerationStarting}
@@ -402,6 +409,8 @@ function GenerationProgressCard({
   percentLabel,
   redirectHint,
   canLeaveHint,
+  finalizingHint,
+  isNearComplete,
   isCompleted,
   isFailed,
   isStarting,
@@ -417,6 +426,8 @@ function GenerationProgressCard({
   percentLabel: string | null
   redirectHint: string
   canLeaveHint: string
+  finalizingHint: string
+  isNearComplete: boolean
   isCompleted: boolean
   isFailed: boolean
   isStarting: boolean
@@ -458,6 +469,11 @@ function GenerationProgressCard({
           ) : null}
           {!isCompleted && !isFailed ? (
             <p className="text-xs leading-5 text-purple-800 dark:text-purple-200">{canLeaveHint}</p>
+          ) : null}
+          {isNearComplete ? (
+            <p className="text-xs leading-5 font-medium text-purple-900 dark:text-purple-100">
+              {finalizingHint}
+            </p>
           ) : null}
         </div>
 

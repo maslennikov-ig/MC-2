@@ -90,6 +90,7 @@ export function normalizeLanguage(language: unknown): Language {
 export function normalizeStoredQAData(raw: unknown): StoredQAData {
   const value = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const hasBusinessContext = Object.prototype.hasOwnProperty.call(value, 'business_context');
+  const generationWarnings = z.array(z.string().min(1)).safeParse(value.generation_warnings);
   const qaData = CareerPlaybookQADataSchema.parse({
     fixed: value.fixed ?? [],
     followups: value.followups ?? [],
@@ -106,6 +107,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
     completeness_score: value.completeness_score,
     ui_progress: value.ui_progress,
     generation_progress: value.generation_progress,
+    generation_warnings: generationWarnings.success ? generationWarnings.data : [],
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(
     value.followup_questions

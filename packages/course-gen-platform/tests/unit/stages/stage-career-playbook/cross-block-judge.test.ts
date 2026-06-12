@@ -207,7 +207,7 @@ flowchart TB
         issues: [
           {
             block_id: 'block_5',
-            severity: 'warning',
+            severity: 'critical',
             description: 'Autonomy levels are too generic.',
           },
         ],
@@ -269,6 +269,14 @@ flowchart TB
         current_group_content: expect.stringContaining('Матрица решений'),
       })
     );
+    expect(invokeLLM).toHaveBeenCalledWith(
+      'rendered judge prompt',
+      expect.objectContaining({
+        structuredOutputName: 'career_playbook_cross_block_judge',
+        structuredOutputMethod: 'jsonSchema',
+        structuredOutputStrict: true,
+      })
+    );
     expect(update.generatedBlocks?.block_5?.judge_verdict).toMatchObject({
       pass: false,
       score: 81,
@@ -283,6 +291,150 @@ flowchart TB
         output_tokens: 40,
         cost_usd: 0.004,
       },
+    ]);
+  });
+
+  it('repairs an empty structured judge response once before merging verdicts', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: '',
+        model: 'mock-judge-model',
+        inputTokens: 50,
+        outputTokens: 1,
+        costUsd: 0.001,
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          pass: false,
+          score: 84,
+          issues: [
+            {
+              block_id: 'block_5',
+              severity: 'critical',
+              description: 'Approval boundaries need clearer escalation.',
+              suggestion: null,
+            },
+          ],
+          needs_regeneration: ['block_5'],
+        }),
+        model: 'mock-judge-repair-model',
+        inputTokens: 70,
+        outputTokens: 35,
+        costUsd: 0.002,
+      });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node({
+      playbookId: 'playbook-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'ru',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: blocks([
+        [
+          'block_5',
+          `## 5. Матрица решений
+
+| Решение | Автономия | Действие |
+| --- | --- | --- |
+| Daily priorities | Full | Decide |
+| Discount 10% | Inform | Use policy |
+| Discount 20% | Recommend | Ask CRO |
+| Legal terms | Approval | Ask Legal |`,
+        ],
+      ]),
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'group2Generator',
+    });
+
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
+    expect(invokeLLM.mock.calls[1][0]).toContain('SYSTEM REPAIR');
+    expect(update.warnings).toBeUndefined();
+    expect(update.lastJudgeVerdict).toMatchObject({
+      pass: false,
+      score: 84,
+      needs_regeneration: ['block_5'],
+    });
+    expect(update.nodeCosts).toEqual([
+      expect.objectContaining({ model: 'mock-judge-model' }),
+      expect.objectContaining({ model: 'mock-judge-repair-model' }),
+    ]);
+  });
+
+  it('keeps LLM warning findings visible without forcing block regeneration', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: JSON.stringify({
+        pass: false,
+        score: 82,
+        issues: [
+          {
+            block_id: 'block_5',
+            severity: 'warning',
+            description: 'Decision matrix wording can be more specific.',
+            suggestion: 'Clarify approval language, but do not regenerate the whole block.',
+          },
+        ],
+        needs_regeneration: ['block_5'],
+      }),
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node({
+      playbookId: 'playbook-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'ru',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: blocks([
+        [
+          'block_5',
+          `## 5. Матрица решений
+
+| Решение | Автономия | Действие |
+| --- | --- | --- |
+| Daily priorities | Full | Decide |
+| Discount 10% | Inform | Use policy |
+| Discount 20% | Recommend | Ask CRO |
+| Legal terms | Approval | Ask Legal |`,
+        ],
+      ]),
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'group2Generator',
+    });
+
+    expect(update.lastJudgeVerdict).toMatchObject({
+      pass: false,
+      score: 82,
+      needs_regeneration: [],
+    });
+    expect(update.lastJudgeVerdict?.issues).toEqual([
+      expect.objectContaining({
+        block_id: 'block_5',
+        severity: 'warning',
+      }),
     ]);
   });
 
@@ -329,11 +481,21 @@ flowchart TB
     });
 
     expect(update.errors).toBeUndefined();
-    expect(update.warnings?.[0]).toContain('crossBlockJudge ignored LLM verdict');
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
+    expect(update.warnings?.[0]).toContain(
+      'crossBlockJudge degraded to deterministic checks after LLM structured verdict failed'
+    );
     expect(update.lastJudgeVerdict).toMatchObject({ pass: true, score: 100 });
     expect(update.judgeVerdicts).toEqual([expect.objectContaining({ pass: true })]);
     expect(update.generatedBlocks?.block_5?.judge_verdict).toMatchObject({ pass: true });
     expect(update.nodeCosts).toEqual([
+      {
+        node: 'crossBlockJudge',
+        model: 'mock-judge-model',
+        input_tokens: 50,
+        output_tokens: 1,
+        cost_usd: 0.001,
+      },
       {
         node: 'crossBlockJudge',
         model: 'mock-judge-model',

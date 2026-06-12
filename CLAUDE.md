@@ -1,5 +1,19 @@
 # CLAUDE.md
 
+@AGENTS.md
+
+## Claude Code CLI Adapter
+
+- Target runtime: Claude Code CLI in the VS Code integrated terminal on WSL.
+- Primary workflow comes from global `~/.claude/CLAUDE.md` and the `orchestration-bridge` plugin.
+- For medium/complex, risky, docs-sensitive, delegated, file-changing, or handoff-prone work, use `orchestration-bridge:orchestrator-stage`.
+- Do not use `template-bridge` for new orchestration.
+- Use Docs L1/L2: `@neuledge/context` first with lockfile-routed package/version; Context7 MCP or first-party docs only when L1 is missing, stale, or insufficient.
+- Use Beads when available for file-changing, delegated, long, or handoff-prone work.
+- Remote push, PR creation, merge, deploy, force-push, and production mutation require repo contract support and current user authorization.
+
+## Preserved Project Notes
+
 Primary repo contract lives in `AGENTS.md`.
 
 For orchestration and current state, use:
@@ -14,7 +28,6 @@ Repo-specific reminders:
 - `/push` is the release/version flow.
 - `/deploy` handles staging delivery into `master`.
 - Prefer isolated worktrees when the primary worktree has unrelated local state.
-
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
@@ -38,27 +51,10 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+**When ending a work session**, follow the repo delivery contract and current user authorization. Remote pushes are not automatic.
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Use `bd` for task truth when available.
+- Run quality gates before completion claims.
+- Do not push unless the repo contract and current user authorization allow it.
 <!-- END BEADS INTEGRATION -->

@@ -68,10 +68,39 @@ Career Playbook sources tied to `career_playbooks` through
 `career_playbook_sources`; they do not require a fake draft course or a
 `course_id`.
 
+Plain text and markdown sources are processed directly as UTF-8 content and do
+not require Docling conversion. The owner UI/API exposes source processing
+state, blocks generation while sources are still pending, and lets owners retry
+or remove failed sources.
+
 Generation receives the user-editable business-context digest separately from
 external web research. Company-specific mode may use the digest as client facts.
 Universal mode must not invent company details and should produce a benchmark
 guide with explicit adaptation notes.
+
+## Numeric Provenance And Output Quality
+
+As of 2026-06-09, generated Career Playbook blocks may include
+`numeric_facts` metadata. The metadata classifies numeric claims as verified
+source values, external benchmarks, structural methodology numbers, model
+suggestions, conflicts, or values that need review. Business-context evidence is
+the preferred source for company-specific KPI targets and deadlines; unsupported
+precise values should not be presented as verified company facts.
+
+The private viewer surfaces a numeric provenance summary and lets owners correct
+a numeric value for one occurrence or the whole block. Regenerated blocks refresh
+numeric provenance from the current role profile and surrounding block context.
+
+Final assembly also applies deterministic output cleanup: auto-added Mermaid
+sections are localized to the target content language, and raw fill-in
+placeholders such as `[Имя]`, `[дата]`, `[число]`, and `[url]` are converted into
+explicit fields to fill while preserving markdown checkboxes and fenced code.
+
+Russian follow-up validation checks unexpected writing systems while allowing
+common Latin product, channel, and KPI terms such as B2B, SaaS, MQL, SQL, CVR,
+VK, Telegram, and YouTube. Cross-block judge degradation is explicit: empty or
+invalid judge output is retried once, then recorded as a generation warning that
+the private viewer can surface instead of silently treating QA as complete.
 
 ## Visibility And Permissions
 
@@ -117,9 +146,9 @@ Targeted unit checks:
 
 ```bash
 pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
-pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/public-playbook-viewer.test.tsx
+pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx tests/unit/components/career-playbook/page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/public-playbook-viewer.test.tsx tests/unit/components/markdown/markdown-renderer-full-numeric.test.tsx
 pnpm --filter @megacampus/shared-types exec vitest run tests/career-playbook.test.ts
-pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/career-playbook-library-service.test.ts tests/unit/career-playbook-visibility-migration.test.ts
+pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/career-playbook-library-service.test.ts tests/unit/career-playbook-visibility-migration.test.ts tests/unit/stages/stage-career-playbook/group-generator.test.ts tests/unit/stages/stage-career-playbook/final-assembler.test.ts tests/unit/stages/stage-career-playbook/numeric-facts.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/stages/stage-career-playbook/followup-questions.test.ts tests/unit/stages/stage-career-playbook/spec-builder.test.ts
 pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/page-client.test.tsx tests/unit/api/career-playbook/upload.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts

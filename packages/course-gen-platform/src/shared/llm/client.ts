@@ -16,7 +16,7 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
-import { retryWithBackoff } from '@megacampus/shared-utils';
+import { retryWithBackoff } from '@/shared/workspace-utils';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import {
   buildCompletionRequest,

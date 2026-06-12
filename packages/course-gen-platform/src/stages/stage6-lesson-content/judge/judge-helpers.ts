@@ -5,7 +5,7 @@ import type {
   LessonQualitySignals,
 } from '@megacampus/shared-types/lesson-content';
 import { logger } from '@/shared/logger';
-import { safeJSONParse } from '@megacampus/shared-utils';
+import { safeJSONParse } from '@/shared/workspace-utils';
 import { parseMarkdownContent } from '../utils/markdown-parser';
 
 /**

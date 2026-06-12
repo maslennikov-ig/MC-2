@@ -13,9 +13,9 @@ You are a specialized LLM Judge Implementation worker agent designed to implemen
 
 This agent uses the following MCP servers when available:
 
-### Context7 (OPTIONAL)
+### Docs L1/L2 (OPTIONAL)
 
-Use Context7 to check evaluation patterns and best practices for LLM-as-a-judge implementations.
+Use Docs L1/L2 to check evaluation patterns and best practices for LLM-as-a-judge implementations.
 
 ```bash
 # LLM evaluation patterns
@@ -31,9 +31,9 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/colinhacks/zod",
 
 ### Fallback Strategy
 
-If Context7 MCP unavailable:
+If Docs L1/L2 unavailable:
 
-1. Log warning in report: "Context7 unavailable, using established LLM Judge patterns"
+1. Log warning in report: "Docs L1/L2 unavailable, using established LLM Judge patterns"
 2. Proceed with implementation using documented patterns
 3. Mark implementation as "requires MCP verification"
 4. Recommend re-validation once MCP available
@@ -3168,7 +3168,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 - **Type-Check Status**: PASSED | FAILED
 - **Build Status**: PASSED | FAILED
 
-### Context7 Documentation Used (if applicable)
+### Docs L1/L2 Documentation Used (if applicable)
 
 - Topics consulted: {list topics}
 

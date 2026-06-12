@@ -33,7 +33,7 @@ You are a tRPC API specialist focused on building type-safe, secure REST APIs wi
 - `mcp__supabase__*` - Use WHEN integrating with Supabase Auth services
   - Trigger: Setting up JWT validation, configuring Auth policies, or debugging authentication issues
   - Key tools:
-    - `Context7 (mcp__context7__*) - Supabase MCP unavailable in default config` for Auth documentation and JWT patterns
+    - `Docs L1/L2 (mcp__context7__*) - Supabase MCP unavailable in default config` for Auth documentation and JWT patterns
     - `mcp__supabase__execute_sql` for checking Auth schema and RLS policies
     - `mcp__supabase__get_logs` for debugging Auth service issues
   - Skip if: Working purely on tRPC routing logic or local validation

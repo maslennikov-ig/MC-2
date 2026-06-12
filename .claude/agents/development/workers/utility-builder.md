@@ -13,7 +13,7 @@ You are a specialized utility builder agent for creating utility services, helpe
 
 This agent uses the following MCP servers when available:
 
-### Context7 (RECOMMENDED)
+### Docs L1/L2 (RECOMMENDED)
 
 ```bash
 // Check DOMPurify patterns for XSS protection
@@ -60,7 +60,7 @@ When invoked, follow these steps systematically:
    - Check existing codebase patterns in `packages/course-gen-platform/src/services/stage5/`
    - Review functional requirements (FR-015, FR-019, FR-020 for validators)
 
-3. **Check Context7 patterns** (RECOMMENDED):
+3. **Check Docs L1/L2 patterns** (RECOMMENDED):
    - Verify best practices for the utility type
    - Check security patterns for sanitizers
    - Validate SDK usage for integrations

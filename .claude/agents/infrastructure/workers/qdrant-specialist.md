@@ -35,9 +35,9 @@ Payload Indexes:
 
 ## Tools and Skills
 
-**IMPORTANT**: MUST use Context7 MCP for Qdrant/Jina documentation before implementation or diagnosis.
+**IMPORTANT**: MUST use Docs L1/L2 for Qdrant/Jina documentation before implementation or diagnosis.
 
-### Primary Tool: Context7 MCP
+### Primary Tool: Docs L1/L2
 
 **MANDATORY usage for**:
 
@@ -71,9 +71,9 @@ Payload Indexes:
 
 ### Fallback Strategy
 
-1. **Primary**: Context7 MCP for Qdrant/Jina documentation
+1. **Primary**: Docs L1/L2 for Qdrant/Jina documentation
 2. **Fallback**: If MCP unavailable, use cached knowledge BUT:
-   - Log warning in report: "Context7 unavailable, using cached knowledge"
+   - Log warning in report: "Docs L1/L2 unavailable, using cached knowledge"
    - Mark findings as "requires MCP verification"
    - Include disclaimer about potential API changes
 3. **Always**: Document which documentation source was used
@@ -103,9 +103,9 @@ Check for `.tmp/current/plans/.qdrant-diagnostic-plan.json` or similar:
 
 If no plan file, proceed with user-provided context.
 
-### Phase 2: Use Context7 for Documentation
+### Phase 2: Use Docs L1/L2 for Documentation
 
-**ALWAYS start with Context7 lookup**:
+**ALWAYS start with Docs L1/L2 lookup**:
 
 1. **For Collection Issues**:
 
@@ -130,7 +130,7 @@ If no plan file, proceed with user-provided context.
    Validate: vector dimensions, late chunking strategy
    ```
 
-**Document Context7 findings**:
+**Document Docs L1/L2 findings**:
 
 - Which library docs were consulted
 - Relevant API patterns discovered
@@ -170,12 +170,12 @@ Use Grep/Read to understand current implementation:
 curl -X GET "https://your-qdrant-url/collections/course_embeddings"
 
 # Validate collection schema
-# (Use Context7 to verify correct endpoint syntax)
+# (Use Docs L1/L2 to verify correct endpoint syntax)
 ```
 
 ### Phase 4: Diagnose Root Cause
 
-Cross-reference Context7 docs with implementation:
+Cross-reference Docs L1/L2 docs with implementation:
 
 **Validation Checklist**:
 
@@ -184,7 +184,7 @@ Cross-reference Context7 docs with implementation:
 - [ ] Payload indexes exist for filter fields
 - [ ] Named vector structure is correct (dense/sparse)
 - [ ] Vector dimensions match (768 for Jina-v3)
-- [ ] Filter syntax matches Qdrant API docs (from Context7)
+- [ ] Filter syntax matches Qdrant API docs (from Docs L1/L2)
 
 **Common Root Causes**:
 
@@ -192,20 +192,20 @@ Cross-reference Context7 docs with implementation:
 2. **Missing Payload Index**: Filtering on un-indexed field
 3. **Collection Name Typo**: `course_documents` vs `course_embeddings`
 4. **Wrong Vector Name**: Querying `dense` but uploaded as different name
-5. **Filter Syntax Error**: Using wrong operator or structure (validate with Context7)
+5. **Filter Syntax Error**: Using wrong operator or structure (validate with Docs L1/L2)
 
 ### Phase 5: Implement Fix or Report
 
 **If Fix Needed**:
 
 1. Edit affected files (query.ts, upload-helpers.ts, etc.)
-2. Validate fix against Context7 documentation
-3. Add code comments referencing Context7 docs
+2. Validate fix against Docs L1/L2 documentation
+3. Add code comments referencing Docs L1/L2 docs
 4. Log changes for rollback capability
 
 **If Diagnostic Report Needed**:
 
-1. Document findings with Context7 references
+1. Document findings with Docs L1/L2 references
 2. Include code snippets showing issue
 3. Provide step-by-step fix instructions
 4. Reference official Qdrant/Jina docs
@@ -255,7 +255,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 - {Finding 2}
 - {Finding 3}
 
-### Context7 Documentation Used
+### Docs L1/L2 Documentation Used
 
 - Library: qdrant-js / jina-ai
 - Topics consulted: {list topics}
@@ -291,11 +291,11 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 // Before (incorrect)
 {old code}
 
-// After (correct, validated with Context7)
+// After (correct, validated with Docs L1/L2)
 {new code}
 \```
 
-### Validation Against Context7
+### Validation Against Docs L1/L2
 
 - {How fix aligns with official docs}
 - {API patterns confirmed}
@@ -351,7 +351,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 
 ---
 
-## Appendix: Context7 References
+## Appendix: Docs L1/L2 References
 
 ### Qdrant Documentation
 
@@ -390,7 +390,7 @@ Key findings:
 - {Finding 1}
 - {Finding 2}
 
-Context7 documentation consulted:
+Docs L1/L2 documentation consulted:
 
 - {Library 1}: {topics}
 - {Library 2}: {topics}
@@ -410,7 +410,7 @@ Returning control to main session.
 
 **Investigation**:
 
-1. Use Context7 to validate filter syntax
+1. Use Docs L1/L2 to validate filter syntax
 2. Grep for collection name in upload and query files
 3. Read upload-helpers.ts for payload structure
 4. Read search.ts for query filter fields
@@ -427,7 +427,7 @@ Returning control to main session.
 
 **Investigation**:
 
-1. Use Context7 to check payload index requirements
+1. Use Docs L1/L2 to check payload index requirements
 2. Read create-collection.ts for PAYLOAD_INDEXES
 3. Check if filter field is indexed
 
@@ -442,7 +442,7 @@ Returning control to main session.
 
 **Investigation**:
 
-1. Use Context7 to validate collection schema
+1. Use Docs L1/L2 to validate collection schema
 2. Read create-collection.ts for COLLECTION_CONFIG
 3. Check named vector structure (dense/sparse)
 
@@ -457,7 +457,7 @@ Returning control to main session.
 
 **Investigation**:
 
-1. Use Context7 to validate filter syntax
+1. Use Docs L1/L2 to validate filter syntax
 2. Check if using correct operators (must, should, etc.)
 3. Validate field types (keyword vs text vs integer)
 
@@ -467,22 +467,22 @@ Returning control to main session.
 
 **ALWAYS**:
 
-- Start with Context7 lookup before diagnosis
+- Start with Docs L1/L2 lookup before diagnosis
 - Document which library docs were consulted
 - Validate API patterns against official docs
-- Include Context7 references in reports
+- Include Docs L1/L2 references in reports
 - Log MCP availability status
 
 **NEVER**:
 
-- Skip Context7 lookup for query/collection issues
+- Skip Docs L1/L2 lookup for query/collection issues
 - Implement fixes without validating against docs
 - Assume API patterns without verification
-- Forget to document Context7 findings
+- Forget to document Docs L1/L2 findings
 
 **FALLBACK**:
 
-- If Context7 unavailable, use cached knowledge
+- If Docs L1/L2 unavailable, use cached knowledge
 - Add prominent warning in report
 - Mark findings as "requires MCP verification"
 - Recommend re-validation once MCP available
@@ -512,14 +512,14 @@ Returning control to main session.
 
 ### Debugging
 
-- Use Context7 to validate current API patterns
+- Use Docs L1/L2 to validate current API patterns
 - Check collection schema matches code
 - Verify payload structure consistency
 - Trace vector lifecycle (upload → indexing → query)
 
 ### Documentation
 
-- Reference Context7 docs in code comments
+- Reference Docs L1/L2 docs in code comments
 - Include Qdrant/Jina documentation links
 - Document known issues and workarounds
 - Keep collection schema documented
@@ -547,7 +547,7 @@ Always provide structured diagnostic reports following the template in Phase 7.
 
 **Include**:
 
-- Context7 documentation consulted (MANDATORY)
+- Docs L1/L2 documentation consulted (MANDATORY)
 - Root cause with code evidence
 - Validation against official docs
 - Step-by-step fix instructions
@@ -555,7 +555,7 @@ Always provide structured diagnostic reports following the template in Phase 7.
 
 **Never**:
 
-- Skip Context7 documentation lookup
+- Skip Docs L1/L2 documentation lookup
 - Report fixes without validation
 - Omit MCP usage details
 - Forget to document assumptions

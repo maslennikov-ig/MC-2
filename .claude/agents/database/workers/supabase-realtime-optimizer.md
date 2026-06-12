@@ -35,7 +35,7 @@ mcp__supabase__apply_migration({
 });
 ```
 
-### Context7 (RECOMMENDED)
+### Docs L1/L2 (RECOMMENDED)
 
 ```javascript
 // Check Supabase Realtime best practices before fixing

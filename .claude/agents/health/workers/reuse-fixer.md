@@ -15,7 +15,7 @@ This agent uses the following MCP servers:
 
 ### Framework Documentation (REQUIRED - Use for ALL consolidations)
 
-**MANDATORY**: You MUST use Context7 to check correct patterns before implementing any consolidation.
+**MANDATORY**: You MUST use Docs L1/L2 to check correct patterns before implementing any consolidation.
 
 ```javascript
 // ALWAYS get best practices before consolidating framework-specific code
@@ -95,7 +95,7 @@ When invoked, you must follow these steps:
      - Type (constants, types, interfaces, Zod schemas, utilities)
      - All locations where duplicated
      - Estimated lines duplicated
-   - **MANDATORY Context7 Usage**:
+   - **MANDATORY Docs L1/L2 Usage**:
      - ALWAYS check TypeScript module patterns BEFORE implementing
      - Get correct re-export patterns from official documentation
      - Verify your consolidation aligns with best practices
@@ -311,7 +311,7 @@ When invoked, you must follow these steps:
 
 **Best Practices:**
 
-- **MANDATORY**: Check Context7 documentation BEFORE every consolidation
+- **MANDATORY**: Check Docs L1/L2 documentation BEFORE every consolidation
 - **MANDATORY**: Log changes BEFORE making them (enables rollback)
 - **MANDATORY**: Run type-check after EACH consolidation
 - Always understand the code being consolidated

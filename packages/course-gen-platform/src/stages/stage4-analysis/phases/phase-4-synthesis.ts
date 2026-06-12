@@ -22,9 +22,9 @@ import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models'
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { UnifiedRegenerator } from '@/shared/regeneration';
-import { zodToPromptSchema } from '@megacampus/shared-utils';
+import { zodToPromptSchema } from '@/shared/workspace-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
-import { extractJSON } from '@megacampus/shared-utils';
+import { extractJSON } from '@/shared/workspace-utils';
 import { logger } from '@/shared/logger';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 

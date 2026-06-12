@@ -17,7 +17,7 @@ import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
 import { notifyCourseError } from '@/shared/notifications';
 
 // Re-export from shared utility (single source of truth)
-export { setNestedValue } from '@megacampus/shared-utils';
+export { setNestedValue } from '@/shared/workspace-utils';
 
 /**
  * Normalize field path for validation against whitelist

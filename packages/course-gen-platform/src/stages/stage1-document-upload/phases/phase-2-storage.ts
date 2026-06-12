@@ -27,6 +27,11 @@ import { incrementQuota, decrementQuota } from '../../../shared/validation/quota
 import { logger } from '../../../shared/logger/index.js';
 import { duplicateVectorsForNewCourse } from '../../../shared/qdrant/lifecycle';
 import type { Stage1StorageInput, Phase2StorageOutput, RollbackContext } from '../types';
+import {
+  getUploadStorageRootPath,
+  isPathInsideUploadStorageRoot,
+  toUploadStoragePath,
+} from '../storage-paths';
 import type { DuplicateFileResult } from '../../../shared/types/database-queries';
 import type { Json } from '@megacampus/shared-types';
 
@@ -198,17 +203,12 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
     // Allow only alphanumeric and dots, max 10 chars
     const fileExtension = rawExtension.replace(/[^a-z0-9.]/gi, '').substring(0, 10) || '.bin';
 
-    const uploadDir = path.join(
-      process.cwd(),
-      'uploads',
-      input.organizationId,
-      ...owner.uploadPathSegments
-    );
+    const uploadDir = path.join(getUploadStorageRootPath(), input.organizationId, ...owner.uploadPathSegments);
     const storagePath = path.join(uploadDir, `${fileId}${fileExtension}`);
 
     // Validate path to prevent directory traversal attacks
     const normalizedPath = path.normalize(storagePath);
-    if (!normalizedPath.startsWith(path.join(process.cwd(), 'uploads'))) {
+    if (!isPathInsideUploadStorageRoot(normalizedPath)) {
       throw createStorageError('BAD_REQUEST', 'Invalid file path', rollback);
     }
 
@@ -338,7 +338,7 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
         // C1: Reorder operations - delete file AFTER database operations succeed
 
         // Step 1: Create reference record in file_catalog
-        const relativeStoragePath = path.relative(process.cwd(), storagePath);
+        const relativeStoragePath = toUploadStoragePath(storagePath);
         const { error: insertError } = await supabase.from('file_catalog').insert({
           id: fileId,
           organization_id: input.organizationId,
@@ -508,7 +508,7 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
     );
 
     // Step 8: Insert file metadata into database
-    const relativeStoragePath = path.relative(process.cwd(), storagePath);
+    const relativeStoragePath = toUploadStoragePath(storagePath);
     const { error: insertError } = await supabase.from('file_catalog').insert({
       id: fileId,
       organization_id: input.organizationId,

@@ -208,7 +208,7 @@ npx knip --dependencies --reporter compact
 - Peer dependencies
 - CLI tools used in npm scripts
 
-**Verify with Context7** if unsure:
+**Verify with Docs L1/L2** if unsure:
 
 ```bash
 mcp__context7__get-library-docs({

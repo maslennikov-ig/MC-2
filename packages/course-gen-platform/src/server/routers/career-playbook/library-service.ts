@@ -1,7 +1,9 @@
 import { TRPCError } from '@trpc/server';
 import { randomUUID } from 'node:crypto';
 import type {
+  CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookNumericFact,
   CareerPlaybookPlaybookStatus,
   CareerPlaybookVisibility,
   CareerPlaybookViewerPermissions,
@@ -13,10 +15,13 @@ import { renderCareerPlaybookPdf } from '../../../services/career-playbook-pdf';
 import {
   mapPlaybookRow,
   normalizeGeneratedBlocks,
+  normalizeStoredQAData,
+  toJson,
   type CareerPlaybookRow,
   type CareerPlaybookSupabase,
 } from './service-mappers';
 import { buildSlug } from './course-bridge-helpers';
+import { annotateCareerPlaybookBlockNumericFacts } from '@/stages/stage-career-playbook/numeric-facts';
 
 export interface CareerPlaybookLibraryItem {
   id: string;
@@ -73,10 +78,12 @@ export interface CareerPlaybookLibraryListInput {
 export interface CareerPlaybookLibraryDetailResponse extends CareerPlaybookLibraryItem {
   generatedBlocks: Record<string, CareerPlaybookBlockState>;
   finalMarkdown: string | null;
+  qualityWarnings: string[];
 }
 
 export interface CareerPlaybookPublicShareResponse extends CareerPlaybookLibraryItem {
   finalMarkdown: string;
+  qualityWarnings: string[];
 }
 
 export interface CareerPlaybookDeleteResponse {
@@ -101,6 +108,19 @@ export interface CareerPlaybookPdfExportResponse {
   contentType: 'application/pdf';
   sizeBytes: number;
 }
+
+export interface CareerPlaybookNumericFactUpdateInput {
+  playbookId: string;
+  blockId: CareerPlaybookBlockId;
+  factId: string;
+  replacementText: string;
+  scope: 'occurrence' | 'block';
+}
+
+const FINAL_BLOCK_ORDER: CareerPlaybookBlockId[] = [
+  'header',
+  ...Array.from({ length: 26 }, (_, index) => `block_${index + 1}`),
+];
 
 function getCareerPlaybookSupabase(): CareerPlaybookSupabase {
   return getSupabaseAdmin() as unknown as CareerPlaybookSupabase;
@@ -243,6 +263,7 @@ const PUBLIC_PLAYBOOK_COLUMNS = [
   'department',
   'specialization',
   'level',
+  'q_a_data',
   'final_markdown',
   'share_slug',
   'is_public',
@@ -411,10 +432,12 @@ function mapRowToLibraryDetail(
   organizationSlug: string | null = null
 ): CareerPlaybookLibraryDetailResponse {
   const mapped = mapPlaybookRow(row);
+  const qaData = normalizeStoredQAData(mapped.q_a_data);
   return {
     ...toLibraryItemFromMappedRow(mapped, user, organizationSlug),
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown,
+    qualityWarnings: qaData.generation_warnings,
   };
 }
 
@@ -424,6 +447,7 @@ function mapRowToPublicShare(
 ): CareerPlaybookPublicShareResponse {
   const mapped = mapPlaybookRow(row);
   const visibility = getVisibility(mapped);
+  const qaData = normalizeStoredQAData(mapped.q_a_data);
   return {
     id: mapped.id,
     status: mapped.status,
@@ -442,6 +466,190 @@ function mapRowToPublicShare(
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
     finalMarkdown: mapped.final_markdown ?? '',
+    qualityWarnings: qaData.generation_warnings,
+  };
+}
+
+function replaceNumberOccurrence(input: {
+  content: string;
+  rawText: string;
+  replacementText: string;
+  occurrenceIndex: number;
+  scope: 'occurrence' | 'block';
+}): string {
+  if (input.scope === 'block') {
+    const next = input.content.split(input.rawText).join(input.replacementText);
+    if (next === input.content) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Numeric fact text not found' });
+    }
+    return next;
+  }
+
+  let cursor = 0;
+  let seen = 0;
+  while (cursor <= input.content.length) {
+    const index = input.content.indexOf(input.rawText, cursor);
+    if (index === -1) break;
+    if (seen === input.occurrenceIndex) {
+      return `${input.content.slice(0, index)}${input.replacementText}${input.content.slice(
+        index + input.rawText.length
+      )}`;
+    }
+    seen += 1;
+    cursor = index + input.rawText.length;
+  }
+
+  throw new TRPCError({ code: 'NOT_FOUND', message: 'Numeric fact occurrence not found' });
+}
+
+function hasCompleteGeneratedBlocks(blocks: Record<string, CareerPlaybookBlockState>): boolean {
+  return FINAL_BLOCK_ORDER.every(blockId => blocks[blockId]?.content.trim());
+}
+
+function assembleStoredBlocksMarkdown(blocks: Record<string, CareerPlaybookBlockState>): string {
+  return FINAL_BLOCK_ORDER.map(blockId => blocks[blockId]?.content.trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function buildPatchedFinalMarkdown(input: {
+  row: CareerPlaybookRow;
+  blocks: Record<string, CareerPlaybookBlockState>;
+  fact: CareerPlaybookNumericFact;
+  replacementText: string;
+  oldBlockContent: string;
+  newBlockContent: string;
+  scope: 'occurrence' | 'block';
+}): string | null {
+  if (hasCompleteGeneratedBlocks(input.blocks)) {
+    return assembleStoredBlocksMarkdown(input.blocks);
+  }
+
+  if (!input.row.final_markdown) return input.blocks[input.fact.block_id]?.content ?? null;
+
+  const oldBlockContent = input.oldBlockContent.trim();
+  if (oldBlockContent && input.row.final_markdown.includes(oldBlockContent)) {
+    return input.row.final_markdown.replace(oldBlockContent, input.newBlockContent.trim());
+  }
+
+  try {
+    return replaceNumberOccurrence({
+      content: input.row.final_markdown,
+      rawText: input.fact.raw_text,
+      replacementText: input.replacementText,
+      occurrenceIndex: input.fact.occurrence_index,
+      scope: input.scope,
+    });
+  } catch {
+    return input.row.final_markdown;
+  }
+}
+
+function markReplacementAsUserVerified(input: {
+  facts: CareerPlaybookNumericFact[];
+  replacementText: string;
+  updatedAt: string;
+}): CareerPlaybookNumericFact[] {
+  let matched = false;
+  return input.facts.map(fact => {
+    if (!matched && fact.raw_text === input.replacementText) {
+      matched = true;
+      return {
+        ...fact,
+        status: 'verified',
+        source: 'user_input',
+        confidence: 1,
+        explanation: 'Исправлено пользователем.',
+        updated_at: input.updatedAt,
+      };
+    }
+    return fact;
+  });
+}
+
+function buildNumericEvidenceText(row: CareerPlaybookRow, replacementText: string): string {
+  return JSON.stringify({
+    replacementText,
+    userInput: replacementText,
+    qaData: row.q_a_data,
+    roleProfileSpec: row.role_profile_spec,
+    webResearch: row.web_research,
+  });
+}
+
+export async function updateCareerPlaybookNumericFact(
+  ctx: Context,
+  input: CareerPlaybookNumericFactUpdateInput
+): Promise<CareerPlaybookBlockState & { blockId: CareerPlaybookBlockId }> {
+  const user = requireUser(ctx);
+  const row = await loadManageablePlaybook(input.playbookId, user);
+  const generatedBlocks = normalizeGeneratedBlocks(row.generated_blocks);
+  const block = generatedBlocks[input.blockId];
+  if (!block) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Career Playbook block not found' });
+  }
+
+  const fact = block.numeric_facts?.find(candidate => candidate.id === input.factId);
+  if (!fact) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Numeric fact not found' });
+  }
+
+  const updatedAt = new Date().toISOString();
+  const content = replaceNumberOccurrence({
+    content: block.content,
+    rawText: fact.raw_text,
+    replacementText: input.replacementText,
+    occurrenceIndex: fact.occurrence_index,
+    scope: input.scope,
+  });
+  const annotatedBlock = annotateCareerPlaybookBlockNumericFacts({
+    blockId: input.blockId,
+    block: {
+      ...block,
+      content,
+      status: 'generated',
+      generated_at: updatedAt,
+    },
+    evidenceText: buildNumericEvidenceText(row, input.replacementText),
+    language: row.language,
+  });
+  annotatedBlock.numeric_facts = markReplacementAsUserVerified({
+    facts: annotatedBlock.numeric_facts ?? [],
+    replacementText: input.replacementText,
+    updatedAt,
+  });
+
+  const nextBlocks = {
+    ...generatedBlocks,
+    [input.blockId]: annotatedBlock,
+  };
+  const finalMarkdown = buildPatchedFinalMarkdown({
+    row,
+    blocks: nextBlocks,
+    fact,
+    replacementText: input.replacementText,
+    oldBlockContent: block.content,
+    newBlockContent: content,
+    scope: input.scope,
+  });
+
+  const supabase = getCareerPlaybookSupabase();
+  const { data, error } = await supabase
+    .from('career_playbooks')
+    .update({
+      generated_blocks: toJson(nextBlocks),
+      final_markdown: finalMarkdown,
+    })
+    .eq('id', input.playbookId)
+    .select('*')
+    .single();
+
+  if (error || !data) throwOnDbError(error, 'Failed to update Career Playbook numeric fact');
+
+  const updatedBlocks = normalizeGeneratedBlocks(data.generated_blocks);
+  return {
+    ...(updatedBlocks[input.blockId] ?? annotatedBlock),
+    blockId: input.blockId,
   };
 }
 

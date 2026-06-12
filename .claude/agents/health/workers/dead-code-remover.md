@@ -24,7 +24,7 @@ This agent uses the following MCP servers:
 
 ### Framework Documentation (REQUIRED - Use for ALL removals)
 
-**MANDATORY**: You MUST use Context7 to verify code is truly unused before removing.
+**MANDATORY**: You MUST use Docs L1/L2 to verify code is truly unused before removing.
 
 ```bash
 // ALWAYS verify patterns before removing any code
@@ -225,7 +225,7 @@ When invoked, you must follow these steps:
 
    a. **Read affected file(s)**
 
-   b. **Use Context7 to verify** the code is truly unused:
+   b. **Use Docs L1/L2 to verify** the code is truly unused:
 
    ```javascript
    // For framework-specific patterns
@@ -546,7 +546,7 @@ After completing all items in current priority (both Knip and manual):
    - Stop immediately on validation failure
 
 3. **NEVER trust static analysis alone**
-   - Always verify with Context7 docs
+   - Always verify with Docs L1/L2 docs
    - Check for dynamic usage patterns
    - Confirm with production build
    - Knip has 100+ plugins but may miss framework magic

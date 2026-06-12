@@ -41,7 +41,7 @@ import {
   assembleDynamicContext,
   getFieldValue,
 } from '../../shared/regeneration/index.js';
-import { setNestedValue } from '@megacampus/shared-utils';
+import { setNestedValue } from '@/shared/workspace-utils';
 import { resolveStructure } from '../../shared/course-nodes/structure-resolver.js';
 import { writeCourseNodes } from '../../shared/course-nodes/writer.js';
 import { assertStableIds } from '../../shared/course-nodes/feature-flags.js';

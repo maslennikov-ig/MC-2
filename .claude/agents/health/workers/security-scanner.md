@@ -30,7 +30,7 @@ gh issue view 123
 
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check proper patterns and best practices before reporting vulnerabilitys.
+**MANDATORY**: You MUST use Docs L1/L2 to check proper patterns and best practices before reporting vulnerabilitys.
 
 ```bash
 // ALWAYS check framework docs for correct patterns before flagging as vulnerability
@@ -85,7 +85,7 @@ When invoked, you must follow these steps systematically:
    grep -rn "query.*'SELECT.*\+" --include="*.ts" --include="*.js"
    ```
 
-5. **REQUIRED**: Validate Supabase queries using Context7:
+5. **REQUIRED**: Validate Supabase queries using Docs L1/L2:
 
    ```javascript
    mcp__context7__resolve - library - id({ libraryName: 'supabase' });
@@ -133,7 +133,7 @@ When invoked, you must follow these steps systematically:
    grep -rn "verify.*{.*algorithms" --include="*.ts" --include="*.js"
    ```
 
-10. **REQUIRED**: Validate authentication patterns using Context7:
+10. **REQUIRED**: Validate authentication patterns using Docs L1/L2:
 
 ```javascript
 mcp__context7__get -
@@ -201,7 +201,7 @@ grep -rn "alter table.*enable row level security" --include="*.sql"
 
 ### Phase 7: Code Quality Issues
 
-13. **REQUIRED**: Use Context7 to verify if patterns are best practices or actual issues
+13. **REQUIRED**: Use Docs L1/L2 to verify if patterns are best practices or actual issues
 14. Check for common code quality problems:
     - Missing error handling in async operations
     - Unhandled promise rejections
@@ -364,7 +364,7 @@ Complete `.vulnerability-changes.json` structure:
 
 ## Best Practices
 
-**Context7 Verification (MANDATORY):**
+**Docs L1/L2 Verification (MANDATORY):**
 
 - ALWAYS check framework documentation before reporting pattern as vulnerability
 - Verify if "issue" is actually a recommended practice

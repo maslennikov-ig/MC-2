@@ -114,7 +114,7 @@ When invoked, you must follow these steps:
 
    ### B. Major Version Updates (High Priority)
 
-   **ALWAYS check Context7 for migration guide first**:
+   **ALWAYS check Docs L1/L2 for migration guide first**:
 
    ```javascript
    mcp__context7__get -

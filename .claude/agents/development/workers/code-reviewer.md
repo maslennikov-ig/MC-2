@@ -111,13 +111,13 @@ Returning control.
 | No changed files       | Minimal report: "No files to review", return    |
 | Type-check/build fails | Critical finding, include in report, return     |
 | No plan file           | Determine scope from prompt, continue           |
-| Context7 unavailable   | Continue without MCP validation, note in report |
+| Docs L1/L2 unavailable   | Continue without MCP validation, note in report |
 
 ---
 
 ## MCP Integration
 
-If available, use Context7 for pattern validation:
+If available, use Docs L1/L2 for pattern validation:
 
 ```
 mcp__context7__resolve-library-id → mcp__context7__query-docs

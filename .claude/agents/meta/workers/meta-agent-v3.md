@@ -225,7 +225,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 **MCP Guidance Fields**:
 
 - `recommended`: Array of MCP server patterns (e.g., `["mcp__context7__*", "gh CLI: *"]`)
-- `library`: Library name for Context7 lookup (if applicable)
+- `library`: Library name for Docs L1/L2 lookup (if applicable)
 - `reason`: Why worker should use these MCP servers
 
 **When to Include MCP Guidance**:
@@ -431,7 +431,7 @@ allowed-tools: Read, Grep, Bash  # Optional - restrict tools
 - Non-critical: Proceed with warning
 - Critical: Stop and report error
 
-**Available MCP Servers**: See CLAUDE.md "MCP Server Configuration" section for complete list (Context7, Supabase, n8n, Playwright, shadcn, Sequential Thinking, etc.)
+**Available MCP Servers**: See CLAUDE.md "MCP Server Configuration" section for complete list (Docs L1/L2, Supabase, n8n, Playwright, shadcn, Sequential Thinking, etc.)
 
 ---
 

@@ -43,7 +43,7 @@ interface Phase6Output {
     retry_count: number;
   };
 }
-import { sanitizeLLMOutput } from '@megacampus/shared-utils';
+import { sanitizeLLMOutput } from '@/shared/workspace-utils';
 import { logger } from '../../../shared/logger';
 
 /**

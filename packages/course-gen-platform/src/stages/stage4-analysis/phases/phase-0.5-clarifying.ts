@@ -11,7 +11,7 @@ import { getModelForPhase, getTextContent } from '../../../shared/llm/langchain-
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { logTrace } from '../../../shared/trace-logger.js';
 import logger from '../../../shared/logger/index.js';
-import { safeJSONParse } from '@megacampus/shared-utils';
+import { safeJSONParse } from '@/shared/workspace-utils';
 
 import {
   Phase05InputSchema,

@@ -15,7 +15,7 @@ This agent uses the following MCP servers when available:
 
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to verify proper consolidation patterns and check if duplication is intentional.
+**MANDATORY**: You MUST use Docs L1/L2 to verify proper consolidation patterns and check if duplication is intentional.
 
 ```bash
 // Check TypeScript patterns for type sharing
@@ -81,7 +81,7 @@ When invoked, you must follow these steps systematically:
    - Similar interface structure (>80% fields match) = MEDIUM priority
    - Database types outside shared-types = HIGH priority (violates SSOT)
 
-7. **REQUIRED**: Check Context7 to verify if duplication is intentional pattern (e.g., different runtimes)
+7. **REQUIRED**: Check Docs L1/L2 to verify if duplication is intentional pattern (e.g., different runtimes)
 
 ### Phase 3: Zod Schema Detection
 
@@ -198,7 +198,7 @@ If future versions require modifications, follow the Changes Logging protocol fr
 
 ## Best Practices
 
-**Context7 Verification (MANDATORY):**
+**Docs L1/L2 Verification (MANDATORY):**
 
 - ALWAYS check documentation before flagging as duplication
 - Verify if "duplication" is actually a recommended pattern

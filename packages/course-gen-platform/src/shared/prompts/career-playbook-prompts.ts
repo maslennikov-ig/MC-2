@@ -26,8 +26,36 @@ const groupHeadingVariables = [
   { name: 'heading_block_4', description: 'Localized Block 4 heading', required: true },
   { name: 'heading_block_5', description: 'Localized Block 5 heading', required: true },
   { name: 'heading_block_6', description: 'Localized Block 6 heading', required: true },
+  { name: 'heading_block_7', description: 'Localized Block 7 heading', required: true },
   { name: 'heading_block_8', description: 'Localized Block 8 heading', required: true },
+  { name: 'heading_block_9', description: 'Localized Block 9 heading', required: true },
+  { name: 'heading_block_10', description: 'Localized Block 10 heading', required: true },
+  { name: 'heading_block_11', description: 'Localized Block 11 heading', required: true },
+  { name: 'heading_block_12', description: 'Localized Block 12 heading', required: true },
+  { name: 'heading_block_13', description: 'Localized Block 13 heading', required: true },
+  { name: 'heading_block_14', description: 'Localized Block 14 heading', required: true },
+  { name: 'heading_block_15', description: 'Localized Block 15 heading', required: true },
+  { name: 'heading_block_16', description: 'Localized Block 16 heading', required: true },
+  { name: 'heading_block_17', description: 'Localized Block 17 heading', required: true },
+  { name: 'heading_block_18', description: 'Localized Block 18 heading', required: true },
+  { name: 'heading_block_19', description: 'Localized Block 19 heading', required: true },
+  { name: 'heading_block_20', description: 'Localized Block 20 heading', required: true },
+  { name: 'heading_block_21', description: 'Localized Block 21 heading', required: true },
+  { name: 'heading_block_22', description: 'Localized Block 22 heading', required: true },
+  { name: 'heading_block_23', description: 'Localized Block 23 heading', required: true },
+  { name: 'heading_block_24', description: 'Localized Block 24 heading', required: true },
+  { name: 'heading_block_25', description: 'Localized Block 25 heading', required: true },
+  { name: 'heading_block_26', description: 'Localized Block 26 heading', required: true },
 ];
+
+function groupHeadingVariable(name: string) {
+  const variable = groupHeadingVariables.find(item => item.name === name);
+  if (!variable) {
+    throw new Error(`Unknown Career Playbook heading variable: ${name}`);
+  }
+
+  return variable;
+}
 
 export const careerPlaybookPrompts: HardcodedPrompt[] = [
   {
@@ -254,6 +282,9 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
 {{heading_header}}
 {{heading_block_1}}
@@ -266,10 +297,10 @@ RoleProfileSpec:
     variables: [
       specJsonVariable,
       contentLanguageVariable,
-      groupHeadingVariables[0],
-      groupHeadingVariables[1],
-      groupHeadingVariables[2],
-      groupHeadingVariables[5],
+      groupHeadingVariable('heading_header'),
+      groupHeadingVariable('heading_block_1'),
+      groupHeadingVariable('heading_block_2'),
+      groupHeadingVariable('heading_block_5'),
     ],
   },
   {
@@ -289,6 +320,9 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
 {{heading_block_3}}
 {{heading_block_4}}
@@ -301,10 +335,10 @@ RoleProfileSpec:
     variables: [
       specJsonVariable,
       contentLanguageVariable,
-      groupHeadingVariables[3],
-      groupHeadingVariables[4],
-      groupHeadingVariables[6],
-      groupHeadingVariables[7],
+      groupHeadingVariable('heading_block_3'),
+      groupHeadingVariable('heading_block_4'),
+      groupHeadingVariable('heading_block_6'),
+      groupHeadingVariable('heading_block_8'),
     ],
   },
   {
@@ -325,16 +359,26 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
-## 7. Необходимые компетенции
-## 9. Как AI меняет эту роль
-## 12. Профиль кандидата
-## 13. Типичный рабочий день
+{{heading_block_7}}
+{{heading_block_9}}
+{{heading_block_12}}
+{{heading_block_13}}
 
 USER:
 RoleProfileSpec:
 {{spec_json}}`,
-    variables: [specJsonVariable, contentLanguageVariable],
+    variables: [
+      specJsonVariable,
+      contentLanguageVariable,
+      groupHeadingVariable('heading_block_7'),
+      groupHeadingVariable('heading_block_9'),
+      groupHeadingVariable('heading_block_12'),
+      groupHeadingVariable('heading_block_13'),
+    ],
   },
   {
     stage: 'stage_6',
@@ -354,17 +398,27 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Include a Mermaid flowchart TB career diagram in Block 11.
 - Use exactly these top-level headings:
-## 11. Карьерный рост
-## 14. Онбординг: First 5 Wins + План 30-60-90
-## 15. Система мотивации
-## 17. Red Flags и система раннего предупреждения
+{{heading_block_11}}
+{{heading_block_14}}
+{{heading_block_15}}
+{{heading_block_17}}
 
 USER:
 RoleProfileSpec:
 {{spec_json}}`,
-    variables: [specJsonVariable, contentLanguageVariable],
+    variables: [
+      specJsonVariable,
+      contentLanguageVariable,
+      groupHeadingVariable('heading_block_11'),
+      groupHeadingVariable('heading_block_14'),
+      groupHeadingVariable('heading_block_15'),
+      groupHeadingVariable('heading_block_17'),
+    ],
   },
   {
     stage: 'stage_6',
@@ -385,18 +439,29 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Include Mermaid diagrams in Blocks 10 and 16.
 - Use exactly these top-level headings:
-## 10. Взаимодействие и зависимости
-## 16. Регламенты и процессы
-## 19. Отраслевой контекст
-## 20. Связь с бизнес-целями
-## 21. Как люди обычно проваливаются на этой роли
+{{heading_block_10}}
+{{heading_block_16}}
+{{heading_block_19}}
+{{heading_block_20}}
+{{heading_block_21}}
 
 USER:
 RoleProfileSpec:
 {{spec_json}}`,
-    variables: [specJsonVariable, contentLanguageVariable],
+    variables: [
+      specJsonVariable,
+      contentLanguageVariable,
+      groupHeadingVariable('heading_block_10'),
+      groupHeadingVariable('heading_block_16'),
+      groupHeadingVariable('heading_block_19'),
+      groupHeadingVariable('heading_block_20'),
+      groupHeadingVariable('heading_block_21'),
+    ],
   },
   {
     stage: 'stage_6',
@@ -418,18 +483,30 @@ Methodology:
 Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 - Use exactly these top-level headings:
-## 18. FAQ
-## 22. "Как со мной работать" (заполняется сотрудником)
-## 23. Протокол непрерывности ("Hit by a Bus")
-## 24. Role Canvas
-## 25. Когда пересматривать эту инструкцию
-## 26. Implementation checklist
+{{heading_block_18}}
+{{heading_block_22}}
+{{heading_block_23}}
+{{heading_block_24}}
+{{heading_block_25}}
+{{heading_block_26}}
 
 USER:
 RoleProfileSpec:
 {{spec_json}}`,
-    variables: [specJsonVariable, contentLanguageVariable],
+    variables: [
+      specJsonVariable,
+      contentLanguageVariable,
+      groupHeadingVariable('heading_block_18'),
+      groupHeadingVariable('heading_block_22'),
+      groupHeadingVariable('heading_block_23'),
+      groupHeadingVariable('heading_block_24'),
+      groupHeadingVariable('heading_block_25'),
+      groupHeadingVariable('heading_block_26'),
+    ],
   },
   {
     stage: 'stage_6',
@@ -509,6 +586,7 @@ User edit instruction:
 {{user_instruction}}
 
 Return only markdown for this one block.
+Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
 
 USER:
 RoleProfileSpec:

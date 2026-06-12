@@ -23,3 +23,10 @@ export {
   isStorageError,
   type StorageError,
 } from './phase-2-storage';
+export {
+  getUploadStorageBasePath,
+  getUploadStorageRootPath,
+  isPathInsideUploadStorageRoot,
+  resolveUploadStoragePath,
+  toUploadStoragePath,
+} from '../storage-paths';

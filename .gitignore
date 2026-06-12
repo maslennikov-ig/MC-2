@@ -61,6 +61,7 @@ yarn-error.log*
 .tmp/
 .local/
 tmp/
+output/
 coverage/
 .nyc_output/
 packages/web/tests/.auth/

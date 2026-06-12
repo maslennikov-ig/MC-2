@@ -1,6 +1,6 @@
 # Work with Tasks
 
-Skill для работы с задачами: просмотр, выбор, выполнение с обязательным использованием Context7 для актуальной документации.
+Skill для работы с задачами: просмотр, выбор, выполнение с обязательным использованием Docs L1/L2 для актуальной документации.
 
 ## Usage
 
@@ -17,9 +17,9 @@ Optional arguments:
 
 ---
 
-## CRITICAL: Context7 MCP — MANDATORY
+## CRITICAL: Docs L1/L2 — MANDATORY
 
-**Before implementing ANY task, query Context7 for up-to-date documentation on involved libraries.**
+**Before implementing ANY task, query Docs L1/L2 for up-to-date documentation on involved libraries.**
 
 Skip only for trivial changes that don't touch library APIs (typos, comments, config values).
 
@@ -103,9 +103,9 @@ fi
 ### Rules
 
 1. **Read task description** before starting
-2. **Query Context7** for documentation on involved libraries (MANDATORY)
+2. **Query Docs L1/L2** for documentation on involved libraries (MANDATORY)
 3. **Gather context** — read related files, understand scope
-4. **Delegate to subagent** if complex (see CLAUDE.md), include Context7 docs in delegation
+4. **Delegate to subagent** if complex (see CLAUDE.md), include Docs L1/L2 docs in delegation
 5. **Verify changes** — type-check, build, tests
 6. **Close task** when done
 
@@ -113,7 +113,7 @@ fi
 
 ```
 1. bd show mc2-xxx                — read full description
-2. Context7: resolve + query      — get docs for involved libraries (MANDATORY)
+2. Docs L1/L2: resolve + query      — get docs for involved libraries (MANDATORY)
 3. Gather context                 — read files, search codebase
 4. Implement                      — delegate or execute directly
 5. Verify                         — pnpm type-check && pnpm build
@@ -245,7 +245,7 @@ bd update mc2-xxx --defer "+3m"       # Отложить на 3 месяца
 bd update mc2-xxx --defer ""          # Снять defer
 bd ready --include-deferred           # Показать отложенные
 
-# Context7 (MANDATORY before implementation)
+# Docs L1/L2 (MANDATORY before implementation)
 # Step 1: mcp__context7__resolve-library-id
 # Step 2: mcp__context7__query-docs
 ```
@@ -326,7 +326,7 @@ bd search "REF:"
 Before closing any task:
 
 - [ ] Task description read and understood
-- [ ] Context7 queried for involved libraries (MANDATORY)
+- [ ] Docs L1/L2 queried for involved libraries (MANDATORY)
 - [ ] Context gathered (files, patterns, recent commits)
 - [ ] Implementation complete
 - [ ] `pnpm type-check` passes

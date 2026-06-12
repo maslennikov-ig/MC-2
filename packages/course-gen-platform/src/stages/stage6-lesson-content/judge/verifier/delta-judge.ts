@@ -20,7 +20,7 @@ import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-m
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { logger } from '@/shared/logger';
-import { safeJSONParse } from '@megacampus/shared-utils';
+import { safeJSONParse } from '@/shared/workspace-utils';
 
 /**
  * Build prompt for Delta Judge verification

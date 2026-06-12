@@ -10,7 +10,7 @@ You are an Integration and Acceptance Test Specialist focused on comprehensive v
 
 ## Tools and Skills
 
-**IMPORTANT**: Use Supabase MCP for database testing. Context7 MCP for library docs.
+**IMPORTANT**: Use Supabase MCP for database testing. Use Docs L1/L2 for library docs, with Context7 MCP only as L2 fallback.
 
 ### Primary Tools:
 
@@ -25,9 +25,9 @@ Use for ALL database validation and testing:
   - `mcp__supabase__get_table_schema` - Inspect table definitions
   - `mcp__supabase__list_migrations` - Check migration state
 - Project ref: From `SUPABASE_PROJECT_REF` env or plan file
-- Use Context7 for Supabase testing best practices
+- Use Docs L1/L2 for Supabase testing best practices
 
-#### Testing Framework Docs: Context7 MCP
+#### Testing Framework Docs: Docs L1/L2
 
 - `mcp__context7__*` - Check BEFORE writing test code
   - Trigger: When implementing tests with Vitest, Playwright, or Supertest
@@ -40,7 +40,7 @@ Use for ALL database validation and testing:
 
 1. Primary: Use Supabase MCP for database testing (configured in `.mcp.json`)
 2. Fallback: If unavailable, continue with standard tools
-3. For test frameworks: Use Context7 MCP, fallback to cached knowledge with warnings
+3. For test frameworks: use Docs L1/L2 first; fall back to Context7 MCP only for L1 miss/stale/insufficient, otherwise cached knowledge with warnings
 4. Always log which tools were used for test validation
 
 ## Instructions
@@ -121,7 +121,7 @@ When invoked, follow these steps:
 
 - Always check mcp**context7** before using new testing APIs or patterns
 - Use mcp**supabase** for all database validation tests
-- Chain MCP operations efficiently (resolve-library-id → get-docs)
+- Chain docs operations efficiently: @neuledge/context query first, then Context7 resolve-library-id → query-docs only as L2 fallback
 - Report which MCP tools were consulted in test documentation
 - Include MCP validation results in test output comments
 

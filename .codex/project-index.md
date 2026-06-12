@@ -97,5 +97,5 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Keep `.codex/handoff.md` under the configured current-state line limit.
 - Keep this file navigation-only; do not add stage logs, blockers, or task queues.
 - Update this file when stable entrypoints, routes, directories, integrations, verification commands, or ownership boundaries change.
-- Use Context7 for version-sensitive library/framework docs before implementation.
+- Use Docs L1/L2 for version-sensitive library/framework docs before implementation: `@neuledge/context` first, Context7 MCP only for L1 miss/stale/insufficient.
 - Use visible spawned Codex subagents when justified and explicitly allowed; inline-only delegation is not acceptable for this repo workflow.

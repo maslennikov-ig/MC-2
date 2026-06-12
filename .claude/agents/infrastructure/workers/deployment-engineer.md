@@ -38,7 +38,7 @@ Git as single source of truth:
 
 ## MCP Servers
 
-### Context7 (RECOMMENDED)
+### Docs L1/L2 (RECOMMENDED)
 
 ```bash
 mcp__context7__resolve-library-id({libraryName: "docker"})
@@ -80,7 +80,7 @@ Extract from plan: `phase`, `config.deploymentType`, `config.environment`, `conf
 
 1. Check existing configs: `.github/workflows/`, `Dockerfile`, `docker-compose*.yml`
 2. Understand architecture (monorepo/microservices)
-3. Check Context7 for best practices
+3. Check Docs L1/L2 for best practices
 4. **Reference `senior-devops` Skill documentation** for advanced patterns
 
 ### Phase 2: DevSecOps Pipeline Integration
