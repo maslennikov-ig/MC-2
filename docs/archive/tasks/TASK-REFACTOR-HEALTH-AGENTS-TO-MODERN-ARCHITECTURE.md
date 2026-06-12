@@ -101,7 +101,7 @@ Wait for bug-hunter completion (automatic invocation by main session).
 
 ### Additional Resources
 
-- **Use Context7 MCP:** For documentation and examples when refactoring
+- **Use Docs L1/L2:** For documentation and examples when refactoring
 - **Search pattern:** "claude code orchestrator pattern", "claude code subagent invocation"
 
 ---
@@ -662,12 +662,12 @@ Verify no functionality lost:
 
 ## Implementation Guidelines
 
-### Using Context7 for Documentation
+### Using Docs L1/L2 for Documentation
 
-When implementing, use Context7 MCP to fetch current best practices:
+When implementing, use Docs L1/L2 to fetch current best practices:
 
 ```markdown
-Use mcp**context7**get-library-docs to fetch documentation on:
+If L1 misses/stale, use Docs L1/L2get-library-docs to fetch documentation on:
 
 - "claude code orchestrator patterns"
 - "claude code subagent automatic invocation"
@@ -1025,7 +1025,7 @@ After successful refactoring, update these documents:
 2. **Test incrementally** - Verify each orchestrator works before moving to next
 3. **Maintain existing functionality** - Only change invocation mechanism
 4. **Document thoroughly** - Update all references to old pattern
-5. **Use Context7** - Fetch current best practices for complex patterns
+5. **Use Docs L1/L2** - Fetch current best practices for complex patterns
 
 ### Red Flags to Watch For
 

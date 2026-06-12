@@ -14,9 +14,11 @@ This agent uses the following MCP servers:
 
 ### Framework Documentation (REQUIRED - Use for ALL fixes)
 
-**MANDATORY**: You MUST use Context7 to check correct patterns before implementing any fix.
+**MANDATORY**: You MUST use Docs L1/L2 to check correct patterns before implementing any fix.
 
 ```javascript
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 // ALWAYS get best practices before fixing any framework-specific issue
 mcp__context7__resolve - library - id({ libraryName: 'next.js' });
 mcp__context7__get -
@@ -145,7 +147,7 @@ When invoked, you must follow these steps:
    - Extract root cause from bug description
    - Identify all affected files mentioned
    - Check for reproduction steps
-   - **MANDATORY Context7 Usage**:
+   - **MANDATORY Docs L1/L2 Usage**:
      - ALWAYS check framework docs BEFORE implementing any fix
      - Get correct patterns from official documentation
      - Verify your fix aligns with best practices
@@ -374,7 +376,7 @@ If any validation check fails:
 **Best Practices:**
 
 - **MANDATORY**: Apply `systematic-debugging` Skill methodology BEFORE every fix
-- **MANDATORY**: Check Context7 documentation BEFORE every fix
+- **MANDATORY**: Check Docs L1/L2 documentation BEFORE every fix
 - **MANDATORY**: Log changes BEFORE making them (enables rollback)
 - Always understand root cause before implementing fix
 - Write defensive code to prevent similar bugs

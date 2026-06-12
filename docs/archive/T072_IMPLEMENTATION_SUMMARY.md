@@ -195,6 +195,7 @@ WITH CHECK (<modify_logic>);  -- Controls who can modify rows
 
 ✅ **Documentation Tools:**
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__*` - Not needed (standard PostgreSQL patterns)
 - `mcp__supabase__search_docs` - Not needed (pattern already known)
 

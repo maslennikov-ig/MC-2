@@ -84,11 +84,13 @@ packages/course-gen-platform/src/stages/
 
 This agent uses the following MCP servers when available:
 
-### Context7 (OPTIONAL)
+### Docs L1/L2 (OPTIONAL)
 
 **Use for pattern validation** when implementing complex TypeScript patterns:
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 # Zod schema patterns
 mcp__context7__resolve-library-id({libraryName: "zod"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/colinhacks/zod", topic: "object schemas"})
@@ -100,9 +102,9 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/openai/openai-no
 
 ### Fallback Strategy
 
-If Context7 MCP unavailable:
+If Docs L1/L2 unavailable:
 
-1. Log info: "Context7 unavailable, using existing codebase patterns"
+1. Log info: "Docs L1/L2 unavailable, using existing codebase patterns"
 2. Proceed with implementation using patterns from existing phase files
 3. Pattern source: Read existing phases in same stage for consistency
 4. Report: Note that MCP verification was not performed
@@ -118,27 +120,35 @@ When invoked, follow these steps systematically:
 1. **Read plan file** using Read tool
 2. **Extract configuration**:
    ```json
-   {
-     "phase": 1,
-     "workflow": "stage-pipeline-implementation",
-     "config": {
-       "targetStage": 2,
-       "targetPhases": ["classification"],
-       "taskIds": ["T016", "T017", "T018"],
-       "scope": ["packages/course-gen-platform/src/stages/"]
-     },
-     "validation": {
-       "required": ["type-check", "build"],
-       "optional": ["tests"]
-     },
-     "mcpGuidance": {
-       "recommended": ["mcp__context7__*"],
-       "library": "zod",
-       "reason": "Check Zod patterns for schema validation"
-     },
-     "nextAgent": "stage-pipeline-specialist"
-   }
+
    ```
+
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
+{
+"phase": 1,
+"workflow": "stage-pipeline-implementation",
+"config": {
+"targetStage": 2,
+"targetPhases": ["classification"],
+"taskIds": ["T016", "T017", "T018"],
+"scope": ["packages/course-gen-platform/src/stages/"]
+},
+"validation": {
+"required": ["type-check", "build"],
+"optional": ["tests"]
+},
+"mcpGuidance": {
+"recommended": ["@neuledge/context MCP", "mcp__context7__* fallback"],
+"library": "zod",
+"reason": "Check Zod patterns for schema validation"
+},
+"nextAgent": "stage-pipeline-specialist"
+}
+
+````
 3. **Adjust implementation scope** based on plan config
 
 **If no plan file**, proceed with analysis mode to understand what needs to be implemented.
@@ -149,9 +159,9 @@ When invoked, follow these steps systematically:
 
 1. **Read target stage orchestrator**:
 
-   ```bash
-   Read packages/course-gen-platform/src/stages/stage{N}/orchestrator.ts
-   ```
+```bash
+Read packages/course-gen-platform/src/stages/stage{N}/orchestrator.ts
+````
 
 2. **Read existing phases in target stage**:
 
@@ -804,6 +814,7 @@ function getSuggestedStructure(archetype: ContentArchetype, depth: number): stri
    - No runtime errors in compiled output
 
 3. **Tests** (OPTIONAL):
+
    ```bash
    cd packages/course-gen-platform && pnpm test
    ```

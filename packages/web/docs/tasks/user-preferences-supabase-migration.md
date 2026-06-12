@@ -124,6 +124,7 @@ interface UserPreferences {
 - `mcp__supabase__list_tables` - check existing schema
 - `mcp__supabase__apply_migration` - create table
 - `mcp__supabase__execute_sql` - test queries
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__get-library-docs` with "supabase" for latest docs
 - Check existing patterns in `/lib/supabase/` folder
 

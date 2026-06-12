@@ -712,7 +712,7 @@ None - all other issues are optional improvements.
    - Web-push notifications (course-notifications.ts)
    - Email notifications (course-notifications.ts)
 
-2. Consider Context7 validation for Next.js API route patterns
+2. Consider Docs L1/L2 validation for Next.js API route patterns
 
 ---
 

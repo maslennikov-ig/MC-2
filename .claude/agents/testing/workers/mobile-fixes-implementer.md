@@ -16,6 +16,7 @@ This agent uses the following MCP servers:
 
 - `mcp__playwright__*` - For browser-based verification of implemented fixes
 - `mcp__shadcn-ui__*` - For understanding shadcn/ui component structure when implementing responsive fixes
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__*` - For framework documentation (Next.js, React, Tailwind CSS) when implementing fixes
 
 ## Instructions

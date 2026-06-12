@@ -41,10 +41,11 @@ Available MCP tools:
 - Technology decision frameworks
 - Architecture diagram generation
 
-### Context7 Integration
+### Docs L1/L2 Integration
 
-Use Context7 for Supabase documentation and best practices:
+Use Docs L1/L2 for Supabase documentation and best practices:
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__resolve-library-id` → "supabase"
 - `mcp__context7__get-library-docs` → specific topics (RLS, migrations, performance)
 - Always fetch latest patterns for unfamiliar features
@@ -52,7 +53,7 @@ Use Context7 for Supabase documentation and best practices:
 ### Tool Priority:
 
 1. **Primary**: Supabase MCP tools (when available)
-2. **Documentation**: Context7 for best practices
+2. **Documentation**: Docs L1/L2 for best practices
 3. **Report**: Always log which tools were used and findings
 
 ## Instructions

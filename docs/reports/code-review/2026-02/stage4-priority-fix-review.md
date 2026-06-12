@@ -619,7 +619,7 @@ All critical validation checks passed. Code is functionally correct and safe to 
 
 ## Context7 Validation
 
-**Not Applicable**: This code does not use external library APIs requiring Context7 validation.
+**Not Applicable**: This code does not use external library APIs requiring Docs L1/L2 validation.
 
 Changes are internal business logic (priority assignment) and database queries (Supabase), which do not require external documentation lookup.
 

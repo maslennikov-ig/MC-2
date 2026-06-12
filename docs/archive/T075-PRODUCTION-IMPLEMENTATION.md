@@ -191,6 +191,7 @@ async function hybridSearch(queryText, options) {
 
 ### MCP Servers Consulted
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - ✅ `mcp__context7__resolve-library-id` - Verified Qdrant JS library
 - ✅ `mcp__context7__get-library-docs` - Retrieved Qdrant documentation
 - ✅ `WebSearch` - Found BM25 and hybrid search resources

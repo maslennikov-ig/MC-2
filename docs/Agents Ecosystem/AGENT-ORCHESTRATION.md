@@ -581,12 +581,12 @@ Prompt: "Implement T005: Create Email service in src/services/email.ts"
 
 **bug-hunter**:
 
-- MUST use Context7 to validate patterns before flagging bugs
+- MUST use Docs L1/L2 to validate patterns before flagging bugs
 - Use `gh` CLI via Bash for GitHub issues
 
 **security-scanner**:
 
-- MUST use Context7 for security best practices
+- MUST use Docs L1/L2 for security best practices
 - Use Supabase MCP for database security checks (when available)
 
 **dependency-auditor**:

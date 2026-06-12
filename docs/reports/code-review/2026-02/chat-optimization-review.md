@@ -347,7 +347,9 @@ export class TargetNotFoundError extends Error {
 **Recommendation**:
 
 ```typescript
-// Add Context7 validation before using OpenAI structured output
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+// Add Docs L1/L2 validation before using OpenAI structured output
 import { ToolSearch } from '@mcp/tools';
 
 export async function classifyIntent(
@@ -366,7 +368,7 @@ export async function classifyIntent(
       // Log recommendations for dev review
       logger.info({ context7 }, 'Context7 structured output recommendations');
     } catch (error) {
-      logger.warn({ error }, 'Context7 validation unavailable');
+      logger.warn({ error }, 'Docs L1/L2 validation unavailable');
     }
   }
 

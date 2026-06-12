@@ -1135,7 +1135,7 @@ Both type-check and build completed successfully. No compilation errors found.
 - **Plan file**: Not applicable (direct code review)
 - **Changes log**: Git commit `e05435fc`
 - **This report**: `docs/reports/code-review/2026-01/chat-cascade-review.md`
-- **Context7 validation**: Completed for React, Next.js, tRPC
+- **Docs L1/L2 validation**: Completed for React, Next.js, tRPC
 
 ---
 
