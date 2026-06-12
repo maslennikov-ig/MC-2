@@ -13,7 +13,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
-import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shared-utils';
+import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
 
 type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
 

@@ -21,11 +21,11 @@ import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models'
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 import { Phase1OutputSchema } from '@megacampus/shared-types/analysis-schemas';
-import { zodToPromptSchema } from '@megacampus/shared-utils';
+import { zodToPromptSchema } from '@/shared/workspace-utils';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { preprocessObject } from '@/shared/validation/preprocessing';
-import { extractJSON } from '@megacampus/shared-utils';
-import { normalizePhase1Output } from '@megacampus/shared-utils';
+import { extractJSON } from '@/shared/workspace-utils';
+import { normalizePhase1Output } from '@/shared/workspace-utils';
 import { logger } from '@/shared/logger';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 

@@ -20,6 +20,7 @@ import type { RestartStageRPCResult } from '../_shared/types';
 import { buildStage5JobInput } from '../_shared/helpers';
 import { deleteVectorsForDocument } from '../../../../shared/qdrant/lifecycle';
 import { validateLocale } from '@/shared/validation';
+import { resolveUploadStoragePath } from '@/stages/stage1-document-upload/phases';
 
 export const restartStageRouter = {
   restartStage: instructorProcedure
@@ -166,7 +167,7 @@ export const restartStageRouter = {
               .eq('course_id', courseId);
 
             for (const file of files) {
-              const absoluteFilePath = `${process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd()}/${file.storage_path}`;
+              const absoluteFilePath = resolveUploadStoragePath(file.storage_path);
               const job = await addJob(JobType.DOCUMENT_PROCESSING, {
                 ...baseJobData,
                 jobType: JobType.DOCUMENT_PROCESSING,

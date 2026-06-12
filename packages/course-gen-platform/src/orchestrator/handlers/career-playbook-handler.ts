@@ -18,7 +18,10 @@ import type {
   CareerPlaybookRow,
   CareerPlaybookSupabase,
 } from '../../server/routers/career-playbook/service-mappers';
-import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
+import {
+  getCareerPlaybookGraph,
+  getCareerPlaybookGraphRecursionLimit,
+} from '@/stages/stage-career-playbook/graph';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
@@ -33,6 +36,7 @@ type CareerPlaybookGraphResult = {
   webResearch?: unknown;
   costBreakdown?: CareerPlaybookCostBreakdown | null;
   nodeCosts?: CareerPlaybookCostBreakdown['nodeCosts'];
+  warnings?: string[];
 };
 
 function toJson(value: unknown): unknown {
@@ -51,6 +55,19 @@ function buildCostBreakdown(result: CareerPlaybookGraphResult) {
 
 function errorMessageFrom(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function normalizeGenerationWarnings(warnings: unknown): string[] {
+  if (!Array.isArray(warnings)) return [];
+
+  return Array.from(
+    new Set(
+      warnings
+        .filter((warning): warning is string => typeof warning === 'string')
+        .map(warning => warning.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 export class CareerPlaybookHandler {
@@ -101,14 +118,17 @@ export class CareerPlaybookHandler {
     });
 
     try {
-      result = (await graph.invoke({
-        playbookId: jobData.playbookId,
-        userId: jobData.userId,
-        organizationId: jobData.organizationId,
-        language: jobData.language,
-        qaData: jobData.qaData,
-        currentNode: 'specBuilder',
-      })) as CareerPlaybookGraphResult;
+      result = (await graph.invoke(
+        {
+          playbookId: jobData.playbookId,
+          userId: jobData.userId,
+          organizationId: jobData.organizationId,
+          language: jobData.language,
+          qaData: jobData.qaData,
+          currentNode: 'specBuilder',
+        },
+        { recursionLimit: getCareerPlaybookGraphRecursionLimit() }
+      )) as CareerPlaybookGraphResult;
     } catch (error) {
       await this.throwAfterGenerationFailure(jobData, job, errorMessageFrom(error), error);
       throw error;
@@ -193,6 +213,7 @@ export class CareerPlaybookHandler {
       q_a_data: toJson({
         ...qaDataWithoutGenerationError,
         generation_progress: completedProgress,
+        generation_warnings: normalizeGenerationWarnings(result.warnings),
       }) as CareerPlaybookRow['q_a_data'],
       completed_at: new Date().toISOString(),
     };

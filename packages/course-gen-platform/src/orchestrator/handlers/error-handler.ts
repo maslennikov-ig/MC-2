@@ -15,7 +15,7 @@
 import { Job } from 'bullmq';
 import { JobData, JobType } from '@megacampus/shared-types';
 import logger, { logPermanentFailure } from '../../shared/logger';
-import { logger as baseLogger } from '@megacampus/shared-logger';
+import { baseLogger } from '../../shared/logger/shared-logger-runtime';
 import { metricsStore } from '../metrics';
 import { getJobCourseId } from '../job-data-fields';
 import {

@@ -6,12 +6,14 @@ import {
   playbookIdInputSchema,
   regenerateBlockInputSchema,
   throwCareerPlaybookNotImplemented,
+  updateNumericFactInputSchema,
   visibilityInputSchema,
 } from './_shared';
 import {
   deleteCareerPlaybookFromLibrary,
   getCareerPlaybookFromLibrary,
   listCareerPlaybooks,
+  updateCareerPlaybookNumericFact,
   updateCareerPlaybookVisibility,
 } from './library-service';
 
@@ -39,6 +41,12 @@ export const careerPlaybookLibraryRouter = router({
   edit: protectedProcedure.input(editBlockInputSchema).mutation(() => {
     throwCareerPlaybookNotImplemented('library.edit');
   }),
+
+  updateNumericFact: protectedProcedure
+    .input(updateNumericFactInputSchema)
+    .mutation(({ ctx, input }) => {
+      return updateCareerPlaybookNumericFact(ctx, input);
+    }),
 });
 
 export type CareerPlaybookLibraryRouter = typeof careerPlaybookLibraryRouter;

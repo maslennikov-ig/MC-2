@@ -23,6 +23,7 @@ import { executeQdrantUpload } from './phases/phase-6-qdrant-upload';
 import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator } from '../../shared/i18n';
+import { processPlainTextDocument } from './plain-text-processing';
 import {
   updateCourseProgressInDB,
   updateDocumentProcessingProgress,
@@ -64,7 +65,7 @@ export async function processDocument(
   if (usePlainText) {
     // BASIC tier: Plain text processing
     await job.updateProgress(10);
-    const result = await processPlainText(filePath, mimeType);
+    const result = await processPlainTextDocument(filePath, mimeType);
     await job.updateProgress(80);
 
     await logTrace({
@@ -467,47 +468,6 @@ async function handleSummarizationFailure(
     errorData: { error: errorMessage, fallback: 'attempted' },
     durationMs: Date.now() - startTime,
   });
-}
-
-/**
- * Process plain text files (TXT, MD)
- */
-async function processPlainText(
-  filePath: string,
-  mimeType: string
-): Promise<DocumentProcessingResult> {
-  const fs = await import('fs/promises');
-  const content = await fs.readFile(filePath, 'utf-8');
-
-  const basicDoclingDoc = {
-    schema_version: '2.0' as const,
-    name: filePath,
-    pages: [],
-    texts: [],
-    pictures: [],
-    tables: [],
-    metadata: {
-      page_count: 1,
-      format: mimeType,
-      processing: {
-        timestamp: new Date().toISOString(),
-      },
-    },
-  };
-
-  return {
-    markdown: content,
-    json: basicDoclingDoc,
-    images: [],
-    stats: {
-      markdown_length: content.length,
-      pages: 1,
-      images: 0,
-      tables: 0,
-      sections: 0,
-      processing_time_ms: 0,
-    },
-  };
 }
 
 /**

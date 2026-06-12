@@ -4,11 +4,13 @@ import { createRateLimiter } from '../../middleware/rate-limit';
 import {
   playbookIdInputSchema,
   removeBusinessContextSourceInputSchema,
+  retryBusinessContextSourceInputSchema,
   uploadBusinessContextSourceInputSchema,
 } from './_shared';
 import {
   listCareerPlaybookBusinessContextSources,
   removeCareerPlaybookBusinessContextSource,
+  retryCareerPlaybookBusinessContextSource,
   uploadCareerPlaybookBusinessContextSource,
 } from './sources.service';
 
@@ -30,6 +32,12 @@ export const careerPlaybookSourcesRouter = router({
     .input(removeBusinessContextSourceInputSchema)
     .mutation(({ ctx, input }) => {
       return removeCareerPlaybookBusinessContextSource(ctx, input);
+    }),
+
+  retrySource: protectedProcedure
+    .input(retryBusinessContextSourceInputSchema)
+    .mutation(({ ctx, input }) => {
+      return retryCareerPlaybookBusinessContextSource(ctx, input);
     }),
 });
 

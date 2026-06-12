@@ -69,6 +69,7 @@ const messages = {
       businessContextFilledTemplate: 'Filled {count} of {total}',
       businessContextSourcesReady: 'Sources ready',
       businessContextSourcesProcessing: 'Sources processing',
+      businessContextSourcesFailed: 'Sources failed',
       businessContextSourcesEmpty: 'No sources added',
       businessContextPreviousStep: 'Previous step',
       businessContextNextStep: 'Next step',
@@ -91,6 +92,7 @@ const messages = {
       businessContextSourceStatusRemoved: 'Removed',
       businessContextSourceTextFallback: 'Text source',
       businessContextRemoveSourceTemplate: 'Remove {name}',
+      businessContextRetrySourceTemplate: 'Retry {name}',
       businessContextMissingTitle: 'Gaps',
       businessContextMissingEmpty: 'Core categories are covered',
       businessContextContinue: 'Continue to follow-ups',
@@ -184,6 +186,8 @@ const messages = {
         'When generation finishes, we will open the Role Guide automatically.',
       generationCanLeaveHint:
         'You can keep this page open or come back later: the status is saved.',
+      generationFinalizingHint:
+        'Finalizing the Role Guide. This can take a few minutes while the final document is saved.',
       generationStepQueued: 'Queueing generation',
       generationStepPreparingContext: 'Preparing the saved context',
       generationStepBuildingProfile: 'Refining the role profile',
@@ -1140,6 +1144,38 @@ describe('CareerPlaybookNewPageClient', () => {
     })
 
     expect(getGenerationStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('clarifies the finalizing state when generation remains near complete', async () => {
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000914',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'generating',
+      progress: 99,
+      generationProgressDetails: {
+        stage: 'final_review',
+        percent: 99,
+        updated_at: '2026-06-08T17:00:00.000Z',
+      },
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Product Lead',
+        },
+      },
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('status')).toHaveTextContent('99%')
+    expect(screen.getByRole('status')).toHaveTextContent('Running the final review')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Finalizing the Role Guide. This can take a few minutes while the final document is saved.'
+    )
   })
 
   it('keeps the generate CTA retryable when backend generation cannot start', async () => {

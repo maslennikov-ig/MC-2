@@ -42,7 +42,7 @@ import type pino from 'pino';
 import { ClarifyingQuestionsInterrupt } from '@/shared/errors';
 import { logTrace } from '../../shared/trace-logger';
 import type { AnalysisContext } from './orchestrator-helpers';
-import { getErrorMessage } from '@megacampus/shared-utils';
+import { getErrorMessage } from '@/shared/workspace-utils';
 
 /**
  * Complete a phase and log its trace data

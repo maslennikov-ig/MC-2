@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CareerPlaybookRoleProfileSpec } from '@megacampus/shared-types';
+import type { CareerPlaybookQAData, CareerPlaybookRoleProfileSpec } from '@megacampus/shared-types';
 import {
   generateCareerPlaybookGroup,
   getCareerPlaybookGroupSpec,
@@ -100,6 +100,33 @@ const groupSixMarkdown = `## 18. FAQ
 - HR schedules calibration
 `;
 
+const businessContextQaData: CareerPlaybookQAData = {
+  fixed: [],
+  followups: [],
+  freeform: [],
+  business_context: {
+    mode: 'company_specific',
+    status: 'ready',
+    digest: {
+      product: ['B2B SaaS платформа для корпоративного обучения и генерации курсов.'],
+      customers: ['ICP: HRD, L&D, руководители отделов продаж и поддержки.'],
+      sales_channels: ['Блог, вебинары, email, VK/Telegram, YouTube, кейсы.'],
+      processes: ['SLA обратной связи продаж: 24-48 часов.'],
+      metrics: [
+        'Целевой объём: 80 MQL/месяц.',
+        'CVR контент → лид: 2.5%.',
+        'Pipeline influenced revenue: 12%.',
+      ],
+      org_structure: ['Контент-менеджер руководит 1-3 контент-специалистами.'],
+      constraints: ['Не использовать неподтверждённые KPI как факт, если их нет в источниках.'],
+      source_ids: ['00000000-0000-4000-8000-000000000301'],
+      missing_signals: [],
+      user_edited: true,
+    },
+    source_ids: ['00000000-0000-4000-8000-000000000301'],
+  },
+};
+
 function promptHeadingLines(promptKey: string): string[] {
   const prompt = careerPlaybookPrompts.find(entry => entry.promptKey === promptKey);
   if (!prompt) {
@@ -107,14 +134,19 @@ function promptHeadingLines(promptKey: string): string[] {
   }
 
   const headingsSection = prompt.promptTemplate.match(
-    /Use exactly these top-level headings:\n(?<headings>(?:## .+\n?)+)\nUSER:/
+    /Use exactly these top-level headings:\n(?<headings>(?:(?:## .+|\{\{heading_[^}]+}})\n?)+)\nUSER:/
   );
 
   return (
     headingsSection?.groups?.headings
       .trim()
       .split('\n')
-      .map(line => line.trim()) ?? []
+      .map(line => {
+        const trimmed = line.trim();
+        if (trimmed === '{{heading_header}}') return '## Header';
+        const variableMatch = /^\{\{heading_block_(\d+)}}$/.exec(trimmed);
+        return variableMatch ? `## ${variableMatch[1]}. Heading` : trimmed;
+      }) ?? []
   );
 }
 
@@ -223,6 +255,72 @@ describe('Career Playbook group generator', () => {
     });
   });
 
+  it('annotates generated numeric facts with business-context provenance', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: `## Header
+
+# Контент-менеджер: должностная инструкция
+
+## 1. Миссия и ключевые результаты
+
+| KR | Метрика |
+| --- | --- |
+| Лидогенерация через контент | 80 MQL/месяц |
+| Конверсия контента | CVR контент → лид 2.5% |
+| Улучшение воронки | Рост CVR на 25% |
+
+## 2. Анти-цели: что эта роль НЕ делает
+
+| Анти-цель | Чья ответственность |
+| --- | --- |
+| Product roadmap | Product |
+| Legal approvals | Legal |
+
+## 5. Матрица решений (Decision Authority)
+
+| Решение | Уровень автономии | Действие |
+| --- | --- | --- |
+| Обычные материалы | Full autonomy | Утвердить |
+| Чувствительные темы | Approval | Legal/Product review |
+`,
+      model: 'mock-career-model',
+      inputTokens: 100,
+      outputTokens: 200,
+      costUsd: 0.012,
+    });
+
+    const result = await generateCareerPlaybookGroup(
+      {
+        groupKey: 'group_1_foundation',
+        roleProfileSpec: spec,
+        language: 'ru',
+        qaData: businessContextQaData,
+      } as Parameters<typeof generateCareerPlaybookGroup>[0],
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(result.blocks.block_1.numeric_facts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          raw_text: '80',
+          status: 'verified',
+          source: 'source_document',
+        }),
+        expect.objectContaining({
+          raw_text: '2.5%',
+          status: 'verified',
+          source: 'source_document',
+        }),
+        expect.objectContaining({
+          raw_text: '25%',
+          status: 'needs_review',
+          source: 'model_suggestion',
+        }),
+      ])
+    );
+  });
+
   it('passes localized English heading labels into group prompts', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
@@ -263,6 +361,36 @@ Decision text`,
         heading_block_1: '## 1. Mission and key results',
         heading_block_2: '## 2. Anti-goals: what this role does NOT do',
         heading_block_5: '## 5. Decision authority matrix',
+      })
+    );
+  });
+
+  it('passes localized heading labels into later group prompts', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: groupSixMarkdown,
+      model: 'mock-career-model',
+      inputTokens: 100,
+      outputTokens: 200,
+      costUsd: 0.012,
+    });
+
+    await generateCareerPlaybookGroup(
+      {
+        groupKey: 'group_6_wrap',
+        roleProfileSpec: spec,
+        language: 'ru',
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(renderPrompt).toHaveBeenCalledWith(
+      'career_playbook_group_6_wrap',
+      expect.objectContaining({
+        heading_block_18: '## 18. Частые вопросы',
+        heading_block_23: '## 23. Протокол непрерывности',
+        heading_block_24: '## 24. Карта роли',
+        heading_block_26: '## 26. Чеклист внедрения',
       })
     );
   });

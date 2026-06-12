@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   unlink: vi.fn(),
   addJob: vi.fn(),
   removeTerminalJobById: vi.fn(),
+  resolveUploadStoragePath: vi.fn(),
+  isPathInsideUploadStorageRoot: vi.fn(() => true),
   rpc: vi.fn(),
 }));
 
@@ -41,6 +43,8 @@ vi.mock('@/shared/validation/quota-enforcer', () => ({
 vi.mock('@/stages/stage1-document-upload/phases', () => ({
   runPhase2Storage: mocks.runPhase2Storage,
   isStorageError: mocks.isStorageError,
+  resolveUploadStoragePath: mocks.resolveUploadStoragePath,
+  isPathInsideUploadStorageRoot: mocks.isPathInsideUploadStorageRoot,
 }));
 
 vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
@@ -208,6 +212,10 @@ describe('careerPlaybookRouter business context sources', () => {
       deduplicated: false,
     });
     mocks.isStorageError.mockReturnValue(false);
+    mocks.resolveUploadStoragePath.mockImplementation((storagePath: string) =>
+      path.join(process.cwd(), storagePath)
+    );
+    mocks.isPathInsideUploadStorageRoot.mockReturnValue(true);
     mocks.decrementQuota.mockResolvedValue(undefined);
     mocks.unlink.mockResolvedValue(undefined);
     mocks.rpc.mockResolvedValue({ data: null, error: null });
@@ -359,6 +367,100 @@ describe('careerPlaybookRouter business context sources', () => {
         updatedAt: '2026-06-03T09:01:00.000Z',
       },
     ]);
+  });
+
+  it('retries a failed file source with Career-scoped ownership checks', async () => {
+    const fileId = '55555555-5555-4555-8555-555555555555';
+    const storagePath = `uploads/${authenticatedContext.user!.organizationId}/career-playbooks/${playbookId}/${fileId}.md`;
+    const playbookBuilder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'awaiting_followups',
+          organization_id: authenticatedContext.user!.organizationId,
+        }),
+        error: null,
+      },
+    ]);
+    const sourceSelectBuilder = createBuilder([
+      {
+        data: {
+          id: sourceId,
+          playbook_id: playbookId,
+          organization_id: authenticatedContext.user!.organizationId,
+          user_id: authenticatedContext.user!.id,
+          source_type: 'file',
+          status: 'failed',
+          filename: 'context.md',
+          file_catalog_id: fileId,
+          error_message: 'Docling unavailable',
+        },
+        error: null,
+      },
+    ]);
+    const sourceUpdateBuilder = createBuilder();
+    const fileSelectBuilder = createBuilder([
+      {
+        data: {
+          id: fileId,
+          organization_id: authenticatedContext.user!.organizationId,
+          course_id: null,
+          storage_path: storagePath,
+          filename: 'context.md',
+          mime_type: 'text/markdown',
+          file_size: 128,
+        },
+        error: null,
+      },
+    ]);
+    const fileUpdateBuilder = createBuilder();
+    const sourceBuilders = [sourceSelectBuilder, sourceUpdateBuilder];
+    const fileBuilders = [fileSelectBuilder, fileUpdateBuilder];
+
+    mocks.from.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbookBuilder;
+      if (table === 'career_playbook_sources') return sourceBuilders.shift();
+      if (table === 'file_catalog') return fileBuilders.shift();
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.sources.retrySource({ playbookId, sourceId });
+
+    expect(sourceUpdateBuilder.update).toHaveBeenCalledWith({
+      status: 'uploaded',
+      error_message: null,
+      updated_at: expect.any(String),
+    });
+    expect(fileUpdateBuilder.update).toHaveBeenCalledWith({
+      vector_status: 'pending',
+      error_message: null,
+      processed_content: null,
+      updated_at: expect.any(String),
+    });
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(
+      `career-playbook-source-${playbookId}-${sourceId}`
+    );
+    expect(mocks.addJob).toHaveBeenCalledWith(
+      JobType.CAREER_PLAYBOOK,
+      expect.objectContaining({
+        operation: 'PROCESS_SOURCE',
+        playbookId,
+        sourceId,
+        fileId,
+        filePath: path.join(process.cwd(), storagePath),
+        mimeType: 'text/markdown',
+        userId: authenticatedContext.user!.id,
+        organizationId: authenticatedContext.user!.organizationId,
+        language: 'en',
+      }),
+      { jobId: `career-playbook-source-${playbookId}-${sourceId}` }
+    );
+    expect(result).toMatchObject({
+      sourceId,
+      playbookId,
+      fileCatalogId: fileId,
+      status: 'processing',
+    });
   });
 
   it('forbids listing sources for another user playbook', async () => {

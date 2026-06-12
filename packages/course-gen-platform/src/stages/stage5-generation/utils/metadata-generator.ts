@@ -22,17 +22,17 @@ import {
 } from '@megacampus/shared-types/generation-result';
 import { getStylePrompt, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { UnifiedRegenerator } from '@/shared/regeneration';
-import { safeJSONParse } from '@megacampus/shared-utils';
+import { safeJSONParse } from '@/shared/workspace-utils';
 import { z } from 'zod';
 import {
   getDifficultyFromAnalysis,
   getCategoryFromAnalysis,
   formatPedagogicalStrategyForPrompt,
 } from './analysis-formatters';
-import { normalizeLanguageCode } from '@megacampus/shared-utils';
+import { normalizeLanguageCode } from '@/shared/workspace-utils';
 import { buildUserContextSection } from './prompt-helpers';
 import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
-import { zodToPromptSchema } from '@megacampus/shared-utils';
+import { zodToPromptSchema } from '@/shared/workspace-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
 import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';

@@ -1,6 +1,6 @@
 import { calculateRequiredTokens } from '@megacampus/shared-types';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
-import type { LanguageCode } from '@megacampus/shared-utils';
+import type { LanguageCode } from '@/shared/workspace-utils';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 
 export interface Stage6PhaseModelContext {

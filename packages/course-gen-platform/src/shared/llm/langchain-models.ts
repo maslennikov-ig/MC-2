@@ -34,7 +34,7 @@ import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
-import type { LanguageCode } from '@megacampus/shared-utils';
+import type { LanguageCode } from '@/shared/workspace-utils';
 
 /**
  * OpenRouter API base URL

@@ -6,9 +6,8 @@
 
 import { TRPCError } from '@trpc/server';
 import { nanoid } from 'nanoid';
-import * as path from 'path';
 import { JobType } from '@megacampus/shared-types';
-import { generateGenerationCode } from '@megacampus/shared-utils';
+import { generateGenerationCode } from '@/shared/workspace-utils';
 import type { Context } from '../../../trpc';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
@@ -20,6 +19,7 @@ import { logTrace } from '../../../../shared/trace-logger';
 import { validateLocale } from '@/shared/validation';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
+import { resolveUploadStoragePath } from '@/stages/stage1-document-upload/phases';
 
 export interface InitiateCourseGenerationInput {
   courseId: string;
@@ -155,10 +155,7 @@ export async function initiateCourseGeneration(params: {
 
     if (hasPendingFiles) {
       jobs = pendingFiles.map(file => {
-        const absoluteFilePath = path.join(
-          process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd(),
-          file.storage_path
-        );
+        const absoluteFilePath = resolveUploadStoragePath(file.storage_path);
 
         return {
           queue: JobType.DOCUMENT_PROCESSING,
@@ -271,10 +268,7 @@ export async function initiateCourseGeneration(params: {
       .eq('id', courseId);
 
     if (updateError) {
-      logger.warn(
-        { requestId, courseId, error: updateError },
-        'Failed to save generation code'
-      );
+      logger.warn({ requestId, courseId, error: updateError }, 'Failed to save generation code');
     }
 
     logger.info(

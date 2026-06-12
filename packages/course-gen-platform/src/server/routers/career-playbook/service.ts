@@ -83,6 +83,7 @@ export interface CareerPlaybookGenerationStatusResponse {
   generatedBlocks?: Record<string, CareerPlaybookBlockState>;
   finalMarkdown?: string;
   completedAt?: string;
+  warnings?: string[];
 }
 
 export interface RequestFollowupsInput {
@@ -790,5 +791,6 @@ function mapRowToGenerationStatus(row: CareerPlaybookRow): CareerPlaybookGenerat
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown ?? undefined,
     completedAt: mapped.completed_at ?? undefined,
+    warnings: qaData.generation_warnings,
   };
 }

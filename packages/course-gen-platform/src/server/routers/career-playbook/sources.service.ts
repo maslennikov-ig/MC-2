@@ -6,14 +6,18 @@ import {
   type Tier,
 } from '@megacampus/shared-types';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 import type { Context, UserContext } from '../../trpc';
-import { addJob } from '@/orchestrator/queue';
+import { addJob, removeTerminalJobById } from '@/orchestrator/queue';
 import { logger } from '../../../shared/logger/index.js';
 import { validateFile } from '../../../shared/validation/file-validator';
 import { decrementQuota } from '../../../shared/validation/quota-enforcer';
-import { runPhase2Storage, isStorageError } from '@/stages/stage1-document-upload/phases';
+import {
+  isPathInsideUploadStorageRoot,
+  isStorageError,
+  resolveUploadStoragePath,
+  runPhase2Storage,
+} from '@/stages/stage1-document-upload/phases';
 import type { Phase2StorageOutput } from '@/stages/stage1-document-upload/types';
 import {
   getCareerPlaybookBusinessContextSupabase,
@@ -51,6 +55,19 @@ export interface RemoveCareerPlaybookSourceResult {
   status: 'removed';
   quotaReleasedBytes: number;
   fileDeleted: boolean;
+}
+
+export interface RetryCareerPlaybookSourceInput {
+  playbookId: string;
+  sourceId: string;
+}
+
+export interface RetryCareerPlaybookSourceResult {
+  sourceId: string;
+  playbookId: string;
+  fileCatalogId: string;
+  status: 'processing';
+  message: string;
 }
 
 function requireUser(ctx: Context): UserContext {
@@ -125,7 +142,7 @@ async function loadSourceForPlaybook(
   const { data, error } = await supabase
     .from('career_playbook_sources')
     .select(
-      'id, playbook_id, organization_id, user_id, status, filename, file_catalog_id, created_at, updated_at'
+      'id, playbook_id, organization_id, user_id, status, filename, file_catalog_id, error_message, created_at, updated_at'
     )
     .eq('id', sourceId)
     .eq('playbook_id', playbookId)
@@ -152,6 +169,27 @@ async function loadFileCatalogForCleanup(
     .select(
       'id, organization_id, course_id, storage_path, file_size, original_file_id, reference_count'
     )
+    .eq('id', fileCatalogId)
+    .single();
+
+  if (error || !data) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to load Career Playbook source file metadata',
+      cause: error,
+    });
+  }
+
+  return data;
+}
+
+async function loadFileCatalogForProcessing(
+  fileCatalogId: string
+): Promise<CareerPlaybookFileCatalogRow> {
+  const supabase = getCareerPlaybookBusinessContextSupabase();
+  const { data, error } = await supabase
+    .from('file_catalog')
+    .select('id, organization_id, course_id, storage_path, filename, mime_type, file_size')
     .eq('id', fileCatalogId)
     .single();
 
@@ -225,19 +263,13 @@ function getSourceProcessingJobId(playbookId: string, sourceId: string): string 
   return `career-playbook-source-${playbookId}-${sourceId}`;
 }
 
-function resolveProcessingFilePath(storagePath: string): string {
-  if (path.isAbsolute(storagePath)) return storagePath;
-  return path.join(process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd(), storagePath);
-}
-
 async function safeUnlinkCareerPlaybookStoragePath(
   file: CareerPlaybookFileCatalogRow
 ): Promise<boolean> {
   if (!file.storage_path) return false;
 
-  const uploadsRoot = path.resolve(process.cwd(), 'uploads');
-  const absolutePath = path.resolve(process.cwd(), file.storage_path);
-  if (absolutePath === uploadsRoot || !absolutePath.startsWith(`${uploadsRoot}${path.sep}`)) {
+  const absolutePath = resolveUploadStoragePath(file.storage_path);
+  if (!isPathInsideUploadStorageRoot(absolutePath)) {
     logger.warn(
       { fileCatalogId: file.id, storagePath: file.storage_path },
       'Skipped unsafe Career Playbook source file removal path'
@@ -353,10 +385,8 @@ async function cleanupStoredSourceFile(
   }
 
   if (!storage.deduplicated) {
-    const absolutePath = path.normalize(path.join(process.cwd(), storage.storagePath));
-    const uploadsRoot = path.join(process.cwd(), 'uploads');
-
-    if (absolutePath === uploadsRoot || absolutePath.startsWith(`${uploadsRoot}${path.sep}`)) {
+    const absolutePath = resolveUploadStoragePath(storage.storagePath);
+    if (isPathInsideUploadStorageRoot(absolutePath)) {
       try {
         await fs.unlink(absolutePath);
       } catch (error) {
@@ -457,7 +487,7 @@ export async function uploadCareerPlaybookBusinessContextSource(
       playbookId: input.playbookId,
       sourceId: data.id,
       fileId: storage.fileId,
-      filePath: resolveProcessingFilePath(storage.storagePath),
+      filePath: resolveUploadStoragePath(storage.storagePath),
       mimeType: input.mimeType,
       userId: user.id,
       organizationId: playbook.organization_id,
@@ -491,6 +521,112 @@ export async function uploadCareerPlaybookBusinessContextSource(
     if (error instanceof TRPCError) throw error;
     throw mapStorageError(error);
   }
+}
+
+export async function retryCareerPlaybookBusinessContextSource(
+  ctx: Context,
+  input: RetryCareerPlaybookSourceInput
+): Promise<RetryCareerPlaybookSourceResult> {
+  const user = requireUser(ctx);
+  const playbook = await loadWritablePlaybook(input.playbookId, user);
+  const source = await loadSourceForPlaybook(
+    input.sourceId,
+    input.playbookId,
+    playbook.organization_id
+  );
+
+  if (!source.file_catalog_id) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Only file-based Career Playbook sources can be retried',
+    });
+  }
+
+  const file = await loadFileCatalogForProcessing(source.file_catalog_id);
+  if (file.organization_id !== playbook.organization_id || file.course_id !== null) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Career Playbook source file access denied',
+    });
+  }
+
+  if (!file.storage_path) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook source file path is missing',
+    });
+  }
+
+  const supabase = getCareerPlaybookBusinessContextSupabase();
+  const now = new Date().toISOString();
+  const { error: sourceError } = await supabase
+    .from('career_playbook_sources')
+    .update({ status: 'uploaded', error_message: null, updated_at: now })
+    .eq('id', source.id);
+
+  if (sourceError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to reset Career Playbook source status',
+      cause: sourceError,
+    });
+  }
+
+  const { error: fileError } = await supabase
+    .from('file_catalog')
+    .update({
+      vector_status: 'pending',
+      error_message: null,
+      processed_content: null,
+      updated_at: now,
+    })
+    .eq('id', file.id);
+
+  if (fileError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to reset Career Playbook source file status',
+      cause: fileError,
+    });
+  }
+
+  const jobId = getSourceProcessingJobId(input.playbookId, source.id);
+  await removeTerminalJobById(jobId);
+
+  const jobData: CareerPlaybookProcessSourceJobData = {
+    jobType: JobType.CAREER_PLAYBOOK,
+    operation: 'PROCESS_SOURCE',
+    playbookId: input.playbookId,
+    sourceId: source.id,
+    fileId: file.id,
+    filePath: resolveUploadStoragePath(file.storage_path),
+    mimeType: file.mime_type || 'application/octet-stream',
+    userId: user.id,
+    organizationId: playbook.organization_id,
+    language: playbook.language,
+    locale: playbook.language === 'en' ? 'en' : 'ru',
+    createdAt: now,
+  };
+
+  await addJob(JobType.CAREER_PLAYBOOK, jobData, { jobId });
+
+  logger.info(
+    {
+      playbookId: input.playbookId,
+      sourceId: source.id,
+      fileId: file.id,
+      organizationId: playbook.organization_id,
+    },
+    'Career Playbook business context source retry queued'
+  );
+
+  return {
+    sourceId: source.id,
+    playbookId: source.playbook_id,
+    fileCatalogId: file.id,
+    status: 'processing',
+    message: `File "${source.filename || file.filename || source.id}" queued for retry`,
+  };
 }
 
 export async function removeCareerPlaybookBusinessContextSource(

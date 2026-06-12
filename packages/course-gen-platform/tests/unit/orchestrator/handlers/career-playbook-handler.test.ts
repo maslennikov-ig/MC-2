@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   generateCareerPlaybookFollowups: vi.fn(),
   regenerateCareerPlaybookBlock: vi.fn(),
   processCareerPlaybookSource: vi.fn(),
+  getCareerPlaybookGraphRecursionLimit: vi.fn(() => 128),
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
@@ -34,6 +35,7 @@ vi.mock('@/stages/stage-career-playbook/source-processing', () => ({
 
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
   getCareerPlaybookGraph: vi.fn(),
+  getCareerPlaybookGraphRecursionLimit: mocks.getCareerPlaybookGraphRecursionLimit,
 }));
 
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
@@ -119,6 +121,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
 describe('CareerPlaybookHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getCareerPlaybookGraphRecursionLimit.mockReturnValue(128);
   });
 
   it('routes GENERATE_FOLLOWUPS through the follow-up helper', async () => {
@@ -158,6 +161,7 @@ describe('CareerPlaybookHandler', () => {
           digest: null,
           source_ids: [],
         },
+        generation_warnings: [],
       },
       language: 'ru',
     });
@@ -346,11 +350,48 @@ describe('CareerPlaybookHandler', () => {
             percent: 100,
             updated_at: expect.any(String),
           }),
+          generation_warnings: [],
         },
         completed_at: expect.any(String),
       })
     );
     expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+  });
+
+  it('invokes the generation graph with the Career Playbook recursion limit', async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      errors: [],
+      generatedBlocks: {},
+      finalMarkdown: '# B2B Sales Manager',
+      roleProfileSpec,
+    });
+    const builder = createBuilder([
+      { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    mocks.getCareerPlaybookGraphRecursionLimit.mockReturnValue(144);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke,
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playbookId,
+        currentNode: 'specBuilder',
+      }),
+      { recursionLimit: 144 }
+    );
   });
 
   it('persists generation progress reported by the graph', async () => {
