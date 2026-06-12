@@ -7,20 +7,24 @@
  *
  * Also exports error logging types and services for centralized error management.
  */
-import {
-  logger as baseLogger,
-  createChildLogger as baseCreateChildLogger,
-  createModuleLogger,
-  createRequestLogger,
-} from '@megacampus/shared-logger';
 import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
 import type { Json } from '@megacampus/shared-types';
-import { detectEnvironment } from '@megacampus/shared-logger';
 import { shouldAutoMute } from './auto-classification';
 import { shouldWriteToDb } from './rate-limiter';
+import {
+  baseLogger,
+  baseCreateChildLogger,
+  baseCreateModuleLogger,
+  baseCreateRequestLogger,
+  detectRuntimeEnvironment,
+} from './shared-logger-runtime';
 
 export type { Logger } from 'pino';
+
+const createModuleLogger = baseCreateModuleLogger;
+const createRequestLogger = baseCreateRequestLogger;
+const detectEnvironment = detectRuntimeEnvironment;
 
 // Re-export error logging types and services (these are local)
 export * from './types';

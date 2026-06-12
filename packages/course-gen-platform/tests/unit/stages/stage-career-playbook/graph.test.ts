@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CareerPlaybookQAData, CareerPlaybookRoleProfileSpec } from '@megacampus/shared-types';
-import { createCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
+import {
+  CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT,
+  DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT,
+  createCareerPlaybookGraph,
+  getCareerPlaybookGraphRecursionLimit,
+} from '@/stages/stage-career-playbook/graph';
+import { CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS } from '@/stages/stage-career-playbook/nodes/block-regenerator';
+import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from '@/stages/stage-career-playbook/nodes/final-assembler';
 
 const qaData: CareerPlaybookQAData = {
   fixed: [
@@ -197,6 +204,22 @@ function initialGraphState() {
 }
 
 describe('Career Playbook graph', () => {
+  it('derives a recursion limit that covers bounded block regeneration loops', () => {
+    const expectedLimit =
+      CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT +
+      CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.length *
+        CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS *
+        2 +
+      5;
+
+    expect(DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT).toBe(expectedLimit);
+    expect(DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT).toBeGreaterThan(25);
+    expect(getCareerPlaybookGraphRecursionLimit('26')).toBe(
+      DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT
+    );
+    expect(getCareerPlaybookGraphRecursionLimit('200')).toBe(200);
+  });
+
   it('runs all six generation groups and assembles final markdown', async () => {
     const runtime = {
       renderPrompt: vi.fn().mockImplementation((promptKey: string) => Promise.resolve(promptKey)),
@@ -445,8 +468,103 @@ describe('Career Playbook graph', () => {
       invokedPrompts.lastIndexOf('career_playbook_block_regenerator')
     );
     expect(result.blockRegenerationAttempts.block_2).toBe(2);
-    expect(result.warnings).toHaveLength(2);
-    expect(result.warnings[0]).toContain('blockRegenerator retained block_2');
+    expect(
+      result.warnings.filter(warning => warning.includes('blockRegenerator retained block_2'))
+    ).toHaveLength(2);
+    expect(result.warnings).toContainEqual(
+      expect.stringContaining('crossBlockJudge advanced after max regeneration attempts')
+    );
+    expect(result.errors).toEqual([]);
+  });
+
+  it('caps repeated regeneration within one judge window before advancing', async () => {
+    const invokedPrompts: string[] = [];
+    const runtime = {
+      renderPrompt: vi.fn().mockImplementation((promptKey: string) => Promise.resolve(promptKey)),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        invokedPrompts.push(prompt);
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve({
+            content: JSON.stringify(roleProfileSpec),
+            model: 'mock-career-model',
+            inputTokens: 10,
+            outputTokens: 20,
+            costUsd: 0.001,
+          });
+        }
+        if (prompt === 'career_playbook_group_1_foundation') {
+          return Promise.resolve({
+            content: groupMarkdownByPromptKey.career_playbook_group_1_foundation,
+            model: 'mock-career-model',
+            inputTokens: 10,
+            outputTokens: 20,
+            costUsd: 0.001,
+          });
+        }
+        if (prompt === 'career_playbook_block_regenerator') {
+          return Promise.resolve({
+            content: `## 5. Матрица решений (Decision Authority)
+
+| Decision | Owner |
+| --- | --- |
+| Daily priority | Role |
+| Discount 10% | Role |
+| Discount 20% | CRO |
+| Legal terms | Legal |`,
+            model: 'mock-career-model',
+            inputTokens: 10,
+            outputTokens: 20,
+            costUsd: 0.001,
+          });
+        }
+        if (prompt === 'career_playbook_cross_block_judge') {
+          return Promise.resolve({
+            content: JSON.stringify({
+              pass: false,
+              score: 60,
+              issues: [
+                {
+                  block_id: 'block_5',
+                  severity: 'critical',
+                  description: 'Decision matrix is still too generic.',
+                  suggestion: 'Regenerate block 5.',
+                },
+              ],
+              needs_regeneration: ['block_5'],
+            }),
+            model: 'mock-career-model',
+            inputTokens: 10,
+            outputTokens: 20,
+            costUsd: 0.001,
+          });
+        }
+
+        return Promise.resolve({
+          content: groupMarkdownByPromptKey[prompt],
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+    const regenerationCalls = invokedPrompts.filter(
+      prompt => prompt === 'career_playbook_block_regenerator'
+    );
+
+    expect(regenerationCalls).toHaveLength(2);
+    expect(invokedPrompts.indexOf('career_playbook_group_2_operations')).toBeGreaterThan(
+      invokedPrompts.lastIndexOf('career_playbook_block_regenerator')
+    );
+    expect(result.warnings).toContainEqual(
+      expect.stringContaining('crossBlockJudge advanced after max regeneration attempts')
+    );
     expect(result.errors).toEqual([]);
   });
 });

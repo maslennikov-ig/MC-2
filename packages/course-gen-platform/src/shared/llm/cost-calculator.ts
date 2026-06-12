@@ -10,7 +10,7 @@
  */
 
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
-import { logger } from '@megacampus/shared-logger';
+import { baseLogger as logger } from '../logger/shared-logger-runtime';
 
 // ============================================================================
 // OPENROUTER PRICING CONFIGURATION

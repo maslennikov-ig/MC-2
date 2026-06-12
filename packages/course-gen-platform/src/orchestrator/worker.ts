@@ -29,7 +29,7 @@ import {
   type Json,
 } from '@megacampus/shared-types';
 import logger from '../shared/logger';
-import { logger as baseLogger } from '@megacampus/shared-logger';
+import { baseLogger } from '../shared/logger/shared-logger-runtime';
 import { QUEUE_NAME } from './queue';
 import { handleJobFailure } from './handlers/error-handler';
 import type { JobResult } from './handlers/base-handler';
@@ -48,6 +48,7 @@ import { JobCancelledError } from '../server/errors/typed-errors';
 import { costTracker } from '../shared/metrics/cost-tracker';
 import { stageMetricsCollector } from '../shared/metrics/stage-metrics';
 import { getJobCourseId } from './job-data-fields';
+import { getWorkerLockDurationMs } from './processor-ttl';
 
 /**
  * Get the processor file path for sandboxed processing
@@ -391,7 +392,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Lock duration for long-running jobs (document processing can take several minutes)
         // Default is 30s, but we need more for PDF processing, embedding generation, etc.
         // With sandboxed processors, lock renewal is handled automatically by the thread
-        lockDuration: 2700000, // 45 minutes - must match PROCESSOR_MAX_TTL_MS
+        lockDuration: getWorkerLockDurationMs(),
         // Stall detection: when a worker process crashes (OOM, segfault, deploy),
         // the restarted worker detects stalled jobs and moves them to failed/retry.
         // Does not interrupt running jobs — only promotes expired-lock jobs back to wait queue.

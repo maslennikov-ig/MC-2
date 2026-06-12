@@ -20,7 +20,7 @@
 
 import type { ContentArchetype } from '@megacampus/shared-types';
 import { CONTENT_ARCHETYPE_TEMPERATURES_V2 } from '@megacampus/shared-types';
-import { normalizeLanguageCode } from '@megacampus/shared-utils';
+import { normalizeLanguageCode } from '@/shared/workspace-utils';
 
 // ============================================================================
 // TYPE DEFINITIONS

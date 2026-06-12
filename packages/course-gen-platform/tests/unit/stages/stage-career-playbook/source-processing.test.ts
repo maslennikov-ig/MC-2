@@ -1,4 +1,7 @@
 import type { Job } from 'bullmq';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CareerPlaybookJobData } from '@megacampus/shared-types';
 
@@ -126,12 +129,12 @@ describe('Career Playbook source processing', () => {
     expect(updates).toEqual([
       {
         table: 'career_playbook_sources',
-        payload: { status: 'processing', updated_at: expect.any(String) },
+        payload: { status: 'processing', error_message: null, updated_at: expect.any(String) },
         eq: ['id', sourceId],
       },
       {
         table: 'career_playbook_sources',
-        payload: { status: 'ready', updated_at: expect.any(String) },
+        payload: { status: 'ready', error_message: null, updated_at: expect.any(String) },
         eq: ['id', sourceId],
       },
     ]);
@@ -147,6 +150,73 @@ describe('Career Playbook source processing', () => {
       organizationId,
       expect.objectContaining({ onProgress: expect.any(Function) })
     );
+  });
+
+  it('processes markdown sources directly without Docling', async () => {
+    const { supabase, updates } = createSupabaseMock();
+    const job = createJob();
+    const tempDir = await mkdtemp(join(tmpdir(), 'career-playbook-source-'));
+    const filePath = join(tempDir, 'context.md');
+    await writeFile(
+      filePath,
+      '# Business context\n\nKPI: 80 MQL/month, CVR content to lead 2.5%.',
+      'utf8'
+    );
+
+    mocks.getSupabaseAdmin.mockReturnValue(supabase);
+    mocks.storeProcessedDocument.mockResolvedValue(undefined);
+    mocks.executePhase6Summarization.mockResolvedValue({
+      success: true,
+      fileId,
+      summary: '80 MQL/month',
+      generatedTitle: 'Business context',
+      summaryTokens: 10,
+      originalTokens: 10,
+      language: 'en',
+      processingMethod: 'full_text',
+      metadata: { iterations: 0, qualityScore: 1, processingTimeMs: 1 },
+    });
+
+    try {
+      const result = await processCareerPlaybookSource({
+        playbookId,
+        sourceId,
+        fileId,
+        filePath,
+        mimeType: 'text/markdown',
+        organizationId,
+        language: 'ru',
+        job,
+      });
+
+      expect(result).toEqual({ sourceId, fileId, status: 'ready' });
+      expect(mocks.executeDoclingConversion).not.toHaveBeenCalled();
+      expect(mocks.storeProcessedDocument).toHaveBeenCalledWith(
+        fileId,
+        expect.objectContaining({
+          markdown: expect.stringContaining('80 MQL/month'),
+          stats: expect.objectContaining({
+            pages: 1,
+            sections: 0,
+          }),
+        }),
+        playbookId
+      );
+      expect(updates).toEqual([
+        {
+          table: 'career_playbook_sources',
+          payload: { status: 'processing', error_message: null, updated_at: expect.any(String) },
+          eq: ['id', sourceId],
+        },
+        {
+          table: 'career_playbook_sources',
+          payload: { status: 'ready', error_message: null, updated_at: expect.any(String) },
+          eq: ['id', sourceId],
+        },
+      ]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('marks source and file processing failed when extraction fails', async () => {
@@ -170,17 +240,25 @@ describe('Career Playbook source processing', () => {
     expect(updates).toEqual([
       {
         table: 'career_playbook_sources',
-        payload: { status: 'processing', updated_at: expect.any(String) },
+        payload: { status: 'processing', error_message: null, updated_at: expect.any(String) },
         eq: ['id', sourceId],
       },
       {
         table: 'career_playbook_sources',
-        payload: { status: 'failed', updated_at: expect.any(String) },
+        payload: {
+          status: 'failed',
+          error_message: 'Docling unavailable',
+          updated_at: expect.any(String),
+        },
         eq: ['id', sourceId],
       },
       {
         table: 'file_catalog',
-        payload: { vector_status: 'failed', updated_at: expect.any(String) },
+        payload: {
+          vector_status: 'failed',
+          error_message: 'Docling unavailable',
+          updated_at: expect.any(String),
+        },
         eq: ['id', fileId],
       },
     ]);

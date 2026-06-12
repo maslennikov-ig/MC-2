@@ -364,6 +364,7 @@ export const CareerPlaybookQADataSchema = z.object({
   completeness_score: z.number().min(0).max(1).optional(),
   ui_progress: CareerPlaybookWizardProgressSchema.optional(),
   generation_progress: CareerPlaybookGenerationProgressSchema.optional(),
+  generation_warnings: z.array(z.string().min(1)).default([]),
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
 
@@ -398,6 +399,44 @@ export const CareerPlaybookBlockStatusSchema = z.enum([
 ]);
 export type CareerPlaybookBlockStatus = z.infer<typeof CareerPlaybookBlockStatusSchema>;
 
+export const CareerPlaybookNumericFactStatusSchema = z.enum([
+  'verified',
+  'benchmark',
+  'suggested',
+  'structural',
+  'needs_review',
+  'conflict',
+]);
+export type CareerPlaybookNumericFactStatus = z.infer<typeof CareerPlaybookNumericFactStatusSchema>;
+
+export const CareerPlaybookNumericFactSourceSchema = z.enum([
+  'user_input',
+  'business_context',
+  'source_document',
+  'web_benchmark',
+  'methodology',
+  'model_suggestion',
+  'unknown',
+]);
+export type CareerPlaybookNumericFactSource = z.infer<typeof CareerPlaybookNumericFactSourceSchema>;
+
+export const CareerPlaybookNumericFactSchema = z.object({
+  id: z.string().min(1),
+  block_id: CareerPlaybookBlockIdSchema,
+  raw_text: z.string().min(1),
+  normalized_value: z.string().min(1),
+  unit: z.string().min(1).optional(),
+  status: CareerPlaybookNumericFactStatusSchema,
+  source: CareerPlaybookNumericFactSourceSchema,
+  source_label: z.string().min(1).optional(),
+  confidence: z.number().min(0).max(1),
+  occurrence_index: z.number().int().nonnegative(),
+  surrounding_text: z.string().min(1).optional(),
+  explanation: z.string().min(1),
+  updated_at: z.string().datetime().optional(),
+});
+export type CareerPlaybookNumericFact = z.infer<typeof CareerPlaybookNumericFactSchema>;
+
 export const CareerPlaybookBlockStateSchema = z.object({
   content: z.string(),
   status: CareerPlaybookBlockStatusSchema,
@@ -405,6 +444,7 @@ export const CareerPlaybookBlockStateSchema = z.object({
   generated_at: z.string().datetime().optional(),
   llm_model: z.string().min(1).optional(),
   attempt: z.number().int().nonnegative().default(0),
+  numeric_facts: z.array(CareerPlaybookNumericFactSchema).optional(),
 });
 export type CareerPlaybookBlockState = z.infer<typeof CareerPlaybookBlockStateSchema>;
 
@@ -634,6 +674,7 @@ export interface CareerPlaybookViewerSnapshot {
   viewerPermissions?: CareerPlaybookViewerPermissions;
   thinkingStream?: string | null;
   currentGenerationGroup?: string | null;
+  qualityWarnings?: string[];
 }
 
 export const CareerPlaybookNodeCostSchema = z.object({

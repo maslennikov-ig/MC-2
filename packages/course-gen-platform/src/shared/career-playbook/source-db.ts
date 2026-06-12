@@ -63,6 +63,8 @@ export interface CareerPlaybookFileCatalogRow {
   filename: string | null;
   processed_content: string | null;
   markdown_content: string | null;
+  mime_type?: string | null;
+  error_message?: string | null;
   original_file_id: string | null;
   reference_count: number | null;
   updated_at?: string | null;

@@ -1,4 +1,5 @@
-import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
+import { extractJSON, safeJSONParse } from '@/shared/workspace-utils';
+import { z } from 'zod';
 import {
   CareerPlaybookBlockIdSchema,
   CareerPlaybookJudgeIssueSchema,
@@ -16,9 +17,37 @@ import type {
   CareerPlaybookGraphNode,
 } from '../state';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
+import {
+  CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
+  countCareerPlaybookRegenerationAttemptsForBlocks,
+} from './block-regenerator';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
 const JUDGE_PHASE = 'stage_career_playbook_judge';
+
+const LLMStructuredJudgeIssueSchema = z.object({
+  block_id: CareerPlaybookBlockIdSchema,
+  severity: z.enum(['critical', 'warning', 'info']),
+  description: z.string().min(1),
+  suggestion: z.string().min(1).nullable(),
+});
+
+const LLMStructuredJudgeVerdictSchema = z.object({
+  pass: z.boolean(),
+  score: z.number().min(0).max(100),
+  issues: z.array(LLMStructuredJudgeIssueSchema).max(50),
+  needs_regeneration: z.array(CareerPlaybookBlockIdSchema).max(27),
+});
+
+class StructuredJudgeOutputError extends Error {
+  constructor(
+    message: string,
+    readonly nodeCosts: CareerPlaybookNodeCost[]
+  ) {
+    super(message);
+    this.name = 'StructuredJudgeOutputError';
+  }
+}
 
 export interface MermaidDiagramRequirement {
   blockId: CareerPlaybookBlockId;
@@ -221,7 +250,10 @@ function normalizeJudgeIssueCandidate(candidate: unknown): CareerPlaybookJudgeIs
   if (!blockId) return null;
 
   issue.block_id = blockId;
-  if (typeof issue.suggestion === 'string' && issue.suggestion.trim().length === 0) {
+  if (
+    issue.suggestion === null ||
+    (typeof issue.suggestion === 'string' && issue.suggestion.trim().length === 0)
+  ) {
     delete issue.suggestion;
   }
 
@@ -284,14 +316,53 @@ function mergeJudgeVerdicts(
   deterministic: CareerPlaybookJudgeVerdict,
   llm: CareerPlaybookJudgeVerdict
 ): CareerPlaybookJudgeVerdict {
+  const criticalLLMIssueBlockIds = uniqueBlockIds(
+    llm.issues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
+  );
+
   return {
     pass: deterministic.pass && llm.pass,
     score: Math.min(deterministic.score, llm.score),
     issues: [...deterministic.issues, ...llm.issues],
     needs_regeneration: uniqueBlockIds([
       ...deterministic.needs_regeneration,
-      ...llm.needs_regeneration,
+      ...llm.needs_regeneration.filter(blockId => criticalLLMIssueBlockIds.includes(blockId)),
     ]),
+  };
+}
+
+function capRegenerationWhenBudgetExhausted(params: {
+  verdict: CareerPlaybookJudgeVerdict;
+  currentBlockIds: CareerPlaybookBlockId[];
+  attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+}): { verdict: CareerPlaybookJudgeVerdict; warnings: string[] } {
+  const scopedNeedsRegeneration = params.verdict.needs_regeneration.filter(blockId =>
+    params.currentBlockIds.includes(blockId)
+  );
+
+  if (scopedNeedsRegeneration.length === 0) {
+    return { verdict: params.verdict, warnings: [] };
+  }
+
+  const attemptCount = countCareerPlaybookRegenerationAttemptsForBlocks(
+    params.attempts,
+    params.currentBlockIds
+  );
+
+  if (attemptCount < CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS) {
+    return { verdict: params.verdict, warnings: [] };
+  }
+
+  return {
+    verdict: {
+      ...params.verdict,
+      needs_regeneration: params.verdict.needs_regeneration.filter(
+        blockId => !params.currentBlockIds.includes(blockId)
+      ),
+    },
+    warnings: [
+      `crossBlockJudge advanced after max regeneration attempts (${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}) for ${params.currentBlockIds.join(', ')}; unresolved issues remain in judge verdict.`,
+    ],
   };
 }
 
@@ -308,6 +379,92 @@ function buildNodeCost(result: {
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
   };
+}
+
+function buildJudgeRepairPrompt(params: {
+  originalPrompt: string;
+  rawContent: string;
+  errorMessage: string;
+}): string {
+  return `${params.originalPrompt}
+
+SYSTEM REPAIR:
+Previous cross-block judge response could not be parsed.
+Error: ${params.errorMessage}
+
+Previous response:
+${params.rawContent || '[empty response]'}
+
+Return only a valid JSON object matching this shape:
+{
+  "pass": boolean,
+  "score": number between 0 and 100,
+  "issues": [
+    {
+      "block_id": "header or block_1 through block_26",
+      "severity": "critical | warning | info",
+      "description": "clear issue",
+      "suggestion": "clear repair suggestion or null"
+    }
+  ],
+  "needs_regeneration": ["block_1"]
+}`;
+}
+
+async function invokeStructuredJudgeWithRepair(
+  runtime: CareerPlaybookRuntime,
+  prompt: string,
+  language: string
+): Promise<{
+  verdict: CareerPlaybookJudgeVerdict;
+  nodeCosts: CareerPlaybookNodeCost[];
+}> {
+  const baseOptions = {
+    phaseName: JUDGE_PHASE,
+    promptKey: JUDGE_PROMPT_KEY,
+    node: 'crossBlockJudge',
+    language,
+    temperature: 0.2,
+    maxTokens: 4_000,
+    structuredOutputSchema: LLMStructuredJudgeVerdictSchema,
+    structuredOutputName: 'career_playbook_cross_block_judge',
+    structuredOutputMethod: 'jsonSchema' as const,
+    structuredOutputStrict: true,
+  };
+  const firstResult = await runtime.invokeLLM(prompt, baseOptions);
+  const nodeCosts = [buildNodeCost(firstResult)];
+
+  try {
+    return {
+      verdict: parseCareerPlaybookJudgeVerdict(firstResult.content),
+      nodeCosts,
+    };
+  } catch (firstError) {
+    const repairPrompt = buildJudgeRepairPrompt({
+      originalPrompt: prompt,
+      rawContent: firstResult.content,
+      errorMessage: firstError instanceof Error ? firstError.message : String(firstError),
+    });
+    const repairResult = await runtime.invokeLLM(repairPrompt, {
+      ...baseOptions,
+      temperature: 0.1,
+      preferFallbackModel: true,
+      maxTokensMultiplier: 1.1,
+    });
+    nodeCosts.push(buildNodeCost(repairResult));
+
+    try {
+      return {
+        verdict: parseCareerPlaybookJudgeVerdict(repairResult.content),
+        nodeCosts,
+      };
+    } catch (repairError) {
+      throw new StructuredJudgeOutputError(
+        `initial parse failed (${firstError instanceof Error ? firstError.message : String(firstError)}); repair parse failed (${repairError instanceof Error ? repairError.message : String(repairError)})`,
+        nodeCosts
+      );
+    }
+  }
 }
 
 function selectGeneratedBlocks(
@@ -425,17 +582,15 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
             ) || 'none',
           current_group_content: joinBlockMarkdown(currentBlocks),
         });
-        const llmResult = await runtime.invokeLLM(prompt, {
-          phaseName: JUDGE_PHASE,
-          promptKey: JUDGE_PROMPT_KEY,
-          node: 'crossBlockJudge',
-          temperature: 0.2,
-          maxTokens: 4_000,
-        });
-        nodeCosts.push(buildNodeCost(llmResult));
-        const llmVerdict = parseCareerPlaybookJudgeVerdict(llmResult.content);
+        const judgeResult = await invokeStructuredJudgeWithRepair(runtime, prompt, state.language);
+        nodeCosts.push(...judgeResult.nodeCosts);
+        const llmVerdict = judgeResult.verdict;
         verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict);
       } catch (error) {
+        if (error instanceof StructuredJudgeOutputError) {
+          nodeCosts.push(...error.nodeCosts);
+        }
+
         return {
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           judgeVerdicts: [deterministicVerdict],
@@ -443,7 +598,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           lastJudgedBlockIds: currentBlockIds,
           nodeCosts,
           warnings: [
-            `crossBlockJudge ignored LLM verdict: ${
+            `crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: ${
               error instanceof Error ? error.message : String(error)
             }`,
           ],
@@ -452,12 +607,19 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       }
     }
 
+    const capped = capRegenerationWhenBudgetExhausted({
+      verdict,
+      currentBlockIds,
+      attempts: state.blockRegenerationAttempts ?? {},
+    });
+
     return {
-      generatedBlocks: attachVerdictToBlocks(currentBlocks, verdict),
-      judgeVerdicts: [verdict],
-      lastJudgeVerdict: verdict,
+      generatedBlocks: attachVerdictToBlocks(currentBlocks, capped.verdict),
+      judgeVerdicts: [capped.verdict],
+      lastJudgeVerdict: capped.verdict,
       lastJudgedBlockIds: currentBlockIds,
       nodeCosts,
+      ...(capped.warnings.length > 0 ? { warnings: capped.warnings } : {}),
       currentNode: options.currentNode ?? 'crossBlockJudge',
     };
   };

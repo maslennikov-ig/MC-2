@@ -6,7 +6,7 @@ import { getRagTokenBudget } from '../../../../services/global-settings-service'
 import logger from '@/shared/logger';
 import { ModelTier } from './types';
 import { MODELS, TOKEN_BUDGET } from './constants';
-import { normalizeLanguageCode } from '@megacampus/shared-utils';
+import { normalizeLanguageCode } from '@/shared/workspace-utils';
 
 /**
  * Estimate context length for Tier 3 routing

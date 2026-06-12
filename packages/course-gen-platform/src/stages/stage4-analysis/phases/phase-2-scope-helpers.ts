@@ -18,7 +18,7 @@ import {
 import type { ChatOpenAI } from '@langchain/openai';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { preprocessObject } from '@/shared/validation/preprocessing';
-import { extractJSON } from '@megacampus/shared-utils';
+import { extractJSON } from '@/shared/workspace-utils';
 import { logger } from '@/shared/logger';
 
 // ============================================================================

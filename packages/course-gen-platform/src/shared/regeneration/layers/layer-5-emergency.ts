@@ -18,7 +18,7 @@
 
 import { getModelForPhase } from '@/shared/llm/langchain-models';
 import logger from '@/shared/logger';
-import { extractJSON } from '@megacampus/shared-utils';
+import { extractJSON } from '@/shared/workspace-utils';
 
 /**
  * Quality fallback result

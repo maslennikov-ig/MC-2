@@ -2,6 +2,7 @@ import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookNodeCost,
+  CareerPlaybookQAData,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type {
@@ -12,6 +13,8 @@ import type {
   CareerPlaybookGraphNode,
 } from '../state';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
+import { annotateCareerPlaybookBlocksNumericFacts } from '../numeric-facts';
+import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
 
 export interface CareerPlaybookBlockSpec {
   blockId: CareerPlaybookBlockId;
@@ -31,6 +34,8 @@ export interface GenerateCareerPlaybookGroupInput {
   groupKey: CareerPlaybookGroupKey;
   roleProfileSpec: CareerPlaybookRoleProfileSpec;
   language: string;
+  qaData?: CareerPlaybookQAData;
+  webResearch?: CareerPlaybookWebResearchResult | null;
 }
 
 export interface GenerateCareerPlaybookGroupResult {
@@ -236,9 +241,28 @@ const GROUP_HEADING_LABELS = {
     heading_block_2: '## 2. Анти-цели: что эта роль НЕ делает',
     heading_block_3: '## 3. Ключевые зоны ответственности',
     heading_block_4: '## 4. Обязанности',
-    heading_block_5: '## 5. Матрица решений (Decision Authority)',
+    heading_block_5: '## 5. Матрица полномочий',
     heading_block_6: '## 6. KPI и метрики',
+    heading_block_7: '## 7. Необходимые компетенции',
     heading_block_8: '## 8. Инструменты и технологии',
+    heading_block_9: '## 9. Как ИИ меняет эту роль',
+    heading_block_10: '## 10. Взаимодействие и зависимости',
+    heading_block_11: '## 11. Карьерный рост',
+    heading_block_12: '## 12. Профиль кандидата',
+    heading_block_13: '## 13. Типичный рабочий день',
+    heading_block_14: '## 14. Онбординг: первые 5 результатов + план 30-60-90',
+    heading_block_15: '## 15. Система мотивации',
+    heading_block_16: '## 16. Регламенты и процессы',
+    heading_block_17: '## 17. Красные флаги и система раннего предупреждения',
+    heading_block_18: '## 18. Частые вопросы',
+    heading_block_19: '## 19. Отраслевой контекст',
+    heading_block_20: '## 20. Связь с бизнес-целями',
+    heading_block_21: '## 21. Как люди обычно проваливаются на этой роли',
+    heading_block_22: '## 22. "Как со мной работать" (заполняется сотрудником)',
+    heading_block_23: '## 23. Протокол непрерывности',
+    heading_block_24: '## 24. Карта роли',
+    heading_block_25: '## 25. Когда пересматривать эту инструкцию',
+    heading_block_26: '## 26. Чеклист внедрения',
   },
   en: {
     heading_header: '## Header',
@@ -248,7 +272,26 @@ const GROUP_HEADING_LABELS = {
     heading_block_4: '## 4. Duties',
     heading_block_5: '## 5. Decision authority matrix',
     heading_block_6: '## 6. KPI and metrics',
+    heading_block_7: '## 7. Required competencies',
     heading_block_8: '## 8. Tools and technologies',
+    heading_block_9: '## 9. How AI changes this role',
+    heading_block_10: '## 10. Dependencies and collaboration',
+    heading_block_11: '## 11. Career growth',
+    heading_block_12: '## 12. Candidate profile',
+    heading_block_13: '## 13. Typical working day',
+    heading_block_14: '## 14. Onboarding: First 5 Wins + 30-60-90 plan',
+    heading_block_15: '## 15. Motivation system',
+    heading_block_16: '## 16. Workflows and processes',
+    heading_block_17: '## 17. Red flags and early warning system',
+    heading_block_18: '## 18. FAQ',
+    heading_block_19: '## 19. Industry context',
+    heading_block_20: '## 20. Link to business goals',
+    heading_block_21: '## 21. How people usually fail in this role',
+    heading_block_22: '## 22. "How to work with me" (completed by the employee)',
+    heading_block_23: '## 23. Continuity protocol',
+    heading_block_24: '## 24. Role Canvas',
+    heading_block_25: '## 25. When to review this guide',
+    heading_block_26: '## 26. Implementation checklist',
   },
 } as const;
 
@@ -299,7 +342,9 @@ export function splitCareerPlaybookGroupMarkdown(
 function toGeneratedBlocks(
   blockContent: Record<CareerPlaybookBlockId, string>,
   model: string,
-  generatedAt: string
+  generatedAt: string,
+  evidenceText: string,
+  language: string
 ): Record<CareerPlaybookBlockId, CareerPlaybookBlockState> {
   const entries = Object.entries(blockContent).map(([blockId, content]) => [
     blockId,
@@ -313,7 +358,20 @@ function toGeneratedBlocks(
     },
   ]);
 
-  return Object.fromEntries(entries) as Record<CareerPlaybookBlockId, CareerPlaybookBlockState>;
+  return annotateCareerPlaybookBlocksNumericFacts({
+    blocks: Object.fromEntries(entries) as Record<CareerPlaybookBlockId, CareerPlaybookBlockState>,
+    evidenceText,
+    language,
+  }) as Record<CareerPlaybookBlockId, CareerPlaybookBlockState>;
+}
+
+function buildNumericEvidenceText(input: GenerateCareerPlaybookGroupInput): string {
+  return JSON.stringify({
+    qaData: input.qaData ?? null,
+    roleProfileSpec: input.roleProfileSpec,
+    businessContext: input.roleProfileSpec.business_context ?? null,
+    research: input.roleProfileSpec.research ?? input.webResearch ?? null,
+  });
 }
 
 export async function generateCareerPlaybookGroup(
@@ -335,7 +393,13 @@ export async function generateCareerPlaybookGroup(
   });
   const generatedAt = new Date().toISOString();
   const blockContent = splitCareerPlaybookGroupMarkdown(llmResult.content, groupSpec);
-  const blocks = toGeneratedBlocks(blockContent, llmResult.model, generatedAt);
+  const blocks = toGeneratedBlocks(
+    blockContent,
+    llmResult.model,
+    generatedAt,
+    buildNumericEvidenceText(input),
+    input.language
+  );
 
   return {
     group: {
@@ -379,6 +443,8 @@ export function createGroupGeneratorNode(
           groupKey,
           roleProfileSpec: state.roleProfileSpec,
           language: state.language,
+          qaData: state.qaData,
+          webResearch: state.webResearch,
         },
         runtime
       );

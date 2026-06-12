@@ -10,7 +10,7 @@ import { Worker, Queue } from 'bullmq';
 import { getRedisClient } from '@/shared/cache/redis';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
-import { retryWithBackoff } from '@megacampus/shared-utils';
+import { retryWithBackoff } from '@/shared/workspace-utils';
 import { STAGE7_CONFIG } from './config';
 import type { Stage7JobInput, Stage7JobResult, Stage7ProgressUpdate } from './types';
 import { processStage7Job } from './services/job-processor';

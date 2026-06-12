@@ -80,6 +80,7 @@ export interface CareerPlaybookGenerationStatus {
   error?: string
   finalMarkdown?: string
   completedAt?: string
+  warnings?: string[]
 }
 
 interface CareerPlaybookLibraryDetail {
@@ -97,6 +98,7 @@ interface CareerPlaybookLibraryDetail {
   visibility?: CareerPlaybookVisibility
   ownerId?: string | null
   viewerPermissions?: CareerPlaybookViewerPermissions
+  qualityWarnings?: string[] | null
 }
 
 export type CareerPlaybookDepartmentResolutionState =
@@ -131,6 +133,9 @@ interface CareerPlaybookSourcesClient {
       removeSource?: {
         mutate: (input: { playbookId: string; sourceId: string }) => Promise<unknown>
       }
+      retrySource?: {
+        mutate: (input: { playbookId: string; sourceId: string }) => Promise<unknown>
+      }
     }
   }
 }
@@ -148,6 +153,13 @@ export interface CareerPlaybookClient {
     playbookId: string
     blockId: CareerPlaybookBlockId
     instruction: string
+  }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
+  updateNumericFact?: (input: {
+    playbookId: string
+    blockId: CareerPlaybookBlockId
+    factId: string
+    replacementText: string
+    scope: 'occurrence' | 'block'
   }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
   requestPdf?: (input: { playbookId: string }) => Promise<CareerPlaybookPdfExportResponse>
   requestFollowups?: (input: {
@@ -170,6 +182,7 @@ export interface CareerPlaybookClient {
     playbookId: string
   }) => Promise<CareerPlaybookBusinessContextSourceSummary[]>
   removeSource?: (input: { playbookId: string; sourceId: string }) => Promise<unknown>
+  retrySource?: (input: { playbookId: string; sourceId: string }) => Promise<unknown>
   submitAnswer: (input: {
     playbookId: string
     phase: 'fixed' | 'followup' | 'freeform' | 'business_context'
@@ -247,6 +260,12 @@ interface CareerPlaybookStoreState {
     blockId: CareerPlaybookBlockId,
     instruction: string
   ) => Promise<CareerPlaybookAutosaveResult>
+  updateCareerPlaybookNumericFact: (input: {
+    blockId: CareerPlaybookBlockId
+    factId: string
+    replacementText: string
+    scope: 'occurrence' | 'block'
+  }) => Promise<CareerPlaybookAutosaveResult>
   requestCareerPlaybookPdf: () => Promise<CareerPlaybookAutosaveResult>
   toggleCareerPlaybookThinkingStream: () => void
   setCareerPlaybookDraftOwner: (ownerUserId: string) => void
@@ -274,6 +293,9 @@ interface CareerPlaybookStoreState {
   ) => void
   refreshCareerPlaybookBusinessContextSources: () => Promise<CareerPlaybookAutosaveResult>
   removeCareerPlaybookBusinessContextSource: (
+    sourceId: string
+  ) => Promise<CareerPlaybookAutosaveResult>
+  retryCareerPlaybookBusinessContextSource: (
     sourceId: string
   ) => Promise<CareerPlaybookAutosaveResult>
   skipCareerPlaybookBusinessContext: () => void
@@ -626,6 +648,7 @@ function initialState(): Omit<
   | 'loadCareerPlaybookViewer'
   | 'editCareerPlaybookViewerBlock'
   | 'regenerateCareerPlaybookViewerBlock'
+  | 'updateCareerPlaybookNumericFact'
   | 'requestCareerPlaybookPdf'
   | 'toggleCareerPlaybookThinkingStream'
   | 'setCareerPlaybookDraftOwner'
@@ -648,6 +671,7 @@ function initialState(): Omit<
   | 'upsertCareerPlaybookBusinessContextSource'
   | 'refreshCareerPlaybookBusinessContextSources'
   | 'removeCareerPlaybookBusinessContextSource'
+  | 'retryCareerPlaybookBusinessContextSource'
   | 'skipCareerPlaybookBusinessContext'
   | 'completeCareerPlaybookFixedPhase'
   | 'startCareerPlaybookSession'
@@ -996,8 +1020,18 @@ function normalizeViewerSnapshot(
       canCreateCourse: true,
       canDelete: true,
     },
+    qualityWarnings: normalizeQualityWarnings(snapshot.qualityWarnings),
     blocks: { ...snapshot.blocks },
   }
+}
+
+function normalizeQualityWarnings(warnings: unknown): string[] {
+  if (!Array.isArray(warnings)) return []
+  return Array.from(
+    new Set(warnings.filter((warning): warning is string => typeof warning === 'string'))
+  )
+    .map((warning) => warning.trim())
+    .filter(Boolean)
 }
 
 function extractMarkdownTitle(markdown: string | null | undefined): string | null {
@@ -1050,6 +1084,7 @@ function libraryDetailToViewerSnapshot(
       canCreateCourse: true,
       canDelete: true,
     },
+    qualityWarnings: normalizeQualityWarnings(detail.qualityWarnings),
   }
 }
 
@@ -1114,6 +1149,10 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.library.regenerateBlock.mutate(
         input
       )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
+    updateNumericFact: async (input) =>
+      (await client.careerPlaybook.library.updateNumericFact.mutate(
+        input
+      )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
     requestPdf: async (input) =>
       (await client.careerPlaybook.exportPdf.query(
         input
@@ -1138,6 +1177,10 @@ function getClient(): CareerPlaybookClient {
       (
         client as unknown as CareerPlaybookSourcesClient
       ).careerPlaybook?.sources?.removeSource?.mutate(input) ?? Promise.resolve(),
+    retrySource: (input) =>
+      (
+        client as unknown as CareerPlaybookSourcesClient
+      ).careerPlaybook?.sources?.retrySource?.mutate(input) ?? Promise.resolve(),
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -1499,6 +1542,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
                 generated_at: updatedBlock.generated_at,
                 llm_model: updatedBlock.llm_model,
                 attempt: updatedBlock.attempt,
+                numeric_facts: updatedBlock.numeric_facts,
               },
             }
             state.viewer = normalizeViewerSnapshot({
@@ -1587,6 +1631,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
                 generated_at: updatedBlock.generated_at,
                 llm_model: updatedBlock.llm_model,
                 attempt: updatedBlock.attempt,
+                numeric_facts: updatedBlock.numeric_facts,
               },
             }
             state.viewer = normalizeViewerSnapshot({
@@ -1611,6 +1656,76 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.viewerActionMessage = message
           })
           return { ok: false, error: message }
+        }
+      },
+
+      updateCareerPlaybookNumericFact: async (input) => {
+        const snapshot = get()
+        if (!snapshot.viewer?.playbookId) {
+          return { ok: false, error: 'Career Playbook viewer is not loaded' }
+        }
+
+        const applyUpdatedBlock = (
+          updatedBlock: CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }
+        ) => {
+          set((state) => {
+            if (!state.viewer) return
+            const blockId = updatedBlock.blockId ?? input.blockId
+            state.viewer = normalizeViewerSnapshot({
+              ...state.viewer,
+              blocks: {
+                ...state.viewer.blocks,
+                [blockId]: {
+                  content: updatedBlock.content,
+                  status: updatedBlock.status,
+                  judge_verdict: updatedBlock.judge_verdict,
+                  generated_at: updatedBlock.generated_at,
+                  llm_model: updatedBlock.llm_model,
+                  attempt: updatedBlock.attempt,
+                  numeric_facts: updatedBlock.numeric_facts,
+                },
+              },
+            })
+            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage = null
+          })
+        }
+
+        set((state) => {
+          state.isUpdatingViewerBlock = true
+          state.viewerActionMessage = null
+        })
+
+        try {
+          const client = getClient()
+          if (!client.updateNumericFact) {
+            const message =
+              'Numeric fact editing is unavailable until the backend action is connected'
+            set((state) => {
+              state.isUpdatingViewerBlock = false
+              state.viewerActionMessage = message
+            })
+            return { ok: false, backendPending: true, error: message }
+          }
+
+          const updatedBlock = await client.updateNumericFact({
+            playbookId: snapshot.viewer.playbookId,
+            ...input,
+          })
+          applyUpdatedBlock(updatedBlock)
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Numeric fact editing failed'
+          set((state) => {
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage = message
+          })
+          return {
+            ok: false,
+            error: message,
+            backendPending: isCareerPlaybookBackendPending(error),
+          }
         }
       },
 
@@ -2306,6 +2421,52 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Source removal failed'
           set((state) => {
+            state.autosaveError = message
+          })
+          return { ok: false, error: message }
+        }
+      },
+
+      retryCareerPlaybookBusinessContextSource: async (sourceId) => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return { ok: false, error: 'Career Playbook session is required before source retry' }
+        }
+
+        set((state) => {
+          state.businessContextSources = state.businessContextSources.map((source) =>
+            source.id === sourceId
+              ? {
+                  ...source,
+                  status: 'processing',
+                  errorMessage: null,
+                  updatedAt: nowIso(),
+                }
+              : source
+          )
+          state.autosaveError = null
+        })
+
+        try {
+          const client = getClient()
+          if (client.retrySource) {
+            await client.retrySource({ playbookId: snapshot.playbookId, sourceId })
+          }
+          await get().refreshCareerPlaybookBusinessContextSources()
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Source retry failed'
+          set((state) => {
+            state.businessContextSources = state.businessContextSources.map((source) =>
+              source.id === sourceId
+                ? {
+                    ...source,
+                    status: 'failed',
+                    errorMessage: message,
+                    updatedAt: nowIso(),
+                  }
+                : source
+            )
             state.autosaveError = message
           })
           return { ok: false, error: message }

@@ -13,7 +13,7 @@ import type { DocumentPriority } from '@megacampus/shared-types';
 import { tokenEstimator } from '../../../shared/llm/token-estimator';
 import { createPromptService } from '../../../shared/prompts/prompt-service';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
-import { formatFileSize } from '@megacampus/shared-utils';
+import { formatFileSize } from '@/shared/workspace-utils';
 import {
   getCachedFileProcessedContent,
   getCachedFileMarkdown,

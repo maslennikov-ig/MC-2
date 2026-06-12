@@ -8,11 +8,13 @@ import type {
 } from '@megacampus/shared-types';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from './final-assembler';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
+import { annotateCareerPlaybookBlockNumericFacts } from '../numeric-facts';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 
 export const BLOCK_REGENERATOR_PROMPT_KEY = 'career_playbook_block_regenerator';
 export const BLOCK_REGENERATOR_PHASE = 'stage_career_playbook_regenerator';
 export const CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS = 2;
+export const CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS = 2;
 
 const BLOCK_NAMES: Record<CareerPlaybookBlockId, string> = {
   header: 'Header',
@@ -145,6 +147,14 @@ export function buildBlockRegeneratorPromptVariables(
   };
 }
 
+function buildNumericEvidenceText(input: RegenerateCareerPlaybookBlockInput): string {
+  return JSON.stringify({
+    roleProfileSpec: input.roleProfileSpec,
+    otherBlocksBrief:
+      input.otherBlocksBrief ?? buildOtherBlocksBrief(input.otherBlocks, input.blockId),
+  });
+}
+
 function buildNodeCost(result: {
   model: string;
   inputTokens: number;
@@ -179,7 +189,7 @@ export async function regenerateCareerPlaybookBlock(
   const attempt = (input.originalBlock?.attempt ?? 0) + 1;
   const content = validateRegeneratedCareerPlaybookBlockMarkdown(input.blockId, llmResult.content);
 
-  return {
+  const block = annotateCareerPlaybookBlockNumericFacts({
     blockId: input.blockId,
     block: {
       content,
@@ -189,6 +199,13 @@ export async function regenerateCareerPlaybookBlock(
       llm_model: llmResult.model,
       attempt,
     },
+    evidenceText: buildNumericEvidenceText(input),
+    language: input.language,
+  });
+
+  return {
+    blockId: input.blockId,
+    block,
     nodeCost: buildNodeCost(llmResult),
   };
 }
@@ -212,10 +229,20 @@ export function selectPendingCareerPlaybookRegeneration(input: {
   blockIds: CareerPlaybookBlockId[];
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
   maxAttempts?: number;
+  maxWindowAttempts?: number;
 }): CareerPlaybookPendingRegeneration | null {
   const maxAttempts = input.maxAttempts ?? CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS;
+  const maxWindowAttempts =
+    input.maxWindowAttempts ?? CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS;
   const verdict = input.verdict;
   if (!verdict?.needs_regeneration.length || verdict.pass) {
+    return null;
+  }
+
+  if (
+    countCareerPlaybookRegenerationAttemptsForBlocks(input.attempts, input.blockIds) >=
+    maxWindowAttempts
+  ) {
     return null;
   }
 
@@ -233,6 +260,13 @@ export function selectPendingCareerPlaybookRegeneration(input: {
   }
 
   return null;
+}
+
+export function countCareerPlaybookRegenerationAttemptsForBlocks(
+  attempts: Partial<Record<CareerPlaybookBlockId, number>>,
+  blockIds: CareerPlaybookBlockId[]
+): number {
+  return blockIds.reduce((total, blockId) => total + (attempts[blockId] ?? 0), 0);
 }
 
 export function createBlockRegeneratorNode(
