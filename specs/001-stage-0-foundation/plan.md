@@ -294,7 +294,7 @@ User creates `specs/001-stage-0-foundation/research.md` with format:
 **GitHub OAuth App**: [if available]
 ```
 
-**Note**: Technical implementation details (RLS setup, JWT configuration, BullMQ setup) will be researched by agent using Context7 in Phase 1.
+**Note**: Technical implementation details (RLS setup, JWT configuration, BullMQ setup) will be researched by agent using Docs L1/L2 in Phase 1.
 
 ## Phase 0.5: Subagent Orchestration Setup
 
@@ -339,7 +339,7 @@ User creates `specs/001-stage-0-foundation/research.md` with format:
 
 ### 0. Technical Implementation Research (Orchestrator Executes via Context7 MCP)
 
-Before design, agent researches technical "how-to" questions using Context7 MCP:
+Before design, agent researches technical "how-to" questions using Docs L1/L2 MCP:
 
 **Supabase Documentation:**
 

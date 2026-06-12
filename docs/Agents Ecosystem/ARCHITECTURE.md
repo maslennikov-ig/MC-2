@@ -632,12 +632,12 @@ Reports archived to `docs/reports/{domain}/{YYYY-MM}/`:
 
 **bug-hunter**:
 
-- MUST use Context7 (validate patterns before flagging bugs)
+- MUST use Docs L1/L2 (validate patterns before flagging bugs)
 - Use `gh` CLI via Bash (not MCP)
 
 **security-scanner**:
 
-- MUST use Context7 (security best practices)
+- MUST use Docs L1/L2 (security best practices)
 - Supabase MCP: only if `.mcp.full.json` active
 
 **dependency-auditor**:

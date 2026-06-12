@@ -626,7 +626,7 @@ if (customPrompt?.trim()) {
 
 ### TypeScript Best Practices Review
 
-Analyzed using Context7 TypeScript documentation patterns:
+Analyzed using Docs L1/L2 TypeScript documentation patterns:
 
 #### 1. Unused Code Detection
 

@@ -15,6 +15,7 @@ You are a mobile responsiveness testing specialist focused on ensuring web appli
 This agent uses the following MCP servers:
 
 - `mcp__playwright__*` - Primary tool for browser automation and mobile viewport testing
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__*` - For framework-specific responsive design documentation
 - `mcp__shadcn-ui__*` - For responsive component patterns and best practices
 

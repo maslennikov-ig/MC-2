@@ -24,7 +24,7 @@ All 8 health worker agents have been validated against the AI Agents Architectur
 
 | Agent                  | Lines | Specialization                   | MCP Usage                        | Report Output                 |
 | ---------------------- | ----- | -------------------------------- | -------------------------------- | ----------------------------- |
-| bug-hunter.md          | 324   | Bug detection, code quality      | IDE, GitHub, Context7 (required) | bug-hunting-report.md         |
+| bug-hunter.md          | 324   | Bug detection, code quality      | IDE, GitHub, Docs L1/L2 (required) | bug-hunting-report.md         |
 | bug-fixer.md           | ~350  | Bug fixing by priority           | Context7 (validation)            | bug-fixes-implemented.md      |
 | security-scanner.md    | 360   | Security vulnerability detection | GitHub, Supabase (optional)      | security-audit-report.md      |
 | vulnerability-fixer.md | ~250  | Security fix implementation      | Context7, Supabase (optional)    | security-fixes-implemented.md |
@@ -104,7 +104,7 @@ dead code identification, and generating prioritized fix tasks.
 
 #### 🎯 Strengths
 
-1. **Context7 Mandate** (Line 33): "MANDATORY: You MUST use Context7 to check proper patterns"
+1. **Context7 Mandate** (Line 33): "MANDATORY: You MUST use Docs L1/L2 to check proper patterns"
 2. **Build Validation** (Lines 64-73): "CRITICAL: Test Production Build" - catches build-only errors
 3. **8-Phase Workflow**: Comprehensive coverage from reconnaissance to reporting
 4. **Priority System**: Clear 1-4 priority levels with specific criteria
@@ -265,12 +265,12 @@ grep -n "Task tool\|Launch\|create plan\|signal readiness" .claude/agents/health
 ```markdown
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check proper patterns and best practices
+**MANDATORY**: You MUST use Docs L1/L2 to check proper patterns and best practices
 before reporting bugs.
 
 // ALWAYS check framework docs for correct patterns before flagging as bug
-mcp**context7**resolve-library-id({libraryName: "next.js"})
-mcp**context7**get-library-docs({context7CompatibleLibraryID: "/vercel/next.js"})
+Docs L1/L2resolve-library-id({libraryName: "next.js"})
+Docs L1/L2get-library-docs({context7CompatibleLibraryID: "/vercel/next.js"})
 ```
 
 ✅ **Excellent:** Clear when/why/how to use MCP, marked as REQUIRED
@@ -412,7 +412,7 @@ From Architecture Guide (lines 621-627, 638-644):
 **bug-hunter.md (Line 33):**
 
 ```markdown
-**MANDATORY**: You MUST use Context7 to check proper patterns and best practices
+**MANDATORY**: You MUST use Docs L1/L2 to check proper patterns and best practices
 before reporting bugs.
 ```
 

@@ -125,7 +125,7 @@ const stageStatus = useGenerationStore(state => state.stages.get(stageId)?.statu
 **Next.js**: ✅ Client-side data fetching pattern is correct
 **Zustand**: ⚠️ Selector could be optimized (see below)
 
-From Context7 documentation:
+From Docs L1/L2 documentation:
 
 > "When you need to subscribe to a computed state from a store, the recommended way is to use a selector. The computed selector will cause a rerender if the output has changed according to Object.is."
 
@@ -205,7 +205,7 @@ const ClarifyingPanel = dynamic(
 
 **Next.js Dynamic Import Pattern** - ✅ **PERFECT**
 
-From Context7 documentation:
+From Docs L1/L2 documentation:
 
 > "This is essential when a component or its dependencies rely on browser APIs like window object that are unavailable during server-side rendering."
 
@@ -371,7 +371,7 @@ Not blocking for deployment, but good for regression prevention.
 **Summary**:
 
 - All three fixes are **correct** and **production-ready**
-- Best practices validated against Context7 documentation
+- Best practices validated against Docs L1/L2 documentation
 - No TypeScript errors, no regressions
 - Minor recommendations for post-deployment improvement
 
@@ -391,7 +391,7 @@ Not blocking for deployment, but good for regression prevention.
 
 ---
 
-## Appendix: Context7 References
+## Appendix: Docs L1/L2 References
 
 ### Next.js Dynamic Imports
 

@@ -398,7 +398,7 @@ expected 22 to be less than or equal to 7  // Vectors found! (too many, but foun
 - `scripts/add-file-id-index.ts` (index creation)
 - `.claude/agents/infrastructure/workers/qdrant-specialist.md` (new agent created)
 
-**Agent Used**: qdrant-specialist (with Context7 MCP integration)
+**Agent Used**: qdrant-specialist (with Docs L1/L2 MCP integration)
 
 ---
 

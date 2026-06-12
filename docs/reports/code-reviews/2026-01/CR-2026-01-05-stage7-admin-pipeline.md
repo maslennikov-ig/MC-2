@@ -530,7 +530,7 @@ Follows the standard pattern:
 
 ### Best Practices Validation
 
-No Context7 lookup needed - implementation follows established internal patterns correctly.
+No Docs L1/L2 lookup needed - implementation follows established internal patterns correctly.
 
 **Reason**: This is project-specific configuration with no third-party library patterns to validate.
 

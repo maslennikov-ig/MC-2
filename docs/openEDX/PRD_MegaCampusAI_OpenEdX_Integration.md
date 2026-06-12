@@ -301,7 +301,7 @@ tutor local run lms ./manage.py lms drf_create_token admin
 
 #### Step 2.1: Study OLX Structure
 
-**Action:** Use Context7 to ingest <https://docs.openedx.org/en/latest/educators/olx/directory-structure.html>
+**Action:** Use Docs L1/L2 to ingest <https://docs.openedx.org/en/latest/educators/olx/directory-structure.html>
 
 **Key Concepts to Understand:**
 
@@ -528,7 +528,7 @@ The PoC is complete when:
 
 ```bash
 # 1. Ingest documentation via Context7 MCP
-# (Use Context7 tool to add all URLs from Section 3.1)
+# (Use Docs L1/L2 tool to add all URLs from Section 3.1)
 
 # 2. Set up Open edX
 tutor local launch

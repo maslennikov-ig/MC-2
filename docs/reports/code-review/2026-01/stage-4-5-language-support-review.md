@@ -734,7 +734,7 @@ All required validation checks (type-check, build) passed successfully. The code
 
 ## Metrics
 
-- **Total Duration**: ~45 minutes (file reading, analysis, Context7 validation, report generation)
+- **Total Duration**: ~45 minutes (file reading, analysis, Docs L1/L2 validation, report generation)
 - **Files Reviewed**: 5
 - **Issues Found**: 11
 - **Validation Checks**: 2/2 passed

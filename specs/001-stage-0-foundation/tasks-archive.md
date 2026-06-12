@@ -41,7 +41,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [x] T000 [ORCHESTRATOR] Research technical implementation details using Context7 MCP
+- [x] T000 [ORCHESTRATOR] Research technical implementation details using Docs L1/L2 MCP
   - ✅ Supabase: RLS policies with auth.uid()/auth.jwt(), custom claims via app_metadata, OAuth redirect URLs
   - ✅ BullMQ: Exponential backoff { type: 'exponential', delay: 1000 }, Worker setup with Redis connection
   - ✅ Qdrant: HNSW m=16 ef_construct=100, Cosine distance, payload filters for multi-tenancy, batch upload 100-500 vectors
@@ -499,7 +499,7 @@
     - Integration notes (2 tests)
   - ✅ All tests passing (30/30)
   - **MCP Tools Used:**
-    - mcp**context7**resolve-library-id and mcp**context7**get-library-docs for tRPC 11.x patterns
+    - Docs L1/L2resolve-library-id and Docs L1/L2get-library-docs for tRPC 11.x patterns
     - mcp**supabase**search_docs for JWT validation best practices
     - mcp**supabase**execute_sql to verify user table structure
   - **Implementation Notes:**

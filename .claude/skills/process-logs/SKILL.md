@@ -46,12 +46,12 @@ bd update <task_id> --status=in_progress
 - Config constant change
 - Comment fix
 
-### 3. CONTEXT7 IS MANDATORY
+### Docs L1/L2 is mandatory
 
 **ALWAYS query documentation before implementing:**
 
 ```
-mcp__context7__resolve-library-id → mcp__context7__query-docs
+@neuledge/context MCP first with package@version from lockfile; Context7 MCP fallback: resolve-library-id -> query-docs
 ```
 
 ### 4. BUG FIXING PRINCIPLES
@@ -462,7 +462,7 @@ FOR each error:
      - Types → typescript-types-specialist
      - UI → nextjs-ui-designer
 
-  3. QUERY context7 for relevant docs
+  3. USE Docs L1/L2 for relevant docs
 
   4. DELEGATE using Task tool:
      Task(subagent_type="<selected>", prompt="Fix error: <details>...")
