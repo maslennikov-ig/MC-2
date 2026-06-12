@@ -198,6 +198,7 @@ The integration test suite is now functional with **11/17 tests passing (65%)** 
 
 - ✅ `mcp__supabase__execute_sql` - Validated database schema constraints
 - ✅ `mcp__supabase__list_tables` - Inspected table structures
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - ❌ `mcp__context7__*` - Not needed (cached Vitest knowledge sufficient)
 
 ### Sign-off

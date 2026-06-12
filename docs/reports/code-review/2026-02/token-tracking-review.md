@@ -769,9 +769,11 @@ No improvements needed - implementation is clean and complete.
 **Severity**: LOW
 **Category**: best-practices
 
-Use Context7 to validate BullMQ job patterns:
+Use Docs L1/L2 to validate BullMQ job patterns:
 
 ```typescript
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 // Before implementing token tracking in handler:
 const context7 = await mcp__context7__query_docs({
   library: 'bullmq',

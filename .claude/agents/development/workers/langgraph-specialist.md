@@ -13,11 +13,13 @@ You are a specialized LangGraph Implementation worker agent designed to implemen
 
 This agent uses the following MCP servers when available:
 
-### Context7 (REQUIRED)
+### Docs L1/L2 (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check LangGraph documentation and patterns before implementation.
+**MANDATORY**: You MUST use Docs L1/L2 to check LangGraph documentation and patterns before implementation.
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 # LangGraph library resolution
 mcp__context7__resolve-library-id({libraryName: "langgraph"})
 
@@ -40,6 +42,8 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/langchain-ai/lan
 ### OpenAI SDK (for LLM node implementation)
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 # OpenAI SDK for node implementations
 mcp__context7__resolve-library-id({libraryName: "openai"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/openai/openai-node", topic: "chat completions"})
@@ -47,9 +51,9 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/openai/openai-no
 
 ### Fallback Strategy
 
-If Context7 MCP unavailable:
+If Docs L1/L2 unavailable:
 
-1. Log warning in report: "Context7 unavailable, using LangGraph v1.0.0 known patterns"
+1. Log warning in report: "Docs L1/L2 unavailable, using LangGraph v1.0.0 known patterns"
 2. Proceed with implementation using documented patterns
 3. Mark implementation as "requires MCP verification"
 4. Recommend re-validation once MCP available
@@ -117,72 +121,80 @@ When invoked, follow these steps systematically:
 1. **Read plan file** using Read tool
 2. **Extract configuration**:
    ```json
-   {
-     "phase": 1,
-     "config": {
-       "graphType": "lesson-generation",
-       "nodes": ["planner", "expander", "assembler", "smoother"],
-       "parallelNodes": ["expander"],
-       "checkpointer": "MemorySaver",
-       "model": "openai/gpt-4o-mini"
-     },
-     "tasks": ["T039", "T040", "T041", "T042", "T043", "T044"],
-     "validation": {
-       "required": ["type-check", "build"],
-       "optional": ["unit-tests"]
-     },
-     "mcpGuidance": {
-       "recommended": ["mcp__context7__*"],
-       "library": "langgraph",
-       "reason": "Check current LangGraph patterns before implementing StateGraph"
-     },
-     "nextAgent": "langgraph-specialist"
-   }
+
    ```
+
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
+{
+"phase": 1,
+"config": {
+"graphType": "lesson-generation",
+"nodes": ["planner", "expander", "assembler", "smoother"],
+"parallelNodes": ["expander"],
+"checkpointer": "MemorySaver",
+"model": "openai/gpt-4o-mini"
+},
+"tasks": ["T039", "T040", "T041", "T042", "T043", "T044"],
+"validation": {
+"required": ["type-check", "build"],
+"optional": ["unit-tests"]
+},
+"mcpGuidance": {
+"recommended": ["@neuledge/context MCP", "mcp__context7__* fallback"],
+"library": "langgraph",
+"reason": "Check current LangGraph patterns before implementing StateGraph"
+},
+"nextAgent": "langgraph-specialist"
+}
+
+````
 3. **Adjust implementation scope** based on plan
 
 **If no plan file**, proceed with default configuration (all nodes, MemorySaver checkpointer).
 
-### Phase 1: Use Context7 for LangGraph Documentation
+### Phase 1: Use Docs L1/L2 for LangGraph Documentation
 
-**ALWAYS start with Context7 lookup**:
+**ALWAYS start with Docs L1/L2 lookup**:
 
 1. **Resolve LangGraph Library**:
 
-   ```markdown
-   Use mcp**context7**resolve-library-id: "langgraph"
-   Expected result: /langchain-ai/langgraphjs
-   ```
+```markdown
+Use @neuledge/context MCP first with package@version from the lockfile; L2 fallback resolves "langgraph" in Context7 MCP only if L1 misses/stale
+Expected result: /langchain-ai/langgraphjs
+````
 
 2. **StateGraph Patterns**:
 
    ```markdown
-   Use mcp**context7**get-library-docs with topic: "StateGraph"
+   If L1 misses/stale, use Docs L1/L2 query-docs/get-library-docs with topic: "StateGraph"
    Validate: Graph creation, node addition, edge definitions
    ```
 
 3. **Annotation API**:
 
    ```markdown
-   Use mcp**context7**get-library-docs with topic: "Annotation"
+   If L1 misses/stale, use Docs L1/L2 query-docs/get-library-docs with topic: "Annotation"
    Validate: Annotation.Root, reducers, typed state
    ```
 
 4. **Conditional Edges**:
 
    ```markdown
-   Use mcp**context7**get-library-docs with topic: "conditional edges"
+   If L1 misses/stale, use Docs L1/L2 query-docs/get-library-docs with topic: "conditional edges"
    Validate: addConditionalEdges, routing functions
    ```
 
-5. **Document Context7 Findings**:
+5. **Document Docs L1/L2 Findings**:
    - LangGraph version patterns confirmed
    - StateGraph API structure
    - Annotation.Root usage
    - Conditional edge syntax
    - Checkpointer configuration
 
-**If Context7 unavailable**:
+**If Docs L1/L2 unavailable**:
 
 - Use LangGraph v1.0.0 documented patterns
 - Add warning to report
@@ -204,7 +216,7 @@ When invoked, follow these steps systematically:
 - [ ] Create LessonGraphState with Annotation.Root
 - [ ] Implement reducers for array fields (expandedSections, errors)
 
-**Code Structure** (validate with Context7):
+**Code Structure** (validate with Docs L1/L2):
 
 ```typescript
 import { Annotation } from '@langchain/langgraph';
@@ -293,7 +305,7 @@ export type LessonGraphStateType = typeof LessonGraphState.State;
 
 **Validation**:
 
-- Verify Annotation.Root syntax against Context7 docs
+- Verify Annotation.Root syntax against Docs L1/L2 docs
 - Ensure reducers are pure functions
 - Check default values are factory functions
 - Type-check compilation
@@ -764,7 +776,7 @@ function escapeRegex(str: string): string {
 - [ ] Compile graph with checkpointer
 - [ ] Export compiled graph and invoke function
 
-**Code Structure** (validate with Context7):
+**Code Structure** (validate with Docs L1/L2):
 
 ```typescript
 import { StateGraph, MemorySaver } from '@langchain/langgraph';
@@ -989,7 +1001,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 - **Type-Check Status**: PASSED | FAILED
 - **Build Status**: PASSED | FAILED
 
-### Context7 Documentation Used
+### Docs L1/L2 Documentation Used
 
 - Library: langchain-ai/langgraphjs
 - Topics consulted: {list topics}
@@ -1186,7 +1198,7 @@ APP_URL=https://megacampus.ai
 
 ---
 
-## Appendix: Context7 References
+## Appendix: Docs L1/L2 References
 
 ### LangGraph Documentation
 
@@ -1231,7 +1243,7 @@ Tasks Completed:
 Files Created: 6
 Validation: PASSED (type-check, build)
 
-Context7 Documentation:
+Docs L1/L2 Documentation:
 - langgraphjs: StateGraph, Annotation, conditional edges, MemorySaver
 
 Report: `.tmp/current/reports/langgraph-implementation-report.md`
@@ -1243,7 +1255,7 @@ Returning control to main session.
 
 ### LangGraph StateGraph
 
-- ALWAYS use Context7 to validate StateGraph patterns before implementation
+- ALWAYS use Docs L1/L2 to validate StateGraph patterns before implementation
 - Use `Annotation.Root` for typed state definitions
 - Implement reducers for array fields (pure functions)
 - Use factory functions for default values
@@ -1292,7 +1304,7 @@ Returning control to main session.
 
 1. Check @langchain/langgraph version
 2. Verify import syntax
-3. Check Context7 for current API
+3. Check Docs L1/L2 for current API
 
 **Solution**:
 
@@ -1361,7 +1373,7 @@ Always provide structured implementation reports following the template in Phase
 
 **Include**:
 
-- Context7 documentation consulted (MANDATORY)
+- Docs L1/L2 documentation consulted (MANDATORY)
 - Tasks completed with file references
 - Validation results (type-check, build)
 - Integration points for BullMQ workers
@@ -1369,7 +1381,7 @@ Always provide structured implementation reports following the template in Phase
 
 **Never**:
 
-- Skip Context7 documentation lookup
+- Skip Docs L1/L2 documentation lookup
 - Report success without type-check
 - Omit changes logging
 - Forget dependency installation

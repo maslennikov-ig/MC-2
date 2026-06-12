@@ -184,17 +184,36 @@ bash scripts/rollback_blue_green.sh
 ### Stages
 
 1. **setup** — `pnpm install --frozen-lockfile`, cache
-2. **Parallel checks** — lint, type-check, security, test-unit (`continue-on-error: true`)
-3. **build** — Build all packages (depends on type-check)
-4. **ci-success** — Gate: all critical checks passed
-5. **build-docker** — Matrix build: `web`, `api`, `notebooklm-bridge` → GHCR
+2. **changes** — `scripts/ci/detect_deploy_changes.sh` classifies changed paths and decides whether deploy/Docker build is needed
+3. **Parallel checks** — lint, type-check, security, test-unit (`continue-on-error: true`)
+4. **build** — Build all packages (depends on type-check)
+5. **ci-success** — Gate: all critical checks passed
+6. **build-docker** — Dynamic matrix build: only changed `web`, `api`, and/or `notebooklm-bridge` images → GHCR
    - `master`: tags `latest` + `master-<sha>`
    - `develop`: tags `develop` + `develop-<sha>`
    - `docling-mcp` is NOT built in CI (too large)
-6. **deploy** (master only) — SCP files to server, run `deploy_blue_green.sh`
-7. **rollback** — Auto on deploy failure
-8. **deploy-dev** (develop only) — SCP `docker-compose.dev.yml` + nginx conf, run `deploy_dev.sh`
-9. **notify** — Telegram notification
+7. **deploy** (master only, deploy-relevant changes only) — SCP files to server, run `deploy_blue_green.sh`
+8. **rollback** — Auto on deploy failure
+9. **deploy-dev** (develop only, deploy-relevant changes only) — SCP `docker-compose.dev.yml` + nginx conf, run `deploy_dev.sh`
+10. **notify** — Telegram notification only when deploy was relevant
+
+### Deploy Gating
+
+Docs/agent/artifact-only changes do not deploy or build Docker images. The workflow ignores pushes and pull requests that only touch:
+
+- `.beads/**`, `.claude/**`, `.codex/**`, `.gemini/**`
+- `docs/**`, `specs/**`, `output/**`, `.playwright-cli/**`
+- Markdown-only files
+
+Runtime changes are image-aware:
+
+- `packages/web/**` builds/deploys `web`.
+- `packages/course-gen-platform/**` builds/deploys `api`, except package-local docs/tests.
+- `packages/shared-types/**`, `packages/shared-logger/**`, `packages/shared-utils/**`, root dependency/TS config files build/deploy both `web` and `api`.
+- `packages/course-gen-platform/docker/notebooklm-bridge/**` builds/deploys `notebooklm-bridge`.
+- Server deploy config such as `docker-compose*.yml`, `deploy/**`, `scripts/deploy*.sh`, and `nginx-docling-proxy.conf` can deploy without rebuilding images.
+
+Deploy scripts receive `DEPLOY_WEB_CHANGED`, `DEPLOY_API_CHANGED`, `DEPLOY_BRIDGE_CHANGED`, and `DEPLOY_CONFIG_CHANGED` from CI. Manual server runs default these flags to `true` to preserve the full legacy deployment behavior.
 
 ### Post-CI Tests (non-blocking)
 

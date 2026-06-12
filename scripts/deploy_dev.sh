@@ -6,10 +6,25 @@ set -e
 # Usage: ./deploy_dev.sh
 
 BASE_PATH="/opt/megacampus"
+DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
+DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}
+DEPLOY_BRIDGE_CHANGED=${DEPLOY_BRIDGE_CHANGED:-true}
+DEPLOY_CONFIG_CHANGED=${DEPLOY_CONFIG_CHANGED:-true}
+APP_DEPLOY_NEEDED=false
+WORKER_DEPLOY_NEEDED=false
+
+if [ "$DEPLOY_WEB_CHANGED" = "true" ] || [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_BRIDGE_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+    APP_DEPLOY_NEEDED=true
+fi
+
+if [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+    WORKER_DEPLOY_NEEDED=true
+fi
 
 echo "Starting Dev Environment Deployment"
 echo "   Domain: dev.ai.megacampus.ru"
 echo "   Ports:  web:3010, api:4010"
+echo "   Changes: web=$DEPLOY_WEB_CHANGED api=$DEPLOY_API_CHANGED bridge=$DEPLOY_BRIDGE_CHANGED config=$DEPLOY_CONFIG_CHANGED"
 echo ""
 
 # 1. Docker Login to GHCR (if GITHUB_TOKEN provided)
@@ -70,8 +85,17 @@ echo "   Infrastructure ready."
 echo ""
 
 # 6. Pull latest images
-echo "Pulling latest develop images..."
-docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull
+PULL_SERVICES=()
+[ "$DEPLOY_WEB_CHANGED" = "true" ] && PULL_SERVICES+=("web-dev")
+[ "$DEPLOY_API_CHANGED" = "true" ] && PULL_SERVICES+=("api-dev" "worker-dev" "worker-stage6-dev" "worker-stage7-dev")
+[ "$DEPLOY_BRIDGE_CHANGED" = "true" ] && PULL_SERVICES+=("notebooklm-bridge-dev")
+
+if [ "${#PULL_SERVICES[@]}" -gt 0 ]; then
+    echo "Pulling changed develop images: ${PULL_SERVICES[*]}"
+    docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull "${PULL_SERVICES[@]}"
+else
+    echo "No develop image changes; using locally cached images."
+fi
 
 # 7. Deploy dev containers in stages
 # Stage 1: Start core services (web, notebooklm-bridge, api) without workers
@@ -81,8 +105,21 @@ docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.en
 echo "Ensuring Qdrant dev container is compose-managed..."
 $DEV_COMPOSE up -d qdrant-dev
 
-echo "Deploying core dev containers (web, bridge, api)..."
-$DEV_COMPOSE up -d --force-recreate --no-deps web-dev notebooklm-bridge-dev api-dev
+if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    CORE_SERVICES=()
+    [ "$DEPLOY_WEB_CHANGED" = "true" ] && CORE_SERVICES+=("web-dev")
+    [ "$DEPLOY_BRIDGE_CHANGED" = "true" ] && CORE_SERVICES+=("notebooklm-bridge-dev")
+    [ "$DEPLOY_API_CHANGED" = "true" ] && CORE_SERVICES+=("api-dev")
+
+    if [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+        CORE_SERVICES=("web-dev" "notebooklm-bridge-dev" "api-dev")
+    fi
+
+    echo "Deploying changed core dev containers: ${CORE_SERVICES[*]}"
+    $DEV_COMPOSE up -d --force-recreate --no-deps "${CORE_SERVICES[@]}"
+else
+    echo "No dev app changes; skipping core container recreate."
+fi
 
 # 8. Health Check — wait for API and Web before starting workers
 echo "Performing Health Checks..."
@@ -151,9 +188,13 @@ if [ "$QDRANT_HEALTHY" = false ] || [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTH
     exit 1
 fi
 
-# Stage 2: Start workers now that API is healthy
-echo "Starting worker containers..."
-$DEV_COMPOSE up -d --force-recreate worker-dev worker-stage6-dev worker-stage7-dev
+if [ "$WORKER_DEPLOY_NEEDED" = "true" ]; then
+    # Stage 2: Start workers now that API is healthy
+    echo "Starting worker containers..."
+    $DEV_COMPOSE up -d --force-recreate worker-dev worker-stage6-dev worker-stage7-dev
+else
+    echo "API image unchanged; skipping dev worker restarts."
+fi
 
 # 9. Docker Cleanup (prevent disk space exhaustion)
 echo ""

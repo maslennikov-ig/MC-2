@@ -19,7 +19,7 @@ status: pr_open
 
 - LazyWeb references remain the same direction as `mc2-db696.27`: compact workspace, useful side rail, and clear review state.
 - No external role taxonomy change is included here; ESCO remains tracked by `mc2-db696.28`.
-- No Context7 lookup was needed because no library/API behavior changed.
+- No Docs L1/L2 lookup was needed because no library/API behavior changed.
 
 ## Verification
 

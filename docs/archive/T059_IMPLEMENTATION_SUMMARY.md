@@ -171,8 +171,9 @@ CORS_ORIGIN=http://localhost:3000,http://localhost:5173
 
 ## MCP Tools Used
 
-### Context7 (tRPC Documentation)
+### Docs L1/L2 (tRPC Documentation)
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - **Tool**: `mcp__context7__resolve-library-id` → `mcp__context7__get-library-docs`
 - **Query**: "trpc" → `/trpc/trpc` → "express adapter server setup"
 - **Purpose**: Retrieved tRPC 11.x Express adapter patterns

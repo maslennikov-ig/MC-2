@@ -30,9 +30,11 @@ gh issue view 123
 
 ### Documentation Lookup (REQUIRED)
 
-**MANDATORY**: You MUST use Context7 to check proper patterns and best practices before reporting vulnerabilitys.
+**MANDATORY**: You MUST use Docs L1/L2 to check proper patterns and best practices before reporting vulnerabilitys.
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 // ALWAYS check framework docs for correct patterns before flagging as vulnerability
 mcp__context7__resolve-library-id({libraryName: "next.js"})
 mcp__context7__get-library-docs({context7CompatibleLibraryID: "/vercel/next.js", topic: "typescript"})
@@ -85,17 +87,25 @@ When invoked, you must follow these steps systematically:
    grep -rn "query.*'SELECT.*\+" --include="*.ts" --include="*.js"
    ```
 
-5. **REQUIRED**: Validate Supabase queries using Context7:
+5. **REQUIRED**: Validate Supabase queries using Docs L1/L2:
 
    ```javascript
-   mcp__context7__resolve - library - id({ libraryName: 'supabase' });
-   mcp__context7__get -
-     library -
-     docs({
-       context7CompatibleLibraryID: '/supabase/supabase',
-       topic: 'query-security',
-     });
+
    ```
+
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
+mcp**context7**resolve - library - id({ libraryName: 'supabase' });
+mcp**context7**get -
+library -
+docs({
+context7CompatibleLibraryID: '/supabase/supabase',
+topic: 'query-security',
+});
+
+````
 
 6. Check for parameterized queries best practices
 
@@ -103,16 +113,16 @@ When invoked, you must follow these steps systematically:
 
 7. Search for XSS risks using Grep:
 
-   ```bash
-   # Dangerous HTML rendering
-   grep -rn "dangerouslySetInnerHTML" --include="*.tsx" --include="*.jsx"
-   grep -rn "\.innerHTML\s*=" --include="*.ts" --include="*.js"
-   grep -rn "document\.write" --include="*.ts" --include="*.js"
+```bash
+# Dangerous HTML rendering
+grep -rn "dangerouslySetInnerHTML" --include="*.tsx" --include="*.jsx"
+grep -rn "\.innerHTML\s*=" --include="*.ts" --include="*.js"
+grep -rn "document\.write" --include="*.ts" --include="*.js"
 
-   # Unsafe user input rendering
-   grep -rn "v-html" --include="*.vue"
-   grep -rn "\[innerHTML\]" --include="*.component.ts"
-   ```
+# Unsafe user input rendering
+grep -rn "v-html" --include="*.vue"
+grep -rn "\[innerHTML\]" --include="*.component.ts"
+````
 
 8. Verify sanitization for user inputs:
    - Check if DOMPurify or similar library is used
@@ -133,9 +143,11 @@ When invoked, you must follow these steps systematically:
    grep -rn "verify.*{.*algorithms" --include="*.ts" --include="*.js"
    ```
 
-10. **REQUIRED**: Validate authentication patterns using Context7:
+10. **REQUIRED**: Validate authentication patterns using Docs L1/L2:
 
 ```javascript
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 mcp__context7__get -
   library -
   docs({
@@ -201,7 +213,7 @@ grep -rn "alter table.*enable row level security" --include="*.sql"
 
 ### Phase 7: Code Quality Issues
 
-13. **REQUIRED**: Use Context7 to verify if patterns are best practices or actual issues
+13. **REQUIRED**: Use Docs L1/L2 to verify if patterns are best practices or actual issues
 14. Check for common code quality problems:
     - Missing error handling in async operations
     - Unhandled promise rejections
@@ -364,7 +376,7 @@ Complete `.vulnerability-changes.json` structure:
 
 ## Best Practices
 
-**Context7 Verification (MANDATORY):**
+**Docs L1/L2 Verification (MANDATORY):**
 
 - ALWAYS check framework documentation before reporting pattern as vulnerability
 - Verify if "issue" is actually a recommended practice

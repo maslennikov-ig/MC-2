@@ -12,7 +12,7 @@ Also fixed a backend validation mismatch in `approveDraft` and added legacy comp
 ## Context Used
 
 - Internal codebase analysis (Stage7 handlers, enrichment procedures, viewer).
-- Context7 docs: `/teng-lin/notebooklm-py` for current artifact generation capabilities (audio/video, source-driven generation, presets).
+- Docs L1/L2 docs: `/teng-lin/notebooklm-py` for current artifact generation capabilities (audio/video, source-driven generation, presets).
 
 ## Main Behavior Changes
 

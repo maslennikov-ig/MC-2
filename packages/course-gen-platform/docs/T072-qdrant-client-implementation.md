@@ -157,8 +157,8 @@ npx tsx scripts/verify-qdrant-connection.ts
 
 ## MCP Tools Used
 
-1. **mcp**context7**resolve-library-id** - Resolved Qdrant JS library ID
-2. **mcp**context7**get-library-docs** - Retrieved official Qdrant client documentation
+1. **Docs L1/L2resolve-library-id** - Resolved Qdrant JS library ID
+2. **Docs L1/L2get-library-docs** - Retrieved official Qdrant client documentation
    - Topics: client initialization, REST API, singleton patterns
    - Used to ensure correct initialization patterns
    - Verified error handling approaches

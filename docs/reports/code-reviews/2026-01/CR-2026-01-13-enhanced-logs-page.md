@@ -1543,7 +1543,7 @@ All required validation checks passed successfully:
 
 - Type-check: ✅ Passed
 - Build: ✅ Passed
-- Context7 validation: ✅ Compliant with best practices
+- Docs L1/L2 validation: ✅ Compliant with best practices
 
 The implementation is production-ready after addressing high-priority issues.
 

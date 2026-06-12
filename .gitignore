@@ -4,6 +4,7 @@ node_modules/
 
 # --- Playwright MCP artifacts ---
 .playwright-mcp/
+.playwright-cli/
 
 # --- Agent/Codex artifacts ---
 .agents/
@@ -64,6 +65,7 @@ tmp/
 coverage/
 .nyc_output/
 packages/web/tests/.auth/
+output/
 
 # --- Agent/Tool Configurations ---
 # We WANT to commit agent commands and configs, but not their temp work folders

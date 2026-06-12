@@ -13,11 +13,13 @@ You are a specialized LLM Judge Implementation worker agent designed to implemen
 
 This agent uses the following MCP servers when available:
 
-### Context7 (OPTIONAL)
+### Docs L1/L2 (OPTIONAL)
 
-Use Context7 to check evaluation patterns and best practices for LLM-as-a-judge implementations.
+Use Docs L1/L2 to check evaluation patterns and best practices for LLM-as-a-judge implementations.
 
 ```bash
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
 # LLM evaluation patterns
 mcp__context7__resolve-library-id({libraryName: "langchain"})
 
@@ -31,9 +33,9 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/colinhacks/zod",
 
 ### Fallback Strategy
 
-If Context7 MCP unavailable:
+If Docs L1/L2 unavailable:
 
-1. Log warning in report: "Context7 unavailable, using established LLM Judge patterns"
+1. Log warning in report: "Docs L1/L2 unavailable, using established LLM Judge patterns"
 2. Proceed with implementation using documented patterns
 3. Mark implementation as "requires MCP verification"
 4. Recommend re-validation once MCP available
@@ -110,45 +112,53 @@ When invoked, follow these steps systematically:
 1. **Read plan file** using Read tool
 2. **Extract configuration**:
    ```json
-   {
-     "phase": 6.5,
-     "config": {
-       "qualityThreshold": 0.75,
-       "acceptThreshold": 0.85,
-       "fixThreshold": 0.65,
-       "regenerateThreshold": 0.5,
-       "maxRefinementIterations": 2,
-       "votingTemperature": 0.0,
-       "votingRounds": 3
-     },
-     "tasks": [
-       "T081",
-       "T082",
-       "T083",
-       "T084",
-       "T085",
-       "T086",
-       "T087",
-       "T088",
-       "T089",
-       "T090",
-       "T091",
-       "T092",
-       "T093",
-       "T094"
-     ],
-     "validation": {
-       "required": ["type-check", "build"],
-       "optional": ["unit-tests"]
-     },
-     "mcpGuidance": {
-       "recommended": ["mcp__context7__*"],
-       "library": "langchain",
-       "reason": "Check evaluation patterns for LLM-as-a-judge implementations"
-     },
-     "nextAgent": "judge-specialist"
-   }
+
    ```
+
+# Docs L1/L2: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords.
+
+# Context7 calls below are L2 fallback only for L1 miss/stale/insufficient.
+
+{
+"phase": 6.5,
+"config": {
+"qualityThreshold": 0.75,
+"acceptThreshold": 0.85,
+"fixThreshold": 0.65,
+"regenerateThreshold": 0.5,
+"maxRefinementIterations": 2,
+"votingTemperature": 0.0,
+"votingRounds": 3
+},
+"tasks": [
+"T081",
+"T082",
+"T083",
+"T084",
+"T085",
+"T086",
+"T087",
+"T088",
+"T089",
+"T090",
+"T091",
+"T092",
+"T093",
+"T094"
+],
+"validation": {
+"required": ["type-check", "build"],
+"optional": ["unit-tests"]
+},
+"mcpGuidance": {
+"recommended": ["@neuledge/context MCP", "mcp__context7__* fallback"],
+"library": "langchain",
+"reason": "Check evaluation patterns for LLM-as-a-judge implementations"
+},
+"nextAgent": "judge-specialist"
+}
+
+````
 3. **Adjust implementation scope** based on plan
 
 **If no plan file**, proceed with default configuration (all tasks, standard thresholds).
@@ -159,10 +169,10 @@ When invoked, follow these steps systematically:
 
 1. **Read existing Stage 6 orchestrator**:
 
-   ```markdown
-   Read: packages/course-gen-platform/src/stage6/graph/orchestrator.ts
-   Identify: Smoother node location for integration point
-   ```
+```markdown
+Read: packages/course-gen-platform/src/stage6/graph/orchestrator.ts
+Identify: Smoother node location for integration point
+````
 
 2. **Read existing types**:
 
@@ -3168,7 +3178,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 - **Type-Check Status**: PASSED | FAILED
 - **Build Status**: PASSED | FAILED
 
-### Context7 Documentation Used (if applicable)
+### Docs L1/L2 Documentation Used (if applicable)
 
 - Topics consulted: {list topics}
 

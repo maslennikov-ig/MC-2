@@ -593,7 +593,7 @@ This commit correctly fixes three distinct production issues:
 
 ---
 
-## Context7 Verification (Skipped)
+## Docs L1/L2 Verification (Skipped)
 
 Context7 verification was not performed in this review because:
 

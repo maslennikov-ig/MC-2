@@ -43,7 +43,7 @@ Comprehensive code review of two related features: user preferences migration fr
 **Severity**: Critical
 
 **Description**:
-According to Supabase best practices (Context7 documentation), RLS policies should explicitly check for `auth.uid() IS NOT NULL` to avoid confusion when unauthenticated requests are made. Currently, policies use `auth.uid() = user_id`, which silently returns `null = user_id` (always false) for unauthenticated users.
+According to Supabase best practices (Docs L1/L2 documentation), RLS policies should explicitly check for `auth.uid() IS NOT NULL` to avoid confusion when unauthenticated requests are made. Currently, policies use `auth.uid() = user_id`, which silently returns `null = user_id` (always false) for unauthenticated users.
 
 **Current Code**:
 

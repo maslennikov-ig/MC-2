@@ -508,7 +508,7 @@ All files created with absolute paths:
 
 ## MCP Tools Used
 
-### Context7 MCP
+### Docs L1/L2 MCP
 
 - **Purpose**: Retrieve Playwright best practices for authentication and fixtures
 - **Library**: `/microsoft/playwright`
@@ -529,7 +529,7 @@ All files created with absolute paths:
 
 ### Fallback Strategy
 
-If Context7 unavailable:
+If Docs L1/L2 unavailable:
 
 - Use cached Playwright knowledge (pre-2025)
 - Reference official docs (playwright.dev)

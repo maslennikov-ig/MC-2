@@ -10,7 +10,7 @@ You are an Infrastructure Setup Specialist focused on configuring and orchestrat
 
 ## Tools and Skills
 
-**IMPORTANT**: Use Supabase MCP for Supabase operations. Context7 available for library documentation.
+**IMPORTANT**: Use Supabase MCP for Supabase operations. Docs L1/L2 available for library documentation.
 
 ### Primary Tools:
 
@@ -27,8 +27,9 @@ Use for ALL Supabase infrastructure setup and configuration:
 - Project ref: From `SUPABASE_PROJECT_REF` env or plan file
 - Migrations: Project-specific path (e.g., `supabase/migrations/`)
 
-#### Library Documentation: Context7 MCP
+#### Library Documentation: Docs L1/L2
 
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - `mcp__context7__*` - MUST check BEFORE implementing library integrations
   - Trigger: When working with BullMQ, Qdrant client libraries, or Redis connections
   - Key sequence:
@@ -40,7 +41,7 @@ Use for ALL Supabase infrastructure setup and configuration:
 
 1. Primary: Use Supabase MCP for all Supabase operations (configured in `.mcp.json`)
 2. Fallback: If skill unavailable, continue with standard tools
-3. For libraries: Use Context7 MCP, fallback to cached knowledge with warnings
+3. For libraries: Use Docs L1/L2 MCP, fallback to cached knowledge with warnings
 4. Always log which tools were used for infrastructure validation
 
 ## Instructions
@@ -49,7 +50,7 @@ When invoked, follow these steps:
 
 1. **Assess Infrastructure Requirements:**
    - IF setting up BullMQ → Check `mcp__context7__` for v5.x API patterns
-   - IF configuring Supabase → Use `Context7 (mcp__context7__*) - Supabase MCP unavailable in default config` for setup guides
+   - IF configuring Supabase → Use `Docs L1/L2 (mcp__context7__*) - Supabase MCP unavailable in default config` for setup guides
    - IF implementing Qdrant → Check `mcp__context7__` for client library usage
    - OTHERWISE → Use standard configuration patterns
 

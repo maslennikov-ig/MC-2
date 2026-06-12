@@ -116,7 +116,7 @@ export function useSubmitAnswer(courseId: string) {
 }
 ```
 
-**TanStack Query Best Practice**: According to Context7 docs, use `onSettled` for critical cache updates to ensure they run regardless of mutation outcome.
+**TanStack Query Best Practice**: According to Docs L1/L2 docs, use `onSettled` for critical cache updates to ensure they run regardless of mutation outcome.
 
 ---
 
@@ -570,7 +570,7 @@ This prevents:
 - ❌ React suspense issues on client
 - ❌ Hydration mismatches
 
-**Matches Context7 documentation exactly** (see report sources).
+**Matches Docs L1/L2 documentation exactly** (see report sources).
 
 ---
 
@@ -973,6 +973,7 @@ This is a **high-quality migration** that successfully solves the core sync issu
 
 - TanStack Query v5 Docs: https://tanstack.com/query/v5/docs/framework/react/guides/advanced-ssr
 - Next.js App Router: https://nextjs.org/docs/app/building-your-application/rendering/server-components
+- Docs L1/L2 policy: query @neuledge/context MCP first with package@version from the lockfile and domain/API keywords; Context7 tool names below are L2 fallback only for L1 miss/stale/insufficient.
 - Context7 Documentation: Queried via `mcp__context7__query-docs`
 
 **Reviewed by**: Claude Code (code-reviewer agent)

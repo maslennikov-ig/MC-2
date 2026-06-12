@@ -14,7 +14,7 @@ cleanup_status: not_applicable
 cleanup_notes: context artifact only; worker worktrees remain active
 risk_level: medium
 verification:
-  - Context7 docs queried for Next.js App Router metadata, Supabase RLS, and tRPC procedures
+  - Docs L1/L2 docs queried for Next.js App Router metadata, Supabase RLS, and tRPC procedures
   - Lazyweb MCP health and reference searches completed
 changed_files:
   - .codex/stages/mc2-db696.10/artifacts/orchestrator-context.md

@@ -101,12 +101,12 @@ gh issue view <number>
 3. Apply same solution pattern if applicable
 4. **Reference in your fix**: `Similar to mc2-xxx / gh-NN. Same fix applied.`
 
-### 4. CONTEXT7 IS MANDATORY
+### Docs L1/L2 is mandatory
 
 **ALWAYS query documentation before implementing:**
 
 ```
-mcp__context7__resolve-library-id → mcp__context7__query-docs
+@neuledge/context MCP first with package@version from lockfile; Context7 MCP fallback: resolve-library-id -> query-docs
 ```
 
 **When to use:**
@@ -281,7 +281,7 @@ For each issue, generate:
 - Subagent: <name> | Execute directly
 - Complexity: Simple | Medium | Complex
 
-### Context7 Queries Needed
+### Docs L1/L2 Queries Needed
 
 - [ ] Next.js: <topic>
 - [ ] Supabase: <topic>
@@ -357,10 +357,10 @@ Present to user:
    bd update <task_id> --status=in_progress
    ```
 
-2. **Query Context7** (if needed):
+2. **Use Docs L1/L2** (if needed):
 
    ```
-   mcp__context7__resolve-library-id → mcp__context7__query-docs
+   @neuledge/context MCP first with package@version from lockfile; Context7 MCP fallback: resolve-library-id -> query-docs
    ```
 
 3. **Delegate or Execute**:
@@ -445,7 +445,7 @@ Before marking ANY issue as fixed:
 - [ ] Useful suggestions considered (adopted/rejected with reason)
 - [ ] Similar issues searched (Beads + GitHub)
 - [ ] Beads task exists for this issue
-- [ ] Context7 queried for relevant docs
+- [ ] Docs L1/L2 checked for relevant docs
 - [ ] Root cause identified (not just symptom)
 - [ ] Modified files reviewed with Read tool
 - [ ] `pnpm type-check` passes

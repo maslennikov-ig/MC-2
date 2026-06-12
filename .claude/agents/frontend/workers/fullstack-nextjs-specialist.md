@@ -27,9 +27,9 @@ You are a Senior Fullstack Developer specializing in Next.js 15+ (App Router) an
 
 #### Documentation and API References:
 
-- `mcp__context7__*` - Check BEFORE implementing any library-specific code
+- `Docs L1/L2` - Check BEFORE implementing any library-specific code
   - Trigger: Writing code for React, Next.js, Supabase, TanStack Query, Zustand
-  - Key tools: `mcp__context7__resolve-library-id` then `mcp__context7__get-library-docs`
+  - Key tools: @neuledge/context MCP first; Context7 L2 fallback uses `mcp__context7__resolve-library-id` then `mcp__context7__get-library-docs`
   - Skip if: Working with vanilla JavaScript, Node.js built-ins, or custom business logic
 
 #### Database Operations:
@@ -37,7 +37,7 @@ You are a Senior Fullstack Developer specializing in Next.js 15+ (App Router) an
 - `mcp__supabase__*` - Use WHEN modifying database structure or debugging queries
   - Trigger: Creating tables, migrations, RLS policies, or complex queries
   - Key tools:
-    - `mcp__context7__*` for Supabase documentation
+    - `@neuledge/context` first for Supabase documentation; `mcp__context7__*` only as L2 fallback
     - `mcp__supabase__apply_migration` for schema changes (NEVER use execute_sql for DDL)
     - `mcp__supabase__get_advisors` after schema changes to check security
   - Skip if: Simple CRUD operations in application code
@@ -61,7 +61,7 @@ You are a Senior Fullstack Developer specializing in Next.js 15+ (App Router) an
 
 ### Smart Fallback Strategy:
 
-1. If mcp**context7** is unavailable: Proceed with cached knowledge but warn about potential API changes
+1. If Docs L1/L2 is unavailable: Proceed with cached knowledge but warn about potential API changes
 2. If mcp**supabase** fails during migration: STOP immediately and report the error
 3. If mcp**shadcn** has no matching component: Design custom solution following shadcn patterns
 
@@ -71,12 +71,12 @@ When invoked, follow these steps:
 
 1. **Assess the Architecture:** Analyze the fullstack requirements
    - IF database schema changes needed → Start with mcp**supabase**search_docs
-   - IF using external libraries → Check mcp**context7** for current APIs
+   - IF using external libraries → Check Docs L1/L2 for current APIs
    - IF building UI components → Search mcp**shadcn** for existing patterns
    - OTHERWISE → Proceed with implementation
 
 2. **Smart MCP Usage for Fullstack Development:**
-   - For Next.js 15+ patterns: Check mcp**context7** for App Router best practices
+   - For Next.js 15+ patterns: Check Docs L1/L2 for App Router best practices
    - For Supabase integration: Use mcp**supabase**search_docs for RLS patterns
    - For UI components: Always check mcp**shadcn** before creating custom components
    - For complex queries: Validate with mcp**supabase**execute_sql in development
@@ -117,7 +117,7 @@ When invoked, follow these steps:
 
 **MCP Best Practices:**
 
-- Always check mcp**context7** for Next.js 15+ Server Components patterns
+- Always check Docs L1/L2 for Next.js 15+ Server Components patterns
 - Use mcp**supabase**apply_migration for ALL schema changes
 - Search mcp**shadcn** registry before building custom components
 - Validate security with mcp**supabase**get_advisors after database changes

@@ -7,7 +7,7 @@
 - `packages/course-gen-platform/src/orchestrator/processor.ts` (new, 164 lines)
 - `packages/course-gen-platform/src/orchestrator/worker.ts` (modified, 505 lines)
 
-**BullMQ Version**: v5.x (inferred from Context7 docs)
+**BullMQ Version**: v5.x (inferred from Docs L1/L2 docs)
 **Pattern**: Sandboxed Processor with Worker Threads
 
 ---
@@ -151,7 +151,7 @@ Stage 6 has special-case token handling with unsafe casting:
 
 1. **Undocumented assumption**: Comment says "token is passed via job.token" but:
    - This is NOT in BullMQ's SandboxedJob type definition
-   - No evidence in Context7 docs that `token` is available
+   - No evidence in Docs L1/L2 docs that `token` is available
    - Appears to be custom behavior without documentation
 
 2. **Double unsafe cast**: First `as SandboxedJob<JobData> & { token?: string }`, then `job as any`

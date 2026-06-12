@@ -19,7 +19,7 @@ low_count: 3
 **Files Reviewed**: 16
 **Issues Found**: 13 (0 critical, 4 high, 6 medium, 3 low)
 
-**Context7 validation**: Next.js App Router docs confirm `window.history.replaceState` is the officially documented pattern for cosmetic URL-only updates. Framer Motion / Motion docs confirm that direct children of `AnimatePresence` must be `motion` components.
+**Docs L1/L2 validation**: Next.js App Router docs confirm `window.history.replaceState` is the officially documented pattern for cosmetic URL-only updates. Framer Motion / Motion docs confirm that direct children of `AnimatePresence` must be `motion` components.
 
 ---
 

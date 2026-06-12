@@ -541,7 +541,7 @@ return () => {
 
 ## React Hooks Anti-Patterns: None Detected
 
-Based on Context7 documentation from React.dev, the code avoids common anti-patterns:
+Based on Docs L1/L2 documentation from React.dev, the code avoids common anti-patterns:
 
 - ❌ **NOT PRESENT**: Object dependencies causing infinite loops
 - ❌ **NOT PRESENT**: Missing cleanup functions in effects
@@ -791,7 +791,7 @@ The performance optimization changes demonstrate strong understanding of React p
 3. ✅ **Storage optimized**: Throttling reduces I/O by ~99%
 4. ✅ **Battery life improved**: Animations pause when tab hidden
 
-The code follows React best practices validated against Context7 documentation, with only minor edge cases and improvements identified. The 2 high-priority issues are simple fixes that should be addressed before merge, but they don't block deployment as they represent edge cases rather than common failures.
+The code follows React best practices validated against Docs L1/L2 documentation, with only minor edge cases and improvements identified. The 2 high-priority issues are simple fixes that should be addressed before merge, but they don't block deployment as they represent edge cases rather than common failures.
 
 **Recommendation**: Address high-priority issues #1 and #2 (5 minutes total), then merge. Consider medium-priority improvements in follow-up PR.
 

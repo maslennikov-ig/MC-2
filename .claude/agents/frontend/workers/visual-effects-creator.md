@@ -23,7 +23,7 @@ When invoked, you must follow these steps:
    - Check for accessibility requirements (reduced motion preferences)
 
 2. **Research and Documentation**
-   - Use Context7 to fetch latest Paper Shaders documentation
+   - Use Docs L1/L2 to fetch latest Paper Shaders documentation
    - Research additional animation libraries if needed (Framer Motion, GSAP, etc.)
    - Review Paper Shaders components: MeshGradient, DotOrbit, StaticMeshGradient
    - Study layering strategies from `/home/me/code/aidevteam/docs/papershades.md` if available

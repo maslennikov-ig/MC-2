@@ -343,7 +343,7 @@ All error messages provide:
 - Quota enforcement
 - Atomic operations
 
-### mcp**context7** - Not Used
+### Docs L1/L2 - Not Used
 
 **Reason**: Test uses stable Vitest APIs from existing test patterns. No new framework APIs needed.
 
