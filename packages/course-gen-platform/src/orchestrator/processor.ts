@@ -22,7 +22,7 @@ import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
  * Safe to use in sandboxed processor (worker thread context)
  */
 import logger from '../shared/logger/index.js';
-import { logger as baseLogger } from '@megacampus/shared-logger';
+import { baseLogger } from '../shared/logger/shared-logger-runtime.js';
 import { logPermanentFailure } from '../shared/logger/error-service.js';
 import { captureError } from '../shared/sentry/init.js';
 import { testJobHandler } from './handlers/test-handler.js';
@@ -36,6 +36,7 @@ import { blockRegenerationHandler } from './handlers/block-regeneration-handler.
 import { careerPlaybookHandler } from './handlers/career-playbook-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 import { getJobCourseId } from './job-data-fields.js';
+import { getProcessorMaxTtlMsForJobType } from './processor-ttl.js';
 
 /**
  * Track current job reference globally so uncaughtException handler can access it.
@@ -553,16 +554,17 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
  * Max time a job can run before being forcefully killed.
  * This prevents runaway jobs from blocking the worker thread forever.
  *
- * Default: 2700000ms (45 minutes) - same as lockDuration in worker.ts
+ * Default: 2700000ms (45 minutes) for ordinary pipeline jobs.
+ * Career Playbook uses CAREER_PLAYBOOK_PROCESSOR_MAX_TTL_MS, defaulting to 120 minutes,
+ * because strict judge/repair can legitimately exceed the course-generation default.
  * Stage 5 generates sections SEQUENTIALLY with thinking models:
  * - kimi-k2-thinking: 55-180s per section (complex), mimo-v2-flash: ~25s (normal)
  * - comprehensive preset: up to 15 sections → worst case ~47 min
  * - standard preset: up to 8 sections → worst case ~26 min
- * Configure via PROCESSOR_MAX_TTL_MS environment variable.
+ * Configure via PROCESSOR_MAX_TTL_MS and CAREER_PLAYBOOK_PROCESSOR_MAX_TTL_MS environment variables.
  *
  * Exit code 10 signals TTL timeout to parent process for metrics/logging.
  */
-const PROCESSOR_MAX_TTL_MS = parseInt(process.env.PROCESSOR_MAX_TTL_MS || '2700000');
 const TTL_EXIT_CODE = 10;
 
 /**
@@ -587,6 +589,7 @@ const TTL_EXIT_CODE = 10;
  */
 export default async function (job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
   let hasCompleted = false;
+  const processorMaxTtlMs = getProcessorMaxTtlMsForJobType(String(job.name));
 
   // Hard kill timeout - exits process if job doesn't complete
   // This catches infinite loops that block the event loop
@@ -596,13 +599,13 @@ export default async function (job: SandboxedJob<JobData>, token?: string): Prom
         {
           jobId: job.id,
           jobType: job.name,
-          ttlMs: PROCESSOR_MAX_TTL_MS,
+          ttlMs: processorMaxTtlMs,
         },
         'Processor TTL exceeded - force killing worker thread'
       );
       process.exit(TTL_EXIT_CODE);
     }
-  }, PROCESSOR_MAX_TTL_MS);
+  }, processorMaxTtlMs);
 
   try {
     const result = await processJob(job, token);

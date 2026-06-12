@@ -27,6 +27,39 @@ echo "   Ports:  web:3010, api:4010"
 echo "   Changes: web=$DEPLOY_WEB_CHANGED api=$DEPLOY_API_CHANGED bridge=$DEPLOY_BRIDGE_CHANGED config=$DEPLOY_CONFIG_CHANGED"
 echo ""
 
+container_running() {
+    local container_name="$1"
+    [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null || true)" = "true" ]
+}
+
+remove_legacy_compose_container() {
+    local container_name="$1"
+    local expected_service="$2"
+
+    if ! docker inspect "$container_name" > /dev/null 2>&1; then
+        return
+    fi
+
+    local compose_project
+    local compose_service
+    compose_project="$(docker inspect -f '{{ with index .Config.Labels "com.docker.compose.project" }}{{ . }}{{ end }}' "$container_name" 2>/dev/null || true)"
+    compose_service="$(docker inspect -f '{{ with index .Config.Labels "com.docker.compose.service" }}{{ . }}{{ end }}' "$container_name" 2>/dev/null || true)"
+
+    if [ "$compose_project" != "megacampus" ] || [ "$compose_service" != "$expected_service" ]; then
+        echo "   Removing legacy $container_name container so compose can manage it..."
+        docker rm -f "$container_name" 2>/dev/null || true
+    fi
+}
+
+add_service_once() {
+    local service="$1"
+    local existing
+    for existing in "${CORE_SERVICES[@]}"; do
+        [ "$existing" = "$service" ] && return
+    done
+    CORE_SERVICES+=("$service")
+}
+
 # 1. Docker Login to GHCR (if GITHUB_TOKEN provided)
 if [ -n "$GITHUB_TOKEN" ]; then
     echo "Logging in to GHCR..."
@@ -34,9 +67,9 @@ if [ -n "$GITHUB_TOKEN" ]; then
 fi
 
 # 2. Clean up any conflicting containers from previous failed deploys
-echo "Cleaning up orphan dev containers..."
-# Docker filter doesn't support regex, so we explicitly list dev container names
-docker rm -f megacampus-api-dev megacampus-web-dev 2>/dev/null || true
+echo "Checking for legacy dev containers..."
+remove_legacy_compose_container megacampus-api-dev api-dev
+remove_legacy_compose_container megacampus-web-dev web-dev
 
 DEV_COMPOSE="docker compose -f $BASE_PATH/docker-compose.dev.yml --env-file $BASE_PATH/.env.dev"
 
@@ -107,18 +140,39 @@ $DEV_COMPOSE up -d qdrant-dev
 
 if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     CORE_SERVICES=()
-    [ "$DEPLOY_WEB_CHANGED" = "true" ] && CORE_SERVICES+=("web-dev")
-    [ "$DEPLOY_BRIDGE_CHANGED" = "true" ] && CORE_SERVICES+=("notebooklm-bridge-dev")
-    [ "$DEPLOY_API_CHANGED" = "true" ] && CORE_SERVICES+=("api-dev")
+    [ "$DEPLOY_WEB_CHANGED" = "true" ] && add_service_once "web-dev"
+    [ "$DEPLOY_BRIDGE_CHANGED" = "true" ] && add_service_once "notebooklm-bridge-dev"
+    [ "$DEPLOY_API_CHANGED" = "true" ] && add_service_once "api-dev"
 
     if [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
-        CORE_SERVICES=("web-dev" "notebooklm-bridge-dev" "api-dev")
+        add_service_once "web-dev"
+        add_service_once "notebooklm-bridge-dev"
+        add_service_once "api-dev"
     fi
+else
+    CORE_SERVICES=()
+fi
 
-    echo "Deploying changed core dev containers: ${CORE_SERVICES[*]}"
+if ! container_running megacampus-web-dev; then
+    echo "   web-dev container is missing or stopped; it will be started for health checks."
+    add_service_once "web-dev"
+fi
+
+if ! container_running megacampus-notebooklm-bridge-dev; then
+    echo "   notebooklm-bridge-dev container is missing or stopped; it will be started for API dependencies."
+    add_service_once "notebooklm-bridge-dev"
+fi
+
+if ! container_running megacampus-api-dev; then
+    echo "   api-dev container is missing or stopped; it will be started for health checks."
+    add_service_once "api-dev"
+fi
+
+if [ "${#CORE_SERVICES[@]}" -gt 0 ]; then
+    echo "Deploying required core dev containers: ${CORE_SERVICES[*]}"
     $DEV_COMPOSE up -d --force-recreate --no-deps "${CORE_SERVICES[@]}"
 else
-    echo "No dev app changes; skipping core container recreate."
+    echo "No core dev container recreate needed."
 fi
 
 # 8. Health Check — wait for API and Web before starting workers

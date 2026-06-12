@@ -7,6 +7,7 @@ const {
   mockGetServerTrpcClient,
   mockCreateSignedUrl,
   mockPlaybackUrlQuery,
+  mockVerifyCourseAccess,
   mockSupabaseFrom,
 } = vi.hoisted(() => ({
   mockGetCurrentUser: vi.fn(),
@@ -14,6 +15,7 @@ const {
   mockGetServerTrpcClient: vi.fn(),
   mockCreateSignedUrl: vi.fn(),
   mockPlaybackUrlQuery: vi.fn(),
+  mockVerifyCourseAccess: vi.fn(),
   mockSupabaseFrom: vi.fn(),
 }))
 
@@ -21,6 +23,7 @@ vi.mock('server-only', () => ({}))
 
 vi.mock('@/lib/auth-helpers', () => ({
   getCurrentUser: mockGetCurrentUser,
+  verifyCourseAccess: mockVerifyCourseAccess,
 }))
 
 vi.mock('@/lib/supabase/client-factory', () => ({
@@ -106,6 +109,7 @@ describe('getEnrichment playback URL handling', () => {
     mockGetCurrentUser.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
     })
+    mockVerifyCourseAccess.mockResolvedValue({ authorized: true })
 
     mockPlaybackUrlQuery.mockResolvedValue({
       url: 'https://playback.example.com/audio.mp3',

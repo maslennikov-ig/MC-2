@@ -1,4 +1,4 @@
-import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
+import { extractJSON, safeJSONParse } from '@/shared/workspace-utils';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
@@ -16,6 +16,7 @@ import {
   getCareerPlaybookBusinessContext,
   loadCareerPlaybookBusinessContextSourceExcerpts,
 } from './business-context';
+import { getTargetLanguageTextViolations } from './language-consistency';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 
 export const FOLLOWUP_GENERATOR_PROMPT_KEY = 'career_playbook_followup_generator';
@@ -97,52 +98,33 @@ export function getFollowupLanguageViolations(
   const violations: string[] = [];
 
   response.questions.forEach((question, questionIndex) => {
-    collectRussianTextViolation(
-      question.question_text,
-      `questions[${questionIndex}].question_text`,
-      violations
+    violations.push(
+      ...getTargetLanguageTextViolations(
+        question.question_text,
+        language,
+        `questions[${questionIndex}].question_text`
+      )
     );
-    collectRussianTextViolation(
-      question.rationale,
-      `questions[${questionIndex}].rationale`,
-      violations
+    violations.push(
+      ...getTargetLanguageTextViolations(
+        question.rationale,
+        language,
+        `questions[${questionIndex}].rationale`
+      )
     );
 
     question.options?.forEach((option, optionIndex) => {
-      collectRussianTextViolation(
-        option.label,
-        `questions[${questionIndex}].options[${optionIndex}].label`,
-        violations
+      violations.push(
+        ...getTargetLanguageTextViolations(
+          option.label,
+          language,
+          `questions[${questionIndex}].options[${optionIndex}].label`
+        )
       );
     });
   });
 
   return violations;
-}
-
-function collectRussianTextViolation(text: string, path: string, violations: string[]): void {
-  const normalized = text.trim();
-  if (!normalized) return;
-
-  const textForRatio = normalized.replace(
-    /\b(?:AI|API|B2B|B2C|BI|CEO|CFO|CMO|CRM|CRO|CTO|ERP|HR|IaaS|KPI|ML|OKR|PaaS|ROI|SaaS|SLA|SQL|UI|UX)\b/g,
-    ''
-  );
-  const cyrillicCount = (textForRatio.match(/\p{Script=Cyrillic}/gu) ?? []).length;
-  const latinWords = textForRatio.match(/[A-Za-z]{3,}/g) ?? [];
-  const latinLetterCount = latinWords.join('').length;
-
-  if (cyrillicCount === 0 && (latinWords.length >= 2 || latinLetterCount >= 12)) {
-    violations.push(`${path}: expected Russian user-facing text, got "${normalized}"`);
-    return;
-  }
-
-  const alphabeticCount = cyrillicCount + latinLetterCount;
-  const cyrillicRatio = alphabeticCount > 0 ? cyrillicCount / alphabeticCount : 1;
-
-  if (latinLetterCount >= 5 && cyrillicRatio < 0.6) {
-    violations.push(`${path}: expected Russian user-facing text, got "${normalized}"`);
-  }
 }
 
 const LLMParseFollowupQuestionSchema = CareerPlaybookFollowupResponseSchema.shape.questions.element

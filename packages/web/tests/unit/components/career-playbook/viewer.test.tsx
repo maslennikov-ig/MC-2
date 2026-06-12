@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps, ReactElement } from 'react'
@@ -14,8 +14,28 @@ import {
 } from '@/stores/use-career-playbook-store'
 
 vi.mock('@/components/markdown/MarkdownRendererFull', () => ({
-  MarkdownRendererFull: ({ content }: { content: string }) => (
-    <div data-testid="markdown-renderer">{content}</div>
+  MarkdownRendererFull: ({
+    content,
+    numericFacts,
+    onNumericFactClick,
+  }: {
+    content: string
+    numericFacts?: Array<{ id: string; raw_text: string }>
+    onNumericFactClick?: (fact: { id: string; raw_text: string }) => void
+  }) => (
+    <div data-testid="markdown-renderer">
+      {content}
+      {numericFacts?.map((fact) => (
+        <button
+          key={fact.id}
+          type="button"
+          data-testid={`numeric-fact-${fact.id}`}
+          onClick={() => onNumericFactClick?.(fact)}
+        >
+          {fact.raw_text}
+        </button>
+      ))}
+    </div>
   ),
 }))
 
@@ -176,6 +196,89 @@ describe('Career Playbook viewer components', () => {
     expect(within(antiGoalsBlock).getByTestId('markdown-renderer')).toHaveTextContent('Anti-goals')
   })
 
+  it('highlights and scrolls the active contents item as document blocks enter the viewport', async () => {
+    const originalIntersectionObserver = globalThis.IntersectionObserver
+    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      'scrollIntoView'
+    )
+    const scrollIntoView = vi.fn()
+    let observerCallback: IntersectionObserverCallback | null = null
+
+    class TestIntersectionObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = ''
+      readonly thresholds: ReadonlyArray<number> = []
+
+      constructor(callback: IntersectionObserverCallback) {
+        observerCallback = callback
+      }
+
+      disconnect = vi.fn()
+      observe = vi.fn()
+      takeRecords = vi.fn(() => [])
+      unobserve = vi.fn()
+    }
+
+    globalThis.IntersectionObserver =
+      TestIntersectionObserver as unknown as typeof IntersectionObserver
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+
+    try {
+      render(
+        <PlaybookViewer
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      const contents = screen.getByRole('navigation', {
+        name: 'Содержание должностной инструкции',
+      })
+      const missionLink = within(contents).getByRole('link', {
+        name: 'Миссия и ключевые результаты',
+      })
+      const missionBlock = screen.getByRole('article', {
+        name: 'Миссия и ключевые результаты',
+      })
+
+      await waitFor(() => expect(observerCallback).not.toBeNull())
+
+      act(() => {
+        observerCallback?.(
+          [
+            {
+              target: missionBlock,
+              isIntersecting: true,
+              intersectionRatio: 0.75,
+            } as IntersectionObserverEntry,
+          ],
+          {} as IntersectionObserver
+        )
+      })
+
+      expect(missionLink).toHaveAttribute('aria-current', 'true')
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    } finally {
+      globalThis.IntersectionObserver = originalIntersectionObserver
+      if (originalScrollIntoViewDescriptor) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor)
+      } else {
+        delete (Element.prototype as Partial<Element>).scrollIntoView
+      }
+    }
+  })
+
   it('hides side panels independently and switches to reading mode', async () => {
     const user = userEvent.setup()
     window.history.replaceState(
@@ -259,6 +362,86 @@ describe('Career Playbook viewer components', () => {
     expect(handleVisibilityChange).toHaveBeenCalledWith('organization')
   })
 
+  it('does not let the visibility dropdown close focus jump the sticky rails to the top', async () => {
+    const user = userEvent.setup()
+    const handleVisibilityChange = vi.fn()
+    const originalScrollYDescriptor = Object.getOwnPropertyDescriptor(window, 'scrollY')
+    const originalFocusDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'focus')
+    let scrollY = 820
+
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      get: () => scrollY,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'focus', {
+      configurable: true,
+      value: vi.fn(function focus(this: HTMLElement, options?: FocusOptions) {
+        const isVisibilityTrigger = this.getAttribute('aria-label')?.startsWith('Видимость:')
+        if (isVisibilityTrigger && !options?.preventScroll) scrollY = 0
+      }),
+    })
+
+    try {
+      render(
+        <PlaybookViewerWithVisibility
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onVisibilityChange={handleVisibilityChange}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+
+      await user.click(within(inspector).getByRole('button', { name: /Видимость: Приватный/ }))
+      scrollY = 820
+      await user.click(await screen.findByRole('menuitem', { name: 'Публичный' }))
+
+      expect(handleVisibilityChange).toHaveBeenCalledWith('public')
+      expect(window.scrollY).toBe(820)
+    } finally {
+      if (originalFocusDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'focus', originalFocusDescriptor)
+      }
+      if (originalScrollYDescriptor) {
+        Object.defineProperty(window, 'scrollY', originalScrollYDescriptor)
+      }
+    }
+  })
+
+  it('shows generation quality warnings in the inspector rail', () => {
+    render(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          qualityWarnings: [
+            'crossBlockJudge degraded to deterministic checks after LLM structured verdict failed',
+          ],
+        }}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    expect(within(inspector).getByText('Предупреждения качества')).toBeInTheDocument()
+    expect(
+      within(inspector).getByText(/crossBlockJudge degraded to deterministic checks/)
+    ).toBeInTheDocument()
+  })
+
   it('renders organization readers without the owner management layer', () => {
     render(
       <PlaybookViewer
@@ -304,6 +487,80 @@ describe('Career Playbook viewer components', () => {
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Показать правый блок' })).not.toBeInTheDocument()
     expect(screen.queryByText('Видимость')).not.toBeInTheDocument()
+  })
+
+  it('shows pastel numeric provenance summary and lets owners correct a numeric fact', async () => {
+    const user = userEvent.setup()
+    const handleUpdateNumericFact = vi.fn().mockResolvedValue(undefined)
+    const blocks = makeBlocks()
+    const blockSix = blocks.find((block) => block.blockId === 'block_6')
+    if (blockSix) {
+      blockSix.state = {
+        content: '## 6. KPI\n\nWin rate: 18%. Pipeline coverage: 3x.',
+        status: 'generated',
+        attempt: 1,
+        numeric_facts: [
+          {
+            id: 'block_6-18-percent-0',
+            block_id: 'block_6',
+            raw_text: '18%',
+            normalized_value: '18%',
+            status: 'needs_review',
+            source: 'model_suggestion',
+            confidence: 0.45,
+            occurrence_index: 0,
+            explanation: 'Точное значение не найдено в источниках.',
+          },
+          {
+            id: 'block_6-3x-0',
+            block_id: 'block_6',
+            raw_text: '3x',
+            normalized_value: '3x',
+            status: 'benchmark',
+            source: 'web_benchmark',
+            confidence: 0.7,
+            occurrence_index: 1,
+            explanation: 'Benchmark из внешнего исследования.',
+          },
+        ],
+      }
+    }
+
+    render(
+      <PlaybookViewer
+        snapshot={snapshot}
+        blocks={blocks}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onUpdateNumericFact={handleUpdateNumericFact}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    expect(within(inspector).getByText('Цифры')).toBeInTheDocument()
+    expect(within(inspector).getByText('Требует проверки: 1')).toBeInTheDocument()
+    expect(within(inspector).getByText('Benchmark: 1')).toBeInTheDocument()
+    expect(within(inspector).getByText('2 числовых значения')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('numeric-fact-block_6-18-percent-0'))
+    expect(screen.getByRole('dialog', { name: 'Проверить цифру' })).toBeInTheDocument()
+    expect(screen.getByText('Точное значение не найдено в источниках.')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Новое значение'))
+    await user.type(screen.getByLabelText('Новое значение'), '21%')
+    await user.click(screen.getByRole('button', { name: 'Сохранить цифру' }))
+
+    expect(handleUpdateNumericFact).toHaveBeenCalledWith({
+      blockId: 'block_6',
+      factId: 'block_6-18-percent-0',
+      replacementText: '21%',
+      scope: 'occurrence',
+    })
   })
 
   it('edits markdown and submits regeneration instructions from the block editor sheet', async () => {

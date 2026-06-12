@@ -1,4 +1,4 @@
-import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
+import { extractJSON, safeJSONParse } from '@/shared/workspace-utils';
 import { z } from 'zod';
 import {
   CareerPlaybookDepartmentCandidateSchema,

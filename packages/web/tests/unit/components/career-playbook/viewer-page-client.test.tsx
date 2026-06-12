@@ -68,6 +68,8 @@ const messages = {
       inspectorTitle: 'Document inspector',
       inspectorStatusTitle: 'Status',
       inspectorReadinessTitle: 'Readiness',
+      inspectorWarningsTitle: 'Quality warnings',
+      inspectorWarningsDescription: 'Review automated quality warnings before rollout.',
       inspectorReadyBlocks: '{ready} of {total} blocks ready',
       inspectorLanguage: 'Document language: {language}',
       inspectorNextStep: 'Next step: create an adaptation course',
@@ -101,6 +103,24 @@ const messages = {
       blocksReady: '{ready} of {total} blocks ready',
       thinkingStream: 'Show thinking stream',
       streamingBlockPending: 'This block is being generated.',
+      numericFactsTitle: 'Numbers',
+      numericFactTotal: '{count} numeric values',
+      numericFactVerified: 'Verified: {count}',
+      numericFactBenchmark: 'Benchmark: {count}',
+      numericFactNeedsReview: 'Needs review: {count}',
+      numericFactSuggested: 'Suggestions: {count}',
+      numericFactStructural: 'Structural: {count}',
+      numericFactConflict: 'Conflicts: {count}',
+      numericEditTitle: 'Review number',
+      numericEditDescription: 'The document currently uses {value}. Enter the correct value.',
+      numericReplacementLabel: 'New value',
+      numericScopeLabel: 'Apply to',
+      numericScopeOccurrence: 'Only here',
+      numericScopeBlock: 'Whole block',
+      numericSave: 'Save number',
+      numericCancel: 'Cancel',
+      numericSaved: 'Number saved',
+      numericSaveError: 'Could not save number',
       statusLabels: {
         draft: 'Draft',
         answering_fixed: 'Answering fixed questions',
@@ -190,6 +210,8 @@ const ruMessages = {
       inspectorTitle: 'Инспектор документа',
       inspectorStatusTitle: 'Состояние',
       inspectorReadinessTitle: 'Готовность',
+      inspectorWarningsTitle: 'Предупреждения качества',
+      inspectorWarningsDescription: 'Проверьте предупреждения качества перед внедрением.',
       inspectorReadyBlocks: 'Готово блоков: {ready} из {total}',
       inspectorLanguage: 'Язык документа: {language}',
       inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
@@ -372,6 +394,40 @@ describe('CareerPlaybookViewerPageClient', () => {
       expect(useCareerPlaybookStore.getState().viewer?.visibility).toBe('organization')
     })
     expect(screen.getByRole('button', { name: /Видимость: Для организации/ })).toBeInTheDocument()
+  })
+
+  it('renders viewer snapshots with unknown waiting statuses without crashing', async () => {
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Контент-менеджер',
+      department: 'Маркетинг',
+      level: 'senior',
+      contentLanguage: 'ru',
+      status: 'waiting',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Контент-менеджер',
+          status: 'waiting',
+          attempt: 0,
+        },
+      },
+    } as never)
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    expect(await screen.findByRole('heading', { name: 'Контент-менеджер' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('Ожидает').length).toBeGreaterThan(0))
   })
 
   it('copies the canonical public URL from the reader inspector', async () => {

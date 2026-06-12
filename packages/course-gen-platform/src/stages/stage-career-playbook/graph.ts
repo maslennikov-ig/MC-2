@@ -16,6 +16,7 @@ import {
 } from './nodes/final-assembler';
 import {
   createBlockRegeneratorNode,
+  CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   selectPendingCareerPlaybookRegeneration,
 } from './nodes/block-regenerator';
 import type {
@@ -115,6 +116,32 @@ const GROUP_PIPELINE = [
   judgeNode: string;
   nextNode: string;
 }>;
+
+const CAREER_PLAYBOOK_GRAPH_REGENERATION_STEP_COST = 2;
+const CAREER_PLAYBOOK_GRAPH_RECURSION_BUFFER_STEPS = 5;
+
+export const CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT = 1 + GROUP_PIPELINE.length * 2 + 2;
+export const DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT =
+  CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT +
+  CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.length *
+    CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS *
+    CAREER_PLAYBOOK_GRAPH_REGENERATION_STEP_COST +
+  CAREER_PLAYBOOK_GRAPH_RECURSION_BUFFER_STEPS;
+
+export function getCareerPlaybookGraphRecursionLimit(
+  value = process.env.CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT
+): number {
+  if (!value) {
+    return DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT) {
+    return DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT;
+  }
+
+  return parsed;
+}
 
 function getGroupBlockIds(groupKey: CareerPlaybookGroupKey): CareerPlaybookBlockId[] {
   return getCareerPlaybookGroupSpec(groupKey).blocks.map(block => block.blockId);

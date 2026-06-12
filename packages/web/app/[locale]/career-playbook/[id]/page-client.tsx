@@ -71,6 +71,29 @@ const VIEWER_BLOCK_GROUP_KEYS = {
   group_6_wrap: 'blockGroups.group_6_wrap',
 } as const satisfies Record<CareerPlaybookBlockGroupKey, `blockGroups.${string}`>
 
+const VIEWER_STATUS_LABEL_KEYS = new Set([
+  'draft',
+  'answering_fixed',
+  'awaiting_followups',
+  'answering_followups',
+  'ready_to_generate',
+  'generating',
+  'completed',
+  'failed',
+])
+
+const VIEWER_BLOCK_STATUS_LABEL_KEYS = new Set([
+  'pending',
+  'generating',
+  'generated',
+  'failed',
+  'regenerating',
+])
+
+function fallbackRuntimeStatusLabel(status: string): string {
+  return status.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function getViewerBlockTitleKey(blockId: CareerPlaybookBlockId) {
   const key = blockId as keyof typeof VIEWER_BLOCK_TITLE_KEYS
   return VIEWER_BLOCK_TITLE_KEYS[key]
@@ -151,15 +174,30 @@ export default function CareerPlaybookViewerPageClient({
       contents: t('contents'),
       contentsAriaLabel: t('contentsAriaLabel'),
       waitingBlock: t('waitingBlock'),
-      statusLabel: (status: CareerPlaybookViewerSnapshot['status']) => t(`statusLabels.${status}`),
+      statusLabel: (status: CareerPlaybookViewerSnapshot['status']) => {
+        const statusKey = String(status)
+        if (statusKey === 'waiting') return t('blockStatusLabels.pending')
+        if (VIEWER_STATUS_LABEL_KEYS.has(statusKey)) {
+          return t(`statusLabels.${statusKey}` as never)
+        }
+
+        return fallbackRuntimeStatusLabel(statusKey)
+      },
       blockTitle: (blockId: CareerPlaybookBlockId, fallback: string) => {
         const key = getViewerBlockTitleKey(blockId)
         return key ? t(key) : fallback
       },
       blockGroupLabel: (groupKey: CareerPlaybookBlockGroupKey, fallback: string) =>
         t(VIEWER_BLOCK_GROUP_KEYS[groupKey]) || fallback,
-      blockStatusLabel: (status: CareerPlaybookViewerBlock['state']['status']) =>
-        t(`blockStatusLabels.${status}`),
+      blockStatusLabel: (status: CareerPlaybookViewerBlock['state']['status']) => {
+        const statusKey = String(status)
+        if (statusKey === 'waiting') return t('blockStatusLabels.pending')
+        if (VIEWER_BLOCK_STATUS_LABEL_KEYS.has(statusKey)) {
+          return t(`blockStatusLabels.${statusKey}` as never)
+        }
+
+        return fallbackRuntimeStatusLabel(statusKey)
+      },
       editBlock: (title: string) => t('editBlock', { title }),
       regenerateBlock: (title: string) => t('regenerateBlock', { title }),
       collapseBlock: (title: string) => t('collapseBlock', { title }),
@@ -175,6 +213,8 @@ export default function CareerPlaybookViewerPageClient({
       inspectorTitle: t('inspectorTitle'),
       inspectorStatusTitle: t('inspectorStatusTitle'),
       inspectorReadinessTitle: t('inspectorReadinessTitle'),
+      inspectorWarningsTitle: t('inspectorWarningsTitle'),
+      inspectorWarningsDescription: t('inspectorWarningsDescription'),
       visibilityLabel: tc('visibility.label'),
       visibilityValueLabel: (visibility: CareerPlaybookVisibility) =>
         tc(`visibility.${visibility}`),
@@ -183,6 +223,22 @@ export default function CareerPlaybookViewerPageClient({
       inspectorLanguage: (language: string) => t('inspectorLanguage', { language }),
       inspectorNextStep: t('inspectorNextStep'),
       inspectorPrepare: t('inspectorPrepare'),
+      numericFactsTitle: t('numericFactsTitle'),
+      numericFactTotal: (count: number) => t('numericFactTotal', { count }),
+      numericFactVerified: (count: number) => t('numericFactVerified', { count }),
+      numericFactBenchmark: (count: number) => t('numericFactBenchmark', { count }),
+      numericFactNeedsReview: (count: number) => t('numericFactNeedsReview', { count }),
+      numericFactSuggested: (count: number) => t('numericFactSuggested', { count }),
+      numericFactStructural: (count: number) => t('numericFactStructural', { count }),
+      numericFactConflict: (count: number) => t('numericFactConflict', { count }),
+      numericEditTitle: t('numericEditTitle'),
+      numericEditDescription: (value: string) => t('numericEditDescription', { value }),
+      numericReplacementLabel: t('numericReplacementLabel'),
+      numericScopeLabel: t('numericScopeLabel'),
+      numericScopeOccurrence: t('numericScopeOccurrence'),
+      numericScopeBlock: t('numericScopeBlock'),
+      numericSave: t('numericSave'),
+      numericCancel: t('numericCancel'),
       actions: {
         actionsLabel: t('actionsLabel'),
         pdf: t('pdf'),
@@ -218,8 +274,15 @@ export default function CareerPlaybookViewerPageClient({
       },
       blockGroupLabel: (groupKey: CareerPlaybookBlockGroupKey, fallback: string) =>
         t(VIEWER_BLOCK_GROUP_KEYS[groupKey]) || fallback,
-      blockStatusLabel: (status: CareerPlaybookViewerBlock['state']['status']) =>
-        t(`blockStatusLabels.${status}`),
+      blockStatusLabel: (status: CareerPlaybookViewerBlock['state']['status']) => {
+        const statusKey = String(status)
+        if (statusKey === 'waiting') return t('blockStatusLabels.pending')
+        if (VIEWER_BLOCK_STATUS_LABEL_KEYS.has(statusKey)) {
+          return t(`blockStatusLabels.${statusKey}` as never)
+        }
+
+        return fallbackRuntimeStatusLabel(statusKey)
+      },
     }),
     [t]
   )
@@ -421,8 +484,21 @@ export default function CareerPlaybookViewerPageClient({
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
         isUpdatingVisibility={isUpdatingVisibility}
+        isUpdatingNumericFact={state.isUpdatingViewerBlock}
         onVisibilityChange={(visibility) => {
           void handleVisibilityChange(visibility)
+        }}
+        onUpdateNumericFact={async (input) => {
+          if (!canEditViewer) return false
+          const result = await useCareerPlaybookStore
+            .getState()
+            .updateCareerPlaybookNumericFact(input)
+          if (!result.ok) {
+            setBackendPendingMessage(result.error ?? t('numericSaveError'))
+            return false
+          }
+          setBackendPendingMessage(t('numericSaved'))
+          return true
         }}
       />
       {commonEditor}

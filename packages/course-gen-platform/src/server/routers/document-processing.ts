@@ -31,6 +31,7 @@ import { JobType } from '@megacampus/shared-types';
 import type { DocumentProcessingJobData } from '@megacampus/shared-types';
 import { deleteVectorsForDocument } from '../../shared/qdrant/lifecycle';
 import { validateLocale } from '@/shared/validation';
+import { resolveUploadStoragePath } from '@/stages/stage1-document-upload/phases';
 
 // ============================================================================
 // Input Schemas
@@ -280,7 +281,7 @@ export const documentProcessingRouter = router({
           courseId: courseId,
           userId: currentUser.id,
           fileId: fileId,
-          filePath: `${process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd()}/${file.storage_path}`,
+          filePath: resolveUploadStoragePath(file.storage_path),
           mimeType: file.mime_type,
           chunkSize: 512,
           chunkOverlap: 50,

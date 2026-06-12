@@ -24,7 +24,7 @@ import {
 } from '@megacampus/shared-types';
 import { ValidationError } from '../../server/errors/typed-errors';
 import { getEffectiveTier, type Role } from '../tier/superadmin-bypass';
-import { formatFileSize } from '@megacampus/shared-utils';
+import { formatFileSize } from '@/shared/workspace-utils';
 
 // ============================================================================
 // Types

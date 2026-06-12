@@ -27,7 +27,7 @@
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
-import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shared-utils';
+import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
 
 /** Emergency universal fallback model when DB config is unavailable */

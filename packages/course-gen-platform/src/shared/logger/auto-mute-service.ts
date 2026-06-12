@@ -10,7 +10,7 @@
 // to prevent infinite recursion in enhanced logger proxy.
 // The enhanced logger calls applyAutoMuteStatus, which could call logger.warn,
 // creating an infinite loop. Using baseLogger bypasses the proxy.
-import { logger as baseLogger } from '@megacampus/shared-logger';
+import { baseLogger } from './shared-logger-runtime';
 import { getSupabaseAdmin } from '../supabase/admin';
 import { shouldAutoMute } from './auto-classification';
 

@@ -425,6 +425,7 @@ export default function CareerPlaybookNewPageClient({
     filledTemplate: t.raw('businessContextFilledTemplate') as string,
     sourcesReady: t('businessContextSourcesReady'),
     sourcesProcessing: t('businessContextSourcesProcessing'),
+    sourcesFailed: t('businessContextSourcesFailed'),
     sourcesEmpty: t('businessContextSourcesEmpty'),
     previousStep: t('businessContextPreviousStep'),
     nextStep: t('businessContextNextStep'),
@@ -445,6 +446,7 @@ export default function CareerPlaybookNewPageClient({
     sourceStatusRemoved: t('businessContextSourceStatusRemoved'),
     sourceTextFallback: t('businessContextSourceTextFallback'),
     removeSourceTemplate: t.raw('businessContextRemoveSourceTemplate') as string,
+    retrySourceTemplate: t.raw('businessContextRetrySourceTemplate') as string,
     missingTitle: t('businessContextMissingTitle'),
     missingEmpty: t('businessContextMissingEmpty'),
     back: t('back'),
@@ -487,6 +489,7 @@ export default function CareerPlaybookNewPageClient({
     generationErrorTitle: t('generationErrorTitle'),
     generationRedirectHint: t('generationRedirectHint'),
     generationCanLeaveHint: t('generationCanLeaveHint'),
+    generationFinalizingHint: t('generationFinalizingHint'),
     generationStepLabels: {
       queued: t('generationStepQueued'),
       preparing_context: t('generationStepPreparingContext'),
@@ -727,6 +730,7 @@ export default function CareerPlaybookNewPageClient({
               onContextChange={state.saveCareerPlaybookBusinessContext}
               onFreeformTextChange={state.saveCareerPlaybookFreeformDraft}
               onRemoveSource={state.removeCareerPlaybookBusinessContextSource}
+              onRetrySource={state.retryCareerPlaybookBusinessContextSource}
               onSourceUploaded={state.upsertCareerPlaybookBusinessContextSource}
               onBack={() =>
                 useCareerPlaybookStore.getState().editCareerPlaybookFixedAnswer('content_language')

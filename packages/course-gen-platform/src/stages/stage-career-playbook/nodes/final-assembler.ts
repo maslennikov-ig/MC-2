@@ -12,13 +12,27 @@ export const CAREER_PLAYBOOK_FINAL_BLOCK_ORDER: CareerPlaybookBlockId[] = [
 
 interface RequiredMermaidSection {
   blockId: CareerPlaybookBlockId;
-  heading: string;
-  buildDiagram: (roleProfileSpec?: CareerPlaybookRoleProfileSpec) => string;
+  heading: {
+    en: string;
+    ru: string;
+  };
+  buildDiagram: (
+    roleProfileSpec: CareerPlaybookRoleProfileSpec | undefined,
+    language: string
+  ) => string;
 }
 
 export interface AssembleCareerPlaybookFinalMarkdownInput {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   roleProfileSpec?: CareerPlaybookRoleProfileSpec;
+}
+
+function resolveContentLanguage(roleProfileSpec?: CareerPlaybookRoleProfileSpec): 'en' | 'ru' {
+  return roleProfileSpec?.content_language === 'ru' ? 'ru' : 'en';
+}
+
+function localizedValue(language: string, en: string, ru: string): string {
+  return language === 'ru' ? ru : en;
 }
 
 function cleanMermaidLabel(value: string | undefined, fallback: string): string {
@@ -29,33 +43,69 @@ function cleanMermaidLabel(value: string | undefined, fallback: string): string 
 export const REQUIRED_MERMAID_SECTIONS: RequiredMermaidSection[] = [
   {
     blockId: 'block_11',
-    heading: 'Career Path Diagram',
-    buildDiagram: roleProfileSpec => {
-      const roleTitle = cleanMermaidLabel(roleProfileSpec?.position.title, 'Target role');
+    heading: {
+      en: 'Career Path Diagram',
+      ru: 'Схема карьерного пути',
+    },
+    buildDiagram: (roleProfileSpec, language) => {
+      const roleTitle = cleanMermaidLabel(
+        roleProfileSpec?.position.title,
+        localizedValue(language, 'Target role', 'Целевая роль')
+      );
+      const entryRole = localizedValue(language, 'Entry role', 'Стартовая роль');
+      const nextScope = localizedValue(
+        language,
+        'Next senior scope',
+        'Следующий уровень ответственности'
+      );
       return `flowchart LR
-  Entry["Entry role"] --> Current["${roleTitle}"]
-  Current --> Next["Next senior scope"]`;
+  Entry["${entryRole}"] --> Current["${roleTitle}"]
+  Current --> Next["${nextScope}"]`;
     },
   },
   {
     blockId: 'block_10',
-    heading: 'Dependencies Diagram',
-    buildDiagram: roleProfileSpec => {
-      const roleTitle = cleanMermaidLabel(roleProfileSpec?.position.title, 'Target role');
-      const reportsTo = cleanMermaidLabel(roleProfileSpec?.context.reports_to, 'Manager');
+    heading: {
+      en: 'Dependencies Diagram',
+      ru: 'Схема зависимостей',
+    },
+    buildDiagram: (roleProfileSpec, language) => {
+      const roleTitle = cleanMermaidLabel(
+        roleProfileSpec?.position.title,
+        localizedValue(language, 'Target role', 'Целевая роль')
+      );
+      const reportsTo = cleanMermaidLabel(
+        roleProfileSpec?.context.reports_to,
+        localizedValue(language, 'Manager', 'Руководитель')
+      );
+      const team = localizedValue(language, 'Internal team', 'Внутренняя команда');
+      const stakeholders = localizedValue(
+        language,
+        'Cross-functional stakeholders',
+        'Смежные участники'
+      );
       return `flowchart LR
   Manager["${reportsTo}"] --> Role["${roleTitle}"]
-  Role --> Team["Internal team"]
-  Role --> Stakeholders["Cross-functional stakeholders"]`;
+  Role --> Team["${team}"]
+  Role --> Stakeholders["${stakeholders}"]`;
     },
   },
   {
     blockId: 'block_16',
-    heading: 'Main Process Diagram',
-    buildDiagram: () => `flowchart TD
-  Intake["Intake"] --> Prioritize["Prioritize"]
-  Prioritize --> Execute["Execute"]
-  Execute --> Review["Review"]`,
+    heading: {
+      en: 'Main Process Diagram',
+      ru: 'Схема основного процесса',
+    },
+    buildDiagram: (_roleProfileSpec, language) => {
+      const intake = localizedValue(language, 'Intake', 'Входящий запрос');
+      const prioritize = localizedValue(language, 'Prioritize', 'Приоритизация');
+      const execute = localizedValue(language, 'Execute', 'Исполнение');
+      const review = localizedValue(language, 'Review', 'Проверка');
+      return `flowchart TD
+  Intake["${intake}"] --> Prioritize["${prioritize}"]
+  Prioritize --> Execute["${execute}"]
+  Execute --> Review["${review}"]`;
+    },
   },
 ];
 
@@ -63,30 +113,150 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function hasMermaidSection(content: string, heading: string): boolean {
-  const headingPattern = new RegExp(`^###\\s+${escapeRegExp(heading)}\\s*$`, 'im');
-  const match = headingPattern.exec(content);
-  if (!match) return false;
+function hasMermaidSection(content: string, headings: string[]): boolean {
+  for (const heading of headings) {
+    const headingPattern = new RegExp(`^###\\s+${escapeRegExp(heading)}\\s*$`, 'im');
+    const match = headingPattern.exec(content);
+    if (!match) continue;
 
-  return /```mermaid[\s\S]*?```/i.test(content.slice(match.index));
+    if (/```mermaid[\s\S]*?```/i.test(content.slice(match.index))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function normalizeMermaidSectionHeading(
+  content: string,
+  section: RequiredMermaidSection,
+  language: string
+): string {
+  const targetHeading = language === 'ru' ? section.heading.ru : section.heading.en;
+  const sourceHeadings = Object.values(section.heading).filter(
+    heading => heading !== targetHeading
+  );
+  let normalized = content;
+
+  for (const sourceHeading of sourceHeadings) {
+    normalized = normalized.replace(
+      new RegExp(`^(###\\s+)${escapeRegExp(sourceHeading)}\\s*$`, 'gim'),
+      `$1${targetHeading}`
+    );
+  }
+
+  return normalized;
 }
 
 function appendMermaidSection(
   content: string,
   section: RequiredMermaidSection,
-  roleProfileSpec?: CareerPlaybookRoleProfileSpec
+  roleProfileSpec: CareerPlaybookRoleProfileSpec | undefined,
+  language: string
 ): string {
-  if (hasMermaidSection(content, section.heading)) {
-    return content.trim();
+  const normalizedContent = normalizeMermaidSectionHeading(content, section, language);
+  const localizedHeading = section.heading[resolveContentLanguage(roleProfileSpec)];
+  if (hasMermaidSection(normalizedContent, Object.values(section.heading))) {
+    return normalizedContent.trim();
   }
 
-  return `${content.trim()}
+  return `${normalizedContent.trim()}
 
-### ${section.heading}
+### ${localizedHeading}
 
 \`\`\`mermaid
-${section.buildDiagram(roleProfileSpec)}
+${section.buildDiagram(roleProfileSpec, language)}
 \`\`\``;
+}
+
+function normalizeFillableFieldLabel(rawLabel: string, language: string): string {
+  const label = rawLabel
+    .replace(/\s+/g, ' ')
+    .replace(/[.:;]+$/g, '')
+    .trim()
+    .toLocaleLowerCase('ru');
+
+  if (/^(url|ссылка|link)/i.test(label)) {
+    return language === 'ru' ? 'ссылка' : 'link';
+  }
+  if (/^(dd\.mm\.yyyy|дд\.мм\.гггг|дата|date)/i.test(label)) {
+    return language === 'ru' ? 'дата' : 'date';
+  }
+  if (/^(имя|name)/i.test(label)) {
+    return language === 'ru' ? 'имя' : 'name';
+  }
+  if (/^(число|number|value)/i.test(label)) {
+    return language === 'ru' ? 'число' : 'number';
+  }
+  if (/название компании|company name/i.test(label)) {
+    return language === 'ru' ? 'название компании' : 'company name';
+  }
+  if (/^(название|title)/i.test(label)) {
+    return language === 'ru' ? 'название' : 'title';
+  }
+
+  return label;
+}
+
+function formatFillableField(rawLabel: string, language: string): string {
+  const label = normalizeFillableFieldLabel(rawLabel, language);
+  return language === 'ru' ? `поле для заполнения: ${label}` : `field to fill: ${label}`;
+}
+
+function shouldTreatBracketAsFillableField(label: string): boolean {
+  const normalized = label.trim().toLocaleLowerCase('ru');
+  return (
+    /^(имя|name)$/.test(normalized) ||
+    /^(число|number|value)$/.test(normalized) ||
+    /^(дата|date|dd\.mm\.yyyy|дд\.мм\.гггг)(?:\b|$)/.test(normalized) ||
+    /^(url|ссылка|link)(?:\b|$)/.test(normalized) ||
+    /^название(?: компании)?$/.test(normalized) ||
+    /^company name$/.test(normalized)
+  );
+}
+
+function shouldTreatBraceAsFillableField(label: string): boolean {
+  const normalized = label.trim().toLocaleLowerCase('ru');
+  return (
+    normalized === 'заполните' ||
+    shouldTreatBracketAsFillableField(normalized) ||
+    /^требуется ли /.test(normalized)
+  );
+}
+
+function normalizeFillablePlaceholders(content: string, language: string): string {
+  const lines = content.split('\n');
+  let insideFence = false;
+
+  return lines
+    .map(line => {
+      if (/^\s*```/.test(line)) {
+        insideFence = !insideFence;
+        return line;
+      }
+      if (insideFence) return line;
+
+      const withBrackets = line.replace(
+        /\[([^\]\n]{2,80})\]/g,
+        (match: string, label: string, offset: number) => {
+          const nextChar = line[offset + match.length];
+          if (nextChar === '(' || !shouldTreatBracketAsFillableField(label)) {
+            return match;
+          }
+
+          return formatFillableField(label, language);
+        }
+      );
+
+      return withBrackets.replace(/\{([^}\n]{2,100})\}/g, (match: string, label: string) => {
+        if (!shouldTreatBraceAsFillableField(label)) {
+          return match;
+        }
+
+        return formatFillableField(label, language);
+      });
+    })
+    .join('\n');
 }
 
 function assertAllBlocksPresent(
@@ -111,23 +281,54 @@ export function ensureRequiredMermaidSections(
   assertAllBlocksPresent(generatedBlocks);
 
   const blocksWithDiagrams = { ...generatedBlocks };
+  const language = resolveContentLanguage(roleProfileSpec);
   for (const section of REQUIRED_MERMAID_SECTIONS) {
     const block = blocksWithDiagrams[section.blockId];
     if (!block) continue;
 
     blocksWithDiagrams[section.blockId] = {
       ...block,
-      content: appendMermaidSection(block.content, section, roleProfileSpec),
+      content: appendMermaidSection(block.content, section, roleProfileSpec, language),
     };
   }
 
   return blocksWithDiagrams;
 }
 
+export function normalizeCareerPlaybookFinalContent(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  roleProfileSpec?: CareerPlaybookRoleProfileSpec
+): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
+  const language = resolveContentLanguage(roleProfileSpec);
+  const normalizedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> = {};
+
+  for (const [blockId, block] of Object.entries(generatedBlocks)) {
+    if (!block) continue;
+    normalizedBlocks[blockId] = {
+      ...block,
+      content: normalizeFillablePlaceholders(block.content, language),
+    };
+  }
+
+  return normalizedBlocks;
+}
+
 export function prepareCareerPlaybookFinalBlocks(
   input: AssembleCareerPlaybookFinalMarkdownInput
 ): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
-  return ensureRequiredMermaidSections(input.generatedBlocks, input.roleProfileSpec);
+  const normalizedBlocks = normalizeCareerPlaybookFinalContent(
+    input.generatedBlocks,
+    input.roleProfileSpec
+  );
+  return ensureRequiredMermaidSections(normalizedBlocks, input.roleProfileSpec);
+}
+
+function joinCareerPlaybookFinalBlocks(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): string {
+  return CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.map(blockId =>
+    generatedBlocks[blockId]?.content.trim()
+  ).join('\n\n');
 }
 
 export function assembleCareerPlaybookFinalMarkdown(
@@ -135,9 +336,7 @@ export function assembleCareerPlaybookFinalMarkdown(
 ): string {
   const blocksWithDiagrams = prepareCareerPlaybookFinalBlocks(input);
 
-  return CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.map(blockId =>
-    blocksWithDiagrams[blockId]?.content.trim()
-  ).join('\n\n');
+  return joinCareerPlaybookFinalBlocks(blocksWithDiagrams);
 }
 
 export function createFinalAssemblerNode() {
@@ -152,7 +351,7 @@ export function createFinalAssemblerNode() {
 
       return {
         generatedBlocks,
-        finalMarkdown: assembleCareerPlaybookFinalMarkdown({ generatedBlocks }),
+        finalMarkdown: joinCareerPlaybookFinalBlocks(generatedBlocks),
         currentNode: 'finalAssembler',
       };
     } catch (error) {

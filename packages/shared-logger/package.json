@@ -18,13 +18,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@axiomhq/pino": "^1.2.0",
+    "@axiomhq/pino": "^1.6.1",
     "pino": "^9.6.0"
   },
   "devDependencies": {
     "pino-pretty": "^13.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.1.8"
   }
 }

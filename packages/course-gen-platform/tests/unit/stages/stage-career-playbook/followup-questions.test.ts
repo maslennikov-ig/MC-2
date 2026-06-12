@@ -14,6 +14,7 @@ vi.mock('@/shared/supabase/admin', () => ({
 import {
   buildFollowupPromptVariables,
   generateCareerPlaybookFollowups,
+  getFollowupLanguageViolations,
   parseFollowupResponseFromLLM,
 } from '@/stages/stage-career-playbook/nodes/followup-questions';
 
@@ -234,6 +235,58 @@ describe('Career Playbook follow-up questions helper', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
       );
     }
+  });
+
+  it('accepts Russian follow-ups with common Latin product and KPI terms', () => {
+    const response = {
+      questions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000005',
+          question_text:
+            'Какие B2B SaaS, CMS, CRM, WordPress, VK, Telegram и YouTube ограничения важны для роли?',
+          question_type: 'multi_choice' as const,
+          options: [
+            {
+              value: 'metrics',
+              label: 'MQL, SQL, CVR, pipeline, revenue attribution',
+            },
+            {
+              value: 'tools',
+              label: 'Notion, Airtable, Contentful, HubSpot, Salesforce',
+            },
+          ],
+          rationale:
+            'Нужно проверить, какие технические термины и KPI должны остаться в должностной инструкции.',
+        },
+      ],
+      completeness_score: 0.82,
+      stop_recommendation: 'ask_more' as const,
+    };
+
+    expect(getFollowupLanguageViolations(response, 'ru')).toEqual([]);
+  });
+
+  it('flags English sentences in Russian follow-up fields', () => {
+    const response = {
+      questions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000006',
+          question_text: 'Какая CRM-метрика should define success for this role?',
+          question_type: 'single_choice' as const,
+          options: [{ value: 'pipeline', label: 'Pipeline покрытие' }],
+          rationale: 'The instruction needs one measurable anchor.',
+        },
+      ],
+      completeness_score: 0.82,
+      stop_recommendation: 'ask_more' as const,
+    };
+
+    expect(getFollowupLanguageViolations(response, 'ru')).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('questions[0].question_text'),
+        expect.stringContaining('questions[0].rationale'),
+      ])
+    );
   });
 
   it('renders the follow-up prompt with Career Playbook source evidence, invokes runtime, and returns parsed response with cost', async () => {
