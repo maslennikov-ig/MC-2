@@ -1,43 +1,43 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-13
-Stage: `mc2-owuag`
+Stage: `mc2-spb1n`
 Branch: `codex/career-playbook-course-preview-bridge`
-Beads: `mc2-owuag`
+Beads: `mc2-spb1n`
 
 ## Current State
 
-- Career Playbook Role Guide -> course bridge preview/create flow is implemented locally.
-- Private Role Guide viewer opens `CreateCourseFromPlaybookDialog`; read-only viewers do not see the create-course action.
-- The dialog now loads a preview, lets the owner edit title, description, audience, outcomes, language, localized course size, localized style, and optional supporting sources before generation.
-- Supporting sources default to off. Role Guide markdown is always primary; web research and uploaded business-context excerpts are included only by explicit opt-in.
-- Backend bridge stores `course_size` and `style`, uploads bridge sources, starts generation, and rolls back created draft courses if required source upload/evidence/generation start fails.
-- Explicit business-context opt-in now uses structured source evidence metadata: `hasAuthoritativeEvidence` and `unavailableReason`.
-- Docs and Graphify were refreshed for the bridge behavior.
+- Career Playbook Role Guide -> course bridge preview/create flow is implemented and delivered to Dev.
+- Private owners can preview prefilled course data, edit title/description/audience/outcomes/language/course size/style, create a course, and start generation.
+- Role Guide markdown is always primary; web research and uploaded business-context excerpts stay default-off and opt-in only.
+- Backend persists the synthetic source, starts generation, and rolls back the draft if source persistence or generation start fails.
+- Dev hotfix `787b228f` changed bridge source `file_catalog.processing_method` to DB-valid `full_text`; origin metadata remains `summary_metadata.source = career_playbook_bridge`.
 
 ## Verification
 
-- Passed: `pnpm exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook-course-bridge.service.test.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/stages/stage-career-playbook/business-context.test.ts` from `packages/course-gen-platform` -> 69 tests.
-- Passed: `pnpm exec vitest run tests/unit/components/career-playbook/create-course-from-playbook-dialog.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx` from `packages/web` -> 21 tests.
-- Passed: `pnpm --filter @megacampus/course-gen-platform type-check`.
-- Passed: `pnpm --filter @megacampus/web type-check`.
-- Passed: `pnpm build`.
-- Passed: `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-owuag --verify-group code_change_commands`.
+- Passed local: backend course-bridge unit test (19 tests), backend type-check, backend lint (0 errors, 95 warnings within budget), web viewer tests (19 tests), web type-check.
+- Passed CI/CD: run `27471885516` (`927a2ea1`) deployed web to Dev; run `27472451330` (`913420bc`) passed CI, API Docker build, contract tests, and Dev deploy.
+- Passed Dev health: `https://dev.ai.megacampus.ru/health` returned `HTTP/2 200`, `x-environment: development`, queue `course-generation-dev`.
+- Passed live Dev E2E: playbook `45b0932e-1dc9-450c-b85e-97239703ca03` created course `ee09aae4-b39b-4857-84fe-a87bf755cf31`; preview/create tRPC returned 200; generating page loaded.
+- Passed post-worker DB/log check: course reached `stage_2_awaiting_approval`; source file `71949ba7-6e8e-4aa2-8267-3a01a4fd5249` is `indexed`, `chunk_count = 2`, `processing_method = full_text`; document_processing job completed at 100%.
+- E2E artifacts: `output/playwright/course-bridge-dev/result.json`, screenshots `01-viewer-before-create.png` through `05-generating-page.png`, and logs under `output/playwright/course-bridge-dev/logs/`.
 
 ## Next recommended
 
-Next stage id: none.
-Recommended action: review diff, then deliver through the normal dev delivery path when ready.
+Next stage id: `mc2-dkkau`.
+Recommended action: fix the stale Beads sync fallback in `.claude/scripts/push-dev.sh`; product delivery for the Career Playbook course bridge is complete on Dev.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, Beads `mc2-owuag`, `.codex/stages/mc2-owuag/summary.md`, and the current diff.
+Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads `mc2-dkkau`, and `.claude/scripts/push-dev.sh`. Replace the unsupported `bd sync` no-op with a supported installed-`bd` sync path while preserving safe Dev delivery behavior.
 
 ## Delivery
 
-- docs-reviewed: updated - bridge flow and architecture docs describe structured business-context evidence metadata, localized preview/edit controls, default-off supporting sources, rollback, and generation start.
-- graph-reviewed: updated - ran `graphify update .`; local ignored `graphify-out/graph.json` and `GRAPH_REPORT.md` were regenerated. HTML visualization was skipped because the graph is above the default node limit.
+- Delivered to feature branch `codex/career-playbook-course-preview-bridge` and to `develop` via merge commits `927a2ea1` and `913420bc`.
+- Dev deploy succeeded through GitHub Actions runs `27471885516` and `27472451330`; staging `/deploy` was not run because the requested post-delivery E2E target was Dev.
+- docs-reviewed: updated - handoff and stage summary record delivered behavior, Dev run IDs, E2E evidence, and the bounded `bd sync` follow-up.
+- graph-reviewed: no-change-needed - final changes did not introduce a new route/module boundary; earlier bridge graph refresh remains sufficient.
 
 ## Explicit defers
 
-- Browser-level private viewer -> preview -> generation redirect E2E remains blocked by Beads `mc2-zt4ju` until the local course-gen-platform dev/start runtime is fixed.
+- `mc2-dkkau` - `.claude/scripts/push-dev.sh` calls unsupported `bd sync 2>/dev/null || true`; current installed `bd` has no `sync` subcommand. Delivery is unaffected, but the script should not silently no-op.
