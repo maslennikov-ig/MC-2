@@ -18,7 +18,7 @@ import {
 import {
   loadCareerPlaybookBusinessContextSourceEvidence,
   type CareerPlaybookBusinessContextSourceEvidenceResult,
-} from '../../../stages/stage-career-playbook/nodes/business-context';
+} from '../../../stages/stage-career-playbook/nodes/business-context-source-evidence';
 import { initiateCourseGeneration } from '../generation/lifecycle/initiate.service';
 import {
   mapPlaybookRow,
