@@ -153,14 +153,39 @@ that names adaptation areas before operational rollout.
 
 ## Course Bridge Sources
 
+`careerPlaybook.courseBridge.previewCourseFromPlaybook` builds the editable
+course passport for a completed Role Guide. The private viewer and library card
+dialog use this preview so the owner can review title, description, target
+audience, learning outcomes, language, course size, style, and optional source
+toggles before generation starts. Optional business-context source discovery is
+best-effort in preview; if source listing fails, the bridge still returns the
+Role Guide passport with business-context source toggles disabled.
+
 `careerPlaybook.courseBridge.createCourseFromPlaybook` creates a draft course
-from a completed Role Guide and persists generated markdown sources through the
-Career Playbook bridge storage module:
+from a completed Role Guide, applies the preview overrides, persists generated
+markdown sources through the Career Playbook bridge storage module, and starts
+generation immediately:
 
 - `course-bridge.service.ts` owns playbook access, course creation, web-research
-  selection, and generation start.
+  selection, optional business-context source selection, and generation start.
 - `course-bridge-storage.ts` owns synthetic markdown file writes, `file_catalog`
   rows, and storage-quota accounting.
+
+The final Role Guide markdown is always the primary source. Supporting sources
+are explicit opt-ins and default to off:
+
+- `includeWebResearch = false`
+- `includeBusinessContextSources = false`
+
+When web research is enabled, the bridge first reuses persisted Career Playbook
+research and falls back to a fresh research call. When uploaded business-context
+sources are enabled, the bridge uses the Career Playbook business-context source
+evidence helper, which prefers authoritative `file_catalog.markdown_content`,
+keeps source boundaries in the synthetic markdown source, and returns structured
+availability metadata for bridge gating. Explicit business-context opt-in
+requires `hasAuthoritativeEvidence = true`. If the selected sources are missing,
+still processing, unavailable, or load as warning-only text, course creation
+fails with a user-visible error and the draft course is rolled back.
 
 Bridge sources are still trusted generated markdown and keep
 `processing_method = 'career_playbook_bridge'`, `markdown_content`, and
@@ -169,6 +194,9 @@ reserve organization storage quota before writing the source file, release it if
 the write or `file_catalog` insert fails, and release quota during bridge course
 rollback after the course delete succeeds. If course rollback delete fails, the
 files and quota are left intact because database ownership may still exist.
+
+The created course stores `course_size` and `style` from the preview payload so
+Stage 4-6 generation sees the same controls as a normal `/create` course.
 
 ## E2E Harness
 
