@@ -649,7 +649,7 @@ describe('course bridge service', () => {
         course_id: courseId,
         file_size: expectedSize,
         filename: 'career-playbook-product-lead.md',
-        processing_method: 'career_playbook_bridge',
+        processing_method: 'full_text',
       })
     );
     expect(bridgeMocks.decrementQuota).not.toHaveBeenCalled();
