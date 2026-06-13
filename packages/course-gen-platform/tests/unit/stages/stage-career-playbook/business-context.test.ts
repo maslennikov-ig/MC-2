@@ -14,10 +14,12 @@ vi.mock('@/shared/supabase/admin', () => ({
 import {
   refreshCareerPlaybookBusinessContextDigest,
   hasPendingCareerPlaybookBusinessContextSources,
-  inspectCareerPlaybookBusinessContextSourceEvidence,
-  loadCareerPlaybookBusinessContextSourceEvidence,
   loadCareerPlaybookBusinessContextSourceExcerpts,
 } from '@/stages/stage-career-playbook/nodes/business-context';
+import {
+  inspectCareerPlaybookBusinessContextSourceEvidence,
+  loadCareerPlaybookBusinessContextSourceEvidence,
+} from '@/stages/stage-career-playbook/nodes/business-context-source-evidence';
 
 function createSourceRowsBuilder(data: unknown[], error: unknown = null) {
   const builder = {
