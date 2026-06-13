@@ -49,6 +49,7 @@ export function ActionsBar({
       variant="outline"
       size="sm"
       onClick={createCourseAction ? undefined : onCreateCourse}
+      data-testid="career-playbook-create-course-trigger"
     >
       <BookOpen className="mr-2 h-4 w-4" aria-hidden />
       {labels.createCourse}
