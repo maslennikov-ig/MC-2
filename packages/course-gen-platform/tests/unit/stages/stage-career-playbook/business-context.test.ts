@@ -14,6 +14,8 @@ vi.mock('@/shared/supabase/admin', () => ({
 import {
   refreshCareerPlaybookBusinessContextDigest,
   hasPendingCareerPlaybookBusinessContextSources,
+  inspectCareerPlaybookBusinessContextSourceEvidence,
+  loadCareerPlaybookBusinessContextSourceEvidence,
   loadCareerPlaybookBusinessContextSourceExcerpts,
 } from '@/stages/stage-career-playbook/nodes/business-context';
 
@@ -277,6 +279,82 @@ describe('Career Playbook business context digest refresh', () => {
 
     expect(result).toContain('source evidence could not be loaded');
     expect(result).toContain('Do not infer facts from source ids');
+  });
+
+  it('classifies source evidence as authoritative only when real source content is present', () => {
+    const authoritative = inspectCareerPlaybookBusinessContextSourceEvidence(
+      [
+        'Source evidence pack.',
+        '[Source 1: company.md]',
+        'Authoritative source content (Docling markdown):',
+        'Company-specific operating model.',
+      ].join('\n')
+    );
+    const warningOnly = inspectCareerPlaybookBusinessContextSourceEvidence(
+      'Uploaded source files are recorded, but source evidence could not be loaded. Do not infer facts from source ids.'
+    );
+
+    expect(authoritative).toMatchObject({
+      hasAuthoritativeEvidence: true,
+      unavailableReason: 'none',
+    });
+    expect(warningOnly).toMatchObject({
+      hasAuthoritativeEvidence: false,
+      unavailableReason: 'loader_unavailable',
+    });
+  });
+
+  it('returns structured source evidence for consumers that require authoritative files', async () => {
+    sourceMocks.from.mockImplementation(() => {
+      throw new Error('database connection lost');
+    });
+
+    const result = await loadCareerPlaybookBusinessContextSourceEvidence({
+      playbookId: '33333333-3333-4333-8333-333333333333',
+      context: {
+        mode: 'company_specific',
+        status: 'ready',
+        source_ids: ['00000000-0000-4000-8000-000000000010'],
+        digest: null,
+      },
+    });
+
+    expect(result).toMatchObject({
+      hasAuthoritativeEvidence: false,
+      unavailableReason: 'loader_unavailable',
+    });
+    expect(result.sourceExcerpts).toContain('source evidence could not be loaded');
+  });
+
+  it('returns no authoritative evidence when selected source rows have no loaded text', async () => {
+    const sourceId = '00000000-0000-4000-8000-000000000010';
+    mockSources(
+      [
+        {
+          id: sourceId,
+          filename: 'empty-source.pdf',
+          status: 'ready',
+          file_catalog_id: null,
+        },
+      ],
+      []
+    );
+
+    const result = await loadCareerPlaybookBusinessContextSourceEvidence({
+      playbookId: '33333333-3333-4333-8333-333333333333',
+      context: {
+        mode: 'company_specific',
+        status: 'ready',
+        source_ids: [sourceId],
+        digest: null,
+      },
+    });
+
+    expect(result).toMatchObject({
+      hasAuthoritativeEvidence: false,
+      unavailableReason: 'no_authoritative_content',
+    });
+    expect(result.sourceExcerpts).toContain('Processed text is not available yet');
   });
 
   it('keeps context collecting when any selected source is still processing', async () => {

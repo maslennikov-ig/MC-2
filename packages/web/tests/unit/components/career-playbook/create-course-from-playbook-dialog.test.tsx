@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 
+const previewCourseFromPlaybook = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const routerPush = vi.fn()
 
@@ -15,21 +16,52 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
+  previewCourseFromPlaybook: (...args: unknown[]) =>
+    previewCourseFromPlaybook(...(args as [input: { playbookId: string }])),
   createCourseFromPlaybook: (...args: unknown[]) =>
-    createCourseFromPlaybook(
-      ...(args as [input: { playbookId: string; includeWebResearch: boolean }])
-    ),
+    createCourseFromPlaybook(...(args as [input: Record<string, unknown>])),
 }))
 
 const messages = {
   'career-playbook': {
     library: {
       createCourseDialog: {
-        title: 'Create course from Role Guide',
-        description:
-          'Start course generation from this completed Role Guide. You can add materials after the course is created.',
-        startWithoutMaterials: 'Start without extra materials',
-        addMaterialsLater: 'Materials can be added after course creation if needed.',
+        title: 'Review course draft',
+        description: 'Check the course passport before generation starts.',
+        loadingPreview: 'Loading course draft...',
+        previewErrorTitle: 'Could not prepare course draft',
+        retryPreview: 'Retry',
+        roleGuideSourceTitle: 'Primary source',
+        roleGuideSourceDescription: 'The final Role Guide will be uploaded as the main source.',
+        titleLabel: 'Course title',
+        descriptionLabel: 'What the course will cover',
+        targetAudienceLabel: 'Target audience',
+        learningOutcomesLabel: 'Learning outcomes',
+        learningOutcomesHelp: 'One outcome per line.',
+        languageLabel: 'Language',
+        courseSizeLabel: 'Course size',
+        styleLabel: 'Style',
+        styleOptions: {
+          professional: 'Professional',
+          practical: 'Practical',
+          problem_based: 'Problem based',
+          analytical: 'Analytical',
+          conversational: 'Conversational',
+          storytelling: 'Storytelling',
+          interactive: 'Interactive',
+          motivational: 'Motivational',
+          academic: 'Academic',
+          technical: 'Technical',
+          research: 'Research',
+          gamified: 'Gamified',
+        },
+        sourcesTitle: 'Supporting sources',
+        webResearchLabel: 'Include web research',
+        webResearchDescription: 'Use external role research as an additional source.',
+        businessContextLabel: 'Include uploaded company context',
+        businessContextDescription: '{count} source files are available.',
+        businessContextUnavailable: 'No uploaded company context sources are available.',
+        createAndGenerate: 'Create and generate',
         loading: 'Creating course...',
         errorTitle: 'Course creation failed',
         genericError: 'Could not create a course from this Role Guide.',
@@ -49,14 +81,54 @@ function renderDialog() {
   )
 }
 
+function mockPreview() {
+  previewCourseFromPlaybook.mockResolvedValue({
+    playbookId: 'pb-1',
+    brief: {
+      title: 'Product Lead',
+      courseDescription: 'A course about platform product leadership.',
+      targetAudience: 'Lead Product Platform',
+      learningOutcomes: ['Improve activation', 'Run discovery rituals'],
+      language: 'en',
+      courseSize: 'standard',
+      style: 'professional',
+    },
+    defaults: {
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    },
+    sources: {
+      roleGuide: { included: true },
+      webResearch: {
+        available: true,
+        defaultIncluded: false,
+      },
+      businessContextSources: {
+        available: true,
+        defaultIncluded: false,
+        sourceCount: 1,
+        sources: [
+          {
+            id: 'source-1',
+            filename: 'company-handbook.md',
+            status: 'ready',
+          },
+        ],
+      },
+    },
+  })
+}
+
 describe('CreateCourseFromPlaybookDialog', () => {
   beforeEach(() => {
+    previewCourseFromPlaybook.mockReset()
     createCourseFromPlaybook.mockReset()
     routerPush.mockReset()
   })
 
-  it('opens from trigger and creates a course without extra materials', async () => {
+  it('opens from trigger, pre-fills the passport, and creates from default source choices', async () => {
     const user = userEvent.setup()
+    mockPreview()
     createCourseFromPlaybook.mockResolvedValue({
       success: true,
       courseId: 'course-1',
@@ -68,25 +140,71 @@ describe('CreateCourseFromPlaybookDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create course' }))
 
-    expect(
-      screen.getByRole('dialog', { name: 'Create course from Role Guide' })
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('Materials can be added after course creation if needed.')
-    ).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add materials before creation' })).toBeNull()
+    expect(await screen.findByRole('dialog', { name: 'Review course draft' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Course title')).toHaveValue('Product Lead')
+    expect(screen.getByLabelText('What the course will cover')).toHaveValue(
+      'A course about platform product leadership.'
+    )
+    expect(screen.getByLabelText('Learning outcomes')).toHaveValue(
+      'Improve activation\nRun discovery rituals'
+    )
+    expect(screen.getByLabelText('Include web research')).not.toBeChecked()
+    expect(screen.getByLabelText('Include uploaded company context')).not.toBeChecked()
 
-    await user.click(screen.getByRole('button', { name: 'Start without extra materials' }))
+    await user.click(screen.getByRole('button', { name: 'Create and generate' }))
 
     expect(createCourseFromPlaybook).toHaveBeenCalledWith({
       playbookId: 'pb-1',
-      includeWebResearch: true,
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+      overrides: {
+        title: 'Product Lead',
+        courseDescription: 'A course about platform product leadership.',
+        targetAudience: 'Lead Product Platform',
+        learningOutcomes: ['Improve activation', 'Run discovery rituals'],
+        language: 'en',
+        courseSize: 'standard',
+        style: 'professional',
+      },
     })
     expect(routerPush).toHaveBeenCalledWith('/en/courses/acme/product-lead/generating')
   })
 
+  it('submits edited fields and explicitly selected supporting sources', async () => {
+    const user = userEvent.setup()
+    mockPreview()
+    createCourseFromPlaybook.mockResolvedValue({
+      success: true,
+      courseId: 'course-1',
+      redirectUrl: '/en/courses/acme/edited/generating',
+      sourceDocumentIds: ['source-1', 'source-2'],
+    })
+
+    renderDialog()
+
+    await user.click(screen.getByRole('button', { name: 'Create course' }))
+    const title = await screen.findByLabelText('Course title')
+    await user.clear(title)
+    await user.type(title, 'Edited onboarding course')
+    await user.click(screen.getByLabelText('Include web research'))
+    await user.click(screen.getByLabelText('Include uploaded company context'))
+
+    await user.click(screen.getByRole('button', { name: 'Create and generate' }))
+
+    expect(createCourseFromPlaybook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeWebResearch: true,
+        includeBusinessContextSources: true,
+        overrides: expect.objectContaining({
+          title: 'Edited onboarding course',
+        }),
+      })
+    )
+  })
+
   it('shows loading and error states without navigating', async () => {
     const user = userEvent.setup()
+    mockPreview()
     let rejectRequest: (error: Error) => void = () => {}
     createCourseFromPlaybook.mockImplementation(
       () =>
@@ -98,7 +216,7 @@ describe('CreateCourseFromPlaybookDialog', () => {
     renderDialog()
 
     await user.click(screen.getByRole('button', { name: 'Create course' }))
-    await user.click(screen.getByRole('button', { name: 'Start without extra materials' }))
+    await user.click(await screen.findByRole('button', { name: 'Create and generate' }))
 
     expect(screen.getByRole('button', { name: 'Creating course...' })).toBeDisabled()
     rejectRequest(new Error('Bridge unavailable'))

@@ -15,7 +15,16 @@ vi.mock('@/components/layouts/header', () => ({
 }))
 
 const updateVisibility = vi.fn()
+const previewCourseFromPlaybook = vi.fn()
+const createCourseFromPlaybook = vi.fn()
+const routerPush = vi.fn()
 const copyToClipboard = vi.hoisted(() => vi.fn())
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: routerPush,
+  }),
+}))
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
   updateCareerPlaybookVisibility: (...args: unknown[]) =>
@@ -26,6 +35,10 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
         locale: string,
       ])
     ),
+  previewCourseFromPlaybook: (...args: unknown[]) =>
+    previewCourseFromPlaybook(...(args as [input: { playbookId: string }])),
+  createCourseFromPlaybook: (...args: unknown[]) =>
+    createCourseFromPlaybook(...(args as [input: Record<string, unknown>])),
 }))
 
 vi.mock('@/lib/utils/clipboard', () => ({
@@ -44,6 +57,49 @@ const messages = {
     },
   },
   'career-playbook': {
+    library: {
+      createCourseDialog: {
+        title: 'Review course draft',
+        description: 'Check the course passport before generation starts.',
+        loadingPreview: 'Loading course draft...',
+        previewErrorTitle: 'Could not prepare course draft',
+        retryPreview: 'Retry',
+        roleGuideSourceTitle: 'Primary source',
+        roleGuideSourceDescription: 'The final Role Guide will be uploaded as the main source.',
+        titleLabel: 'Course title',
+        descriptionLabel: 'What the course will cover',
+        targetAudienceLabel: 'Target audience',
+        learningOutcomesLabel: 'Learning outcomes',
+        learningOutcomesHelp: 'One outcome per line.',
+        languageLabel: 'Language',
+        courseSizeLabel: 'Course size',
+        styleLabel: 'Style',
+        styleOptions: {
+          professional: 'Professional',
+          practical: 'Practical',
+          problem_based: 'Problem based',
+          analytical: 'Analytical',
+          conversational: 'Conversational',
+          storytelling: 'Storytelling',
+          interactive: 'Interactive',
+          motivational: 'Motivational',
+          academic: 'Academic',
+          technical: 'Technical',
+          research: 'Research',
+          gamified: 'Gamified',
+        },
+        sourcesTitle: 'Supporting sources',
+        webResearchLabel: 'Include web research',
+        webResearchDescription: 'Use external role research as an additional source.',
+        businessContextLabel: 'Include uploaded company context',
+        businessContextDescription: '{count} source files are available.',
+        businessContextUnavailable: 'No uploaded company context sources are available.',
+        createAndGenerate: 'Create and generate',
+        loading: 'Creating course...',
+        errorTitle: 'Course creation failed',
+        genericError: 'Could not create a course from this Role Guide.',
+      },
+    },
     viewer: {
       productLabel: 'Role Guide',
       contents: 'Contents',
@@ -191,6 +247,52 @@ const ruMessages = {
     },
   },
   'career-playbook': {
+    library: {
+      createCourseDialog: {
+        ...messages['career-playbook'].library.createCourseDialog,
+        title: 'Проверить курс перед созданием',
+        description: 'Проверьте паспорт курса перед запуском генерации.',
+        loadingPreview: 'Загружаем черновик курса...',
+        previewErrorTitle: 'Не удалось подготовить черновик курса',
+        retryPreview: 'Повторить',
+        roleGuideSourceTitle: 'Основной источник',
+        roleGuideSourceDescription:
+          'Финальная должностная инструкция будет загружена как основной источник.',
+        titleLabel: 'Название курса',
+        descriptionLabel: 'Что будет в курсе',
+        targetAudienceLabel: 'Целевая аудитория',
+        learningOutcomesLabel: 'Результаты обучения',
+        learningOutcomesHelp: 'Один результат на строку.',
+        languageLabel: 'Язык',
+        courseSizeLabel: 'Размер курса',
+        styleLabel: 'Стиль',
+        styleOptions: {
+          professional: 'Профессиональный',
+          practical: 'Практический',
+          problem_based: 'Проблемно-ориентированный',
+          analytical: 'Аналитический',
+          conversational: 'Разговорный',
+          storytelling: 'Сторителлинг',
+          interactive: 'Интерактивный',
+          motivational: 'Мотивационный',
+          academic: 'Академический',
+          technical: 'Технический',
+          research: 'Исследовательский',
+          gamified: 'Игровой',
+        },
+        sourcesTitle: 'Дополнительные источники',
+        webResearchLabel: 'Добавить web research',
+        webResearchDescription:
+          'Использовать внешнее исследование роли как дополнительный источник.',
+        businessContextLabel: 'Добавить загруженный бизнес-контекст',
+        businessContextDescription: 'Доступно файлов: {count}.',
+        businessContextUnavailable: 'Загруженные источники бизнес-контекста недоступны.',
+        createAndGenerate: 'Создать и запустить генерацию',
+        loading: 'Создаём курс...',
+        errorTitle: 'Не удалось создать курс',
+        genericError: 'Не удалось создать курс из должностной инструкции.',
+      },
+    },
     viewer: {
       ...messages['career-playbook'].viewer,
       contents: 'Содержание',
@@ -293,11 +395,43 @@ function renderPage({
   )
 }
 
+function mockCoursePreview() {
+  previewCourseFromPlaybook.mockResolvedValue({
+    playbookId: '00000000-0000-4000-8000-000000002001',
+    brief: {
+      title: 'Руководитель продаж',
+      courseDescription: 'Курс по должностной инструкции руководителя продаж.',
+      targetAudience: 'Руководители продаж',
+      learningOutcomes: ['Выстроить KPI', 'Запустить адаптацию'],
+      language: 'ru',
+      courseSize: 'standard',
+      style: 'professional',
+    },
+    defaults: {
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    },
+    sources: {
+      roleGuide: { included: true },
+      webResearch: { available: true, defaultIncluded: false },
+      businessContextSources: {
+        available: false,
+        defaultIncluded: false,
+        sourceCount: 0,
+        sources: [],
+      },
+    },
+  })
+}
+
 describe('CareerPlaybookViewerPageClient', () => {
   beforeEach(() => {
     useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     setCareerPlaybookClientForTests(null)
     updateVisibility.mockReset()
+    previewCourseFromPlaybook.mockReset()
+    createCourseFromPlaybook.mockReset()
+    routerPush.mockReset()
     copyToClipboard.mockReset()
     copyToClipboard.mockResolvedValue(true)
     localStorage.clear()
@@ -394,6 +528,89 @@ describe('CareerPlaybookViewerPageClient', () => {
       expect(useCareerPlaybookStore.getState().viewer?.visibility).toBe('organization')
     })
     expect(screen.getByRole('button', { name: /Видимость: Для организации/ })).toBeInTheDocument()
+  })
+
+  it('opens the real course preview dialog from the private viewer action', async () => {
+    const user = userEvent.setup()
+    mockCoursePreview()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    await user.click(await screen.findByRole('button', { name: 'Создать курс из инструкции' }))
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Проверить курс перед созданием' })
+    ).toBeInTheDocument()
+    expect(await screen.findByLabelText('Название курса')).toHaveValue('Руководитель продаж')
+    expect(screen.getByRole('option', { name: 'Стандартный (30-50 уроков)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Профессиональный' })).toBeInTheDocument()
+    expect(
+      screen.queryByText('Создание курса будет доступно после подключения серверного действия')
+    ).not.toBeInTheDocument()
+  })
+
+  it('hides the course creation action when viewer permissions deny it', async () => {
+    mockCoursePreview()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: false,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    expect(await screen.findByRole('heading', { name: 'Руководитель продаж' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Создать курс из инструкции' })
+    ).not.toBeInTheDocument()
+    expect(previewCourseFromPlaybook).not.toHaveBeenCalled()
   })
 
   it('renders viewer snapshots with unknown waiting statuses without crashing', async () => {

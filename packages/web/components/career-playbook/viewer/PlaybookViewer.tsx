@@ -1,6 +1,6 @@
 'use client'
 
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Building2,
@@ -127,6 +127,7 @@ interface PlaybookViewerProps {
   onPdf: () => void
   onShare: () => void
   onCreateCourse: () => void
+  createCourseAction?: (trigger: ReactNode) => ReactNode
   onDelete: () => void
   isUpdatingVisibility?: boolean
   isUpdatingNumericFact?: boolean
@@ -317,6 +318,7 @@ export function PlaybookViewer({
   onPdf,
   onShare,
   onCreateCourse,
+  createCourseAction,
   onDelete,
   isUpdatingVisibility = false,
   isUpdatingNumericFact = false,
@@ -578,11 +580,13 @@ export function PlaybookViewer({
                 numericSummary={numericSummary}
                 contentLanguage={snapshot.contentLanguage}
                 canManageVisibility={viewerPermissions.canManageVisibility}
+                canCreateCourse={viewerPermissions.canCreateCourse}
                 isUpdatingVisibility={isUpdatingVisibility}
                 onVisibilityChange={onVisibilityChange}
                 onPdf={onPdf}
                 onShare={onShare}
                 onCreateCourse={onCreateCourse}
+                createCourseAction={createCourseAction}
                 onDelete={onDelete}
               />
             ) : null}
@@ -769,11 +773,13 @@ function InspectorRail({
   numericSummary,
   contentLanguage,
   canManageVisibility,
+  canCreateCourse,
   isUpdatingVisibility,
   onVisibilityChange,
   onPdf,
   onShare,
   onCreateCourse,
+  createCourseAction,
   onDelete,
 }: {
   snapshot: CareerPlaybookViewerSnapshot
@@ -784,11 +790,13 @@ function InspectorRail({
   numericSummary: NumericFactSummary
   contentLanguage: string
   canManageVisibility: boolean
+  canCreateCourse: boolean
   isUpdatingVisibility: boolean
   onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
   onPdf: () => void
   onShare: () => void
   onCreateCourse: () => void
+  createCourseAction?: (trigger: ReactNode) => ReactNode
   onDelete: () => void
 }) {
   return (
@@ -810,6 +818,8 @@ function InspectorRail({
           onPdf={onPdf}
           onShare={onShare}
           onCreateCourse={onCreateCourse}
+          createCourseAction={createCourseAction}
+          canCreateCourse={canCreateCourse}
           onDelete={onDelete}
         />
 

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   generateCareerPlaybookFollowups: vi.fn(),
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
+  previewCourseFromPlaybook: vi.fn(),
   createCourseFromPlaybook: vi.fn(),
   validateFile: vi.fn(),
   runPhase2Storage: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock('@/services/career-playbook-pdf', () => ({
 }));
 
 vi.mock('@/server/routers/career-playbook/course-bridge.service', () => ({
+  previewCourseFromPlaybook: mocks.previewCourseFromPlaybook,
   createCourseFromPlaybook: mocks.createCourseFromPlaybook,
 }));
 
@@ -1331,7 +1333,8 @@ describe('careerPlaybookRouter transport', () => {
 
     expect(mocks.createCourseFromPlaybook).toHaveBeenCalledWith(authenticatedContext, {
       playbookId,
-      includeWebResearch: true,
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
     });
     expect(result).toMatchObject({
       success: true,

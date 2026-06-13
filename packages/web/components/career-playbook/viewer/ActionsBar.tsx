@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { BookOpen, Download, Share2, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,8 @@ interface ActionsBarProps {
   onPdf: () => void
   onShare: () => void
   onCreateCourse: () => void
+  createCourseAction?: (trigger: ReactNode) => ReactNode
+  canCreateCourse?: boolean
   onDelete: () => void
 }
 
@@ -35,9 +38,22 @@ export function ActionsBar({
   onPdf,
   onShare,
   onCreateCourse,
+  createCourseAction,
+  canCreateCourse = true,
   onDelete,
 }: ActionsBarProps) {
   const labels = { ...defaultCopy, ...copy }
+  const createCourseButton = canCreateCourse ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={createCourseAction ? undefined : onCreateCourse}
+    >
+      <BookOpen className="mr-2 h-4 w-4" aria-hidden />
+      {labels.createCourse}
+    </Button>
+  ) : null
 
   return (
     <div className="flex flex-col gap-2">
@@ -53,10 +69,11 @@ export function ActionsBar({
           <Share2 className="mr-2 h-4 w-4" aria-hidden />
           {labels.share}
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={onCreateCourse}>
-          <BookOpen className="mr-2 h-4 w-4" aria-hidden />
-          {labels.createCourse}
-        </Button>
+        {createCourseButton
+          ? createCourseAction
+            ? createCourseAction(createCourseButton)
+            : createCourseButton
+          : null}
         <Button
           type="button"
           variant="outline"

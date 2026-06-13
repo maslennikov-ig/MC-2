@@ -1,45 +1,43 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-12
-Stage: none
-Branch: `codex/security-audit-deps-20260612`
-Beads: `mc2-bwx1o`
+Updated: 2026-06-13
+Stage: `mc2-owuag`
+Branch: `codex/career-playbook-course-preview-bridge`
+Beads: `mc2-owuag`
 
 ## Current State
 
-- Dependency security audit cleanup is complete in `codex/security-audit-deps-20260612`.
-- Local `pnpm audit` was reduced from 151 vulnerabilities to zero reported vulnerabilities.
-- Patched direct dependency ranges and targeted pnpm overrides cover Next 15, Vitest/Vite/Rollup, axios, fast-xml-parser, Mermaid, MCP SDK, LangChain, Supabase CLI, jsdom, webpack, uuid, minimatch, brace-expansion, qs, path-to-regexp, postcss, undici, tar, yaml, lodash, and related transitive packages.
-- `bullmq` remains pinned to `5.66.3` because the newer major-compatible update changed Queue/Redis generics and was not required after the `uuid` override.
-- Test-only updates align stale expectations with current contracts for pause/resume organization lookup, fixed header positioning, compact Stage 6 module cards, current Career Playbook demo structure, and enrichment access mocking.
+- Career Playbook Role Guide -> course bridge preview/create flow is implemented locally.
+- Private Role Guide viewer opens `CreateCourseFromPlaybookDialog`; read-only viewers do not see the create-course action.
+- The dialog now loads a preview, lets the owner edit title, description, audience, outcomes, language, localized course size, localized style, and optional supporting sources before generation.
+- Supporting sources default to off. Role Guide markdown is always primary; web research and uploaded business-context excerpts are included only by explicit opt-in.
+- Backend bridge stores `course_size` and `style`, uploads bridge sources, starts generation, and rolls back created draft courses if required source upload/evidence/generation start fails.
+- Explicit business-context opt-in now uses structured source evidence metadata: `hasAuthoritativeEvidence` and `unavailableReason`.
+- Docs and Graphify were refreshed for the bridge behavior.
 
 ## Verification
 
-- Passed: `pnpm audit --json` -> 0 info, 0 low, 0 moderate, 0 high, 0 critical.
-- Passed: `pnpm type-check`.
-- Passed: `pnpm lint` with existing warning budget only.
-- Passed: dummy-env `pnpm build`.
-- Passed: `pnpm --filter @megacampus/web test` -> 82 files, 1210 tests.
-- Passed earlier in this branch after dependency updates: `pnpm --filter @megacampus/shared-types test:unit` -> 176 tests.
-- Passed earlier in this branch after dependency updates: backend unit suite excluding local-only PDF Chromium test -> 4257 tests.
-- Passed: `scripts/orchestration/run_process_verification.sh`.
+- Passed: `pnpm exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook-course-bridge.service.test.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/stages/stage-career-playbook/business-context.test.ts` from `packages/course-gen-platform` -> 69 tests.
+- Passed: `pnpm exec vitest run tests/unit/components/career-playbook/create-course-from-playbook-dialog.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx` from `packages/web` -> 21 tests.
+- Passed: `pnpm --filter @megacampus/course-gen-platform type-check`.
+- Passed: `pnpm --filter @megacampus/web type-check`.
+- Passed: `pnpm build`.
+- Passed: `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-owuag --verify-group code_change_commands`.
 
 ## Next recommended
 
 Next stage id: none.
-Recommended action: merge/push through the dev delivery path, then monitor CI and dev smoke checks.
+Recommended action: review diff, then deliver through the normal dev delivery path when ready.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Read `AGENTS.md`, `.codex/orchestrator.toml`,
-Beads `mc2-bwx1o`, and the commit on `codex/security-audit-deps-20260612`. Confirm whether develop
-delivery already completed before doing any further dependency/security work.
+Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, Beads `mc2-owuag`, `.codex/stages/mc2-owuag/summary.md`, and the current diff.
 
 ## Delivery
 
-- docs-reviewed: no-change-needed - dependency/test cleanup does not change public behavior, API contracts, migrations, or operator runbooks.
-- graph-reviewed: updated - ran `graphify update .`; local `graphify-out/graph.json` and `GRAPH_REPORT.md` were regenerated, ignored by git.
+- docs-reviewed: updated - bridge flow and architecture docs describe structured business-context evidence metadata, localized preview/edit controls, default-off supporting sources, rollback, and generation start.
+- graph-reviewed: updated - ran `graphify update .`; local ignored `graphify-out/graph.json` and `GRAPH_REPORT.md` were regenerated. HTML visualization was skipped because the graph is above the default node limit.
 
 ## Explicit defers
 
-- None.
+- Browser-level private viewer -> preview -> generation redirect E2E remains blocked by Beads `mc2-zt4ju` until the local course-gen-platform dev/start runtime is fixed.

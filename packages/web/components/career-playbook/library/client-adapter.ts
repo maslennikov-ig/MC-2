@@ -8,6 +8,7 @@ import type {
   CareerPlaybookVisibility,
   CreateCourseFromPlaybookInput,
   CreateCourseFromPlaybookResult,
+  PreviewCourseFromPlaybookResult,
 } from './types'
 
 type BrowserCareerPlaybookClient = {
@@ -34,6 +35,9 @@ type BrowserCareerPlaybookClient = {
       }
     }
     courseBridge?: {
+      previewCourseFromPlaybook?: {
+        query: (input: { playbookId: string }) => Promise<PreviewCourseFromPlaybookResult>
+      }
       createCourseFromPlaybook?: {
         mutate: (input: CreateCourseFromPlaybookInput) => Promise<CreateCourseFromPlaybookResult>
       }
@@ -136,4 +140,17 @@ export async function createCourseFromPlaybook(
   }
 
   return procedure.mutate(input)
+}
+
+export async function previewCourseFromPlaybook(input: {
+  playbookId: string
+}): Promise<PreviewCourseFromPlaybookResult> {
+  const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
+  const procedure = client.careerPlaybook?.courseBridge?.previewCourseFromPlaybook
+
+  if (!procedure) {
+    throw new Error('careerPlaybook.courseBridge.previewCourseFromPlaybook unavailable')
+  }
+
+  return procedure.query(input)
 }
