@@ -369,6 +369,7 @@ export default function GenerationProgressContainerEnhanced({
       error_message?: string | null
       analysis_result?: unknown
       generation_paused_at?: string | null
+      has_files?: boolean | null
     }) => {
       if ('generation_paused_at' in course) {
         const newIsPaused = course.generation_paused_at !== null
@@ -400,14 +401,14 @@ export default function GenerationProgressContainerEnhanced({
         if (modulesTotal !== undefined) lastKnownModulesTotal.current = modulesTotal
         if (lessonsTotal > DEFAULT_LESSONS_COUNT) lastKnownLessonsTotal.current = lessonsTotal
 
+        const hasDocuments = progress.has_documents === true || course.has_files === true
         const generationProgress: GenerationProgress = {
           steps: (progress.steps as GenerationStep[]) || [],
           message: (progress.message as string) || 'Processing...',
           percentage: (progress.percentage as number) || 0,
           current_step: (progress.current_step as number) || 0,
           total_steps: (progress.total_steps as number) || 6,
-          has_documents:
-            progress.has_documents !== undefined ? (progress.has_documents as boolean) : false,
+          has_documents: hasDocuments,
           lessons_completed: (progress.lessons_completed as number) || 0,
           lessons_total: lessonsTotal,
           modules_total: modulesTotal,

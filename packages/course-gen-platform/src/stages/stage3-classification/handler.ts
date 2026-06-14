@@ -104,10 +104,25 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
 
       // Handle stage completion with automatic mode support
       try {
-        const { autoApproved } = await handleStageCompletion(courseId, 3);
+        const singleDocumentAutoSkip = output.totalDocuments === 1;
+        const { autoApproved } = await handleStageCompletion(
+          courseId,
+          3,
+          undefined,
+          singleDocumentAutoSkip
+            ? {
+                forceAutoApprove: true,
+                forceReason: 'single_document_auto_core',
+              }
+            : undefined
+        );
 
         if (!autoApproved) {
           this.log(job, 'info', 'Course status updated to stage_3_awaiting_approval', { courseId });
+        } else if (singleDocumentAutoSkip) {
+          this.log(job, 'info', 'Stage 3 auto-skipped for single document, proceeding to Stage 4', {
+            courseId,
+          });
         } else {
           this.log(job, 'info', 'Stage 3 auto-approved, proceeding to Stage 4', { courseId });
         }

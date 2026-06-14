@@ -188,15 +188,22 @@ still processing, unavailable, or load as warning-only text, course creation
 fails with a user-visible error and the draft course is rolled back.
 
 Bridge sources are still trusted generated markdown and keep
-`processing_method = 'career_playbook_bridge'`, `markdown_content`, and
-`processed_content` populated for the downstream course pipeline. They now
-reserve organization storage quota before writing the source file, release it if
-the write or `file_catalog` insert fails, and release quota during bridge course
-rollback after the course delete succeeds. If course rollback delete fails, the
-files and quota are left intact because database ownership may still exist.
+`markdown_content` and `processed_content` populated for the downstream course
+pipeline, with `summary_metadata.source = 'career_playbook_bridge'`. They still
+enter Stage 2 so the course pipeline can index/vectorize the source consistently,
+but the source is not a user-facing Markdown review gate in the bridge flow.
+Bridge course creation sets `generation_mode = 'automatic'`; when there is only
+one source document, Stage 3 assigns it `CORE` and proceeds without manual
+prioritization. They now reserve organization storage quota before writing the
+source file, release it if the write or `file_catalog` insert fails, and release
+quota during bridge course rollback after the course delete succeeds. If course
+rollback delete fails, the files and quota are left intact because database
+ownership may still exist.
 
-The created course stores `course_size` and `style` from the preview payload so
-Stage 4-6 generation sees the same controls as a normal `/create` course.
+The created course stores `course_size`, `style`, and the automatic generation
+mode from the preview payload so Stage 4-6 generation sees the same controls as
+a normal `/create` course without extra review clicks for obvious single-source
+steps.
 
 ## E2E Harness
 

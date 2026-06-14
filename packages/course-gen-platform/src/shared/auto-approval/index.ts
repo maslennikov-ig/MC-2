@@ -21,6 +21,11 @@ import {
 
 type GenerationStatus = Database['public']['Enums']['generation_status'];
 
+interface HandleStageCompletionOptions {
+  forceAutoApprove?: boolean;
+  forceReason?: string;
+}
+
 // ============================================================================
 // STAGE STATUS TRANSITION
 // ============================================================================
@@ -193,7 +198,8 @@ async function validateCourseStatusForTransition(
 export async function handleStageCompletion(
   courseId: string,
   currentStage: number,
-  supabase?: SupabaseClient
+  supabase?: SupabaseClient,
+  options: HandleStageCompletionOptions = {}
 ): Promise<{ autoApproved: boolean; nextStage?: number }> {
   const db = supabase || getSupabaseAdmin();
 
@@ -215,13 +221,23 @@ export async function handleStageCompletion(
     throw new Error(`Course not found: ${courseId}`);
   }
 
+  const shouldAutoApprove = course.generation_mode === 'automatic' || options.forceAutoApprove;
+
   // Check if automatic mode
-  if (course.generation_mode !== 'automatic') {
+  if (!shouldAutoApprove) {
     return handleSemiAutomaticMode(db, courseId, currentStage);
   }
 
   // Automatic mode: proceed to next stage
-  logger.info({ courseId, currentStage }, 'Auto-approving stage (automatic mode)');
+  logger.info(
+    {
+      courseId,
+      currentStage,
+      forced: Boolean(options.forceAutoApprove),
+      forceReason: options.forceReason,
+    },
+    'Auto-approving stage'
+  );
 
   const nextStage = currentStage + 1;
   const completeStatus = `stage_${currentStage}_complete` as GenerationStatus;
