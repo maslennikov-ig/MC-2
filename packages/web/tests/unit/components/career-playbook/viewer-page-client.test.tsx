@@ -404,7 +404,7 @@ function mockCoursePreview() {
       targetAudience: 'Руководители продаж',
       learningOutcomes: ['Выстроить KPI', 'Запустить адаптацию'],
       language: 'ru',
-      courseSize: 'standard',
+      courseSize: 'auto',
       style: 'professional',
     },
     defaults: {

@@ -90,7 +90,7 @@ function mockPreview() {
       targetAudience: 'Lead Product Platform',
       learningOutcomes: ['Improve activation', 'Run discovery rituals'],
       language: 'en',
-      courseSize: 'standard',
+      courseSize: 'auto',
       style: 'professional',
     },
     defaults: {
@@ -163,7 +163,7 @@ describe('CreateCourseFromPlaybookDialog', () => {
         targetAudience: 'Lead Product Platform',
         learningOutcomes: ['Improve activation', 'Run discovery rituals'],
         language: 'en',
-        courseSize: 'standard',
+        courseSize: 'auto',
         style: 'professional',
       },
     })

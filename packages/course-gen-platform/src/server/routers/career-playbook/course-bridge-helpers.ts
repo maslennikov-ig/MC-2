@@ -222,7 +222,7 @@ export function buildCourseBridgeBrief(playbook: CareerPlaybookRow): CourseBridg
     targetAudience,
     learningOutcomes: learningOutcomes.length > 0 ? learningOutcomes : fallbackOutcomes,
     language: playbook.language,
-    courseSize: 'standard',
+    courseSize: 'auto',
     style: DEFAULT_COURSE_STYLE,
     settings: toJson({
       source: 'career_playbook',

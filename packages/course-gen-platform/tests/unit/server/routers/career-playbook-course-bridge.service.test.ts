@@ -266,7 +266,7 @@ describe('course bridge service', () => {
 
     expect(preview.brief).toMatchObject({
       title: 'Product Lead',
-      courseSize: 'standard',
+      courseSize: 'auto',
       style: 'professional',
       language: 'en',
     });
@@ -503,6 +503,7 @@ describe('course bridge service', () => {
         slug: 'product-lead',
         courseDescription: expect.stringContaining('Mission: own platform product outcomes.'),
         targetAudience: 'lead Product Platform',
+        courseSize: 'auto',
       })
     );
     expect(dependencies.uploadDocument).toHaveBeenCalledTimes(2);
