@@ -52,7 +52,7 @@ const modelConfigService = createModelConfigService();
  * Used when database is unavailable or config not found
  *
  * NOTE: These are LAST RESORT fallbacks. Primary source is database.
- * All standard phases now use DEFAULT_MODEL_ID (Xiaomi MiMo V2 Flash).
+ * All standard phases now use DEFAULT_MODEL_ID (DeepSeek V4 Flash).
  * Special phases (emergency, quality_fallback) keep specific models.
  *
  * Hierarchy:
@@ -280,7 +280,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 15000,
   },
   stage_6_extended_en: {
-    modelId: 'x-ai/grok-4.1-fast', // Extended context, Grok for EN
+    modelId: 'deepseek/deepseek-v4-flash', // Extended context for EN
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -323,12 +323,12 @@ const PHASE_FALLBACK_CONFIG: Record<
   },
   // Special phases (keep specific models)
   emergency: {
-    modelId: 'x-ai/grok-4-fast', // Large context (2M tokens)
+    modelId: 'deepseek/deepseek-v4-flash', // Large context (2M tokens)
     temperature: 0.7,
     maxTokens: 30000,
   },
   quality_fallback: {
-    modelId: DEFAULT_MODEL_ID, // Updated: use MiMo for quality fallback too
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.3,
     maxTokens: 16000,
   },

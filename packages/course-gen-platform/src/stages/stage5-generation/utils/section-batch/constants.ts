@@ -16,7 +16,7 @@ export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
  */
 export const MODELS = {
   /** Simple tier: fast cheap model for trivial sections */
-  simple: 'xiaomi/mimo-v2-flash',
+  simple: 'deepseek/deepseek-v4-flash',
   /** Normal tier: thinking model for most sections */
   normal: 'moonshotai/kimi-k2-thinking',
   /** Complex tier: premium model for hardest sections + first section */

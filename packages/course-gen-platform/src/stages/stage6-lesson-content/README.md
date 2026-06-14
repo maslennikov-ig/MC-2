@@ -225,8 +225,8 @@ When max iterations reached without meeting threshold:
 
 ### Patcher Model
 
-The Patcher uses a FREE model: `xiaomi/mimo-v2-flash`
-This keeps refinement costs minimal while maintaining quality.
+The Patcher uses the default fast model: `deepseek/deepseek-v4-flash`.
+This keeps refinement latency low while maintaining quality.
 
 ## Test Coverage
 

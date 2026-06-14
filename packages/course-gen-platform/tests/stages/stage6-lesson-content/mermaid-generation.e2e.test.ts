@@ -45,10 +45,10 @@ let runMermaidFixPipeline: typeof import('../../../src/stages/stage6-lesson-cont
 /**
  * Model to use for diagram generation tests
  * Using EXACTLY the same model as Stage 6 section expander (from llm_model_config table)
- * Primary: xiaomi/mimo-v2-flash
+ * Primary: deepseek/deepseek-v4-flash
  * Fallback: qwen/qwen3-235b-a22b-2507
  */
-const GENERATION_MODEL_PRIMARY = 'xiaomi/mimo-v2-flash';
+const GENERATION_MODEL_PRIMARY = 'deepseek/deepseek-v4-flash';
 const GENERATION_MODEL_FALLBACK = 'qwen/qwen3-235b-a22b-2507';
 
 /**
@@ -1130,7 +1130,7 @@ describe('Stress Tests', () => {
 // ============================================================================
 
 describe('Statistics Collection', () => {
-  it('should collect and report LLM fixer statistics', async () => {
+  it('should collect and report LLM fixer statistics', () => {
     const metrics = getLLMFixerMetrics();
 
     console.log('\n📊 Final LLM Fixer Statistics:');

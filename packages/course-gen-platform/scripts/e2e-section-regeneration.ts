@@ -36,7 +36,7 @@ import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 // CONFIGURATION
 // ============================================================================
 
-const TEST_MODEL = 'xiaomi/mimo-v2-flash';
+const TEST_MODEL = 'deepseek/deepseek-v4-flash';
 const LANGUAGE = 'ru';
 
 // ============================================================================

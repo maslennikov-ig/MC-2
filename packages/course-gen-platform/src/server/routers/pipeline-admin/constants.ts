@@ -157,7 +157,7 @@ type PipelineDefaultPhaseName = PhaseName | 'stage_6_content';
  * Used by resetModelConfigToDefault procedure
  *
  * NOTE: These are LAST RESORT fallbacks. Primary source is database.
- * Uses DEFAULT_MODEL_ID (Xiaomi MiMo V2 Flash) for standard phases.
+ * Uses DEFAULT_MODEL_ID (DeepSeek V4 Flash) for standard phases.
  * Extended phases use Gemini 2.5 Flash for large context.
  */
 export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultModelConfig> = {
@@ -287,7 +287,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: 'google/gemini-3-flash-preview',
   },
   stage_5_simple: {
-    modelId: 'xiaomi/mimo-v2-flash',
+    modelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 30000,
     fallbackModelId: 'moonshotai/kimi-k2-thinking',
@@ -381,8 +381,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId,
     temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.temperature,
     maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.maxTokens,
-    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration
-      .fallbackModelId,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.fallbackModelId,
   },
   stage_6_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
@@ -403,7 +402,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_6_extended_en: {
-    modelId: 'x-ai/grok-4.1-fast',
+    modelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -479,7 +478,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
   },
   // Special phases
   emergency: {
-    modelId: 'x-ai/grok-4-fast',
+    modelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 30000,
     fallbackModelId: 'google/gemini-3-flash-preview',

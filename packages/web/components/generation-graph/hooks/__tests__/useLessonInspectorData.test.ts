@@ -132,7 +132,7 @@ describe('resolveLessonInspectorQualityScore', () => {
               manual_triggered: true,
               selected_model: 'openai/gpt-5.4',
               fallback_model: 'z-ai/glm-5',
-              model_used: 'xiaomi/mimo-v2-flash',
+              model_used: 'deepseek/deepseek-v4-flash',
               quality_score: 0,
             },
           ],

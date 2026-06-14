@@ -17,10 +17,10 @@
 
 /**
  * Default primary model (used when DB is unavailable)
- * Xiaomi MiMo V2 Flash - stable, good Russian language support
+ * DeepSeek V4 Flash - default fast runtime model for course generation
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = 'xiaomi/mimo-v2-flash';
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable)

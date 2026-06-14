@@ -17,6 +17,17 @@ import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspa
 
 type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
 
+const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
+  'xiaomi/mimo-v2-flash': 'deepseek/deepseek-v4-flash',
+  'x-ai/grok-4.1-fast': 'deepseek/deepseek-v4-flash',
+  'x-ai/grok-4-fast': 'deepseek/deepseek-v4-flash',
+};
+
+function normalizeRuntimeModelId(modelId: string | null | undefined): string | null {
+  if (!modelId) return null;
+  return RETIRED_MODEL_ID_REPLACEMENTS[modelId] ?? modelId;
+}
+
 /**
  * Default values for per-stage configuration when not specified in database
  */
@@ -180,8 +191,8 @@ export async function fetchStageConfigFromDb(
       }
 
       return {
-        primary: config.model_id,
-        fallback: config.fallback_model_id,
+        primary: normalizeRuntimeModelId(config.model_id) ?? config.model_id,
+        fallback: normalizeRuntimeModelId(config.fallback_model_id) ?? config.fallback_model_id,
         maxContext: config.max_context_tokens,
         cacheReadEnabled: config.cache_read_enabled || false,
         tier,
@@ -278,8 +289,8 @@ export async function fetchPhaseConfigFromDb(
         );
       }
       return {
-        modelId: courseOverride.model_id,
-        fallbackModelId: courseOverride.fallback_model_id || null,
+        modelId: normalizeRuntimeModelId(courseOverride.model_id) ?? courseOverride.model_id,
+        fallbackModelId: normalizeRuntimeModelId(courseOverride.fallback_model_id),
         temperature: courseOverride.temperature || 0.7,
         maxTokens: courseOverride.max_tokens || 4096,
         maxContextTokens: courseOverride.max_context_tokens || null,
@@ -322,8 +333,8 @@ export async function fetchPhaseConfigFromDb(
         );
       }
       return {
-        modelId: globalConfig.model_id,
-        fallbackModelId: globalConfig.fallback_model_id || null,
+        modelId: normalizeRuntimeModelId(globalConfig.model_id) ?? globalConfig.model_id,
+        fallbackModelId: normalizeRuntimeModelId(globalConfig.fallback_model_id),
         temperature: globalConfig.temperature || 0.7,
         maxTokens: globalConfig.max_tokens || 4096,
         maxContextTokens: globalConfig.max_context_tokens || null,
@@ -421,13 +432,15 @@ export async function fetchJudgeConfigsFromDb(
  * Maps database judge config row to JudgeModelConfig
  */
 function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
+  const modelId = normalizeRuntimeModelId(config.model_id) ?? config.model_id;
+
   return {
-    modelId: config.model_id,
+    modelId,
     weight: config.weight || 0.7,
     temperature: config.temperature || 0.3,
     maxTokens: config.max_tokens || 4096,
-    displayName: config.primary_display_name || config.model_id,
-    fallbackModelId: config.fallback_model_id || 'openai/gpt-oss-120b',
+    displayName: config.primary_display_name || modelId,
+    fallbackModelId: normalizeRuntimeModelId(config.fallback_model_id) || 'openai/gpt-oss-120b',
   };
 }
 
@@ -437,7 +450,7 @@ function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
  */
 const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
   global_default: {
-    modelId: 'xiaomi/mimo-v2-flash',
+    modelId: 'deepseek/deepseek-v4-flash',
     fallbackModelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 4096,
@@ -451,7 +464,7 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
   },
   emergency: {
     modelId: 'google/gemini-3-flash-preview',
-    fallbackModelId: 'xiaomi/mimo-v2-flash',
+    fallbackModelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 4096,
     maxContextTokens: 128000,
@@ -473,9 +486,11 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
  * - cache_read_enabled: may be absent in older seeds, defaults to false
  */
 function seedEntryToPhaseConfig(entry: Record<string, unknown>): PhaseModelConfig {
+  const modelId = normalizeRuntimeModelId(entry.model_id as string) ?? (entry.model_id as string);
+
   return {
-    modelId: entry.model_id as string,
-    fallbackModelId: (entry.fallback_model_id as string) || null,
+    modelId,
+    fallbackModelId: normalizeRuntimeModelId(entry.fallback_model_id as string),
     temperature:
       typeof entry.temperature === 'string'
         ? parseFloat(entry.temperature) || 0.7

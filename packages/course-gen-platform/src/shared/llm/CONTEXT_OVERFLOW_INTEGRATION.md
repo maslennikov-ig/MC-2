@@ -205,8 +205,8 @@ For Russian (ru):
 
 For English (en):
 
-1. Standard: `x-ai/grok-4.1-fast:free` (260K context)
-2. Extended primary: `x-ai/grok-4.1-fast:free` (1M context)
+1. Standard: `deepseek/deepseek-v4-flash` (260K context)
+2. Extended primary: `deepseek/deepseek-v4-flash` (1M context)
 3. Extended fallback: `moonshotai/kimi-linear-48b-a3b-instruct` (1M context)
 
 ## Best Practices

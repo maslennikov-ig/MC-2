@@ -47,12 +47,12 @@ export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — enrichments (quiz
 export const MODEL_CONFIG = {
   /** Primary model for quiz generation */
   quiz: {
-    primary: 'xiaomi/mimo-v2-flash',
+    primary: 'deepseek/deepseek-v4-flash',
     fallback: 'qwen/qwen3-235b-a22b-2507',
   },
   /** Primary model for presentation generation */
   presentation: {
-    primary: 'xiaomi/mimo-v2-flash',
+    primary: 'deepseek/deepseek-v4-flash',
     fallback: 'qwen/qwen3-235b-a22b-2507',
   },
   /** Max attempts before switching to fallback model */

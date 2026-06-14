@@ -2,7 +2,7 @@
  * E2E Tests for Targeted Refinement Cycle
  * @module tests/stages/stage6-lesson-content/targeted-refinement-cycle.e2e
  *
- * Tests the full Judge → Patcher (mimo) → Judge verification cycle with mocked LLM calls.
+ * Tests the full Judge → Patcher → Judge verification cycle with mocked LLM calls.
  *
  * Test Scenarios:
  * 1. Single iteration success - Patcher fixes issue on first attempt

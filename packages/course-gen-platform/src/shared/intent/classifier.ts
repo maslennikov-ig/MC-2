@@ -176,7 +176,7 @@ export interface NodeContextForClassification {
 // ============================================================================
 
 /**
- * Classify user message intent using a cheap, fast model (Xiaomi mimo-v2-flash)
+ * Classify user message intent using the configured cheap, fast model.
  *
  * @param userMessage - User's chat message
  * @param nodeContext - Optional context about the currently selected node

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, max-lines-per-function */
+/* eslint-disable @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-argument */
 /**
  * Block Regeneration Handler Unit Tests
  * @module tests/unit/orchestrator/handlers/block-regeneration-handler
@@ -252,7 +252,7 @@ describe('BlockRegenerationHandler', () => {
       expect(llmClient.generateCompletion).toHaveBeenCalledWith(
         expect.stringContaining('sections[0].lessons[0].lesson_title'),
         expect.objectContaining({
-          model: 'xiaomi/mimo-v2-flash',
+          model: 'deepseek/deepseek-v4-flash',
           temperature: 0.7,
         })
       );

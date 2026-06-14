@@ -109,7 +109,7 @@ at the concrete lesson level. This complements Stage 4's abstract-level anti-ove
 **Model Tiered Routing (RT-001):**
 
 - **Complex tier** (`kimi-k2-thinking`): First section + sections with `importance: "complex"` (~55-180s each)
-- **Normal tier** (`mimo-v2-flash`): Standard sections (~25s each)
+- **Normal tier** (`deepseek-v4-flash`): Standard sections (~25s each)
 - Models configured via database `llm_model_config` table
 
 **Timing Estimates (sequential):**

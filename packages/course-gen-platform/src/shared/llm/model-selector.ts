@@ -12,7 +12,7 @@
  * - Analysis: oss-120b (<=80K) or gemini-flash (>80K) based on token count
  * - Generation RU: qwen3-235b-a22b-2507 primary, kimi-k2 fallback
  * - Generation EN: deepseek-v3.1-terminus primary, kimi-k2 fallback
- * - Large Context: grok-4-fast primary, gemini-flash fallback
+ * - Large Context: deepseek-v4-flash primary, gemini-flash fallback
  *
  * @see docs/MODEL-SELECTION-DECISIONS.md
  * @see specs/010-stages-456-pipeline/data-model.md
@@ -198,14 +198,14 @@ export const MODELS: Record<string, ModelConfig> = {
     capabilities: ['generation', 'multilingual', 'structured_output', 'code'],
   },
 
-  // Large Context Model
-  'grok-4-fast': {
-    modelId: 'x-ai/grok-4-fast',
-    displayName: 'Grok 4 Fast',
-    maxContextTokens: 2_000_000,
-    costPer1kInput: 0.0002,
-    costPer1kOutput: 0.0005,
-    capabilities: ['large_context', 'analysis', 'generation'],
+  // Fast default model
+  'deepseek-v4-flash': {
+    modelId: 'deepseek/deepseek-v4-flash',
+    displayName: 'DeepSeek V4 Flash',
+    maxContextTokens: 1_000_000,
+    costPer1kInput: 0.0001,
+    costPer1kOutput: 0.0002,
+    capabilities: ['analysis', 'generation', 'multilingual', 'structured_output'],
   },
 
   // Legacy OSS Models (Stage 4 Analysis)
@@ -228,12 +228,12 @@ export const MODELS: Record<string, ModelConfig> = {
     capabilities: ['analysis', 'large_context', 'multilingual'],
   },
 
-  'grok-4.1-fast-free': {
-    modelId: 'x-ai/grok-4.1-fast:free',
-    displayName: 'Grok 4.1 Fast (Free)',
+  'deepseek-v4-flash-alt': {
+    modelId: 'deepseek/deepseek-v4-flash',
+    displayName: 'DeepSeek V4 Flash',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0,
-    costPer1kOutput: 0,
+    costPer1kInput: 0.0001,
+    costPer1kOutput: 0.0002,
     capabilities: ['analysis', 'large_context', 'generation'],
   },
 
@@ -270,7 +270,7 @@ const FALLBACK_MAP: Record<string, string> = {
   'deepseek-terminus': 'kimi-k2',
 
   // Large context fallback
-  'grok-4-fast': 'gemini-flash',
+  'deepseek-v4-flash': 'gemini-flash',
 
   // Kimi K2 is the ultimate fallback, falls back to gemini-flash
   'kimi-k2': 'gemini-flash',
@@ -501,7 +501,7 @@ export function selectModelForGeneration(
  * - oss-120b -> gemini-flash
  * - qwen3-max -> kimi-k2
  * - deepseek-terminus -> kimi-k2
- * - grok-4-fast -> gemini-flash
+ * - deepseek-v4-flash -> gemini-flash
  * - kimi-k2 -> gemini-flash (ultimate fallback)
  *
  * @param primaryModelKey - Key of the primary model in MODELS registry
@@ -574,19 +574,19 @@ export function getModelById(modelId: string): ModelConfig | null {
 /**
  * Select model for large context tasks (>128K tokens).
  *
- * Uses Grok 4 Fast (2M context) as primary, Gemini Flash (1M context) as fallback.
+ * Uses the current default fast model for large context tasks.
  *
  * @returns ModelConfig for large context model
  *
  * @example
  * ```typescript
  * const model = selectModelForLargeContext();
- * // model.modelId === 'x-ai/grok-4-fast'
- * // model.maxContextTokens === 2_000_000
+ * // model.modelId === 'deepseek/deepseek-v4-flash'
+ * // model.maxContextTokens === 1_000_000
  * ```
  */
 export function selectModelForLargeContext(): ModelConfig {
-  return MODELS['grok-4-fast'];
+  return MODELS['deepseek-v4-flash'];
 }
 
 /**
@@ -598,7 +598,7 @@ export function selectModelForLargeContext(): ModelConfig {
  * @example
  * ```typescript
  * const generationModels = getModelsWithCapability('generation');
- * // Returns qwen3-max, deepseek-terminus, kimi-k2, grok-4-fast
+ * // Returns qwen3-max, deepseek-terminus, kimi-k2, deepseek-v4-flash
  * ```
  */
 export function getModelsWithCapability(capability: ModelCapability): ModelConfig[] {

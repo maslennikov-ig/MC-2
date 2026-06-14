@@ -28,7 +28,7 @@ describe('stage6 fallback topology', () => {
     }
   });
 
-  it('keeps escalation and manual canonical defaults off the Xiaomi path', () => {
+  it('keeps escalation and manual canonical defaults off the retired default-model path', () => {
     const autoLastChance = STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance;
     const manualRegeneration = STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration;
 
@@ -51,8 +51,7 @@ describe('stage6 fallback topology', () => {
 
     expect(DEFAULT_MODEL_CONFIGS.stage_6_manual_regeneration).toMatchObject({
       modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId,
-      fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration
-        .fallbackModelId,
+      fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.fallbackModelId,
       temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.temperature,
       maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.maxTokens,
     });

@@ -71,10 +71,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   // Fallback model
   'moonshotai/kimi-k2-thinking': { input: 0.55, output: 2.25 },
 
-  // Large context model
-  'x-ai/grok-4-fast': { input: 0.2, output: 0.5 },
-
-  // Career Playbook DeepSeek V4 routing
+  // DeepSeek V4 routing
   'deepseek/deepseek-v4-flash': { input: 0.1, output: 0.2 },
   'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
 
