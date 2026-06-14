@@ -11,10 +11,12 @@ Beads: none active
 - Career Playbook course bridge now creates courses with `generation_mode = automatic`, initializes progress with `has_documents = true`, and keeps Stage 2 as technical indexing/vectorization rather than a user-facing Markdown review gate.
 - Stage 3 assigns the only source document as `CORE` and auto-continues to Stage 4 without manual prioritization, even for legacy/semi-automatic single-document courses.
 - Generating UI now treats `courses.has_files = true` as document presence when `generation_progress.has_documents` is stale or false.
+- AutoCard preview status badges now use non-interactive soft outline styling so `Готово` no longer looks like a clickable primary button.
 
 ## Verification
 
 - Passed targeted backend tests: `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/auto-approval/force-auto-approval.test.ts tests/unit/server/routers/career-playbook-course-bridge.service.test.ts`.
+- Passed AutoCard UI checks: `pnpm --filter @megacampus/web exec eslint components/generation-graph/panels/shared/AutoCardPreview.tsx`; `pnpm --filter @megacampus/web type-check`.
 - Passed: `pnpm type-check`.
 - Passed: `pnpm build`.
 
