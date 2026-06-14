@@ -19,7 +19,7 @@ Beads: `mc2-dkkau`
 - Passed: `bash .claude/scripts/push-dev.sh --help`.
 - Passed: `rg -n "bd sync|Syncing Beads|bd dolt push|sync_beads" .claude/scripts/push-dev.sh` confirms no `bd sync` call remains and `bd dolt push` is used.
 - Passed: `bd dolt push --help`.
-- Passed final delivery check: `bash .claude/scripts/push-dev.sh --yes` printed `Beads Dolt remote pushed` and pushed `develop` to `b3f18645`.
+- Passed final delivery check: `bash .claude/scripts/push-dev.sh --yes` printed `Beads Dolt remote pushed` and pushed `develop` to `origin`.
 
 ## Next recommended
 
@@ -32,7 +32,7 @@ Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orches
 
 ## Delivery
 
-- Delivered to feature branch `codex/fix-push-dev-beads-sync` at `f5331913` and to `develop` at merge commit `b3f18645`.
+- Delivered to feature branch `codex/fix-push-dev-beads-sync` and promoted to `develop` via `.claude/scripts/push-dev.sh --yes`.
 - docs-reviewed: updated - handoff and stage summary document the corrected Beads sync behavior, delivery, and verification.
 - graph-reviewed: no-change-needed - shell delivery script change only; no code architecture or route/module boundary changed.
 
