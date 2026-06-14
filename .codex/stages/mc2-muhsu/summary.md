@@ -35,13 +35,18 @@ Defaulted Career Playbook course bridge size selection to `auto`, so the downstr
 - Passed RED: `pnpm --filter @megacampus/course-gen-platform test -- career-playbook-course-bridge.service.test.ts` failed while code still returned `standard`.
 - Passed GREEN: `pnpm --filter @megacampus/course-gen-platform test -- career-playbook-course-bridge.service.test.ts`.
 - Passed: `pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/create-course-from-playbook-dialog.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx`.
-- Passed: `git grep -n "tvly-dev" -- . ':!*.env' ':!*.env.local' || true` produced no tracked matches.
+- Passed: tracked secret grep produced no matches for the provided Tavily key prefix.
 - Passed: backend dotenv check reports `TAVILY_API_KEY=set`.
 - Passed: `pnpm type-check`.
 - Passed: `pnpm build`.
 - Passed: `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-muhsu`.
 - Passed: Beads `mc2-muhsu` closed and `bd dolt push` completed.
-- Pending: commit and dev delivery.
+- Passed dev delivery: `.claude/scripts/push-dev.sh --yes` promoted the feature branch to `develop` and printed `Beads Dolt remote pushed`.
+
+## Delivery
+
+- Feature branch `codex/career-playbook-auto-course-size` pushed to `origin`.
+- Delivered to `develop` via `.claude/scripts/push-dev.sh --yes`.
 
 ## Docs And Graph
 
