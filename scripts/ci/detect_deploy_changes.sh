@@ -150,6 +150,7 @@ classify_path() {
 
   case "$path" in
     .github/workflows/*|scripts/ci/*)
+      deploy_config_changed=true
       return
       ;;
     scripts/*|packages/*|supabase/*)
