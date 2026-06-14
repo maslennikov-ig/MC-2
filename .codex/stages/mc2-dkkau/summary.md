@@ -35,12 +35,12 @@ Fixed the stale Beads sync path in `.claude/scripts/push-dev.sh`.
 - Passed: `bd sync --help` reproduced the installed CLI behavior: `unknown command "sync"`.
 - Passed: `bd dolt push --help` confirms the supported Beads push command exists.
 - Passed: `rg -n "bd sync|Syncing Beads|bd dolt push|sync_beads" .claude/scripts/push-dev.sh` shows no `bd sync` call remains.
-- Passed delivery verification: `bash .claude/scripts/push-dev.sh --yes` invoked `sync_beads()`, printed `Beads Dolt remote pushed`, and pushed `develop` to `b3f18645`.
+- Passed delivery verification: `bash .claude/scripts/push-dev.sh --yes` invoked `sync_beads()`, printed `Beads Dolt remote pushed`, and pushed `develop` to `origin`.
 
 ## Delivery
 
-- Feature branch `codex/fix-push-dev-beads-sync` pushed at `f5331913`.
-- Delivered to `develop` via merge commit `b3f18645`.
+- Feature branch `codex/fix-push-dev-beads-sync` pushed to `origin`.
+- Delivered to `develop` via `.claude/scripts/push-dev.sh --yes`.
 
 ## Docs And Graph
 
