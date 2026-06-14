@@ -23,7 +23,7 @@ Beads: `mc2-5e4ek`, `mc2-5e4ek.1`, `mc2-5e4ek.2`, `mc2-pmrmf.1`, `mc2-pmrmf.1.1`
 
 ## Explicit defers
 
-- `mc2-pmrmf.1`: live DB model config still needs replacement of deprecated Grok/Xiaomi IDs with `deepseek/deepseek-v4-flash`.
+- `mc2-pmrmf.1`: live DB model config was updated from deprecated Grok/Xiaomi IDs to `deepseek/deepseek-v4-flash`; dev E2E rerun remains pending.
 - `mc2-pmrmf.1.1`: add read-only model config health check for deprecated provider model IDs.
 - `mc2-5e4ek.1`: fix Career Playbook viewer-editor authenticated E2E fixture/API failure.
 - `mc2-5e4ek.2`: centralize Stage 5 structural quality UI state contract and add behavioral UI tests.
