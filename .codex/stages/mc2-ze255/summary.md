@@ -6,7 +6,7 @@ Branch: `codex/deploy-workflow-changes-trigger-dev`
 
 ## Outcome
 
-Fixed CI/CD change detection so workflow and CI detector changes count as deploy-config changes. This lets the Tavily deploy-env workflow update roll out to Dev instead of being skipped as CI-only.
+Fixed and delivered CI/CD change detection so workflow and CI detector changes count as deploy-config changes. This lets the Tavily deploy-env workflow update roll out to Dev instead of being skipped as CI-only.
 
 ## Classification And Routing
 
@@ -33,11 +33,14 @@ Fixed CI/CD change detection so workflow and CI detector changes count as deploy
 - Passed GREEN: `bash scripts/ci/test_detect_deploy_changes.sh`.
 - Passed: `bash -n scripts/ci/detect_deploy_changes.sh scripts/ci/test_detect_deploy_changes.sh`.
 - Passed: `.github/workflows/ci-cd.yml` YAML parse.
+- Passed: `git diff --check`.
+- Passed: `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-ze255`.
+- Passed delivery: `.claude/scripts/push-dev.sh --yes`; GitHub Actions run `27493226003` succeeded with Contract Tests and Deploy to Dev.
+- Passed Dev E2E: `PLAYWRIGHT_BASE_URL=https://dev.ai.megacampus.ru PLAYWRIGHT_DISABLE_VIDEO=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter @megacampus/web test:e2e:career-playbook` (`5 passed`).
 
 ## Docs And Graph
 
 - docs-reviewed: updated - handoff and this stage summary record the detector behavior.
-- project-index: reviewed-no-change - existing project index already points to the CI/CD change detector and its test.
 - graph-reviewed: no-change-needed - deploy gating shell script only; no application architecture or module graph changed.
 
 ## Explicit Defers
