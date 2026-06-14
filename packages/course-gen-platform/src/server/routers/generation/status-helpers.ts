@@ -15,6 +15,23 @@ type GenerationMetadataWithError = GenerationMetadata & {
   error_message?: string;
 };
 
+function hasCriticalStructureIssues(generationMetadata: unknown): boolean {
+  if (!generationMetadata || typeof generationMetadata !== 'object') return false;
+  const metadata = generationMetadata as {
+    quality_scores?: {
+      structure?: {
+        hasCriticalIssues?: unknown;
+        criticalIssues?: unknown;
+      };
+    };
+  };
+  const structure = metadata.quality_scores?.structure;
+  return (
+    structure?.hasCriticalIssues === true ||
+    (Array.isArray(structure?.criticalIssues) && structure.criticalIssues.length > 0)
+  );
+}
+
 interface PhaseWeights {
   validate_input: number;
   generate_metadata: number;
@@ -416,6 +433,10 @@ async function handleStage4Approval(
       lesson_duration_minutes: (course.settings as unknown as CourseSettings)
         ?.lesson_duration_minutes,
       learning_outcomes: (course.settings as unknown as CourseSettings)?.learning_outcomes,
+      settings:
+        course.settings && typeof course.settings === 'object'
+          ? (course.settings as Record<string, unknown>)
+          : undefined,
     },
     vectorized_documents: hasVectorizedDocs,
     document_summaries: documentSummaries,
@@ -432,6 +453,22 @@ async function handleStage5Approval(
   supabase: SupabaseClient<Database>,
   courseId: string
 ): Promise<{ success: boolean; nextStage: number }> {
+  const { data: course, error } = await supabase
+    .from('courses')
+    .select('generation_metadata')
+    .eq('id', courseId)
+    .single();
+
+  throwOnSupabaseError(error, 'Stage 5 quality metadata', { courseId });
+
+  if (hasCriticalStructureIssues(course?.generation_metadata)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'Stage 5 structure has critical quality issues. Regenerate or edit the course structure before continuing.',
+    });
+  }
+
   await supabase
     .from('courses')
     .update({

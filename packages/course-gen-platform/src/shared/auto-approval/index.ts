@@ -26,6 +26,23 @@ interface HandleStageCompletionOptions {
   forceReason?: string;
 }
 
+function hasCriticalStructureIssues(generationMetadata: unknown): boolean {
+  if (!generationMetadata || typeof generationMetadata !== 'object') return false;
+  const metadata = generationMetadata as {
+    quality_scores?: {
+      structure?: {
+        hasCriticalIssues?: unknown;
+        criticalIssues?: unknown;
+      };
+    };
+  };
+  const structure = metadata.quality_scores?.structure;
+  return (
+    structure?.hasCriticalIssues === true ||
+    (Array.isArray(structure?.criticalIssues) && structure.criticalIssues.length > 0)
+  );
+}
+
 // ============================================================================
 // STAGE STATUS TRANSITION
 // ============================================================================
@@ -207,7 +224,7 @@ export async function handleStageCompletion(
   const { data: course, error } = await db
     .from('courses')
     .select(
-      'generation_mode, user_id, organization_id, title, settings, language, style, target_audience, difficulty, course_description, course_size, analysis_result, organization:organizations(tier)'
+      'generation_mode, user_id, organization_id, title, settings, language, style, target_audience, difficulty, course_description, course_size, analysis_result, generation_metadata, organization:organizations(tier)'
     )
     .eq('id', courseId)
     .single();
@@ -225,6 +242,14 @@ export async function handleStageCompletion(
 
   // Check if automatic mode
   if (!shouldAutoApprove) {
+    return handleSemiAutomaticMode(db, courseId, currentStage);
+  }
+
+  if (currentStage === 5 && hasCriticalStructureIssues(course.generation_metadata)) {
+    logger.warn(
+      { courseId, currentStage },
+      'Stage 5 has critical structural quality issues; blocking automatic transition to Stage 6'
+    );
     return handleSemiAutomaticMode(db, courseId, currentStage);
   }
 

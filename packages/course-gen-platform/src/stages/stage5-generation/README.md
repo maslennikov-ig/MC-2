@@ -101,6 +101,8 @@ a digest of previously generated lessons (titles + topics) to prevent content ov
 at the concrete lesson level. This complements Stage 4's abstract-level anti-overlap.
 
 - Sections generated sequentially: section 1, then section 2, etc.
+- Each section uses its own Stage 4 `estimated_lessons` budget instead of a
+  uniform `total_lessons / total_sections` split.
 - Each section's digest grows as more sections are completed
 - Retries for failed sections use `pLimit(2)` for parallel recovery
 
@@ -158,8 +160,11 @@ at the concrete lesson level. This complements Stage 4's abstract-level anti-ove
 
 **Threshold:** 0.75 minimum similarity
 
-**Note:** Quality validation is **non-blocking** in Stage 5 (skeleton generation).
-Full enforcement occurs in Stage 6 (lesson content generation).
+**Note:** Embedding/semantic quality validation remains non-blocking in Stage 5
+(skeleton generation). Deterministic structural checks are blocking: hard lesson
+cap violations, duplicate lesson titles, objective overload, empty sections, and
+invalid senior-role beginner classification are stored in
+`generation_metadata.quality_scores.structure` and prevent Stage 6 progression.
 
 ---
 
@@ -251,6 +256,15 @@ interface GenerationMetadata {
     metadata_similarity: number;
     sections_similarity: number[];
     overall: number;
+    structure?: {
+      passed: boolean;
+      hasCriticalIssues: boolean;
+      profileId: string;
+      totalLessons: number;
+      computedDurationHours: number;
+      criticalIssues: Array<{ code: string; message: string }>;
+      warnings: Array<{ code: string; message: string }>;
+    };
   };
   retry_count: {
     metadata: number;

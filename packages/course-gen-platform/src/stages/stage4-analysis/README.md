@@ -99,6 +99,12 @@ AnalysisResult -> courses.analysis_result
 **Validation:**
 
 - Minimum 10 total lessons (FR-015)
+- Profile-based auto-size bounds:
+  - `general_auto`: target 16-28 lessons, hard maximum 40, 4-8 sections
+  - `role_playbook_bridge`: target 18-24 lessons, hard maximum 30, 5-7 sections
+- Phase 2 post-processing normalizes section breakdowns, recomputes totals and
+  durations, splits or merges sections to profile bounds, and removes over-large
+  auto structures before Stage 5 receives the blueprint.
 
 ---
 

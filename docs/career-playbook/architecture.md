@@ -205,6 +205,15 @@ mode from the preview payload so Stage 4-6 generation sees the same controls as
 a normal `/create` course without extra review clicks for obvious single-source
 steps.
 
+Career Playbook bridge courses use the `role_playbook_bridge` structure profile
+in Stage 4/5 auto-size generation. The profile targets 18-24 lessons, allows at
+most 30 lessons, and keeps the structure to 5-7 sections. This keeps the bridge
+output as a practical onboarding/upskilling course from the role guide instead
+of expanding the full playbook into an encyclopedic course. Stage 5 stores
+structural quality findings in `generation_metadata.quality_scores.structure`;
+critical findings keep the course at Stage 5 review and block Stage 6 lesson
+generation until the structure is regenerated or edited.
+
 ## E2E Harness
 
 `packages/web/playwright.config.ts` derives one web URL from `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_PORT`, `PORT`, or the default `http://localhost:3000`. The same URL is used for Playwright `baseURL`, `webServer.url`, and `NEXT_PUBLIC_APP_URL`; the resolved port is passed into the Next dev server through `PORT`.

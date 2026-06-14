@@ -1,39 +1,40 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-14
-Stage: none active
+Stage: `mc2-dqdv8` local_verified
 Branch: `codex/single-source-course-generation-flow`
-Beads: none active
+Beads: `mc2-dqdv8`
 
 ## Current State
 
-- Closed Beads task `mc2-f3q7c`: single-source Career Playbook course generation no longer asks for manual review/prioritization gates.
-- Career Playbook course bridge now creates courses with `generation_mode = automatic`, initializes progress with `has_documents = true`, and keeps Stage 2 as technical indexing/vectorization rather than a user-facing Markdown review gate.
-- Stage 3 assigns the only source document as `CORE` and auto-continues to Stage 4 without manual prioritization, even for legacy/semi-automatic single-document courses.
-- Generating UI now treats `courses.has_files = true` as document presence when `generation_progress.has_documents` is stale or false.
-- AutoCard preview status badges now use non-interactive soft outline styling so `Готово` no longer looks like a clickable primary button.
+- Stage `mc2-dqdv8` implements course structure quality guardrails for auto-size and Career Playbook -> course bridge.
+- Stage 4 now resolves a `structure_profile` (`general_auto`, `role_playbook_bridge`, or explicit size), removes broad auto expansion guidance, normalizes section counts and lesson caps, and recomputes totals/durations before Stage 5.
+- Stage 5 now uses each Stage 4 section's `estimated_lessons` budget, reconciles actual duration/difficulty metadata, and stores deterministic structural quality under `generation_metadata.quality_scores.structure`.
+- Critical Stage 5 structure issues block automatic Stage 6 transition, manual Stage 5 approval, and direct Stage 6 starts.
+- Stage 5 UI now shows "needs fixes" / warning / can-continue quality states and disables approval when critical structural issues exist.
+- Durable docs/spec added for the policy in `docs/course-generation/structure-quality-spec.md`; Career Playbook and Stage 4/5 docs updated.
 
 ## Verification
 
-- Passed targeted backend tests: `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/auto-approval/force-auto-approval.test.ts tests/unit/server/routers/career-playbook-course-bridge.service.test.ts`.
-- Passed AutoCard UI checks: `pnpm --filter @megacampus/web exec eslint components/generation-graph/panels/shared/AutoCardPreview.tsx`; `pnpm --filter @megacampus/web type-check`.
+- Passed targeted backend tests: `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/course-structure-policy.test.ts tests/unit/stage5-structural-quality.test.ts tests/unit/stages/stage5-generation/section-batch-constraints.test.ts`.
+- Passed targeted UI lint: `pnpm --filter @megacampus/web exec eslint components/generation-graph/controls/ApprovalControls.tsx components/generation-graph/panels/stage5/Stage5OutputTab.tsx components/generation-graph/panels/stage5/types.ts`.
 - Passed: `pnpm type-check`.
 - Passed: `pnpm build`.
 
 ## Delivery
 
-- docs-reviewed: updated - `docs/career-playbook/architecture.md` now documents automatic bridge generation and single-document prioritization.
-- graph-reviewed: updated - ran `graphify update .`; local graph rebuilt successfully, no tracked graph diff remained.
+- docs-reviewed: updated - structure quality spec plus Career Playbook and Stage 4/5 docs.
+- graph-reviewed: updated - ran `graphify update .`; graph rebuilt successfully, `graph.html` skipped by Graphify size limit, no tracked graph diff remained.
 
 ## Next recommended
 
-Next stage id: none.
-Recommended action: push `codex/single-source-course-generation-flow`; merge/deploy only with explicit current-task authorization.
+Next stage id: `mc2-dqdv8` closeout/delivery.
+Recommended action: commit and push `codex/single-source-course-generation-flow`; merge/deploy only with explicit current-task authorization. Follow-up live E2E is tracked as `mc2-pmrmf`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, and Beads. Current branch contains the single-source Career Playbook course generation flow fix.
+Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, `.codex/stages/mc2-dqdv8/summary.md`, and Beads. Current branch contains structure-quality guardrails for auto-size and Career Playbook course bridge. Verify latest status, commit, pull --rebase, `bd dolt push`, and push if still clean.
 
 ## Explicit defers
 
-- Live click-through course generation was not run in this branch because it can trigger real LLM/Tavily generation cost; covered by service/unit tests plus type-check/build.
+- `mc2-pmrmf`: live dev E2E for Career Playbook -> course with real LLM/Tavily calls was not run because disposable data and explicit cost budget were not available in this closeout. Covered by targeted unit tests, UI lint, type-check, and build.

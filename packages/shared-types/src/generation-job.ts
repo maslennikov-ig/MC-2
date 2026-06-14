@@ -82,6 +82,12 @@ export const FrontendParametersSchema = z.object({
     .array(z.string())
     .optional()
     .describe('User-specified learning outcomes (constraints, not guidance)'),
+
+  /**
+   * Internal course settings copied from courses.settings for generation policy decisions.
+   * This is not user prompt content; consumers must read only known keys.
+   */
+  settings: z.record(z.unknown()).optional(),
 });
 
 export type FrontendParameters = z.infer<typeof FrontendParametersSchema>;

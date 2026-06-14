@@ -88,6 +88,9 @@ export interface StructureAnalysisInput {
   /** User-selected course size preset (advisory) */
   course_size?: 'micro' | 'mini' | 'compact' | 'standard' | 'comprehensive';
 
+  /** Structure quality profile used for bounded auto generation */
+  structure_profile?: 'general_auto' | 'role_playbook_bridge' | 'explicit_size';
+
   /** Target lessons count from size preset (advisory) */
   target_lessons?: number;
 

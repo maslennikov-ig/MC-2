@@ -14,7 +14,10 @@
  */
 
 // Re-export main class
-export { SectionBatchGenerator } from './section-batch/section-batch-generator';
+export {
+  SectionBatchGenerator,
+  resolveSectionCourseConstraints,
+} from './section-batch/section-batch-generator';
 
 // Re-export types for consumers
 export type { SectionBatchResult, SectionBatchResultV2, ModelTier } from './section-batch/types';
