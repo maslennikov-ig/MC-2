@@ -46,7 +46,8 @@ vi.mock('@/server/middleware/rate-limit.js', () => ({
 }));
 
 vi.mock('@/server/routers/generation/_shared/helpers', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/server/routers/generation/_shared/helpers')>();
+  const actual =
+    await importOriginal<typeof import('@/server/routers/generation/_shared/helpers')>();
   return {
     ...actual,
     extractTierFromOrg: vi.fn((...args) => mockExtractTierFromOrg(...args)),
@@ -68,7 +69,9 @@ describe('generateRouter.generate', () => {
   let caller: ReturnType<(typeof router)['createCaller']>;
 
   beforeAll(async () => {
-    const { generateRouter } = await import('@/server/routers/generation/lifecycle/generate.router');
+    const { generateRouter } = await import(
+      '@/server/routers/generation/lifecycle/generate.router'
+    );
     const testRouter = router({
       generate: generateRouter.generate,
     });
@@ -91,6 +94,10 @@ describe('generateRouter.generate', () => {
     mockAssertCourseAccess.mockReturnValue(undefined);
     mockThrowOnSupabaseError.mockReturnValue(undefined);
     mockAddJob.mockResolvedValue({ id: 'job-123' });
+    mockBuildDocumentSummaries.mockResolvedValue({
+      hasVectorizedDocs: false,
+      documentSummaries: [],
+    });
     mockGetSupabaseAdmin.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
@@ -106,12 +113,22 @@ describe('generateRouter.generate', () => {
                 learning_outcomes: null,
                 estimated_lessons: 5,
                 estimated_sections: 2,
-                settings: {},
+                course_size: 'auto',
+                settings: {
+                  source: 'career_playbook',
+                  bridgeVersion: 1,
+                  desired_lessons_count: 22,
+                  desired_modules_count: 6,
+                  lesson_duration_minutes: 15,
+                },
                 organization: { tier: 'premium' },
               },
               error: null,
             }),
           })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValue({ error: null }),
         })),
       })),
     });
@@ -149,5 +166,28 @@ describe('generateRouter.generate', () => {
     });
 
     expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('preserves course settings in the Stage 5 job input for profile resolution', async () => {
+    await caller.generate({ courseId: '550e8400-e29b-41d4-a716-446655440000' });
+
+    expect(mockAddJob).toHaveBeenCalledTimes(1);
+    const [, jobInput] = mockAddJob.mock.calls[0];
+    expect(jobInput).toEqual(
+      expect.objectContaining({
+        frontend_parameters: expect.objectContaining({
+          course_size: 'auto',
+          desired_lessons_count: 5,
+          desired_modules_count: 2,
+          lesson_duration_minutes: 15,
+          settings: expect.objectContaining({
+            source: 'career_playbook',
+            bridgeVersion: 1,
+            desired_lessons_count: 22,
+            desired_modules_count: 6,
+          }),
+        }),
+      })
+    );
   });
 });

@@ -1048,6 +1048,7 @@
     "structureQualityIssueDuplicates": "The structure contains duplicate lesson titles.",
     "structureQualityIssueObjectives": "Short lessons contain too many learning objectives.",
     "structureQualityIssueEmptySection": "One section has no lessons.",
+    "structureQualityIssueSectionCount": "Section count does not match the selected generation mode.",
     "structureQualityIssueSeniorBeginner": "Senior/lead/head role courses cannot be purely beginner-level."
   },
   "stage6": {

@@ -16,6 +16,7 @@ export interface StructuralQualityIssue {
     | 'duplicate_lesson_titles'
     | 'lesson_objective_overload'
     | 'invalid_section_lesson_budget'
+    | 'section_count_out_of_bounds'
     | 'senior_role_beginner_level';
   severity: StructuralIssueSeverity;
   message: string;
@@ -87,6 +88,7 @@ export function validateStructuralQuality({
   const profile = resolveProfile(input);
   const issues: StructuralQualityIssue[] = [];
   const totalLessons = sections.reduce((sum, section) => sum + (section.lessons?.length ?? 0), 0);
+  const totalSections = sections.length;
   const computedDurationMinutes = sections.reduce(
     (sum, section) =>
       sum +
@@ -113,6 +115,20 @@ export function validateStructuralQuality({
       'soft_max_lessons_exceeded',
       `Course has ${totalLessons} lessons; ${profile.id} target is ${profile.softMaxLessons} or fewer.`,
       { totalLessons, softMaxLessons: profile.softMaxLessons }
+    );
+  }
+
+  if (totalSections < profile.minSections || totalSections > profile.maxSections) {
+    pushIssue(
+      issues,
+      'critical',
+      'section_count_out_of_bounds',
+      `Course has ${totalSections} sections; ${profile.id} requires ${profile.minSections}-${profile.maxSections}.`,
+      {
+        totalSections,
+        minSections: profile.minSections,
+        maxSections: profile.maxSections,
+      }
     );
   }
 

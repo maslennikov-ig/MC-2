@@ -1048,6 +1048,7 @@
     "structureQualityIssueDuplicates": "В структуре есть повторяющиеся названия уроков.",
     "structureQualityIssueObjectives": "В коротких уроках слишком много целей обучения.",
     "structureQualityIssueEmptySection": "В одном из модулей нет уроков.",
+    "structureQualityIssueSectionCount": "Количество модулей не соответствует выбранному режиму генерации.",
     "structureQualityIssueSeniorBeginner": "Курс для senior/lead/head роли не может быть полностью начального уровня."
   },
   "stage6": {

@@ -86,13 +86,14 @@ Stage 5 writes deterministic structural quality data to
 Critical issues block Stage 6 progression:
 
 - lesson count exceeds profile hard maximum;
+- section count is outside the profile bounds;
 - course duration metadata differs from actual lesson duration by more than
   10% and more than 0.25h;
 - duplicate lesson titles;
 - lesson objective overload;
 - empty generated sections;
-- senior/lead/head Career Playbook bridge course classified as purely beginner
-  before metadata reconciliation.
+- senior/lead/head Career Playbook bridge course remains purely beginner after
+  metadata reconciliation.
 
 Warnings do not block progression:
 
@@ -103,6 +104,11 @@ Warnings do not block progression:
 Automatic mode must leave Stage 5 at `stage_5_awaiting_approval` when critical
 issues exist. Manual approval and direct Stage 6 starts must also reject critical
 Stage 5 structures.
+
+Stage 5 edit, regeneration, chat proposal, and element add/delete paths must
+recompute `generation_metadata.quality_scores.structure` after persisting a new
+`course_structure`, so users can resolve critical blockers by editing or
+regenerating the structure.
 
 ## UI Requirements
 

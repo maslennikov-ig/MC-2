@@ -33,6 +33,7 @@ import { applySurgicalOperations } from './surgical-operations';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
+import { buildStage5StructuralQualityMetadataUpdate } from './structural-quality-metadata';
 
 // ============================================================================
 // Types
@@ -229,6 +230,14 @@ export async function applyFieldUpdatesProposal(
     [updateColumn]: dataToPersist as Json,
     updated_at: now,
   };
+  if (stageId === 'stage_5') {
+    updatePayload.generation_metadata = await buildStage5StructuralQualityMetadataUpdate(
+      supabase,
+      courseId,
+      dataToPersist as CourseStructure,
+      requestId
+    );
+  }
   const updateBaseQuery = supabase.from('courses').update(updatePayload).eq('id', courseId);
   const { data: updatedRows, error: updateError } =
     course.updated_at === null
@@ -464,6 +473,12 @@ export async function applyStructuralOperationProposal(
   const now = new Date().toISOString();
   const updatePayload: Database['public']['Tables']['courses']['Update'] = {
     course_structure: structureToPersist as unknown as Json,
+    generation_metadata: await buildStage5StructuralQualityMetadataUpdate(
+      supabase,
+      courseId,
+      structureToPersist,
+      requestId
+    ),
     updated_at: now,
   };
   const updateBaseQuery = supabase.from('courses').update(updatePayload).eq('id', courseId);

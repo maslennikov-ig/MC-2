@@ -212,7 +212,10 @@ output as a practical onboarding/upskilling course from the role guide instead
 of expanding the full playbook into an encyclopedic course. Stage 5 stores
 structural quality findings in `generation_metadata.quality_scores.structure`;
 critical findings keep the course at Stage 5 review and block Stage 6 lesson
-generation until the structure is regenerated or edited.
+generation until the structure is regenerated or edited. Stage 5 edit and
+element mutation paths recompute the stored structural quality state after
+persisting the new structure, so resolved blockers no longer remain stale in
+the UI or approval guard.
 
 ## E2E Harness
 

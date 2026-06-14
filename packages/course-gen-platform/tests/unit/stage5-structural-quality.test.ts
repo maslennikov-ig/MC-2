@@ -87,13 +87,35 @@ describe('Stage 5 structural quality validator', () => {
     );
   });
 
-  it('passes a focused role bridge structure with consistent duration', () => {
+  it('flags role bridge structures outside the section-count profile', () => {
     const sections = [makeSection(1, 4), makeSection(2, 4), makeSection(3, 4), makeSection(4, 4)];
 
     const result = validateStructuralQuality({
       input: makeInput(),
       metadata: {
         estimated_duration_hours: 4,
+        difficulty_level: 'intermediate',
+      },
+      sections,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.criticalIssues.map(issue => issue.code)).toContain('section_count_out_of_bounds');
+  });
+
+  it('passes a focused role bridge structure with consistent duration', () => {
+    const sections = [
+      makeSection(1, 4),
+      makeSection(2, 4),
+      makeSection(3, 4),
+      makeSection(4, 4),
+      makeSection(5, 4),
+    ];
+
+    const result = validateStructuralQuality({
+      input: makeInput(),
+      metadata: {
+        estimated_duration_hours: 5,
         difficulty_level: 'intermediate',
       },
       sections,

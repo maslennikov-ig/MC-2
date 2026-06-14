@@ -162,9 +162,12 @@ at the concrete lesson level. This complements Stage 4's abstract-level anti-ove
 
 **Note:** Embedding/semantic quality validation remains non-blocking in Stage 5
 (skeleton generation). Deterministic structural checks are blocking: hard lesson
-cap violations, duplicate lesson titles, objective overload, empty sections, and
-invalid senior-role beginner classification are stored in
-`generation_metadata.quality_scores.structure` and prevent Stage 6 progression.
+cap violations, section-count profile violations, duplicate lesson titles,
+objective overload, empty sections, and invalid senior-role beginner
+classification are stored in `generation_metadata.quality_scores.structure` and
+prevent Stage 6 progression. Stage 5 edit/regeneration and element mutation paths
+recompute the same structure quality metadata after saving a changed
+`course_structure`.
 
 ---
 

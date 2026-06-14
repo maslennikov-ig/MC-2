@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, CourseStructure, Section, Lesson } from '@megacampus/shared-types';
+import type { Database, CourseStructure, Section, Lesson, Json } from '@megacampus/shared-types';
 import type {
   DeleteElementResponse,
   AddElementResponse,
@@ -18,6 +18,7 @@ import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
+import { buildStage5StructuralQualityMetadataUpdate } from './structural-quality-metadata';
 
 /**
  * Fetch course and validate authorization
@@ -150,7 +151,13 @@ export async function handleDeleteElement(
   const { error: updateError } = await supabase
     .from('courses')
     .update({
-      course_structure: structureToPersist,
+      course_structure: structureToPersist as unknown as Json,
+      generation_metadata: await buildStage5StructuralQualityMetadataUpdate(
+        supabase,
+        courseId,
+        structureToPersist,
+        requestId
+      ),
       updated_at: now,
     })
     .eq('id', courseId);
@@ -560,7 +567,13 @@ export async function handleAddElement(
   const { error: updateError } = await supabase
     .from('courses')
     .update({
-      course_structure: structureToPersist,
+      course_structure: structureToPersist as unknown as Json,
+      generation_metadata: await buildStage5StructuralQualityMetadataUpdate(
+        supabase,
+        courseId,
+        structureToPersist,
+        requestId
+      ),
       updated_at: now,
     })
     .eq('id', courseId);

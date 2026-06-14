@@ -1,33 +1,43 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-14
-Stage: `mc2-pmrmf` blocked
+Stage: `mc2-5e4ek` review-and-fix complete, delivery pending commit/push
 Branch: `codex/single-source-course-generation-flow`
-Beads: `mc2-pmrmf`, blocker `mc2-pmrmf.1`
+Beads: `mc2-5e4ek`, `mc2-5e4ek.1`, `mc2-5e4ek.2`, `mc2-pmrmf.1`, `mc2-pmrmf.1.1`
 
 ## Current State
 
-- Structure-quality guardrails for auto-size and Career Playbook -> course bridge are implemented and pushed in commit `d9981d3d`.
-- Follow-up live/dev E2E is blocked before Stage 5 by runtime model config, not by the guardrail implementation.
-- Blocker: Stage 4 uses deprecated OpenRouter model `x-ai/grok-4.1-fast`; OpenRouter returns 404 and recommends moving to a newer Grok model.
-- Child Bead `mc2-pmrmf.1` tracks the model-config blocker.
+- Accepted correctness, improvement, QA, docs, and local prompt-regression findings.
+- Fixed Stage 5 profile preservation for Career Playbook bridge job inputs.
+- Added section-count structural blocker plus UI/i18n message.
+- Recompute `generation_metadata.quality_scores.structure` after Stage 5 edit, regeneration, chat structural operation, and element add/delete.
+- Updated docs and `.codex/stages/mc2-5e4ek/` artifacts.
 
-## E2E Verification
+## Verification
 
-- Passed read-only dev preflight: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target dev --json`.
-- Passed browser Career Playbook E2E: `pnpm --filter @megacampus/web test:e2e:career-playbook`, 5/5 tests passed with `/usr/bin/google-chrome`.
-- Live bridge fixture created disposable playbook `d55411ea-1f1f-407f-b4c5-d8a36daf2a56` and course `b4c904bc-e9c3-49ae-9411-c2f94360cdf7`.
-- Initial cloud Qdrant endpoint returned 404; rerunning with local Qdrant `127.0.0.1:6333` allowed Stage 2 to complete.
-- Stage 2 `document_processing` and Stage 3 `document_classification` completed.
-- Stage 4 `structure_analysis` failed after retries with: `404 Grok 4.1 Fast is deprecated`.
+- Targeted backend tests passed: 6 files / 10 tests.
+- Targeted web eslint for Stage 5 UI files passed.
+- `pnpm type-check`, `pnpm build`, and `git diff --check` passed.
+- Dev read-only Career Playbook preflight passed.
+- Playwright Career Playbook E2E is not fully green: 4/5 passed; authenticated viewer-editor flow fails with `Role Guide is unavailable / Failed to fetch` (`mc2-5e4ek.1`).
 
-## Next Recommended
+## Explicit defers
 
-1. Fix dev/runtime model config for Stage 4 classification/scope so it no longer references `x-ai/grok-4.1-fast`.
-2. Rerun `mc2-pmrmf` live bridge E2E from a fresh disposable playbook/course fixture.
-3. Verify Stage 5 reaches `role_playbook_bridge`, lesson count stays `<=30`, no critical structural issues appear, and the UI quality state is visible.
+- `mc2-pmrmf.1`: live dev bridge E2E blocked by runtime model config using deprecated `x-ai/grok-4.1-fast`.
+- `mc2-pmrmf.1.1`: add read-only model config health check for deprecated provider model IDs.
+- `mc2-5e4ek.1`: fix Career Playbook viewer-editor authenticated E2E fixture/API failure.
+- `mc2-5e4ek.2`: centralize Stage 5 structural quality UI state contract and add behavioral UI tests.
 
-## Delivery Notes
+## Next recommended
 
-- docs-reviewed: no-change-needed - E2E found a runtime config blocker; no durable product behavior or code contract changed in this pass.
-- graph-reviewed: used - read `graphify-out/GRAPH_REPORT.md` and used focused Graphify query before E2E planning; no graph update needed because no code changed.
+Next stage id: `mc2-5e4ek.1`
+Recommended action: Fix the Career Playbook viewer-editor authenticated E2E failure before claiming full E2E green.
+
+## Starter prompt for next orchestrator
+
+Use $orchestrator-stage in `/home/me/code/mc2`. Fix `mc2-5e4ek.1`: Career Playbook viewer-editor authenticated Playwright fixture fails with `Role Guide is unavailable / Failed to fetch` even when local backend API is running on `localhost:3456`. Reproduce with `TMPDIR=/tmp PORT=3456 pnpm --filter @megacampus/course-gen-platform dev` plus `PLAYWRIGHT_PORT=3101 pnpm --filter @megacampus/web test:e2e:career-playbook`, inspect tRPC/browser/server errors, fix the fixture/API/auth/runtime cause, then rerun the suite.
+
+## Closeout Markers
+
+docs-reviewed: updated - course-generation structure quality spec, Career Playbook architecture, Stage 4/5 READMEs, and Supabase DB reference.
+graph-reviewed: updated - `graphify update .` rebuilt code graph without LLM/API extraction.

@@ -223,6 +223,8 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
           return t('structureQualityIssueObjectives')
         case 'invalid_section_lesson_budget':
           return t('structureQualityIssueEmptySection')
+        case 'section_count_out_of_bounds':
+          return t('structureQualityIssueSectionCount')
         case 'senior_role_beginner_level':
           return t('structureQualityIssueSeniorBeginner')
         default:
