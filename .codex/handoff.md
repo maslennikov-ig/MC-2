@@ -22,20 +22,21 @@ Beads: `mc2-muhsu`
 - Passed: `pnpm build`.
 - Passed: `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-muhsu`.
 - Passed: Beads `mc2-muhsu` closed and `bd dolt push` completed.
-- Pending: commit and `/push-dev`.
+- Passed dev delivery: `.claude/scripts/push-dev.sh --yes` promoted the feature branch to `develop` and printed `Beads Dolt remote pushed`.
 
 ## Next recommended
 
 Next stage id: `mc2-muhsu`.
-Recommended action: commit, push, and promote to `develop` via `/push-dev`.
+Recommended action: none for this task.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, Beads `mc2-muhsu`, and `.codex/stages/mc2-muhsu/summary.md`. Finish verification and dev delivery for the Career Playbook auto course-size default.
+Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, and Beads. Current task `mc2-muhsu` is delivered; select the next ready Beads task before changing files.
 
 ## Delivery
 
 - docs-reviewed: updated - handoff, stage summary, and backend env example describe the new default and Tavily configuration without secrets.
+- Delivered to `develop` via `.claude/scripts/push-dev.sh --yes`.
 - graph-reviewed: no-change-needed - behavior/default change only; no architecture or route/module ownership boundary changed.
 
 ## Explicit defers
