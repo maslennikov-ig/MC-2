@@ -432,6 +432,11 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                         : undefined
                   }
                   size="xs"
+                  className={
+                    !data.needsReview && currentStatus === 'completed'
+                      ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20 dark:bg-purple-500 dark:text-white'
+                      : undefined
+                  }
                 />
               </div>
 
