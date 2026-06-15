@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { useRestartStage } from '../hooks/useRestartStage'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 interface ApprovalControlsProps {
   courseId: string
@@ -36,6 +37,23 @@ interface ApprovalControlsProps {
   className?: string
 }
 
+function hasCriticalStructureIssues(generationMetadata: unknown): boolean {
+  if (!generationMetadata || typeof generationMetadata !== 'object') return false
+  const metadata = generationMetadata as {
+    quality_scores?: {
+      structure?: {
+        hasCriticalIssues?: unknown
+        criticalIssues?: unknown
+      }
+    }
+  }
+  const structure = metadata.quality_scores?.structure
+  return (
+    structure?.hasCriticalIssues === true ||
+    (Array.isArray(structure?.criticalIssues) && structure.criticalIssues.length > 0)
+  )
+}
+
 export const ApprovalControls = ({
   courseId,
   orgSlug,
@@ -50,6 +68,7 @@ export const ApprovalControls = ({
 }: ApprovalControlsProps) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [action, setAction] = useState<'approve' | 'regenerate' | null>(null)
+  const [isStage5StructurallyBlocked, setIsStage5StructurallyBlocked] = useState(false)
   const t = useTranslations('generation')
   const { restartStage, isRestarting } = useRestartStage(orgSlug, courseSlug)
 
@@ -61,7 +80,39 @@ export const ApprovalControls = ({
     }
   }, [])
 
+  useEffect(() => {
+    if (stageNumber !== 5) {
+      setIsStage5StructurallyBlocked(false)
+      return
+    }
+
+    let cancelled = false
+
+    const fetchQualityState = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('courses')
+        .select('generation_metadata')
+        .eq('id', courseId)
+        .single()
+
+      if (cancelled) return
+      setIsStage5StructurallyBlocked(hasCriticalStructureIssues(data?.generation_metadata))
+    }
+
+    void fetchQualityState()
+
+    return () => {
+      cancelled = true
+    }
+  }, [courseId, stageNumber])
+
   const handleApprove = async () => {
+    if (isStage5StructurallyBlocked) {
+      toast.error(t('actions.stage5StructureBlocked'))
+      return
+    }
+
     setIsProcessing(true)
     setAction('approve')
     try {
@@ -112,6 +163,7 @@ export const ApprovalControls = ({
 
   // Fix operator precedence with explicit parentheses
   const isRegenerating = (isProcessing && action === 'regenerate') || isRestarting
+  const approveDisabled = isProcessing || isRestarting || isStage5StructurallyBlocked
 
   // Prominent variant - large gradient button matching PrioritizationPanel style
   if (variant === 'prominent') {
@@ -131,7 +183,7 @@ export const ApprovalControls = ({
         <Button
           size="compact"
           onClick={() => void handleApprove()}
-          disabled={isProcessing || isRestarting}
+          disabled={approveDisabled}
           className={cn(
             // Light mode gradient
             'bg-gradient-to-r from-purple-500 to-indigo-600',
@@ -151,7 +203,9 @@ export const ApprovalControls = ({
           ) : (
             <Rocket size={14} className="mr-1.5" />
           )}
-          {approveText || t('actions.approveAndContinue') || 'Подтвердить и продолжить'}
+          {isStage5StructurallyBlocked
+            ? t('actions.stage5StructureBlocked')
+            : approveText || t('actions.approveAndContinue') || 'Подтвердить и продолжить'}
         </Button>
 
         {/* Regenerate link for prominent mode */}
@@ -203,7 +257,7 @@ export const ApprovalControls = ({
         variant="outline"
         size="compact"
         onClick={() => void handleApprove()}
-        disabled={isProcessing || isRestarting}
+        disabled={approveDisabled}
         className={cn(
           // Light mode
           'border-emerald-300 text-emerald-600 hover:bg-emerald-50',
@@ -217,7 +271,7 @@ export const ApprovalControls = ({
         ) : (
           <Check size={14} className="mr-1" />
         )}
-        {t('actions.approve')}
+        {isStage5StructurallyBlocked ? t('actions.stage5StructureBlocked') : t('actions.approve')}
       </Button>
 
       {showRegenerate && (

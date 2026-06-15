@@ -26,6 +26,11 @@ import {
 } from '../../shared/validation/quality-validator';
 import { calculateGenerationCost } from '../../shared/llm/cost-calculator';
 import { MinimumLessonsValidator } from './validators/minimum-lessons-validator';
+import {
+  reconcileCourseMetadata,
+  validateStructuralQuality,
+  type StructuralQualityResult,
+} from './validators/structural-quality-validator';
 import { logTrace } from '../../shared/trace-logger';
 
 // ============================================================================
@@ -127,6 +132,7 @@ export interface QualityScoresState {
   metadata_similarity?: number;
   sections_similarity: number[];
   overall?: number;
+  structure?: StructuralQualityResult;
 }
 
 // ============================================================================
@@ -251,11 +257,13 @@ export function validateSectionQuality(
 export async function performPostGenerationQualityGate(
   sections: Section[],
   input: GenerationJobInput,
-  qualityLogger: pino.Logger
+  qualityLogger: pino.Logger,
+  metadata: CourseMetadata
 ): Promise<{
   qualityResult: SectionQualityValidationResult;
   lessonsResult: ReturnType<MinimumLessonsValidator['validateSections']>;
   overlapResult: CrossSectionOverlapResult | null;
+  structuralResult: StructuralQualityResult;
 }> {
   // T037: Quality validation with 0.75 threshold
   const qualityResult = validateSectionQuality(sections, input, qualityLogger);
@@ -277,7 +285,24 @@ export async function performPostGenerationQualityGate(
   // T037: Minimum lessons validation (FR-015)
   const lessonsResult = validateMinimumLessons(sections, input, qualityLogger);
 
-  return { qualityResult, lessonsResult, overlapResult: detectedOverlap };
+  const structuralResult = validateStructuralQuality({
+    input,
+    metadata: reconcileCourseMetadata(metadata, sections, input),
+    sections,
+  });
+  if (structuralResult.hasCriticalIssues) {
+    qualityLogger.warn(
+      {
+        courseId: input.course_id,
+        profileId: structuralResult.profileId,
+        totalLessons: structuralResult.totalLessons,
+        criticalIssues: structuralResult.criticalIssues.map(issue => issue.code),
+      },
+      'Blocking structural quality issues detected'
+    );
+  }
+
+  return { qualityResult, lessonsResult, overlapResult: detectedOverlap, structuralResult };
 }
 
 /**
@@ -426,10 +451,12 @@ export function assembleGenerationResult(
   qualityScores: QualityScoresState,
   phaseDurations: PhaseDurationsState,
   retryCount: RetryCountState,
-  totalDuration: number
+  totalDuration: number,
+  input: GenerationJobInput
 ): { courseStructure: CourseStructure; generationMetadata: GenerationMetadata } {
+  const reconciledMetadata = reconcileCourseMetadata(metadata, sections, input);
   const courseStructure: CourseStructure = {
-    ...(metadata as CourseStructure),
+    ...(reconciledMetadata as CourseStructure),
     sections,
   };
 
@@ -464,6 +491,7 @@ export function assembleGenerationResult(
       metadata_similarity: qualityScores.metadata_similarity || 0,
       sections_similarity: qualityScores.sections_similarity,
       overall: qualityScores.overall || 0,
+      structure: qualityScores.structure,
     },
     batch_count: sections.length,
     retry_count: {

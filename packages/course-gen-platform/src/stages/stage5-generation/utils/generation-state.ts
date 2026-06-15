@@ -180,9 +180,9 @@ export interface GenerationState {
    * Model used per phase for cost/quality analysis
    *
    * RT-001 Model Strategy:
-   * - metadata: "qwen/qwen3-max" (critical) or "openai/gpt-oss-120b" (non-critical)
-   * - sections: "openai/gpt-oss-120b" (primary) or "qwen/qwen3-max" (escalation)
-   * - validation: "openai/gpt-oss-120b" (LLM-as-judge 5%) or undefined (embedding 95%)
+   * - metadata: "qwen/qwen3-max" (critical) or "deepseek/deepseek-v4-flash" (non-critical)
+   * - sections: "deepseek/deepseek-v4-flash" (primary) or "qwen/qwen3-max" (escalation)
+   * - validation: "deepseek/deepseek-v4-flash" (LLM-as-judge 5%) or undefined (embedding 95%)
    */
   modelUsed: {
     /** Model for Phase 2 metadata generation */
@@ -327,8 +327,8 @@ export interface GenerateMetadataResult {
    *
    * Possible values:
    * - "qwen/qwen3-max" (critical fields)
-   * - "openai/gpt-oss-120b" (non-critical fields)
-   * - "qwen/qwen3-max+openai/gpt-oss-120b" (hybrid approach)
+   * - "deepseek/deepseek-v4-flash" (non-critical fields)
+   * - "qwen/qwen3-max+deepseek/deepseek-v4-flash" (hybrid approach)
    */
   model: string;
 
@@ -362,7 +362,7 @@ export interface GenerateSectionsResult {
    * Primary model used for this batch
    *
    * Possible values:
-   * - "openai/gpt-oss-120b" (80% of batches)
+   * - "deepseek/deepseek-v4-flash" (80% of batches)
    * - "qwen/qwen3-max" (20% escalation)
    * - "google/gemini-3-flash-preview" (rate limit overflow)
    */
@@ -640,7 +640,7 @@ export function updateStateWithQuality(
     },
     modelUsed: {
       ...state.modelUsed,
-      validation: result.method === 'llm_judge' ? 'openai/gpt-oss-120b' : undefined,
+      validation: result.method === 'llm_judge' ? 'deepseek/deepseek-v4-flash' : undefined,
     },
     phaseDurations: {
       ...state.phaseDurations,

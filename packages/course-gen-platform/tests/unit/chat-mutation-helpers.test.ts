@@ -733,15 +733,15 @@ describe('resolveModelConfig - DB Unavailable Fallback', () => {
 
     const result = await executeLegacyLLMFlow(params);
 
-    // CHAT_STAGE_FALLBACK_MODELS.stage_6.primary = 'deepseek/deepseek-v3.2'
+    // CHAT_STAGE_FALLBACK_MODELS.stage_6.primary = 'deepseek/deepseek-v4-flash'
     expect(llmClient.generateChatCompletion).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({
-        model: 'deepseek/deepseek-v3.2',
+        model: 'deepseek/deepseek-v4-flash',
       })
     );
 
-    expect(result.modelUsed).toBe('deepseek/deepseek-v3.2');
+    expect(result.modelUsed).toBe('deepseek/deepseek-v4-flash');
   });
 
   it('should use DEFAULT hardcoded models when DB unavailable and stageId unknown', async () => {

@@ -150,7 +150,7 @@ describe('Contract: Summarization Router', () => {
     });
 
     const fileId2 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
-      model_used: 'openai/gpt-oss-120b',
+      model_used: 'deepseek/deepseek-v4-flash',
       estimated_cost_usd: 0.002,
       input_tokens: 1500,
       output_tokens: 300,
@@ -200,7 +200,7 @@ describe('Contract: Summarization Router', () => {
     }
 
     expect(modelCosts.get('openai/gpt-oss-20b')).toBeCloseTo(0.001, 4);
-    expect(modelCosts.get('openai/gpt-oss-120b')).toBeCloseTo(0.002, 4);
+    expect(modelCosts.get('deepseek/deepseek-v4-flash')).toBeCloseTo(0.002, 4);
   });
 
   // ==========================================================================
@@ -549,9 +549,7 @@ describe('Contract: Summarization Router', () => {
   // Test 8: Input Validation - Invalid UUID
   // ==========================================================================
 
-  it('should reject invalid UUID in getSummarizationStatus', async () => {
-    const supabase = getSupabaseAdmin();
-
+  it('should reject invalid UUID in getSummarizationStatus', () => {
     // Invalid UUID should fail at validation layer (before DB query)
     // Simulate Zod validation
     const invalidUuid = 'not-a-valid-uuid';
@@ -569,7 +567,7 @@ describe('Contract: Summarization Router', () => {
   // Test 9: Input Validation - Invalid Date Format
   // ==========================================================================
 
-  it('should reject invalid date format in getCostAnalytics', async () => {
+  it('should reject invalid date format in getCostAnalytics', () => {
     // Invalid ISO 8601 date
     const invalidDate = '2025-13-45'; // Invalid month and day
 

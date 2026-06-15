@@ -133,7 +133,7 @@ export async function executeExpansion(
     const modelService = createModelConfigService();
     const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_section_expander');
 
-    let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
+    let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
     let temperature = fallbackConfig?.temperature ?? 0.7;
 
     try {

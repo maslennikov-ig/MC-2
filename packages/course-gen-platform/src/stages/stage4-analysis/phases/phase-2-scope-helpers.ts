@@ -20,6 +20,10 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/workspace-utils';
 import { logger } from '@/shared/logger';
+import {
+  normalizeRecommendedStructure,
+  resolveCourseStructureProfile,
+} from '@/shared/course-structure-policy';
 
 // ============================================================================
 // TYPES
@@ -220,13 +224,26 @@ export function postProcessAndValidate(
     },
   });
 
+  const profile = resolveCourseStructureProfile({
+    profileId: validatedInput.structure_profile,
+    courseSize: validatedInput.course_size,
+    minLessons: validatedInput.min_lessons,
+    maxLessons: validatedInput.max_lessons,
+    targetLessons: validatedInput.target_lessons,
+    targetSections: validatedInput.target_sections,
+  });
+  const normalized = Phase2OutputSchema.parse({
+    ...validated,
+    recommended_structure: normalizeRecommendedStructure(validated.recommended_structure, profile),
+  });
+
   // CRITICAL: Enforce minimum lessons constraint based on course_size preset
-  enforceMinLessonsConstraint(validated, validatedInput);
+  enforceMinLessonsConstraint(normalized, validatedInput);
 
   // Log if LLM exceeded max_lessons constraint (non-blocking, for analytics)
-  logMaxLessonsExceeded(validated, validatedInput);
+  logMaxLessonsExceeded(normalized, validatedInput);
 
-  return validated;
+  return normalized;
 }
 
 /** Apply safety net defaults to recommended_structure fields */

@@ -13,7 +13,7 @@
  * pnpm tsx scripts/test-lesson-generation.ts \
  *   --course-id bc34283a-0a61-45cb-8e5c-773a3b67a86c \
  *   --lesson-id 8c3623c0-07e5-4e01-853d-ff3eab14a546 \
- *   --models "xiaomi/mimo-v2-flash,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct"
+ *   --models "deepseek/deepseek-v4-flash,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct"
  */
 
 import 'dotenv/config';
@@ -84,7 +84,7 @@ function parseArguments(): TestConfig {
     .option(
       '--models <models>',
       'Comma-separated list of model IDs',
-      'xiaomi/mimo-v2-flash,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct'
+      'deepseek/deepseek-v4-flash,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct'
     )
     .parse();
 
@@ -184,10 +184,7 @@ function createMockLessonSpec(): LessonSpecificationV2 {
 /**
  * Load lesson specification (uses mock for testing)
  */
-async function loadLessonSpec(
-  _courseId: string,
-  _lessonId: string
-): Promise<LessonSpecificationV2> {
+function loadLessonSpec(_courseId: string, _lessonId: string): LessonSpecificationV2 {
   logger.info('Using mock lesson specification for A/B testing');
   return createMockLessonSpec();
 }
@@ -427,7 +424,7 @@ async function main(): Promise<void> {
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
   // Load lesson spec
-  const lessonSpec = await loadLessonSpec(config.courseId, config.lessonId);
+  const lessonSpec = loadLessonSpec(config.courseId, config.lessonId);
 
   // Determine language from spec
   const language = lessonSpec.metadata.language || 'ru';

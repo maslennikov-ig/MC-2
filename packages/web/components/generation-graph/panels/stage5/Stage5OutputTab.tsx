@@ -5,7 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { CheckCircle2, BookOpen, Clock, Tag, GitBranch } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  BookOpen,
+  Clock,
+  Tag,
+  GitBranch,
+  ShieldCheck,
+} from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { StructureTree } from './components/StructureTree'
 import { AutoCardPreview } from '../shared/AutoCardPreview'
@@ -16,7 +24,12 @@ import { useAutoSave } from '../../hooks/useAutoSave'
 import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
 import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
 import { updateFieldAction } from '@/app/actions/admin-generation'
-import type { Stage5OutputTabProps, CourseStructure } from './types'
+import type {
+  Stage5OutputTabProps,
+  CourseStructure,
+  StructuralQualityResult,
+  StructuralQualityIssue,
+} from './types'
 import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
@@ -31,6 +44,29 @@ function isCourseStructure(data: unknown): data is CourseStructure {
   if (!data || typeof data !== 'object') return false
   const d = data as Record<string, unknown>
   return typeof d.course_title === 'string' && Array.isArray(d.sections)
+}
+
+function getStructuralQuality(data: unknown): StructuralQualityResult | null {
+  if (!data || typeof data !== 'object') return null
+  const metadata = data as {
+    quality_scores?: {
+      structure?: Partial<StructuralQualityResult>
+    }
+  }
+  const structure = metadata.quality_scores?.structure
+  if (!structure || typeof structure !== 'object') return null
+  if (typeof structure.passed !== 'boolean') return null
+
+  return {
+    passed: structure.passed,
+    hasCriticalIssues: structure.hasCriticalIssues === true,
+    profileId: typeof structure.profileId === 'string' ? structure.profileId : 'unknown',
+    totalLessons: typeof structure.totalLessons === 'number' ? structure.totalLessons : 0,
+    computedDurationHours:
+      typeof structure.computedDurationHours === 'number' ? structure.computedDurationHours : 0,
+    criticalIssues: Array.isArray(structure.criticalIssues) ? structure.criticalIssues : [],
+    warnings: Array.isArray(structure.warnings) ? structure.warnings : [],
+  }
 }
 
 // ============================================================================
@@ -106,11 +142,14 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   // Pull-fallback: fetch course_structure directly if not available via props
   // Retries every 3s until data is found (handles case when tab is opened before Stage 5 completes)
   const [directFetchResult, setDirectFetchResult] = useState<unknown>(null)
-  const hasFetched = useRef(false)
+  const [directGenerationMetadata, setDirectGenerationMetadata] = useState<unknown>(undefined)
+  const hasFetchedStructure = useRef(false)
 
   useEffect(() => {
-    if (outputData) return
-    if (hasFetched.current || !courseId) return
+    if (!courseId) return
+    const needsStructure = !outputData && !hasFetchedStructure.current
+    const needsMetadata = directGenerationMetadata === undefined
+    if (!needsStructure && !needsMetadata) return
 
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -120,15 +159,20 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
         const supabase = createClient()
         const { data } = await supabase
           .from('courses')
-          .select('course_structure')
+          .select('course_structure, generation_metadata')
           .eq('id', courseId)
           .single()
 
         if (cancelled) return
 
         if (data?.course_structure) {
-          hasFetched.current = true
+          hasFetchedStructure.current = true
           setDirectFetchResult(data.course_structure)
+        }
+
+        setDirectGenerationMetadata(data?.generation_metadata ?? null)
+
+        if (data?.course_structure && data?.generation_metadata) {
           return
         }
 
@@ -150,7 +194,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [outputData, courseId])
+  }, [outputData, courseId, directGenerationMetadata])
 
   // Parse output data - real data IS the CourseStructure directly
   const parsedData = useMemo((): CourseStructure | null => {
@@ -158,6 +202,37 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
     if (isCourseStructure(directFetchResult)) return directFetchResult
     return null
   }, [outputData, directFetchResult])
+
+  const structureQuality = useMemo(
+    () => getStructuralQuality(directGenerationMetadata),
+    [directGenerationMetadata]
+  )
+
+  const formatQualityIssue = useCallback(
+    (issue: StructuralQualityIssue) => {
+      switch (issue.code) {
+        case 'hard_max_lessons_exceeded':
+          return t('structureQualityIssueHardMax')
+        case 'soft_max_lessons_exceeded':
+          return t('structureQualityIssueSoftMax')
+        case 'duration_mismatch':
+          return t('structureQualityIssueDuration')
+        case 'duplicate_lesson_titles':
+          return t('structureQualityIssueDuplicates')
+        case 'lesson_objective_overload':
+          return t('structureQualityIssueObjectives')
+        case 'invalid_section_lesson_budget':
+          return t('structureQualityIssueEmptySection')
+        case 'section_count_out_of_bounds':
+          return t('structureQualityIssueSectionCount')
+        case 'senior_role_beginner_level':
+          return t('structureQualityIssueSeniorBeginner')
+        default:
+          return issue.message
+      }
+    },
+    [t]
+  )
 
   // Handle section toggle - wrapped in useCallback for optimization
   const handleToggleSection = useCallback((sectionId: string) => {
@@ -252,6 +327,79 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
         <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95">
           <SaveStatusIndicator status={status} error={error} />
         </div>
+      )}
+
+      {structureQuality && (
+        <Card
+          className={cn(
+            'border-l-4',
+            structureQuality.hasCriticalIssues
+              ? 'border-l-red-500 bg-red-50/70 dark:bg-red-950/20'
+              : structureQuality.warnings.length > 0
+                ? 'border-l-amber-500 bg-amber-50/70 dark:bg-amber-950/20'
+                : 'border-l-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/20'
+          )}
+        >
+          <CardContent className="space-y-3 pt-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {structureQuality.hasCriticalIssues ? (
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              ) : structureQuality.warnings.length > 0 ? (
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              )}
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-semibold">
+                  {structureQuality.hasCriticalIssues
+                    ? t('structureQualityCriticalTitle')
+                    : structureQuality.warnings.length > 0
+                      ? t('structureQualityWarningTitle')
+                      : t('structureQualityPassedTitle')}
+                </h4>
+                <p className="text-muted-foreground text-sm">
+                  {structureQuality.hasCriticalIssues
+                    ? t('structureQualityCriticalDescription')
+                    : structureQuality.warnings.length > 0
+                      ? t('structureQualityWarningDescription')
+                      : t('structureQualityPassedDescription')}
+                </p>
+              </div>
+              <Badge
+                className={cn(
+                  'text-xs font-medium',
+                  structureQuality.hasCriticalIssues
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                    : structureQuality.warnings.length > 0
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                )}
+              >
+                {structureQuality.hasCriticalIssues
+                  ? t('structureQualityNeedsFix')
+                  : structureQuality.warnings.length > 0
+                    ? t('structureQualityWarning')
+                    : t('structureQualityCanContinue')}
+              </Badge>
+            </div>
+
+            {(structureQuality.criticalIssues.length > 0 ||
+              structureQuality.warnings.length > 0) && (
+              <ul className="space-y-1.5">
+                {(structureQuality.hasCriticalIssues
+                  ? structureQuality.criticalIssues
+                  : structureQuality.warnings
+                )
+                  .slice(0, 4)
+                  .map((issue, index) => (
+                    <li key={`${issue.code}-${index}`} className="text-muted-foreground text-sm">
+                      {formatQualityIssue(issue)}
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Metadata Card */}

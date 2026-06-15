@@ -29,7 +29,7 @@ const client = new OpenAI({
   },
 });
 
-const MODEL = 'xiaomi/mimo-v2-flash';
+const MODEL = 'deepseek/deepseek-v4-flash';
 
 interface TestResult {
   name: string;

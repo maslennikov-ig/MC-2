@@ -558,7 +558,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
  * Career Playbook uses CAREER_PLAYBOOK_PROCESSOR_MAX_TTL_MS, defaulting to 120 minutes,
  * because strict judge/repair can legitimately exceed the course-generation default.
  * Stage 5 generates sections SEQUENTIALLY with thinking models:
- * - kimi-k2-thinking: 55-180s per section (complex), mimo-v2-flash: ~25s (normal)
+ * - kimi-k2-thinking: 55-180s per section (complex), deepseek-v4-flash: ~25s (normal)
  * - comprehensive preset: up to 15 sections → worst case ~47 min
  * - standard preset: up to 8 sections → worst case ~26 min
  * Configure via PROCESSOR_MAX_TTL_MS and CAREER_PLAYBOOK_PROCESSOR_MAX_TTL_MS environment variables.

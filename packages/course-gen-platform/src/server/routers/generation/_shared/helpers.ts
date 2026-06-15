@@ -271,7 +271,7 @@ export async function buildStage5JobInput(
   const { data: fullCourse, error: fullCourseError } = await supabase
     .from('courses')
     .select(
-      'title, settings, language, style, target_audience, difficulty, analysis_result, organization_id'
+      'title, settings, language, style, target_audience, difficulty, course_size, analysis_result, organization_id'
     )
     .eq('id', courseId)
     .single();
@@ -309,6 +309,7 @@ export async function buildStage5JobInput(
       style: fullCourse.style && isValidStyle(fullCourse.style) ? fullCourse.style : undefined,
       target_audience: fullCourse.target_audience ?? undefined,
       difficulty: fullCourse.difficulty ?? 'intermediate',
+      course_size: fullCourse.course_size ?? undefined,
       desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
         ?.desired_lessons_count,
       desired_modules_count: (fullCourse.settings as unknown as CourseSettings)
@@ -316,6 +317,10 @@ export async function buildStage5JobInput(
       lesson_duration_minutes: (fullCourse.settings as unknown as CourseSettings)
         ?.lesson_duration_minutes,
       learning_outcomes: (fullCourse.settings as unknown as CourseSettings)?.learning_outcomes,
+      settings:
+        fullCourse.settings && typeof fullCourse.settings === 'object'
+          ? (fullCourse.settings as Record<string, unknown>)
+          : undefined,
     },
     vectorized_documents: hasVectorizedDocs,
     document_summaries: documentSummaries,

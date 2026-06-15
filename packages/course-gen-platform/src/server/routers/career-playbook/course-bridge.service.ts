@@ -77,6 +77,7 @@ interface InsertCourseInput {
   language: Language;
   courseSize: CourseSize;
   style: CourseStyle;
+  generationMode: 'automatic' | 'semi_automatic';
   settings: Json;
 }
 
@@ -129,6 +130,53 @@ function assertCompleted(playbook: CareerPlaybookRow): void {
     code: 'BAD_REQUEST',
     message: 'Only completed Career Playbooks can be converted into courses',
   });
+}
+
+function buildInitialCourseBridgeProgress(startedAt: string): Json {
+  return {
+    steps: [
+      {
+        id: 1,
+        name: 'Запуск генерации',
+        status: 'in_progress',
+        started_at: startedAt,
+      },
+      {
+        id: 2,
+        name: 'Обработка документов',
+        status: 'pending',
+      },
+      {
+        id: 3,
+        name: 'Приоритизация документов',
+        status: 'pending',
+      },
+      {
+        id: 4,
+        name: 'Глубокий анализ',
+        status: 'pending',
+      },
+      {
+        id: 5,
+        name: 'Формирование структуры',
+        status: 'pending',
+      },
+      {
+        id: 6,
+        name: 'Генерация контента',
+        status: 'pending',
+      },
+    ],
+    message: 'Запуск генерации курса...',
+    percentage: 0,
+    current_step: 1,
+    total_steps: 6,
+    has_documents: true,
+    file_count: 0,
+    total_file_size: 0,
+    files: [],
+    started_at: startedAt,
+  };
 }
 
 async function loadOwnedPlaybook(
@@ -206,8 +254,10 @@ async function insertCourse(input: InsertCourseInput): Promise<InsertedCourse> {
         language: input.language,
         course_size: input.courseSize,
         style: input.style,
+        generation_mode: input.generationMode,
         settings: input.settings,
         has_files: true,
+        generation_progress: buildInitialCourseBridgeProgress(now),
         created_at: now,
         updated_at: now,
       })
@@ -446,6 +496,7 @@ export async function createCourseFromPlaybook(
     language: brief.language,
     courseSize: brief.courseSize,
     style: brief.style,
+    generationMode: 'automatic',
     settings: toJson({
       ...settingsRecord(brief.settings),
       includeWebResearch,

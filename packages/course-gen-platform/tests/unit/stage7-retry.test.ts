@@ -199,13 +199,13 @@ describe('retry-strategy.ts - Pure Functions', () => {
     it('should return primary model for quiz on attempt 1', () => {
       const model = getModelForAttempt('quiz', 1);
 
-      expect(model).toBe('xiaomi/mimo-v2-flash');
+      expect(model).toBe('deepseek/deepseek-v4-flash');
     });
 
     it('should return primary model for quiz on attempt 2', () => {
       const model = getModelForAttempt('quiz', 2);
 
-      expect(model).toBe('xiaomi/mimo-v2-flash');
+      expect(model).toBe('deepseek/deepseek-v4-flash');
     });
 
     it('should return fallback model for quiz on attempt 3', () => {
@@ -217,7 +217,7 @@ describe('retry-strategy.ts - Pure Functions', () => {
     it('should return primary model for presentation on attempt 1', () => {
       const model = getModelForAttempt('presentation', 1);
 
-      expect(model).toBe('xiaomi/mimo-v2-flash');
+      expect(model).toBe('deepseek/deepseek-v4-flash');
     });
 
     it('should return fallback model for presentation on attempt 3', () => {

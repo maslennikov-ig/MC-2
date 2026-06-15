@@ -28,6 +28,7 @@ import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { buildStage5StructuralQualityMetadataUpdate } from './structural-quality-metadata';
 import { ensureStableIdsAndSchemaVersionInMemory } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 
 export const regenerationRouter = {
@@ -335,12 +336,22 @@ ${dynamicContextContent}
           dataToPersist = normalizedStructure;
         }
 
+        const updatePayload: Record<string, unknown> = {
+          [updateColumn]: dataToPersist,
+          updated_at: now,
+        };
+        if (stageId === 'stage_5') {
+          updatePayload.generation_metadata = await buildStage5StructuralQualityMetadataUpdate(
+            supabase,
+            courseId,
+            dataToPersist as CourseStructure,
+            requestId
+          );
+        }
+
         const { error: updateError } = await supabase
           .from('courses')
-          .update({
-            [updateColumn]: dataToPersist,
-            updated_at: now,
-          })
+          .update(updatePayload)
           .eq('id', courseId);
 
         if (updateError) {

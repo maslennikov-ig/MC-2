@@ -89,7 +89,7 @@ pnpm test tests/integration/stage3-cost-tracking.test.ts
 | Model                           | Input Tokens | Output Tokens | Expected Cost | Calculated Cost | Variance |
 | ------------------------------- | ------------ | ------------- | ------------- | --------------- | -------- |
 | openai/gpt-oss-20b              | 8000         | 2000          | $0.000520     | $0.000520       | 0.00%    |
-| openai/gpt-oss-120b             | 8000         | 2000          | $0.001120     | $0.001120       | 0.00%    |
+| deepseek/deepseek-v4-flash      | 8000         | 2000          | $0.001120     | $0.001120       | 0.00%    |
 | google/gemini-2.5-flash-preview | 8000         | 2000          | $0.001600     | $0.001600       | 0.00%    |
 
 **Cost Tolerance**: All calculations within ±0.01% (perfect accuracy for unit tests)
@@ -117,7 +117,7 @@ pnpm test tests/integration/stage3-cost-tracking.test.ts
 1. **small-doc-gpt-oss-20b**: ~200 tokens, full_text strategy, $0 cost
 2. **medium-doc-gpt-oss-20b**: ~1300 tokens, full_text strategy, $0 cost
 3. **large-doc-gpt-oss-20b**: ~8000 tokens, hierarchical strategy, $0.00052 cost
-4. **large-doc-gpt-oss-120b**: ~8000 tokens, hierarchical strategy, $0.00112 cost
+4. **large-doc-deepseek-v4-flash**: ~8000 tokens, hierarchical strategy, $0.00112 cost
 5. **large-doc-gemini-flash**: ~8000 tokens, hierarchical strategy, $0.00160 cost
 
 ## Testing Best Practices Followed

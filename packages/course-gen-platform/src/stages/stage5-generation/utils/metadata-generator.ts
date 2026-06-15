@@ -4,7 +4,7 @@
  * Implements RT-001 Phase 2 hybrid model routing strategy:
  * - Critical fields → qwen3-max ALWAYS (learning_outcomes, learning_objectives,
  *   pedagogical_strategy, course_structure, domain_taxonomy)
- * - Non-critical fields → openai/gpt-oss-120b first, escalate to qwen3-max if quality < 0.85
+ * - Non-critical fields → deepseek/deepseek-v4-flash first, escalate to qwen3-max if quality < 0.85
  *
  * Cost savings: 25-40% vs always using qwen3-max ($0.126-0.144 per course)
  *
@@ -81,7 +81,7 @@ const MODELS = {
   metadata_fallback: 'moonshotai/kimi-k2-thinking',
 
   // Legacy (for emergency cases)
-  oss120b: 'openai/gpt-oss-120b',
+  oss120b: 'deepseek/deepseek-v4-flash',
 } as const;
 
 // ============================================================================

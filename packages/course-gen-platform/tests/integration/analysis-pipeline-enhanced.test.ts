@@ -228,7 +228,7 @@ function getMockPhase3Output(): Phase3Output {
     ],
     phase_metadata: {
       duration_ms: 12000,
-      model_used: 'openai/gpt-oss-120b',
+      model_used: 'deepseek/deepseek-v4-flash',
       tokens: { input: 3500, output: 2200, total: 5700 },
       quality_score: 0.92,
       retry_count: 0,

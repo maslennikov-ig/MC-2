@@ -87,7 +87,7 @@ export async function executeLlmCall(
   const modelService = createModelConfigService();
   const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_patcher');
 
-  let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
+  let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
   try {
     const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
     modelId = config.modelId || fallbackConfig?.modelId || modelId;

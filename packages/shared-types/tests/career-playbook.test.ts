@@ -323,7 +323,7 @@ describe('Career Playbook shared schemas', () => {
         needs_regeneration: [],
       },
       generated_at: '2026-05-13T09:10:00.000Z',
-      llm_model: 'openai/gpt-5.4',
+      llm_model: 'google/gemini-3.5-flash',
       attempt: 1,
     });
 
@@ -353,7 +353,7 @@ describe('Career Playbook shared schemas', () => {
       nodeCosts: [
         {
           node: 'specBuilder',
-          model: 'openai/gpt-5.4',
+          model: 'google/gemini-3.5-flash',
           input_tokens: 1200,
           output_tokens: 400,
           cost_usd: 0.013,

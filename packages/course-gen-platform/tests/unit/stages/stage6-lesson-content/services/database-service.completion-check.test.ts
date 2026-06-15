@@ -6,23 +6,22 @@ const {
   mockNotifyCourseError,
   mockResolveLessonUuid,
   mockLogger,
-} =
-  vi.hoisted(() => {
-    const logger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-      child: vi.fn().mockReturnThis(),
-    };
-    return {
-      mockGetSupabaseAdmin: vi.fn(),
-      mockNotifyCourseCompletion: vi.fn().mockResolvedValue(undefined),
-      mockNotifyCourseError: vi.fn().mockResolvedValue(undefined),
-      mockResolveLessonUuid: vi.fn().mockResolvedValue('lesson-uuid'),
-      mockLogger: logger,
-    };
-  });
+} = vi.hoisted(() => {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn().mockReturnThis(),
+  };
+  return {
+    mockGetSupabaseAdmin: vi.fn(),
+    mockNotifyCourseCompletion: vi.fn().mockResolvedValue(undefined),
+    mockNotifyCourseError: vi.fn().mockResolvedValue(undefined),
+    mockResolveLessonUuid: vi.fn().mockResolvedValue('lesson-uuid'),
+    mockLogger: logger,
+  };
+});
 
 vi.mock('@/shared/supabase/admin', () => ({
   getSupabaseAdmin: mockGetSupabaseAdmin,
@@ -487,7 +486,7 @@ describe('markForReview', () => {
               rung_attempt_index: 0,
               outcome: 'quality_retryable',
               selected_model: 'z-ai/glm-5',
-              fallback_model: 'qwen/qwen3.5-plus-02-15',
+              fallback_model: 'qwen/qwen3.7-plus',
               model_used: 'z-ai/glm-5',
               quality_score: 0.52,
               errors: [],
@@ -620,7 +619,7 @@ describe('saveLessonContent', () => {
         durationMs: 5000,
         modelUsed: 'z-ai/glm-5',
         selectedModel: 'z-ai/glm-5',
-        fallbackModel: 'qwen/qwen3.5-plus-02-15',
+        fallbackModel: 'qwen/qwen3.7-plus',
         selectedModelTier: 'complex',
         selectedModelTierReason: 'module 1 premium path',
         selectedModelPhase: 'stage_6_auto_last_chance',

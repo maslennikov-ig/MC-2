@@ -89,39 +89,44 @@ function getStatusConfig(status: CardData['status'], t: ReturnType<typeof useTra
     case 'completed':
       return {
         label: t('autoCard.ready'),
-        variant: 'default' as const,
+        variant: 'outline' as const,
         icon: Check,
-        color: 'text-green-600',
+        className:
+          'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300',
       }
     case 'pending':
     case 'generating':
       return {
         label: t('autoCard.generating'),
-        variant: 'secondary' as const,
+        variant: 'outline' as const,
         icon: Loader2,
-        color: 'text-amber-500',
+        className:
+          'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300',
         animate: true,
       }
     case 'failed':
       return {
         label: t('autoCard.error'),
-        variant: 'destructive' as const,
+        variant: 'outline' as const,
         icon: AlertCircle,
-        color: 'text-red-500',
+        className:
+          'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300',
       }
     case 'cancelled':
       return {
         label: t('autoCard.cancelled'),
         variant: 'outline' as const,
         icon: AlertCircle,
-        color: 'text-muted-foreground',
+        className:
+          'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300',
       }
     default:
       return {
         label: status,
         variant: 'outline' as const,
         icon: Clock,
-        color: 'text-muted-foreground',
+        className:
+          'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300',
       }
   }
 }
@@ -402,7 +407,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
   onRegenerate: externalRegenerate,
   className,
 }) {
-  const locale = (useLocale() as 'ru' | 'en') || 'en'
+  const locale = useLocale() || 'en'
   const t = useTranslations('common')
 
   // Validate props in development mode
@@ -432,6 +437,9 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
     await regenerate()
     externalRegenerate?.()
   }
+  const handleRegenerateClick = () => {
+    void handleRegenerate()
+  }
 
   // Get card title based on type
   const cardTitle = cardType === 'course' ? t('autoCard.courseCard') : t('autoCard.lessonCard')
@@ -455,7 +463,8 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
           {!isLoading && (
             <Badge
               variant={statusConfig.variant}
-              className={cn('gap-1 text-xs', statusConfig.color)}
+              role="status"
+              className={cn('gap-1 text-xs shadow-none', statusConfig.className)}
             >
               <StatusIcon className={cn('h-3 w-3', statusConfig.animate && 'animate-spin')} />
               {statusConfig.label}
@@ -473,7 +482,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
         {!isLoading && error && !card && (
           <ErrorState
             errorMessage={error.message}
-            onRetry={handleRegenerate}
+            onRetry={handleRegenerateClick}
             isRetrying={isRegenerating}
             t={t}
           />
@@ -494,7 +503,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
             {card.status === 'failed' && (
               <ErrorState
                 errorMessage={card.errorMessage}
-                onRetry={handleRegenerate}
+                onRetry={handleRegenerateClick}
                 isRetrying={isRegenerating}
                 t={t}
               />
@@ -508,7 +517,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
                 updatedAt={card.updatedAt}
                 locale={locale}
                 compact={compact}
-                onRegenerate={handleRegenerate}
+                onRegenerate={handleRegenerateClick}
                 isRegenerating={isRegenerating}
                 t={t}
               />
@@ -518,7 +527,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
             {card.status === 'cancelled' && (
               <ErrorState
                 errorMessage={t('autoCard.cancelledMessage')}
-                onRetry={handleRegenerate}
+                onRetry={handleRegenerateClick}
                 isRetrying={isRegenerating}
                 t={t}
               />

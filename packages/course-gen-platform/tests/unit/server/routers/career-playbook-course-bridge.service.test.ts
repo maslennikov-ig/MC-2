@@ -339,6 +339,7 @@ describe('course bridge service', () => {
         language: 'ru',
         courseSize: 'mini',
         style: 'practical',
+        generationMode: 'automatic',
         settings: expect.objectContaining({
           source: 'career_playbook',
           playbookId,
@@ -504,6 +505,7 @@ describe('course bridge service', () => {
         courseDescription: expect.stringContaining('Mission: own platform product outcomes.'),
         targetAudience: 'lead Product Platform',
         courseSize: 'auto',
+        generationMode: 'automatic',
       })
     );
     expect(dependencies.uploadDocument).toHaveBeenCalledTimes(2);

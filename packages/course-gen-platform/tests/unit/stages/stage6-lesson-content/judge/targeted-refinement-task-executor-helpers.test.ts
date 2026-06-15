@@ -75,7 +75,7 @@ describe('executeLlmCall config failures', () => {
       tokensUsed: 321,
     });
     expect(mockGenerateCompletion).toHaveBeenCalledWith('prompt', {
-      model: 'xiaomi/mimo-v2-flash',
+      model: 'deepseek/deepseek-v4-flash',
       temperature: 0.1,
       maxTokens: 1200,
       systemPrompt: 'system prompt',

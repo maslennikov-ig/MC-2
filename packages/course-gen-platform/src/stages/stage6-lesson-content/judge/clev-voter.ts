@@ -9,7 +9,7 @@
  *
  * Vote aggregation uses weighted mean based on model historical accuracy:
  * - Formula: w_i = 1 / (1 + exp(-accuracy_i))
- * - Weights: Minimax M2.5 (0.76), Qwen3.5 Plus (0.75), GLM-5 (0.74)
+ * - Weights: Minimax M3 (0.76), Qwen3.7 Plus (0.75), GLM-5 (0.74)
  *
  * Reference:
  * - docs/research/010-stage6-generation-strategy/ (CLEV research)

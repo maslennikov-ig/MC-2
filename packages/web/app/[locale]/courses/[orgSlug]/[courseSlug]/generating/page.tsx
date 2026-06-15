@@ -101,7 +101,9 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
     course = {
       ...course,
       generation_status: stage6Reconciliation.targetStatus,
-      ...(stage6Reconciliation.targetStatus === 'completed' ? { status: 'published' as const } : {}),
+      ...(stage6Reconciliation.targetStatus === 'completed'
+        ? { status: 'published' as const }
+        : {}),
     }
   }
 
@@ -159,16 +161,14 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
       document_size?: unknown
       estimated_completion?: unknown
     }
+    const hasDocuments = progress.has_documents === true || course.has_files === true
     generationProgress = {
       steps: (progress.steps as GenerationStep[]) || [],
       message: (progress.message as string) || 'Initializing course generation...',
       percentage: (progress.percentage as number) || 0,
       current_step: (progress.current_step as number) || 0,
       total_steps: (progress.total_steps as number) || 6,
-      has_documents:
-        progress.has_documents !== undefined
-          ? (progress.has_documents as boolean)
-          : course.has_files || false,
+      has_documents: hasDocuments,
       lessons_completed: (progress.lessons_completed as number) || 0,
       lessons_total: lessonsTotal,
       modules_total: modulesTotal ?? (progress.modules_total as number) ?? undefined,

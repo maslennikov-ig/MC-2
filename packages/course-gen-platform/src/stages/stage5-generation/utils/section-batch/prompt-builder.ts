@@ -80,6 +80,11 @@ export async function buildBatchPrompt(
   const learningObjectives = section.learning_objectives || [];
   const keyTopics = section.key_topics || [];
   const estimatedLessons = section.estimated_lessons || 3;
+  const lessonDurationMinutes =
+    input.frontend_parameters.lesson_duration_minutes ||
+    input.analysis_result?.recommended_structure?.lesson_duration_minutes ||
+    15;
+  const maxLessonObjectives = lessonDurationMinutes <= 15 ? 3 : 5;
 
   // Sanitize user-provided fields to prevent prompt injection
   const sanitize = (s: string) => s.replace(/[\n\r]+/g, ' ').trim();
@@ -158,8 +163,8 @@ ${previousSectionsDigest}
 
   // Dynamic lesson guidance based on constraints
   const lessonGuidance = constraints
-    ? `Generate ${constraints.lessonsPerSectionBudget} lessons (target from user settings; ±1 if content requires it)`
-    : `Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)`;
+    ? `Generate ${constraints.lessonsPerSectionBudget} lessons (target from Stage 4; ±1 only if pedagogically justified). Each lesson must have 1-${maxLessonObjectives} focused objectives.`
+    : `Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified). Each lesson must have 1-${maxLessonObjectives} focused objectives.`;
 
   // RAG tool info
   let ragToolInfo = '';
@@ -183,7 +188,7 @@ ${previousSectionsDigest}
 1. **JSON ONLY**: No markdown, no code blocks, no explanations
 2. **Valid Schema**: Match exact structure above
 3. **Section/Lesson Numbers**: Use sequential integers starting from 1
-4. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson
+4. **Array Lengths**: 1-5 learning_objectives per section, ${constraints?.lessonsPerSectionBudget ?? estimatedLessons} lessons for this section (±1 max), 1-${maxLessonObjectives} lesson_objectives per lesson
 5. **String Lengths**: Respect min/max character limits
 
 **Output Format**: Single JSON object from { ... } only.

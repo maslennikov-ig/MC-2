@@ -1,43 +1,47 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-14
-Stage: `mc2-ze255` (closed)
-Branch: `develop`
-Beads: none active
+Updated: 2026-06-15
+Stage: model matrix replacement complete locally and in Dev DB, delivery pending commit/push
+Branch: `codex/single-source-course-generation-flow`
+Beads: `mc2-5e4ek`, `mc2-5e4ek.1`, `mc2-5e4ek.2`, `mc2-pmrmf.1`, `mc2-pmrmf.1.1`
 
 ## Current State
 
-- Career Playbook course bridge preview defaults course size to `auto` (`Оптимальный (ИИ-анализ)`), and create persists `course_size = auto` unless the user overrides it.
-- `TAVILY_API_KEY` is configured in ignored local backend env and GitHub Actions repo secrets; tracked files contain only placeholders.
-- Deploy workflows write `TAVILY_API_KEY` into `.env.dev` and `.env.production`.
-- CI/CD workflow and `scripts/ci/*` changes are deploy-config changes, so Dev deploy runs after env-template changes.
+- Replaced active runtime model IDs per user request:
+  - `qwen/qwen3.5-plus-02-15` -> `qwen/qwen3.7-plus`
+  - `deepseek/deepseek-v3.2` -> `deepseek/deepseek-v4-flash`
+  - `openai/gpt-5.4` -> `google/gemini-3.5-flash`
+  - `minimax/minimax-m2.5` -> `minimax/minimax-m3`
+  - `openai/gpt-oss-120b` -> `deepseek/deepseek-v4-flash`
+- Added runtime normalization for these retired IDs and collision protection: if primary/fallback both normalize to `deepseek/deepseek-v4-flash`, fallback becomes `qwen/qwen3-235b-a22b-2507`.
+- Added Supabase data migration `20260615120000_replace_retired_llm_model_ids.sql`.
+- Live Dev `public.llm_model_config` updated and display names normalized.
 
 ## Verification
 
-- Passed backend bridge unit test: `pnpm --filter @megacampus/course-gen-platform test -- career-playbook-course-bridge.service.test.ts`.
-- Passed frontend dialog/viewer tests: `pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/create-course-from-playbook-dialog.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx`.
-- Passed: `pnpm type-check`.
-- Passed: `pnpm build`.
-- Passed Dev delivery for course-size change: GitHub Actions run `27492382994` succeeded with Deploy to Dev and Verify deployment.
-- Passed deploy-secret checks: `gh secret list` shows `TAVILY_API_KEY`; tracked secret grep found no actual key value.
-- Passed detector tests: RED before fix, then `bash scripts/ci/test_detect_deploy_changes.sh`, `bash -n scripts/ci/detect_deploy_changes.sh scripts/ci/test_detect_deploy_changes.sh`, and workflow YAML parse.
-- Passed Dev delivery for detector fix: GitHub Actions run `27493226003` succeeded with Contract Tests and Deploy to Dev.
-- Passed Dev E2E after deploy: `PLAYWRIGHT_BASE_URL=https://dev.ai.megacampus.ru PLAYWRIGHT_DISABLE_VIDEO=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome pnpm --filter @megacampus/web test:e2e:career-playbook` (`5 passed`).
-
-## Delivery
-
-- docs-reviewed: updated - env example, handoff, and stage summaries record the deploy env wiring and detector fix without secrets.
-- graph-reviewed: no-change-needed - course bridge and deploy change detection did not require graph/schema refresh.
-
-## Next recommended
-
-Next stage id: none.
-Recommended action: no active orchestrator-stage work remains; start a new Beads task if the user requests live Tavily/course generation testing.
-
-## Starter prompt for next orchestrator
-
-Use $orchestrator-stage in `/home/me/code/mc2`; read `AGENTS.md`, `.codex/orchestrator.toml`, `.codex/handoff.md`, and Beads. No active stage remains; previous work delivered auto course size defaults, Tavily deploy env propagation, and CI deploy detection.
+- Targeted Vitest passed: `load-default-phase-configs`, `stage6-fallback-topology`, Stage 5 `cost-calculator`, shared `LLMClient`, legacy `llm-client` (5 files / 110 tests).
+- `pnpm type-check` passed.
+- `pnpm build` passed.
+- `git diff --check` passed.
+- Dev DB verification passed: retired primary count 0, retired fallback count 0, same primary/fallback count 0, display mismatch count 0.
 
 ## Explicit defers
 
-- Live click on “Создать курс” with web research was not run because it can trigger real LLM/Tavily generation cost; covered by unit/service tests and Dev E2E around the Career Playbook flow.
+- `mc2-pmrmf.1`: model config replacements are implemented and verified locally plus in Dev DB; dev E2E rerun remains pending.
+- `mc2-pmrmf.1.1`: add read-only model config health check for deprecated provider model IDs.
+- `mc2-5e4ek.1`: fix Career Playbook viewer-editor authenticated E2E fixture/API failure.
+- `mc2-5e4ek.2`: centralize Stage 5 structural quality UI state contract and add behavioral UI tests.
+
+## Next recommended
+
+Next stage id: `mc2-pmrmf`
+Recommended action: rerun dev Career Playbook -> course E2E against the updated model matrix.
+
+## Starter prompt for next orchestrator
+
+Use $orchestrator-stage in `/home/me/code/mc2`. Continue `mc2-pmrmf`: rerun the dev Career Playbook -> course E2E against the updated Dev DB model matrix. Verify Stage 4 no longer calls retired models, the pipeline reaches Stage 5, and role_playbook_bridge structural assertions pass. Start from `bd show mc2-pmrmf.1`, inspect any new runtime errors, and do not deploy unless explicitly authorized.
+
+## Closeout Markers
+
+docs-reviewed: updated - handoff and Supabase data migration record the model matrix replacement; no durable product docs required beyond config/migration.
+graph-reviewed: no-change-needed - model ID/config replacement only; no architecture or call graph discovery required.

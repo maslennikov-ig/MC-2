@@ -111,7 +111,20 @@
   - `total_tokens`: {metadata: number, sections: number, validation: number, total: number}
   - `cost_usd`: number (total generation cost)
   - `duration_ms`: {metadata: number, sections: number, validation: number, total: number}
-  - `quality_scores`: {metadata_similarity: number, sections_similarity: number[], overall: number}
+  - `quality_scores`: {
+    metadata_similarity: number,
+    sections_similarity: number[],
+    overall: number,
+    structure?: {
+    passed: boolean,
+    hasCriticalIssues: boolean,
+    profileId: "general_auto" | "role_playbook_bridge" | "explicit_size",
+    totalLessons: number,
+    computedDurationHours: number,
+    criticalIssues: Array<{severity: "critical", code: string, message: string, details?: object}>,
+    warnings: Array<{severity: "warning", code: string, message: string, details?: object}>
+    }
+    }
   - `batch_count`: number (= total_sections, SECTIONS_PER_BATCH = 1)
   - `retry_count`: {metadata: number, sections: number[]}
   - `created_at`: string (ISO 8601 timestamp)

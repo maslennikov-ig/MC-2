@@ -209,7 +209,7 @@ describe('review-required UI surfaces', () => {
             humanReviewRequired: false,
             automaticRungs: [],
             terminalPhaseName: 'stage_6_manual_regeneration',
-            terminalModelId: 'openai/gpt-5.4',
+            terminalModelId: 'google/gemini-3.5-flash',
             manualRegenerationRequested: true,
             reasons: [],
           } as never
@@ -223,7 +223,7 @@ describe('review-required UI surfaces', () => {
 
     expect(screen.getByText('Human escalation used')).toBeTruthy()
     expect(screen.getByText('stage_6_manual_regeneration')).toBeTruthy()
-    expect(screen.getByText('openai/gpt-5.4')).toBeTruthy()
+    expect(screen.getByText('google/gemini-3.5-flash')).toBeTruthy()
     expect(screen.queryByText('Automatic rungs passed')).toBeNull()
   })
 
@@ -251,7 +251,7 @@ describe('review-required UI surfaces', () => {
             humanReviewRequired: true,
             automaticRungs: ['stage_6_complex', 'stage_6_auto_last_chance'],
             terminalPhaseName: 'stage_6_manual_regeneration',
-            terminalModelId: 'openai/gpt-5.4',
+            terminalModelId: 'google/gemini-3.5-flash',
             manualRegenerationRequested: true,
             reasons: [],
           } as never
@@ -269,7 +269,7 @@ describe('review-required UI surfaces', () => {
         'Automatic attempts and manual-top regeneration were both exhausted. A human now needs to review this lesson directly.'
       )
     ).toHaveLength(1)
-    expect(screen.queryByText('openai/gpt-5.4')).not.toBeInTheDocument()
+    expect(screen.queryByText('google/gemini-3.5-flash')).not.toBeInTheDocument()
   })
 
   it('does not render recovery history for normal completed lessons', () => {

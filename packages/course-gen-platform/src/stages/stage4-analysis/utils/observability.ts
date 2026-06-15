@@ -142,8 +142,8 @@ export interface RepairMetrics {
  */
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   'openai/gpt-oss-20b': { input: 0.2, output: 0.4 }, // 20B model (cheap)
-  'openai/gpt-oss-120b': { input: 1.0, output: 2.0 }, // 120B model (expensive)
-  'google/gemini-3-flash-preview': { input: 0.50, output: 3.0 }, // Emergency model
+  'deepseek/deepseek-v4-flash': { input: 1.0, output: 2.0 }, // 120B model (expensive)
+  'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 }, // Emergency model
 };
 
 /**

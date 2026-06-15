@@ -48,11 +48,11 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(pricing.outputPricePerMillion).toBe(0.08);
     });
 
-    it('should have pricing for openai/gpt-oss-120b with unified pricing', () => {
-      const pricing = OPENROUTER_PRICING['openai/gpt-oss-120b'];
+    it('should have pricing for deepseek/deepseek-v4-flash with split pricing', () => {
+      const pricing = OPENROUTER_PRICING['deepseek/deepseek-v4-flash'];
       expect(pricing).toBeDefined();
-      expect(pricing.combinedPricePerMillion).toBe(0.2);
-      expect(pricing.inputPricePerMillion).toBe(0.2);
+      expect(pricing.combinedPricePerMillion).toBeUndefined();
+      expect(pricing.inputPricePerMillion).toBe(0.1);
       expect(pricing.outputPricePerMillion).toBe(0.2);
     });
 
@@ -95,11 +95,11 @@ describe('Stage 5 Cost Calculator Service', () => {
   // ============================================================================
 
   describe('calculateGenerationCost()', () => {
-    it('should calculate cost for typical generation with qwen3-max metadata + gpt-oss-120b sections', () => {
+    it('should calculate cost for typical generation with qwen3-max metadata + deepseek-v4-flash sections', () => {
       const metadata: GenerationMetadata = {
         model_used: {
           metadata: 'qwen/qwen3-max',
-          sections: 'openai/gpt-oss-120b',
+          sections: 'deepseek/deepseek-v4-flash',
         },
         total_tokens: {
           metadata: 5000,
@@ -120,14 +120,14 @@ describe('Stage 5 Cost Calculator Service', () => {
       // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 1.20) + (2500/1M * 6.00) = 0.003 + 0.015 = 0.018
       expect(cost.metadata_cost_usd).toBeCloseTo(0.018, 6);
 
-      // Sections cost (gpt-oss-120b, unified): 45000/1M * 0.20 = 0.009
-      expect(cost.sections_cost_usd).toBeCloseTo(0.009, 6);
+      // Sections cost (deepseek-v4-flash, 50/50 split): (22500/1M * 0.10) + (22500/1M * 0.20) = 0.00675
+      expect(cost.sections_cost_usd).toBeCloseTo(0.00675, 6);
 
       // Validation cost: 0
       expect(cost.validation_cost_usd).toBe(0);
 
-      // Total cost: 0.018 + 0.009 = 0.027
-      expect(cost.total_cost_usd).toBeCloseTo(0.027, 6);
+      // Total cost: 0.018 + 0.00675 = 0.02475
+      expect(cost.total_cost_usd).toBeCloseTo(0.02475, 6);
 
       // Token breakdown
       expect(cost.token_breakdown.metadata_tokens).toBe(5000);
@@ -137,7 +137,7 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       // Model breakdown
       expect(cost.model_breakdown.metadata_model).toBe('qwen/qwen3-max');
-      expect(cost.model_breakdown.sections_model).toBe('openai/gpt-oss-120b');
+      expect(cost.model_breakdown.sections_model).toBe('deepseek/deepseek-v4-flash');
       expect(cost.model_breakdown.validation_model).toBe('none');
     });
 
@@ -357,11 +357,11 @@ describe('Stage 5 Cost Calculator Service', () => {
   describe('hasUnifiedPricing()', () => {
     it('should return true for OSS models with unified pricing', () => {
       expect(hasUnifiedPricing('openai/gpt-oss-20b')).toBe(true);
-      expect(hasUnifiedPricing('openai/gpt-oss-120b')).toBe(true);
     });
 
     it('should return false for models with split pricing', () => {
       expect(hasUnifiedPricing('qwen/qwen3-max')).toBe(false);
+      expect(hasUnifiedPricing('deepseek/deepseek-v4-flash')).toBe(false);
     });
 
     it('should return false for unknown models', () => {
@@ -405,11 +405,11 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should achieve expected cost range for typical course generation', () => {
       // RT-001 expected: $0.53-0.63 per course
       // Metadata: 5K tokens (qwen3-max)
-      // Sections: 45K tokens (gpt-oss-120b)
+      // Sections: 45K tokens (deepseek-v4-flash)
       const metadata: GenerationMetadata = {
         model_used: {
           metadata: 'qwen/qwen3-max',
-          sections: 'openai/gpt-oss-120b',
+          sections: 'deepseek/deepseek-v4-flash',
         },
         total_tokens: {
           metadata: 5000,
@@ -438,7 +438,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       const metadata: GenerationMetadata = {
         model_used: {
           metadata: 'qwen/qwen3-max',
-          sections: 'openai/gpt-oss-120b',
+          sections: 'deepseek/deepseek-v4-flash',
           validation: 'google/gemini-3-flash-preview',
         },
         total_tokens: {

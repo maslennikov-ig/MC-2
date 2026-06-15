@@ -190,7 +190,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
       model_usage: {
         phase_1: 'openai/gpt-oss-20b',
         phase_2: 'openai/gpt-oss-20b',
-        phase_3: 'openai/gpt-oss-120b',
+        phase_3: 'deepseek/deepseek-v4-flash',
         phase_4: 'openai/gpt-oss-20b',
       },
       total_tokens: {

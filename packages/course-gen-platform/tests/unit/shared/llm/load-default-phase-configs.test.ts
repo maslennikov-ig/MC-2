@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_PHASE_CONFIGS } from '@/shared/llm/model-config-db';
-import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
+import seedConfigs from '@/config/config-seed.json' with { type: 'json' };
 
 describe('DEFAULT_PHASE_CONFIGS (loaded from config-seed.json)', () => {
   it('should load configs from config-seed.json', () => {
@@ -207,6 +207,48 @@ describe('DEFAULT_PHASE_CONFIGS (loaded from config-seed.json)', () => {
     }
   });
 
+  it('should not use retired model IDs in default runtime configs', () => {
+    const retiredModelIds = new Set([
+      'xiaomi/mimo-v2-flash',
+      'x-ai/grok-4.1-fast',
+      'x-ai/grok-4-fast',
+      'qwen/qwen3.5-plus-02-15',
+      'deepseek/deepseek-v3.2',
+      'openai/gpt-5.4',
+      'minimax/minimax-m2.5',
+      'openai/gpt-oss-120b',
+    ]);
+
+    for (const [phaseName, config] of Object.entries(DEFAULT_PHASE_CONFIGS)) {
+      expect(retiredModelIds.has(config.modelId), `${phaseName}.modelId`).toBe(false);
+      if (config.fallbackModelId) {
+        expect(retiredModelIds.has(config.fallbackModelId), `${phaseName}.fallbackModelId`).toBe(
+          false
+        );
+      }
+    }
+
+    for (const config of seedConfigs) {
+      expect(retiredModelIds.has(config.model_id), `${config.phase_name}.model_id`).toBe(false);
+      if (config.fallback_model_id) {
+        expect(
+          retiredModelIds.has(config.fallback_model_id),
+          `${config.phase_name}.fallback_model_id`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('should not seed identical primary and fallback models after retired-ID normalization', () => {
+    for (const config of seedConfigs) {
+      if (!config.fallback_model_id) continue;
+
+      expect(config.fallback_model_id, `${config.phase_name}.fallback_model_id`).not.toBe(
+        config.model_id
+      );
+    }
+  });
+
   it('should set source to "hardcoded" for all entries', () => {
     const configs = Object.values(DEFAULT_PHASE_CONFIGS);
 
@@ -271,7 +313,7 @@ describe('DEFAULT_PHASE_CONFIGS emergency fallback behavior', () => {
     // when config-seed.json is missing, malformed, or invalid.
     //
     // EMERGENCY_FALLBACK_CONFIGS contains only two entries:
-    // - global_default: { modelId: 'xiaomi/mimo-v2-flash', ... }
+    // - global_default: { modelId: 'deepseek/deepseek-v4-flash', ... }
     // - emergency: { modelId: 'google/gemini-3-flash-preview', ... }
     //
     // This test documents the expected behavior, which is validated via:
