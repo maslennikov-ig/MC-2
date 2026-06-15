@@ -34,9 +34,9 @@ describe('stage6 fallback topology', () => {
 
     expect(autoLastChance.modelId).toBe('z-ai/glm-5');
     expect(autoLastChance.modelId).not.toBe(DEFAULT_MODEL_ID);
-    expect(autoLastChance.fallbackModelId).toBe('qwen/qwen3.5-plus-02-15');
+    expect(autoLastChance.fallbackModelId).toBe('qwen/qwen3.7-plus');
 
-    expect(manualRegeneration.modelId).toBe('openai/gpt-5.4');
+    expect(manualRegeneration.modelId).toBe('google/gemini-3.5-flash');
     expect(manualRegeneration.modelId).not.toBe(DEFAULT_MODEL_ID);
     expect(manualRegeneration.fallbackModelId).toBe('z-ai/glm-5');
   });

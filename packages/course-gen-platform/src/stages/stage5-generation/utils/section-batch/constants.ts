@@ -20,7 +20,7 @@ export const MODELS = {
   /** Normal tier: thinking model for most sections */
   normal: 'moonshotai/kimi-k2-thinking',
   /** Complex tier: premium model for hardest sections + first section */
-  complex: 'qwen/qwen3.5-plus-02-15',
+  complex: 'qwen/qwen3.7-plus',
   /** Context overflow: large context model */
   tier3_gemini: 'google/gemini-3-flash-preview',
 } as const;

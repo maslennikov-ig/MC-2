@@ -33,7 +33,7 @@ function createStage6Config(
 export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
   stage_6_content: createStage6Config({
     modelId: 'moonshotai/kimi-k2-thinking',
-    fallbackModelId: 'qwen/qwen3.5-plus-02-15',
+    fallbackModelId: 'qwen/qwen3.7-plus',
   }),
   stage_6_refinement: createStage6Config({
     modelId: DEFAULT_MODEL_ID,
@@ -55,16 +55,16 @@ export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
     fallbackModelId: 'google/gemini-3-flash-preview',
   }),
   stage_6_complex: createStage6Config({
-    modelId: 'qwen/qwen3.5-plus-02-15',
+    modelId: 'qwen/qwen3.7-plus',
     fallbackModelId: 'moonshotai/kimi-k2-thinking',
   }),
   stage_6_auto_last_chance: createStage6Config({
     modelId: 'z-ai/glm-5',
-    fallbackModelId: 'qwen/qwen3.5-plus-02-15',
+    fallbackModelId: 'qwen/qwen3.7-plus',
     maxTokens: 12000,
   }),
   stage_6_manual_regeneration: createStage6Config({
-    modelId: 'openai/gpt-5.4',
+    modelId: 'google/gemini-3.5-flash',
     fallbackModelId: 'z-ai/glm-5',
     maxTokens: 12000,
   }),

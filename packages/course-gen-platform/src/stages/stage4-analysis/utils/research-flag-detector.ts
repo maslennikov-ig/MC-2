@@ -158,7 +158,7 @@ export async function detectResearchFlags(
     estimatedTokenCount,
     input.language
   );
-  const modelId = model.model || 'openai/gpt-oss-120b'; // Get modelId from ChatOpenAI instance
+  const modelId = model.model || 'deepseek/deepseek-v4-flash'; // Get modelId from ChatOpenAI instance
 
   // Build prompt
   const prompt = buildResearchFlagPrompt(input);

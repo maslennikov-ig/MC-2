@@ -107,7 +107,7 @@ See `packages/shared-types/src/common-enums.ts` for `LANGUAGE_NAMES` mapping.
 
 ### Why Full Names Instead of ISO Codes
 
-- **Problem**: Some models (like DeepSeek V3.2) ignore ISO codes in RAG context
+- **Problem**: Some models (like DeepSeek V4 Flash) ignore ISO codes in RAG context
 - **Solution**: Full language names in prompts provide stronger signal to LLMs
 - **Benefit**: Works reliably across all models, including those that don't infer language from context
 

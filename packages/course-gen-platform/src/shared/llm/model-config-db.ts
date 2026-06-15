@@ -21,11 +21,39 @@ const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
   'xiaomi/mimo-v2-flash': 'deepseek/deepseek-v4-flash',
   'x-ai/grok-4.1-fast': 'deepseek/deepseek-v4-flash',
   'x-ai/grok-4-fast': 'deepseek/deepseek-v4-flash',
+  'qwen/qwen3.5-plus-02-15': 'qwen/qwen3.7-plus',
+  'deepseek/deepseek-v3.2': 'deepseek/deepseek-v4-flash',
+  'openai/gpt-5.4': 'google/gemini-3.5-flash',
+  'minimax/minimax-m2.5': 'minimax/minimax-m3',
+  'openai/gpt-oss-120b': 'deepseek/deepseek-v4-flash',
 };
+
+const COLLISION_FALLBACK_MODEL_ID = 'qwen/qwen3-235b-a22b-2507';
 
 function normalizeRuntimeModelId(modelId: string | null | undefined): string | null {
   if (!modelId) return null;
   return RETIRED_MODEL_ID_REPLACEMENTS[modelId] ?? modelId;
+}
+
+function normalizeRuntimeModelPair(
+  modelId: string | null | undefined,
+  fallbackModelId: string | null | undefined
+): { modelId: string | null; fallbackModelId: string | null } {
+  const normalizedModelId = normalizeRuntimeModelId(modelId);
+  let normalizedFallbackModelId = normalizeRuntimeModelId(fallbackModelId);
+
+  if (
+    normalizedModelId &&
+    normalizedFallbackModelId &&
+    normalizedModelId === normalizedFallbackModelId
+  ) {
+    normalizedFallbackModelId = COLLISION_FALLBACK_MODEL_ID;
+  }
+
+  return {
+    modelId: normalizedModelId,
+    fallbackModelId: normalizedFallbackModelId,
+  };
 }
 
 /**
@@ -190,9 +218,11 @@ export async function fetchStageConfigFromDb(
         throw new Error(errorMsg);
       }
 
+      const normalizedConfig = normalizeRuntimeModelPair(config.model_id, config.fallback_model_id);
+
       return {
-        primary: normalizeRuntimeModelId(config.model_id) ?? config.model_id,
-        fallback: normalizeRuntimeModelId(config.fallback_model_id) ?? config.fallback_model_id,
+        primary: normalizedConfig.modelId ?? config.model_id,
+        fallback: normalizedConfig.fallbackModelId ?? config.fallback_model_id,
         maxContext: config.max_context_tokens,
         cacheReadEnabled: config.cache_read_enabled || false,
         tier,
@@ -288,9 +318,14 @@ export async function fetchPhaseConfigFromDb(
           'Using universal (any) language course override config as fallback'
         );
       }
+      const normalizedConfig = normalizeRuntimeModelPair(
+        courseOverride.model_id,
+        courseOverride.fallback_model_id
+      );
+
       return {
-        modelId: normalizeRuntimeModelId(courseOverride.model_id) ?? courseOverride.model_id,
-        fallbackModelId: normalizeRuntimeModelId(courseOverride.fallback_model_id),
+        modelId: normalizedConfig.modelId ?? courseOverride.model_id,
+        fallbackModelId: normalizedConfig.fallbackModelId,
         temperature: courseOverride.temperature || 0.7,
         maxTokens: courseOverride.max_tokens || 4096,
         maxContextTokens: courseOverride.max_context_tokens || null,
@@ -332,9 +367,14 @@ export async function fetchPhaseConfigFromDb(
           'Using language-specific config (exact match)'
         );
       }
+      const normalizedConfig = normalizeRuntimeModelPair(
+        globalConfig.model_id,
+        globalConfig.fallback_model_id
+      );
+
       return {
-        modelId: normalizeRuntimeModelId(globalConfig.model_id) ?? globalConfig.model_id,
-        fallbackModelId: normalizeRuntimeModelId(globalConfig.fallback_model_id),
+        modelId: normalizedConfig.modelId ?? globalConfig.model_id,
+        fallbackModelId: normalizedConfig.fallbackModelId,
         temperature: globalConfig.temperature || 0.7,
         maxTokens: globalConfig.max_tokens || 4096,
         maxContextTokens: globalConfig.max_context_tokens || null,
@@ -432,7 +472,8 @@ export async function fetchJudgeConfigsFromDb(
  * Maps database judge config row to JudgeModelConfig
  */
 function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
-  const modelId = normalizeRuntimeModelId(config.model_id) ?? config.model_id;
+  const normalizedConfig = normalizeRuntimeModelPair(config.model_id, config.fallback_model_id);
+  const modelId = normalizedConfig.modelId ?? config.model_id;
 
   return {
     modelId,
@@ -440,7 +481,7 @@ function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
     temperature: config.temperature || 0.3,
     maxTokens: config.max_tokens || 4096,
     displayName: config.primary_display_name || modelId,
-    fallbackModelId: normalizeRuntimeModelId(config.fallback_model_id) || 'openai/gpt-oss-120b',
+    fallbackModelId: normalizedConfig.fallbackModelId || COLLISION_FALLBACK_MODEL_ID,
   };
 }
 
@@ -486,11 +527,15 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
  * - cache_read_enabled: may be absent in older seeds, defaults to false
  */
 function seedEntryToPhaseConfig(entry: Record<string, unknown>): PhaseModelConfig {
-  const modelId = normalizeRuntimeModelId(entry.model_id as string) ?? (entry.model_id as string);
+  const normalizedConfig = normalizeRuntimeModelPair(
+    entry.model_id as string,
+    entry.fallback_model_id as string
+  );
+  const modelId = normalizedConfig.modelId ?? (entry.model_id as string);
 
   return {
     modelId,
-    fallbackModelId: normalizeRuntimeModelId(entry.fallback_model_id as string),
+    fallbackModelId: normalizedConfig.fallbackModelId,
     temperature:
       typeof entry.temperature === 'string'
         ? parseFloat(entry.temperature) || 0.7

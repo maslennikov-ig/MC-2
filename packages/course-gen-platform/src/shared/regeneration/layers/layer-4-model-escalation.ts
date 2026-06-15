@@ -52,7 +52,7 @@ export interface ModelEscalationResult {
  * );
  *
  * console.log(result.output); // Raw JSON from model
- * console.log(result.modelUsed); // 'openai/gpt-oss-120b'
+ * console.log(result.modelUsed); // 'deepseek/deepseek-v4-flash'
  * console.log(result.phaseUsed); // 'stage_4_expert'
  * ```
  */

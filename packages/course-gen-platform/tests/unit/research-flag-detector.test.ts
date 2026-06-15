@@ -591,7 +591,7 @@ describe('Research Flag Detector', () => {
       expect(trackPhaseExecution).toHaveBeenCalledWith(
         'research_flag_detection',
         'standalone',
-        'openai/gpt-oss-120b',
+        'deepseek/deepseek-v4-flash',
         expect.any(Function)
       );
     });

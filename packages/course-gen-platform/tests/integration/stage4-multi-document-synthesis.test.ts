@@ -395,7 +395,7 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
       // =====================================================================
       // STEP 5: Verify Phase 4 Used 120B Model
       // =====================================================================
-      expect(validated.metadata.model_usage.phase_4).toBe('openai/gpt-oss-120b');
+      expect(validated.metadata.model_usage.phase_4).toBe('deepseek/deepseek-v4-flash');
 
       console.log('✓ Phase 4 used 120B model (expected for ≥3 documents)');
 

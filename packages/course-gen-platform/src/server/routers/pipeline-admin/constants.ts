@@ -275,7 +275,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_5_tier1: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 30000,
     fallbackModelId: 'moonshotai/kimi-k2-thinking',
@@ -299,7 +299,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: 'google/gemini-3-flash-preview',
   },
   stage_5_complex: {
-    modelId: 'qwen/qwen3.5-plus-02-15',
+    modelId: 'qwen/qwen3.7-plus',
     temperature: 0.7,
     maxTokens: 30000,
     fallbackModelId: 'moonshotai/kimi-k2-thinking',

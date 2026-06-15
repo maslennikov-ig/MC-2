@@ -207,11 +207,16 @@ describe('DEFAULT_PHASE_CONFIGS (loaded from config-seed.json)', () => {
     }
   });
 
-  it('should not use retired Xiaomi or Grok models in default runtime configs', () => {
+  it('should not use retired model IDs in default runtime configs', () => {
     const retiredModelIds = new Set([
       'xiaomi/mimo-v2-flash',
       'x-ai/grok-4.1-fast',
       'x-ai/grok-4-fast',
+      'qwen/qwen3.5-plus-02-15',
+      'deepseek/deepseek-v3.2',
+      'openai/gpt-5.4',
+      'minimax/minimax-m2.5',
+      'openai/gpt-oss-120b',
     ]);
 
     for (const [phaseName, config] of Object.entries(DEFAULT_PHASE_CONFIGS)) {
@@ -231,6 +236,16 @@ describe('DEFAULT_PHASE_CONFIGS (loaded from config-seed.json)', () => {
           `${config.phase_name}.fallback_model_id`
         ).toBe(false);
       }
+    }
+  });
+
+  it('should not seed identical primary and fallback models after retired-ID normalization', () => {
+    for (const config of seedConfigs) {
+      if (!config.fallback_model_id) continue;
+
+      expect(config.fallback_model_id, `${config.phase_name}.fallback_model_id`).not.toBe(
+        config.model_id
+      );
     }
   });
 

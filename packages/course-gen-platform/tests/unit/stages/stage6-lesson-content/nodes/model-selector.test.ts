@@ -44,7 +44,7 @@ describe('selectStage6ModelTier', () => {
 
   it('forces complex tier for module 1 lessons', async () => {
     mockGetModelForPhase.mockResolvedValue({
-      modelId: 'qwen/qwen3.5-plus-02-15',
+      modelId: 'qwen/qwen3.7-plus',
       fallbackModelId: 'moonshotai/kimi-k2-thinking',
       source: 'database',
     });
@@ -53,7 +53,7 @@ describe('selectStage6ModelTier', () => {
 
     expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex', undefined);
     expect(result.tier).toBe('complex');
-    expect(result.model).toBe('qwen/qwen3.5-plus-02-15');
+    expect(result.model).toBe('qwen/qwen3.7-plus');
   });
 
   it('selects simple tier for beginner non-module-1 lessons', async () => {
@@ -93,7 +93,7 @@ describe('selectStage6ModelTier', () => {
 
   it('selects complex tier for advanced lessons', async () => {
     mockGetModelForPhase.mockResolvedValue({
-      modelId: 'qwen/qwen3.5-plus-02-15',
+      modelId: 'qwen/qwen3.7-plus',
       fallbackModelId: 'moonshotai/kimi-k2-thinking',
       source: 'database',
     });
@@ -102,7 +102,7 @@ describe('selectStage6ModelTier', () => {
 
     expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex', undefined);
     expect(result.tier).toBe('complex');
-    expect(result.model).toBe('qwen/qwen3.5-plus-02-15');
+    expect(result.model).toBe('qwen/qwen3.7-plus');
   });
 
   it('uses hardcoded tier defaults when model config lookup fails', async () => {

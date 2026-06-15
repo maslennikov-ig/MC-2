@@ -152,10 +152,10 @@ export const MODEL_TIERS = {
 export const MODELS: Record<string, ModelConfig> = {
   // Analysis Models
   'oss-120b': {
-    modelId: 'openai/gpt-oss-120b',
-    displayName: 'GPT OSS 120B',
+    modelId: 'deepseek/deepseek-v4-flash',
+    displayName: 'DeepSeek V4 Flash',
     maxContextTokens: 128_000,
-    costPer1kInput: 0.0002,
+    costPer1kInput: 0.0001,
     costPer1kOutput: 0.0002,
     capabilities: ['analysis', 'structured_output'],
   },
@@ -303,7 +303,7 @@ export const ARCHETYPE_TEMPERATURES = CONTENT_ARCHETYPE_TEMPERATURES_V2;
  * ```typescript
  * // Small context - uses OSS 120B
  * const model = selectModelForAnalysis(50_000);
- * // model.modelId === 'openai/gpt-oss-120b'
+ * // model.modelId === 'deepseek/deepseek-v4-flash'
  *
  * // Large context - uses Gemini Flash
  * const model = selectModelForAnalysis(100_000);

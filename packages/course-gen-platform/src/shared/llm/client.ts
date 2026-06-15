@@ -388,7 +388,7 @@ Create a summary that someone could use to understand the core content without r
     // Pricing per 1M tokens (USD)
     const pricing: Record<string, { input: number; output: number }> = {
       'openai/gpt-oss-20b': { input: 0.03, output: 0.14 },
-      'openai/gpt-oss-120b': { input: 0.04, output: 0.4 },
+      'deepseek/deepseek-v4-flash': { input: 0.1, output: 0.2 },
       'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 },
     };
 

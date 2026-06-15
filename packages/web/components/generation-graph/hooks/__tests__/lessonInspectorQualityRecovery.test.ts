@@ -170,8 +170,8 @@ describe('buildLessonInspectorQualityRecoverySummary', () => {
                 is_initial_rung: true,
                 max_regeneration_retries: 0,
                 manual_triggered: true,
-                selected_model: 'openai/gpt-5.4',
-                model_used: 'openai/gpt-5.4',
+                selected_model: 'google/gemini-3.5-flash',
+                model_used: 'google/gemini-3.5-flash',
               },
             ],
             final_disposition: {
@@ -197,7 +197,7 @@ describe('buildLessonInspectorQualityRecoverySummary', () => {
       humanReviewRequired: false,
       automaticRungs: [],
       terminalPhaseName: 'stage_6_manual_regeneration',
-      terminalModelId: 'openai/gpt-5.4',
+      terminalModelId: 'google/gemini-3.5-flash',
       manualRegenerationRequested: true,
     })
   })

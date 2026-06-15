@@ -873,7 +873,7 @@ describe('stage6/services/job-processor', () => {
       mockGetModelForPhase.mockImplementation((phaseName: string) => {
         if (phaseName === 'stage_6_manual_regeneration') {
           return {
-            modelId: 'openai/gpt-5.4',
+            modelId: 'google/gemini-3.5-flash',
             fallbackModelId: 'z-ai/glm-5',
             source: 'database',
           };
@@ -905,8 +905,8 @@ describe('stage6/services/job-processor', () => {
       );
       expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
       expect(mockExecuteStage6Orchestrator.mock.calls[0][0]).toMatchObject({
-        modelOverride: 'openai/gpt-5.4',
-        selectedModel: 'openai/gpt-5.4',
+        modelOverride: 'google/gemini-3.5-flash',
+        selectedModel: 'google/gemini-3.5-flash',
         fallbackModel: 'z-ai/glm-5',
         selectedModelTier: null,
       });

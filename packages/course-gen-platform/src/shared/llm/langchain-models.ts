@@ -128,7 +128,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 8000,
   },
   stage_5_tier1: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 30000,
   },
@@ -138,7 +138,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 30000,
   },
   stage_5_simple: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 30000,
   },
@@ -148,7 +148,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 30000,
   },
   stage_5_complex: {
-    modelId: 'qwen/qwen3.5-plus-02-15',
+    modelId: 'qwen/qwen3.7-plus',
     temperature: 0.7,
     maxTokens: 30000,
   },
@@ -399,7 +399,7 @@ const PHASE_FALLBACK_CONFIG: Record<
  *
  * @example
  * // Create 120B model for expert analysis
- * const expertModel = createOpenRouterModel('openai/gpt-oss-120b', 0.5, 8000);
+ * const expertModel = createOpenRouterModel('deepseek/deepseek-v4-flash', 0.5, 8000);
  */
 export function createOpenRouterModel(
   modelId: string,
@@ -444,7 +444,7 @@ export function createOpenRouterModel(
  *
  * @example
  * // Create model with database-first key resolution
- * const model = await createOpenRouterModelAsync('openai/gpt-oss-120b', 0.5, 8000);
+ * const model = await createOpenRouterModelAsync('deepseek/deepseek-v4-flash', 0.5, 8000);
  */
 export async function createOpenRouterModelAsync(
   modelId: string,

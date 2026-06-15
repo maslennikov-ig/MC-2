@@ -299,21 +299,21 @@ describe('LLMClient', () => {
       expect(cost).toBeCloseTo(0.17, 4);
     });
 
-    it('should estimate cost for openai/gpt-oss-120b', () => {
+    it('should estimate cost for deepseek/deepseek-v4-flash', () => {
       const client = new LLMClient();
       const response = {
         content: 'test',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
         totalTokens: 2_000_000,
-        model: 'openai/gpt-oss-120b',
+        model: 'deepseek/deepseek-v4-flash',
         finishReason: 'stop',
       };
 
       const cost = client.estimateCost(response);
 
-      // $0.04/1M input + $0.40/1M output = $0.44
-      expect(cost).toBeCloseTo(0.44, 4);
+      // $0.10/1M input + $0.20/1M output = $0.30
+      expect(cost).toBeCloseTo(0.3, 4);
     });
 
     it('should estimate cost for google/gemini-3-flash-preview', () => {

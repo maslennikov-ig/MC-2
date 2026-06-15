@@ -8,7 +8,7 @@
  * Tier Mapping:
  * - simple: beginner difficulty → deepseek/deepseek-v4-flash
  * - normal: intermediate difficulty → moonshotai/kimi-k2-thinking
- * - complex: advanced difficulty + module 1 → qwen/qwen3.5-plus-02-15
+ * - complex: advanced difficulty + module 1 → qwen/qwen3.7-plus
  *
  * First Module Rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier
  * for best first impression quality.
@@ -35,7 +35,7 @@ export interface Stage6ModelTier {
  * Mapping:
  * - beginner → simple → deepseek/deepseek-v4-flash
  * - intermediate → normal → moonshotai/kimi-k2-thinking
- * - advanced → complex → qwen/qwen3.5-plus-02-15
+ * - advanced → complex → qwen/qwen3.7-plus
  *
  * First module rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier.
  *

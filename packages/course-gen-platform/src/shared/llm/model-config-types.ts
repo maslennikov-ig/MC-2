@@ -90,7 +90,7 @@ export interface PhaseModelConfig {
    *
    * Null means no fallback (fail immediately on primary failure)
    *
-   * @example 'openai/gpt-oss-120b'
+   * @example 'deepseek/deepseek-v4-flash'
    * @example 'qwen/qwen3-235b-a22b-2507'
    */
   fallback_model_id: string | null;
@@ -135,7 +135,7 @@ export interface PhaseModelConfig {
    * Null means no limit (not recommended - use actual model limit)
    *
    * @example 128000 // Claude Sonnet 3.5
-   * @example 200000 // GPT-OSS-120B
+   * @example 200000 // DeepSeek V4 Flash
    * @example 1000000 // Gemini 2.0 Flash
    */
   max_context_tokens: number | null;
@@ -222,7 +222,7 @@ export interface PhaseModelConfig {
    * Null for non-judge phases.
    *
    * @example 'primary' // Claude Opus 4.5
-   * @example 'secondary' // GPT-OSS-120B
+   * @example 'secondary' // DeepSeek V4 Flash
    * @example 'tiebreaker' // Qwen3-235B
    */
   judge_role?: 'primary' | 'secondary' | 'tiebreaker' | null;
@@ -241,7 +241,7 @@ export interface PhaseModelConfig {
    * Null for non-judge phases.
    *
    * @example 0.92 // Claude Opus 4.5 (primary)
-   * @example 0.78 // GPT-OSS-120B (secondary)
+   * @example 0.78 // DeepSeek V4 Flash (secondary)
    * @example 0.65 // Qwen3-235B (tiebreaker)
    */
   weight?: number | null;
