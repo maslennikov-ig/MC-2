@@ -565,7 +565,7 @@ export async function validateModelAvailability(bunker: ModelConfigBunker): Prom
   try {
     const { getOpenRouterModels } = await import('../../../services/openrouter-models.js');
     const { models } = await getOpenRouterModels();
-    const availableIds = new Set(models.map((m: any) => m.id));
+    const availableIds = new Set(models.map(model => model.id));
 
     const configuredIds = bunker.getUniqueModelIds();
     const invalidIds = configuredIds.filter(id => !availableIds.has(id));
