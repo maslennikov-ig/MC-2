@@ -56,21 +56,46 @@ type CoursesUpdateResult = {
 };
 
 function createMockSupabase(updateResult: CoursesUpdateResult) {
-  const query = {
+  const updateQuery = {
     eq: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
     select: vi.fn().mockResolvedValue(updateResult),
   };
 
+  const metadataQuery = {
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({
+      data: {
+        id: 'course-1',
+        user_id: 'user-1',
+        organization_id: 'org-1',
+        title: 'Test Course',
+        settings: {},
+        language: 'ru',
+        style: null,
+        target_audience: null,
+        difficulty: 'beginner',
+        course_description: null,
+        course_size: 'auto',
+        analysis_result: null,
+        generation_metadata: {},
+      },
+      error: null,
+    }),
+  };
+
   const from = vi.fn().mockReturnValue({
-    update: vi.fn().mockReturnValue(query),
+    update: vi.fn().mockReturnValue(updateQuery),
+    select: vi.fn().mockReturnValue(metadataQuery),
   });
 
   return {
     from,
-    _query: query,
+    _query: updateQuery,
+    _metadataQuery: metadataQuery,
   } as unknown as SupabaseClient<Database> & {
-    _query: typeof query;
+    _query: typeof updateQuery;
+    _metadataQuery: typeof metadataQuery;
   };
 }
 
