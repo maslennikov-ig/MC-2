@@ -88,7 +88,7 @@ describe('Phase 3: Deep Expert Analysis', () => {
         research_flags: [],
         phase_metadata: {
           duration_ms: 30000,
-          model_used: 'openai/gpt-oss-120b',
+          model_used: 'deepseek/deepseek-v4-flash',
           tokens: { input: 3000, output: 1500, total: 4500 },
           quality_score: 0.0,
           retry_count: 0,
@@ -115,7 +115,7 @@ describe('Phase 3: Deep Expert Analysis', () => {
         ],
         phase_metadata: {
           duration_ms: 28000,
-          model_used: 'openai/gpt-oss-120b',
+          model_used: 'deepseek/deepseek-v4-flash',
           tokens: { input: 2800, output: 1400, total: 4200 },
           quality_score: 0.0,
           retry_count: 0,
@@ -132,7 +132,7 @@ describe('Phase 3: Deep Expert Analysis', () => {
   describe('Model configuration', () => {
     it('should ALWAYS use 120B model for Phase 3', () => {
       // Phase 3 is critical quality phase - NEVER use cheap models
-      const expectedModelId = 'openai/gpt-oss-120b';
+      const expectedModelId = 'deepseek/deepseek-v4-flash';
 
       const mockOutput: Phase3Output = {
         pedagogical_strategy: {

@@ -127,7 +127,7 @@ describe('Phase 4: Document Synthesis', () => {
           research_flags: [],
           phase_metadata: {
             duration_ms: 12000,
-            model_used: 'openai/gpt-oss-120b',
+            model_used: 'deepseek/deepseek-v4-flash',
             tokens: { input: 2000, output: 1200, total: 3200 },
             quality_score: 0.92,
             retry_count: 0,

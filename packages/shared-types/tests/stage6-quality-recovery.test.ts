@@ -15,9 +15,9 @@ describe('Stage 6 quality recovery shared types', () => {
       is_initial_rung: true,
       max_regeneration_retries: 0,
       manual_triggered: true,
-      selected_model: 'openai/gpt-5.4',
+      selected_model: 'google/gemini-3.5-flash',
       fallback_model: 'z-ai/glm-5',
-      model_used: 'openai/gpt-5.4',
+      model_used: 'google/gemini-3.5-flash',
     });
 
     const finalDisposition = QualityRecoveryFinalDispositionSchema.parse({
@@ -35,7 +35,7 @@ describe('Stage 6 quality recovery shared types', () => {
     });
 
     expect(recovery.attempts[0].phase_name).toBe('stage_6_manual_regeneration');
-    expect(recovery.attempts[0].model_used).toBe('openai/gpt-5.4');
+    expect(recovery.attempts[0].model_used).toBe('google/gemini-3.5-flash');
     expect(recovery.final_disposition.terminal_mode).toBe('manual');
   });
 

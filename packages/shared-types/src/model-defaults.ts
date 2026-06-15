@@ -17,10 +17,10 @@
 
 /**
  * Default primary model (used when DB is unavailable)
- * Xiaomi MiMo V2 Flash - stable, good Russian language support
+ * DeepSeek V4 Flash - default fast runtime model for course generation
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = 'xiaomi/mimo-v2-flash';
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable)
@@ -38,8 +38,8 @@ export const CHAT_PRIMARY_MODEL_ID = 'moonshotai/kimi-k2-thinking';
 /** Fallback chat model (Kimi K2.5) — used when primary chat model fails */
 export const CHAT_FALLBACK_MODEL_ID = 'moonshotai/kimi-k2.5';
 
-/** Stage 6 chat primary model (DeepSeek V3.2) — used for chat_stage_6_refinement */
-export const CHAT_STAGE6_PRIMARY_MODEL_ID = 'deepseek/deepseek-v3.2';
+/** Stage 6 chat primary model (DeepSeek V4 Flash) — used for chat_stage_6_refinement */
+export const CHAT_STAGE6_PRIMARY_MODEL_ID = 'deepseek/deepseek-v4-flash';
 
 /** Stage 6 chat fallback model — same as DEFAULT_FALLBACK_MODEL_ID */
 export const CHAT_STAGE6_FALLBACK_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
@@ -49,12 +49,12 @@ export const CHAT_STAGE6_FALLBACK_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
 // ============================================================================
 
 /**
- * Legacy model IDs (for migration/compatibility checks)
+ * Legacy model aliases mapped to current replacement IDs.
  * @deprecated These should not be used in new code
  */
 export const LEGACY_MODEL_IDS = {
   OSS_20B: 'openai/gpt-oss-20b',
-  OSS_120B: 'openai/gpt-oss-120b',
+  OSS_120B: 'deepseek/deepseek-v4-flash',
 } as const;
 
 /**

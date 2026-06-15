@@ -274,14 +274,15 @@ YOU MUST GENERATE EXACTLY:
   return `\n\n## Course Size: AI-Determined (AUTO MODE)
 The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment.
 - **HARD MINIMUM**: 10 lessons (course WILL FAIL validation if below this)
-- No maximum constraint - create as many lessons as the topic genuinely requires for quality coverage.`;
+- Prefer the smallest complete course that satisfies the learning outcomes.
+- Do not broaden the topic just to add more lessons.`;
 }
 
 /** Build dynamic minimum lesson rule based on course size */
 function buildMinLessonsRule(input: Phase2Input): string {
   return input.size_guidance
-    ? `3. COURSE SIZE PRESET ACTIVE: ${input.course_size?.toUpperCase()} - Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s). DO NOT default to 10 lessons!`
-    : `3. Minimum 10 lessons REQUIRED (FR-015) - if scope is insufficient, recommend more content`;
+    ? `3. COURSE SIZE CONSTRAINT ACTIVE: ${(input.course_size ?? 'auto').toUpperCase()} - Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s). DO NOT default to 10 lessons!`
+    : `3. Minimum 10 lessons REQUIRED (FR-015) - if scope is insufficient, recommend more focused component practice`;
 }
 
 /** Build the system prompt */
@@ -316,24 +317,24 @@ async function buildUserPrompt(
 ): Promise<string> {
   // Pre-compute all dynamic values
   const sizeConstraintNote = input.size_guidance
-    ? `   - FOR THIS ${input.course_size?.toUpperCase()} COURSE: Generate ${input.min_lessons}-${input.max_lessons} lessons ONLY`
+    ? `   - FOR THIS ${(input.course_size ?? 'AUTO').toUpperCase()} COURSE: Generate ${input.min_lessons}-${input.max_lessons} lessons ONLY`
     : `   - CRITICAL: Result MUST be >= 10 lessons (FR-015)`;
 
   const sectionsRange = input.size_guidance
-    ? `${input.target_sections} section(s) for ${input.course_size} size`
+    ? `${input.target_sections} section(s) for ${input.course_size ?? 'auto'} size`
     : '1-30 sections';
 
   const sectionsSuffix = input.size_guidance
-    ? `For ${input.course_size} size: generate ${input.target_sections} section(s) only.`
+    ? `For ${input.course_size ?? 'auto'} size: generate ${input.target_sections} section(s) only.`
     : '';
 
   const sizeSpecificNotes = input.size_guidance
-    ? `- RESPECT THE SIZE PRESET: Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s) - DO NOT default to 10!
-- For ${input.course_size} size: Focus on essentials ONLY, reduce scope if topic is too broad
-- STAY WITHIN LIMITS: The user explicitly chose ${input.course_size} size, respect their choice`
-    : `- total_lessons MUST be >= 10 (expand scope creatively if needed to surprise the learner)
-- For seemingly narrow topics, think broadly: add context, history, applications, best practices
-- Aim for comprehensive coverage that provides maximum value`;
+    ? `- RESPECT THE SIZE CONSTRAINT: Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s) - DO NOT default to 10!
+- For ${input.course_size ?? 'auto'} size: Focus on essentials ONLY, reduce scope if topic is too broad
+- STAY WITHIN LIMITS: The selected size policy is binding`
+    : `- total_lessons MUST be >= 10
+- Choose the smallest complete course that satisfies the learning outcomes
+- Do not add broad background, history, or nice-to-have topics unless needed for the stated outcomes`;
 
   const overlapFeedbackSection = input.overlap_feedback ? `\n\n${input.overlap_feedback}\n` : '';
 

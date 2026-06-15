@@ -87,7 +87,7 @@ describe('runLLMReview modelUsed tracking', () => {
 
   it('returns selected model id even when LLM response is invalid', async () => {
     mockGetModelForPhase.mockResolvedValue({
-      modelId: 'qwen/qwen3.5-plus-02-15',
+      modelId: 'qwen/qwen3.7-plus',
       fallbackModelId: 'moonshotai/kimi-k2-thinking',
     });
 
@@ -107,7 +107,7 @@ describe('runLLMReview modelUsed tracking', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('invalid response format');
-    expect(result.modelUsed).toBe('qwen/qwen3.5-plus-02-15');
+    expect(result.modelUsed).toBe('qwen/qwen3.7-plus');
     expect(result.tokensUsed).toBe(111);
   });
 

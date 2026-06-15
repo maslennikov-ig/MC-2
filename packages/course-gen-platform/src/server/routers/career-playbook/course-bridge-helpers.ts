@@ -1,6 +1,9 @@
 import anyAscii from 'any-ascii';
 import {
   CareerPlaybookRoleProfileSpecSchema,
+  DEFAULT_COURSE_STYLE,
+  type CourseSize,
+  type CourseStyle,
   type CareerPlaybookRoleProfileSpec,
   type Json,
   type Language,
@@ -20,7 +23,8 @@ export interface CourseBridgeBrief {
   targetAudience: string;
   learningOutcomes: string[];
   language: Language;
-  courseSize: 'standard';
+  courseSize: CourseSize;
+  style: CourseStyle;
   settings: Json;
 }
 
@@ -153,6 +157,21 @@ function normalizeWebResearchResult(raw: unknown): CareerPlaybookWebResearchResu
   return hasResearch ? research : null;
 }
 
+export function hasCourseBridgeSourceEvidence(
+  sourceExcerpts: string | null | undefined
+): sourceExcerpts is string {
+  const text = sourceExcerpts?.trim();
+  if (!text || text === '- none') return false;
+  if (text.startsWith('Uploaded source ids were provided, but no matching source records')) {
+    return false;
+  }
+  if (text.startsWith('Uploaded source files are recorded, but source evidence')) return false;
+  if (text.startsWith('Source evidence pack.') && !text.includes('Authoritative source content')) {
+    return false;
+  }
+  return true;
+}
+
 export function buildCourseBridgeBrief(playbook: CareerPlaybookRow): CourseBridgeBrief {
   const roleSpec = parseRoleProfileSpec(playbook);
   const looseRoleSpec = asRecord(playbook.role_profile_spec);
@@ -178,7 +197,9 @@ export function buildCourseBridgeBrief(playbook: CareerPlaybookRow): CourseBridg
     .join(' ')
     .trim();
   const targetAudience =
-    (roleSpecTargetAudience(roleSpec) ?? readString(looseRoleSpec.target_audience) ?? rowAudience) ||
+    (roleSpecTargetAudience(roleSpec) ??
+      readString(looseRoleSpec.target_audience) ??
+      rowAudience) ||
     `Professionals preparing for the ${title} role`;
   const learningOutcomes = uniqueStrings([
     ...(roleSpec?.focus_areas.primary_kpis ?? []),
@@ -201,13 +222,35 @@ export function buildCourseBridgeBrief(playbook: CareerPlaybookRow): CourseBridg
     targetAudience,
     learningOutcomes: learningOutcomes.length > 0 ? learningOutcomes : fallbackOutcomes,
     language: playbook.language,
-    courseSize: 'standard',
+    courseSize: 'auto',
+    style: DEFAULT_COURSE_STYLE,
     settings: toJson({
       source: 'career_playbook',
       playbookId: playbook.id,
       bridgeVersion: 1,
-      includeWebResearch: true,
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+      style: DEFAULT_COURSE_STYLE,
     }),
+  };
+}
+
+export function renderCourseBridgeBusinessContextSourceDocument(params: {
+  brief: CourseBridgeBrief;
+  sourceExcerpts: string | null;
+}): CourseBridgeSourceDocument | null {
+  if (!hasCourseBridgeSourceEvidence(params.sourceExcerpts)) return null;
+
+  return {
+    filename: sourceFilename('career-playbook-business-context', params.brief.title),
+    markdown: [
+      `# Uploaded business context for ${params.brief.title}`,
+      '',
+      'Source: Career Playbook uploaded business-context files',
+      '',
+      params.sourceExcerpts.trim(),
+    ].join('\n'),
+    sourceUrls: [],
   };
 }
 
@@ -216,6 +259,7 @@ export function renderCourseBridgeSourceDocuments(params: {
   brief: CourseBridgeBrief;
   research: CareerPlaybookWebResearchResult | null;
   includeWebResearch: boolean;
+  businessContextSourceExcerpts?: string | null;
 }): CourseBridgeSourceDocument[] {
   const documents: CourseBridgeSourceDocument[] = [
     {
@@ -257,6 +301,12 @@ export function renderCourseBridgeSourceDocuments(params: {
       sourceUrls: research.sources,
     });
   }
+
+  const businessContextDocument = renderCourseBridgeBusinessContextSourceDocument({
+    brief: params.brief,
+    sourceExcerpts: params.businessContextSourceExcerpts ?? null,
+  });
+  if (businessContextDocument) documents.push(businessContextDocument);
 
   return documents;
 }

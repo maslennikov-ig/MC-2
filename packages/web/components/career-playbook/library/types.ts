@@ -1,6 +1,9 @@
 import type {
   CareerPlaybookViewerPermissions,
   CareerPlaybookVisibility,
+  CourseSize,
+  CourseStyle,
+  Language,
 } from '@megacampus/shared-types'
 
 export type { CareerPlaybookViewerPermissions, CareerPlaybookVisibility }
@@ -66,6 +69,16 @@ export interface CareerPlaybookLibraryData {
 export interface CreateCourseFromPlaybookInput {
   playbookId: string
   includeWebResearch: boolean
+  includeBusinessContextSources: boolean
+  overrides: {
+    title: string
+    courseDescription: string
+    targetAudience: string
+    learningOutcomes: string[]
+    language: Language
+    courseSize: CourseSize
+    style: CourseStyle
+  }
 }
 
 export interface CreateCourseFromPlaybookResult {
@@ -74,6 +87,42 @@ export interface CreateCourseFromPlaybookResult {
   redirectUrl: string
   sourceDocumentIds: string[]
   generationCode?: string
+}
+
+export interface PreviewCourseFromPlaybookResult {
+  playbookId: string
+  brief: {
+    title: string
+    courseDescription: string
+    targetAudience: string
+    learningOutcomes: string[]
+    language: Language
+    courseSize: CourseSize
+    style: CourseStyle
+  }
+  defaults: {
+    includeWebResearch: boolean
+    includeBusinessContextSources: boolean
+  }
+  sources: {
+    roleGuide: {
+      included: boolean
+    }
+    webResearch: {
+      available: boolean
+      defaultIncluded: boolean
+    }
+    businessContextSources: {
+      available: boolean
+      defaultIncluded: boolean
+      sourceCount: number
+      sources: Array<{
+        id: string
+        filename: string | null
+        status: string
+      }>
+    }
+  }
 }
 
 export interface CareerPlaybookPublicSharePlaybook {

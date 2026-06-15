@@ -99,8 +99,9 @@ assert_value "$deploy_script" api_changed false
 assert_value "$deploy_script" docker_matrix '{"include":[]}'
 
 ci_only="$(run_case "ci-only" .github/workflows/ci-cd.yml scripts/ci/detect_deploy_changes.sh)"
-assert_value "$ci_only" should_deploy false
+assert_value "$ci_only" should_deploy true
 assert_value "$ci_only" should_build_docker false
+assert_value "$ci_only" deploy_config_changed true
 assert_value "$ci_only" docker_matrix '{"include":[]}'
 
 root_deps="$(run_case "root-deps" package.json pnpm-lock.yaml)"

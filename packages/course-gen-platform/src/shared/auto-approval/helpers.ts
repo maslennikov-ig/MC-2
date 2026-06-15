@@ -58,6 +58,7 @@ export interface CourseForAutoApproval {
   course_description: string | null;
   course_size: string | null;
   analysis_result: unknown;
+  generation_metadata?: unknown;
   organization: { tier: string | null } | { tier: string | null }[] | null;
 }
 
@@ -315,6 +316,10 @@ export async function queueStage5Job(
       desired_modules_count: settings.desired_modules_count,
       lesson_duration_minutes: settings.lesson_duration_minutes,
       learning_outcomes: settings.learning_outcomes,
+      settings:
+        course.settings && typeof course.settings === 'object'
+          ? (course.settings as Record<string, unknown>)
+          : undefined,
     },
     vectorized_documents: hasVectorizedDocs,
     document_summaries: documentSummaries,

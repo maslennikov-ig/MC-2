@@ -63,7 +63,7 @@ function parseArgs(): CLIArgs {
     verbose: args.includes('--verbose'),
     models: (
       args.find(a => a.startsWith('--models='))?.split('=')[1] ||
-      'deepseek/deepseek-chat,xiaomi/mimo-v2-flash'
+      'deepseek/deepseek-chat,deepseek/deepseek-v4-flash'
     ).split(','),
   };
 }
@@ -473,7 +473,7 @@ const REPORT: FullReport = {
 // SUITE 1: HEURISTIC FILTERS (12 tests)
 // ============================================================================
 
-async function runSuite1HeuristicFilters(): Promise<SuiteResult> {
+function runSuite1HeuristicFilters(): SuiteResult {
   const suite: SuiteResult = {
     name: 'Heuristic Filters',
     tests: [],
@@ -929,7 +929,7 @@ async function runSuite2RepairMechanisms(): Promise<SuiteResult> {
 // SUITE 3: INLINE FIXER (5 tests)
 // ============================================================================
 
-async function runSuite3InlineFixer(): Promise<SuiteResult> {
+function runSuite3InlineFixer(): SuiteResult {
   const suite: SuiteResult = {
     name: 'Inline Fixer',
     tests: [],
@@ -1343,7 +1343,7 @@ flowchart TD
 // SUITE 5: CJK DETECTION & RECOVERY (5 tests)
 // ============================================================================
 
-async function runSuite5CJKDetection(): Promise<SuiteResult> {
+function runSuite5CJKDetection(): SuiteResult {
   const suite: SuiteResult = {
     name: 'CJK Detection & Recovery',
     tests: [],
@@ -1459,7 +1459,7 @@ async function runSuite5CJKDetection(): Promise<SuiteResult> {
 // SUITE 6: PROMPT MARKER DETECTION (5 tests)
 // ============================================================================
 
-async function runSuite6PromptMarkers(): Promise<SuiteResult> {
+function runSuite6PromptMarkers(): SuiteResult {
   const suite: SuiteResult = {
     name: 'Prompt Marker Detection',
     tests: [],
@@ -1598,7 +1598,7 @@ async function main() {
   const startTime = Date.now();
 
   // Run suites based on filter
-  const suiteMap: Record<string, () => Promise<SuiteResult>> = {
+  const suiteMap: Record<string, () => SuiteResult | Promise<SuiteResult>> = {
     heuristic: runSuite1HeuristicFilters,
     repair: runSuite2RepairMechanisms,
     inline: runSuite3InlineFixer,

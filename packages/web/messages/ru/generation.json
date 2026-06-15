@@ -55,6 +55,7 @@
     "approveAndContinue": "Подтвердить и продолжить",
     "regenerating": "Перегенерация...",
     "regenerate": "Перегенерировать",
+    "stage5StructureBlocked": "Исправьте структуру",
     "approving": "Одобрение...",
     "approveAll": "Одобрить всё",
     "lessonsApproved": "Уроков одобрено",
@@ -1031,7 +1032,24 @@
     "emptyOutput": "Структура курса появится здесь",
     "emptyActivity": "События ещё не записаны",
     "errorGeneration": "Ошибка генерации",
-    "retryGeneration": "Повторить генерацию"
+    "retryGeneration": "Повторить генерацию",
+    "structureQualityCriticalTitle": "Структуру нужно исправить",
+    "structureQualityWarningTitle": "Есть предупреждения по структуре",
+    "structureQualityPassedTitle": "Структура прошла проверку",
+    "structureQualityCriticalDescription": "Нельзя продолжить к генерации уроков, пока критичные проблемы не исправлены.",
+    "structureQualityWarningDescription": "Можно продолжить, но стоит проверить структуру перед генерацией уроков.",
+    "structureQualityPassedDescription": "Курс выглядит согласованным по объёму, сложности и длительности.",
+    "structureQualityNeedsFix": "Нужно исправить",
+    "structureQualityWarning": "Предупреждение",
+    "structureQualityCanContinue": "Можно продолжить",
+    "structureQualityIssueHardMax": "Слишком много уроков для выбранного режима генерации.",
+    "structureQualityIssueSoftMax": "Уроков больше оптимального диапазона, проверьте объём курса.",
+    "structureQualityIssueDuration": "Длительность курса не совпадает с фактической длительностью уроков.",
+    "structureQualityIssueDuplicates": "В структуре есть повторяющиеся названия уроков.",
+    "structureQualityIssueObjectives": "В коротких уроках слишком много целей обучения.",
+    "structureQualityIssueEmptySection": "В одном из модулей нет уроков.",
+    "structureQualityIssueSectionCount": "Количество модулей не соответствует выбранному режиму генерации.",
+    "structureQualityIssueSeniorBeginner": "Курс для senior/lead/head роли не может быть полностью начального уровня."
   },
   "stage6": {
     "controlTower": {

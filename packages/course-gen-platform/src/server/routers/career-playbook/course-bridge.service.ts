@@ -1,25 +1,40 @@
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
-import { type CareerPlaybookQAData, type Json, type Language } from '@megacampus/shared-types';
+import {
+  type CareerPlaybookBusinessContext,
+  type CareerPlaybookBusinessContextSourceSummary,
+  type CareerPlaybookQAData,
+  type CourseSize,
+  type CourseStyle,
+  type Json,
+  type Language,
+} from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import {
   runCareerPlaybookWebResearch,
   type CareerPlaybookWebResearchResult,
 } from '../../../stages/stage-career-playbook/rag/web-research';
+import {
+  loadCareerPlaybookBusinessContextSourceEvidence,
+  type CareerPlaybookBusinessContextSourceEvidenceResult,
+} from '../../../stages/stage-career-playbook/nodes/business-context-source-evidence';
 import { initiateCourseGeneration } from '../generation/lifecycle/initiate.service';
 import {
   mapPlaybookRow,
   normalizeStoredQAData,
+  toJson,
   type CareerPlaybookRow,
   type CareerPlaybookSupabase,
 } from './service-mappers';
 import {
   buildCourseBridgeBrief,
   buildSlug,
+  type CourseBridgeBrief,
   persistedWebResearch,
   renderCourseBridgeSourceDocuments,
 } from './course-bridge-helpers';
+import { listCareerPlaybookBusinessContextSourceSummaries } from './sources.service';
 import {
   deleteCareerPlaybookBridgeCourse,
   uploadSyntheticCourseBridgeDocument,
@@ -30,9 +45,25 @@ export { deleteCareerPlaybookBridgeCourse, uploadSyntheticCourseBridgeDocument }
 
 export { buildCourseBridgeBrief, renderCourseBridgeSourceDocuments };
 
+interface PreviewCourseFromPlaybookInput {
+  playbookId: string;
+}
+
+interface CourseBridgeOverrides {
+  title?: string;
+  courseDescription?: string;
+  targetAudience?: string;
+  learningOutcomes?: string[];
+  language?: Language;
+  courseSize?: CourseSize;
+  style?: CourseStyle;
+}
+
 interface CreateCourseFromPlaybookInput {
   playbookId: string;
   includeWebResearch?: boolean;
+  includeBusinessContextSources?: boolean;
+  overrides?: CourseBridgeOverrides;
 }
 
 interface InsertCourseInput {
@@ -44,7 +75,9 @@ interface InsertCourseInput {
   targetAudience: string;
   learningOutcomes: string[];
   language: Language;
-  courseSize: string;
+  courseSize: CourseSize;
+  style: CourseStyle;
+  generationMode: 'automatic' | 'semi_automatic';
   settings: Json;
 }
 
@@ -60,6 +93,16 @@ export interface CourseBridgeDependencies {
   insertCourse: (input: InsertCourseInput) => Promise<InsertedCourse>;
   deleteCourse: (courseId: string) => Promise<void>;
   uploadDocument: (input: UploadDocumentInput) => Promise<{ fileId: string }>;
+  listBusinessContextSources: (
+    playbookId: string
+  ) => Promise<CareerPlaybookBusinessContextSourceSummary[]>;
+  loadBusinessContextSourceEvidence: (input: {
+    playbookId?: string;
+    context: CareerPlaybookBusinessContext;
+    maxSources?: number;
+    maxCharsPerSource?: number;
+    maxAggregateTokens?: number;
+  }) => Promise<CareerPlaybookBusinessContextSourceEvidenceResult>;
   runWebResearch: (qaData: CareerPlaybookQAData) => Promise<CareerPlaybookWebResearchResult>;
   initiateGeneration: typeof initiateCourseGeneration;
   now: () => Date;
@@ -87,6 +130,53 @@ function assertCompleted(playbook: CareerPlaybookRow): void {
     code: 'BAD_REQUEST',
     message: 'Only completed Career Playbooks can be converted into courses',
   });
+}
+
+function buildInitialCourseBridgeProgress(startedAt: string): Json {
+  return {
+    steps: [
+      {
+        id: 1,
+        name: 'Запуск генерации',
+        status: 'in_progress',
+        started_at: startedAt,
+      },
+      {
+        id: 2,
+        name: 'Обработка документов',
+        status: 'pending',
+      },
+      {
+        id: 3,
+        name: 'Приоритизация документов',
+        status: 'pending',
+      },
+      {
+        id: 4,
+        name: 'Глубокий анализ',
+        status: 'pending',
+      },
+      {
+        id: 5,
+        name: 'Формирование структуры',
+        status: 'pending',
+      },
+      {
+        id: 6,
+        name: 'Генерация контента',
+        status: 'pending',
+      },
+    ],
+    message: 'Запуск генерации курса...',
+    percentage: 0,
+    current_step: 1,
+    total_steps: 6,
+    has_documents: true,
+    file_count: 0,
+    total_file_size: 0,
+    files: [],
+    started_at: startedAt,
+  };
 }
 
 async function loadOwnedPlaybook(
@@ -163,8 +253,11 @@ async function insertCourse(input: InsertCourseInput): Promise<InsertedCourse> {
         learning_outcomes: input.learningOutcomes.join('\n'),
         language: input.language,
         course_size: input.courseSize,
+        style: input.style,
+        generation_mode: input.generationMode,
         settings: input.settings,
         has_files: true,
+        generation_progress: buildInitialCourseBridgeProgress(now),
         created_at: now,
         updated_at: now,
       })
@@ -190,9 +283,191 @@ function defaultDependencies(): CourseBridgeDependencies {
     insertCourse,
     deleteCourse: deleteCareerPlaybookBridgeCourse,
     uploadDocument: uploadSyntheticCourseBridgeDocument,
+    listBusinessContextSources: listCareerPlaybookBusinessContextSourceSummaries,
+    loadBusinessContextSourceEvidence: loadCareerPlaybookBusinessContextSourceEvidence,
     runWebResearch: runCareerPlaybookWebResearch,
     initiateGeneration: initiateCourseGeneration,
     now: () => new Date(),
+  };
+}
+
+function settingsRecord(settings: Json): Record<string, unknown> {
+  return settings && typeof settings === 'object' && !Array.isArray(settings)
+    ? (settings as Record<string, unknown>)
+    : {};
+}
+
+function textOverride(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : fallback;
+}
+
+function normalizedLearningOutcomes(value: string[] | undefined, fallback: string[]): string[] {
+  const outcomes =
+    value
+      ?.map(item => item.trim())
+      .filter((item): item is string => item.length > 0)
+      .slice(0, 20) ?? [];
+  return outcomes.length > 0 ? outcomes : fallback;
+}
+
+function applyCourseBridgeOverrides(
+  brief: CourseBridgeBrief,
+  overrides: CourseBridgeOverrides | undefined
+): CourseBridgeBrief {
+  if (!overrides) return brief;
+
+  const title = textOverride(overrides.title, brief.title);
+  const style = overrides.style ?? brief.style;
+
+  return {
+    ...brief,
+    title,
+    slugBase: buildSlug(title),
+    courseDescription: textOverride(overrides.courseDescription, brief.courseDescription),
+    targetAudience: textOverride(overrides.targetAudience, brief.targetAudience),
+    learningOutcomes: normalizedLearningOutcomes(
+      overrides.learningOutcomes,
+      brief.learningOutcomes
+    ),
+    language: overrides.language ?? brief.language,
+    courseSize: overrides.courseSize ?? brief.courseSize,
+    style,
+    settings: toJson({
+      ...settingsRecord(brief.settings),
+      style,
+    }),
+  };
+}
+
+function courseBridgeDraft(brief: CourseBridgeBrief) {
+  return {
+    title: brief.title,
+    courseDescription: brief.courseDescription,
+    targetAudience: brief.targetAudience,
+    learningOutcomes: brief.learningOutcomes,
+    language: brief.language,
+    courseSize: brief.courseSize,
+    style: brief.style,
+  };
+}
+
+function resolveBusinessContextForBridge(
+  playbook: CareerPlaybookRow,
+  sources: CareerPlaybookBusinessContextSourceSummary[] = []
+): CareerPlaybookBusinessContext {
+  const context = normalizeStoredQAData(playbook.q_a_data).business_context;
+  if (context.source_ids.length > 0) return context;
+
+  const readySourceIds = sources
+    .filter(source => source.status === 'ready')
+    .map(source => source.id);
+  if (readySourceIds.length === 0) return context;
+
+  return {
+    ...context,
+    mode: 'company_specific',
+    status: 'ready',
+    source_ids: readySourceIds,
+  };
+}
+
+function selectedBusinessContextSources(
+  context: CareerPlaybookBusinessContext,
+  sources: CareerPlaybookBusinessContextSourceSummary[]
+): CareerPlaybookBusinessContextSourceSummary[] {
+  const selectedIds = new Set(context.source_ids);
+  return sources.filter(source => source.status === 'ready' && selectedIds.has(source.id));
+}
+
+async function resolveBusinessContextForCreate(
+  playbook: CareerPlaybookRow,
+  dependencies: CourseBridgeDependencies
+): Promise<CareerPlaybookBusinessContext> {
+  const context = normalizeStoredQAData(playbook.q_a_data).business_context;
+  if (context.source_ids.length > 0) return context;
+
+  const sources = await dependencies.listBusinessContextSources(playbook.id);
+  return resolveBusinessContextForBridge(playbook, sources);
+}
+
+function throwBusinessContextSourcesUnavailable(): never {
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: 'Selected business context sources are unavailable. Retry without company context.',
+  });
+}
+
+async function loadRequiredBusinessContextSourceExcerpts(
+  playbook: CareerPlaybookRow,
+  dependencies: CourseBridgeDependencies
+): Promise<string> {
+  try {
+    const context = await resolveBusinessContextForCreate(playbook, dependencies);
+    if (context.mode === 'universal' || context.source_ids.length === 0) {
+      throwBusinessContextSourcesUnavailable();
+    }
+
+    const sourceEvidence = await dependencies.loadBusinessContextSourceEvidence({
+      playbookId: playbook.id,
+      context,
+      maxSources: 8,
+      maxCharsPerSource: 12_000,
+      maxAggregateTokens: 12_000,
+    });
+    if (!sourceEvidence.hasAuthoritativeEvidence) throwBusinessContextSourcesUnavailable();
+    return sourceEvidence.sourceExcerpts;
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    throwBusinessContextSourcesUnavailable();
+  }
+}
+
+export async function previewCourseFromPlaybook(
+  ctx: Context,
+  input: PreviewCourseFromPlaybookInput,
+  dependencies: CourseBridgeDependencies = defaultDependencies()
+) {
+  const user = requireUser(ctx);
+  const playbook = await dependencies.loadPlaybook(input.playbookId, user);
+  assertPlaybookAccess(playbook, user);
+  assertCompleted(playbook);
+
+  let businessContextSources: CareerPlaybookBusinessContextSourceSummary[] = [];
+  try {
+    businessContextSources = await dependencies.listBusinessContextSources(playbook.id);
+  } catch {
+    businessContextSources = [];
+  }
+  const businessContext = resolveBusinessContextForBridge(playbook, businessContextSources);
+  const selectedSources = selectedBusinessContextSources(businessContext, businessContextSources);
+
+  return {
+    playbookId: playbook.id,
+    brief: courseBridgeDraft(buildCourseBridgeBrief(playbook)),
+    defaults: {
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    },
+    sources: {
+      roleGuide: {
+        included: true,
+      },
+      webResearch: {
+        available: Boolean(persistedWebResearch(playbook)),
+        defaultIncluded: false,
+      },
+      businessContextSources: {
+        available: selectedSources.length > 0,
+        defaultIncluded: false,
+        sourceCount: selectedSources.length,
+        sources: selectedSources.map(source => ({
+          id: source.id,
+          filename: source.filename,
+          status: source.status,
+        })),
+      },
+    },
   };
 }
 
@@ -206,8 +481,9 @@ export async function createCourseFromPlaybook(
   assertPlaybookAccess(playbook, user);
   assertCompleted(playbook);
 
-  const includeWebResearch = input.includeWebResearch ?? true;
-  const brief = buildCourseBridgeBrief(playbook);
+  const includeWebResearch = input.includeWebResearch ?? false;
+  const includeBusinessContextSources = input.includeBusinessContextSources ?? false;
+  const brief = applyCourseBridgeOverrides(buildCourseBridgeBrief(playbook), input.overrides);
   const orgSlug = await dependencies.getOrganizationSlug(user.organizationId);
   const course = await dependencies.insertCourse({
     userId: user.id,
@@ -219,41 +495,48 @@ export async function createCourseFromPlaybook(
     learningOutcomes: brief.learningOutcomes,
     language: brief.language,
     courseSize: brief.courseSize,
-    settings: {
-      ...(brief.settings && typeof brief.settings === 'object' && !Array.isArray(brief.settings)
-        ? brief.settings
-        : {}),
+    style: brief.style,
+    generationMode: 'automatic',
+    settings: toJson({
+      ...settingsRecord(brief.settings),
       includeWebResearch,
-    } as Json,
+      includeBusinessContextSources,
+      style: brief.style,
+    }),
   });
 
-  let research: CareerPlaybookWebResearchResult | null = null;
-  if (includeWebResearch) {
-    research = persistedWebResearch(playbook);
-  }
-  if (includeWebResearch && !research) {
-    try {
-      research = await dependencies.runWebResearch(normalizeStoredQAData(playbook.q_a_data));
-    } catch (error) {
-      research = {
-        kpis_insights: [],
-        trends_insights: [],
-        onboarding_insights: [],
-        sources: [],
-        errors: [error instanceof Error ? error.message : String(error)],
-      };
-    }
-  }
-
-  const documents = renderCourseBridgeSourceDocuments({
-    playbook,
-    brief,
-    research,
-    includeWebResearch,
-  });
   const uploadedDocuments: Array<{ fileId: string }> = [];
 
   try {
+    let research: CareerPlaybookWebResearchResult | null = null;
+    if (includeWebResearch) {
+      research = persistedWebResearch(playbook);
+    }
+    if (includeWebResearch && !research) {
+      try {
+        research = await dependencies.runWebResearch(normalizeStoredQAData(playbook.q_a_data));
+      } catch (error) {
+        research = {
+          kpis_insights: [],
+          trends_insights: [],
+          onboarding_insights: [],
+          sources: [],
+          errors: [error instanceof Error ? error.message : String(error)],
+        };
+      }
+    }
+    const businessContextSourceExcerpts = includeBusinessContextSources
+      ? await loadRequiredBusinessContextSourceExcerpts(playbook, dependencies)
+      : null;
+
+    const documents = renderCourseBridgeSourceDocuments({
+      playbook,
+      brief,
+      research,
+      includeWebResearch,
+      businessContextSourceExcerpts,
+    });
+
     for (const document of documents) {
       uploadedDocuments.push(
         await dependencies.uploadDocument({

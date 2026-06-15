@@ -20,6 +20,7 @@ import { assertStableIds, isDualWriteEnabled } from '../../../../shared/course-n
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { buildStage5StructuralQualityMetadataUpdate } from './structural-quality-metadata';
 
 // Schema for checking downstream stages
 const checkDownstreamStagesInputSchema = z.object({
@@ -140,12 +141,22 @@ export const fieldUpdateRouter = {
         const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
         const now = new Date().toISOString();
 
+        const updatePayload: Record<string, unknown> = {
+          [updateColumn]: dataToPersist,
+          updated_at: now,
+        };
+        if (stageId === 'stage_5') {
+          updatePayload.generation_metadata = await buildStage5StructuralQualityMetadataUpdate(
+            supabase,
+            courseId,
+            dataToPersist as CourseStructure,
+            requestId
+          );
+        }
+
         const { error: updateError } = await supabase
           .from('courses')
-          .update({
-            [updateColumn]: dataToPersist,
-            updated_at: now,
-          })
+          .update(updatePayload)
           .eq('id', courseId);
 
         if (updateError) {

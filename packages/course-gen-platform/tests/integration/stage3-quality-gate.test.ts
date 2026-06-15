@@ -108,7 +108,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
    * - First attempt: Quality score 0.65 (below threshold)
    * - Document is large (>3K tokens)
    * - Retry #1: Same model (strategy switch skipped)
-   * - Retry #2: Model upgraded to gpt-oss-120b
+   * - Retry #2: Model upgraded to deepseek-v4-flash
    * - Second attempt: Quality score 0.82 (passes)
    * - Job succeeds with retry metadata
    */
@@ -164,7 +164,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
     expect(result.summary_metadata.quality_check_passed).toBe(true);
     expect(result.summary_metadata.retry_attempts).toBe(2); // 2 retries before success
     expect(result.summary_metadata.retry_strategy_changes).toContain(
-      'model: gpt-oss-20b → openai/gpt-oss-120b'
+      'model: gpt-oss-20b → deepseek/deepseek-v4-flash'
     );
 
     // Verify quality validator called 3 times (original + 2 retries)
@@ -362,7 +362,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
    *
    * Scenario:
    * - Retry #1: Strategy switch (skipped)
-   * - Retry #2: Model upgrade (gpt-oss-20b → gpt-oss-120b)
+   * - Retry #2: Model upgrade (gpt-oss-20b → deepseek-v4-flash)
    * - Retry #3: Token budget increase (200K → 250K)
    * - Verify retry_strategy_changes includes token budget change
    *
@@ -440,7 +440,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
     // Assertions
     expect(result.summary_metadata.retry_attempts).toBe(3);
     expect(result.summary_metadata.retry_strategy_changes).toContain(
-      'model: gpt-oss-20b → openai/gpt-oss-120b'
+      'model: gpt-oss-20b → deepseek/deepseek-v4-flash'
     );
     expect(result.summary_metadata.retry_strategy_changes).toContain('max_tokens: 200K → 250K');
 

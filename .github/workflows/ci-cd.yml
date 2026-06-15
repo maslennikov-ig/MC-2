@@ -696,6 +696,7 @@ jobs:
           QDRANT_URL=${{ secrets.QDRANT_URL }}
           QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
           JINA_API_KEY=${{ secrets.JINA_API_KEY }}
+          TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
@@ -858,6 +859,7 @@ jobs:
           QDRANT_URL=http://megacampus-qdrant-dev:6333
           QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
           JINA_API_KEY=${{ secrets.JINA_API_KEY }}
+          TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru

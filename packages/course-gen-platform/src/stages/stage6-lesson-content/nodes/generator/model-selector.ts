@@ -6,9 +6,9 @@
  * Mirrors the Stage 5 importance-based routing pattern but uses lesson difficulty instead.
  *
  * Tier Mapping:
- * - simple: beginner difficulty → xiaomi/mimo-v2-flash
+ * - simple: beginner difficulty → deepseek/deepseek-v4-flash
  * - normal: intermediate difficulty → moonshotai/kimi-k2-thinking
- * - complex: advanced difficulty + module 1 → qwen/qwen3.5-plus-02-15
+ * - complex: advanced difficulty + module 1 → qwen/qwen3.7-plus
  *
  * First Module Rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier
  * for best first impression quality.
@@ -33,9 +33,9 @@ export interface Stage6ModelTier {
  * Select model tier for Stage 6 lesson generation based on difficulty_level.
  *
  * Mapping:
- * - beginner → simple → xiaomi/mimo-v2-flash
+ * - beginner → simple → deepseek/deepseek-v4-flash
  * - intermediate → normal → moonshotai/kimi-k2-thinking
- * - advanced → complex → qwen/qwen3.5-plus-02-15
+ * - advanced → complex → qwen/qwen3.7-plus
  *
  * First module rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier.
  *

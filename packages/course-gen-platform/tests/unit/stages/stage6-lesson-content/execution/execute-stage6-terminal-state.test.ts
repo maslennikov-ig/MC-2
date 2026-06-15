@@ -78,7 +78,7 @@ describe('executeStage6 terminal state detection', () => {
       truncationCount: 0,
       errors: ['Self-review regeneration retries exceeded (2). Last status: REGENERATE.'],
       tokensUsed: 3000,
-      modelUsed: 'qwen/qwen3.5-plus-02-15',
+      modelUsed: 'qwen/qwen3.7-plus',
       qualityScore: null,
       currentNode: 'selfReviewer',
     });
@@ -108,7 +108,7 @@ describe('executeStage6 terminal state detection', () => {
         'Truncation continuation attempts exceeded (2). Marked as review_required (fail-open).',
       ],
       tokensUsed: 5000,
-      modelUsed: 'qwen/qwen3.5-plus-02-15',
+      modelUsed: 'qwen/qwen3.7-plus',
       qualityScore: null,
       currentNode: 'selfReviewer',
     });
@@ -214,7 +214,7 @@ describe('executeStage6 terminal state detection', () => {
       tokensUsed: 4200,
       modelUsed: 'z-ai/glm-5',
       selectedModel: 'z-ai/glm-5',
-      fallbackModel: 'qwen/qwen3.5-plus-02-15',
+      fallbackModel: 'qwen/qwen3.7-plus',
       selectedModelTier: 'complex',
       selectedModelTierReason: 'module 1',
       selectedModelPhase: 'stage_6_auto_last_chance',

@@ -4,7 +4,7 @@
  * Last resort fallback to high-quality model (Kimi K2) when validation/quality fails.
  * Extracted from orchestrator/services/analysis/phase-2-scope.ts for reusability.
  *
- * NOTE: This is NOT for context overflow - use 'emergency' phase (Grok/Gemini) for that.
+ * NOTE: This is NOT for context overflow - use the 'emergency' phase for that.
  * This layer is specifically for quality/validation failures with normal-sized input.
  *
  * Pattern:

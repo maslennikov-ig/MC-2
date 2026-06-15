@@ -32,21 +32,21 @@ const DIGEST_TEXT_LIMIT = 6_000;
 const TRUNCATION_NOTICE = '[truncated to fit Career Playbook source budget]';
 const SOURCE_EVIDENCE_TOKEN_LANGUAGE = 'rus';
 
-interface CareerPlaybookSourceRecord {
+export interface CareerPlaybookSourceRecord {
   id: string;
   filename: string | null;
   status: string;
   file_catalog_id: string | null;
 }
 
-interface FileCatalogSourceRecord {
+export interface FileCatalogSourceRecord {
   id: string;
   filename: string | null;
   processed_content: string | null;
   markdown_content: string | null;
 }
 
-interface LoadedCareerPlaybookSourceRecord extends CareerPlaybookSourceRecord {
+export interface LoadedCareerPlaybookSourceRecord extends CareerPlaybookSourceRecord {
   file?: FileCatalogSourceRecord;
 }
 
@@ -302,14 +302,24 @@ function buildDigestFromText(input: {
   return digest;
 }
 
-function formatLoadedSourceEvidence(
+export interface FormattedCareerPlaybookBusinessContextSourceEvidence {
+  sourceExcerpts: string;
+  hasAuthoritativeEvidence: boolean;
+}
+
+export function buildLoadedSourceEvidence(
   sources: LoadedCareerPlaybookSourceRecord[],
   options: {
     maxCharsPerSource?: number;
     maxAggregateTokens?: number;
   } = {}
-): string {
-  if (sources.length === 0) return '- none';
+): FormattedCareerPlaybookBusinessContextSourceEvidence {
+  if (sources.length === 0) {
+    return {
+      sourceExcerpts: '- none',
+      hasAuthoritativeEvidence: false,
+    };
+  }
 
   const maxAggregateTokens = options.maxAggregateTokens ?? DEFAULT_SOURCE_EVIDENCE_TOKEN_BUDGET;
   const parts = [
@@ -366,10 +376,24 @@ function formatLoadedSourceEvidence(
     appendWithinBudget(parts, sourceParts.join('\n\n'), budget);
   }
 
-  return parts.join('\n\n');
+  const sourceExcerpts = parts.join('\n\n');
+  return {
+    sourceExcerpts,
+    hasAuthoritativeEvidence: sourceExcerpts.includes('Authoritative source content ('),
+  };
 }
 
-async function loadBusinessContextSources(input: {
+function formatLoadedSourceEvidence(
+  sources: LoadedCareerPlaybookSourceRecord[],
+  options: {
+    maxCharsPerSource?: number;
+    maxAggregateTokens?: number;
+  } = {}
+): string {
+  return buildLoadedSourceEvidence(sources, options).sourceExcerpts;
+}
+
+export async function loadBusinessContextSources(input: {
   playbookId?: string;
   sourceIds: string[];
   maxSources?: number;

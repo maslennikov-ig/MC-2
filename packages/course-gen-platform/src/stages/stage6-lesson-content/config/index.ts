@@ -68,7 +68,7 @@ export const MODEL_FALLBACK = {
     en: 'moonshotai/kimi-k2-thinking',
   },
   /** Fallback model for all languages */
-  fallback: 'qwen/qwen3.5-plus-02-15',
+  fallback: 'qwen/qwen3.7-plus',
   /** Max attempts before switching to fallback model */
   maxPrimaryAttempts: 2,
 } as const;

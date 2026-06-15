@@ -99,7 +99,7 @@ export type PhaseName =
  *   course_id: null,
  *   phase_name: 'stage_4_classification',
  *   model_id: 'openai/gpt-oss-20b',
- *   fallback_model_id: 'openai/gpt-oss-120b',
+ *   fallback_model_id: 'deepseek/deepseek-v4-flash',
  *   temperature: 0.7,
  *   max_tokens: 4096
  * }
@@ -110,7 +110,7 @@ export type PhaseName =
  *   config_type: 'course_override',
  *   course_id: '550e8400-e29b-41d4-a716-446655440000',
  *   phase_name: 'stage_4_expert',
- *   model_id: 'openai/gpt-oss-120b',
+ *   model_id: 'deepseek/deepseek-v4-flash',
  *   fallback_model_id: 'google/gemini-3-flash-preview',
  *   temperature: 0.5,
  *   max_tokens: 8000
@@ -141,7 +141,7 @@ export interface ModelConfig {
    * Primary OpenRouter model identifier
    *
    * @example 'openai/gpt-oss-20b'
-   * @example 'openai/gpt-oss-120b'
+   * @example 'deepseek/deepseek-v4-flash'
    * @example 'google/gemini-3-flash-preview'
    */
   model_id: string;
@@ -150,7 +150,7 @@ export interface ModelConfig {
    * Fallback model for quality-based escalation
    * Used if primary model fails or produces low-quality output
    *
-   * @example 'openai/gpt-oss-120b'
+   * @example 'deepseek/deepseek-v4-flash'
    * @example 'google/gemini-3-flash-preview'
    */
   fallback_model_id?: string | null;

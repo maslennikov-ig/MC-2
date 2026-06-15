@@ -109,7 +109,7 @@ export async function uploadSyntheticCourseBridgeDocument(
       vector_status: 'pending',
       markdown_content: input.markdown,
       processed_content: input.markdown,
-      processing_method: 'career_playbook_bridge',
+      processing_method: 'full_text',
       summary_metadata: {
         source: 'career_playbook_bridge',
         source_urls: input.sourceUrls ?? [],

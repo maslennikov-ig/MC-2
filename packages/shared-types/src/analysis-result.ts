@@ -126,7 +126,7 @@ export interface AnalysisResult {
     analysis_version: string; // e.g., 'v1.0.0'
     total_duration_ms: number;
     phase_durations_ms: Record<string, number>; // e.g., { phase_1: 5000, phase_2: 8000, ... }
-    model_usage: Record<string, string>; // e.g., { phase_1: 'openai/gpt-oss-20b', phase_3: 'openai/gpt-oss-120b' }
+    model_usage: Record<string, string>; // e.g., { phase_1: 'openai/gpt-oss-20b', phase_3: 'deepseek/deepseek-v4-flash' }
     total_tokens: { input: number; output: number; total: number };
     total_cost_usd: number;
     retry_count: number; // Total retries across all phases

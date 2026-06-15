@@ -30,6 +30,7 @@ import {
   buildCourseBridgeBrief,
   createCourseFromPlaybook,
   deleteCareerPlaybookBridgeCourse,
+  previewCourseFromPlaybook,
   renderCourseBridgeSourceDocuments,
   uploadSyntheticCourseBridgeDocument,
   type CourseBridgeDependencies,
@@ -138,6 +139,26 @@ function completedPlaybook(overrides: Partial<CareerPlaybookRow> = {}): CareerPl
   };
 }
 
+function businessContextPlaybook(): CareerPlaybookRow {
+  return completedPlaybook({
+    q_a_data: {
+      fixed: [
+        { question_key: 'position', value: 'Product Lead' },
+        { question_key: 'department', value: 'Product' },
+        { question_key: 'level', value: 'Lead' },
+      ],
+      followups: [],
+      freeform: [],
+      business_context: {
+        mode: 'company_specific',
+        status: 'ready',
+        digest: null,
+        source_ids: ['55555555-5555-4555-8555-555555555555'],
+      },
+    },
+  });
+}
+
 function createDependencies(overrides: Partial<CourseBridgeDependencies> = {}) {
   const uploadedIds: string[] = [];
   const dependencies: CourseBridgeDependencies = {
@@ -152,10 +173,22 @@ function createDependencies(overrides: Partial<CourseBridgeDependencies> = {}) {
     ),
     deleteCourse: vi.fn(() => Promise.resolve(undefined)),
     uploadDocument: vi.fn(input => {
-      const id = input.filename.includes('web-research') ? 'file-web-kpis' : 'file-role-guide';
+      const id = input.filename.includes('web-research')
+        ? 'file-web-kpis'
+        : input.filename.includes('business-context')
+          ? 'file-business-context'
+          : 'file-role-guide';
       uploadedIds.push(id);
       return Promise.resolve({ fileId: id });
     }),
+    listBusinessContextSources: vi.fn(() => Promise.resolve([])),
+    loadBusinessContextSourceEvidence: vi.fn(() =>
+      Promise.resolve({
+        sourceExcerpts: '- none',
+        hasAuthoritativeEvidence: false,
+        unavailableReason: 'universal',
+      })
+    ),
     runWebResearch: vi.fn(() =>
       Promise.resolve({
         kpis_insights: ['Activation and retention are common product lead KPIs.'],
@@ -203,6 +236,157 @@ describe('course bridge service', () => {
     expect(brief.courseDescription).toContain('Competencies: discovery');
     expect(brief.courseDescription).toContain('First 30 days');
     expect(brief.courseDescription).toContain('Career path');
+  });
+
+  it('previews an editable course passport with supporting sources disabled by default', async () => {
+    const { dependencies } = createDependencies({
+      loadPlaybook: vi.fn(() => Promise.resolve(businessContextPlaybook())),
+      listBusinessContextSources: vi.fn(() =>
+        Promise.resolve([
+          {
+            id: '55555555-5555-4555-8555-555555555555',
+            playbookId,
+            sourceType: 'file',
+            filename: 'company-handbook.md',
+            status: 'ready',
+            fileCatalogId: 'file-company-handbook',
+            errorMessage: null,
+            createdAt: '2026-05-14T00:00:00.000Z',
+            updatedAt: '2026-05-14T00:00:00.000Z',
+          },
+        ])
+      ),
+    });
+
+    const preview = await previewCourseFromPlaybook(
+      instructorContext,
+      { playbookId },
+      dependencies
+    );
+
+    expect(preview.brief).toMatchObject({
+      title: 'Product Lead',
+      courseSize: 'auto',
+      style: 'professional',
+      language: 'en',
+    });
+    expect(preview.defaults).toEqual({
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    });
+    expect(preview.sources.roleGuide).toMatchObject({ included: true });
+    expect(preview.sources.webResearch).toMatchObject({
+      available: true,
+      defaultIncluded: false,
+    });
+    expect(preview.sources.businessContextSources).toMatchObject({
+      available: true,
+      defaultIncluded: false,
+      sourceCount: 1,
+    });
+  });
+
+  it('keeps course preview available when optional business-context source listing fails', async () => {
+    const { dependencies } = createDependencies({
+      listBusinessContextSources: vi.fn(() => Promise.reject(new Error('source list unavailable'))),
+    });
+
+    const preview = await previewCourseFromPlaybook(
+      instructorContext,
+      { playbookId },
+      dependencies
+    );
+
+    expect(preview.brief.title).toBe('Product Lead');
+    expect(preview.sources.roleGuide).toMatchObject({ included: true });
+    expect(preview.sources.businessContextSources).toEqual({
+      available: false,
+      defaultIncluded: false,
+      sourceCount: 0,
+      sources: [],
+    });
+  });
+
+  it('applies preview overrides and keeps optional sources off by default', async () => {
+    const { dependencies } = createDependencies();
+
+    await createCourseFromPlaybook(
+      instructorContext,
+      {
+        playbookId,
+        overrides: {
+          title: 'Edited onboarding course',
+          courseDescription: 'Edited course description',
+          targetAudience: 'New platform product leads',
+          learningOutcomes: ['Build activation strategy', 'Run discovery rituals'],
+          language: 'ru',
+          courseSize: 'mini',
+          style: 'practical',
+        },
+      },
+      dependencies
+    );
+
+    expect(dependencies.runWebResearch).not.toHaveBeenCalled();
+    expect(dependencies.loadBusinessContextSourceEvidence).not.toHaveBeenCalled();
+    expect(dependencies.insertCourse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Edited onboarding course',
+        slug: 'edited-onboarding-course',
+        courseDescription: 'Edited course description',
+        targetAudience: 'New platform product leads',
+        learningOutcomes: ['Build activation strategy', 'Run discovery rituals'],
+        language: 'ru',
+        courseSize: 'mini',
+        style: 'practical',
+        generationMode: 'automatic',
+        settings: expect.objectContaining({
+          source: 'career_playbook',
+          playbookId,
+          bridgeVersion: 1,
+          includeWebResearch: false,
+          includeBusinessContextSources: false,
+          style: 'practical',
+        }),
+      })
+    );
+    expect(dependencies.uploadDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds uploaded business-context sources only when explicitly requested', async () => {
+    const { dependencies } = createDependencies({
+      loadPlaybook: vi.fn(() => Promise.resolve(businessContextPlaybook())),
+      loadBusinessContextSourceEvidence: vi.fn(() =>
+        Promise.resolve({
+          sourceExcerpts: '## Source: company-handbook.md\n\nCompany-specific activation rituals.',
+          hasAuthoritativeEvidence: true,
+          unavailableReason: 'none',
+        })
+      ),
+    });
+
+    const result = await createCourseFromPlaybook(
+      instructorContext,
+      { playbookId, includeBusinessContextSources: true },
+      dependencies
+    );
+
+    expect(dependencies.loadBusinessContextSourceEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playbookId,
+        context: expect.objectContaining({
+          mode: 'company_specific',
+          source_ids: ['55555555-5555-4555-8555-555555555555'],
+        }),
+      })
+    );
+    expect(dependencies.uploadDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: 'career-playbook-business-context-product-lead.md',
+        markdown: expect.stringContaining('Company-specific activation rituals.'),
+      })
+    );
+    expect(result.sourceDocumentIds).toEqual(['file-role-guide', 'file-business-context']);
   });
 
   it('creates fallback source markdown when web research is unavailable', async () => {
@@ -320,6 +504,8 @@ describe('course bridge service', () => {
         slug: 'product-lead',
         courseDescription: expect.stringContaining('Mission: own platform product outcomes.'),
         targetAudience: 'lead Product Platform',
+        courseSize: 'auto',
+        generationMode: 'automatic',
       })
     );
     expect(dependencies.uploadDocument).toHaveBeenCalledTimes(2);
@@ -351,6 +537,60 @@ describe('course bridge service', () => {
 
     expect(dependencies.uploadDocument).toHaveBeenCalled();
     expect(dependencies.deleteCourse).toHaveBeenCalledWith(courseId);
+  });
+
+  it('rolls back the created course when selected business-context source lookup fails', async () => {
+    const { dependencies } = createDependencies({
+      listBusinessContextSources: vi.fn(() => Promise.reject(new Error('source list unavailable'))),
+    });
+
+    await expect(
+      createCourseFromPlaybook(
+        instructorContext,
+        { playbookId, includeBusinessContextSources: true },
+        dependencies
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+
+    expect(dependencies.deleteCourse).toHaveBeenCalledWith(courseId);
+    expect(dependencies.uploadDocument).not.toHaveBeenCalled();
+    expect(dependencies.initiateGeneration).not.toHaveBeenCalled();
+  });
+
+  it('rolls back when selected business-context sources have no authoritative evidence', async () => {
+    const { dependencies } = createDependencies({
+      loadPlaybook: vi.fn(() => Promise.resolve(businessContextPlaybook())),
+      loadBusinessContextSourceEvidence: vi.fn(() =>
+        Promise.resolve({
+          sourceExcerpts: [
+            'Source evidence pack.',
+            'Aggregate budget: 12000 estimated tokens across all selected sources.',
+            '',
+            '[Source 1: company-handbook.md]',
+            'Status: uploaded. Processed text is not available yet.',
+            'Do not infer facts from this file.',
+          ].join('\n'),
+          hasAuthoritativeEvidence: false,
+          unavailableReason: 'no_authoritative_content',
+        })
+      ),
+    });
+
+    await expect(
+      createCourseFromPlaybook(
+        instructorContext,
+        { playbookId, includeBusinessContextSources: true },
+        dependencies
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+
+    expect(dependencies.deleteCourse).toHaveBeenCalledWith(courseId);
+    expect(dependencies.uploadDocument).not.toHaveBeenCalled();
+    expect(dependencies.initiateGeneration).not.toHaveBeenCalled();
   });
 
   it('rejects non-completed playbooks before creating a course', async () => {
@@ -412,7 +652,7 @@ describe('course bridge service', () => {
         course_id: courseId,
         file_size: expectedSize,
         filename: 'career-playbook-product-lead.md',
-        processing_method: 'career_playbook_bridge',
+        processing_method: 'full_text',
       })
     );
     expect(bridgeMocks.decrementQuota).not.toHaveBeenCalled();

@@ -203,6 +203,10 @@ export const generateRouter = {
             lesson_duration_minutes: (course.settings as unknown as CourseSettings)
               ?.lesson_duration_minutes,
             learning_outcomes: parsedLearningOutcomes,
+            settings:
+              course.settings && typeof course.settings === 'object'
+                ? (course.settings as Record<string, unknown>)
+                : undefined,
           },
           vectorized_documents: hasVectorizedDocs,
           document_summaries: documentSummaries,

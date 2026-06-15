@@ -28,15 +28,15 @@ describe('stage6 fallback topology', () => {
     }
   });
 
-  it('keeps escalation and manual canonical defaults off the Xiaomi path', () => {
+  it('keeps escalation and manual canonical defaults off the retired default-model path', () => {
     const autoLastChance = STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance;
     const manualRegeneration = STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration;
 
     expect(autoLastChance.modelId).toBe('z-ai/glm-5');
     expect(autoLastChance.modelId).not.toBe(DEFAULT_MODEL_ID);
-    expect(autoLastChance.fallbackModelId).toBe('qwen/qwen3.5-plus-02-15');
+    expect(autoLastChance.fallbackModelId).toBe('qwen/qwen3.7-plus');
 
-    expect(manualRegeneration.modelId).toBe('openai/gpt-5.4');
+    expect(manualRegeneration.modelId).toBe('google/gemini-3.5-flash');
     expect(manualRegeneration.modelId).not.toBe(DEFAULT_MODEL_ID);
     expect(manualRegeneration.fallbackModelId).toBe('z-ai/glm-5');
   });
@@ -51,8 +51,7 @@ describe('stage6 fallback topology', () => {
 
     expect(DEFAULT_MODEL_CONFIGS.stage_6_manual_regeneration).toMatchObject({
       modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId,
-      fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration
-        .fallbackModelId,
+      fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.fallbackModelId,
       temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.temperature,
       maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.maxTokens,
     });

@@ -241,7 +241,7 @@ ${dynamicContext.content}
 </regeneration_task>`;
 
     // Get model config from bunker (with fallback)
-    let modelId = 'xiaomi/mimo-v2-flash';
+    let modelId = 'deepseek/deepseek-v4-flash';
     let temperature = 0.7;
     let maxTokens = 2000;
 

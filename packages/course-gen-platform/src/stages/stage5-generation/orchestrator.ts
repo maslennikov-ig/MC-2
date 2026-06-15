@@ -37,8 +37,13 @@ import {
   assembleGenerationResult,
   detectOverlap,
   buildSectionOverlapFeedback,
+  type QualityScoresState,
 } from './orchestrator-helpers';
 import type { CrossSectionOverlapResult } from '../../shared/validation/quality-validator';
+import {
+  reconcileCourseMetadata,
+  validateStructuralQuality,
+} from './validators/structural-quality-validator';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -65,6 +70,7 @@ const GenerationStateAnnotation = Annotation.Root({
     metadata_similarity?: number;
     sections_similarity: number[];
     overall?: number;
+    structure?: QualityScoresState['structure'];
   }>,
 
   // Token usage tracking
@@ -217,7 +223,8 @@ export class GenerationOrchestrator {
     const qualityGateResults = await performPostGenerationQualityGate(
       finalState.sections,
       input,
-      this.logger
+      this.logger,
+      finalState.metadata!
     );
 
     this.logQualityGateResults(input, qualityGateResults);
@@ -234,6 +241,15 @@ export class GenerationOrchestrator {
       updatedSections !== finalState.sections
         ? { ...finalState, sections: updatedSections }
         : finalState;
+    const finalStructuralResult = validateStructuralQuality({
+      input,
+      metadata: reconcileCourseMetadata(finalState.metadata!, stateForAssembly.sections, input),
+      sections: stateForAssembly.sections,
+    });
+    stateForAssembly.qualityScores = {
+      ...stateForAssembly.qualityScores,
+      structure: finalStructuralResult,
+    };
 
     return this.assembleAndReturnResult(stateForAssembly, input, totalDuration);
   }
@@ -494,7 +510,7 @@ export class GenerationOrchestrator {
     input: GenerationJobInput,
     results: Awaited<ReturnType<typeof performPostGenerationQualityGate>>
   ): void {
-    const { qualityResult, lessonsResult, overlapResult } = results;
+    const { qualityResult, lessonsResult, overlapResult, structuralResult } = results;
 
     this.logger.info(
       {
@@ -518,6 +534,13 @@ export class GenerationOrchestrator {
               overlapCount: overlapResult.overlapCount,
             }
           : { ran: false },
+        structure_quality: {
+          passed: structuralResult.passed,
+          profileId: structuralResult.profileId,
+          totalLessons: structuralResult.totalLessons,
+          criticalCount: structuralResult.criticalIssues.length,
+          warningCount: structuralResult.warnings.length,
+        },
       },
       'T037 quality gate validation completed'
     );
@@ -537,7 +560,8 @@ export class GenerationOrchestrator {
       finalState.qualityScores,
       finalState.phaseDurations,
       finalState.retryCount,
-      totalDuration
+      totalDuration,
+      input
     );
 
     const result: GenerationResult = {

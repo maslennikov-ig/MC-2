@@ -21,13 +21,13 @@ import type { Stage4TierConfig } from '../../src/stages/stage4-analysis/phases/s
 // Reusable tier config fixtures
 const ruTierConfig: Stage4TierConfig = {
   standard: {
-    modelId: 'xiaomi/mimo-v2-flash',
+    modelId: 'deepseek/deepseek-v4-flash',
     fallbackModelId: 'google/gemini-3-flash-preview',
     maxContext: 128_000,
   },
   extended: {
     modelId: 'google/gemini-3-flash-preview',
-    fallbackModelId: 'xiaomi/mimo-v2-flash',
+    fallbackModelId: 'deepseek/deepseek-v4-flash',
     maxContext: 1_000_000,
     cacheReadEnabled: false,
   },
@@ -35,13 +35,13 @@ const ruTierConfig: Stage4TierConfig = {
 
 const enTierConfig: Stage4TierConfig = {
   standard: {
-    modelId: 'x-ai/grok-4.1-fast',
+    modelId: 'deepseek/deepseek-v4-flash',
     fallbackModelId: 'google/gemini-3-flash-preview',
     maxContext: 128_000,
   },
   extended: {
     modelId: 'google/gemini-3-flash-preview',
-    fallbackModelId: 'x-ai/grok-4.1-fast',
+    fallbackModelId: 'deepseek/deepseek-v4-flash',
     maxContext: 1_000_000,
     cacheReadEnabled: false,
   },
@@ -111,7 +111,7 @@ describe('Context Overflow Handler', () => {
 
   describe('getContextOverflowFallback - With tierConfig (DB-driven)', () => {
     it('should escalate from standard primary to extended primary (RU)', () => {
-      const fallback = getContextOverflowFallback('xiaomi/mimo-v2-flash', 'ru', ruTierConfig);
+      const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru', ruTierConfig);
 
       expect(fallback).not.toBeNull();
       expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
@@ -127,12 +127,12 @@ describe('Context Overflow Handler', () => {
 
       // standard.fallback === extended.modelId, so tries extended fallback
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('xiaomi/mimo-v2-flash');
+      expect(fallback!.modelId).toBe('deepseek/deepseek-v4-flash');
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should escalate from standard primary to extended primary (EN)', () => {
-      const fallback = getContextOverflowFallback('x-ai/grok-4.1-fast', 'en', enTierConfig);
+      const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'en', enTierConfig);
 
       expect(fallback).not.toBeNull();
       expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
@@ -147,15 +147,14 @@ describe('Context Overflow Handler', () => {
       );
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('x-ai/grok-4.1-fast');
+      expect(fallback!.modelId).toBe('deepseek/deepseek-v4-flash');
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should return null when already on extended fallback (EN)', () => {
-      // After grok → gemini → grok cycle, should return null for grok since it matches standard.modelId
-      // which escalates to extended.modelId (gemini). Then gemini → grok (extended fallback).
-      // grok is standard.modelId, so it loops. But in real scenario you wouldn't retry after getting a fallback.
-      const fallback = getContextOverflowFallback('x-ai/grok-4.1-fast', 'en', enTierConfig);
+      // After default → gemini → default cycle, this returns a fallback for the configured model.
+      // In real scenarios callers should stop retrying after receiving a fallback candidate.
+      const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'en', enTierConfig);
       expect(fallback).not.toBeNull();
     });
 
@@ -165,7 +164,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should return 1M context for extended tier escalation', () => {
-      const fallback = getContextOverflowFallback('xiaomi/mimo-v2-flash', 'ru', ruTierConfig);
+      const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru', ruTierConfig);
       expect(fallback).not.toBeNull();
       expect(fallback!.maxContext).toBe(1_000_000);
     });
@@ -173,7 +172,7 @@ describe('Context Overflow Handler', () => {
 
   describe('getContextOverflowFallback - Without tierConfig (generic fallback)', () => {
     it('should escalate any model to Gemini 2.5 Flash', () => {
-      const fallback = getContextOverflowFallback('xiaomi/mimo-v2-flash', 'ru');
+      const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru');
 
       expect(fallback).not.toBeNull();
       expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
@@ -201,7 +200,7 @@ describe('Context Overflow Handler', () => {
 
   describe('getContextOverflowFallback - Return Type Validation', () => {
     it('should return correct structure with tierConfig', () => {
-      const fallback = getContextOverflowFallback('xiaomi/mimo-v2-flash', 'ru', ruTierConfig);
+      const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru', ruTierConfig);
 
       expect(fallback).not.toBeNull();
       expect(fallback).toHaveProperty('modelId');
@@ -222,10 +221,10 @@ describe('Context Overflow Handler', () => {
 
   describe('Integration - Error Detection + Fallback Selection', () => {
     it('should detect context error and provide fallback model with tierConfig', () => {
-      const error = new Error('context_length_exceeded for xiaomi/mimo-v2-flash');
+      const error = new Error('context_length_exceeded for deepseek/deepseek-v4-flash');
       const isOverflow = isContextOverflowError(error);
       const fallback = isOverflow
-        ? getContextOverflowFallback('xiaomi/mimo-v2-flash', 'ru', ruTierConfig)
+        ? getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru', ruTierConfig)
         : null;
 
       expect(isOverflow).toBe(true);
@@ -237,7 +236,7 @@ describe('Context Overflow Handler', () => {
       const error = new Error('Request exceeds maximum context window');
       const isOverflow = isContextOverflowError(error);
       const fallback = isOverflow
-        ? getContextOverflowFallback('x-ai/grok-4.1-fast', 'en')
+        ? getContextOverflowFallback('deepseek/deepseek-v4-flash', 'en')
         : null;
 
       expect(isOverflow).toBe(true);
@@ -331,9 +330,9 @@ describe('Context Overflow Handler', () => {
         throw new Error('context_length_exceeded');
       };
 
-      await expect(
-        executeWithContextFallback(operation, 'some-model', 'ru', 5)
-      ).rejects.toThrow(/context_length_exceeded/);
+      await expect(executeWithContextFallback(operation, 'some-model', 'ru', 5)).rejects.toThrow(
+        /context_length_exceeded/
+      );
     });
   });
 });

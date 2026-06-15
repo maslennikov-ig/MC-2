@@ -503,6 +503,7 @@ export const Phase2InputSchema = z.object({
   }),
   // Course size fields (advisory - LLM may deviate if needed)
   course_size: z.enum(['micro', 'mini', 'compact', 'standard', 'comprehensive']).optional(),
+  structure_profile: z.enum(['general_auto', 'role_playbook_bridge', 'explicit_size']).optional(),
   target_lessons: z.number().int().positive().optional(),
   target_sections: z.number().int().positive().optional(),
   size_guidance: z.string().min(1).optional(),

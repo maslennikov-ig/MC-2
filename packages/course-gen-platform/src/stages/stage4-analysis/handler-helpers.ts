@@ -34,6 +34,7 @@ import {
   getCachedFileProcessedContentBatch,
   getCachedFileMarkdownBatch,
 } from '../../shared/cache/file-content-cache';
+import { resolveCourseStructureProfile } from '../../shared/course-structure-policy';
 
 // ============================================================================
 // TYPES
@@ -507,6 +508,19 @@ export async function buildAnalysisInput(
   // Extract lesson_duration_minutes from settings JSONB
   const settings = courseForInput.settings as { lesson_duration_minutes?: number } | null;
   const lessonDuration = settings?.lesson_duration_minutes || 15;
+  const structureProfile = resolveCourseStructureProfile({
+    courseSize: dbCourseSize,
+    settings,
+    minLessons: sizePreset?.minLessons,
+    maxLessons: sizePreset?.maxLessons,
+    targetLessons: sizePreset?.targetLessons,
+    targetSections: sizePreset?.targetSections,
+  });
+  const effectiveMinLessons = sizePreset?.minLessons ?? structureProfile.minLessons;
+  const effectiveMaxLessons = sizePreset?.maxLessons ?? structureProfile.hardMaxLessons;
+  const effectiveTargetLessons = sizePreset?.targetLessons ?? structureProfile.targetLessonsMax;
+  const effectiveTargetSections = sizePreset?.targetSections ?? structureProfile.targetSections;
+  const effectiveGuidance = sizePreset?.llmGuidance ?? structureProfile.llmGuidance;
 
   const analysisInput: import('@megacampus/shared-types').StructureAnalysisInput = {
     topic: courseForInput.title || 'Course Topic',
@@ -518,11 +532,12 @@ export async function buildAnalysisInput(
     lesson_duration_minutes: lessonDuration,
     document_summaries: documentSummaries,
     course_size: sizePreset?.size,
-    target_lessons: sizePreset?.targetLessons,
-    target_sections: sizePreset?.targetSections,
-    size_guidance: sizePreset?.llmGuidance,
-    min_lessons: sizePreset?.minLessons,
-    max_lessons: sizePreset?.maxLessons,
+    structure_profile: sizePreset ? 'explicit_size' : structureProfile.id,
+    target_lessons: effectiveTargetLessons,
+    target_sections: effectiveTargetSections,
+    size_guidance: effectiveGuidance,
+    min_lessons: effectiveMinLessons,
+    max_lessons: effectiveMaxLessons,
     course_description: courseForInput.course_description || undefined,
     learning_outcomes: courseForInput.learning_outcomes || undefined,
   };

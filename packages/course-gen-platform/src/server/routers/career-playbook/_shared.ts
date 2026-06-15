@@ -8,6 +8,8 @@ import {
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookVisibilitySchema,
   CareerPlaybookWizardProgressSchema,
+  CourseStyleSchema,
+  courseSizeSchema,
   languageSchema,
 } from '@megacampus/shared-types';
 
@@ -19,8 +21,22 @@ export const playbookIdInputSchema = z.object({
   playbookId: z.string().uuid('Invalid playbook ID'),
 });
 
+const courseBridgeOverridesSchema = z.object({
+  title: z.string().max(200).optional(),
+  courseDescription: z.string().max(7000).optional(),
+  targetAudience: z.string().max(2000).optional(),
+  learningOutcomes: z.array(z.string().max(500)).max(20).optional(),
+  language: languageSchema.optional(),
+  courseSize: courseSizeSchema.optional(),
+  style: CourseStyleSchema.optional(),
+});
+
+export const previewCourseFromPlaybookInputSchema = playbookIdInputSchema;
+
 export const createCourseFromPlaybookInputSchema = playbookIdInputSchema.extend({
-  includeWebResearch: z.boolean().default(true),
+  includeWebResearch: z.boolean().default(false),
+  includeBusinessContextSources: z.boolean().default(false),
+  overrides: courseBridgeOverridesSchema.optional(),
 });
 
 export const blockInputSchema = playbookIdInputSchema.extend({

@@ -55,6 +55,7 @@
     "approveAndContinue": "Approve and continue",
     "regenerating": "Regenerating...",
     "regenerate": "Regenerate",
+    "stage5StructureBlocked": "Fix structure first",
     "approving": "Approving...",
     "approveAll": "Approve All",
     "lessonsApproved": "Lessons approved",
@@ -1031,7 +1032,24 @@
     "emptyOutput": "Course structure will appear here",
     "emptyActivity": "No events recorded yet",
     "errorGeneration": "Generation Error",
-    "retryGeneration": "Retry Generation"
+    "retryGeneration": "Retry Generation",
+    "structureQualityCriticalTitle": "Structure needs fixes",
+    "structureQualityWarningTitle": "Structure warnings found",
+    "structureQualityPassedTitle": "Structure passed checks",
+    "structureQualityCriticalDescription": "You cannot continue to lesson generation until critical issues are fixed.",
+    "structureQualityWarningDescription": "You can continue, but review the structure before generating lessons.",
+    "structureQualityPassedDescription": "The course looks consistent by scope, difficulty, and duration.",
+    "structureQualityNeedsFix": "Needs fixes",
+    "structureQualityWarning": "Warning",
+    "structureQualityCanContinue": "Can continue",
+    "structureQualityIssueHardMax": "Too many lessons for the selected generation mode.",
+    "structureQualityIssueSoftMax": "Lesson count is above the optimal range; review the course scope.",
+    "structureQualityIssueDuration": "Course duration does not match the actual lesson duration.",
+    "structureQualityIssueDuplicates": "The structure contains duplicate lesson titles.",
+    "structureQualityIssueObjectives": "Short lessons contain too many learning objectives.",
+    "structureQualityIssueEmptySection": "One section has no lessons.",
+    "structureQualityIssueSectionCount": "Section count does not match the selected generation mode.",
+    "structureQualityIssueSeniorBeginner": "Senior/lead/head role courses cannot be purely beginner-level."
   },
   "stage6": {
     "controlTower": {

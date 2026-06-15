@@ -812,6 +812,15 @@ export const DurationSchema = z.object({
 
 export type Duration = z.infer<typeof DurationSchema>;
 
+const StructuralIssueDetailsValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()),
+  z.array(z.number()),
+]);
+
 /**
  * Quality scores based on semantic similarity (Jina-v3 embeddings)
  * RT-004 validation thresholds for quality assurance
@@ -828,6 +837,33 @@ export const QualityScoresSchema = z.object({
     .describe('Semantic similarity scores per section batch'),
 
   overall: z.number().min(0).max(1).describe('Overall quality score (weighted average)'),
+
+  structure: z
+    .object({
+      passed: z.boolean(),
+      hasCriticalIssues: z.boolean(),
+      profileId: z.string(),
+      totalLessons: z.number().int().min(0),
+      computedDurationHours: z.number().min(0),
+      criticalIssues: z.array(
+        z.object({
+          code: z.string(),
+          severity: z.enum(['critical', 'warning']),
+          message: z.string(),
+          details: z.record(StructuralIssueDetailsValueSchema).optional(),
+        })
+      ),
+      warnings: z.array(
+        z.object({
+          code: z.string(),
+          severity: z.enum(['critical', 'warning']),
+          message: z.string(),
+          details: z.record(StructuralIssueDetailsValueSchema).optional(),
+        })
+      ),
+    })
+    .optional()
+    .describe('Deterministic Stage 5 structural quality gate result'),
 });
 
 export type QualityScores = z.infer<typeof QualityScoresSchema>;

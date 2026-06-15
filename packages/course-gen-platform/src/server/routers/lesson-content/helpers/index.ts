@@ -41,6 +41,23 @@ export type SectionFromStructure = {
   lessons: LessonFromStructure[];
 };
 
+function hasCriticalStructureIssues(generationMetadata: unknown): boolean {
+  if (!generationMetadata || typeof generationMetadata !== 'object') return false;
+  const metadata = generationMetadata as {
+    quality_scores?: {
+      structure?: {
+        hasCriticalIssues?: unknown;
+        criticalIssues?: unknown;
+      };
+    };
+  };
+  const structure = metadata.quality_scores?.structure;
+  return (
+    structure?.hasCriticalIssues === true ||
+    (Array.isArray(structure?.criticalIssues) && structure.criticalIssues.length > 0)
+  );
+}
+
 // ── Shared lesson/section utility functions ──
 
 export function buildLessonId(sectionNumber: number, lessonOrder: number): string {
@@ -520,7 +537,7 @@ export async function transitionToStage6Generating(
 
   const { data: statusData } = await supabase
     .from('courses')
-    .select('generation_status')
+    .select('generation_status, generation_metadata')
     .eq('id', courseId)
     .single();
 
@@ -536,6 +553,18 @@ export async function transitionToStage6Generating(
   ];
 
   if (currentStatus === 'stage_5_awaiting_approval' || currentStatus === 'stage_5_complete') {
+    if (hasCriticalStructureIssues(statusData?.generation_metadata)) {
+      logger.warn(
+        { requestId, courseId, currentStatus },
+        'Stage 6 start blocked by critical Stage 5 structural quality issues'
+      );
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'Stage 5 structure has critical quality issues. Regenerate or edit the course structure before generating lesson content.',
+      });
+    }
+
     logger.info(
       { requestId, courseId, currentStatus },
       currentStatus === 'stage_5_awaiting_approval'

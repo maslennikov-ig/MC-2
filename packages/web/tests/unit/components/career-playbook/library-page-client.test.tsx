@@ -12,6 +12,7 @@ vi.mock('@/components/layouts/header', () => ({
 
 const deletePlaybook = vi.fn()
 const fetchPage = vi.fn()
+const previewCourseFromPlaybook = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const toggleShare = vi.fn()
 const updateVisibility = vi.fn()
@@ -29,10 +30,10 @@ vi.mock('@/src/i18n/navigation', () => ({
 }))
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
+  previewCourseFromPlaybook: (...args: unknown[]) =>
+    previewCourseFromPlaybook(...(args as [input: { playbookId: string }])),
   createCourseFromPlaybook: (...args: unknown[]) =>
-    createCourseFromPlaybook(
-      ...(args as [input: { playbookId: string; includeWebResearch: boolean }])
-    ),
+    createCourseFromPlaybook(...(args as [input: Record<string, unknown>])),
   deleteCareerPlaybook: (...args: unknown[]) =>
     deletePlaybook(...(args as [playbookId: string, locale: string])),
   fetchCareerPlaybookLibraryPage: (...args: unknown[]) =>
@@ -145,12 +146,42 @@ const messages = {
         confirm: 'Delete guide',
       },
       createCourseDialog: {
-        title: 'Create course from Role Guide',
-        description:
-          'Start course generation from this completed Role Guide. You can add materials after the course is created.',
-        startWithoutMaterials: 'Start without extra materials',
-        addMaterialsLater: 'Materials can be added after course creation if needed.',
-        secondaryDisabled: 'Add materials before creation',
+        title: 'Review course draft',
+        description: 'Check the course passport before generation starts.',
+        loadingPreview: 'Loading course draft...',
+        previewErrorTitle: 'Could not prepare course draft',
+        retryPreview: 'Retry',
+        roleGuideSourceTitle: 'Primary source',
+        roleGuideSourceDescription: 'The final Role Guide will be uploaded as the main source.',
+        titleLabel: 'Course title',
+        descriptionLabel: 'What the course will cover',
+        targetAudienceLabel: 'Target audience',
+        learningOutcomesLabel: 'Learning outcomes',
+        learningOutcomesHelp: 'One outcome per line.',
+        languageLabel: 'Language',
+        courseSizeLabel: 'Course size',
+        styleLabel: 'Style',
+        styleOptions: {
+          professional: 'Professional',
+          practical: 'Practical',
+          problem_based: 'Problem based',
+          analytical: 'Analytical',
+          conversational: 'Conversational',
+          storytelling: 'Storytelling',
+          interactive: 'Interactive',
+          motivational: 'Motivational',
+          academic: 'Academic',
+          technical: 'Technical',
+          research: 'Research',
+          gamified: 'Gamified',
+        },
+        sourcesTitle: 'Supporting sources',
+        webResearchLabel: 'Include web research',
+        webResearchDescription: 'Use external role research as an additional source.',
+        businessContextLabel: 'Include uploaded company context',
+        businessContextDescription: '{count} source files are available.',
+        businessContextUnavailable: 'No uploaded company context sources are available.',
+        createAndGenerate: 'Create and generate',
         loading: 'Creating course...',
         errorTitle: 'Course creation failed',
         genericError: 'Could not create a course from this Role Guide.',
@@ -181,6 +212,7 @@ function renderPage({
 
 describe('CareerPlaybookLibraryPageClient', () => {
   beforeEach(() => {
+    previewCourseFromPlaybook.mockReset()
     createCourseFromPlaybook.mockReset()
     deletePlaybook.mockReset()
     fetchPage.mockReset()

@@ -39,7 +39,7 @@ import { getLessonContent } from '../services/database-service';
  * Primary model comes from: settings.model → llm_model_config → DEFAULT_MODEL_ID
  *
  * @see llm_model_config table for admin-configurable models
- * @see DEFAULT_MODEL_ID from shared-types (Xiaomi MiMo V2 Flash)
+ * @see DEFAULT_MODEL_ID from shared-types (DeepSeek V4 Flash)
  */
 const FALLBACK_MODEL = DEFAULT_MODEL_ID;
 

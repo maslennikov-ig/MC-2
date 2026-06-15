@@ -438,7 +438,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'emergency',
           retryCount: 3,
-          modelsUsed: ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'gemini-2.0-flash-exp'],
+          modelsUsed: ['openai/gpt-oss-20b', 'deepseek/deepseek-v4-flash', 'gemini-2.0-flash-exp'],
         },
       });
 

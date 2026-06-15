@@ -64,7 +64,7 @@ const MAX_DIAGRAM_SIZE_FOR_LLM = 2000;
  */
 const LLM_MODELS = {
   primary: 'minimax/minimax-m2.1', // T1: cheap, $0.30/1M input
-  secondary: 'qwen/qwen3.5-plus-02-15', // T2: strong, ~$3/1M input
+  secondary: 'qwen/qwen3.7-plus', // T2: strong, ~$3/1M input
   ultimate: 'z-ai/glm-5', // T3: top model, expensive, last resort
 } as const;
 

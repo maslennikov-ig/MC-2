@@ -219,7 +219,7 @@ describe('model-config-service', () => {
         expect(config.modelId).not.toBe(DEFAULT_PHASE_CONFIGS.global_default.modelId);
       });
 
-      it('keeps stage_6_auto_last_chance fallback off the Xiaomi path', async () => {
+      it('keeps stage_6_auto_last_chance fallback off the retired default-model path', async () => {
         vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockResolvedValue(null);
 
         const config = await service.getModelForPhase('stage_6_auto_last_chance');
@@ -233,7 +233,7 @@ describe('model-config-service', () => {
         );
       });
 
-      it('keeps stage_6_manual_regeneration fallback off the Xiaomi path', async () => {
+      it('keeps stage_6_manual_regeneration fallback off the retired default-model path', async () => {
         vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockResolvedValue(null);
 
         const config = await service.getModelForPhase('stage_6_manual_regeneration');

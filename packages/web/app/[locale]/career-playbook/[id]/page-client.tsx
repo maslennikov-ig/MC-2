@@ -10,6 +10,7 @@ import type {
 } from '@megacampus/shared-types'
 
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
+import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import { updateCareerPlaybookVisibility } from '@/components/career-playbook/library/client-adapter'
 import { buildCareerPlaybookPublicUrl } from '@/components/career-playbook/library/public-url'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
@@ -409,6 +410,7 @@ export default function CareerPlaybookViewerPageClient({
   }
 
   const canEditViewer = state.viewer.viewerPermissions?.canEdit ?? true
+  const canCreateCourse = state.viewer.viewerPermissions?.canCreateCourse ?? true
   const commonEditor = canEditViewer ? (
     <BlockEditor
       open={Boolean(selectedBlock)}
@@ -482,6 +484,16 @@ export default function CareerPlaybookViewerPageClient({
         }
         onShare={() => void handleShare()}
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
+        createCourseAction={
+          canCreateCourse
+            ? (trigger) => (
+                <CreateCourseFromPlaybookDialog
+                  playbookId={state.viewer!.playbookId}
+                  trigger={trigger}
+                />
+              )
+            : undefined
+        }
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
         isUpdatingVisibility={isUpdatingVisibility}
         isUpdatingNumericFact={state.isUpdatingViewerBlock}

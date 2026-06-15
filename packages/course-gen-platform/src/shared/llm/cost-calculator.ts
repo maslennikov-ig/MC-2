@@ -40,7 +40,7 @@ export interface ModelPricing {
  *   ⚠️ WARNING: Context >128K triggers 2.5x price increase ($3.00/$15.00)
  *   Use validateQwen3MaxContext() before generation to prevent overflow
  * - openai/gpt-oss-20b: $0.08 per 1M tokens combined (section generation)
- * - openai/gpt-oss-120b: $0.20 per 1M tokens combined (section generation)
+ * - deepseek/deepseek-v4-flash: $0.10/$0.20 per 1M tokens (section generation)
  * - google/gemini-3-flash-preview: $0.50/$3.00 per 1M tokens (validation)
  *
  * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md
@@ -92,11 +92,6 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
     combinedPricePerMillion: 0.08,
     inputPricePerMillion: 0.08,
     outputPricePerMillion: 0.08,
-  },
-  'openai/gpt-oss-120b': {
-    combinedPricePerMillion: 0.2,
-    inputPricePerMillion: 0.2,
-    outputPricePerMillion: 0.2,
   },
   'google/gemini-3-flash-preview': {
     inputPricePerMillion: 0.5,
@@ -248,8 +243,8 @@ export interface CostStatus {
  * Calculate cost for a single generation phase
  *
  * Supports both split pricing (input/output) and unified pricing models.
- * For OSS models (gpt-oss-20b, gpt-oss-120b, gemini-2.5-flash), uses combinedPricePerMillion.
- * For qwen/qwen3-max, uses split input/output pricing with 50/50 assumption if not specified.
+ * For unified pricing models (gpt-oss-20b, gemini-2.5-flash), uses combinedPricePerMillion.
+ * For split-pricing models, uses input/output pricing with 50/50 assumption if not specified.
  *
  * @param modelName - OpenRouter model identifier (e.g., "qwen/qwen3-max")
  * @param totalTokens - Total tokens consumed in this phase
@@ -302,7 +297,7 @@ function calculatePhaseCost(modelName: string, totalTokens: number, inputTokens:
  * const metadata: GenerationMetadata = {
  *   model_used: {
  *     metadata: "qwen/qwen3-max",
- *     sections: "openai/gpt-oss-120b",
+ *     sections: "deepseek/deepseek-v4-flash",
  *     validation: "openai/gpt-oss-20b"
  *   },
  *   total_tokens: {

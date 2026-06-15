@@ -125,7 +125,7 @@ function createMockPhase3Output(): Phase3Output {
     ],
     phase_metadata: {
       duration_ms: 12000,
-      model_used: 'openai/gpt-oss-120b',
+      model_used: 'deepseek/deepseek-v4-flash',
       tokens: { input: 1000, output: 800, total: 1800 },
       quality_score: 0.88,
       retry_count: 1,
@@ -161,7 +161,7 @@ function createMockPhase4Output(): Phase4Output {
 }
 
 describe('Phase 5 Assembly Service', () => {
-  it('should assemble complete AnalysisResult from all phases', async () => {
+  it('should assemble complete AnalysisResult from all phases', () => {
     const input = {
       course_id: 'test-course-123',
       language: 'en',
@@ -177,7 +177,7 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.15,
     };
 
-    const result = await assembleAnalysisResult(input);
+    const result = assembleAnalysisResult(input);
 
     // Validate structure from Phase 1
     expect(result.course_category.primary).toBe('professional');
@@ -194,8 +194,8 @@ describe('Phase 5 Assembly Service', () => {
 
     // Validate structure from Phase 4 (generation_guidance replaces scope_instructions)
     expect(result.generation_guidance).toBeDefined();
-    expect(result.generation_guidance!.tone).toBe('conversational but precise');
-    expect(result.generation_guidance!.use_analogies).toBe(true);
+    expect(result.generation_guidance.tone).toBe('conversational but precise');
+    expect(result.generation_guidance.use_analogies).toBe(true);
 
     // Validate metadata
     expect(result.metadata.analysis_version).toBe('1.0.0');
@@ -207,7 +207,7 @@ describe('Phase 5 Assembly Service', () => {
     expect(result.metadata.phase_durations_ms.phase_5).toBeGreaterThanOrEqual(0); // Assembly time (can be 0ms for fast operations)
 
     expect(result.metadata.model_usage.phase_1).toBe('openai/gpt-oss-20b');
-    expect(result.metadata.model_usage.phase_3).toBe('openai/gpt-oss-120b');
+    expect(result.metadata.model_usage.phase_3).toBe('deepseek/deepseek-v4-flash');
 
     expect(result.metadata.total_tokens.total).toBe(4800);
     expect(result.metadata.total_cost_usd).toBe(0.15);
@@ -279,7 +279,7 @@ describe('Phase 5 Assembly Service', () => {
     expect(() => assembleAnalysisResult(input)).toThrow('Phase 4 output is missing');
   });
 
-  it('should handle empty research_flags array', async () => {
+  it('should handle empty research_flags array', () => {
     const phase3 = createMockPhase3Output();
     phase3.research_flags = []; // Empty but valid
 
@@ -298,13 +298,13 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.15,
     };
 
-    const result = await assembleAnalysisResult(input);
+    const result = assembleAnalysisResult(input);
 
     expect(result.research_flags).toEqual([]);
     expect(Array.isArray(result.research_flags)).toBe(true);
   });
 
-  it('should calculate cumulative retry count across all phases', async () => {
+  it('should calculate cumulative retry count across all phases', () => {
     const phase1 = createMockPhase1Output();
     phase1.phase_metadata.retry_count = 2;
 
@@ -332,7 +332,7 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.15,
     };
 
-    const result = await assembleAnalysisResult(input);
+    const result = assembleAnalysisResult(input);
 
     expect(result.metadata.retry_count).toBe(7); // 2 + 1 + 3 + 1
   });

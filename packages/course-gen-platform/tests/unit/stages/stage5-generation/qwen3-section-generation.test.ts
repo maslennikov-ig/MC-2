@@ -7,7 +7,7 @@
  *
  * Test Scenarios (4 A/B comparisons):
  * 1. Baseline: Current prompt + qwen3-235b
- * 2. Control: Same prompt + gpt-oss-120b
+ * 2. Control: Same prompt + deepseek-v4-flash
  * 3. Variation 1: Simplified Russian prompt + qwen3-235b
  * 4. Variation 2: Explicit Zod schema in prompt + qwen3-235b
  *
@@ -32,7 +32,7 @@ import path from 'path';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const MODELS = {
   qwen3_235b: 'qwen/qwen3-235b-a22b-thinking-2507',
-  gpt_oss_120b: 'openai/gpt-oss-120b',
+  gpt_oss_120b: 'deepseek/deepseek-v4-flash',
 } as const;
 
 const TEST_SECTION_CONTEXT = {
@@ -70,7 +70,7 @@ const TEST_SCENARIOS: TestScenario[] = [
     description: 'Exact prompt used in failed T053 run',
   },
   {
-    name: 'Control: gpt-oss-120b + Same Prompt',
+    name: 'Control: deepseek-v4-flash + Same Prompt',
     model: MODELS.gpt_oss_120b,
     promptType: 'baseline',
     description: 'Baseline comparison with known-good model',
@@ -301,7 +301,8 @@ async function runScenarioTest(scenario: TestScenario): Promise<TestResult> {
     // Invoke model
     console.log(`[Test] Invoking model: ${scenario.model}`);
     const response = await model.invoke(prompt);
-    const rawContent = response.content.toString();
+    const rawContent =
+      typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
     result.rawOutputLength = rawContent.length;
     result.rawOutputPreview = rawContent.slice(0, 500);
@@ -430,7 +431,7 @@ describe.skipIf(shouldSkip)('Qwen3-235B Section Generation - Direct Testing', ()
     // Assertions
     expect(results).toHaveLength(4);
 
-    // At least control (gpt-oss-120b) should pass
+    // At least control (deepseek-v4-flash) should pass
     const controlResult = results.find(r => r.model === MODELS.gpt_oss_120b);
     expect(controlResult).toBeDefined();
     expect(controlResult?.parseSuccess).toBe(true);
@@ -478,7 +479,7 @@ Isolated testing of qwen3-235b model for section generation to determine if T053
 
 **Key Findings**:
 - **Qwen3-235B Success Rate**: ${(qwen3SuccessRate * 100).toFixed(0)}% (${qwen3Results.filter(r => r.parseSuccess).length}/${qwen3Results.length} scenarios)
-- **GPT-OSS-120B Success Rate**: ${controlResult?.parseSuccess ? '100%' : '0%'} (control)
+- **DeepSeek V4 Flash Success Rate**: ${controlResult?.parseSuccess ? '100%' : '0%'} (control)
 - **Root Cause**: ${qwen3SuccessRate < 0.5 ? 'MODEL-SPECIFIC ISSUE' : qwen3SuccessRate < 1.0 ? 'PROMPT OPTIMIZATION NEEDED' : 'NO ISSUE DETECTED'}
 
 **Recommendation**: ${generateRecommendation(results)}
@@ -594,7 +595,7 @@ function analyzeModelIssues(results: TestResult[]): string {
   const controlResult = results.find(r => r.model === MODELS.gpt_oss_120b);
 
   if (!controlResult?.parseSuccess) {
-    return '⚠️ Control test (gpt-oss-120b) also failed. Issue is likely **prompt-specific**, not model-specific.';
+    return '⚠️ Control test (deepseek-v4-flash) also failed. Issue is likely **prompt-specific**, not model-specific.';
   }
 
   const qwen3SuccessCount = qwen3Results.filter(r => r.parseSuccess).length;

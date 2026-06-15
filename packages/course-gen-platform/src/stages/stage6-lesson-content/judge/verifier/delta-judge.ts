@@ -141,7 +141,7 @@ export async function verifyPatch(
 
   try {
     // Get model configuration
-    let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
+    let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
     let temperature = fallbackConfig?.temperature ?? 0.0;
     let maxTokens = fallbackConfig?.maxTokens ?? 512;
 

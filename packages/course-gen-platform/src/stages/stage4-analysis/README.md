@@ -85,7 +85,8 @@ AnalysisResult -> courses.analysis_result
 **Output:**
 
 - `recommended_structure`:
-  - `total_lessons`: Number of lessons (minimum 10, enforced)
+  - `total_lessons`: Number of lessons, normalized to the selected profile or
+    explicit size preset
   - `total_sections`: Number of sections
   - `sections_breakdown[]`:
     - `section_id`: Unique identifier
@@ -98,7 +99,15 @@ AnalysisResult -> courses.analysis_result
 
 **Validation:**
 
-- Minimum 10 total lessons (FR-015)
+- Profile-based auto-size bounds:
+  - `general_auto`: minimum 10, target 16-28 lessons, hard maximum 40,
+    4-8 sections
+  - `role_playbook_bridge`: minimum 12, target 18-24 lessons, hard maximum 30,
+    5-7 sections
+- Explicit user-selected course sizes keep their preset bounds.
+- Phase 2 post-processing normalizes section breakdowns, recomputes totals and
+  durations, splits or merges sections to profile bounds, and removes over-large
+  auto structures before Stage 5 receives the blueprint.
 
 ---
 
@@ -220,7 +229,7 @@ interface AnalysisResult {
     total_tokens: { input: number; output: number; total: number };
     total_cost_usd: number;
     retry_count: number;
-    quality_scores: Record<string, number>;
+    quality_scores: Record<string, number>; // Phase-level analysis quality signals
     created_at: string;
   };
 }
