@@ -108,7 +108,7 @@ const messages = {
       pdf: 'PDF',
       share: 'Share',
       createCourse: 'Create course',
-      openCourse: 'Open course',
+      openCourse: 'View course',
       delete: 'Delete',
       editBlock: 'Edit {title}',
       regenerateBlock: 'Regenerate {title}',
