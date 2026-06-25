@@ -27,6 +27,10 @@ import {
   getCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
 } from '@/stages/stage-career-playbook/graph';
+import {
+  remediateCareerPlaybookFinalMarkdown,
+  remediateCareerPlaybookMermaidBlocks,
+} from '@/stages/stage-career-playbook/nodes/mermaid-quality';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
@@ -221,6 +225,12 @@ function buildCareerPlaybookQualityIssues(
   );
 }
 
+function hasGeneratedBlocks(
+  value: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+) {
+  return Object.keys(value).length > 0;
+}
+
 export class CareerPlaybookHandler {
   async process(job: Job<CareerPlaybookJobData>): Promise<JobResult> {
     const jobData = CareerPlaybookOperationJobDataSchema.parse(job.data);
@@ -347,11 +357,12 @@ export class CareerPlaybookHandler {
     jobData: CareerPlaybookGeneratePlaybookJobData,
     result: CareerPlaybookGraphResult
   ) {
+    const safeResult = await this.remediateMermaidBeforePersist(result);
     const costBreakdown = buildCostBreakdown(result);
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
-    const generationWarnings = normalizeGenerationWarnings(result.warnings);
-    const qualityIssues = buildCareerPlaybookQualityIssues(result, generationWarnings);
+    const generationWarnings = normalizeGenerationWarnings(safeResult.warnings);
+    const qualityIssues = buildCareerPlaybookQualityIssues(safeResult, generationWarnings);
     const completedProgress = this.buildGenerationProgress(
       jobData,
       { stage: 'completed', percent: 100 },
@@ -360,9 +371,9 @@ export class CareerPlaybookHandler {
     const updatePayload: Partial<CareerPlaybookRow> = {
       status: 'completed',
       generated_blocks: toJson(
-        result.generatedBlocks ?? {}
+        safeResult.generatedBlocks ?? {}
       ) as CareerPlaybookRow['generated_blocks'],
-      final_markdown: result.finalMarkdown ?? null,
+      final_markdown: safeResult.finalMarkdown ?? null,
       q_a_data: toJson({
         ...qaDataWithoutGenerationError,
         generation_progress: completedProgress,
@@ -385,6 +396,29 @@ export class CareerPlaybookHandler {
     }
 
     await this.updatePlaybook(jobData.playbookId, updatePayload);
+  }
+
+  private async remediateMermaidBeforePersist(
+    result: CareerPlaybookGraphResult
+  ): Promise<CareerPlaybookGraphResult> {
+    const generatedBlocks = asGeneratedBlocks(result.generatedBlocks);
+    const blockRemediation = await remediateCareerPlaybookMermaidBlocks(generatedBlocks);
+    const markdownRemediation = await remediateCareerPlaybookFinalMarkdown(result.finalMarkdown);
+    const qualityIssues = mergeQualityIssues(
+      normalizeQualityIssues(result.qualityIssues),
+      blockRemediation.qualityIssues
+    );
+
+    return {
+      ...result,
+      generatedBlocks: hasGeneratedBlocks(generatedBlocks)
+        ? blockRemediation.generatedBlocks
+        : result.generatedBlocks,
+      finalMarkdown: markdownRemediation.modified
+        ? markdownRemediation.content
+        : result.finalMarkdown,
+      qualityIssues,
+    };
   }
 
   private async persistFailed(jobData: CareerPlaybookGeneratePlaybookJobData, error: string) {

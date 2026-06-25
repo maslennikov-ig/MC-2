@@ -22,6 +22,13 @@ interface InvalidMermaidBlock {
   errors: string[];
 }
 
+interface MermaidMarkdownRemediationResult {
+  content: string;
+  fallbackCount: number;
+  repairedCount: number;
+  modified: boolean;
+}
+
 export interface CareerPlaybookMermaidRemediationResult {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   qualityIssues: CareerPlaybookQualityIssue[];
@@ -124,6 +131,45 @@ async function replaceInvalidMermaidWithFallback(content: string): Promise<{
   return { content: nextContent, fallbackCount };
 }
 
+async function remediateCareerPlaybookMermaidMarkdown(
+  content: string
+): Promise<MermaidMarkdownRemediationResult> {
+  const invalidBefore = await findInvalidCareerPlaybookMermaidBlocks(content);
+  if (invalidBefore.length === 0) {
+    return {
+      content,
+      fallbackCount: 0,
+      repairedCount: 0,
+      modified: false,
+    };
+  }
+
+  const pipelineResult = await runMermaidFixPipeline(content, { skipLLM: true });
+  const fallbackResult = await replaceInvalidMermaidWithFallback(pipelineResult.content);
+  let nextContent = fallbackResult.content;
+  let invalidAfter = await findInvalidCareerPlaybookMermaidBlocks(nextContent);
+
+  if (invalidAfter.length > 0) {
+    nextContent = nextContent.replace(MERMAID_BLOCK_PATTERN, () =>
+      buildFallbackBlock(['Invalid Mermaid syntax'])
+    );
+    invalidAfter = await findInvalidCareerPlaybookMermaidBlocks(nextContent);
+  }
+
+  if (invalidAfter.length > 0) {
+    nextContent = nextContent.replace(MERMAID_BLOCK_PATTERN, '');
+  }
+
+  const trimmedContent = nextContent.trim();
+  return {
+    content: trimmedContent,
+    fallbackCount:
+      pipelineResult.metrics.diagramsFallback + fallbackResult.fallbackCount + invalidAfter.length,
+    repairedCount: invalidBefore.length,
+    modified: trimmedContent !== content.trim(),
+  };
+}
+
 function buildMermaidQualityIssue(params: {
   blockId: CareerPlaybookBlockId;
   fallbackCount: number;
@@ -155,33 +201,18 @@ export async function remediateCareerPlaybookMermaidBlocks(
   for (const [blockId, block] of Object.entries(generatedBlocks)) {
     if (!block?.content || !/```mermaid/i.test(block.content)) continue;
 
-    const invalidBefore = await findInvalidCareerPlaybookMermaidBlocks(block.content);
-    if (invalidBefore.length === 0) continue;
-
-    const pipelineResult = await runMermaidFixPipeline(block.content, { skipLLM: true });
-    const fallbackResult = await replaceInvalidMermaidWithFallback(pipelineResult.content);
-    const invalidAfter = await findInvalidCareerPlaybookMermaidBlocks(fallbackResult.content);
-    const nextContent =
-      invalidAfter.length > 0
-        ? (
-            await replaceInvalidMermaidWithFallback(
-              fallbackResult.content.replace(
-                MERMAID_BLOCK_PATTERN,
-                buildFallbackBlock(['Invalid Mermaid syntax'])
-              )
-            )
-          ).content
-        : fallbackResult.content;
+    const remediation = await remediateCareerPlaybookMermaidMarkdown(block.content);
+    if (!remediation.modified) continue;
 
     updatedBlocks[blockId] = {
       ...block,
-      content: nextContent.trim(),
+      content: remediation.content,
     };
     qualityIssues.push(
       buildMermaidQualityIssue({
         blockId,
-        fallbackCount: pipelineResult.metrics.diagramsFallback + fallbackResult.fallbackCount,
-        repairedCount: invalidBefore.length,
+        fallbackCount: remediation.fallbackCount,
+        repairedCount: remediation.repairedCount,
       })
     );
   }
@@ -190,4 +221,19 @@ export async function remediateCareerPlaybookMermaidBlocks(
     generatedBlocks: updatedBlocks,
     qualityIssues,
   };
+}
+
+export async function remediateCareerPlaybookFinalMarkdown(
+  finalMarkdown: string | null | undefined
+): Promise<MermaidMarkdownRemediationResult> {
+  if (!finalMarkdown?.trim() || !/```mermaid/i.test(finalMarkdown)) {
+    return {
+      content: finalMarkdown ?? '',
+      fallbackCount: 0,
+      repairedCount: 0,
+      modified: false,
+    };
+  }
+
+  return remediateCareerPlaybookMermaidMarkdown(finalMarkdown);
 }

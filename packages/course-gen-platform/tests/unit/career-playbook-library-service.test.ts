@@ -13,6 +13,7 @@ vi.mock('../../src/shared/supabase/admin', () => ({
 
 const {
   getCareerPlaybookFromLibrary,
+  getPublicCareerPlaybookBySlug,
   listCareerPlaybooks,
   toggleCareerPlaybookShare,
   updateCareerPlaybookNumericFact,
@@ -199,6 +200,43 @@ describe('career-playbook library visibility service', () => {
     });
   });
 
+  it('repairs legacy invalid Mermaid before returning library detail', async () => {
+    const invalidDiagram = `## 16. Основной процесс
+
+\`\`\`mermaid
+flowchart TD
+  A[Секретарь (Senior)] --> B{Выбор сценария}
+\`\`\``;
+    const rowWithInvalidMermaid: CareerPlaybookRow = {
+      ...baseRow,
+      generated_blocks: {
+        block_16: {
+          content: invalidDiagram,
+          status: 'generated',
+          attempt: 1,
+        },
+      },
+      final_markdown: invalidDiagram,
+    };
+    fromMock.mockReturnValue(chainResult({ data: rowWithInvalidMermaid, error: null }));
+
+    const detail = await getCareerPlaybookFromLibrary(ctx(owner), {
+      playbookId: baseRow.id,
+    });
+
+    expect(detail.generatedBlocks.block_16?.content).not.toContain('A[Секретарь (Senior)]');
+    expect(detail.finalMarkdown).not.toContain('A[Секретарь (Senior)]');
+    expect(detail.finalMarkdown).not.toContain('Syntax error in text');
+    expect(detail.qualityIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'mermaid',
+          blockId: 'block_16',
+        }),
+      ])
+    );
+  });
+
   it('returns linked course metadata in library list items', async () => {
     const playbooksQuery = chainResult({
       data: [baseRow],
@@ -244,6 +282,31 @@ describe('career-playbook library visibility service', () => {
       status: 'draft',
       generationStatus: 'stage_6_generating',
     });
+  });
+
+  it('repairs legacy invalid Mermaid before returning public share markdown', async () => {
+    const invalidDiagram = `## 16. Основной процесс
+
+\`\`\`mermaid
+flowchart TD
+  A[Секретарь (Senior)] --> B{Выбор сценария}
+\`\`\``;
+    fromMock.mockReturnValue(
+      chainResult({
+        data: {
+          ...baseRow,
+          visibility: 'public',
+          is_public: true,
+          final_markdown: invalidDiagram,
+        },
+        error: null,
+      })
+    );
+
+    const share = await getPublicCareerPlaybookBySlug({ shareSlug: 'sales-manager' });
+
+    expect(share.finalMarkdown).not.toContain('A[Секретарь (Senior)]');
+    expect(share.finalMarkdown).not.toContain('Syntax error in text');
   });
 
   it('rejects non-owner visibility changes', async () => {

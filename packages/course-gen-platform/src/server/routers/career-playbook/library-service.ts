@@ -27,6 +27,10 @@ import {
   annotateCareerPlaybookBlockNumericFacts,
   findCareerPlaybookNumericFactOccurrences,
 } from '@/stages/stage-career-playbook/numeric-facts';
+import {
+  remediateCareerPlaybookFinalMarkdown,
+  remediateCareerPlaybookMermaidBlocks,
+} from '@/stages/stage-career-playbook/nodes/mermaid-quality';
 
 export interface CareerPlaybookLibraryItem {
   id: string;
@@ -564,29 +568,59 @@ function sortRows(
   });
 }
 
-function mapRowToLibraryDetail(
+function mergeQualityIssues(
+  ...groups: CareerPlaybookQualityIssue[][]
+): CareerPlaybookQualityIssue[] {
+  const merged: CareerPlaybookQualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of groups.flat()) {
+    if (seen.has(issue.id)) continue;
+    merged.push(issue);
+    seen.add(issue.id);
+  }
+
+  return merged;
+}
+
+async function mapRowToLibraryDetail(
   row: CareerPlaybookRow,
   user: UserContext,
   organizationSlug: string | null = null,
   linkedCourse: CareerPlaybookLinkedCourse | null = null
-): CareerPlaybookLibraryDetailResponse {
+): Promise<CareerPlaybookLibraryDetailResponse> {
   const mapped = mapPlaybookRow(row);
   const qaData = normalizeStoredQAData(mapped.q_a_data);
+  const generatedBlocks = normalizeGeneratedBlocks(mapped.generated_blocks);
+  const blockRemediation = await remediateCareerPlaybookMermaidBlocks(generatedBlocks);
+  const markdownRemediation = await remediateCareerPlaybookFinalMarkdown(mapped.final_markdown);
+  const remediatedGeneratedBlocks: Record<string, CareerPlaybookBlockState> = {
+    ...generatedBlocks,
+  };
+  for (const [blockId, block] of Object.entries(blockRemediation.generatedBlocks)) {
+    if (block) {
+      remediatedGeneratedBlocks[blockId] = block;
+    }
+  }
+
   return {
     ...toLibraryItemFromMappedRow(mapped, user, organizationSlug, linkedCourse),
-    generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
-    finalMarkdown: mapped.final_markdown,
+    generatedBlocks: remediatedGeneratedBlocks,
+    finalMarkdown: markdownRemediation.modified
+      ? markdownRemediation.content
+      : mapped.final_markdown,
     qualityWarnings: qaData.generation_warnings,
-    qualityIssues: qaData.quality_issues,
+    qualityIssues: mergeQualityIssues(qaData.quality_issues, blockRemediation.qualityIssues),
   };
 }
 
-function mapRowToPublicShare(
+async function mapRowToPublicShare(
   row: CareerPlaybookRow,
   organizationSlug: string | null
-): CareerPlaybookPublicShareResponse {
+): Promise<CareerPlaybookPublicShareResponse> {
   const mapped = mapPlaybookRow(row);
   const visibility = getVisibility(mapped);
+  const markdownRemediation = await remediateCareerPlaybookFinalMarkdown(mapped.final_markdown);
   return {
     id: mapped.id,
     status: mapped.status,
@@ -605,7 +639,9 @@ function mapRowToPublicShare(
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
-    finalMarkdown: mapped.final_markdown ?? '',
+    finalMarkdown: markdownRemediation.modified
+      ? markdownRemediation.content
+      : (mapped.final_markdown ?? ''),
     qualityWarnings: [],
   };
 }
@@ -859,7 +895,7 @@ export async function getCareerPlaybookFromLibrary(
     [row],
     new Map([[row.organization_id, organizationSlug]])
   );
-  return mapRowToLibraryDetail(
+  return await mapRowToLibraryDetail(
     row,
     user,
     organizationSlug,
@@ -972,7 +1008,7 @@ export async function getPublicCareerPlaybookBySlug(input: {
   }
 
   const organizationSlug = await loadOrganizationSlug(mapped.organization_id);
-  return mapRowToPublicShare(mapped, organizationSlug);
+  return await mapRowToPublicShare(mapped, organizationSlug);
 }
 
 export async function exportCareerPlaybookPdf(
