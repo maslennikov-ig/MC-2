@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookLinkedCourse,
   CareerPlaybookNumericFact,
   CareerPlaybookPlaybookStatus,
   CareerPlaybookQualityIssue,
@@ -17,6 +18,7 @@ import {
   normalizeGeneratedBlocks,
   normalizeStoredQAData,
   toJson,
+  type CareerPlaybookLinkedCourseRow,
   type CareerPlaybookRow,
   type CareerPlaybookSupabase,
 } from './service-mappers';
@@ -40,6 +42,7 @@ export interface CareerPlaybookLibraryItem {
   viewerPermissions: CareerPlaybookViewerPermissions;
   shareSlug: string | null;
   organizationSlug: string | null;
+  linkedCourse: CareerPlaybookLinkedCourse | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -343,6 +346,17 @@ const LIBRARY_PLAYBOOK_COLUMNS = [
   'completed_at',
 ].join(',');
 
+const LINKED_COURSE_COLUMNS = [
+  'id',
+  'organization_id',
+  'title',
+  'slug',
+  'status',
+  'generation_status',
+  'settings',
+  'created_at',
+].join(',');
+
 function assertShareable(row: CareerPlaybookRow): void {
   if (row.status === 'completed' && row.final_markdown?.trim()) return;
 
@@ -382,7 +396,8 @@ async function loadManageablePlaybook(playbookId: string, user: UserContext) {
 function toLibraryItemFromMappedRow(
   mapped: CareerPlaybookRow,
   user: UserContext,
-  organizationSlug: string | null = null
+  organizationSlug: string | null = null,
+  linkedCourse: CareerPlaybookLinkedCourse | null = null
 ): CareerPlaybookLibraryItem {
   const visibility = getVisibility(mapped);
   return {
@@ -399,6 +414,7 @@ function toLibraryItemFromMappedRow(
     viewerPermissions: getViewerPermissions(mapped, user),
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
     organizationSlug,
+    linkedCourse,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
@@ -408,10 +424,80 @@ function toLibraryItemFromMappedRow(
 function mapRowToLibraryItem(
   row: CareerPlaybookRow,
   user: UserContext,
-  organizationSlug: string | null = null
+  organizationSlug: string | null = null,
+  linkedCourse: CareerPlaybookLinkedCourse | null = null
 ): CareerPlaybookLibraryItem {
   const mapped = mapPlaybookRow(row);
-  return toLibraryItemFromMappedRow(mapped, user, organizationSlug);
+  return toLibraryItemFromMappedRow(mapped, user, organizationSlug, linkedCourse);
+}
+
+function recordFromJson(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function linkedPlaybookIdFromCourse(row: CareerPlaybookLinkedCourseRow): string | null {
+  const settings = recordFromJson(row.settings);
+  return settings.source === 'career_playbook' && typeof settings.playbookId === 'string'
+    ? settings.playbookId
+    : null;
+}
+
+function toLinkedCourse(
+  row: CareerPlaybookLinkedCourseRow,
+  organizationSlug: string | null
+): CareerPlaybookLinkedCourse | null {
+  if (!row.id || !row.slug?.trim()) return null;
+
+  return {
+    id: row.id,
+    title: row.title?.trim() || 'Course',
+    slug: row.slug.trim(),
+    organizationSlug,
+    status: row.status ?? null,
+    generationStatus: row.generation_status ?? null,
+  };
+}
+
+async function loadLinkedCourseMap(
+  rows: CareerPlaybookRow[],
+  organizationSlugById: Map<string, string | null>
+): Promise<Map<string, CareerPlaybookLinkedCourse>> {
+  const playbookIds = new Set(rows.map(row => row.id));
+  const organizationIds = Array.from(
+    new Set(rows.map(row => row.organization_id).filter((id): id is string => Boolean(id)))
+  );
+  const linkedByPlaybookId = new Map<string, CareerPlaybookLinkedCourse>();
+  if (playbookIds.size === 0 || organizationIds.length === 0) return linkedByPlaybookId;
+
+  const supabase = getCareerPlaybookSupabase();
+  await Promise.all(
+    organizationIds.map(async organizationId => {
+      const { data, error } = await supabase
+        .from('courses')
+        .select(LINKED_COURSE_COLUMNS)
+        .eq('organization_id', organizationId)
+        .contains('settings', { source: 'career_playbook' })
+        .order('created_at', { ascending: false });
+
+      if (error) throwOnDbError(error, 'Failed to load Career Playbook linked courses');
+
+      const organizationSlug = organizationSlugById.get(organizationId) ?? null;
+      const courseRows = Array.isArray(data) ? data : [];
+      for (const courseRow of courseRows) {
+        const playbookId = linkedPlaybookIdFromCourse(courseRow);
+        if (!playbookId || !playbookIds.has(playbookId) || linkedByPlaybookId.has(playbookId)) {
+          continue;
+        }
+
+        const linkedCourse = toLinkedCourse(courseRow, organizationSlug);
+        if (linkedCourse) linkedByPlaybookId.set(playbookId, linkedCourse);
+      }
+    })
+  );
+
+  return linkedByPlaybookId;
 }
 
 function parseOffsetCursor(cursor: string | undefined): number {
@@ -481,12 +567,13 @@ function sortRows(
 function mapRowToLibraryDetail(
   row: CareerPlaybookRow,
   user: UserContext,
-  organizationSlug: string | null = null
+  organizationSlug: string | null = null,
+  linkedCourse: CareerPlaybookLinkedCourse | null = null
 ): CareerPlaybookLibraryDetailResponse {
   const mapped = mapPlaybookRow(row);
   const qaData = normalizeStoredQAData(mapped.q_a_data);
   return {
-    ...toLibraryItemFromMappedRow(mapped, user, organizationSlug),
+    ...toLibraryItemFromMappedRow(mapped, user, organizationSlug, linkedCourse),
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown,
     qualityWarnings: qaData.generation_warnings,
@@ -514,6 +601,7 @@ function mapRowToPublicShare(
     viewerPermissions: { ...READONLY_PERMISSIONS },
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
     organizationSlug,
+    linkedCourse: null,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
     completedAt: mapped.completed_at,
@@ -741,8 +829,14 @@ export async function listCareerPlaybooks(
   const pageRows = page.slice(0, input.limit);
   const hasMore = page.length > input.limit;
   const organizationSlugById = await loadOrganizationSlugMap(pageRows);
+  const linkedCourseByPlaybookId = await loadLinkedCourseMap(pageRows, organizationSlugById);
   const items = pageRows.map(row =>
-    mapRowToLibraryItem(row, user, organizationSlugById.get(row.organization_id) ?? null)
+    mapRowToLibraryItem(
+      row,
+      user,
+      organizationSlugById.get(row.organization_id) ?? null,
+      linkedCourseByPlaybookId.get(row.id) ?? null
+    )
   );
 
   return {
@@ -761,7 +855,16 @@ export async function getCareerPlaybookFromLibrary(
   const user = requireUser(ctx);
   const row = await loadReadablePlaybook(input.playbookId, user);
   const organizationSlug = await loadOrganizationSlug(row.organization_id);
-  return mapRowToLibraryDetail(row, user, organizationSlug);
+  const linkedCourseByPlaybookId = await loadLinkedCourseMap(
+    [row],
+    new Map([[row.organization_id, organizationSlug]])
+  );
+  return mapRowToLibraryDetail(
+    row,
+    user,
+    organizationSlug,
+    linkedCourseByPlaybookId.get(row.id) ?? null
+  );
 }
 
 export async function deleteCareerPlaybookFromLibrary(

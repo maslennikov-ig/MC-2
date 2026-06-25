@@ -49,6 +49,7 @@ import {
   buildCareerPlaybookPublicPath,
   buildCareerPlaybookPublicUrl,
 } from '@/components/career-playbook/library/public-url'
+import { buildCareerPlaybookLinkedCoursePath } from '@/components/career-playbook/library/linked-course-url'
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
 import Header from '@/components/layouts/header'
 import {
@@ -375,9 +376,11 @@ export default function CareerPlaybookLibraryPageClient({
       canCreateCourse: true,
       canDelete: true,
     }
+    const linkedCourseHref = buildCareerPlaybookLinkedCoursePath(locale, item.linkedCourse)
     const canEdit = permissions.canEdit
     const canManageVisibility = permissions.canManageVisibility
-    const canCreateCourse = permissions.canCreateCourse && item.status === 'completed'
+    const canCreateCourse =
+      permissions.canCreateCourse && item.status === 'completed' && !linkedCourseHref
     const canDelete = permissions.canDelete
     const currentVisibility = visibilityConfig[visibility]
     const VisibilityIcon = currentVisibility.icon
@@ -548,6 +551,14 @@ export default function CareerPlaybookLibraryPageClient({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {linkedCourseHref ? (
+              <Button asChild variant="outline" size="sm" className="rounded-md">
+                <Link href={linkedCourseHref}>
+                  <BookOpenCheck className="h-4 w-4" aria-hidden />
+                  {t('card.openCourse')}
+                </Link>
+              </Button>
+            ) : null}
             {canCreateCourse ? (
               <CreateCourseFromPlaybookDialog
                 playbookId={item.id}

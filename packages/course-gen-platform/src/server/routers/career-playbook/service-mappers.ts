@@ -54,6 +54,17 @@ export interface CareerPlaybookRow {
   completed_at: string | null;
 }
 
+export interface CareerPlaybookLinkedCourseRow {
+  id: string;
+  organization_id: string;
+  title: string | null;
+  slug: string | null;
+  status: string | null;
+  generation_status?: string | null;
+  settings: Json | null;
+  created_at: string | null;
+}
+
 interface QueryResult<T> {
   data: T | null;
   error: unknown;
@@ -70,6 +81,7 @@ interface CareerPlaybookQueryBuilder<T> {
   delete: () => CareerPlaybookQueryBuilder<T>;
   select: (columns?: string) => CareerPlaybookQueryBuilder<T>;
   eq: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
+  contains: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
   or: (filters: string) => CareerPlaybookQueryBuilder<T>;
   order: (column: string, options?: { ascending?: boolean }) => Promise<ListQueryResult<T>>;
   single: () => Promise<QueryResult<T>>;
@@ -81,6 +93,7 @@ export interface CareerPlaybookSupabase {
   from(
     table: 'career_playbook_fixed_questions'
   ): CareerPlaybookQueryBuilder<CareerPlaybookFixedQuestion>;
+  from(table: 'courses'): CareerPlaybookQueryBuilder<CareerPlaybookLinkedCourseRow>;
 }
 
 export function normalizeLanguage(language: unknown): Language {

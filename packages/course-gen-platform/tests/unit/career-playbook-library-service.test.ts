@@ -75,6 +75,7 @@ function chainResult(result: unknown) {
   const chain = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
+    contains: vi.fn(() => chain),
     or: vi.fn(() => chain),
     order: vi.fn(() => Promise.resolve(result)),
     single: vi.fn(() => Promise.resolve(result)),
@@ -150,6 +151,99 @@ describe('career-playbook library visibility service', () => {
     expect(detail.viewerPermissions.canEdit).toBe(false);
     expect(detail.viewerPermissions.canManageVisibility).toBe(false);
     expect(detail.generatedBlocks.header?.content).toBe('# Header');
+  });
+
+  it('returns the linked course for a playbook detail when a course already exists', async () => {
+    const playbookQuery = chainResult({ data: baseRow, error: null });
+    const organizationQuery = chainResult({ data: { slug: 'mega-campus' }, error: null });
+    const coursesQuery = chainResult({
+      data: [
+        {
+          id: 'course-1',
+          title: 'Курс для менеджера по продажам',
+          slug: 'sales-manager-course',
+          organization_id: 'org-1',
+          status: 'draft',
+          generation_status: 'completed',
+          settings: {
+            source: 'career_playbook',
+            playbookId: baseRow.id,
+          },
+          created_at: '2026-06-02T10:00:00.000Z',
+        },
+      ],
+      error: null,
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbookQuery;
+      if (table === 'organizations') return organizationQuery;
+      if (table === 'courses') return coursesQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const detail = await getCareerPlaybookFromLibrary(ctx(owner), {
+      playbookId: baseRow.id,
+    });
+
+    expect(coursesQuery.contains).toHaveBeenCalledWith('settings', {
+      source: 'career_playbook',
+    });
+    expect(detail.linkedCourse).toEqual({
+      id: 'course-1',
+      title: 'Курс для менеджера по продажам',
+      slug: 'sales-manager-course',
+      organizationSlug: 'mega-campus',
+      status: 'draft',
+      generationStatus: 'completed',
+    });
+  });
+
+  it('returns linked course metadata in library list items', async () => {
+    const playbooksQuery = chainResult({
+      data: [baseRow],
+      error: null,
+    });
+    const organizationQuery = chainResult({ data: { slug: 'mega-campus' }, error: null });
+    const coursesQuery = chainResult({
+      data: [
+        {
+          id: 'course-1',
+          title: 'Курс для менеджера по продажам',
+          slug: 'sales-manager-course',
+          organization_id: 'org-1',
+          status: 'draft',
+          generation_status: 'stage_6_generating',
+          settings: {
+            source: 'career_playbook',
+            playbookId: baseRow.id,
+          },
+          created_at: '2026-06-02T10:00:00.000Z',
+        },
+      ],
+      error: null,
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbooksQuery;
+      if (table === 'organizations') return organizationQuery;
+      if (table === 'courses') return coursesQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await listCareerPlaybooks(ctx(owner), {
+      limit: 20,
+      sort: 'created_desc',
+    });
+
+    expect(result.items[0]?.linkedCourse).toEqual({
+      id: 'course-1',
+      title: 'Курс для менеджера по продажам',
+      slug: 'sales-manager-course',
+      organizationSlug: 'mega-campus',
+      status: 'draft',
+      generationStatus: 'stage_6_generating',
+    });
   });
 
   it('rejects non-owner visibility changes', async () => {
