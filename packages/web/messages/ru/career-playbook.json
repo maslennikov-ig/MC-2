@@ -459,6 +459,16 @@
     "inspectorReadinessTitle": "Готовность",
     "inspectorWarningsTitle": "Предупреждения качества",
     "inspectorWarningsDescription": "Часть автоматической проверки завершилась в резервном режиме. Проверьте эти пункты перед внедрением.",
+    "qualityIssueOpenBlock": "Открыть блок",
+    "qualityIssueEditBlock": "Редактировать",
+    "qualityIssueRegenerateBlock": "Перегенерировать",
+    "qualityIssueSuggestionLabel": "Что исправить",
+    "qualityIssueLegacyTitle": "Системное предупреждение",
+    "qualityIssueSeverity": {
+      "critical": "Критично",
+      "warning": "Предупреждение",
+      "info": "Инфо"
+    },
     "inspectorReadyBlocks": "Готово блоков: {ready} из {total}",
     "inspectorLanguage": "Язык документа: {language}",
     "inspectorNextStep": "Следующий шаг: создать курс для адаптации",

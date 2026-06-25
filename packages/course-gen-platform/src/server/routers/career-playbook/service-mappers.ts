@@ -5,6 +5,7 @@ import {
   CareerPlaybookGenerationProgressSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookPlaybookStatusSchema,
+  CareerPlaybookQualityIssueSchema,
   CareerPlaybookWizardProgressSchema,
   languageSchema,
   type CareerPlaybookBlockState,
@@ -91,6 +92,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
   const value = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const hasBusinessContext = Object.prototype.hasOwnProperty.call(value, 'business_context');
   const generationWarnings = z.array(z.string().min(1)).safeParse(value.generation_warnings);
+  const qualityIssues = z.array(CareerPlaybookQualityIssueSchema).safeParse(value.quality_issues);
   const qaData = CareerPlaybookQADataSchema.parse({
     fixed: value.fixed ?? [],
     followups: value.followups ?? [],
@@ -108,6 +110,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
     ui_progress: value.ui_progress,
     generation_progress: value.generation_progress,
     generation_warnings: generationWarnings.success ? generationWarnings.data : [],
+    quality_issues: qualityIssues.success ? qualityIssues.data : [],
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(
     value.followup_questions
