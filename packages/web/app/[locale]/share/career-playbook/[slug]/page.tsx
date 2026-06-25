@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 import type { Locale } from '@/src/i18n/config'
 import { PublicPlaybookViewer } from '@/components/career-playbook/viewer/public-playbook-viewer'
+import { buildCareerPlaybookPublicPath } from '@/components/career-playbook/library/public-url'
 import { getPublicCareerPlaybookBySlug } from './data'
 
 export const dynamic = 'force-dynamic'
@@ -57,6 +58,15 @@ export default async function SharedCareerPlaybookPage({ params }: PageProps) {
     notFound()
   }
 
+  const canonicalPath = buildCareerPlaybookPublicPath(
+    locale,
+    result.playbook.organizationSlug,
+    result.playbook.slug
+  )
+  if (canonicalPath) {
+    redirect(canonicalPath)
+  }
+
   const cta = getMc2CtaCopy(locale)
 
   return (
@@ -91,7 +101,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://megacampusai.com'
-  const url = `${appUrl}/${locale}/share/career-playbook/${result.playbook.slug}`
+  const canonicalPath =
+    buildCareerPlaybookPublicPath(locale, result.playbook.organizationSlug, result.playbook.slug) ??
+    `/${locale}/share/career-playbook/${result.playbook.slug}`
+  const url = `${appUrl}${canonicalPath}`
 
   return {
     title: result.playbook.title,
@@ -109,7 +122,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description: result.playbook.summary,
     },
     alternates: {
-      canonical: `/${locale}/share/career-playbook/${result.playbook.slug}`,
+      canonical: canonicalPath,
     },
   }
 }

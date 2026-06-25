@@ -12,9 +12,13 @@ import { getPublicCareerPlaybookBySlug } from '@/app/[locale]/share/career-playb
 const notFound = vi.fn(() => {
   throw new Error('NEXT_NOT_FOUND')
 })
+const redirect = vi.fn((url: string) => {
+  throw new Error(`NEXT_REDIRECT:${url}`)
+})
 
 vi.mock('next/navigation', () => ({
   notFound: () => notFound(),
+  redirect: (url: string) => redirect(url),
 }))
 
 vi.mock('next-intl/server', () => ({
@@ -37,10 +41,11 @@ const mockedGetPublicCareerPlaybookBySlug = vi.mocked(getPublicCareerPlaybookByS
 describe('SharedCareerPlaybookPage', () => {
   beforeEach(() => {
     notFound.mockClear()
+    redirect.mockClear()
     mockedGetPublicCareerPlaybookBySlug.mockReset()
   })
 
-  it('renders public viewer and locale-aware MC2 CTA', async () => {
+  it('redirects legacy share URLs to the organization-scoped public URL', async () => {
     mockedGetPublicCareerPlaybookBySlug.mockResolvedValue({
       status: 'ok',
       playbook: {
@@ -57,18 +62,14 @@ describe('SharedCareerPlaybookPage', () => {
       },
     })
 
-    render(
-      await SharedCareerPlaybookPage({
+    await expect(
+      SharedCareerPlaybookPage({
         params: Promise.resolve({ locale: 'en', slug: 'head-of-sales' }),
       })
-    )
+    ).rejects.toThrow('NEXT_REDIRECT:/en/career-playbooks/mega-campus/head-of-sales')
 
-    expect(screen.getByTestId('public-playbook-viewer')).toHaveTextContent('Head of Sales')
-    expect(screen.getByText('Created on MC2')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'create your own' })).toHaveAttribute(
-      'href',
-      '/en/career-playbook'
-    )
+    expect(redirect).toHaveBeenCalledWith('/en/career-playbooks/mega-campus/head-of-sales')
+    expect(screen.queryByTestId('public-playbook-viewer')).not.toBeInTheDocument()
   })
 
   it('returns 404 for missing and private slugs', async () => {
@@ -117,6 +118,7 @@ describe('SharedCareerPlaybookPage', () => {
 
 describe('generateMetadata for shared career playbook', () => {
   beforeEach(() => {
+    redirect.mockClear()
     mockedGetPublicCareerPlaybookBySlug.mockReset()
   })
 
@@ -145,15 +147,17 @@ describe('generateMetadata for shared career playbook', () => {
     expect(metadata.description).toBe('Role Guide summary')
     expect(metadata.openGraph?.title).toBe('Head of Sales')
     expect(metadata.openGraph?.url).toBe(
-      'https://megacampusai.com/en/share/career-playbook/head-of-sales'
+      'https://megacampusai.com/en/career-playbooks/mega-campus/head-of-sales'
     )
     expect(metadata.twitter?.title).toBe('Head of Sales')
+    expect(metadata.alternates?.canonical).toBe('/en/career-playbooks/mega-campus/head-of-sales')
   })
 })
 
 describe('PublicCareerPlaybookPage canonical route', () => {
   beforeEach(() => {
     notFound.mockClear()
+    redirect.mockClear()
     mockedGetPublicCareerPlaybookBySlug.mockReset()
   })
 

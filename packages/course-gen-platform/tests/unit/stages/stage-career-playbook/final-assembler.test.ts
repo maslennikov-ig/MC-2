@@ -4,7 +4,10 @@ import type {
   CareerPlaybookBlockState,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
-import { assembleCareerPlaybookFinalMarkdown } from '@/stages/stage-career-playbook/nodes/final-assembler';
+import {
+  assembleCareerPlaybookFinalMarkdown,
+  prepareCareerPlaybookFinalBlocksWithQuality,
+} from '@/stages/stage-career-playbook/nodes/final-assembler';
 
 function block(content: string): CareerPlaybookBlockState {
   return {
@@ -89,6 +92,33 @@ flowchart LR
 
     expect(markdown.match(/### Career Path Diagram/g)).toHaveLength(1);
     expect(markdown).toContain('Current --> Lead');
+  });
+
+  it('remediates invalid Mermaid before final persistence and records a quality issue', async () => {
+    const blocks = completeBlocks();
+    blocks.block_10 = block(`## 10. Dependencies
+
+### Dependencies Diagram
+
+\`\`\`mermaid
+flowchart LR
+  Sales -->
+\`\`\``);
+
+    const result = await prepareCareerPlaybookFinalBlocksWithQuality({ generatedBlocks: blocks });
+    const content = result.generatedBlocks.block_10?.content ?? '';
+
+    expect(content).not.toContain('Sales -->');
+    expect(content).not.toContain('Syntax error in text');
+    expect(result.qualityIssues).toEqual([
+      expect.objectContaining({
+        source: 'mermaid',
+        severity: 'warning',
+        blockId: 'block_10',
+        title: expect.stringContaining('Mermaid'),
+        action: 'edit',
+      }),
+    ]);
   });
 
   it('localizes auto-added Mermaid section headings and labels for Russian output', () => {

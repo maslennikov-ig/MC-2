@@ -162,6 +162,7 @@ describe('CareerPlaybookHandler', () => {
           source_ids: [],
         },
         generation_warnings: [],
+        quality_issues: [],
       },
       language: 'ru',
     });
@@ -351,11 +352,96 @@ describe('CareerPlaybookHandler', () => {
             updated_at: expect.any(String),
           }),
           generation_warnings: [],
+          quality_issues: [],
         },
         completed_at: expect.any(String),
       })
     );
     expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+  });
+
+  it('persists structured quality issues from judge verdicts and legacy warnings', async () => {
+    const generatedBlocks = {
+      block_10: {
+        content: '## 10. Dependencies',
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 2,
+        judge_verdict: {
+          pass: false,
+          score: 75,
+          issues: [
+            {
+              block_id: 'block_10' as const,
+              severity: 'critical' as const,
+              description: 'Dependency diagram is too generic.',
+              suggestion: 'Add named stakeholder handoffs.',
+            },
+          ],
+          needs_regeneration: ['block_10' as const],
+        },
+      },
+    };
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+      followups: [],
+      freeform: [],
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        generatedBlocks,
+        finalMarkdown: '# B2B Sales Manager',
+        roleProfileSpec,
+        warnings: [
+          'crossBlockJudge advanced after max regeneration attempts (2/2) for block_10; unresolved issues remain in judge verdict.',
+        ],
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        q_a_data: expect.objectContaining({
+          generation_warnings: [
+            'crossBlockJudge advanced after max regeneration attempts (2/2) for block_10; unresolved issues remain in judge verdict.',
+          ],
+          quality_issues: expect.arrayContaining([
+            expect.objectContaining({
+              source: 'cross_block_judge',
+              severity: 'critical',
+              blockId: 'block_10',
+              title: 'Проблема качества блока',
+              message: 'Dependency diagram is too generic.',
+              suggestion: 'Add named stakeholder handoffs.',
+              action: 'regenerate',
+            }),
+            expect.objectContaining({
+              source: 'system',
+              severity: 'warning',
+              blockId: 'block_10',
+              title: 'Системное предупреждение',
+              action: 'regenerate',
+            }),
+          ]),
+        }),
+      })
+    );
   });
 
   it('invokes the generation graph with the Career Playbook recursion limit', async () => {

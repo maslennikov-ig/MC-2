@@ -55,8 +55,8 @@ const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
 };
 
 describe('Career Playbook cross-block judge', () => {
-  it('flags Phase 3 minimum item failures for anti-goals, decisions, and failure modes', () => {
-    const verdict = runCareerPlaybookDeterministicChecks({
+  it('flags Phase 3 minimum item failures for anti-goals, decisions, and failure modes', async () => {
+    const verdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: blocks([
         [
           'block_2',
@@ -136,6 +136,33 @@ flowchart TB
         block_id: 'block_11',
         severity: 'critical',
         description: expect.stringContaining('career path'),
+      }),
+    ]);
+  });
+
+  it('treats invalid Mermaid syntax as a deterministic quality failure', async () => {
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_10',
+          `## 10. Dependencies
+
+\`\`\`mermaid
+flowchart LR
+  Sales -->
+\`\`\``,
+        ],
+      ]),
+    });
+
+    expect(verdict.pass).toBe(false);
+    expect(verdict.needs_regeneration).toEqual(['block_10']);
+    expect(verdict.issues).toEqual([
+      expect.objectContaining({
+        block_id: 'block_10',
+        severity: 'critical',
+        description: expect.stringContaining('invalid Mermaid syntax'),
+        suggestion: expect.stringContaining('Fix or replace the Mermaid diagram'),
       }),
     ]);
   });

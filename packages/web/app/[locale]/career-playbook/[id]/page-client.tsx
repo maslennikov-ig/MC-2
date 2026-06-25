@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type {
   CareerPlaybookBlockGroupKey,
+  CareerPlaybookQualityIssue,
   CareerPlaybookViewerPermissions,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookVisibility,
@@ -216,6 +217,13 @@ export default function CareerPlaybookViewerPageClient({
       inspectorReadinessTitle: t('inspectorReadinessTitle'),
       inspectorWarningsTitle: t('inspectorWarningsTitle'),
       inspectorWarningsDescription: t('inspectorWarningsDescription'),
+      qualityIssueOpenBlock: t('qualityIssueOpenBlock'),
+      qualityIssueEditBlock: t('qualityIssueEditBlock'),
+      qualityIssueRegenerateBlock: t('qualityIssueRegenerateBlock'),
+      qualityIssueSuggestionLabel: t('qualityIssueSuggestionLabel'),
+      qualityIssueLegacyTitle: t('qualityIssueLegacyTitle'),
+      qualityIssueSeverityLabel: (severity: CareerPlaybookQualityIssue['severity']) =>
+        t(`qualityIssueSeverity.${severity}` as never),
       visibilityLabel: tc('visibility.label'),
       visibilityValueLabel: (visibility: CareerPlaybookVisibility) =>
         tc(`visibility.${visibility}`),

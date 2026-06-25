@@ -5,6 +5,7 @@ import type {
   CareerPlaybookJudgeVerdict,
   CareerPlaybookNodeCost,
   CareerPlaybookQAData,
+  CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type { CareerPlaybookWebResearchResult } from './rag/web-research';
@@ -92,6 +93,10 @@ export const CareerPlaybookGraphState = Annotation.Root({
     default: () => [],
   }),
   warnings: Annotation<string[]>({
+    reducer: (current, update) => [...current, ...update],
+    default: () => [],
+  }),
+  qualityIssues: Annotation<CareerPlaybookQualityIssue[]>({
     reducer: (current, update) => [...current, ...update],
     default: () => [],
   }),

@@ -459,6 +459,16 @@
     "inspectorReadinessTitle": "Readiness",
     "inspectorWarningsTitle": "Quality warnings",
     "inspectorWarningsDescription": "Part of the automated quality check completed in fallback mode. Review these items before rollout.",
+    "qualityIssueOpenBlock": "Open block",
+    "qualityIssueEditBlock": "Edit",
+    "qualityIssueRegenerateBlock": "Regenerate",
+    "qualityIssueSuggestionLabel": "What to fix",
+    "qualityIssueLegacyTitle": "System warning",
+    "qualityIssueSeverity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
     "inspectorReadyBlocks": "{ready} of {total} blocks ready",
     "inspectorLanguage": "Document language: {language}",
     "inspectorNextStep": "Next step: create an adaptation course",
