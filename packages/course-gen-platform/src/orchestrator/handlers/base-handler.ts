@@ -7,7 +7,7 @@
  * @module orchestrator/handlers/base-handler
  */
 
-import { Job } from 'bullmq';
+import { DelayedError, Job } from 'bullmq';
 import {
   JobData,
   JobType,
@@ -286,6 +286,22 @@ export abstract class BaseJobHandler<T extends CourseJobData = CourseJobData> {
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
+
+      if (
+        error instanceof DelayedError ||
+        (error instanceof Error && error.name === 'DelayedError')
+      ) {
+        jobLogger.info(
+          {
+            duration,
+            attemptsMade: job.attemptsMade,
+            attemptsMax: job.opts.attempts,
+          },
+          'Job moved to delayed state'
+        );
+        throw error;
+      }
+
       metricsStore.recordJobFailure(this.jobType, duration);
 
       jobLogger.error(

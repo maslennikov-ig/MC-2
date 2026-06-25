@@ -171,6 +171,12 @@ function createCourseRow(autoFinalize = true): CourseRow {
   };
 }
 
+function longMarkdown(title: string): string {
+  const intro = Array.from({ length: 80 }, (_, index) => `intro${index + 1}`).join(' ');
+  const body = Array.from({ length: 160 }, (_, index) => `body${index + 1}`).join(' ');
+  return [`# ${title}`, '', '## Introduction', intro, '', '## Main Section', body].join('\n');
+}
+
 describe('checkAndSetStage6Complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -198,8 +204,16 @@ describe('checkAndSetStage6Complete', () => {
     const { supabase, coursesTable } = createSupabaseAdminMock({
       courseRow: createCourseRow(true),
       lessonContentsRows: [
-        { lesson_id: 'lesson-1', status: 'completed' },
-        { lesson_id: 'lesson-2', status: 'completed' },
+        {
+          lesson_id: 'lesson-1',
+          status: 'completed',
+          metadata: { lessonLabel: '1.1', markdownContent: longMarkdown('Lesson 1') },
+        },
+        {
+          lesson_id: 'lesson-2',
+          status: 'completed',
+          metadata: { lessonLabel: '1.2', markdownContent: longMarkdown('Lesson 2') },
+        },
       ],
     });
     mockGetSupabaseAdmin.mockReturnValue(supabase);
@@ -211,6 +225,52 @@ describe('checkAndSetStage6Complete', () => {
       expect.objectContaining({ generation_status: 'completed', status: 'published' })
     );
     expect(mockNotifyCourseCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not auto-finalize completed rows with empty or failed-sanity content', async () => {
+    const { supabase, coursesTable, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [
+        {
+          lesson_id: 'lesson-1',
+          status: 'completed',
+          metadata: {
+            lessonLabel: '1.1',
+            markdownContent: '',
+            sanityCheck: { passed: true },
+          },
+        },
+        {
+          lesson_id: 'lesson-2',
+          status: 'completed',
+          metadata: {
+            lessonLabel: '1.2',
+            markdownContent: longMarkdown('Lesson 2'),
+            sanityCheck: { passed: false, reason: 'EMPTY_OR_NEAR_EMPTY' },
+          },
+        },
+      ],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await checkAndSetStage6Complete('course-123');
+
+    expect(coursesTable.update).toHaveBeenCalledTimes(1);
+    expect(coursesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({ generation_status: 'stage_6_complete' })
+    );
+    expect(coursesTable.update.mock.calls[0][0]).not.toHaveProperty('status');
+    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(2);
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lesson_id: 'lesson-1',
+        status: 'review_required',
+        metadata: expect.objectContaining({
+          failureReason: expect.stringContaining('not publishable'),
+        }),
+      })
+    );
+    expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
   });
 
   it('moves to stage_6_complete when lessons are terminal but not fully completed', async () => {
@@ -254,8 +314,13 @@ describe('checkAndSetStage6Complete', () => {
     process.env.FEATURE_STAGE6_COURSE_AUDIT = 'true';
     process.env.FEATURE_STAGE6_QUALITY_ALERTS = 'true';
 
-    const repeatedAnalogy = `## Введение
-Корпоративная социальная сеть похожа на чертеж здания: сначала проектируют каркас, потом заполняют его жизнью.
+    const repeatedAnalogy = `# Введение
+
+## Основной раздел
+Корпоративная социальная сеть похожа на чертеж здания: сначала проектируют каркас, потом заполняют его жизнью. ${Array.from(
+      { length: 230 },
+      (_, index) => `пример${index + 1}`
+    ).join(' ')}
 
 ## Упражнения
 Опишите первый шаг запуска сообщества.`;
@@ -322,7 +387,20 @@ describe('checkAndSetStage6Complete', () => {
           status: 'completed',
           metadata: {
             lessonLabel: '1.1',
-            markdownContent: '## Intro\n\n```python\nprint("a")\n```\n\n```json\n{"ok": true}\n```',
+            markdownContent: [
+              '# Intro',
+              '',
+              '## Main',
+              Array.from({ length: 230 }, (_, index) => `python${index + 1}`).join(' '),
+              '',
+              '```python',
+              'print("a")',
+              '```',
+              '',
+              '```json',
+              '{"ok": true}',
+              '```',
+            ].join('\n'),
             qaSignals: { version: 1, lesson_counters: { callout_count: 0, code_block_count: 4 } },
           },
           content: {
@@ -336,7 +414,20 @@ describe('checkAndSetStage6Complete', () => {
           status: 'completed',
           metadata: {
             lessonLabel: '1.2',
-            markdownContent: '## Intro\n\n```python\nprint("b")\n```\n\n```json\n{"ok": true}\n```',
+            markdownContent: [
+              '# Intro',
+              '',
+              '## Main',
+              Array.from({ length: 230 }, (_, index) => `typescript${index + 1}`).join(' '),
+              '',
+              '```python',
+              'print("b")',
+              '```',
+              '',
+              '```json',
+              '{"ok": true}',
+              '```',
+            ].join('\n'),
             qaSignals: { version: 1, lesson_counters: { callout_count: 0, code_block_count: 3 } },
           },
           content: {
@@ -670,6 +761,76 @@ describe('saveLessonContent', () => {
       p_course_id: 'course-123',
       p_stage_key: 'lesson:lesson-uuid',
       p_tokens: 1200,
+    });
+  });
+
+  it('does not persist completed content when sanity check failed', async () => {
+    const { supabase, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    const result: Stage6Output = {
+      lessonContent: {
+        lesson_id: '1.1',
+        course_id: 'course-123',
+        content: {
+          intro: '',
+          sections: [],
+          examples: [],
+          exercises: [],
+        },
+        metadata: {
+          total_words: 0,
+          total_tokens: 1200,
+          cost_usd: 0,
+          quality_score: 0.81,
+          rag_chunks_used: 0,
+          generation_duration_ms: 5000,
+          model_used: 'z-ai/glm-5',
+          archetype_used: 'concept_explainer',
+          temperature_used: 0.7,
+        },
+        status: 'completed',
+        created_at: new Date('2026-04-17T12:00:00Z'),
+        updated_at: new Date('2026-04-17T12:00:00Z'),
+      },
+      success: true,
+      errors: [],
+      metrics: {
+        tokensUsed: 1200,
+        durationMs: 5000,
+        modelUsed: 'z-ai/glm-5',
+        selectedModel: 'z-ai/glm-5',
+        fallbackModel: null,
+        selectedModelTier: 'complex',
+        selectedModelTierReason: 'test',
+        selectedModelPhase: 'stage_6_auto_last_chance',
+        selectedModelSource: 'database',
+        qualityScore: 0.81,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
+        regenerationMode: null,
+      },
+    };
+
+    await saveLessonContent(
+      'course-123',
+      '1.1',
+      result,
+      {
+        ok: false,
+        reason: 'EMPTY_OR_NEAR_EMPTY',
+        metrics: { charCount: 0, wordCount: 0, hasHeadings: false },
+      },
+      'ru'
+    );
+
+    expect(lessonContentsTable.insert).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalledWith('increment_lessons_completed', {
+      p_course_id: 'course-123',
     });
   });
 });

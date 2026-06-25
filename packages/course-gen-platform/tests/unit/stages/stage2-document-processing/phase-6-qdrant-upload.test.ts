@@ -1,22 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EmbeddingResult } from '@/shared/embeddings/generate';
 
-const {
-  mockUploadChunksToQdrant,
-  mockUpdateVectorStatus,
-  mockGetSupabaseAdmin,
-  mockLogger,
-} = vi.hoisted(() => ({
-  mockUploadChunksToQdrant: vi.fn(),
-  mockUpdateVectorStatus: vi.fn(),
-  mockGetSupabaseAdmin: vi.fn(),
-  mockLogger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+const { mockUploadChunksToQdrant, mockUpdateVectorStatus, mockGetSupabaseAdmin, mockLogger } =
+  vi.hoisted(() => ({
+    mockUploadChunksToQdrant: vi.fn(),
+    mockUpdateVectorStatus: vi.fn(),
+    mockGetSupabaseAdmin: vi.fn(),
+    mockLogger: {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+  }));
 
 vi.mock('@/shared/qdrant/upload.js', () => ({
   uploadChunksToQdrant: vi.fn((...args) => mockUploadChunksToQdrant(...args)),
@@ -86,5 +82,79 @@ describe('phase-6-qdrant-upload', () => {
       expect.anything(),
       'Vectors uploaded to Qdrant'
     );
+  });
+
+  it('does not retry non-recoverable Qdrant Not Found upload errors', async () => {
+    process.env.MAX_QDRANT_RETRIES = '3';
+
+    const batchUpdate = vi.fn().mockResolvedValue({ error: null });
+    mockGetSupabaseAdmin.mockReturnValue({
+      from: vi.fn(() => ({
+        update: vi.fn(() => ({
+          in: batchUpdate,
+        })),
+      })),
+    });
+
+    mockUploadChunksToQdrant.mockRejectedValue(new Error('Not Found'));
+
+    const { executeQdrantUpload } = await import(
+      '@/stages/stage2-document-processing/phases/phase-6-qdrant-upload'
+    );
+
+    const embeddings = [
+      {
+        chunk: {
+          document_id: 'doc-1',
+        },
+      },
+    ] as EmbeddingResult[];
+
+    const job = {
+      id: 'job-1',
+      updateProgress: vi.fn().mockResolvedValue(undefined),
+    } as any;
+
+    await expect(executeQdrantUpload(embeddings, job)).rejects.toThrow(/Not Found/);
+
+    expect(mockUploadChunksToQdrant).toHaveBeenCalledTimes(1);
+    expect(batchUpdate).toHaveBeenCalledWith('id', ['doc-1']);
+  });
+
+  it('retries recoverable Qdrant service errors before failing indexing', async () => {
+    process.env.MAX_QDRANT_RETRIES = '3';
+
+    const batchUpdate = vi.fn().mockResolvedValue({ error: null });
+    mockGetSupabaseAdmin.mockReturnValue({
+      from: vi.fn(() => ({
+        update: vi.fn(() => ({
+          in: batchUpdate,
+        })),
+      })),
+    });
+
+    mockUploadChunksToQdrant.mockRejectedValue(new Error('Service unavailable'));
+
+    const { executeQdrantUpload } = await import(
+      '@/stages/stage2-document-processing/phases/phase-6-qdrant-upload'
+    );
+
+    const embeddings = [
+      {
+        chunk: {
+          document_id: 'doc-1',
+        },
+      },
+    ] as EmbeddingResult[];
+
+    const job = {
+      id: 'job-1',
+      updateProgress: vi.fn().mockResolvedValue(undefined),
+    } as any;
+
+    await expect(executeQdrantUpload(embeddings, job)).rejects.toThrow(/Service unavailable/);
+
+    expect(mockUploadChunksToQdrant).toHaveBeenCalledTimes(3);
+    expect(batchUpdate).toHaveBeenCalledWith('id', ['doc-1']);
   });
 });

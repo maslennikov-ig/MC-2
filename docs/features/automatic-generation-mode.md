@@ -89,6 +89,10 @@ export async function notifyStageComplete(courseId: string, stage: number): Prom
 - Email (if user email present)
 - Telegram (if `telegram_chat_id` configured)
 
+Stage 2 Qdrant upload outages use the same `notifyCourseError` path. Retryable vector
+database outages keep the course in progress for up to 3 hours before notifying; non-retryable
+configuration errors notify immediately.
+
 #### 3. Telegram Service
 
 **Location**: `packages/course-gen-platform/src/shared/telegram/send.ts`

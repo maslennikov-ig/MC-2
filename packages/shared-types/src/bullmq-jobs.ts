@@ -542,7 +542,7 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
   [JobType.DOCUMENT_PROCESSING]: {
     attempts: 5,
     backoff: { type: 'exponential', delay: 2000 },
-    timeout: 300000, // 5 minutes
+    timeout: 900000, // 15 minutes; Qdrant upload has a longer bounded retry loop
     removeOnComplete: 100,
     removeOnFail: false,
   },

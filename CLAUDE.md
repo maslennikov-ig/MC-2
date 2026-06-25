@@ -8,7 +8,7 @@
 - Primary workflow comes from global `~/.claude/CLAUDE.md` and the `orchestration-bridge` plugin.
 - For medium/complex, risky, docs-sensitive, delegated, file-changing, or handoff-prone work, use `orchestration-bridge:orchestrator-stage`.
 - Do not use `template-bridge` for new orchestration.
-- Use Docs L1/L2: `@neuledge/context` first with lockfile-routed package/version; Context7 MCP or first-party docs only when L1 is missing, stale, or insufficient.
+- Use Docs L1/L2: `@neuledge/context` first with lockfile-routed package/version; Context7 MCP or first-party docs as fallback only when L1 is missing, stale, or insufficient.
 - Use Beads when available for file-changing, delegated, long, or handoff-prone work.
 - Remote push, PR creation, merge, deploy, force-push, and production mutation require repo contract support and current user authorization.
 
@@ -58,5 +58,5 @@ bd close <id>         # Complete work
 
 - Use `bd` for task truth when available.
 - Run quality gates before completion claims.
-- Do not push unless the repo contract and current user authorization allow it.
+- Ordinary commits and ordinary push are allowed after fresh verification/closeout when the repo contract or current user request authorizes delivery. Before push, fetch and stop if remote is ahead/diverged, branch/protected-target is unclear, or uncommitted/staged scope is unsafe. Subagents may commit/push only their assigned branch/worktree when explicitly allowed by task/contract, never directly to protected/base branches.
 <!-- END BEADS INTEGRATION -->

@@ -339,15 +339,22 @@ describe('course bridge service', () => {
         language: 'ru',
         courseSize: 'mini',
         style: 'practical',
-        generationMode: 'automatic',
+        generationMode: 'semi_automatic',
         settings: expect.objectContaining({
           source: 'career_playbook',
           playbookId,
           bridgeVersion: 1,
           includeWebResearch: false,
           includeBusinessContextSources: false,
+          clarifying_questions_enabled: true,
+          clarifying_questions_skipped: false,
           style: 'practical',
         }),
+        sourceDocuments: [
+          expect.objectContaining({
+            filename: 'career-playbook-edited-onboarding-course.md',
+          }),
+        ],
       })
     );
     expect(dependencies.uploadDocument).toHaveBeenCalledTimes(1);
@@ -505,7 +512,23 @@ describe('course bridge service', () => {
         courseDescription: expect.stringContaining('Mission: own platform product outcomes.'),
         targetAudience: 'lead Product Platform',
         courseSize: 'auto',
-        generationMode: 'automatic',
+        generationMode: 'semi_automatic',
+        settings: expect.objectContaining({
+          clarifying_questions_enabled: true,
+          clarifying_questions_skipped: false,
+        }),
+        sourceDocuments: expect.arrayContaining([
+          expect.objectContaining({
+            filename: 'career-playbook-product-lead.md',
+            size: expect.any(Number),
+            type: 'text/markdown',
+          }),
+          expect.objectContaining({
+            filename: 'career-playbook-web-research-product-lead.md',
+            size: expect.any(Number),
+            type: 'text/markdown',
+          }),
+        ]),
       })
     );
     expect(dependencies.uploadDocument).toHaveBeenCalledTimes(2);
@@ -539,7 +562,7 @@ describe('course bridge service', () => {
     expect(dependencies.deleteCourse).toHaveBeenCalledWith(courseId);
   });
 
-  it('rolls back the created course when selected business-context source lookup fails', async () => {
+  it('does not create a course when selected business-context source lookup fails', async () => {
     const { dependencies } = createDependencies({
       listBusinessContextSources: vi.fn(() => Promise.reject(new Error('source list unavailable'))),
     });
@@ -554,12 +577,13 @@ describe('course bridge service', () => {
       code: 'BAD_REQUEST',
     });
 
-    expect(dependencies.deleteCourse).toHaveBeenCalledWith(courseId);
+    expect(dependencies.insertCourse).not.toHaveBeenCalled();
+    expect(dependencies.deleteCourse).not.toHaveBeenCalled();
     expect(dependencies.uploadDocument).not.toHaveBeenCalled();
     expect(dependencies.initiateGeneration).not.toHaveBeenCalled();
   });
 
-  it('rolls back when selected business-context sources have no authoritative evidence', async () => {
+  it('does not create a course when selected business-context sources have no authoritative evidence', async () => {
     const { dependencies } = createDependencies({
       loadPlaybook: vi.fn(() => Promise.resolve(businessContextPlaybook())),
       loadBusinessContextSourceEvidence: vi.fn(() =>
@@ -588,7 +612,8 @@ describe('course bridge service', () => {
       code: 'BAD_REQUEST',
     });
 
-    expect(dependencies.deleteCourse).toHaveBeenCalledWith(courseId);
+    expect(dependencies.insertCourse).not.toHaveBeenCalled();
+    expect(dependencies.deleteCourse).not.toHaveBeenCalled();
     expect(dependencies.uploadDocument).not.toHaveBeenCalled();
     expect(dependencies.initiateGeneration).not.toHaveBeenCalled();
   });
