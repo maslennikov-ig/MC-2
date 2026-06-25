@@ -78,6 +78,7 @@ function chainResult(result: unknown) {
     or: vi.fn(() => chain),
     order: vi.fn(() => Promise.resolve(result)),
     single: vi.fn(() => Promise.resolve(result)),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
   };
   return chain;
 }
@@ -169,7 +170,7 @@ describe('career-playbook library visibility service', () => {
         user_id: owner.id,
         visibility: 'public',
         is_public: true,
-        share_slug: 'menedzher-po-prodazham-000000',
+        share_slug: 'menedzher-po-prodazham',
       },
       error: null,
     });
@@ -177,6 +178,7 @@ describe('career-playbook library visibility service', () => {
       .mockReturnValueOnce(
         chainResult({ data: { ...baseRow, user_id: owner.id, share_slug: null }, error: null })
       )
+      .mockReturnValueOnce(chainResult({ data: null, error: null }))
       .mockReturnValueOnce(update.chain)
       .mockReturnValueOnce(chainResult({ data: { slug: 'mega-campus' }, error: null }));
 
@@ -187,12 +189,12 @@ describe('career-playbook library visibility service', () => {
 
     expect(update.updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        share_slug: expect.stringMatching(/^menedzher-po-prodazham-[a-f0-9]{6}$/),
+        share_slug: 'menedzher-po-prodazham',
       })
     );
     expect(result.visibility).toBe('public');
     expect(result.isPublic).toBe(true);
-    expect(result.shareSlug).toBe('menedzher-po-prodazham-000000');
+    expect(result.shareSlug).toBe('menedzher-po-prodazham');
     expect(result.organizationSlug).toBe('mega-campus');
     expect(result.viewerPermissions.canManageVisibility).toBe(true);
   });
