@@ -441,7 +441,7 @@
     "pdf": "PDF",
     "share": "Поделиться",
     "createCourse": "Создать курс из инструкции",
-    "openCourse": "Перейти в курс",
+    "openCourse": "Посмотреть курс",
     "delete": "Удалить",
     "editBlock": "Редактировать {title}",
     "regenerateBlock": "Сгенерировать заново {title}",
@@ -614,7 +614,7 @@
     },
     "card": {
       "createCourse": "Создать курс из инструкции",
-      "openCourse": "Перейти в курс",
+      "openCourse": "Посмотреть курс",
       "publicBadge": "Публичный",
       "privateBadge": "Приватный",
       "readonlyBadge": "Только чтение",
