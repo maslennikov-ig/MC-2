@@ -29,6 +29,7 @@ import type {
   CareerPlaybookFollowupQuestion,
   CareerPlaybookFollowupResponse,
   CareerPlaybookGenerationProgress,
+  CareerPlaybookLinkedCourse,
   CareerPlaybookPlaybookStatus,
   CareerPlaybookQualityIssue,
   CareerPlaybookVisibility,
@@ -101,6 +102,7 @@ interface CareerPlaybookLibraryDetail {
   viewerPermissions?: CareerPlaybookViewerPermissions
   qualityWarnings?: string[] | null
   qualityIssues?: CareerPlaybookQualityIssue[] | null
+  linkedCourse?: CareerPlaybookLinkedCourse | null
 }
 
 export type CareerPlaybookDepartmentResolutionState =
@@ -1024,7 +1026,33 @@ function normalizeViewerSnapshot(
     },
     qualityWarnings: normalizeQualityWarnings(snapshot.qualityWarnings),
     qualityIssues: normalizeQualityIssues(snapshot.qualityIssues),
+    linkedCourse: normalizeLinkedCourse(snapshot.linkedCourse),
     blocks: { ...snapshot.blocks },
+  }
+}
+
+function normalizeLinkedCourse(raw: unknown): CareerPlaybookLinkedCourse | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const record = raw as Partial<CareerPlaybookLinkedCourse>
+  const id = typeof record.id === 'string' ? record.id.trim() : ''
+  const title = typeof record.title === 'string' ? record.title.trim() : ''
+  const slug = typeof record.slug === 'string' ? record.slug.trim() : ''
+  if (!id || !title || !slug) return null
+
+  return {
+    id,
+    title,
+    slug,
+    organizationSlug:
+      typeof record.organizationSlug === 'string' && record.organizationSlug.trim()
+        ? record.organizationSlug.trim()
+        : null,
+    status: typeof record.status === 'string' && record.status.trim() ? record.status.trim() : null,
+    generationStatus:
+      typeof record.generationStatus === 'string' && record.generationStatus.trim()
+        ? record.generationStatus.trim()
+        : null,
   }
 }
 
@@ -1127,6 +1155,7 @@ function libraryDetailToViewerSnapshot(
     },
     qualityWarnings: normalizeQualityWarnings(detail.qualityWarnings),
     qualityIssues: normalizeQualityIssues(detail.qualityIssues),
+    linkedCourse: normalizeLinkedCourse(detail.linkedCourse),
   }
 }
 

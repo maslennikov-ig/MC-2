@@ -118,6 +118,7 @@ const messages = {
       },
       card: {
         createCourse: 'Create course',
+        openCourse: 'Open course',
         readonlyBadge: 'Read-only',
         share: 'Share',
         copyPublicLink: 'Copy public link',
@@ -440,6 +441,51 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(
       within(generatingCard as HTMLElement).queryByRole('button', { name: 'Create course' })
     ).toBeNull()
+  })
+
+  it('shows an open-course link instead of course creation when a generated course exists', () => {
+    renderPage({
+      initialData: {
+        items: [
+          {
+            id: 'pb-1',
+            title: 'Head of Sales',
+            department: 'sales',
+            level: 'lead',
+            status: 'completed',
+            createdAt: '2026-05-14T10:00:00.000Z',
+            isPublic: false,
+            visibility: 'private',
+            shareSlug: null,
+            ownerId: 'owner-user',
+            viewerPermissions: {
+              canEdit: true,
+              canManageVisibility: true,
+              canCreateCourse: true,
+              canDelete: true,
+            },
+            linkedCourse: {
+              id: 'course-1',
+              title: 'Head of Sales course',
+              slug: 'head-of-sales-course',
+              organizationSlug: 'mega-campus',
+              status: 'draft',
+              generationStatus: 'stage_6_generating',
+            },
+          },
+        ],
+        nextCursor: null,
+        error: null,
+      },
+    })
+
+    const card = screen.getByRole('article')
+
+    expect(within(card).getByRole('link', { name: 'Open course' })).toHaveAttribute(
+      'href',
+      '/en/courses/mega-campus/head-of-sales-course/generating'
+    )
+    expect(within(card).queryByRole('button', { name: 'Create course' })).not.toBeInTheDocument()
   })
 
   it('deletes a guide directly from its card', async () => {
