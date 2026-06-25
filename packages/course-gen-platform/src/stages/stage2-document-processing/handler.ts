@@ -14,7 +14,7 @@
  * @module stages/stage2-document-processing/handler
  */
 
-import { Job } from 'bullmq';
+import { DelayedError, Job } from 'bullmq';
 import { access, constants } from 'fs/promises';
 import { JobType, DocumentProcessingJobData } from '@megacampus/shared-types';
 import { BaseJobHandler } from '../../orchestrator/handlers/base-handler';
@@ -27,6 +27,14 @@ import { ContentPolicyError } from '../../shared/errors/pipeline-errors';
 import { DoclingError, DoclingErrorCode } from './docling/types.js';
 import { getTranslator } from '../../shared/i18n/translator';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import { notifyCourseError } from '../../shared/notifications';
+import {
+  getQdrantRecoveryDecision,
+  isQdrantUploadNonRetryableError,
+  isQdrantUploadRetryableError,
+  type QdrantRecoveryState,
+  type QdrantUploadRetryableError,
+} from './qdrant-recovery-policy';
 
 /**
  * Configuration for ENOENT retry logic
@@ -141,6 +149,22 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
           attemptsMade: job.attemptsMade,
         });
         throw error; // Let BullMQ retry
+      }
+
+      if (isQdrantUploadRetryableError(error)) {
+        const recoveryAction = await this.handleRetryableQdrantFailure(jobData, job, token, error);
+
+        if (recoveryAction === 'delayed') {
+          throw new DelayedError();
+        }
+
+        if (recoveryAction === 'bullmq_retry') {
+          throw error;
+        }
+
+        await this.notifyCourseErrorOnce(courseId, 2, errorMsg);
+      } else if (isQdrantUploadNonRetryableError(error)) {
+        await this.notifyCourseErrorOnce(courseId, 2, errorMsg);
       }
 
       // Permanent errors: update status and return failure
@@ -270,6 +294,146 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private getQdrantRecoveryState(
+    job: Job<DocumentProcessingJobData>
+  ): QdrantRecoveryState | undefined {
+    const recovery = (job.data as Record<string, unknown>).qdrantRecovery;
+    if (!recovery || typeof recovery !== 'object' || Array.isArray(recovery)) {
+      return undefined;
+    }
+
+    const startedAt = (recovery as { startedAt?: unknown }).startedAt;
+    const retryCount = (recovery as { retryCount?: unknown }).retryCount;
+
+    if (typeof startedAt !== 'string') {
+      return undefined;
+    }
+
+    return {
+      startedAt,
+      retryCount: typeof retryCount === 'number' && Number.isFinite(retryCount) ? retryCount : 0,
+    };
+  }
+
+  private async handleRetryableQdrantFailure(
+    jobData: DocumentProcessingJobData,
+    job: Job<DocumentProcessingJobData>,
+    token: string | undefined,
+    error: QdrantUploadRetryableError
+  ): Promise<'delayed' | 'exhausted' | 'bullmq_retry'> {
+    const { fileId, courseId } = jobData;
+
+    if (!token) {
+      this.log(job, 'warn', 'Cannot delay Qdrant recovery because job token is missing', {
+        fileId,
+        courseId,
+        error: error.message,
+      });
+      return 'bullmq_retry';
+    }
+
+    const decision = getQdrantRecoveryDecision(this.getQdrantRecoveryState(job));
+
+    if (decision.action === 'exhausted') {
+      this.log(job, 'error', 'Qdrant recovery window exhausted', {
+        fileId,
+        courseId,
+        retryCount: decision.retryCount,
+        elapsedMs: decision.elapsedMs,
+        windowMs: decision.windowMs,
+        error: error.message,
+      });
+      return 'exhausted';
+    }
+
+    const supabase = getSupabaseAdmin();
+    const nextData = {
+      ...(job.data as Record<string, unknown>),
+      qdrantRecovery: {
+        startedAt: decision.startedAt,
+        retryCount: decision.nextRetryCount,
+        lastError: error.message,
+        lastDelayedAt: new Date().toISOString(),
+        delayUntil: decision.delayUntil,
+      },
+    };
+
+    await job.updateData(nextData as unknown as DocumentProcessingJobData);
+    await job.updateProgress({
+      status: 'delayed',
+      percent: 70,
+      message: 'Ожидаем восстановления векторной базы данных',
+      qdrantRecovery: nextData.qdrantRecovery,
+    });
+
+    try {
+      await supabase
+        .from('file_catalog')
+        .update({
+          vector_status: 'indexing',
+          error_message: `Temporary Qdrant outage, retry scheduled until ${decision.delayUntil}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', fileId);
+
+      await supabase.rpc('update_course_progress', {
+        p_course_id: courseId,
+        p_step_id: 2,
+        p_status: 'in_progress',
+        p_message: 'Ожидаем восстановления векторной базы данных',
+        p_metadata: {
+          job_id: job.id,
+          worker_type: JobType.DOCUMENT_PROCESSING,
+          qdrant_recovery: nextData.qdrantRecovery,
+          retry_after_ms: decision.delayMs,
+          recovery_window_ms: decision.windowMs,
+        },
+      });
+    } catch (progressError) {
+      this.log(job, 'error', 'Failed to persist Qdrant recovery progress metadata', {
+        fileId,
+        courseId,
+        error: progressError instanceof Error ? progressError.message : String(progressError),
+      });
+    }
+
+    this.log(job, 'warn', 'Qdrant temporarily unavailable, delaying document processing job', {
+      fileId,
+      courseId,
+      delayMs: decision.delayMs,
+      delayUntil: decision.delayUntil,
+      retryCount: decision.nextRetryCount,
+      elapsedMs: decision.elapsedMs,
+      windowMs: decision.windowMs,
+      error: error.message,
+    });
+
+    await job.moveToDelayed(Date.parse(decision.delayUntil), token);
+    return 'delayed';
+  }
+
+  private async notifyCourseErrorOnce(
+    courseId: string,
+    stage: number,
+    errorMessage: string
+  ): Promise<void> {
+    try {
+      await notifyCourseError(courseId, stage, errorMessage);
+    } catch (notificationError) {
+      logger.error(
+        {
+          courseId,
+          stage,
+          error:
+            notificationError instanceof Error
+              ? notificationError.message
+              : String(notificationError),
+        },
+        'Failed to send course error notification'
+      );
+    }
   }
 
   /**

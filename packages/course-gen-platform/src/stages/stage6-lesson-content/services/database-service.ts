@@ -9,7 +9,7 @@ import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
 import { sanitizeContent } from '../judge/strip-metadata';
 import { cacheLessonMarkdown } from '../../../shared/cache/file-content-cache';
-import type { SanityCheckResult } from '../utils/sanity-check';
+import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import {
   LessonUUID,
   LessonLabel,
@@ -103,6 +103,43 @@ function getMarkdownFromStoredRow(row: StoredLessonContentRow): string {
   }
 
   return '';
+}
+
+function getStoredSanityCheck(row: StoredLessonContentRow): Record<string, unknown> | null {
+  if (isRecord(row.metadata) && isRecord(row.metadata.sanityCheck)) {
+    return row.metadata.sanityCheck;
+  }
+
+  return null;
+}
+
+function getStoredLessonPublishabilityFailure(row: StoredLessonContentRow): string | null {
+  if (!STAGE6_FULLY_COMPLETED_STATUSES.has(row.status)) {
+    return null;
+  }
+
+  const markdown = getMarkdownFromStoredRow(row);
+  if (markdown.trim().length === 0) {
+    return 'empty markdown content';
+  }
+
+  const storedSanityCheck = getStoredSanityCheck(row);
+  if (storedSanityCheck?.passed === false) {
+    const reason =
+      typeof storedSanityCheck.reason === 'string' ? storedSanityCheck.reason : 'unknown';
+    return `stored sanity check failed: ${reason}`;
+  }
+
+  const sanityResult = quickSanityCheck(markdown);
+  if (!sanityResult.ok) {
+    return `sanity check failed: ${sanityResult.reason ?? 'unknown'}`;
+  }
+
+  return null;
+}
+
+function isStoredLessonPublishable(row: StoredLessonContentRow): boolean {
+  return getStoredLessonPublishabilityFailure(row) === null;
 }
 
 function getLessonLabelFromStoredRow(row: StoredLessonContentRow): string {
@@ -356,6 +393,7 @@ export interface ReviewMarkerContext {
   factualWarnings?: Stage6Output['factualWarnings'];
   qaSignals?: LessonQualitySignals | null;
   qualityRecovery?: Stage6QualityRecoveryHistory;
+  sanityCheck?: SanityCheckResult;
   courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
   suppressAlert?: boolean;
 }
@@ -419,6 +457,14 @@ export async function markForReview(
           qa_signals: context.qaSignals ?? undefined,
           qualityRecovery: context.qualityRecovery ?? undefined,
           qualityRecoveryDisposition: context.qualityRecovery?.final_disposition ?? undefined,
+          sanityCheck: context.sanityCheck
+            ? {
+                passed: context.sanityCheck.ok,
+                reason: context.sanityCheck.reason,
+                charCount: context.sanityCheck.metrics?.charCount,
+                wordCount: context.sanityCheck.metrics?.wordCount,
+              }
+            : undefined,
           courseAuditFindings: context.courseAuditFindings ?? undefined,
         })
       ) as Json,
@@ -493,6 +539,19 @@ export async function saveLessonContent(
   language: string = 'en'
 ): Promise<void> {
   if (!result.lessonContent) return;
+
+  if (sanityResult && !sanityResult.ok) {
+    logger.warn(
+      {
+        courseId,
+        lessonLabel,
+        reason: sanityResult.reason,
+        metrics: sanityResult.metrics,
+      },
+      'Refusing to persist completed lesson content because sanity check failed'
+    );
+    return;
+  }
 
   const supabaseAdmin = getSupabaseAdmin();
 
@@ -959,7 +1018,9 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         terminalLessonsCount++;
       }
       if (STAGE6_FULLY_COMPLETED_STATUSES.has(latestStatus)) {
-        fullyCompletedLessonsCount++;
+        if (isStoredLessonPublishable(latestRow)) {
+          fullyCompletedLessonsCount++;
+        }
       }
     }
 
@@ -978,6 +1039,44 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
     if (terminalLessonsCount >= expectedLessonsCount) {
       let courseAuditBlockedFinalize = false;
       let courseAuditSummary: string | null = null;
+      const invalidCompletedLessons = Array.from(latestRowByLesson.values())
+        .map(row => ({
+          row,
+          reason: getStoredLessonPublishabilityFailure(row),
+        }))
+        .filter((entry): entry is { row: StoredLessonContentRow; reason: string } =>
+          Boolean(entry.reason)
+        );
+
+      if (invalidCompletedLessons.length > 0) {
+        courseAuditBlockedFinalize = true;
+        courseAuditSummary = `not publishable lesson content: ${invalidCompletedLessons
+          .slice(0, 3)
+          .map(entry => `${getLessonLabelFromStoredRow(entry.row)} (${entry.reason})`)
+          .join('; ')}`;
+
+        logger.warn(
+          {
+            courseId,
+            invalidLessons: invalidCompletedLessons.map(entry => ({
+              lessonId: entry.row.lesson_id,
+              lessonLabel: getLessonLabelFromStoredRow(entry.row),
+              reason: entry.reason,
+            })),
+          },
+          'Stage 6 completed rows failed publishability checks'
+        );
+
+        for (const entry of invalidCompletedLessons) {
+          await markForReview(
+            courseId,
+            entry.row.lesson_id as LessonUUID,
+            getLessonLabelFromStoredRow(entry.row) as LessonLabel,
+            `Stage 6 completed content is not publishable: ${entry.reason}`,
+            { suppressAlert: true }
+          );
+        }
+      }
 
       if (
         isStage6CourseAuditEnabled() &&

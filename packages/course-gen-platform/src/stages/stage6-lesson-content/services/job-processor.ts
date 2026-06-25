@@ -1155,29 +1155,43 @@ export async function processStage6Job(
     const needsReview = result.reviewInfo?.needsReview === true;
 
     let sanityResult: SanityCheckResult = { ok: true };
+    let sanityReviewReason: string | null = null;
     if (result.lessonContent) {
       const markdown = extractContentMarkdown(result.lessonContent, language);
       sanityResult = quickSanityCheck(markdown);
 
       if (!sanityResult.ok) {
+        sanityReviewReason = `Stage 6 sanity check failed: ${sanityResult.reason ?? 'unknown'}`;
         jobLogger.warn(
           {
             reason: sanityResult.reason,
             metrics: sanityResult.metrics,
             qualityScore: result.metrics.qualityScore,
           },
-          'Content failed sanity check (non-blocking warning)'
+          'Content failed sanity check; marking lesson for review'
         );
       } else {
         jobLogger.debug({ metrics: sanityResult.metrics }, 'Content passed sanity check');
       }
     }
 
+    const sanityNeedsReview = Boolean(result.lessonContent && sanityReviewReason);
+    const effectiveNeedsReview = needsReview || sanityNeedsReview;
+    const effectiveReviewInfo = sanityNeedsReview
+      ? {
+          needsReview: true as const,
+          reasons: [
+            sanityReviewReason!,
+            ...(result.reviewInfo?.reasons?.filter(reason => reason !== sanityReviewReason) ?? []),
+          ],
+        }
+      : result.reviewInfo;
+
     await updateJobProgress(job, {
       lessonId: lessonSpec.lesson_id,
       phase: 'complete',
       progress: 100,
-      message: needsReview
+      message: effectiveNeedsReview
         ? 'Generation complete (review required)'
         : result.success
           ? 'Generation complete'
@@ -1185,8 +1199,28 @@ export async function processStage6Job(
       tokensUsed: result.metrics.tokensUsed,
     });
 
-    if (needsReview) {
-      if (lessonUuid && result.lessonContent) {
+    if (effectiveNeedsReview) {
+      if (sanityNeedsReview && lessonUuid) {
+        await markForReview(courseId, lessonUuid, lessonLabel, sanityReviewReason!, {
+          modelUsed: result.metrics.modelUsed,
+          selectedModel: result.metrics.selectedModel,
+          fallbackModel: result.metrics.fallbackModel,
+          selectedModelTier: result.metrics.selectedModelTier,
+          selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase,
+          selectedModelSource: result.metrics.selectedModelSource,
+          regenerateCount: result.metrics.regenerateCount,
+          truncationCount: result.metrics.truncationCount,
+          rejectedTokens: result.metrics.rejectedTokens,
+          regenerationMode: result.metrics.regenerationMode ?? null,
+          reviewInfo: effectiveReviewInfo,
+          factualWarnings: result.factualWarnings,
+          qaSignals: result.lessonContent?.metadata?.qa_signals ?? null,
+          qualityRecovery: result.qualityRecovery,
+          sanityCheck: sanityResult,
+        });
+        runCompletionCheck();
+      } else if (lessonUuid && result.lessonContent) {
         await handlePartialSuccess(
           job.id ?? 'unknown',
           courseId,
@@ -1214,10 +1248,11 @@ export async function processStage6Job(
             truncationCount: result.metrics.truncationCount,
             rejectedTokens: result.metrics.rejectedTokens,
             regenerationMode: result.metrics.regenerationMode ?? null,
-            reviewInfo: result.reviewInfo,
+            reviewInfo: effectiveReviewInfo,
             factualWarnings: result.factualWarnings,
-            qaSignals: result.lessonContent?.metadata.qa_signals ?? null,
+            qaSignals: result.lessonContent?.metadata?.qa_signals ?? null,
             qualityRecovery: result.qualityRecovery,
+            sanityCheck: sanityNeedsReview ? sanityResult : undefined,
           }
         );
         runCompletionCheck();
@@ -1247,7 +1282,7 @@ export async function processStage6Job(
       }
     }
 
-    if (!needsReview && result.success && result.lessonContent) {
+    if (!effectiveNeedsReview && result.success && result.lessonContent) {
       await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult, language);
 
       // Save source documents attribution for traceability
@@ -1275,9 +1310,9 @@ export async function processStage6Job(
         regenerateCount: result.metrics.regenerateCount,
         truncationCount: result.metrics.truncationCount,
         rejectedTokens: result.metrics.rejectedTokens,
-        reviewRequired: needsReview,
+        reviewRequired: effectiveNeedsReview,
         hasPartialContent:
-          result.lessonContent !== null && (result.errors.length > 0 || needsReview),
+          result.lessonContent !== null && (result.errors.length > 0 || effectiveNeedsReview),
       },
       'Stage 6 job processed'
     );

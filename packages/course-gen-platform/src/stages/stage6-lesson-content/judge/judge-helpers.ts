@@ -4,9 +4,83 @@ import type {
   LessonContentBody,
   LessonQualitySignals,
 } from '@megacampus/shared-types/lesson-content';
+import { validateLessonContentBody } from '@megacampus/shared-types/lesson-content';
 import { logger } from '@/shared/logger';
 import { safeJSONParse } from '@/shared/workspace-utils';
 import { parseMarkdownContent } from '../utils/markdown-parser';
+
+type LessonContentBodyValidationResult = ReturnType<typeof validateLessonContentBody>;
+
+function validatedContentBody(value: unknown, source: string): LessonContentBody | null {
+  const parsed: LessonContentBodyValidationResult = validateLessonContentBody(value);
+  if (parsed.success) {
+    return parsed.data;
+  }
+
+  logger.warn(
+    {
+      source,
+      issues: parsed.error.issues.map(issue => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    },
+    'Rejected invalid LessonContentBody'
+  );
+  return null;
+}
+
+function isJsonLikeContent(value: string): boolean {
+  const trimmed = value.trim();
+  const fencedJson = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const candidate = fencedJson ? fencedJson[1].trim() : trimmed;
+  return candidate.startsWith('{') || candidate.startsWith('[');
+}
+
+function parseMarkdownContentBody(markdown: string): LessonContentBody | null {
+  const parsedMarkdown = parseMarkdownContent(markdown);
+
+  if (parsedMarkdown.sections.length === 0) {
+    logger.warn(
+      {
+        title: parsedMarkdown.title,
+        wordCount: parsedMarkdown.wordCount,
+        headingCount: parsedMarkdown.headingStructure.length,
+      },
+      'Markdown parsed but no sections extracted'
+    );
+    return null;
+  }
+
+  const contentBody: LessonContentBody = {
+    intro: parsedMarkdown.introduction || parsedMarkdown.summary || '',
+    sections: parsedMarkdown.sections,
+    examples: [],
+    exercises: parsedMarkdown.exercises.map(exerciseText => ({
+      question: exerciseText,
+      solution: 'См. содержание урока для получения рекомендаций.',
+      hints: [],
+    })),
+  };
+
+  const validated = validatedContentBody(contentBody, 'generatedContent.markdown');
+  if (!validated) {
+    return null;
+  }
+
+  logger.info(
+    {
+      title: parsedMarkdown.title,
+      sectionsCount: validated.sections.length,
+      exercisesCount: validated.exercises.length,
+      introLength: validated.intro.length,
+      wordCount: parsedMarkdown.wordCount,
+    },
+    'Successfully parsed markdown to LessonContentBody'
+  );
+
+  return validated;
+}
 
 /**
  * Extract LessonContentBody from state
@@ -15,7 +89,7 @@ import { parseMarkdownContent } from '../utils/markdown-parser';
 export function extractContentBody(state: LessonGraphStateType): LessonContentBody | null {
   // Primary path: use lessonContent.content from generator node
   if (state.lessonContent?.content) {
-    return state.lessonContent.content;
+    return validatedContentBody(state.lessonContent.content, 'state.lessonContent.content');
   }
 
   // Fallback: if lessonContent not available but generatedContent exists
@@ -26,80 +100,34 @@ export function extractContentBody(state: LessonGraphStateType): LessonContentBo
 
   try {
     // If generatedContent is already parsed, validate structure before casting
-    if (
-      typeof state.generatedContent === 'object' &&
-      state.generatedContent !== null &&
-      !Array.isArray(state.generatedContent) &&
-      'intro' in state.generatedContent &&
-      'sections' in state.generatedContent
-    ) {
-      return state.generatedContent as LessonContentBody;
+    if (typeof state.generatedContent === 'object' && state.generatedContent !== null) {
+      return validatedContentBody(state.generatedContent, 'state.generatedContent');
     }
 
-    // Try to parse JSON from string (for backward compatibility)
-    // safeJSONParse handles markdown code blocks, thinking tags, and JSON repair
-    const parsed = safeJSONParse(state.generatedContent);
-    if (parsed && typeof parsed === 'object') {
-      const body = parsed as LessonContentBody;
-      if (!Array.isArray(body.sections)) {
-        body.sections = [];
-      }
-      if (!Array.isArray(body.examples)) {
-        body.examples = [];
-      }
-      if (!Array.isArray(body.exercises)) {
-        body.exercises = [];
-      }
-      if (!body.intro) {
-        body.intro = '';
-      }
-      return body;
-    }
-    return null;
-  } catch {
-    // JSON parsing failed, try markdown parser
-    logger.debug('Failed to parse JSON, trying markdown parser');
-
-    // NEW: Parse markdown content using the markdown parser
-    // This is the primary path for the new generator node which outputs markdown
-    const parsedMarkdown = parseMarkdownContent(state.generatedContent);
-
-    if (parsedMarkdown.sections.length === 0) {
-      logger.warn(
-        {
-          title: parsedMarkdown.title,
-          wordCount: parsedMarkdown.wordCount,
-          headingCount: parsedMarkdown.headingStructure.length,
-        },
-        'Markdown parsed but no sections extracted'
-      );
+    if (typeof state.generatedContent !== 'string') {
       return null;
     }
 
-    // Convert ParsedMarkdown to LessonContentBody
-    const contentBody: LessonContentBody = {
-      intro: parsedMarkdown.introduction || parsedMarkdown.summary || '',
-      sections: parsedMarkdown.sections,
-      examples: [], // Markdown doesn't have structured examples
-      exercises: parsedMarkdown.exercises.map(exerciseText => ({
-        question: exerciseText,
-        solution: 'См. содержание урока для получения рекомендаций.',
-        hints: [],
-      })),
-    };
+    const generatedContent = state.generatedContent.trim();
+    if (!generatedContent) return null;
 
-    logger.info(
-      {
-        title: parsedMarkdown.title,
-        sectionsCount: contentBody.sections.length,
-        exercisesCount: contentBody.exercises.length,
-        introLength: contentBody.intro.length,
-        wordCount: parsedMarkdown.wordCount,
-      },
-      'Successfully parsed markdown to LessonContentBody'
-    );
+    if (isJsonLikeContent(generatedContent)) {
+      try {
+        // safeJSONParse handles markdown code blocks, thinking tags, and JSON repair.
+        const parsed = safeJSONParse(generatedContent);
+        const validated = validatedContentBody(parsed, 'state.generatedContent.json');
+        if (validated) {
+          return validated;
+        }
+      } catch {
+        logger.debug('Failed to parse generatedContent as JSON, trying markdown parser');
+      }
+    }
 
-    return contentBody;
+    return parseMarkdownContentBody(generatedContent);
+  } catch {
+    logger.warn('Failed to extract LessonContentBody from graph state');
+    return null;
   }
 }
 

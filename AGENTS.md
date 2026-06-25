@@ -60,6 +60,7 @@ Typical code-change gates in this repo include:
 - The project-local Codex `PreToolUse` hook that runs `graphify hook-check` is allowed for Bash reminders.
 - Do not install Graphify git hooks or configure external semantic/model backends unless explicitly asked.
 - During closeout, record `graph-reviewed: used`, `graph-reviewed: updated`, `graph-reviewed: no-change-needed`, or `graph-reviewed: blocked`.
+- Graphify refresh policy: read-only audits only read/query; after code/docs/architecture/durable workflow changes, refresh the local graph during closeout when ownership/worktree state is safe, otherwise record `graph-reviewed: blocked` or `graph-reviewed: no-change-needed` with a concrete reason. Do not use external semantic/model/API modes or Graphify git hooks without explicit approval.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 

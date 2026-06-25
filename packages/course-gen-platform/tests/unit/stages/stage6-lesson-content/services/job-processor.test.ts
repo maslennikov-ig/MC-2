@@ -196,6 +196,7 @@ import {
   processWithFallback,
   processStage6Job,
 } from '@/stages/stage6-lesson-content/services/job-processor';
+import { quickSanityCheck } from '@/stages/stage6-lesson-content/utils/sanity-check';
 import type { Job } from 'bullmq';
 import type {
   Stage6JobInput,
@@ -651,6 +652,36 @@ describe('stage6/services/job-processor', () => {
       expect(result.success).toBe(true);
       expect(result.lessonId).toBe('1.1');
       expect(result.metrics.tokensUsed).toBe(5000);
+    });
+
+    it('marks successful content for review instead of saving when sanity check fails', async () => {
+      vi.mocked(quickSanityCheck).mockReturnValueOnce({
+        ok: false,
+        reason: 'EMPTY_OR_NEAR_EMPTY',
+        metrics: { charCount: 0, wordCount: 0, hasHeadings: false },
+      });
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce(createSuccessOutput());
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(true);
+      expect(mockSaveLessonContent).not.toHaveBeenCalled();
+      expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
+      expect(mockMarkForReview).toHaveBeenCalledTimes(1);
+      expect(mockMarkForReview).toHaveBeenCalledWith(
+        'course-uuid',
+        'lesson-uuid-123',
+        '1.1',
+        expect.stringContaining('Stage 6 sanity check failed: EMPTY_OR_NEAR_EMPTY'),
+        expect.objectContaining({
+          modelUsed: 'test-primary-model',
+          reviewInfo: expect.objectContaining({
+            needsReview: true,
+            reasons: [expect.stringContaining('EMPTY_OR_NEAR_EMPTY')],
+          }),
+        })
+      );
+      expect(mockCheckAndSetStage6Complete).toHaveBeenCalledTimes(1);
     });
 
     it('stops the ladder immediately when the initial rung is accepted', async () => {

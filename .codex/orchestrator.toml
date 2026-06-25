@@ -40,7 +40,7 @@ ask_before = [
 
 [handoff]
 mode = "current_state_plus_stages"
-current_state_max_lines = 45
+current_state_max_lines = 200
 legacy_archive_dir = ".codex/agent-reports"
 
 [artifacts]
@@ -103,6 +103,7 @@ git_hooks_allowed = false
 codex_pre_tool_use_hook = true
 codex_pre_tool_use_command = "/home/me/.local/bin/graphify hook-check"
 closeout_marker = "graph-reviewed"
+refresh_policy = "read-only uses/query only; after code/docs/architecture/durable workflow changes refresh local graph during closeout when safe; otherwise graph-reviewed blocked/no-change-needed"
 
 [delivery]
 dev_branch = "develop"

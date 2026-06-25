@@ -185,25 +185,30 @@ keeps source boundaries in the synthetic markdown source, and returns structured
 availability metadata for bridge gating. Explicit business-context opt-in
 requires `hasAuthoritativeEvidence = true`. If the selected sources are missing,
 still processing, unavailable, or load as warning-only text, course creation
-fails with a user-visible error and the draft course is rolled back.
+fails with a user-visible error before the draft course is created.
 
 Bridge sources are still trusted generated markdown and keep
 `markdown_content` and `processed_content` populated for the downstream course
 pipeline, with `summary_metadata.source = 'career_playbook_bridge'`. They still
 enter Stage 2 so the course pipeline can index/vectorize the source consistently,
 but the source is not a user-facing Markdown review gate in the bridge flow.
-Bridge course creation sets `generation_mode = 'automatic'`; when there is only
-one source document, Stage 3 assigns it `CORE` and proceeds without manual
-prioritization. They now reserve organization storage quota before writing the
-source file, release it if the write or `file_catalog` insert fails, and release
-quota during bridge course rollback after the course delete succeeds. If course
-rollback delete fails, the files and quota are left intact because database
-ownership may still exist.
+Bridge course creation sets `generation_mode = 'semi_automatic'` and
+`settings.clarifying_questions_enabled = true` so Stage 4 asks the user
+course-level clarifying questions even when the source is a completed Role
+Guide. When there is only one source document, Stage 3 can still assign it
+`CORE` without manual prioritization. Bridge progress metadata records the
+synthetic Markdown source filenames, sizes, and `text/markdown` type so document
+processing status can show which bridge document was processed. The bridge
+reserves organization storage quota before writing the source file, releases it
+if the write or `file_catalog` insert fails, and releases quota during bridge
+course rollback after the course delete succeeds. If course rollback delete
+fails, the files and quota are left intact because database ownership may still
+exist.
 
-The created course stores `course_size`, `style`, and the automatic generation
-mode from the preview payload so Stage 4-6 generation sees the same controls as
-a normal `/create` course without extra review clicks for obvious single-source
-steps.
+The created course stores `course_size`, `style`, and the semi-automatic
+generation mode from the preview payload so Stage 4-6 generation sees the same
+controls as a normal `/create` course while preserving the course-level
+clarifying-question step.
 
 Career Playbook bridge courses use the `role_playbook_bridge` structure profile
 in Stage 4/5 auto-size generation. The profile targets 18-24 lessons, allows at
