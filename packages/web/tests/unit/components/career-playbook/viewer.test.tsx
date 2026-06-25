@@ -99,6 +99,13 @@ const ruViewerCopy = {
   exitReadingMode: 'Выйти из режима чтения',
   inspectorLabel: 'Инспектор документа',
   inspectorTitle: 'Инспектор документа',
+  inspectorWarningsTitle: 'Предупреждения качества',
+  inspectorWarningsDescription: 'Проверьте проблемные разделы перед публикацией.',
+  qualityIssueOpenBlock: 'Открыть блок',
+  qualityIssueEditBlock: 'Редактировать',
+  qualityIssueRegenerateBlock: 'Перегенерировать',
+  qualityIssueSuggestionLabel: 'Что исправить',
+  qualityIssueLegacyTitle: 'Системное предупреждение',
   visibilityLabel: 'Видимость',
   visibilityValueLabel: (visibility: string) =>
     visibility === 'organization'
@@ -415,7 +422,58 @@ describe('Career Playbook viewer components', () => {
     }
   })
 
-  it('shows generation quality warnings in the inspector rail', () => {
+  it('groups structured quality issues by block and exposes block actions', async () => {
+    const user = userEvent.setup()
+    const handleEdit = vi.fn()
+    const handleRegenerate = vi.fn()
+
+    render(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          qualityIssues: [
+            {
+              id: 'judge:block_2:anti-goals',
+              source: 'cross_block_judge',
+              severity: 'critical',
+              blockId: 'block_2',
+              title: 'Недостаточно анти-целей',
+              message: 'В разделе перечислено только 2 анти-цели.',
+              suggestion: 'Добавьте минимум 4 конкретные анти-цели с владельцами.',
+              action: 'regenerate',
+            },
+          ],
+        }}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onEditBlock={handleEdit}
+        onRegenerateBlock={handleRegenerate}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    expect(within(inspector).getByText('Предупреждения качества')).toBeInTheDocument()
+    expect(within(inspector).getByText('Что не входит в роль')).toBeInTheDocument()
+    expect(within(inspector).getByText('Недостаточно анти-целей')).toBeInTheDocument()
+    expect(
+      within(inspector).getByText('В разделе перечислено только 2 анти-цели.')
+    ).toBeInTheDocument()
+    expect(
+      within(inspector).getByText('Добавьте минимум 4 конкретные анти-цели с владельцами.')
+    ).toBeInTheDocument()
+
+    await user.click(within(inspector).getByRole('button', { name: 'Редактировать' }))
+    expect(handleEdit).toHaveBeenCalledWith('block_2')
+
+    await user.click(within(inspector).getByRole('button', { name: 'Перегенерировать' }))
+    expect(handleRegenerate).toHaveBeenCalledWith('block_2')
+  })
+
+  it('still renders legacy generation quality warning strings in the inspector rail', () => {
     render(
       <PlaybookViewer
         snapshot={{
@@ -436,7 +494,7 @@ describe('Career Playbook viewer components', () => {
     )
 
     const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
-    expect(within(inspector).getByText('Предупреждения качества')).toBeInTheDocument()
+    expect(within(inspector).getAllByText('Системное предупреждение').length).toBeGreaterThan(0)
     expect(
       within(inspector).getByText(/crossBlockJudge degraded to deterministic checks/)
     ).toBeInTheDocument()

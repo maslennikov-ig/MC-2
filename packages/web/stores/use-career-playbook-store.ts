@@ -30,6 +30,7 @@ import type {
   CareerPlaybookFollowupResponse,
   CareerPlaybookGenerationProgress,
   CareerPlaybookPlaybookStatus,
+  CareerPlaybookQualityIssue,
   CareerPlaybookVisibility,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookViewerPermissions,
@@ -99,6 +100,7 @@ interface CareerPlaybookLibraryDetail {
   ownerId?: string | null
   viewerPermissions?: CareerPlaybookViewerPermissions
   qualityWarnings?: string[] | null
+  qualityIssues?: CareerPlaybookQualityIssue[] | null
 }
 
 export type CareerPlaybookDepartmentResolutionState =
@@ -1021,6 +1023,7 @@ function normalizeViewerSnapshot(
       canDelete: true,
     },
     qualityWarnings: normalizeQualityWarnings(snapshot.qualityWarnings),
+    qualityIssues: normalizeQualityIssues(snapshot.qualityIssues),
     blocks: { ...snapshot.blocks },
   }
 }
@@ -1032,6 +1035,44 @@ function normalizeQualityWarnings(warnings: unknown): string[] {
   )
     .map((warning) => warning.trim())
     .filter(Boolean)
+}
+
+function normalizeQualityIssues(issues: unknown): CareerPlaybookQualityIssue[] {
+  if (!Array.isArray(issues)) return []
+  const normalized: CareerPlaybookQualityIssue[] = []
+  const seen = new Set<string>()
+
+  for (const issue of issues) {
+    if (!issue || typeof issue !== 'object' || Array.isArray(issue)) continue
+    const candidate = issue as Partial<CareerPlaybookQualityIssue>
+    if (
+      typeof candidate.id !== 'string' ||
+      candidate.id.trim().length === 0 ||
+      typeof candidate.source !== 'string' ||
+      typeof candidate.severity !== 'string' ||
+      typeof candidate.title !== 'string' ||
+      typeof candidate.message !== 'string' ||
+      typeof candidate.action !== 'string'
+    ) {
+      continue
+    }
+    if (seen.has(candidate.id)) continue
+    normalized.push({
+      id: candidate.id,
+      source: candidate.source,
+      severity: candidate.severity,
+      ...(typeof candidate.blockId === 'string' ? { blockId: candidate.blockId } : {}),
+      title: candidate.title,
+      message: candidate.message,
+      ...(typeof candidate.suggestion === 'string' && candidate.suggestion.trim().length > 0
+        ? { suggestion: candidate.suggestion.trim() }
+        : {}),
+      action: candidate.action,
+    })
+    seen.add(candidate.id)
+  }
+
+  return normalized
 }
 
 function extractMarkdownTitle(markdown: string | null | undefined): string | null {
@@ -1085,6 +1126,7 @@ function libraryDetailToViewerSnapshot(
       canDelete: true,
     },
     qualityWarnings: normalizeQualityWarnings(detail.qualityWarnings),
+    qualityIssues: normalizeQualityIssues(detail.qualityIssues),
   }
 }
 

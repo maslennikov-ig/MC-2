@@ -1,10 +1,10 @@
 import { TRPCError } from '@trpc/server';
-import { randomUUID } from 'node:crypto';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookNumericFact,
   CareerPlaybookPlaybookStatus,
+  CareerPlaybookQualityIssue,
   CareerPlaybookVisibility,
   CareerPlaybookViewerPermissions,
   Language,
@@ -82,6 +82,7 @@ export interface CareerPlaybookLibraryDetailResponse extends CareerPlaybookLibra
   generatedBlocks: Record<string, CareerPlaybookBlockState>;
   finalMarkdown: string | null;
   qualityWarnings: string[];
+  qualityIssues: CareerPlaybookQualityIssue[];
 }
 
 export interface CareerPlaybookPublicShareResponse extends CareerPlaybookLibraryItem {
@@ -203,13 +204,62 @@ function getViewerPermissions(
   return isOwner(row, user) ? { ...OWNER_PERMISSIONS } : { ...READONLY_PERMISSIONS };
 }
 
-function buildShareSlug(positionTitle: string | null | undefined): string {
-  const suffix = randomUUID().replaceAll('-', '').slice(0, 6);
-  return buildSlug(positionTitle?.trim() || 'role-guide', suffix);
+function buildShareSlugBase(positionTitle: string | null | undefined): string {
+  const slug = buildSlug(positionTitle?.trim() || 'role-guide');
+  return slug === 'course' ? 'role-guide' : slug;
+}
+
+function shareSlugSuffixFromId(playbookId: string): string {
+  return (
+    playbookId
+      .replace(/[^a-f0-9]/gi, '')
+      .slice(0, 6)
+      .toLowerCase() || 'role'
+  );
 }
 
 function isLegacyShareSlug(shareSlug: string | null): boolean {
   return Boolean(shareSlug?.match(/^cp-[a-f0-9]{24,32}$/i));
+}
+
+async function shareSlugBelongsToAnotherPlaybook(
+  candidate: string,
+  playbookId: string
+): Promise<boolean> {
+  const supabase = getCareerPlaybookSupabase();
+  const { data, error } = await supabase
+    .from('career_playbooks')
+    .select('id')
+    .eq('share_slug', candidate)
+    .maybeSingle();
+
+  if (error) throwOnDbError(error, 'Failed to check Career Playbook share slug');
+  return Boolean(data && data.id !== playbookId);
+}
+
+async function buildUniqueShareSlug(row: CareerPlaybookRow): Promise<string> {
+  const baseSlug = buildShareSlugBase(row.position_title);
+  if (!(await shareSlugBelongsToAnotherPlaybook(baseSlug, row.id))) {
+    return baseSlug;
+  }
+
+  const suffix = shareSlugSuffixFromId(row.id);
+  const suffixed = buildSlug(baseSlug, suffix);
+  if (!(await shareSlugBelongsToAnotherPlaybook(suffixed, row.id))) {
+    return suffixed;
+  }
+
+  for (let index = 2; index <= 9; index += 1) {
+    const candidate = buildSlug(baseSlug, `${suffix}${index}`);
+    if (!(await shareSlugBelongsToAnotherPlaybook(candidate, row.id))) {
+      return candidate;
+    }
+  }
+
+  throw new TRPCError({
+    code: 'CONFLICT',
+    message: 'Unable to allocate a unique Career Playbook share slug',
+  });
 }
 
 async function loadOrganizationSlug(
@@ -440,6 +490,7 @@ function mapRowToLibraryDetail(
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown,
     qualityWarnings: qaData.generation_warnings,
+    qualityIssues: qaData.quality_issues,
   };
 }
 
@@ -756,7 +807,7 @@ export async function updateCareerPlaybookVisibility(
   if (isPublic) assertShareable(row);
   const shareSlug =
     isPublic && (!row.share_slug || isLegacyShareSlug(row.share_slug))
-      ? buildShareSlug(row.position_title)
+      ? await buildUniqueShareSlug(row)
       : row.share_slug;
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase

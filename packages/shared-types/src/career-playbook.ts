@@ -351,6 +351,44 @@ export type CareerPlaybookGenerationProgress = z.infer<
   typeof CareerPlaybookGenerationProgressSchema
 >;
 
+export const CareerPlaybookBlockIdSchema = z.union([
+  z.literal('header'),
+  z.string().regex(/^block_([1-9]|1[0-9]|2[0-6])$/, 'Expected header or block_1 through block_26'),
+]);
+export type CareerPlaybookBlockId = z.infer<typeof CareerPlaybookBlockIdSchema>;
+
+export const CareerPlaybookQualityIssueSourceSchema = z.enum([
+  'cross_block_judge',
+  'block_regenerator',
+  'mermaid',
+  'system',
+]);
+export type CareerPlaybookQualityIssueSource = z.infer<
+  typeof CareerPlaybookQualityIssueSourceSchema
+>;
+
+export const CareerPlaybookQualityIssueActionSchema = z.enum([
+  'review',
+  'edit',
+  'regenerate',
+  'none',
+]);
+export type CareerPlaybookQualityIssueAction = z.infer<
+  typeof CareerPlaybookQualityIssueActionSchema
+>;
+
+export const CareerPlaybookQualityIssueSchema = z.object({
+  id: z.string().min(1),
+  source: CareerPlaybookQualityIssueSourceSchema,
+  severity: z.enum(['critical', 'warning', 'info']),
+  blockId: CareerPlaybookBlockIdSchema.optional(),
+  title: z.string().min(1),
+  message: z.string().min(1),
+  suggestion: z.string().min(1).optional(),
+  action: CareerPlaybookQualityIssueActionSchema,
+});
+export type CareerPlaybookQualityIssue = z.infer<typeof CareerPlaybookQualityIssueSchema>;
+
 export const CareerPlaybookQADataSchema = z.object({
   fixed: z.array(CareerPlaybookFixedAnswerSchema).default([]),
   followups: z.array(CareerPlaybookFollowupAnswerSchema).default([]),
@@ -365,14 +403,9 @@ export const CareerPlaybookQADataSchema = z.object({
   ui_progress: CareerPlaybookWizardProgressSchema.optional(),
   generation_progress: CareerPlaybookGenerationProgressSchema.optional(),
   generation_warnings: z.array(z.string().min(1)).default([]),
+  quality_issues: z.array(CareerPlaybookQualityIssueSchema).default([]),
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
-
-export const CareerPlaybookBlockIdSchema = z.union([
-  z.literal('header'),
-  z.string().regex(/^block_([1-9]|1[0-9]|2[0-6])$/, 'Expected header or block_1 through block_26'),
-]);
-export type CareerPlaybookBlockId = z.infer<typeof CareerPlaybookBlockIdSchema>;
 
 export const CareerPlaybookJudgeIssueSchema = z.object({
   block_id: CareerPlaybookBlockIdSchema,
@@ -675,6 +708,7 @@ export interface CareerPlaybookViewerSnapshot {
   thinkingStream?: string | null;
   currentGenerationGroup?: string | null;
   qualityWarnings?: string[];
+  qualityIssues?: CareerPlaybookQualityIssue[];
 }
 
 export const CareerPlaybookNodeCostSchema = z.object({

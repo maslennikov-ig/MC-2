@@ -1,9 +1,11 @@
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
+import { remediateCareerPlaybookMermaidBlocks } from './mermaid-quality';
 
 export const CAREER_PLAYBOOK_FINAL_BLOCK_ORDER: CareerPlaybookBlockId[] = [
   'header',
@@ -25,6 +27,11 @@ interface RequiredMermaidSection {
 export interface AssembleCareerPlaybookFinalMarkdownInput {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   roleProfileSpec?: CareerPlaybookRoleProfileSpec;
+}
+
+export interface PrepareCareerPlaybookFinalBlocksResult {
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
+  qualityIssues: CareerPlaybookQualityIssue[];
 }
 
 function resolveContentLanguage(roleProfileSpec?: CareerPlaybookRoleProfileSpec): 'en' | 'ru' {
@@ -323,6 +330,13 @@ export function prepareCareerPlaybookFinalBlocks(
   return ensureRequiredMermaidSections(normalizedBlocks, input.roleProfileSpec);
 }
 
+export async function prepareCareerPlaybookFinalBlocksWithQuality(
+  input: AssembleCareerPlaybookFinalMarkdownInput
+): Promise<PrepareCareerPlaybookFinalBlocksResult> {
+  const blocksWithDiagrams = prepareCareerPlaybookFinalBlocks(input);
+  return remediateCareerPlaybookMermaidBlocks(blocksWithDiagrams);
+}
+
 function joinCareerPlaybookFinalBlocks(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): string {
@@ -340,17 +354,18 @@ export function assembleCareerPlaybookFinalMarkdown(
 }
 
 export function createFinalAssemblerNode() {
-  return function finalAssemblerNode(
+  return async function finalAssemblerNode(
     state: CareerPlaybookGraphStateType
-  ): CareerPlaybookGraphStateUpdate {
+  ): Promise<CareerPlaybookGraphStateUpdate> {
     try {
-      const generatedBlocks = prepareCareerPlaybookFinalBlocks({
+      const { generatedBlocks, qualityIssues } = await prepareCareerPlaybookFinalBlocksWithQuality({
         generatedBlocks: state.generatedBlocks,
         roleProfileSpec: state.roleProfileSpec ?? undefined,
       });
 
       return {
         generatedBlocks,
+        ...(qualityIssues.length > 0 ? { qualityIssues } : {}),
         finalMarkdown: joinCareerPlaybookFinalBlocks(generatedBlocks),
         currentNode: 'finalAssembler',
       };

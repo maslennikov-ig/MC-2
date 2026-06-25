@@ -3,11 +3,16 @@ import {
   CareerPlaybookGenerationProgressSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookOperationJobDataSchema,
+  CareerPlaybookBlockIdSchema,
+  CareerPlaybookQualityIssueSchema,
   type CareerPlaybookCostBreakdown,
+  type CareerPlaybookBlockId,
+  type CareerPlaybookBlockState,
   type CareerPlaybookGenerationProgress,
   type CareerPlaybookGenerateFollowupsJobData,
   type CareerPlaybookGeneratePlaybookJobData,
   type CareerPlaybookJobData,
+  type CareerPlaybookQualityIssue,
   type CareerPlaybookProcessSourceJobData,
   type CareerPlaybookRegenerateBlockJobData,
 } from '@megacampus/shared-types';
@@ -37,6 +42,7 @@ type CareerPlaybookGraphResult = {
   costBreakdown?: CareerPlaybookCostBreakdown | null;
   nodeCosts?: CareerPlaybookCostBreakdown['nodeCosts'];
   warnings?: string[];
+  qualityIssues?: unknown;
 };
 
 function toJson(value: unknown): unknown {
@@ -67,6 +73,151 @@ function normalizeGenerationWarnings(warnings: unknown): string[] {
         .map(warning => warning.trim())
         .filter(Boolean)
     )
+  );
+}
+
+function normalizeQualityIssues(issues: unknown): CareerPlaybookQualityIssue[] {
+  if (!Array.isArray(issues)) return [];
+
+  const normalized: CareerPlaybookQualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of issues) {
+    const parsed = CareerPlaybookQualityIssueSchema.safeParse(issue);
+    if (!parsed.success || seen.has(parsed.data.id)) continue;
+    normalized.push(parsed.data);
+    seen.add(parsed.data.id);
+  }
+
+  return normalized;
+}
+
+function maybeBlockId(value: unknown): CareerPlaybookBlockId | undefined {
+  const parsed = CareerPlaybookBlockIdSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function asGeneratedBlocks(
+  value: unknown
+): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const result: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> = {};
+  for (const [rawBlockId, rawBlock] of Object.entries(value)) {
+    const blockId = maybeBlockId(rawBlockId);
+    if (!blockId || !rawBlock || typeof rawBlock !== 'object' || Array.isArray(rawBlock)) continue;
+    result[blockId] = rawBlock as CareerPlaybookBlockState;
+  }
+
+  return result;
+}
+
+function qualityIssueTitleForSeverity(severity: CareerPlaybookQualityIssue['severity']): string {
+  if (severity === 'critical') return 'Проблема качества блока';
+  if (severity === 'warning') return 'Замечание к качеству блока';
+  return 'Информационное замечание';
+}
+
+function issueId(
+  source: string,
+  blockId: CareerPlaybookBlockId | undefined,
+  index: number
+): string {
+  return `${source}:${blockId ?? 'system'}:${index}`;
+}
+
+function collectJudgeQualityIssues(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookQualityIssue[] {
+  const issues: CareerPlaybookQualityIssue[] = [];
+
+  for (const [rawBlockId, block] of Object.entries(generatedBlocks)) {
+    const verdictIssues = block?.judge_verdict?.issues ?? [];
+    for (const [index, issue] of verdictIssues.entries()) {
+      issues.push({
+        id: issueId('cross_block_judge', rawBlockId, index),
+        source: 'cross_block_judge',
+        severity: issue.severity,
+        blockId: issue.block_id,
+        title: qualityIssueTitleForSeverity(issue.severity),
+        message: issue.description,
+        ...(issue.suggestion ? { suggestion: issue.suggestion } : {}),
+        action: issue.severity === 'info' ? 'review' : 'regenerate',
+      });
+    }
+  }
+
+  return issues;
+}
+
+function extractWarningBlockIds(warning: string): CareerPlaybookBlockId[] {
+  const forMatch = warning.match(/\bfor\s+([^;]+);/i);
+  if (!forMatch) return [];
+
+  return forMatch[1]
+    .split(',')
+    .map(part => maybeBlockId(part.trim()))
+    .filter((blockId): blockId is CareerPlaybookBlockId => Boolean(blockId));
+}
+
+function collectWarningQualityIssues(warnings: string[]): CareerPlaybookQualityIssue[] {
+  const issues: CareerPlaybookQualityIssue[] = [];
+
+  for (const [index, warning] of warnings.entries()) {
+    const blockIds = extractWarningBlockIds(warning);
+    if (blockIds.length === 0) {
+      issues.push({
+        id: issueId('system', undefined, index),
+        source: 'system',
+        severity: 'warning',
+        title: 'Системное предупреждение',
+        message: warning,
+        suggestion: 'Проверьте должностную инструкцию вручную перед публикацией.',
+        action: 'review',
+      });
+      continue;
+    }
+
+    for (const blockId of blockIds) {
+      issues.push({
+        id: issueId('system', blockId, index),
+        source: 'system',
+        severity: 'warning',
+        blockId,
+        title: 'Системное предупреждение',
+        message: warning,
+        suggestion: 'Проверьте блок вручную или запустите регенерацию блока.',
+        action: 'regenerate',
+      });
+    }
+  }
+
+  return issues;
+}
+
+function mergeQualityIssues(
+  ...groups: CareerPlaybookQualityIssue[][]
+): CareerPlaybookQualityIssue[] {
+  const merged: CareerPlaybookQualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of groups.flat()) {
+    if (seen.has(issue.id)) continue;
+    merged.push(issue);
+    seen.add(issue.id);
+  }
+
+  return merged;
+}
+
+function buildCareerPlaybookQualityIssues(
+  result: CareerPlaybookGraphResult,
+  warnings: string[]
+): CareerPlaybookQualityIssue[] {
+  return mergeQualityIssues(
+    normalizeQualityIssues(result.qualityIssues),
+    collectJudgeQualityIssues(asGeneratedBlocks(result.generatedBlocks)),
+    collectWarningQualityIssues(warnings)
   );
 }
 
@@ -199,6 +350,8 @@ export class CareerPlaybookHandler {
     const costBreakdown = buildCostBreakdown(result);
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
+    const generationWarnings = normalizeGenerationWarnings(result.warnings);
+    const qualityIssues = buildCareerPlaybookQualityIssues(result, generationWarnings);
     const completedProgress = this.buildGenerationProgress(
       jobData,
       { stage: 'completed', percent: 100 },
@@ -213,7 +366,8 @@ export class CareerPlaybookHandler {
       q_a_data: toJson({
         ...qaDataWithoutGenerationError,
         generation_progress: completedProgress,
-        generation_warnings: normalizeGenerationWarnings(result.warnings),
+        generation_warnings: generationWarnings,
+        quality_issues: qualityIssues,
       }) as CareerPlaybookRow['q_a_data'],
       completed_at: new Date().toISOString(),
     };

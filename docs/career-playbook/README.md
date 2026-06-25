@@ -92,15 +92,20 @@ a numeric value for one occurrence or the whole block. Regenerated blocks refres
 numeric provenance from the current role profile and surrounding block context.
 
 Final assembly also applies deterministic output cleanup: auto-added Mermaid
-sections are localized to the target content language, and raw fill-in
-placeholders such as `[Имя]`, `[дата]`, `[число]`, and `[url]` are converted into
-explicit fields to fill while preserving markdown checkboxes and fenced code.
+sections are localized to the target content language, Mermaid fences are parsed
+through the shared Stage 6 Mermaid validator/remediation pipeline before
+persistence, and raw fill-in placeholders such as `[Имя]`, `[дата]`, `[число]`,
+and `[url]` are converted into explicit fields to fill while preserving markdown
+checkboxes and fenced code. If a Mermaid diagram still cannot parse, the final
+assembler replaces it with safe markdown fallback text and records a structured
+quality issue instead of leaving a frontend `Syntax error in text`.
 
 Russian follow-up validation checks unexpected writing systems while allowing
 common Latin product, channel, and KPI terms such as B2B, SaaS, MQL, SQL, CVR,
 VK, Telegram, and YouTube. Cross-block judge degradation is explicit: empty or
-invalid judge output is retried once, then recorded as a generation warning that
-the private viewer can surface instead of silently treating QA as complete.
+invalid judge output is retried once, then recorded as both a legacy
+`generation_warnings[]` string and structured `quality_issues[]` records that
+the private viewer groups by block with open/edit/regenerate actions.
 
 ## Visibility And Permissions
 
@@ -110,6 +115,11 @@ As of 2026-06-05, Career Playbook visibility matches course visibility:
 `career_playbooks.visibility` is the source of truth. `is_public` remains a
 legacy compatibility mirror for public links and is synchronized from
 `visibility` by migration `20260605150000_career_playbook_visibility.sql`.
+Public links use the same organization-scoped rule as courses:
+`/career-playbooks/{orgSlug}/{playbookSlug}`. The playbook slug is derived from
+the position title and only gets a short suffix when the base slug collides.
+Legacy `/share/career-playbook/{slug}` URLs redirect to the canonical path when
+the organization slug is known.
 
 Access model:
 

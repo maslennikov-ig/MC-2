@@ -12,6 +12,7 @@
 - Worker handler: `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts`
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
 - Visibility/access migration: `packages/course-gen-platform/supabase/migrations/20260605150000_career_playbook_visibility.sql`
+- Public slug fallback migration: `packages/course-gen-platform/supabase/migrations/20260625110000_career_playbook_public_slug_policy.sql`
 - Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
 - Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
 
@@ -48,6 +49,14 @@ Role Guide, not its raw source material.
 The compatibility mutation `careerPlaybook.share.shareToggle` maps to
 `private`/`public`, while the canonical protected mutation is
 `careerPlaybook.library.updateVisibility({ playbookId, visibility })`.
+
+Public Career Playbook URLs are canonical only at
+`/[locale]/career-playbooks/{orgSlug}/{playbookSlug}`. The backend allocates
+`share_slug` from `position_title` without a suffix unless that slug already
+belongs to another playbook; collisions get a short stable suffix from the
+current playbook id. Legacy `/share/career-playbook/{slug}` pages remain for old
+links and redirect to the organization-scoped canonical URL when the organization
+slug is known.
 
 ## Department Resolution
 
@@ -150,6 +159,22 @@ unavailable-content warning rather than raw UUIDs.
 Universal mode explicitly instructs the model not to invent
 company/product/channel details; the generated Role Guide is a benchmark guide
 that names adaptation areas before operational rollout.
+
+## Generation Quality
+
+Cross-block judge findings, capped regeneration warnings, and final Mermaid
+remediation are persisted in `q_a_data.quality_issues[]` as structured records
+with severity, optional block id, message, suggestion, and action. The legacy
+`q_a_data.generation_warnings[]` string list remains for backward compatibility
+and is normalized into system warnings in the private viewer.
+
+Mermaid diagrams are required for dependency, career-path, and main-process
+blocks. Deterministic checks now validate both coverage and Mermaid parser
+syntax. Final assembly runs the shared Stage 6 Mermaid remediation pipeline with
+LLM fixes disabled; diagrams that still cannot parse are replaced with safe
+markdown fallback text and surfaced as block-level quality issues. Internal
+quality issues are returned to owner/private viewer payloads, not to public share
+responses.
 
 ## Course Bridge Sources
 
