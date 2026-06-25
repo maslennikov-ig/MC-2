@@ -478,6 +478,7 @@ async function loadLinkedCourseMap(
   const supabase = getCareerPlaybookSupabase();
   await Promise.all(
     organizationIds.map(async organizationId => {
+      // Keep this lookup in the runtime path so existing playbook courses replace the create-course CTA.
       const { data, error } = await supabase
         .from('courses')
         .select(LINKED_COURSE_COLUMNS)
