@@ -441,7 +441,7 @@
     "pdf": "PDF",
     "share": "Share",
     "createCourse": "Create course",
-    "openCourse": "Open course",
+    "openCourse": "View course",
     "delete": "Delete",
     "editBlock": "Edit {title}",
     "regenerateBlock": "Regenerate {title}",
@@ -614,7 +614,7 @@
     },
     "card": {
       "createCourse": "Create course",
-      "openCourse": "Open course",
+      "openCourse": "View course",
       "publicBadge": "Public",
       "privateBadge": "Private",
       "readonlyBadge": "Read-only",
