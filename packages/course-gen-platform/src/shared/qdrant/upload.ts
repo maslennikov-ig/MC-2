@@ -37,6 +37,12 @@ const DEFAULT_UPLOAD_OPTIONS: Required<UploadOptions> = {
   enable_sparse: false,
 };
 
+type QdrantUploadErrorDetails = Error & {
+  status?: unknown;
+  data?: unknown;
+  cause?: unknown;
+};
+
 /**
  * Cached Supabase client instance
  */
@@ -314,7 +320,17 @@ export async function uploadChunksToQdrant(
       logger.warn({ reason: 'Supabase not configured' }, 'Skipping vector_status update');
     }
 
-    throw new Error(errorMessage);
+    const wrappedError = new Error(errorMessage) as QdrantUploadErrorDetails;
+    if (typeof error === 'object' && error !== null) {
+      if ('status' in error) {
+        wrappedError.status = (error as { status?: unknown }).status;
+      }
+      if ('data' in error) {
+        wrappedError.data = (error as { data?: unknown }).data;
+      }
+    }
+    wrappedError.cause = error;
+    throw wrappedError;
   }
 }
 

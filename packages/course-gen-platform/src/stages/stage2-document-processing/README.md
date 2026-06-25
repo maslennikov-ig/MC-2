@@ -110,6 +110,9 @@ Uploads chunk embeddings to Qdrant vector database for RAG retrieval.
 - Batch upload (100 points per batch)
 - Automatic vector_status update to 'indexed'
 - Chunk count tracking
+- Fast retry loop for transient Qdrant failures
+- 3-hour delayed recovery window for temporary vector database outages
+- Immediate operator/user notification for non-retryable Qdrant configuration errors
 - Upload duration metrics
 
 **Progress:** 80% → 95%
@@ -258,21 +261,24 @@ Error: Docling MCP conversion failed: timeout
 Error: Failed to upload chunks to Qdrant
 ```
 
-**Cause:** Qdrant unavailable or rate-limited
-**Resolution:** Retry job, check Qdrant connection
+**Cause:** Qdrant unavailable, rate-limited, or misconfigured
+**Resolution:** Retryable outages are delayed automatically for up to 3 hours; check Qdrant connection and collection configuration for non-retryable errors such as `404 page not found`
 
 ### Failure Recovery
 
-On any phase failure:
+On permanent phase failure:
 
 1. **vector_status** updated to 'failed' in file_catalog
 2. Error logged to **error_logs** table with full stack trace
 3. Job marked as **failed** in BullMQ
 4. User notified via UI (generation_status)
+5. Automatic-mode course owners with Telegram enabled receive an error notification
 
 **Retry Strategy:**
 
-- Automatic retry: 3 attempts with exponential backoff
+- Qdrant upload retry: 5 short attempts inside the current job for transient errors
+- Qdrant outage recovery: delayed retry loop up to 3 hours, with progress kept `in_progress`
+- Non-retryable Qdrant errors: fail fast and notify via the existing course error notification path
 - Manual retry (single document): Use `documentProcessing.retryDocument` tRPC endpoint
 - Manual retry (all documents): Use `generation.restartFromStage` with stage 2
 

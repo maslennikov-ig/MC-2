@@ -18,15 +18,20 @@ import { uploadChunksToQdrant, updateVectorStatus } from '../../../shared/qdrant
 import type { EmbeddingResult } from '../../../shared/embeddings/generate.js';
 import { logger } from '../../../shared/logger/index.js';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin.js';
+import {
+  isQdrantUploadRetryableError,
+  toQdrantUploadError,
+  wrapFinalQdrantUploadError,
+} from '../qdrant-recovery-policy.js';
 
 /** Qdrant upload timeout in milliseconds (configurable via env) */
-const QDRANT_UPLOAD_TIMEOUT_MS = parseInt(process.env.QDRANT_UPLOAD_TIMEOUT_MS || '60000', 10);
+const QDRANT_UPLOAD_TIMEOUT_MS = parseInt(process.env.QDRANT_UPLOAD_TIMEOUT_MS || '90000', 10);
 
 /** Maximum retry attempts for Qdrant upload (configurable via env) */
-const MAX_QDRANT_RETRIES = parseInt(process.env.MAX_QDRANT_RETRIES || '3', 10);
+const MAX_QDRANT_RETRIES = parseInt(process.env.MAX_QDRANT_RETRIES || '5', 10);
 
 /** Base delay for exponential backoff in ms (configurable via env) */
-const BASE_RETRY_DELAY_MS = parseInt(process.env.QDRANT_BASE_RETRY_DELAY_MS || '2000', 10);
+const BASE_RETRY_DELAY_MS = parseInt(process.env.QDRANT_BASE_RETRY_DELAY_MS || '5000', 10);
 
 // Log configuration on module load (debug level)
 logger.debug(
@@ -94,8 +99,11 @@ export async function executeQdrantUpload(
 ): Promise<ReturnType<typeof uploadChunksToQdrant>> {
   const documentIds = getDocumentIds(embeddings);
   let lastError: Error | null = null;
+  let attemptsUsed = 0;
 
   for (let attempt = 1; attempt <= MAX_QDRANT_RETRIES; attempt++) {
+    attemptsUsed = attempt;
+
     try {
       logger.info(
         {
@@ -136,7 +144,13 @@ export async function executeQdrantUpload(
 
       return uploadResult;
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      lastError = toQdrantUploadError(error, {
+        jobId: job.id,
+        attempt,
+        maxRetries: MAX_QDRANT_RETRIES,
+        documentIds,
+        pointCount: embeddings.length,
+      });
 
       logger.warn(
         {
@@ -144,9 +158,16 @@ export async function executeQdrantUpload(
           attempt,
           maxRetries: MAX_QDRANT_RETRIES,
           error: lastError.message,
+          retryable: isQdrantUploadRetryableError(lastError),
         },
-        'Qdrant upload failed, will retry'
+        isQdrantUploadRetryableError(lastError)
+          ? 'Qdrant upload failed, will retry'
+          : 'Qdrant upload failed with non-retryable error'
       );
+
+      if (!isQdrantUploadRetryableError(lastError)) {
+        break;
+      }
 
       // Don't retry if this was the last attempt
       if (attempt < MAX_QDRANT_RETRIES) {
@@ -169,7 +190,8 @@ export async function executeQdrantUpload(
       documentIds,
       pointCount: embeddings.length,
       error: baseErrorMessage,
-      attemptsExhausted: MAX_QDRANT_RETRIES,
+      attemptsUsed,
+      attemptsExhausted: attemptsUsed >= MAX_QDRANT_RETRIES,
     },
     'Qdrant upload failed after all retries, marking documents as failed'
   );
@@ -211,5 +233,11 @@ export async function executeQdrantUpload(
   }
 
   // Re-throw with enhanced error message for better debugging
-  throw new Error(enhancedErrorMessage);
+  throw wrapFinalQdrantUploadError(lastError, enhancedErrorMessage, {
+    jobId: job.id,
+    documentIds,
+    pointCount: embeddings.length,
+    attemptsUsed,
+    maxRetries: MAX_QDRANT_RETRIES,
+  });
 }

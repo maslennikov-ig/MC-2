@@ -79,12 +79,21 @@ interface InsertCourseInput {
   style: CourseStyle;
   generationMode: 'automatic' | 'semi_automatic';
   settings: Json;
+  sourceDocuments: CourseBridgeProgressDocument[];
 }
 
 interface InsertedCourse {
   id: string;
   slug: string;
   title: string;
+}
+
+interface CourseBridgeProgressDocument {
+  name: string;
+  filename: string;
+  size: number;
+  type: 'text/markdown';
+  source: 'career_playbook';
 }
 
 export interface CourseBridgeDependencies {
@@ -132,7 +141,12 @@ function assertCompleted(playbook: CareerPlaybookRow): void {
   });
 }
 
-function buildInitialCourseBridgeProgress(startedAt: string): Json {
+function buildInitialCourseBridgeProgress(
+  startedAt: string,
+  sourceDocuments: CourseBridgeProgressDocument[]
+): Json {
+  const totalFileSize = sourceDocuments.reduce((sum, document) => sum + document.size, 0);
+
   return {
     steps: [
       {
@@ -171,12 +185,25 @@ function buildInitialCourseBridgeProgress(startedAt: string): Json {
     percentage: 0,
     current_step: 1,
     total_steps: 6,
-    has_documents: true,
-    file_count: 0,
-    total_file_size: 0,
-    files: [],
+    has_documents: sourceDocuments.length > 0,
+    document_size: sourceDocuments.length > 0 ? totalFileSize : null,
+    file_count: sourceDocuments.length,
+    total_file_size: totalFileSize,
+    files: sourceDocuments,
     started_at: startedAt,
-  };
+  } as unknown as Json;
+}
+
+function courseBridgeProgressDocuments(
+  documents: Array<{ filename: string; markdown: string }>
+): CourseBridgeProgressDocument[] {
+  return documents.map(document => ({
+    name: document.filename,
+    filename: document.filename,
+    size: Buffer.byteLength(document.markdown, 'utf8'),
+    type: 'text/markdown',
+    source: 'career_playbook',
+  }));
 }
 
 async function loadOwnedPlaybook(
@@ -257,7 +284,7 @@ async function insertCourse(input: InsertCourseInput): Promise<InsertedCourse> {
         generation_mode: input.generationMode,
         settings: input.settings,
         has_files: true,
-        generation_progress: buildInitialCourseBridgeProgress(now),
+        generation_progress: buildInitialCourseBridgeProgress(now, input.sourceDocuments),
         created_at: now,
         updated_at: now,
       })
@@ -485,27 +512,9 @@ export async function createCourseFromPlaybook(
   const includeBusinessContextSources = input.includeBusinessContextSources ?? false;
   const brief = applyCourseBridgeOverrides(buildCourseBridgeBrief(playbook), input.overrides);
   const orgSlug = await dependencies.getOrganizationSlug(user.organizationId);
-  const course = await dependencies.insertCourse({
-    userId: user.id,
-    organizationId: user.organizationId,
-    title: brief.title,
-    slug: brief.slugBase,
-    courseDescription: brief.courseDescription,
-    targetAudience: brief.targetAudience,
-    learningOutcomes: brief.learningOutcomes,
-    language: brief.language,
-    courseSize: brief.courseSize,
-    style: brief.style,
-    generationMode: 'automatic',
-    settings: toJson({
-      ...settingsRecord(brief.settings),
-      includeWebResearch,
-      includeBusinessContextSources,
-      style: brief.style,
-    }),
-  });
 
   const uploadedDocuments: Array<{ fileId: string }> = [];
+  let course: InsertedCourse | null = null;
 
   try {
     let research: CareerPlaybookWebResearchResult | null = null;
@@ -536,6 +545,30 @@ export async function createCourseFromPlaybook(
       includeWebResearch,
       businessContextSourceExcerpts,
     });
+    const sourceDocuments = courseBridgeProgressDocuments(documents);
+
+    course = await dependencies.insertCourse({
+      userId: user.id,
+      organizationId: user.organizationId,
+      title: brief.title,
+      slug: brief.slugBase,
+      courseDescription: brief.courseDescription,
+      targetAudience: brief.targetAudience,
+      learningOutcomes: brief.learningOutcomes,
+      language: brief.language,
+      courseSize: brief.courseSize,
+      style: brief.style,
+      generationMode: 'semi_automatic',
+      settings: toJson({
+        ...settingsRecord(brief.settings),
+        includeWebResearch,
+        includeBusinessContextSources,
+        clarifying_questions_enabled: true,
+        clarifying_questions_skipped: false,
+        style: brief.style,
+      }),
+      sourceDocuments,
+    });
 
     for (const document of documents) {
       uploadedDocuments.push(
@@ -563,7 +596,9 @@ export async function createCourseFromPlaybook(
       generationCode: generation.generationCode,
     };
   } catch (error) {
-    await dependencies.deleteCourse(course.id);
+    if (course) {
+      await dependencies.deleteCourse(course.id);
+    }
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
