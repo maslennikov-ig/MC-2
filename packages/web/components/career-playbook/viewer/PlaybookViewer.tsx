@@ -135,6 +135,7 @@ interface PlaybookViewerProps {
   onShare: () => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
+  openCourseHref?: string | null
   onDelete: () => void
   isUpdatingVisibility?: boolean
   isUpdatingNumericFact?: boolean
@@ -211,6 +212,7 @@ const defaultActionsCopy: Required<ActionsBarCopy> = {
   pdf: 'PDF',
   share: 'Поделиться',
   createCourse: 'Создать курс из инструкции',
+  openCourse: 'Перейти в курс',
   delete: 'Удалить',
 }
 
@@ -333,6 +335,7 @@ export function PlaybookViewer({
   onShare,
   onCreateCourse,
   createCourseAction,
+  openCourseHref,
   onDelete,
   isUpdatingVisibility = false,
   isUpdatingNumericFact = false,
@@ -604,6 +607,7 @@ export function PlaybookViewer({
                 onRegenerateBlock={onRegenerateBlock}
                 onCreateCourse={onCreateCourse}
                 createCourseAction={createCourseAction}
+                openCourseHref={openCourseHref}
                 onDelete={onDelete}
               />
             ) : null}
@@ -800,6 +804,7 @@ function InspectorRail({
   onRegenerateBlock,
   onCreateCourse,
   createCourseAction,
+  openCourseHref,
   onDelete,
 }: {
   snapshot: CareerPlaybookViewerSnapshot
@@ -820,6 +825,7 @@ function InspectorRail({
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
+  openCourseHref?: string | null
   onDelete: () => void
 }) {
   return (
@@ -843,6 +849,7 @@ function InspectorRail({
           onCreateCourse={onCreateCourse}
           createCourseAction={createCourseAction}
           canCreateCourse={canCreateCourse}
+          openCourseHref={openCourseHref}
           onDelete={onDelete}
         />
 
