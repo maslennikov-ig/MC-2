@@ -444,6 +444,70 @@ describe('CareerPlaybookHandler', () => {
     );
   });
 
+  it('remediates invalid Mermaid from graph output before completed persistence', async () => {
+    const invalidDiagram = `## 16. Main Process
+
+\`\`\`mermaid
+flowchart TD
+  A[Секретарь (Senior)] --> B{Выбор сценария}
+\`\`\``;
+    const generatedBlocks = {
+      block_16: {
+        content: invalidDiagram,
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 1,
+      },
+    };
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'Секретарь' }],
+      followups: [],
+      freeform: [],
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        generatedBlocks,
+        finalMarkdown: invalidDiagram,
+        roleProfileSpec,
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    const persisted = builder.update.mock.calls.at(-1)?.[0] as {
+      generated_blocks?: Record<string, { content?: string }>;
+      final_markdown?: string | null;
+      q_a_data?: { quality_issues?: Array<{ source?: string; blockId?: string }> };
+    };
+
+    expect(persisted.generated_blocks?.block_16.content).not.toContain('A[Секретарь (Senior)]');
+    expect(persisted.final_markdown).not.toContain('A[Секретарь (Senior)]');
+    expect(persisted.final_markdown).not.toContain('Syntax error in text');
+    expect(persisted.q_a_data?.quality_issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'mermaid',
+          blockId: 'block_16',
+        }),
+      ])
+    );
+  });
+
   it('invokes the generation graph with the Career Playbook recursion limit', async () => {
     const invoke = vi.fn().mockResolvedValue({
       errors: [],
