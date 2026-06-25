@@ -144,6 +144,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    contains: vi.fn(() => builder),
     or: vi.fn(() => builder),
     order: vi.fn(() => builder),
     maybeSingle: vi.fn(() => {
@@ -164,6 +165,7 @@ function createListBuilder(data: unknown[], error: unknown = null) {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    contains: vi.fn(() => builder),
     or: vi.fn(() => builder),
     order: vi.fn(() => Promise.resolve({ data, error })),
   };
