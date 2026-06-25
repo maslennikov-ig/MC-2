@@ -311,7 +311,7 @@ const ruMessages = {
       actionsLabel: 'Действия с должностной инструкцией',
       share: 'Поделиться',
       createCourse: 'Создать курс из инструкции',
-      openCourse: 'Перейти в курс',
+      openCourse: 'Посмотреть курс',
       delete: 'Удалить',
       hideContents: 'Скрыть левую панель',
       showContents: 'Показать левую панель',
@@ -675,7 +675,7 @@ describe('CareerPlaybookViewerPageClient', () => {
     renderPage({ locale: 'ru' })
 
     expect(await screen.findByRole('heading', { name: 'Руководитель продаж' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Перейти в курс' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Посмотреть курс' })).toHaveAttribute(
       'href',
       '/ru/courses/mega-campus/sales-leadership-course'
     )
