@@ -59,6 +59,14 @@ function normalizePublicPlaybook(
     department: readString(row, 'department'),
     level: readString(row, 'level'),
     language: readString(row, 'language'),
+    imageUrl: readString(row, 'imageUrl', 'image_url'),
+    imageStatus: readString(
+      row,
+      'imageStatus',
+      'image_status'
+    ) as CareerPlaybookPublicSharePlaybook['imageStatus'],
+    imageAltText: readString(row, 'imageAltText', 'image_alt_text'),
+    imageErrorMessage: readString(row, 'imageErrorMessage', 'image_error_message'),
     createdAt: readString(row, 'created_at', 'createdAt') ?? new Date(0).toISOString(),
   }
 }

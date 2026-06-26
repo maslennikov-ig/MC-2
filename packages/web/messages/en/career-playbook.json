@@ -459,6 +459,9 @@
     "inspectorReadinessTitle": "Readiness",
     "inspectorWarningsTitle": "Quality warnings",
     "inspectorWarningsDescription": "Part of the automated quality check completed in fallback mode. Review these items before rollout.",
+    "imageStatusTitle": "Image",
+    "imageRegenerate": "Regenerate",
+    "imageUnavailable": "Image has not been created yet",
     "inspectorReadyBlocks": "{ready} of {total} blocks ready",
     "inspectorLanguage": "Document language: {language}",
     "inspectorNextStep": "Next step: create an adaptation course",
@@ -505,6 +508,8 @@
     "regenerateLocal": "Block regenerated locally until the backend action is connected",
     "numericSaved": "Number saved",
     "numericSaveError": "Could not save number",
+    "imageRegenerateQueued": "Image generation queued",
+    "imageRegenerateError": "Could not start image generation",
     "generatingTitle": "Generating {title}",
     "blocksReady": "{ready} of {total} blocks ready",
     "thinkingStream": "Show thinking stream",
@@ -525,6 +530,15 @@
       "generated": "Ready",
       "failed": "Failed",
       "regenerating": "Regenerating"
+    },
+    "imageStatusLabels": {
+      "pending": "Queued",
+      "draft_generating": "Preparing draft",
+      "draft_ready": "Draft ready",
+      "generating": "Generating",
+      "completed": "Ready",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
     },
     "blockGroups": {
       "group_1_foundation": "Foundation",

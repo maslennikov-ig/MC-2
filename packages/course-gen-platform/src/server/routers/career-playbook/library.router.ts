@@ -13,6 +13,7 @@ import {
   deleteCareerPlaybookFromLibrary,
   getCareerPlaybookFromLibrary,
   listCareerPlaybooks,
+  regenerateCareerPlaybookImage,
   updateCareerPlaybookNumericFact,
   updateCareerPlaybookVisibility,
 } from './library-service';
@@ -32,6 +33,10 @@ export const careerPlaybookLibraryRouter = router({
 
   updateVisibility: protectedProcedure.input(visibilityInputSchema).mutation(({ ctx, input }) => {
     return updateCareerPlaybookVisibility(ctx, input);
+  }),
+
+  regenerateImage: protectedProcedure.input(playbookIdInputSchema).mutation(({ ctx, input }) => {
+    return regenerateCareerPlaybookImage(ctx, input);
   }),
 
   regenerateBlock: protectedProcedure.input(regenerateBlockInputSchema).mutation(() => {

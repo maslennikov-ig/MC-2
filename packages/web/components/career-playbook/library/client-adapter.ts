@@ -23,6 +23,9 @@ type BrowserCareerPlaybookClient = {
           visibility: CareerPlaybookVisibility
         }) => Promise<unknown>
       }
+      regenerateImage?: {
+        mutate: (input: { playbookId: string }) => Promise<unknown>
+      }
       list?: {
         query: (
           input: { limit: number; cursor?: string } & Partial<CareerPlaybookLibraryFilters>
@@ -127,6 +130,17 @@ export async function updateCareerPlaybookVisibility(
   }
 
   return procedure.mutate({ playbookId, visibility })
+}
+
+export async function regenerateCareerPlaybookImage(playbookId: string, locale: string) {
+  const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
+  const procedure = client.careerPlaybook?.library?.regenerateImage
+
+  if (!procedure) {
+    throw new Error(`careerPlaybook.library.regenerateImage unavailable (${locale})`)
+  }
+
+  return procedure.mutate({ playbookId })
 }
 
 export async function createCourseFromPlaybook(

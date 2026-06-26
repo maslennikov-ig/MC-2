@@ -20,6 +20,7 @@ import { logger } from '@/shared/logger';
 import {
   uploadEnrichmentAssetLocal,
   uploadCourseCardLocal,
+  uploadCareerPlaybookCardLocal,
   buildPublicUrl as buildPublicUrlLocal,
   deleteEnrichmentAssetLocal,
   assetExistsLocal,
@@ -174,6 +175,43 @@ export async function uploadCourseCard(
   return uploadEnrichmentAssetSupabase(
     courseId,
     'course-card',
+    'card',
+    buffer,
+    getMimeTypeForExtension(normalizedExtension),
+    normalizedExtension
+  );
+}
+
+/**
+ * Upload Career Playbook card image.
+ *
+ * Uses path career-playbooks/{playbookId}/card.webp on both storage backends.
+ *
+ * @param playbookId - Career Playbook UUID
+ * @param buffer - File content
+ * @param extension - File extension (default: 'webp')
+ * @returns Storage path
+ */
+export async function uploadCareerPlaybookCard(
+  playbookId: string,
+  buffer: Buffer,
+  extension = 'webp'
+): Promise<string> {
+  const normalizedExtension = toNormalizedExtension(extension);
+  const backend = getStorageBackendName();
+
+  logger.debug(
+    { playbookId, extension: normalizedExtension, backend },
+    'Unified storage: uploading Career Playbook card'
+  );
+
+  if (useLocalStorage()) {
+    return uploadCareerPlaybookCardLocal(playbookId, buffer, normalizedExtension);
+  }
+
+  return uploadEnrichmentAssetSupabase(
+    'career-playbooks',
+    playbookId,
     'card',
     buffer,
     getMimeTypeForExtension(normalizedExtension),

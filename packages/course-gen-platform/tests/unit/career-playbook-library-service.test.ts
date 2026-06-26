@@ -56,6 +56,12 @@ const baseRow: CareerPlaybookRow = {
   final_markdown: '# Менеджер по продажам',
   web_research: null,
   cost_breakdown: null,
+  image_status: null,
+  image_content: null,
+  image_metadata: null,
+  image_generation_attempt: 0,
+  image_error_message: null,
+  image_updated_at: null,
   share_slug: 'sales-manager',
   is_public: false,
   visibility: 'organization',
@@ -135,6 +141,61 @@ describe('career-playbook library visibility service', () => {
       canManageVisibility: false,
       canCreateCourse: false,
       canDelete: false,
+    });
+  });
+
+  it('exposes completed card images and ignores invalid image content in library rows', async () => {
+    const validImageRow: CareerPlaybookRow = {
+      ...baseRow,
+      id: '00000000-0000-4000-8000-000000002010',
+      image_status: 'completed',
+      image_content: {
+        type: 'card',
+        imageUrl: 'https://cdn.example.test/career-playbooks/card.webp',
+        altText: 'Role Guide image: Head of Sales',
+        dimensions: { width: 1024, height: 1024 },
+        visualStyle: {
+          colorScheme: 'blue and purple gradients with subtle accents',
+          aesthetic: 'modern, professional, clean',
+        },
+        generation_prompt: 'Create a role-guide card image',
+        format: 'webp',
+        file_size_bytes: 1234,
+      },
+      image_error_message: null,
+    };
+    const invalidImageRow: CareerPlaybookRow = {
+      ...baseRow,
+      id: '00000000-0000-4000-8000-000000002011',
+      image_status: 'completed',
+      image_content: { imageUrl: 42 },
+      image_error_message: 'Malformed image content',
+    };
+    fromMock.mockReturnValue(
+      chainResult({
+        data: [validImageRow, invalidImageRow],
+        error: null,
+      })
+    );
+
+    const result = await listCareerPlaybooks(ctx(owner), {
+      limit: 20,
+      sort: 'created_desc',
+    });
+
+    expect(result.items[0]).toMatchObject({
+      id: validImageRow.id,
+      imageStatus: 'completed',
+      imageUrl: 'https://cdn.example.test/career-playbooks/card.webp',
+      imageAltText: 'Role Guide image: Head of Sales',
+      imageErrorMessage: null,
+    });
+    expect(result.items[1]).toMatchObject({
+      id: invalidImageRow.id,
+      imageStatus: 'completed',
+      imageUrl: null,
+      imageAltText: null,
+      imageErrorMessage: 'Malformed image content',
     });
   });
 

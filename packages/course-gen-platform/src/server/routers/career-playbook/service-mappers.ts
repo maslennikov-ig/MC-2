@@ -3,6 +3,7 @@ import {
   CareerPlaybookBlockStateSchema,
   CareerPlaybookFollowupQuestionSchema,
   CareerPlaybookGenerationProgressSchema,
+  CareerPlaybookImageStatusSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookPlaybookStatusSchema,
   CareerPlaybookWizardProgressSchema,
@@ -11,6 +12,7 @@ import {
   type CareerPlaybookFixedQuestion,
   type CareerPlaybookFollowupQuestion,
   type CareerPlaybookGenerationProgress,
+  type CareerPlaybookImageStatus,
   type CareerPlaybookPlaybookStatus,
   type CareerPlaybookQAData,
   type CareerPlaybookVisibility,
@@ -45,6 +47,12 @@ export interface CareerPlaybookRow {
   final_markdown: string | null;
   web_research: Json | null;
   cost_breakdown: Json | null;
+  image_status: CareerPlaybookImageStatus | null;
+  image_content: Json | null;
+  image_metadata: Json | null;
+  image_generation_attempt: number;
+  image_error_message: string | null;
+  image_updated_at: string | null;
   share_slug: string | null;
   is_public: boolean;
   visibility?: CareerPlaybookVisibility;
@@ -216,6 +224,7 @@ export function generationProgress(
 
 export function mapPlaybookRow(row: CareerPlaybookRow): CareerPlaybookRow {
   const parsedStatus = CareerPlaybookPlaybookStatusSchema.safeParse(row.status);
+  const parsedImageStatus = CareerPlaybookImageStatusSchema.nullable().safeParse(row.image_status);
   const visibility =
     row.visibility === 'private' || row.visibility === 'organization' || row.visibility === 'public'
       ? row.visibility
@@ -226,6 +235,14 @@ export function mapPlaybookRow(row: CareerPlaybookRow): CareerPlaybookRow {
   return {
     ...row,
     status: parsedStatus.success ? parsedStatus.data : 'draft',
+    image_status: parsedImageStatus.success ? parsedImageStatus.data : null,
+    image_content: row.image_content ?? null,
+    image_metadata: row.image_metadata ?? null,
+    image_generation_attempt:
+      typeof row.image_generation_attempt === 'number' ? row.image_generation_attempt : 0,
+    image_error_message:
+      typeof row.image_error_message === 'string' ? row.image_error_message : null,
+    image_updated_at: typeof row.image_updated_at === 'string' ? row.image_updated_at : null,
     language: normalizeLanguage(row.language),
     visibility,
     is_public: visibility === 'public',

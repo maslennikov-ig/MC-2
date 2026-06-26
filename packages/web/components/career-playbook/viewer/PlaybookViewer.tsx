@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -32,6 +33,7 @@ import { MarkdownRendererFull } from '@/components/markdown/MarkdownRendererFull
 import { PanelIconButton } from '@/components/common/panel-icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ImageSkeleton } from '@/components/ui/image-skeleton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,6 +92,10 @@ export interface PlaybookViewerCopy {
   inspectorReadinessTitle?: string
   inspectorWarningsTitle?: string
   inspectorWarningsDescription?: string
+  imageStatusTitle?: string
+  imageStatusLabel?: (status: NonNullable<CareerPlaybookViewerSnapshot['imageStatus']>) => string
+  imageRegenerate?: string
+  imageUnavailable?: string
   visibilityLabel?: string
   visibilityValueLabel?: (visibility: CareerPlaybookVisibility) => string
   inspectorReadyBlocks?: (ready: number, total: number) => string
@@ -129,7 +135,9 @@ interface PlaybookViewerProps {
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   onDelete: () => void
+  onRegenerateImage?: () => void
   isUpdatingVisibility?: boolean
+  isRegeneratingImage?: boolean
   isUpdatingNumericFact?: boolean
   onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
   onUpdateNumericFact?: (input: {
@@ -167,6 +175,10 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   inspectorWarningsTitle: 'Предупреждения качества',
   inspectorWarningsDescription:
     'Часть автоматической проверки завершилась в резервном режиме. Проверьте эти пункты перед внедрением.',
+  imageStatusTitle: 'Изображение',
+  imageStatusLabel: (status) => DEFAULT_IMAGE_STATUS_LABELS[status] ?? status,
+  imageRegenerate: 'Перегенерировать',
+  imageUnavailable: 'Изображение ещё не создано',
   visibilityLabel: 'Видимость',
   visibilityValueLabel: (visibility) => DEFAULT_VISIBILITY_LABELS[visibility],
   inspectorReadyBlocks: (ready, total) => `Готово блоков: ${ready} из ${total}`,
@@ -266,6 +278,19 @@ const DEFAULT_VISIBILITY_LABELS: Record<CareerPlaybookVisibility, string> = {
   public: 'Публичный',
 }
 
+const DEFAULT_IMAGE_STATUS_LABELS: Record<
+  NonNullable<CareerPlaybookViewerSnapshot['imageStatus']>,
+  string
+> = {
+  pending: 'В очереди',
+  draft_generating: 'Готовится черновик',
+  draft_ready: 'Черновик готов',
+  generating: 'Генерируется',
+  completed: 'Готово',
+  failed: 'Ошибка',
+  cancelled: 'Отменено',
+}
+
 const VISIBILITY_CONFIG: Record<
   CareerPlaybookVisibility,
   {
@@ -320,7 +345,9 @@ export function PlaybookViewer({
   onCreateCourse,
   createCourseAction,
   onDelete,
+  onRegenerateImage,
   isUpdatingVisibility = false,
+  isRegeneratingImage = false,
   isUpdatingNumericFact = false,
   onVisibilityChange,
   onUpdateNumericFact,
@@ -588,6 +615,9 @@ export function PlaybookViewer({
                 onCreateCourse={onCreateCourse}
                 createCourseAction={createCourseAction}
                 onDelete={onDelete}
+                canRegenerateImage={viewerPermissions.canManageVisibility}
+                isRegeneratingImage={isRegeneratingImage}
+                onRegenerateImage={onRegenerateImage}
               />
             ) : null}
           </section>
@@ -781,6 +811,9 @@ function InspectorRail({
   onCreateCourse,
   createCourseAction,
   onDelete,
+  canRegenerateImage,
+  isRegeneratingImage,
+  onRegenerateImage,
 }: {
   snapshot: CareerPlaybookViewerSnapshot
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
@@ -798,6 +831,9 @@ function InspectorRail({
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   onDelete: () => void
+  canRegenerateImage: boolean
+  isRegeneratingImage: boolean
+  onRegenerateImage?: () => void
 }) {
   return (
     <aside
@@ -826,6 +862,14 @@ function InspectorRail({
         <NumericFactsSummary summary={numericSummary} labels={labels} />
 
         <QualityWarningsSummary warnings={snapshot.qualityWarnings} labels={labels} />
+
+        <ImageStatusSection
+          snapshot={snapshot}
+          labels={labels}
+          canRegenerateImage={canRegenerateImage}
+          isRegeneratingImage={isRegeneratingImage}
+          onRegenerateImage={onRegenerateImage}
+        />
 
         {canManageVisibility && onVisibilityChange ? (
           <VisibilitySection
@@ -890,6 +934,59 @@ function QualityWarningsSummary({
           </li>
         ))}
       </ul>
+    </section>
+  )
+}
+
+function ImageStatusSection({
+  snapshot,
+  labels,
+  canRegenerateImage,
+  isRegeneratingImage,
+  onRegenerateImage,
+}: {
+  snapshot: CareerPlaybookViewerSnapshot
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  canRegenerateImage: boolean
+  isRegeneratingImage: boolean
+  onRegenerateImage?: () => void
+}) {
+  const status = snapshot.imageStatus
+  const statusLabel = status ? labels.imageStatusLabel(status) : labels.imageUnavailable
+  const canRegenerate = canRegenerateImage && Boolean(onRegenerateImage)
+
+  return (
+    <section className="career-playbook-muted-card p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">{labels.imageStatusTitle}</h2>
+          <Badge variant="outline" className="mt-2 rounded-md">
+            {statusLabel}
+          </Badge>
+          {snapshot.imageErrorMessage ? (
+            <p className="mt-2 text-xs leading-5 text-rose-700 dark:text-rose-200">
+              {snapshot.imageErrorMessage}
+            </p>
+          ) : null}
+        </div>
+        {canRegenerate ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="shrink-0 rounded-md"
+            disabled={isRegeneratingImage}
+            onClick={onRegenerateImage}
+          >
+            {isRegeneratingImage ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="h-4 w-4" aria-hidden />
+            )}
+            {labels.imageRegenerate}
+          </Button>
+        ) : null}
+      </div>
     </section>
   )
 }
@@ -1199,6 +1296,8 @@ function DocumentPaper({
         spacious ? 'px-6 py-8 md:px-12 md:py-12' : 'px-5 py-6 md:px-8 md:py-8'
       )}
     >
+      <DocumentHeroImage snapshot={snapshot} />
+
       <header className="career-playbook-document-rule mb-7 flex flex-wrap items-start justify-between gap-4 border-b pb-5">
         <div className="min-w-0">
           <div className="career-playbook-pill mb-3 inline-flex px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -1331,6 +1430,41 @@ function DocumentPaper({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function DocumentHeroImage({ snapshot }: { snapshot: CareerPlaybookViewerSnapshot }) {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [hasError, setHasError] = useState(false)
+
+  if (!snapshot.imageUrl) return null
+
+  return (
+    <div
+      className="relative mb-7 aspect-square max-h-[520px] overflow-hidden rounded-md border border-[#d6c2a6] bg-[#f3f0ea] dark:border-slate-700 dark:bg-slate-900"
+      aria-busy={!isLoaded && !hasError}
+    >
+      {!isLoaded && !hasError ? <ImageSkeleton gradient /> : null}
+      {hasError ? (
+        <ImageSkeleton
+          icon={<FileText className="h-14 w-14 text-slate-400 dark:text-slate-700" />}
+          className="animate-none bg-[#f3f0ea] dark:bg-slate-900"
+        />
+      ) : null}
+      <Image
+        src={snapshot.imageUrl}
+        alt={snapshot.imageAltText ?? `Role Guide image: ${snapshot.title}`}
+        fill
+        unoptimized
+        className={cn(
+          'object-cover transition-opacity duration-300',
+          isLoaded && !hasError ? 'opacity-100' : 'opacity-0'
+        )}
+        sizes="(max-width: 768px) 100vw, 760px"
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+      />
     </div>
   )
 }

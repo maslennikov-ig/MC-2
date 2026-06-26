@@ -96,6 +96,10 @@ interface CareerPlaybookLibraryDetail {
   organizationSlug?: string | null
   isPublic?: boolean
   visibility?: CareerPlaybookVisibility
+  imageUrl?: string | null
+  imageStatus?: CareerPlaybookViewerSnapshot['imageStatus']
+  imageAltText?: string | null
+  imageErrorMessage?: string | null
   ownerId?: string | null
   viewerPermissions?: CareerPlaybookViewerPermissions
   qualityWarnings?: string[] | null
@@ -1014,6 +1018,10 @@ function normalizeViewerSnapshot(
     ...snapshot,
     visibility,
     isPublic: visibility === 'public',
+    imageUrl: snapshot.imageUrl ?? null,
+    imageStatus: snapshot.imageStatus ?? null,
+    imageAltText: snapshot.imageAltText ?? null,
+    imageErrorMessage: snapshot.imageErrorMessage ?? null,
     viewerPermissions: snapshot.viewerPermissions ?? {
       canEdit: true,
       canManageVisibility: true,
@@ -1077,6 +1085,10 @@ function libraryDetailToViewerSnapshot(
     organizationSlug: detail.organizationSlug ?? null,
     isPublic: detail.visibility === 'public' || detail.isPublic === true,
     visibility: detail.visibility ?? (detail.isPublic ? 'public' : 'private'),
+    imageUrl: detail.imageUrl ?? null,
+    imageStatus: detail.imageStatus ?? null,
+    imageAltText: detail.imageAltText ?? null,
+    imageErrorMessage: detail.imageErrorMessage ?? null,
     ownerId: detail.ownerId ?? null,
     viewerPermissions: detail.viewerPermissions ?? {
       canEdit: true,

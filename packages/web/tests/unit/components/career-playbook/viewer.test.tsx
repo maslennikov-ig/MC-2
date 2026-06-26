@@ -196,6 +196,40 @@ describe('Career Playbook viewer components', () => {
     expect(within(antiGoalsBlock).getByTestId('markdown-renderer')).toHaveTextContent('Anti-goals')
   })
 
+  it('renders the generated hero image and exposes owner image regeneration', async () => {
+    const user = userEvent.setup()
+    const handleRegenerateImage = vi.fn()
+
+    render(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          imageUrl: 'https://cdn.example.test/career-playbooks/pb-1/card.webp',
+          imageAltText: 'Role Guide image: Head of Sales',
+          imageStatus: 'completed',
+          imageErrorMessage: null,
+        }}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+        onRegenerateImage={handleRegenerateImage}
+      />
+    )
+
+    expect(screen.getByAltText('Role Guide image: Head of Sales')).toHaveAttribute(
+      'src',
+      expect.stringContaining('career-playbooks')
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Перегенерировать' }))
+    expect(handleRegenerateImage).toHaveBeenCalledTimes(1)
+  })
+
   it('highlights and scrolls the active contents item as document blocks enter the viewport', async () => {
     const originalIntersectionObserver = globalThis.IntersectionObserver
     const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(

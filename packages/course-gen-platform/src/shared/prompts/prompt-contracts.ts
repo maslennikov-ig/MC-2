@@ -222,6 +222,20 @@ export interface Stage7CardLessonVars {
   mood: string;
 }
 
+export interface CareerPlaybookCardVars {
+  roleTitle: string;
+  department: string;
+  level: string;
+  specialization: string;
+  businessContextSummary: string;
+  roleFocusSummary: string;
+  languageContext: string;
+  colorScheme: string;
+  aesthetic: string;
+  visualElements: string;
+  mood: string;
+}
+
 export interface Stage7CoverUserVars {
   lessonTitle: string;
   courseSubject: string;
@@ -261,6 +275,7 @@ export interface PromptVariableMap {
   stage6_single_call_generator: Stage6SingleCallGeneratorVars;
   stage7_card_course: Stage7CardCourseVars;
   stage7_card_lesson: Stage7CardLessonVars;
+  career_playbook_card: CareerPlaybookCardVars;
   stage7_cover_user: Stage7CoverUserVars;
 }
 

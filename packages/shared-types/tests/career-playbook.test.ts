@@ -261,6 +261,26 @@ describe('Career Playbook shared schemas', () => {
     expect('courseId' in result.data).toBe(false);
   });
 
+  it('validates Career Playbook image generation jobs without fake lesson enrichments', () => {
+    const result = JobDataSchema.safeParse({
+      jobType: JobType.CAREER_PLAYBOOK,
+      operation: 'GENERATE_IMAGE',
+      playbookId: '00000000-0000-4000-8000-000000000014',
+      userId: '00000000-0000-4000-8000-000000000017',
+      organizationId: '00000000-0000-4000-8000-000000000018',
+      language: 'ru',
+      locale: 'ru',
+      createdAt: '2026-06-26T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.error.format()));
+    }
+    expect('courseId' in result.data).toBe(false);
+    expect('lessonId' in result.data).toBe(false);
+  });
+
   it('rejects empty follow-up answers unless explicitly skipped', () => {
     expect(
       CareerPlaybookFollowupAnswerSchema.safeParse({

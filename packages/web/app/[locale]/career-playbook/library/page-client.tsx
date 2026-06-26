@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
@@ -51,6 +52,7 @@ import {
 } from '@/components/career-playbook/library/public-url'
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
 import Header from '@/components/layouts/header'
+import { ImageSkeleton } from '@/components/ui/image-skeleton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -213,6 +215,49 @@ function defaultStatistics(items: CareerPlaybookLibraryItem[]) {
     ).length,
     publicCount: items.filter((item) => item.isPublic).length,
   }
+}
+
+function CareerPlaybookCardImage({ item }: { item: CareerPlaybookLibraryItem }) {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [hasError, setHasError] = useState(false)
+  const hasImage = item.imageStatus === 'completed' && Boolean(item.imageUrl)
+  const alt = item.imageAltText ?? `Role Guide image: ${item.title}`
+
+  return (
+    <div
+      className="relative mb-4 aspect-square overflow-hidden rounded-md border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
+      aria-busy={hasImage && !isLoaded && !hasError}
+    >
+      {hasImage ? (
+        <>
+          {!isLoaded && !hasError ? <ImageSkeleton gradient /> : null}
+          {hasError ? (
+            <ImageSkeleton
+              icon={<FileText className="h-12 w-12 text-slate-400 dark:text-slate-700" />}
+              className="animate-none bg-slate-100 dark:bg-slate-900"
+            />
+          ) : null}
+          <Image
+            src={item.imageUrl as string}
+            alt={alt}
+            fill
+            unoptimized
+            className={`object-cover transition-opacity duration-300 ${
+              isLoaded && !hasError ? 'opacity-100' : 'opacity-0'
+            }`}
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+            onLoad={() => setIsLoaded(true)}
+            onError={() => setHasError(true)}
+          />
+        </>
+      ) : (
+        <ImageSkeleton
+          icon={<FileText className="h-12 w-12 text-slate-400 dark:text-slate-700" />}
+          className="animate-none bg-slate-100 dark:bg-slate-900"
+        />
+      )}
+    </div>
+  )
 }
 
 export default function CareerPlaybookLibraryPageClient({
@@ -390,6 +435,7 @@ export default function CareerPlaybookLibraryPageClient({
 
     return (
       <article className="career-playbook-panel flex h-full flex-col p-4">
+        <CareerPlaybookCardImage item={item} />
         <div className="flex items-start justify-between gap-3">
           {canManageVisibility ? (
             <DropdownMenu>

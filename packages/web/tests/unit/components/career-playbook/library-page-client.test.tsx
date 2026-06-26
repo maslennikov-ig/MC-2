@@ -234,6 +234,10 @@ describe('CareerPlaybookLibraryPageClient', () => {
             department: 'sales',
             level: 'lead',
             status: 'completed',
+            imageUrl: 'https://cdn.example.test/career-playbooks/pb-1/card.webp',
+            imageStatus: 'completed',
+            imageAltText: 'Role Guide image: Head of Sales',
+            imageErrorMessage: null,
             createdAt: '2026-05-14T10:00:00.000Z',
             isPublic: true,
             visibility: 'public',
@@ -298,6 +302,10 @@ describe('CareerPlaybookLibraryPageClient', () => {
     expect(screen.getByPlaceholderText('Search by role title')).toBeInTheDocument()
     expect(screen.getByText('Head of Sales')).toBeInTheDocument()
     expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
+    expect(screen.getByAltText('Role Guide image: Head of Sales')).toHaveAttribute(
+      'src',
+      expect.stringContaining('career-playbooks')
+    )
   })
 
   it('puts owner-only course-style visibility and item actions on each card', () => {
