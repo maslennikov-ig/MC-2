@@ -370,6 +370,73 @@ flowchart TD
     expect(share.finalMarkdown).not.toContain('Syntax error in text');
   });
 
+  it('keeps true missing public share lookups as not found', async () => {
+    fromMock.mockReturnValue(
+      chainResult({
+        data: null,
+        error: {
+          code: 'PGRST116',
+          message: 'JSON object requested, multiple (or no) rows returned',
+        },
+      })
+    );
+
+    await expect(
+      getPublicCareerPlaybookBySlug({ shareSlug: 'missing-sales-manager' })
+    ).rejects.toMatchObject<Partial<TRPCError>>({
+      code: 'NOT_FOUND',
+      message: 'Career Playbook not found',
+    });
+  });
+
+  it('falls back without image columns when public share lookup hits rollout schema drift', async () => {
+    const primaryQuery = chainResult({
+      data: null,
+      error: {
+        code: '42703',
+        message: 'column career_playbooks.image_status does not exist',
+      },
+    });
+    const fallbackQuery = chainResult({
+      data: {
+        ...baseRow,
+        visibility: 'public',
+        is_public: true,
+        share_slug: 'sales-manager',
+        final_markdown: '# Менеджер по продажам',
+      },
+      error: null,
+    });
+
+    let careerPlaybookCall = 0;
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') {
+        careerPlaybookCall += 1;
+        return careerPlaybookCall === 1 ? primaryQuery : fallbackQuery;
+      }
+      if (table === 'organizations') {
+        return chainResult({ data: { slug: 'mega-campus' }, error: null });
+      }
+      return {
+        insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      };
+    });
+
+    const share = await getPublicCareerPlaybookBySlug({ shareSlug: 'sales-manager' });
+
+    expect(primaryQuery.select).toHaveBeenCalledWith(expect.stringContaining('image_status'));
+    expect(fallbackQuery.select).toHaveBeenCalledWith(expect.not.stringContaining('image_status'));
+    expect(share).toMatchObject({
+      shareSlug: 'sales-manager',
+      isPublic: true,
+      imageUrl: null,
+      imageStatus: null,
+      imageAltText: null,
+      imageErrorMessage: null,
+      finalMarkdown: '# Менеджер по продажам',
+    });
+  });
+
   it('rejects non-owner visibility changes', async () => {
     fromMock.mockReturnValue(chainResult({ data: baseRow, error: null }));
 

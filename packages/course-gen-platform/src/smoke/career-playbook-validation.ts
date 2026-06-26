@@ -37,6 +37,8 @@ export interface CareerPlaybookSmokeCourseBridgeEvidence {
   courseId?: string | null;
   redirectUrl?: string | null;
   sourceDocumentIds?: string[];
+  documentProcessingStatus?: string | null;
+  documentProcessingError?: string | null;
 }
 
 export interface CareerPlaybookSmokeEvidenceInput {
@@ -178,8 +180,10 @@ function validateDeterministicContent(
   const careerMermaid = countMermaidDiagrams(generatedBlocks.block_11?.content ?? '');
   const processMermaid = countMermaidDiagrams(generatedBlocks.block_16?.content ?? '');
 
-  if (antiGoals < 4) issues.push(`Expected block_2 to contain at least 4 anti-goals; found ${antiGoals}.`);
-  if (decisions < 4) issues.push(`Expected block_5 to contain at least 4 decisions; found ${decisions}.`);
+  if (antiGoals < 4)
+    issues.push(`Expected block_2 to contain at least 4 anti-goals; found ${antiGoals}.`);
+  if (decisions < 4)
+    issues.push(`Expected block_5 to contain at least 4 decisions; found ${decisions}.`);
   if (failureModes < 3) {
     issues.push(`Expected block_21 to contain at least 3 failure modes; found ${failureModes}.`);
   }
@@ -281,10 +285,24 @@ function validateCourseBridge(
     };
   }
 
+  if (courseBridge.documentProcessingStatus === 'failed') {
+    return {
+      id: 'course-bridge',
+      status: 'fail',
+      note: `Course bridge document processing failed: ${
+        courseBridge.documentProcessingError ?? 'unknown error'
+      }.`,
+    };
+  }
+
   return {
     id: 'course-bridge',
     status: 'pass',
-    note: `Course bridge created ${courseBridge.courseId} with ${courseBridge.sourceDocumentIds.length} source document(s).`,
+    note: `Course bridge created ${courseBridge.courseId} with ${courseBridge.sourceDocumentIds.length} source document(s)${
+      hasText(courseBridge.documentProcessingStatus)
+        ? `; document processing reached ${courseBridge.documentProcessingStatus}`
+        : ''
+    }.`,
   };
 }
 

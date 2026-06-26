@@ -42,7 +42,7 @@ export type Context = {
  * @returns JWT token string or null if not found
  */
 function extractToken(req: Request): string | null {
-  const authHeader = req.headers.get('Authorization');
+  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
   if (!authHeader) {
     return null;
   }

@@ -3,6 +3,7 @@ import type {
   CareerPlaybookBlockState,
   CareerPlaybookNodeCost,
   CareerPlaybookQAData,
+  CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type {
@@ -41,6 +42,7 @@ export interface GenerateCareerPlaybookGroupInput {
 export interface GenerateCareerPlaybookGroupResult {
   group: CareerPlaybookGroupResult;
   blocks: Record<CareerPlaybookBlockId, CareerPlaybookBlockState>;
+  qualityIssues: CareerPlaybookQualityIssue[];
   nodeCost: CareerPlaybookNodeCost;
 }
 
@@ -319,6 +321,23 @@ export function splitCareerPlaybookGroupMarkdown(
   markdown: string,
   groupSpec: CareerPlaybookGroupSpec
 ): Record<CareerPlaybookBlockId, string> {
+  const { blocks, missingBlockIds } = splitCareerPlaybookGroupMarkdownPartial(markdown, groupSpec);
+  if (missingBlockIds.length > 0) {
+    throw new Error(
+      `Career Playbook group ${groupSpec.groupKey} is missing blocks: ${missingBlockIds.join(', ')}`
+    );
+  }
+
+  return blocks as Record<CareerPlaybookBlockId, string>;
+}
+
+function splitCareerPlaybookGroupMarkdownPartial(
+  markdown: string,
+  groupSpec: CareerPlaybookGroupSpec
+): {
+  blocks: Partial<Record<CareerPlaybookBlockId, string>>;
+  missingBlockIds: CareerPlaybookBlockId[];
+} {
   const starts = findBlockStarts(markdown, groupSpec);
   const blocks: Partial<Record<CareerPlaybookBlockId, string>> = {};
 
@@ -330,13 +349,103 @@ export function splitCareerPlaybookGroupMarkdown(
   const missingBlockIds = groupSpec.blocks
     .filter(block => !blocks[block.blockId])
     .map(block => block.blockId);
-  if (missingBlockIds.length > 0) {
-    throw new Error(
-      `Career Playbook group ${groupSpec.groupKey} is missing blocks: ${missingBlockIds.join(', ')}`
+
+  return { blocks, missingBlockIds };
+}
+
+function headingForBlock(
+  blockId: CareerPlaybookBlockId,
+  blockTitle: string,
+  language: string
+): string {
+  const labels = getGroupHeadingLabels(language);
+  if (blockId === 'header') return labels.heading_header;
+
+  const headingKey = `heading_${blockId}` as keyof typeof labels;
+  return labels[headingKey] ?? `## ${blockId.replace('block_', '')}. ${blockTitle}`;
+}
+
+function fallbackBlockContent(
+  block: CareerPlaybookBlockSpec,
+  input: GenerateCareerPlaybookGroupInput
+): string {
+  const language = input.language === 'en' ? 'en' : 'ru';
+  const heading = headingForBlock(block.blockId, block.title, language);
+  const roleTitle = input.roleProfileSpec.position.title;
+
+  if (block.blockId === 'header') {
+    const suffix = language === 'ru' ? 'должностная инструкция' : 'role guide';
+    const note =
+      language === 'ru'
+        ? 'Этот заголовок восстановлен автоматически, потому что модель не вернула обязательный раздел. Проверьте формулировку перед публикацией.'
+        : 'This header was restored automatically because the model omitted a required section. Review the wording before publishing.';
+
+    return `${heading}
+
+# ${roleTitle}: ${suffix}
+
+> ${note}`;
+  }
+
+  if (language === 'ru') {
+    return `${heading}
+
+> Этот раздел восстановлен автоматически, потому что модель не вернула обязательный блок "${block.title}". Проверьте и дополните его вручную или запустите регенерацию блока.
+
+- Что проверить: полноту раздела "${block.title}".
+- Что сделать: открыть блок и запустить регенерацию или заполнить раздел вручную.`;
+  }
+
+  return `${heading}
+
+> This section was restored automatically because the model omitted the required "${block.title}" block. Review and expand it manually or regenerate the block.
+
+- What to check: completeness of the "${block.title}" section.
+- Suggested action: open the block and regenerate it or fill it manually.`;
+}
+
+function buildFallbackBlockQualityIssue(
+  groupKey: CareerPlaybookGroupKey,
+  blockId: CareerPlaybookBlockId,
+  blockTitle: string
+): CareerPlaybookQualityIssue {
+  return {
+    id: `system:${blockId}:missing-${groupKey}`,
+    source: 'system',
+    severity: 'critical',
+    blockId,
+    title: 'Блок восстановлен автоматически',
+    message: `Модель не вернула обязательный блок ${blockId} (${blockTitle}); система сохранила безопасный fallback вместо падения генерации.`,
+    suggestion: 'Откройте блок, проверьте содержание и запустите регенерацию блока.',
+    action: 'regenerate',
+  };
+}
+
+function splitCareerPlaybookGroupMarkdownWithFallback(
+  markdown: string,
+  groupSpec: CareerPlaybookGroupSpec,
+  input: GenerateCareerPlaybookGroupInput
+): {
+  blockContent: Record<CareerPlaybookBlockId, string>;
+  qualityIssues: CareerPlaybookQualityIssue[];
+} {
+  const { blocks, missingBlockIds } = splitCareerPlaybookGroupMarkdownPartial(markdown, groupSpec);
+  const qualityIssues: CareerPlaybookQualityIssue[] = [];
+
+  for (const missingBlockId of missingBlockIds) {
+    const spec = groupSpec.blocks.find(block => block.blockId === missingBlockId);
+    if (!spec) continue;
+
+    blocks[missingBlockId] = fallbackBlockContent(spec, input);
+    qualityIssues.push(
+      buildFallbackBlockQualityIssue(groupSpec.groupKey, missingBlockId, spec.title)
     );
   }
 
-  return blocks as Record<CareerPlaybookBlockId, string>;
+  return {
+    blockContent: blocks as Record<CareerPlaybookBlockId, string>,
+    qualityIssues,
+  };
 }
 
 function toGeneratedBlocks(
@@ -392,7 +501,11 @@ export async function generateCareerPlaybookGroup(
     maxTokens: 14_000,
   });
   const generatedAt = new Date().toISOString();
-  const blockContent = splitCareerPlaybookGroupMarkdown(llmResult.content, groupSpec);
+  const { blockContent, qualityIssues } = splitCareerPlaybookGroupMarkdownWithFallback(
+    llmResult.content,
+    groupSpec,
+    input
+  );
   const blocks = toGeneratedBlocks(
     blockContent,
     llmResult.model,
@@ -411,6 +524,7 @@ export async function generateCareerPlaybookGroup(
       model: llmResult.model,
     },
     blocks,
+    qualityIssues,
     nodeCost: {
       node: groupSpec.node,
       model: llmResult.model,
@@ -452,6 +566,7 @@ export function createGroupGeneratorNode(
       return {
         generatedGroups: { [groupKey]: result.group },
         generatedBlocks: result.blocks,
+        ...(result.qualityIssues.length > 0 ? { qualityIssues: result.qualityIssues } : {}),
         nodeCosts: [result.nodeCost],
         currentNode: NEXT_GROUP_NODE[groupKey] ?? groupSpec.node,
       };
