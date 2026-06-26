@@ -6,6 +6,7 @@ import {
   CareerPlaybookImageStatusSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookPlaybookStatusSchema,
+  CareerPlaybookQualityIssueSchema,
   CareerPlaybookWizardProgressSchema,
   languageSchema,
   type CareerPlaybookBlockState,
@@ -61,6 +62,17 @@ export interface CareerPlaybookRow {
   completed_at: string | null;
 }
 
+export interface CareerPlaybookLinkedCourseRow {
+  id: string;
+  organization_id: string;
+  title: string | null;
+  slug: string | null;
+  status: string | null;
+  generation_status?: string | null;
+  settings: Json | null;
+  created_at: string | null;
+}
+
 interface QueryResult<T> {
   data: T | null;
   error: unknown;
@@ -77,6 +89,7 @@ interface CareerPlaybookQueryBuilder<T> {
   delete: () => CareerPlaybookQueryBuilder<T>;
   select: (columns?: string) => CareerPlaybookQueryBuilder<T>;
   eq: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
+  contains: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
   or: (filters: string) => CareerPlaybookQueryBuilder<T>;
   order: (column: string, options?: { ascending?: boolean }) => Promise<ListQueryResult<T>>;
   single: () => Promise<QueryResult<T>>;
@@ -88,6 +101,7 @@ export interface CareerPlaybookSupabase {
   from(
     table: 'career_playbook_fixed_questions'
   ): CareerPlaybookQueryBuilder<CareerPlaybookFixedQuestion>;
+  from(table: 'courses'): CareerPlaybookQueryBuilder<CareerPlaybookLinkedCourseRow>;
 }
 
 export function normalizeLanguage(language: unknown): Language {
@@ -99,6 +113,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
   const value = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const hasBusinessContext = Object.prototype.hasOwnProperty.call(value, 'business_context');
   const generationWarnings = z.array(z.string().min(1)).safeParse(value.generation_warnings);
+  const qualityIssues = z.array(CareerPlaybookQualityIssueSchema).safeParse(value.quality_issues);
   const qaData = CareerPlaybookQADataSchema.parse({
     fixed: value.fixed ?? [],
     followups: value.followups ?? [],
@@ -116,6 +131,7 @@ export function normalizeStoredQAData(raw: unknown): StoredQAData {
     ui_progress: value.ui_progress,
     generation_progress: value.generation_progress,
     generation_warnings: generationWarnings.success ? generationWarnings.data : [],
+    quality_issues: qualityIssues.success ? qualityIssues.data : [],
   });
   const followupQuestions = CareerPlaybookFollowupQuestionSchema.array().safeParse(
     value.followup_questions

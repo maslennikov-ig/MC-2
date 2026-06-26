@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import type {
   CareerPlaybookNumericFact,
+  CareerPlaybookQualityIssue,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookVisibility,
 } from '@megacampus/shared-types'
@@ -96,6 +97,12 @@ export interface PlaybookViewerCopy {
   imageStatusLabel?: (status: NonNullable<CareerPlaybookViewerSnapshot['imageStatus']>) => string
   imageRegenerate?: string
   imageUnavailable?: string
+  qualityIssueOpenBlock?: string
+  qualityIssueEditBlock?: string
+  qualityIssueRegenerateBlock?: string
+  qualityIssueSuggestionLabel?: string
+  qualityIssueLegacyTitle?: string
+  qualityIssueSeverityLabel?: (severity: CareerPlaybookQualityIssue['severity']) => string
   visibilityLabel?: string
   visibilityValueLabel?: (visibility: CareerPlaybookVisibility) => string
   inspectorReadyBlocks?: (ready: number, total: number) => string
@@ -134,6 +141,7 @@ interface PlaybookViewerProps {
   onShare: () => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
+  openCourseHref?: string | null
   onDelete: () => void
   onRegenerateImage?: () => void
   isUpdatingVisibility?: boolean
@@ -179,6 +187,13 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   imageStatusLabel: (status) => DEFAULT_IMAGE_STATUS_LABELS[status] ?? status,
   imageRegenerate: 'Перегенерировать',
   imageUnavailable: 'Изображение ещё не создано',
+  qualityIssueOpenBlock: 'Открыть блок',
+  qualityIssueEditBlock: 'Редактировать',
+  qualityIssueRegenerateBlock: 'Перегенерировать',
+  qualityIssueSuggestionLabel: 'Что исправить',
+  qualityIssueLegacyTitle: 'Системное предупреждение',
+  qualityIssueSeverityLabel: (severity) =>
+    severity === 'critical' ? 'Критично' : severity === 'warning' ? 'Предупреждение' : 'Инфо',
   visibilityLabel: 'Видимость',
   visibilityValueLabel: (visibility) => DEFAULT_VISIBILITY_LABELS[visibility],
   inspectorReadyBlocks: (ready, total) => `Готово блоков: ${ready} из ${total}`,
@@ -209,6 +224,7 @@ const defaultActionsCopy: Required<ActionsBarCopy> = {
   pdf: 'PDF',
   share: 'Поделиться',
   createCourse: 'Создать курс из инструкции',
+  openCourse: 'Перейти в курс',
   delete: 'Удалить',
 }
 
@@ -344,6 +360,7 @@ export function PlaybookViewer({
   onShare,
   onCreateCourse,
   createCourseAction,
+  openCourseHref,
   onDelete,
   onRegenerateImage,
   isUpdatingVisibility = false,
@@ -605,6 +622,7 @@ export function PlaybookViewer({
                 readyBlocks={readyBlocks}
                 totalBlocks={blocks.length}
                 numericSummary={numericSummary}
+                blocks={blocks}
                 contentLanguage={snapshot.contentLanguage}
                 canManageVisibility={viewerPermissions.canManageVisibility}
                 canCreateCourse={viewerPermissions.canCreateCourse}
@@ -612,8 +630,11 @@ export function PlaybookViewer({
                 onVisibilityChange={onVisibilityChange}
                 onPdf={onPdf}
                 onShare={onShare}
+                onEditBlock={onEditBlock}
+                onRegenerateBlock={onRegenerateBlock}
                 onCreateCourse={onCreateCourse}
                 createCourseAction={createCourseAction}
+                openCourseHref={openCourseHref}
                 onDelete={onDelete}
                 canRegenerateImage={viewerPermissions.canManageVisibility}
                 isRegeneratingImage={isRegeneratingImage}
@@ -801,6 +822,7 @@ function InspectorRail({
   readyBlocks,
   totalBlocks,
   numericSummary,
+  blocks,
   contentLanguage,
   canManageVisibility,
   canCreateCourse,
@@ -808,8 +830,11 @@ function InspectorRail({
   onVisibilityChange,
   onPdf,
   onShare,
+  onEditBlock,
+  onRegenerateBlock,
   onCreateCourse,
   createCourseAction,
+  openCourseHref,
   onDelete,
   canRegenerateImage,
   isRegeneratingImage,
@@ -821,6 +846,7 @@ function InspectorRail({
   readyBlocks: number
   totalBlocks: number
   numericSummary: NumericFactSummary
+  blocks: CareerPlaybookViewerBlock[]
   contentLanguage: string
   canManageVisibility: boolean
   canCreateCourse: boolean
@@ -828,8 +854,11 @@ function InspectorRail({
   onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
   onPdf: () => void
   onShare: () => void
+  onEditBlock: (blockId: CareerPlaybookBlockId) => void
+  onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
+  openCourseHref?: string | null
   onDelete: () => void
   canRegenerateImage: boolean
   isRegeneratingImage: boolean
@@ -856,12 +885,20 @@ function InspectorRail({
           onCreateCourse={onCreateCourse}
           createCourseAction={createCourseAction}
           canCreateCourse={canCreateCourse}
+          openCourseHref={openCourseHref}
           onDelete={onDelete}
         />
 
         <NumericFactsSummary summary={numericSummary} labels={labels} />
 
-        <QualityWarningsSummary warnings={snapshot.qualityWarnings} labels={labels} />
+        <QualityWarningsSummary
+          issues={snapshot.qualityIssues}
+          warnings={snapshot.qualityWarnings}
+          blocks={blocks}
+          labels={labels}
+          onEditBlock={onEditBlock}
+          onRegenerateBlock={onRegenerateBlock}
+        />
 
         <ImageStatusSection
           snapshot={snapshot}
@@ -904,14 +941,51 @@ function InspectorRail({
 }
 
 function QualityWarningsSummary({
+  issues,
   warnings,
+  blocks,
   labels,
+  onEditBlock,
+  onRegenerateBlock,
 }: {
+  issues?: CareerPlaybookQualityIssue[]
   warnings?: string[]
+  blocks: CareerPlaybookViewerBlock[]
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  onEditBlock: (blockId: CareerPlaybookBlockId) => void
+  onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
 }) {
-  const visibleWarnings = warnings?.filter((warning) => warning.trim().length > 0) ?? []
-  if (visibleWarnings.length === 0) return null
+  const blockTitleById = new Map(
+    blocks.map((block) => [block.blockId, labels.blockTitle(block.blockId, block.title)])
+  )
+  const structuredIssues = issues?.filter((issue) => issue.message.trim().length > 0) ?? []
+  const legacyIssues: CareerPlaybookQualityIssue[] =
+    warnings
+      ?.filter((warning) => warning.trim().length > 0)
+      .map((warning, index) => ({
+        id: `legacy-warning:${index}`,
+        source: 'system',
+        severity: 'warning',
+        title: labels.qualityIssueLegacyTitle,
+        message: warning.trim(),
+        action: 'review',
+      })) ?? []
+  const visibleIssues = [...structuredIssues, ...legacyIssues]
+  if (visibleIssues.length === 0) return null
+
+  const groupedIssues = groupQualityIssues(visibleIssues)
+
+  const openBlock = (blockId: CareerPlaybookBlockId) => {
+    const element = document.getElementById(blockId)
+    element?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    if (window.location.hash !== `#${blockId}`) {
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}#${blockId}`
+      )
+    }
+  }
 
   return (
     <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-950 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-50">
@@ -924,16 +998,82 @@ function QualityWarningsSummary({
           </p>
         </div>
       </div>
-      <ul className="mt-3 grid gap-2 text-xs leading-5">
-        {visibleWarnings.map((warning, index) => (
-          <li
-            key={`${index}-${warning}`}
-            className="rounded-md bg-white/70 p-2 dark:bg-slate-950/35"
+      <div className="mt-3 grid gap-2">
+        {groupedIssues.map((group) => (
+          <details
+            key={group.key}
+            open
+            className="rounded-md bg-white/75 p-2 text-xs leading-5 dark:bg-slate-950/35"
           >
-            {warning}
-          </li>
+            <summary className="cursor-pointer list-none font-semibold text-amber-950 dark:text-amber-50">
+              <span>
+                {group.blockId
+                  ? (blockTitleById.get(group.blockId) ?? group.blockId)
+                  : labels.qualityIssueLegacyTitle}
+              </span>
+              <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-300/15 dark:text-amber-100">
+                {group.issues.length}
+              </span>
+            </summary>
+            <div className="mt-2 grid gap-2">
+              {group.issues.map((issue) => (
+                <div
+                  key={issue.id}
+                  className="rounded-md border border-amber-200/70 bg-white/80 p-2 dark:border-amber-300/15 dark:bg-slate-950/40"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="rounded-md border-amber-300 px-1.5 py-0 text-[10px] text-amber-800 dark:text-amber-100"
+                    >
+                      {labels.qualityIssueSeverityLabel(issue.severity)}
+                    </Badge>
+                    <span className="font-semibold">{issue.title}</span>
+                  </div>
+                  <p className="mt-1 text-amber-900 dark:text-amber-50/90">{issue.message}</p>
+                  {issue.suggestion ? (
+                    <p className="mt-1 text-amber-800 dark:text-amber-100/80">
+                      <span className="font-semibold">{labels.qualityIssueSuggestionLabel}: </span>
+                      {issue.suggestion}
+                    </p>
+                  ) : null}
+                  {issue.blockId ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-md px-2 text-[11px]"
+                        onClick={() => openBlock(issue.blockId!)}
+                      >
+                        {labels.qualityIssueOpenBlock}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-md px-2 text-[11px]"
+                        onClick={() => onEditBlock(issue.blockId!)}
+                      >
+                        {labels.qualityIssueEditBlock}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-md px-2 text-[11px]"
+                        onClick={() => onRegenerateBlock(issue.blockId!)}
+                      >
+                        {labels.qualityIssueRegenerateBlock}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </details>
         ))}
-      </ul>
+      </div>
     </section>
   )
 }
@@ -989,6 +1129,33 @@ function ImageStatusSection({
       </div>
     </section>
   )
+}
+
+function groupQualityIssues(issues: CareerPlaybookQualityIssue[]): Array<{
+  key: string
+  blockId?: CareerPlaybookBlockId
+  issues: CareerPlaybookQualityIssue[]
+}> {
+  const groups = new Map<
+    string,
+    { key: string; blockId?: CareerPlaybookBlockId; issues: CareerPlaybookQualityIssue[] }
+  >()
+
+  for (const issue of issues) {
+    const key = issue.blockId ?? 'system'
+    const existing = groups.get(key)
+    if (existing) {
+      existing.issues.push(issue)
+      continue
+    }
+    groups.set(key, {
+      key,
+      ...(issue.blockId ? { blockId: issue.blockId } : {}),
+      issues: [issue],
+    })
+  }
+
+  return Array.from(groups.values())
 }
 
 function NumericFactsSummary({

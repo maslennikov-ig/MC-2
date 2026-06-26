@@ -4,12 +4,17 @@ import {
   CareerPlaybookQADataSchema,
   CareerPlaybookOperationJobDataSchema,
   JobType,
+  CareerPlaybookBlockIdSchema,
+  CareerPlaybookQualityIssueSchema,
+  type CareerPlaybookBlockId,
+  type CareerPlaybookBlockState,
   type CareerPlaybookCostBreakdown,
   type CareerPlaybookGenerateImageJobData,
   type CareerPlaybookGenerationProgress,
   type CareerPlaybookGenerateFollowupsJobData,
   type CareerPlaybookGeneratePlaybookJobData,
   type CareerPlaybookJobData,
+  type CareerPlaybookQualityIssue,
   type CareerPlaybookProcessSourceJobData,
   type CareerPlaybookRegenerateBlockJobData,
 } from '@megacampus/shared-types';
@@ -24,6 +29,10 @@ import {
   getCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
 } from '@/stages/stage-career-playbook/graph';
+import {
+  remediateCareerPlaybookFinalMarkdown,
+  remediateCareerPlaybookMermaidBlocks,
+} from '@/stages/stage-career-playbook/nodes/mermaid-quality';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
@@ -41,6 +50,7 @@ type CareerPlaybookGraphResult = {
   costBreakdown?: CareerPlaybookCostBreakdown | null;
   nodeCosts?: CareerPlaybookCostBreakdown['nodeCosts'];
   warnings?: string[];
+  qualityIssues?: unknown;
 };
 
 function toJson(value: unknown): unknown {
@@ -72,6 +82,157 @@ function normalizeGenerationWarnings(warnings: unknown): string[] {
         .filter(Boolean)
     )
   );
+}
+
+function normalizeQualityIssues(issues: unknown): CareerPlaybookQualityIssue[] {
+  if (!Array.isArray(issues)) return [];
+
+  const normalized: CareerPlaybookQualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of issues) {
+    const parsed = CareerPlaybookQualityIssueSchema.safeParse(issue);
+    if (!parsed.success || seen.has(parsed.data.id)) continue;
+    normalized.push(parsed.data);
+    seen.add(parsed.data.id);
+  }
+
+  return normalized;
+}
+
+function maybeBlockId(value: unknown): CareerPlaybookBlockId | undefined {
+  const parsed = CareerPlaybookBlockIdSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function asGeneratedBlocks(
+  value: unknown
+): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const result: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> = {};
+  for (const [rawBlockId, rawBlock] of Object.entries(value)) {
+    const blockId = maybeBlockId(rawBlockId);
+    if (!blockId || !rawBlock || typeof rawBlock !== 'object' || Array.isArray(rawBlock)) continue;
+    result[blockId] = rawBlock as CareerPlaybookBlockState;
+  }
+
+  return result;
+}
+
+function qualityIssueTitleForSeverity(severity: CareerPlaybookQualityIssue['severity']): string {
+  if (severity === 'critical') return 'Проблема качества блока';
+  if (severity === 'warning') return 'Замечание к качеству блока';
+  return 'Информационное замечание';
+}
+
+function issueId(
+  source: string,
+  blockId: CareerPlaybookBlockId | undefined,
+  index: number
+): string {
+  return `${source}:${blockId ?? 'system'}:${index}`;
+}
+
+function collectJudgeQualityIssues(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookQualityIssue[] {
+  const issues: CareerPlaybookQualityIssue[] = [];
+
+  for (const [rawBlockId, block] of Object.entries(generatedBlocks)) {
+    const verdictIssues = block?.judge_verdict?.issues ?? [];
+    for (const [index, issue] of verdictIssues.entries()) {
+      issues.push({
+        id: issueId('cross_block_judge', rawBlockId, index),
+        source: 'cross_block_judge',
+        severity: issue.severity,
+        blockId: issue.block_id,
+        title: qualityIssueTitleForSeverity(issue.severity),
+        message: issue.description,
+        ...(issue.suggestion ? { suggestion: issue.suggestion } : {}),
+        action: issue.severity === 'info' ? 'review' : 'regenerate',
+      });
+    }
+  }
+
+  return issues;
+}
+
+function extractWarningBlockIds(warning: string): CareerPlaybookBlockId[] {
+  const forMatch = warning.match(/\bfor\s+([^;]+);/i);
+  if (!forMatch) return [];
+
+  return forMatch[1]
+    .split(',')
+    .map(part => maybeBlockId(part.trim()))
+    .filter((blockId): blockId is CareerPlaybookBlockId => Boolean(blockId));
+}
+
+function collectWarningQualityIssues(warnings: string[]): CareerPlaybookQualityIssue[] {
+  const issues: CareerPlaybookQualityIssue[] = [];
+
+  for (const [index, warning] of warnings.entries()) {
+    const blockIds = extractWarningBlockIds(warning);
+    if (blockIds.length === 0) {
+      issues.push({
+        id: issueId('system', undefined, index),
+        source: 'system',
+        severity: 'warning',
+        title: 'Системное предупреждение',
+        message: warning,
+        suggestion: 'Проверьте должностную инструкцию вручную перед публикацией.',
+        action: 'review',
+      });
+      continue;
+    }
+
+    for (const blockId of blockIds) {
+      issues.push({
+        id: issueId('system', blockId, index),
+        source: 'system',
+        severity: 'warning',
+        blockId,
+        title: 'Системное предупреждение',
+        message: warning,
+        suggestion: 'Проверьте блок вручную или запустите регенерацию блока.',
+        action: 'regenerate',
+      });
+    }
+  }
+
+  return issues;
+}
+
+function mergeQualityIssues(
+  ...groups: CareerPlaybookQualityIssue[][]
+): CareerPlaybookQualityIssue[] {
+  const merged: CareerPlaybookQualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of groups.flat()) {
+    if (seen.has(issue.id)) continue;
+    merged.push(issue);
+    seen.add(issue.id);
+  }
+
+  return merged;
+}
+
+function buildCareerPlaybookQualityIssues(
+  result: CareerPlaybookGraphResult,
+  warnings: string[]
+): CareerPlaybookQualityIssue[] {
+  return mergeQualityIssues(
+    normalizeQualityIssues(result.qualityIssues),
+    collectJudgeQualityIssues(asGeneratedBlocks(result.generatedBlocks)),
+    collectWarningQualityIssues(warnings)
+  );
+}
+
+function hasGeneratedBlocks(
+  value: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+) {
+  return Object.keys(value).length > 0;
 }
 
 export class CareerPlaybookHandler {
@@ -212,9 +373,12 @@ export class CareerPlaybookHandler {
     jobData: CareerPlaybookGeneratePlaybookJobData,
     result: CareerPlaybookGraphResult
   ) {
+    const safeResult = await this.remediateMermaidBeforePersist(result);
     const costBreakdown = buildCostBreakdown(result);
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
+    const generationWarnings = normalizeGenerationWarnings(safeResult.warnings);
+    const qualityIssues = buildCareerPlaybookQualityIssues(safeResult, generationWarnings);
     const completedProgress = this.buildGenerationProgress(
       jobData,
       { stage: 'completed', percent: 100 },
@@ -223,13 +387,14 @@ export class CareerPlaybookHandler {
     const updatePayload: Partial<CareerPlaybookRow> = {
       status: 'completed',
       generated_blocks: toJson(
-        result.generatedBlocks ?? {}
+        safeResult.generatedBlocks ?? {}
       ) as CareerPlaybookRow['generated_blocks'],
-      final_markdown: result.finalMarkdown ?? null,
+      final_markdown: safeResult.finalMarkdown ?? null,
       q_a_data: toJson({
         ...qaDataWithoutGenerationError,
         generation_progress: completedProgress,
-        generation_warnings: normalizeGenerationWarnings(result.warnings),
+        generation_warnings: generationWarnings,
+        quality_issues: qualityIssues,
       }) as CareerPlaybookRow['q_a_data'],
       completed_at: new Date().toISOString(),
     };
@@ -301,6 +466,29 @@ export class CareerPlaybookHandler {
         );
       }
     }
+  }
+
+  private async remediateMermaidBeforePersist(
+    result: CareerPlaybookGraphResult
+  ): Promise<CareerPlaybookGraphResult> {
+    const generatedBlocks = asGeneratedBlocks(result.generatedBlocks);
+    const blockRemediation = await remediateCareerPlaybookMermaidBlocks(generatedBlocks);
+    const markdownRemediation = await remediateCareerPlaybookFinalMarkdown(result.finalMarkdown);
+    const qualityIssues = mergeQualityIssues(
+      normalizeQualityIssues(result.qualityIssues),
+      blockRemediation.qualityIssues
+    );
+
+    return {
+      ...result,
+      generatedBlocks: hasGeneratedBlocks(generatedBlocks)
+        ? blockRemediation.generatedBlocks
+        : result.generatedBlocks,
+      finalMarkdown: markdownRemediation.modified
+        ? markdownRemediation.content
+        : result.finalMarkdown,
+      qualityIssues,
+    };
   }
 
   private async persistFailed(jobData: CareerPlaybookGeneratePlaybookJobData, error: string) {

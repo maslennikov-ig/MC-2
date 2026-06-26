@@ -7,6 +7,7 @@ import type {
   CareerPlaybookVisibility,
   CareerPlaybookImageStatus,
   CareerPlaybookViewerPermissions,
+  CareerPlaybookLinkedCourse,
 } from './types'
 
 type RawRecord = Record<string, unknown>
@@ -97,6 +98,25 @@ function normalizeViewerPermissions(raw: unknown): CareerPlaybookViewerPermissio
       readBoolean(record, 'canManageVisibility', 'can_manage_visibility') ?? false,
     canCreateCourse: readBoolean(record, 'canCreateCourse', 'can_create_course') ?? false,
     canDelete: readBoolean(record, 'canDelete', 'can_delete') ?? false,
+  }
+}
+
+function normalizeLinkedCourse(raw: unknown): CareerPlaybookLinkedCourse | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const record = raw as RawRecord
+  const id = readString(record, 'id', 'courseId', 'course_id')
+  const title = readString(record, 'title')
+  const slug = readString(record, 'slug', 'courseSlug', 'course_slug')
+  if (!id || !title || !slug) return null
+
+  return {
+    id,
+    title,
+    slug,
+    organizationSlug: readString(record, 'organizationSlug', 'organization_slug', 'orgSlug'),
+    status: readString(record, 'status'),
+    generationStatus: readString(record, 'generationStatus', 'generation_status'),
   }
 }
 
@@ -204,6 +224,7 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
     viewerPermissions: normalizeViewerPermissions(readRecord(row, 'viewerPermissions')),
     shareSlug: readString(row, 'share_slug', 'shareSlug'),
     organizationSlug: readString(row, 'organization_slug', 'organizationSlug', 'orgSlug'),
+    linkedCourse: normalizeLinkedCourse(readRecord(row, 'linkedCourse', 'linked_course')),
     language: readString(row, 'language'),
   }
 }

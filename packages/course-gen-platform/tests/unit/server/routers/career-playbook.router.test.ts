@@ -144,8 +144,13 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    contains: vi.fn(() => builder),
     or: vi.fn(() => builder),
     order: vi.fn(() => builder),
+    maybeSingle: vi.fn(() => {
+      const result = singleResults.shift();
+      return Promise.resolve(result ?? { data: null, error: null });
+    }),
     single: vi.fn(() => {
       const result = singleResults.shift();
       return Promise.resolve(result ?? { data: null, error: new Error('No mocked single result') });
@@ -160,6 +165,7 @@ function createListBuilder(data: unknown[], error: unknown = null) {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    contains: vi.fn(() => builder),
     or: vi.fn(() => builder),
     order: vi.fn(() => Promise.resolve({ data, error })),
   };
@@ -1091,8 +1097,7 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update).not.toHaveBeenCalled();
   });
 
-  it('enables public sharing with an unguessable generated share slug', async () => {
-    const predictableSlug = 'role-guide-333333';
+  it('enables public sharing with a deterministic role-based share slug', async () => {
     const builder = createBuilder([
       {
         data: playbookRow({
@@ -1100,12 +1105,14 @@ describe('careerPlaybookRouter transport', () => {
           is_public: false,
           status: 'completed',
           final_markdown: '# Sales Manager',
+          position_title: 'Head of Sales',
         }),
         error: null,
       },
+      { data: null, error: null },
       {
         data: playbookRow({
-          share_slug: 'role-guide-123456',
+          share_slug: 'head-of-sales',
           is_public: true,
           status: 'completed',
           final_markdown: '# Sales Manager',
@@ -1121,16 +1128,16 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         is_public: true,
-        share_slug: expect.stringMatching(/^role-guide-[a-f0-9]{6}$/),
+        share_slug: 'head-of-sales',
       })
     );
-    expect(builder.update.mock.calls[0][0].share_slug).not.toBe(predictableSlug);
+    expect(builder.maybeSingle).toHaveBeenCalledTimes(1);
     expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
     expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
     expect(result).toMatchObject({
       playbookId,
       isPublic: true,
-      shareSlug: 'role-guide-123456',
+      shareSlug: 'head-of-sales',
       organizationSlug: 'mega-campus',
       visibility: 'public',
       viewerPermissions: {
@@ -1140,6 +1147,49 @@ describe('careerPlaybookRouter transport', () => {
         canManageVisibility: true,
       },
     });
+  });
+
+  it('adds a short suffix only when the role-based share slug collides', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: null,
+          is_public: false,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+          position_title: 'Head of Sales',
+        }),
+        error: null,
+      },
+      {
+        data: { id: '99999999-9999-4999-8999-999999999999' },
+        error: null,
+      },
+      { data: null, error: null },
+      {
+        data: playbookRow({
+          share_slug: 'head-of-sales-333333',
+          is_public: true,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+          position_title: 'Head of Sales',
+        }),
+        error: null,
+      },
+    ]);
+    mockCareerPlaybookTable(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.share.shareToggle({ playbookId, isPublic: true });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_public: true,
+        share_slug: 'head-of-sales-333333',
+      })
+    );
+    expect(builder.maybeSingle).toHaveBeenCalledTimes(2);
+    expect(result.shareSlug).toBe('head-of-sales-333333');
   });
 
   it('disables public sharing without returning an active share link', async () => {

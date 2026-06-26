@@ -13,6 +13,7 @@ vi.mock('../../src/shared/supabase/admin', () => ({
 
 const {
   getCareerPlaybookFromLibrary,
+  getPublicCareerPlaybookBySlug,
   listCareerPlaybooks,
   toggleCareerPlaybookShare,
   updateCareerPlaybookNumericFact,
@@ -81,9 +82,11 @@ function chainResult(result: unknown) {
   const chain = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
+    contains: vi.fn(() => chain),
     or: vi.fn(() => chain),
     order: vi.fn(() => Promise.resolve(result)),
     single: vi.fn(() => Promise.resolve(result)),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
   };
   return chain;
 }
@@ -212,6 +215,161 @@ describe('career-playbook library visibility service', () => {
     expect(detail.generatedBlocks.header?.content).toBe('# Header');
   });
 
+  it('returns the linked course for a playbook detail when a course already exists', async () => {
+    const playbookQuery = chainResult({ data: baseRow, error: null });
+    const organizationQuery = chainResult({ data: { slug: 'mega-campus' }, error: null });
+    const coursesQuery = chainResult({
+      data: [
+        {
+          id: 'course-1',
+          title: 'Курс для менеджера по продажам',
+          slug: 'sales-manager-course',
+          organization_id: 'org-1',
+          status: 'draft',
+          generation_status: 'completed',
+          settings: {
+            source: 'career_playbook',
+            playbookId: baseRow.id,
+          },
+          created_at: '2026-06-02T10:00:00.000Z',
+        },
+      ],
+      error: null,
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbookQuery;
+      if (table === 'organizations') return organizationQuery;
+      if (table === 'courses') return coursesQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const detail = await getCareerPlaybookFromLibrary(ctx(owner), {
+      playbookId: baseRow.id,
+    });
+
+    expect(coursesQuery.contains).toHaveBeenCalledWith('settings', {
+      source: 'career_playbook',
+    });
+    expect(detail.linkedCourse).toEqual({
+      id: 'course-1',
+      title: 'Курс для менеджера по продажам',
+      slug: 'sales-manager-course',
+      organizationSlug: 'mega-campus',
+      status: 'draft',
+      generationStatus: 'completed',
+    });
+  });
+
+  it('repairs legacy invalid Mermaid before returning library detail', async () => {
+    const invalidDiagram = `## 16. Основной процесс
+
+\`\`\`mermaid
+flowchart TD
+  A[Секретарь (Senior)] --> B{Выбор сценария}
+\`\`\``;
+    const rowWithInvalidMermaid: CareerPlaybookRow = {
+      ...baseRow,
+      generated_blocks: {
+        block_16: {
+          content: invalidDiagram,
+          status: 'generated',
+          attempt: 1,
+        },
+      },
+      final_markdown: invalidDiagram,
+    };
+    fromMock.mockReturnValue(chainResult({ data: rowWithInvalidMermaid, error: null }));
+
+    const detail = await getCareerPlaybookFromLibrary(ctx(owner), {
+      playbookId: baseRow.id,
+    });
+
+    expect(detail.generatedBlocks.block_16?.content).not.toContain('A[Секретарь (Senior)]');
+    expect(detail.finalMarkdown).not.toContain('A[Секретарь (Senior)]');
+    expect(detail.finalMarkdown).not.toContain('Syntax error in text');
+    expect(detail.qualityIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'mermaid',
+          blockId: 'block_16',
+        }),
+      ])
+    );
+  });
+
+  it('returns linked course metadata in library list items', async () => {
+    const playbooksQuery = chainResult({
+      data: [baseRow],
+      error: null,
+    });
+    const organizationQuery = chainResult({ data: { slug: 'mega-campus' }, error: null });
+    const coursesQuery = chainResult({
+      data: [
+        {
+          id: 'course-1',
+          title: 'Курс для менеджера по продажам',
+          slug: 'sales-manager-course',
+          organization_id: 'org-1',
+          status: 'draft',
+          generation_status: 'stage_6_generating',
+          settings: {
+            source: 'career_playbook',
+            playbookId: baseRow.id,
+          },
+          created_at: '2026-06-02T10:00:00.000Z',
+        },
+      ],
+      error: null,
+    });
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') return playbooksQuery;
+      if (table === 'organizations') return organizationQuery;
+      if (table === 'courses') return coursesQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await listCareerPlaybooks(ctx(owner), {
+      limit: 20,
+      sort: 'created_desc',
+    });
+
+    expect(result.items[0]?.linkedCourse).toEqual({
+      id: 'course-1',
+      title: 'Курс для менеджера по продажам',
+      slug: 'sales-manager-course',
+      organizationSlug: 'mega-campus',
+      status: 'draft',
+      generationStatus: 'stage_6_generating',
+    });
+  });
+
+  it('repairs legacy invalid Mermaid before returning public share markdown', async () => {
+    const invalidDiagram = `## 16. Основной процесс
+
+\`\`\`mermaid
+flowchart TD
+  A[Секретарь (Senior)] --> B{Выбор сценария}
+\`\`\``;
+    fromMock.mockReturnValue(
+      chainResult({
+        data: {
+          ...baseRow,
+          visibility: 'public',
+          is_public: true,
+          final_markdown: invalidDiagram,
+        },
+        error: null,
+      })
+    );
+
+    const share = await getPublicCareerPlaybookBySlug({ shareSlug: 'sales-manager' });
+
+    expect(share.finalMarkdown).not.toContain('A[Секретарь (Senior)]');
+    expect(share.finalMarkdown).not.toContain('Syntax error in text');
+  });
+
   it('rejects non-owner visibility changes', async () => {
     fromMock.mockReturnValue(chainResult({ data: baseRow, error: null }));
 
@@ -230,7 +388,7 @@ describe('career-playbook library visibility service', () => {
         user_id: owner.id,
         visibility: 'public',
         is_public: true,
-        share_slug: 'menedzher-po-prodazham-000000',
+        share_slug: 'menedzher-po-prodazham',
       },
       error: null,
     });
@@ -238,6 +396,7 @@ describe('career-playbook library visibility service', () => {
       .mockReturnValueOnce(
         chainResult({ data: { ...baseRow, user_id: owner.id, share_slug: null }, error: null })
       )
+      .mockReturnValueOnce(chainResult({ data: null, error: null }))
       .mockReturnValueOnce(update.chain)
       .mockReturnValueOnce(chainResult({ data: { slug: 'mega-campus' }, error: null }));
 
@@ -248,12 +407,12 @@ describe('career-playbook library visibility service', () => {
 
     expect(update.updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        share_slug: expect.stringMatching(/^menedzher-po-prodazham-[a-f0-9]{6}$/),
+        share_slug: 'menedzher-po-prodazham',
       })
     );
     expect(result.visibility).toBe('public');
     expect(result.isPublic).toBe(true);
-    expect(result.shareSlug).toBe('menedzher-po-prodazham-000000');
+    expect(result.shareSlug).toBe('menedzher-po-prodazham');
     expect(result.organizationSlug).toBe('mega-campus');
     expect(result.viewerPermissions.canManageVisibility).toBe(true);
   });

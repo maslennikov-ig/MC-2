@@ -343,7 +343,11 @@ export function removeRawQuotes(context: BlockProcessingContext): BlockProcessin
   let rawQuotesRemoved = 0;
   const sanitized = context.sanitized.replace(
     /(\w+)\[([^\]]*)"([^\]"]*)"([^\]]*)\]/g,
-    (_, id, before, quoted, after) => {
+    (match: string, id: string, before: string, quoted: string, after: string): string => {
+      if (!before.trim() && !after.trim()) {
+        return match;
+      }
+
       rawQuotesRemoved++;
       return `${id}[${before}${quoted}${after}]`;
     }

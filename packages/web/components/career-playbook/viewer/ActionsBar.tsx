@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { BookOpen, Download, Share2, Trash2 } from 'lucide-react'
+import { BookOpen, Download, ExternalLink, Share2, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
@@ -10,6 +11,7 @@ export interface ActionsBarCopy {
   pdf?: string
   share?: string
   createCourse?: string
+  openCourse?: string
   delete?: string
 }
 
@@ -21,6 +23,7 @@ interface ActionsBarProps {
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   canCreateCourse?: boolean
+  openCourseHref?: string | null
   onDelete: () => void
 }
 
@@ -29,6 +32,7 @@ const defaultCopy: Required<ActionsBarCopy> = {
   pdf: 'PDF',
   share: 'Share',
   createCourse: 'Create course',
+  openCourse: 'Open course',
   delete: 'Delete',
 }
 
@@ -40,19 +44,29 @@ export function ActionsBar({
   onCreateCourse,
   createCourseAction,
   canCreateCourse = true,
+  openCourseHref,
   onDelete,
 }: ActionsBarProps) {
   const labels = { ...defaultCopy, ...copy }
-  const createCourseButton = canCreateCourse ? (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={createCourseAction ? undefined : onCreateCourse}
-      data-testid="career-playbook-create-course-trigger"
-    >
-      <BookOpen className="mr-2 h-4 w-4" aria-hidden />
-      {labels.createCourse}
+  const createCourseButton =
+    canCreateCourse && !openCourseHref ? (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={createCourseAction ? undefined : onCreateCourse}
+        data-testid="career-playbook-create-course-trigger"
+      >
+        <BookOpen className="mr-2 h-4 w-4" aria-hidden />
+        {labels.createCourse}
+      </Button>
+    ) : null
+  const openCourseButton = openCourseHref ? (
+    <Button asChild variant="outline" size="sm">
+      <Link href={openCourseHref}>
+        <ExternalLink className="mr-2 h-4 w-4" aria-hidden />
+        {labels.openCourse}
+      </Link>
     </Button>
   ) : null
 
@@ -70,6 +84,7 @@ export function ActionsBar({
           <Share2 className="mr-2 h-4 w-4" aria-hidden />
           {labels.share}
         </Button>
+        {openCourseButton}
         {createCourseButton
           ? createCourseAction
             ? createCourseAction(createCourseButton)

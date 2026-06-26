@@ -24,6 +24,7 @@ import {
   invokeStructuredJudgeWithRepair,
   StructuredJudgeOutputError,
 } from './cross-block-judge-structured';
+import { validateCareerPlaybookMermaidSyntax } from './mermaid-quality';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
 
@@ -259,9 +260,9 @@ function normalizeJudgeVerdictCandidate(candidate: unknown): unknown {
   return verdict;
 }
 
-export function runCareerPlaybookDeterministicChecks(
+export async function runCareerPlaybookDeterministicChecks(
   input: RunDeterministicChecksInput
-): CareerPlaybookJudgeVerdict {
+): Promise<CareerPlaybookJudgeVerdict> {
   const { generatedBlocks } = input;
   const issues: CareerPlaybookJudgeIssue[] = [];
 
@@ -281,6 +282,7 @@ export function runCareerPlaybookDeterministicChecks(
   }
 
   issues.push(...validateMermaidCoverage(generatedBlocks, input.mermaid));
+  issues.push(...(await validateCareerPlaybookMermaidSyntax(generatedBlocks)));
 
   return verdictFromIssues(issues);
 }
@@ -429,7 +431,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       };
     }
 
-    const deterministicVerdict = runCareerPlaybookDeterministicChecks({
+    const deterministicVerdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: currentBlocks,
     });
 

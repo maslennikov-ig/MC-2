@@ -108,6 +108,7 @@ const messages = {
       pdf: 'PDF',
       share: 'Share',
       createCourse: 'Create course',
+      openCourse: 'View course',
       delete: 'Delete',
       editBlock: 'Edit {title}',
       regenerateBlock: 'Regenerate {title}',
@@ -126,6 +127,16 @@ const messages = {
       inspectorReadinessTitle: 'Readiness',
       inspectorWarningsTitle: 'Quality warnings',
       inspectorWarningsDescription: 'Review automated quality warnings before rollout.',
+      qualityIssueOpenBlock: 'Open block',
+      qualityIssueEditBlock: 'Edit',
+      qualityIssueRegenerateBlock: 'Regenerate',
+      qualityIssueSuggestionLabel: 'What to fix',
+      qualityIssueLegacyTitle: 'System warning',
+      qualityIssueSeverity: {
+        critical: 'Critical',
+        warning: 'Warning',
+        info: 'Info',
+      },
       inspectorReadyBlocks: '{ready} of {total} blocks ready',
       inspectorLanguage: 'Document language: {language}',
       inspectorNextStep: 'Next step: create an adaptation course',
@@ -310,6 +321,7 @@ const ruMessages = {
       actionsLabel: 'Действия с должностной инструкцией',
       share: 'Поделиться',
       createCourse: 'Создать курс из инструкции',
+      openCourse: 'Посмотреть курс',
       delete: 'Удалить',
       hideContents: 'Скрыть левую панель',
       showContents: 'Показать левую панель',
@@ -324,6 +336,16 @@ const ruMessages = {
       inspectorReadinessTitle: 'Готовность',
       inspectorWarningsTitle: 'Предупреждения качества',
       inspectorWarningsDescription: 'Проверьте предупреждения качества перед внедрением.',
+      qualityIssueOpenBlock: 'Открыть блок',
+      qualityIssueEditBlock: 'Редактировать',
+      qualityIssueRegenerateBlock: 'Перегенерировать',
+      qualityIssueSuggestionLabel: 'Что исправить',
+      qualityIssueLegacyTitle: 'Системное предупреждение',
+      qualityIssueSeverity: {
+        critical: 'Критично',
+        warning: 'Предупреждение',
+        info: 'Инфо',
+      },
       inspectorReadyBlocks: 'Готово блоков: {ready} из {total}',
       inspectorLanguage: 'Язык документа: {language}',
       inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
@@ -627,6 +649,56 @@ describe('CareerPlaybookViewerPageClient', () => {
     renderPage({ locale: 'ru' })
 
     expect(await screen.findByRole('heading', { name: 'Руководитель продаж' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Создать курс из инструкции' })
+    ).not.toBeInTheDocument()
+    expect(previewCourseFromPlaybook).not.toHaveBeenCalled()
+  })
+
+  it('opens an already linked course instead of showing course creation', async () => {
+    mockCoursePreview()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      linkedCourse: {
+        id: 'course-1',
+        title: 'Курс для руководителя продаж',
+        slug: 'sales-leadership-course',
+        organizationSlug: 'mega-campus',
+        status: 'draft',
+        generationStatus: 'completed',
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    } as never)
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    expect(await screen.findByRole('heading', { name: 'Руководитель продаж' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Посмотреть курс' })).toHaveAttribute(
+      'href',
+      '/ru/courses/mega-campus/sales-leadership-course'
+    )
     expect(
       screen.queryByRole('button', { name: 'Создать курс из инструкции' })
     ).not.toBeInTheDocument()

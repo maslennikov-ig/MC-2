@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type {
   CareerPlaybookBlockGroupKey,
+  CareerPlaybookQualityIssue,
   CareerPlaybookViewerPermissions,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookVisibility,
@@ -15,6 +16,7 @@ import {
   regenerateCareerPlaybookImage,
   updateCareerPlaybookVisibility,
 } from '@/components/career-playbook/library/client-adapter'
+import { buildCareerPlaybookLinkedCoursePath } from '@/components/career-playbook/library/linked-course-url'
 import { buildCareerPlaybookPublicUrl } from '@/components/career-playbook/library/public-url'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
@@ -252,6 +254,13 @@ export default function CareerPlaybookViewerPageClient({
         t(`imageStatusLabels.${status}` as never),
       imageRegenerate: t('imageRegenerate'),
       imageUnavailable: t('imageUnavailable'),
+      qualityIssueOpenBlock: t('qualityIssueOpenBlock'),
+      qualityIssueEditBlock: t('qualityIssueEditBlock'),
+      qualityIssueRegenerateBlock: t('qualityIssueRegenerateBlock'),
+      qualityIssueSuggestionLabel: t('qualityIssueSuggestionLabel'),
+      qualityIssueLegacyTitle: t('qualityIssueLegacyTitle'),
+      qualityIssueSeverityLabel: (severity: CareerPlaybookQualityIssue['severity']) =>
+        t(`qualityIssueSeverity.${severity}` as never),
       visibilityLabel: tc('visibility.label'),
       visibilityValueLabel: (visibility: CareerPlaybookVisibility) =>
         tc(`visibility.${visibility}`),
@@ -281,6 +290,7 @@ export default function CareerPlaybookViewerPageClient({
         pdf: t('pdf'),
         share: t('share'),
         createCourse: t('createCourse'),
+        openCourse: t('openCourse'),
         delete: t('delete'),
       },
     }),
@@ -481,6 +491,7 @@ export default function CareerPlaybookViewerPageClient({
 
   const canEditViewer = state.viewer.viewerPermissions?.canEdit ?? true
   const canCreateCourse = state.viewer.viewerPermissions?.canCreateCourse ?? true
+  const linkedCourseHref = buildCareerPlaybookLinkedCoursePath(locale, state.viewer.linkedCourse)
   const commonEditor = canEditViewer ? (
     <BlockEditor
       open={Boolean(selectedBlock)}
@@ -555,7 +566,7 @@ export default function CareerPlaybookViewerPageClient({
         onShare={() => void handleShare()}
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         createCourseAction={
-          canCreateCourse
+          canCreateCourse && !linkedCourseHref
             ? (trigger) => (
                 <CreateCourseFromPlaybookDialog
                   playbookId={state.viewer!.playbookId}
@@ -564,6 +575,7 @@ export default function CareerPlaybookViewerPageClient({
               )
             : undefined
         }
+        openCourseHref={linkedCourseHref}
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
         onRegenerateImage={() => void handleRegenerateImage()}
         isUpdatingVisibility={isUpdatingVisibility}

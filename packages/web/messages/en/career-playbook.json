@@ -441,6 +441,7 @@
     "pdf": "PDF",
     "share": "Share",
     "createCourse": "Create course",
+    "openCourse": "View course",
     "delete": "Delete",
     "editBlock": "Edit {title}",
     "regenerateBlock": "Regenerate {title}",
@@ -462,6 +463,16 @@
     "imageStatusTitle": "Image",
     "imageRegenerate": "Regenerate",
     "imageUnavailable": "Image has not been created yet",
+    "qualityIssueOpenBlock": "Open block",
+    "qualityIssueEditBlock": "Edit",
+    "qualityIssueRegenerateBlock": "Regenerate",
+    "qualityIssueSuggestionLabel": "What to fix",
+    "qualityIssueLegacyTitle": "System warning",
+    "qualityIssueSeverity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
     "inspectorReadyBlocks": "{ready} of {total} blocks ready",
     "inspectorLanguage": "Document language: {language}",
     "inspectorNextStep": "Next step: create an adaptation course",
@@ -617,6 +628,7 @@
     },
     "card": {
       "createCourse": "Create course",
+      "openCourse": "View course",
       "publicBadge": "Public",
       "privateBadge": "Private",
       "readonlyBadge": "Read-only",

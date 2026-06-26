@@ -1,13 +1,15 @@
 import type {
+  CareerPlaybookImageStatus,
+  CareerPlaybookLinkedCourse,
   CareerPlaybookViewerPermissions,
   CareerPlaybookVisibility,
   CourseSize,
   CourseStyle,
-  CareerPlaybookImageStatus,
   Language,
 } from '@megacampus/shared-types'
 
 export type { CareerPlaybookImageStatus, CareerPlaybookViewerPermissions, CareerPlaybookVisibility }
+export type { CareerPlaybookLinkedCourse }
 
 export type CareerPlaybookLibraryStatus =
   | 'draft'
@@ -36,6 +38,7 @@ export interface CareerPlaybookLibraryItem {
   viewerPermissions?: CareerPlaybookViewerPermissions
   shareSlug: string | null
   organizationSlug?: string | null
+  linkedCourse?: CareerPlaybookLinkedCourse | null
   language?: string | null
 }
 

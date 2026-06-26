@@ -29,7 +29,9 @@ import type {
   CareerPlaybookFollowupQuestion,
   CareerPlaybookFollowupResponse,
   CareerPlaybookGenerationProgress,
+  CareerPlaybookLinkedCourse,
   CareerPlaybookPlaybookStatus,
+  CareerPlaybookQualityIssue,
   CareerPlaybookVisibility,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookViewerPermissions,
@@ -103,6 +105,8 @@ interface CareerPlaybookLibraryDetail {
   ownerId?: string | null
   viewerPermissions?: CareerPlaybookViewerPermissions
   qualityWarnings?: string[] | null
+  qualityIssues?: CareerPlaybookQualityIssue[] | null
+  linkedCourse?: CareerPlaybookLinkedCourse | null
 }
 
 export type CareerPlaybookDepartmentResolutionState =
@@ -1029,7 +1033,34 @@ function normalizeViewerSnapshot(
       canDelete: true,
     },
     qualityWarnings: normalizeQualityWarnings(snapshot.qualityWarnings),
+    qualityIssues: normalizeQualityIssues(snapshot.qualityIssues),
+    linkedCourse: normalizeLinkedCourse(snapshot.linkedCourse),
     blocks: { ...snapshot.blocks },
+  }
+}
+
+function normalizeLinkedCourse(raw: unknown): CareerPlaybookLinkedCourse | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const record = raw as Partial<CareerPlaybookLinkedCourse>
+  const id = typeof record.id === 'string' ? record.id.trim() : ''
+  const title = typeof record.title === 'string' ? record.title.trim() : ''
+  const slug = typeof record.slug === 'string' ? record.slug.trim() : ''
+  if (!id || !title || !slug) return null
+
+  return {
+    id,
+    title,
+    slug,
+    organizationSlug:
+      typeof record.organizationSlug === 'string' && record.organizationSlug.trim()
+        ? record.organizationSlug.trim()
+        : null,
+    status: typeof record.status === 'string' && record.status.trim() ? record.status.trim() : null,
+    generationStatus:
+      typeof record.generationStatus === 'string' && record.generationStatus.trim()
+        ? record.generationStatus.trim()
+        : null,
   }
 }
 
@@ -1040,6 +1071,44 @@ function normalizeQualityWarnings(warnings: unknown): string[] {
   )
     .map((warning) => warning.trim())
     .filter(Boolean)
+}
+
+function normalizeQualityIssues(issues: unknown): CareerPlaybookQualityIssue[] {
+  if (!Array.isArray(issues)) return []
+  const normalized: CareerPlaybookQualityIssue[] = []
+  const seen = new Set<string>()
+
+  for (const issue of issues) {
+    if (!issue || typeof issue !== 'object' || Array.isArray(issue)) continue
+    const candidate = issue as Partial<CareerPlaybookQualityIssue>
+    if (
+      typeof candidate.id !== 'string' ||
+      candidate.id.trim().length === 0 ||
+      typeof candidate.source !== 'string' ||
+      typeof candidate.severity !== 'string' ||
+      typeof candidate.title !== 'string' ||
+      typeof candidate.message !== 'string' ||
+      typeof candidate.action !== 'string'
+    ) {
+      continue
+    }
+    if (seen.has(candidate.id)) continue
+    normalized.push({
+      id: candidate.id,
+      source: candidate.source,
+      severity: candidate.severity,
+      ...(typeof candidate.blockId === 'string' ? { blockId: candidate.blockId } : {}),
+      title: candidate.title,
+      message: candidate.message,
+      ...(typeof candidate.suggestion === 'string' && candidate.suggestion.trim().length > 0
+        ? { suggestion: candidate.suggestion.trim() }
+        : {}),
+      action: candidate.action,
+    })
+    seen.add(candidate.id)
+  }
+
+  return normalized
 }
 
 function extractMarkdownTitle(markdown: string | null | undefined): string | null {
@@ -1097,6 +1166,8 @@ function libraryDetailToViewerSnapshot(
       canDelete: true,
     },
     qualityWarnings: normalizeQualityWarnings(detail.qualityWarnings),
+    qualityIssues: normalizeQualityIssues(detail.qualityIssues),
+    linkedCourse: normalizeLinkedCourse(detail.linkedCourse),
   }
 }
 
