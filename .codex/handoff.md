@@ -1,9 +1,9 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-26
-Stage: Career Playbook images + E2E verification complete locally; delivery/commit/push pending
-Branch: `codex/single-source-course-generation-flow`
-Beads: `mc2-06s02` closed; `mc2-pmrmf`, `mc2-pmrmf.1`, `mc2-db696.11`, `mc2-db696.11.5` updated/blocked
+Stage: Career Playbook images delivered; local E2E, merge, production deploy, and smoke verification passed
+Branch: `develop` after delivery from `codex/single-source-course-generation-flow`
+Beads: `mc2-g24ex` closed; `mc2-06s02` closed; `mc2-pmrmf`, `mc2-pmrmf.1`, `mc2-db696.11`, `mc2-db696.11.5` updated/blocked
 
 ## Current State
 
@@ -35,7 +35,12 @@ Beads: `mc2-06s02` closed; `mc2-pmrmf`, `mc2-pmrmf.1`, `mc2-db696.11`, `mc2-db69
 - `pnpm type-check` passed.
 - `pnpm build` passed.
 - `git diff --check` passed.
-- Graphify refreshed with `graphify update . --force`: 53,432 nodes, 78,354 edges, 3,289 communities.
+- Feature branch pushed: `origin/codex/single-source-course-generation-flow`.
+- `/push-dev` completed: feature branch merged into `develop` and pushed to `origin/develop` at `c08b7569`.
+- `/deploy` completed: `develop` merged into `master` and pushed to `origin/master` at `2f7e9a2f`.
+- GitHub Actions run `28220706717` completed successfully on `master`: type-check, unit tests, lint, security audit job, package build, contract tests, integration tests, Docker builds, production deploy, and deploy verification all passed.
+- External production smoke passed on `https://ai.megacampus.ru`: `/`, `/api/health`, and `/health` returned HTTP 200.
+- Graphify refreshed with `graphify update . --force` and `graphify cluster-only . --no-viz`: 52,825 nodes, 77,610 edges, 3,277 communities.
 
 ## Explicit defers
 
@@ -57,4 +62,4 @@ Use $orchestrator-stage in `/home/me/code/mc2`. Continue from `mc2-pmrmf`, `mc2-
 ## Closeout Markers
 
 docs-reviewed: updated - `docs/career-playbook/architecture.md`, Beads notes, and this handoff reflect the new Career Playbook image behavior plus the Playwright E2E CSP/env fix.
-graph-reviewed: updated - `graphify update . --force` completed after final code/test/handoff changes.
+graph-reviewed: updated - `graphify update . --force` and `graphify cluster-only . --no-viz` completed after delivery; final graph report shows 52,825 nodes, 77,610 edges, 3,277 communities.
