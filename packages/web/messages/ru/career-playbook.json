@@ -441,7 +441,7 @@
     "pdf": "PDF",
     "share": "Поделиться",
     "createCourse": "Создать курс из инструкции",
-    "openCourse": "Перейти в курс",
+    "openCourse": "Посмотреть курс",
     "delete": "Удалить",
     "editBlock": "Редактировать {title}",
     "regenerateBlock": "Сгенерировать заново {title}",
@@ -460,6 +460,9 @@
     "inspectorReadinessTitle": "Готовность",
     "inspectorWarningsTitle": "Предупреждения качества",
     "inspectorWarningsDescription": "Часть автоматической проверки завершилась в резервном режиме. Проверьте эти пункты перед внедрением.",
+    "imageStatusTitle": "Изображение",
+    "imageRegenerate": "Перегенерировать",
+    "imageUnavailable": "Изображение ещё не создано",
     "qualityIssueOpenBlock": "Открыть блок",
     "qualityIssueEditBlock": "Редактировать",
     "qualityIssueRegenerateBlock": "Перегенерировать",
@@ -516,6 +519,8 @@
     "regenerateLocal": "Блок сгенерирован заново локально до подключения серверного действия",
     "numericSaved": "Цифра сохранена",
     "numericSaveError": "Не удалось сохранить цифру",
+    "imageRegenerateQueued": "Генерация изображения поставлена в очередь",
+    "imageRegenerateError": "Не удалось запустить генерацию изображения",
     "generatingTitle": "Генерируем {title}",
     "blocksReady": "Готово блоков: {ready} из {total}",
     "thinkingStream": "Показать поток рассуждений",
@@ -536,6 +541,15 @@
       "generated": "Готово",
       "failed": "Ошибка",
       "regenerating": "Генерируется заново"
+    },
+    "imageStatusLabels": {
+      "pending": "В очереди",
+      "draft_generating": "Готовится черновик",
+      "draft_ready": "Черновик готов",
+      "generating": "Генерируется",
+      "completed": "Готово",
+      "failed": "Ошибка",
+      "cancelled": "Отменено"
     },
     "blockGroups": {
       "group_1_foundation": "Основа",
@@ -614,7 +628,7 @@
     },
     "card": {
       "createCourse": "Создать курс из инструкции",
-      "openCourse": "Перейти в курс",
+      "openCourse": "Посмотреть курс",
       "publicBadge": "Публичный",
       "privateBadge": "Приватный",
       "readonlyBadge": "Только чтение",

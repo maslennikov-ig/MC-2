@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import type { LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import type { LessonGraphStateType } from '@/stages/stage6-lesson-content/state';
 
 vi.mock('@/shared/logger', () => {
@@ -88,10 +89,10 @@ function createMockLessonSpec(
   return {
     lesson_id: '1.2',
     title: 'Test Lesson',
-    learning_objectives: [
-      { id: 'obj_1', objective: 'Understand the basics', level: 'Remember' },
+    learning_objectives: [{ id: 'obj_1', objective: 'Understand the basics', level: 'Remember' }],
+    sections: [
+      { id: 'sec_1', title: 'Практика', type: 'lecture', required: true, constraints: {} },
     ],
-    sections: [{ id: 'sec_1', title: 'Практика', type: 'lecture', required: true, constraints: {} }],
     metadata: {
       lesson_duration_minutes: 15,
       difficulty_level: 'intermediate',
@@ -224,21 +225,26 @@ describe('selfReviewer canonical markdown source', () => {
       finishReason: 'stop',
     });
 
-    const rawStructuredPayload = JSON.stringify({
+    const rawStructuredContent: LessonContentBody = {
       intro:
         'Краткое введение с нормальной длиной текста, чтобы эвристика не сочла контент подозрительно коротким.',
       sections: [
         {
           title: 'Практика',
-          content: 'Тактические задачи: 2, 4.',
+          content:
+            'Тактические задачи: 2, 4. Дополнительно студент должен сравнить стратегические и тактические цели, описать различия между ними и привести собственный рабочий пример.',
         },
       ],
       examples: [],
       exercises: [],
-    });
+    };
+    const rawStructuredPayload = JSON.stringify(rawStructuredContent);
 
     const state = createMockState({
       generatedContent: rawStructuredPayload,
+      lessonContent: {
+        content: rawStructuredContent,
+      } as LessonGraphStateType['lessonContent'],
     });
 
     await selfReviewerNode(state);

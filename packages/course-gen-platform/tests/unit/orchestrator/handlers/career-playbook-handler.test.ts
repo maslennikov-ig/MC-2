@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   generateCareerPlaybookFollowups: vi.fn(),
   regenerateCareerPlaybookBlock: vi.fn(),
   processCareerPlaybookSource: vi.fn(),
+  generateCareerPlaybookImage: vi.fn(),
+  addJob: vi.fn(),
   getCareerPlaybookGraphRecursionLimit: vi.fn(() => 128),
 }));
 
@@ -33,9 +35,17 @@ vi.mock('@/stages/stage-career-playbook/source-processing', () => ({
   processCareerPlaybookSource: mocks.processCareerPlaybookSource,
 }));
 
+vi.mock('@/stages/stage-career-playbook/image-generation', () => ({
+  generateCareerPlaybookImage: mocks.generateCareerPlaybookImage,
+}));
+
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
   getCareerPlaybookGraph: vi.fn(),
   getCareerPlaybookGraphRecursionLimit: mocks.getCareerPlaybookGraphRecursionLimit,
+}));
+
+vi.mock('@/orchestrator/queue', () => ({
+  addJob: mocks.addJob,
 }));
 
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
@@ -121,6 +131,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
 describe('CareerPlaybookHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.addJob.mockResolvedValue(undefined);
     mocks.getCareerPlaybookGraphRecursionLimit.mockReturnValue(128);
   });
 
@@ -243,6 +254,30 @@ describe('CareerPlaybookHandler', () => {
     });
   });
 
+  it('routes GENERATE_IMAGE through the Career Playbook image generator', async () => {
+    mocks.generateCareerPlaybookImage.mockResolvedValue({
+      imageUrl: 'https://cdn.example.test/career-playbooks/card.webp',
+      storagePath: 'career-playbooks/00000000-0000-4000-8000-000000000001/card.webp',
+    });
+
+    const result = await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_IMAGE',
+      })
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Generated Career Playbook image');
+    expect(mocks.generateCareerPlaybookImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...baseJobData(),
+        operation: 'GENERATE_IMAGE',
+        force: false,
+      })
+    );
+  });
+
   it('does not fail playbook generation only because retained judge verdicts contain warnings', async () => {
     const builder = createBuilder([{ data: { id: playbookId }, error: null }]);
     mocks.from.mockReturnValue(builder);
@@ -358,6 +393,19 @@ describe('CareerPlaybookHandler', () => {
       })
     );
     expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+    expect(mocks.addJob).toHaveBeenCalledWith(
+      JobType.CAREER_PLAYBOOK,
+      expect.objectContaining({
+        jobType: JobType.CAREER_PLAYBOOK,
+        operation: 'GENERATE_IMAGE',
+        playbookId,
+        userId,
+        organizationId,
+      }),
+      expect.objectContaining({
+        jobId: `career-playbook-image-${playbookId}`,
+      })
+    );
   });
 
   it('persists structured quality issues from judge verdicts and legacy warnings', async () => {
@@ -489,7 +537,9 @@ flowchart TD
       })
     );
 
-    const persisted = builder.update.mock.calls.at(-1)?.[0] as {
+    const persisted = builder.update.mock.calls.find(([payload]) =>
+      Boolean((payload as { generated_blocks?: unknown }).generated_blocks)
+    )?.[0] as {
       generated_blocks?: Record<string, { content?: string }>;
       final_markdown?: string | null;
       q_a_data?: { quality_issues?: Array<{ source?: string; blockId?: string }> };

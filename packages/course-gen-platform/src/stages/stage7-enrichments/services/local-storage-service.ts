@@ -370,6 +370,60 @@ export async function uploadCourseCardLocal(
 }
 
 /**
+ * Upload Career Playbook card image.
+ *
+ * @param playbookId - Career Playbook UUID
+ * @param buffer - File content as Buffer
+ * @param extension - File extension (default: 'webp')
+ * @returns Storage path (e.g., "career-playbooks/{playbookId}/card.webp")
+ */
+export async function uploadCareerPlaybookCardLocal(
+  playbookId: string,
+  buffer: Buffer,
+  extension = 'webp'
+): Promise<string> {
+  const normalizedExtension = extension.toLowerCase();
+
+  validatePathComponent(playbookId, 'playbookId');
+  validateExtension(normalizedExtension);
+
+  if (buffer.length > MAX_FILE_SIZE_BYTES) {
+    throw new Error(`File size ${buffer.length} exceeds maximum ${MAX_FILE_SIZE_BYTES} bytes`);
+  }
+
+  const dirPath = path.join(STORAGE_BASE, 'career-playbooks', playbookId);
+  const fileName = `card.${normalizedExtension}`;
+  const filePath = path.join(dirPath, fileName);
+  const storagePath = `career-playbooks/${playbookId}/${fileName}`;
+
+  assertPathWithinBase(filePath);
+  await checkDiskSpace(STORAGE_BASE);
+
+  try {
+    await atomicWriteFile(filePath, buffer);
+
+    logger.info(
+      {
+        storagePath,
+        fileSize: buffer.length,
+      },
+      'Local Career Playbook card uploaded'
+    );
+
+    return storagePath;
+  } catch (error) {
+    logger.error(
+      {
+        storagePath,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to upload local Career Playbook card'
+    );
+    throw error;
+  }
+}
+
+/**
  * Build full public URL for enrichment asset
  *
  * Constructs the complete URL that clients use to access assets served by nginx.

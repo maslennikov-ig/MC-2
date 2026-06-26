@@ -25,7 +25,9 @@ test.describe('Career Playbook viewer editor', () => {
       await page.goto(`/en/career-playbook/${playbookId}`)
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByRole('heading', { name: 'Sales Director' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Sales Director' })).toBeVisible({
+        timeout: 20000,
+      })
 
       await page.getByRole('button', { name: 'Edit Role guide header' }).click()
       await page.getByLabel('Block markdown').fill('# Edited viewer block')

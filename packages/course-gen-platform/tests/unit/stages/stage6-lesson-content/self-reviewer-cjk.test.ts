@@ -360,6 +360,26 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
 
     const state = createMockState({
       generatedContent: contentWithIntroAndSummary,
+      lessonContent: {
+        content: {
+          intro:
+            'Введение с 稀缺性资源分配问题分析市场经济供给需求价格机制 символами урока по теме экономики для студентов высших учебных заведений.',
+          sections: [
+            {
+              title: 'Основные концепции',
+              content:
+                'Чистая секция без китайских символов. Здесь изложены основные принципы экономики для студентов высших учебных заведений.',
+            },
+            {
+              title: 'Практические примеры',
+              content:
+                'Чистые примеры для закрепления материала, разбора задач и самостоятельного применения изученных принципов.',
+            },
+          ],
+          examples: [],
+          exercises: [],
+        },
+      } as LessonGraphStateType['lessonContent'],
       lessonSpec: {
         lesson_id: '1.1',
         title: 'Test',

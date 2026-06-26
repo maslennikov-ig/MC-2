@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { resolvePlaywrightWebServer } from '../../playwright.config'
+import { resolvePlaywrightWebServer } from '../../playwright-web-server'
 
 describe('Playwright web server config', () => {
   test('keeps localhost:3000 as the default web server URL', () => {
@@ -29,18 +29,15 @@ describe('Playwright web server config', () => {
       expectedUrl: 'http://127.0.0.1:3103',
       expectedPort: '3103',
     },
-  ])(
-    'derives one coherent URL from $env',
-    ({ env, expectedPort, expectedUrl }) => {
-      const webServer = resolvePlaywrightWebServer(env)
+  ])('derives one coherent URL from $env', ({ env, expectedPort, expectedUrl }) => {
+    const webServer = resolvePlaywrightWebServer(env)
 
-      expect(webServer.url).toBe(expectedUrl)
-      expect(webServer.isManaged).toBe(true)
-      expect(webServer.port).toBe(expectedPort)
-      expect(webServer.env.PORT).toBe(expectedPort)
-      expect(webServer.env.NEXT_PUBLIC_APP_URL).toBe(expectedUrl)
-    }
-  )
+    expect(webServer.url).toBe(expectedUrl)
+    expect(webServer.isManaged).toBe(true)
+    expect(webServer.port).toBe(expectedPort)
+    expect(webServer.env.PORT).toBe(expectedPort)
+    expect(webServer.env.NEXT_PUBLIC_APP_URL).toBe(expectedUrl)
+  })
 
   test('does not start a managed dev server for an external base URL', () => {
     const webServer = resolvePlaywrightWebServer({

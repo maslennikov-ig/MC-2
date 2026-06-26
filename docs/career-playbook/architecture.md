@@ -13,6 +13,10 @@
 - DB migration: `packages/course-gen-platform/supabase/migrations/20260513090000_career_playbook.sql`
 - Visibility/access migration: `packages/course-gen-platform/supabase/migrations/20260605150000_career_playbook_visibility.sql`
 - Public slug fallback migration: `packages/course-gen-platform/supabase/migrations/20260625110000_career_playbook_public_slug_policy.sql`
+- Image state/prompt migrations:
+  `packages/course-gen-platform/supabase/migrations/20260626120000_add_career_playbook_images.sql`
+  and
+  `packages/course-gen-platform/supabase/migrations/20260626121000_seed_career_playbook_card_prompt.sql`
 - Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
 - Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
 
@@ -49,6 +53,45 @@ Role Guide, not its raw source material.
 The compatibility mutation `careerPlaybook.share.shareToggle` maps to
 `private`/`public`, while the canonical protected mutation is
 `careerPlaybook.library.updateVisibility({ playbookId, visibility })`.
+
+## Generated Images
+
+Career Playbook images reuse the course card image pipeline without creating
+fake `lesson_enrichments` rows. Image state belongs to `career_playbooks`:
+`image_status`, `image_content`, `image_metadata`, `image_generation_attempt`,
+`image_error_message`, and `image_updated_at`.
+
+After `GENERATE_PLAYBOOK` persists a completed Role Guide, the worker enqueues
+a best-effort `JobType.CAREER_PLAYBOOK` job with operation `GENERATE_IMAGE` and
+deterministic job ID `career-playbook-image-{playbookId}`. Image generation
+failure only updates `image_status = 'failed'`; it must not move the completed
+playbook back to a failed document state.
+
+`stage-career-playbook/image-generation.ts` loads the completed playbook,
+renders `career_playbook_card`, calls the Stage 7 `generateCardImage` helper,
+converts the result to WebP, uploads it through unified storage, and stores a
+`CardEnrichmentContent` payload in `career_playbooks.image_content`. Storage
+uses `career-playbooks/{playbookId}/card.webp` through
+`uploadCareerPlaybookCard`.
+
+Read APIs expose `imageUrl`, `imageStatus`, `imageAltText`, and
+`imageErrorMessage` on library items, authenticated viewer snapshots, and public
+share responses. `imageUrl` is returned only when `image_status = 'completed'`
+and `image_content` validates as `CardEnrichmentContent`; invalid JSON is logged
+as a warning and returns `imageUrl = null` instead of breaking the library.
+
+Owners can call `careerPlaybook.library.regenerateImage` from the viewer
+inspector. Existing completed Role Guides are not backfilled by migration. Use
+the explicit dry-run script first:
+
+```bash
+pnpm --dir packages/course-gen-platform exec tsx scripts/backfill-career-playbook-images.ts
+```
+
+After production/dev data mutation is explicitly approved, the same script can
+enqueue jobs with `--enqueue`.
+
+## Public URLs
 
 Public Career Playbook URLs are canonical only at
 `/[locale]/career-playbooks/{orgSlug}/{playbookSlug}`. The backend allocates

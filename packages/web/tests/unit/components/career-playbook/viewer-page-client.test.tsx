@@ -108,7 +108,7 @@ const messages = {
       pdf: 'PDF',
       share: 'Share',
       createCourse: 'Create course',
-      openCourse: 'Open course',
+      openCourse: 'View course',
       delete: 'Delete',
       editBlock: 'Edit {title}',
       regenerateBlock: 'Regenerate {title}',
@@ -141,6 +141,16 @@ const messages = {
       inspectorLanguage: 'Document language: {language}',
       inspectorNextStep: 'Next step: create an adaptation course',
       inspectorPrepare: 'Prepare for rollout',
+      imageStatusTitle: 'Image',
+      imageRegenerate: 'Regenerate',
+      imageUnavailable: 'Image has not been created yet',
+      imageStatusLabels: {
+        pending: 'Pending',
+        queued: 'Queued',
+        generating: 'Generating',
+        completed: 'Completed',
+        failed: 'Failed',
+      },
       waitingBlock: 'This block is waiting for generation.',
       editorTitle: 'Edit block',
       editorDescription:
@@ -311,7 +321,7 @@ const ruMessages = {
       actionsLabel: 'Действия с должностной инструкцией',
       share: 'Поделиться',
       createCourse: 'Создать курс из инструкции',
-      openCourse: 'Перейти в курс',
+      openCourse: 'Посмотреть курс',
       delete: 'Удалить',
       hideContents: 'Скрыть левую панель',
       showContents: 'Показать левую панель',
@@ -340,6 +350,16 @@ const ruMessages = {
       inspectorLanguage: 'Язык документа: {language}',
       inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
       inspectorPrepare: 'Подготовить к внедрению',
+      imageStatusTitle: 'Изображение',
+      imageRegenerate: 'Перегенерировать',
+      imageUnavailable: 'Изображение ещё не создано',
+      imageStatusLabels: {
+        pending: 'Ожидает',
+        queued: 'В очереди',
+        generating: 'Генерируется',
+        completed: 'Готово',
+        failed: 'Ошибка',
+      },
       localPreviewTitle: 'Превью должностной инструкции',
       localPreviewContent:
         '# Превью должностной инструкции\n\nСерверный просмотр ещё не подключён.',
@@ -675,7 +695,7 @@ describe('CareerPlaybookViewerPageClient', () => {
     renderPage({ locale: 'ru' })
 
     expect(await screen.findByRole('heading', { name: 'Руководитель продаж' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Перейти в курс' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Посмотреть курс' })).toHaveAttribute(
       'href',
       '/ru/courses/mega-campus/sales-leadership-course'
     )

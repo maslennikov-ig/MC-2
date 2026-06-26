@@ -3,11 +3,13 @@ import {
   CareerPlaybookGenerationProgressSchema,
   CareerPlaybookQADataSchema,
   CareerPlaybookOperationJobDataSchema,
+  JobType,
   CareerPlaybookBlockIdSchema,
   CareerPlaybookQualityIssueSchema,
-  type CareerPlaybookCostBreakdown,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
+  type CareerPlaybookCostBreakdown,
+  type CareerPlaybookGenerateImageJobData,
   type CareerPlaybookGenerationProgress,
   type CareerPlaybookGenerateFollowupsJobData,
   type CareerPlaybookGeneratePlaybookJobData,
@@ -34,6 +36,8 @@ import {
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
+import { generateCareerPlaybookImage } from '@/stages/stage-career-playbook/image-generation';
+import { addJob } from '@/orchestrator/queue';
 
 export type { CareerPlaybookJobData };
 
@@ -242,7 +246,9 @@ export class CareerPlaybookHandler {
         return this.generatePlaybook(jobData, job);
       case 'PROCESS_SOURCE':
         return this.processSource(jobData, job);
-      default:
+      case 'GENERATE_IMAGE':
+        return this.generateImage(jobData);
+      case 'REGENERATE_BLOCK':
         return this.regenerateBlock(jobData);
     }
   }
@@ -353,6 +359,16 @@ export class CareerPlaybookHandler {
     };
   }
 
+  private async generateImage(jobData: CareerPlaybookGenerateImageJobData): Promise<JobResult> {
+    const result = await generateCareerPlaybookImage(jobData);
+
+    return {
+      success: true,
+      message: 'Generated Career Playbook image',
+      data: result,
+    };
+  }
+
   private async persistCompleted(
     jobData: CareerPlaybookGeneratePlaybookJobData,
     result: CareerPlaybookGraphResult
@@ -396,6 +412,60 @@ export class CareerPlaybookHandler {
     }
 
     await this.updatePlaybook(jobData.playbookId, updatePayload);
+    await this.enqueueImageGenerationBestEffort(jobData);
+  }
+
+  private async enqueueImageGenerationBestEffort(jobData: CareerPlaybookGeneratePlaybookJobData) {
+    const now = new Date().toISOString();
+    const imageJobData: CareerPlaybookGenerateImageJobData = {
+      jobType: JobType.CAREER_PLAYBOOK,
+      operation: 'GENERATE_IMAGE',
+      playbookId: jobData.playbookId,
+      userId: jobData.userId,
+      organizationId: jobData.organizationId,
+      language: jobData.language,
+      locale: jobData.locale,
+      createdAt: now,
+      force: false,
+    };
+
+    try {
+      await this.updatePlaybook(jobData.playbookId, {
+        image_status: 'pending',
+        image_error_message: null,
+        image_updated_at: now,
+      });
+
+      await addJob(JobType.CAREER_PLAYBOOK, imageJobData, {
+        jobId: `career-playbook-image-${jobData.playbookId}`,
+        priority: 4,
+      });
+    } catch (error) {
+      const message = errorMessageFrom(error);
+      logger.warn(
+        {
+          playbookId: jobData.playbookId,
+          error: message,
+        },
+        'Failed to enqueue Career Playbook image generation'
+      );
+
+      try {
+        await this.updatePlaybook(jobData.playbookId, {
+          image_status: 'failed',
+          image_error_message: message,
+          image_updated_at: new Date().toISOString(),
+        });
+      } catch (updateError) {
+        logger.warn(
+          {
+            playbookId: jobData.playbookId,
+            error: errorMessageFrom(updateError),
+          },
+          'Failed to persist Career Playbook image enqueue failure'
+        );
+      }
+    }
   }
 
   private async remediateMermaidBeforePersist(

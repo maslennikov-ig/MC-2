@@ -1,7 +1,10 @@
 import { TRPCError } from '@trpc/server';
+import { JobType, cardEnrichmentContentSchema } from '@megacampus/shared-types';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookGenerateImageJobData,
+  CareerPlaybookImageStatus,
   CareerPlaybookLinkedCourse,
   CareerPlaybookNumericFact,
   CareerPlaybookPlaybookStatus,
@@ -12,6 +15,7 @@ import type {
 } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
+import { logger } from '../../../shared/logger';
 import { renderCareerPlaybookPdf } from '../../../services/career-playbook-pdf';
 import {
   mapPlaybookRow,
@@ -27,6 +31,7 @@ import {
   annotateCareerPlaybookBlockNumericFacts,
   findCareerPlaybookNumericFactOccurrences,
 } from '@/stages/stage-career-playbook/numeric-facts';
+import { addJob, removeTerminalJobById } from '@/orchestrator/queue';
 import {
   remediateCareerPlaybookFinalMarkdown,
   remediateCareerPlaybookMermaidBlocks,
@@ -46,6 +51,10 @@ export interface CareerPlaybookLibraryItem {
   viewerPermissions: CareerPlaybookViewerPermissions;
   shareSlug: string | null;
   organizationSlug: string | null;
+  imageUrl: string | null;
+  imageStatus: CareerPlaybookImageStatus | null;
+  imageAltText: string | null;
+  imageErrorMessage: string | null;
   linkedCourse: CareerPlaybookLinkedCourse | null;
   createdAt: string;
   updatedAt: string;
@@ -112,6 +121,13 @@ export interface CareerPlaybookShareToggleResponse {
 }
 
 export type CareerPlaybookVisibilityUpdateResponse = CareerPlaybookShareToggleResponse;
+
+export interface CareerPlaybookImageRegenerateResponse {
+  playbookId: string;
+  imageStatus: CareerPlaybookImageStatus;
+  imageUrl: null;
+  imageErrorMessage: null;
+}
 
 export interface CareerPlaybookPdfExportResponse {
   pdfBase64: string;
@@ -312,6 +328,39 @@ async function loadOrganizationSlugMap(
   return new Map(entries);
 }
 
+function buildCareerPlaybookImageFields(
+  row: CareerPlaybookRow
+): Pick<
+  CareerPlaybookLibraryItem,
+  'imageUrl' | 'imageStatus' | 'imageAltText' | 'imageErrorMessage'
+> {
+  const parsedContent = cardEnrichmentContentSchema.safeParse(row.image_content);
+
+  if (row.image_status === 'completed' && !parsedContent.success && row.image_content) {
+    logger.warn(
+      {
+        playbookId: row.id,
+        imageStatus: row.image_status,
+        validationError: parsedContent.error.message,
+      },
+      'Invalid Career Playbook image content'
+    );
+  }
+
+  const content = parsedContent.success ? parsedContent.data : null;
+  const imageUrl =
+    row.image_status === 'completed' && typeof content?.imageUrl === 'string'
+      ? content.imageUrl
+      : null;
+
+  return {
+    imageUrl,
+    imageStatus: row.image_status,
+    imageAltText: content?.altText ?? null,
+    imageErrorMessage: row.image_error_message,
+  };
+}
+
 const PUBLIC_PLAYBOOK_COLUMNS = [
   'id',
   'user_id',
@@ -324,6 +373,12 @@ const PUBLIC_PLAYBOOK_COLUMNS = [
   'specialization',
   'level',
   'final_markdown',
+  'image_status',
+  'image_content',
+  'image_metadata',
+  'image_generation_attempt',
+  'image_error_message',
+  'image_updated_at',
   'share_slug',
   'is_public',
   'visibility',
@@ -342,6 +397,12 @@ const LIBRARY_PLAYBOOK_COLUMNS = [
   'department',
   'specialization',
   'level',
+  'image_status',
+  'image_content',
+  'image_metadata',
+  'image_generation_attempt',
+  'image_error_message',
+  'image_updated_at',
   'share_slug',
   'is_public',
   'visibility',
@@ -418,6 +479,7 @@ function toLibraryItemFromMappedRow(
     viewerPermissions: getViewerPermissions(mapped, user),
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
     organizationSlug,
+    ...buildCareerPlaybookImageFields(mapped),
     linkedCourse,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
@@ -636,6 +698,7 @@ async function mapRowToPublicShare(
     viewerPermissions: { ...READONLY_PERMISSIONS },
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
     organizationSlug,
+    ...buildCareerPlaybookImageFields(mapped),
     linkedCourse: null,
     createdAt: mapped.created_at,
     updatedAt: mapped.updated_at,
@@ -974,6 +1037,65 @@ export async function updateCareerPlaybookVisibility(
     shareSlug: visibility === 'public' ? mapped.share_slug : null,
     organizationSlug,
     viewerPermissions: getViewerPermissions(mapped, user),
+  };
+}
+
+export async function regenerateCareerPlaybookImage(
+  ctx: Context,
+  input: { playbookId: string }
+): Promise<CareerPlaybookImageRegenerateResponse> {
+  const user = requireUser(ctx);
+  const row = await loadManageablePlaybook(input.playbookId, user);
+
+  if (row.status !== 'completed') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must be completed before image generation',
+    });
+  }
+
+  const jobId = `career-playbook-image-${row.id}`;
+  const now = new Date().toISOString();
+  const supabase = getCareerPlaybookSupabase();
+
+  const { error } = await supabase
+    .from('career_playbooks')
+    .update({
+      image_status: 'pending',
+      image_error_message: null,
+      image_updated_at: now,
+    })
+    .eq('id', row.id)
+    .eq('user_id', row.user_id)
+    .select('id')
+    .single();
+
+  if (error) throwOnDbError(error, 'Failed to reset Career Playbook image status');
+
+  await removeTerminalJobById(jobId);
+
+  const jobData: CareerPlaybookGenerateImageJobData = {
+    jobType: JobType.CAREER_PLAYBOOK,
+    operation: 'GENERATE_IMAGE',
+    playbookId: row.id,
+    userId: row.user_id,
+    organizationId: row.organization_id,
+    language: row.language,
+    locale: row.language === 'en' ? 'en' : 'ru',
+    createdAt: now,
+    force: true,
+  };
+
+  await addJob(JobType.CAREER_PLAYBOOK, jobData, {
+    jobId,
+    priority: 4,
+  });
+
+  return {
+    playbookId: row.id,
+    imageStatus: 'pending',
+    imageUrl: null,
+    imageErrorMessage: null,
   };
 }
 

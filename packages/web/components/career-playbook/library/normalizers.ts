@@ -5,6 +5,7 @@ import type {
   CareerPlaybookLibraryStatistics,
   CareerPlaybookLibraryStatus,
   CareerPlaybookVisibility,
+  CareerPlaybookImageStatus,
   CareerPlaybookViewerPermissions,
   CareerPlaybookLinkedCourse,
 } from './types'
@@ -26,6 +27,18 @@ function isLibraryStatus(value: unknown): value is CareerPlaybookLibraryStatus {
 
 function isVisibility(value: unknown): value is CareerPlaybookVisibility {
   return value === 'private' || value === 'organization' || value === 'public'
+}
+
+function isImageStatus(value: unknown): value is CareerPlaybookImageStatus {
+  return (
+    value === 'pending' ||
+    value === 'draft_generating' ||
+    value === 'draft_ready' ||
+    value === 'generating' ||
+    value === 'completed' ||
+    value === 'failed' ||
+    value === 'cancelled'
+  )
 }
 
 function readString(record: RawRecord, ...keys: string[]): string | null {
@@ -191,6 +204,8 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
     : isPublic
       ? 'public'
       : 'private'
+  const imageStatusRaw = readString(row, 'imageStatus', 'image_status')
+  const imageStatus = isImageStatus(imageStatusRaw) ? imageStatusRaw : null
 
   return {
     id,
@@ -201,6 +216,10 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
     createdAt,
     isPublic: visibility === 'public',
     visibility,
+    imageUrl: readString(row, 'imageUrl', 'image_url'),
+    imageStatus,
+    imageAltText: readString(row, 'imageAltText', 'image_alt_text'),
+    imageErrorMessage: readString(row, 'imageErrorMessage', 'image_error_message'),
     ownerId: readString(row, 'ownerId', 'owner_id', 'userId', 'user_id'),
     viewerPermissions: normalizeViewerPermissions(readRecord(row, 'viewerPermissions')),
     shareSlug: readString(row, 'share_slug', 'shareSlug'),
