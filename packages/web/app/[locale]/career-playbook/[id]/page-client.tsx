@@ -12,7 +12,10 @@ import type {
 
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
-import { updateCareerPlaybookVisibility } from '@/components/career-playbook/library/client-adapter'
+import {
+  regenerateCareerPlaybookImage,
+  updateCareerPlaybookVisibility,
+} from '@/components/career-playbook/library/client-adapter'
 import { buildCareerPlaybookLinkedCoursePath } from '@/components/career-playbook/library/linked-course-url'
 import { buildCareerPlaybookPublicUrl } from '@/components/career-playbook/library/public-url'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
@@ -29,6 +32,7 @@ import {
 } from '@/stores/use-career-playbook-store'
 
 type ReaderMode = 'standard' | 'reading'
+type ViewerImageStatus = NonNullable<CareerPlaybookViewerSnapshot['imageStatus']>
 
 interface CareerPlaybookViewerPageClientProps {
   locale: Locale
@@ -156,6 +160,32 @@ function readVisibilityUpdateResult(value: unknown) {
   }
 }
 
+function isViewerImageStatus(value: unknown): value is ViewerImageStatus {
+  return (
+    value === 'pending' ||
+    value === 'draft_generating' ||
+    value === 'draft_ready' ||
+    value === 'generating' ||
+    value === 'completed' ||
+    value === 'failed' ||
+    value === 'cancelled'
+  )
+}
+
+function readImageRegenerateResult(value: unknown) {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const playbookId = typeof record.playbookId === 'string' ? record.playbookId : null
+  const imageStatus = isViewerImageStatus(record.imageStatus) ? record.imageStatus : null
+
+  if (!playbookId || !imageStatus) return null
+
+  return {
+    playbookId,
+    imageStatus,
+  }
+}
+
 export default function CareerPlaybookViewerPageClient({
   locale,
   playbookId,
@@ -165,6 +195,7 @@ export default function CareerPlaybookViewerPageClient({
   const state = useCareerPlaybookStore()
   const [selectedBlockId, setSelectedBlockId] = useState<CareerPlaybookBlockId | null>(null)
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
+  const [isRegeneratingImage, setIsRegeneratingImage] = useState(false)
   const [readerMode, setReaderMode] = useState<ReaderMode>(() => {
     if (typeof window === 'undefined') return 'standard'
     return new URLSearchParams(window.location.search).get('mode') === 'reading'
@@ -218,6 +249,11 @@ export default function CareerPlaybookViewerPageClient({
       inspectorReadinessTitle: t('inspectorReadinessTitle'),
       inspectorWarningsTitle: t('inspectorWarningsTitle'),
       inspectorWarningsDescription: t('inspectorWarningsDescription'),
+      imageStatusTitle: t('imageStatusTitle'),
+      imageStatusLabel: (status: NonNullable<CareerPlaybookViewerSnapshot['imageStatus']>) =>
+        t(`imageStatusLabels.${status}` as never),
+      imageRegenerate: t('imageRegenerate'),
+      imageUnavailable: t('imageUnavailable'),
       qualityIssueOpenBlock: t('qualityIssueOpenBlock'),
       qualityIssueEditBlock: t('qualityIssueEditBlock'),
       qualityIssueRegenerateBlock: t('qualityIssueRegenerateBlock'),
@@ -372,6 +408,40 @@ export default function CareerPlaybookViewerPageClient({
     }
   }
 
+  const handleRegenerateImage = async () => {
+    const viewer = useCareerPlaybookStore.getState().viewer
+    if (!viewer || isRegeneratingImage) return
+
+    setIsRegeneratingImage(true)
+    useCareerPlaybookStore.setState({ viewerActionMessage: null })
+
+    try {
+      const result = readImageRegenerateResult(
+        await regenerateCareerPlaybookImage(viewer.playbookId, locale)
+      )
+
+      if (!result || result.playbookId !== viewer.playbookId) {
+        setBackendPendingMessage(t('imageRegenerateError'))
+        return
+      }
+
+      const currentViewer = useCareerPlaybookStore.getState().viewer
+      if (!currentViewer || currentViewer.playbookId !== result.playbookId) return
+
+      useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+        ...currentViewer,
+        imageUrl: null,
+        imageStatus: result.imageStatus,
+        imageErrorMessage: null,
+      })
+      setBackendPendingMessage(t('imageRegenerateQueued'))
+    } catch {
+      setBackendPendingMessage(t('imageRegenerateError'))
+    } finally {
+      setIsRegeneratingImage(false)
+    }
+  }
+
   const handleShare = async () => {
     const viewer = useCareerPlaybookStore.getState().viewer
     if (!viewer || viewer.visibility !== 'public') {
@@ -507,7 +577,9 @@ export default function CareerPlaybookViewerPageClient({
         }
         openCourseHref={linkedCourseHref}
         onDelete={() => setBackendPendingMessage(t('deletePending'))}
+        onRegenerateImage={() => void handleRegenerateImage()}
         isUpdatingVisibility={isUpdatingVisibility}
+        isRegeneratingImage={isRegeneratingImage}
         isUpdatingNumericFact={state.isUpdatingViewerBlock}
         onVisibilityChange={(visibility) => {
           void handleVisibilityChange(visibility)

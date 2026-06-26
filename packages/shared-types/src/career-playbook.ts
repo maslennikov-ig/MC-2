@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { languageSchema, SUPPORTED_LANGUAGES } from './common-enums';
+import { enrichmentStatusSchema } from './lesson-enrichment';
 
 export const SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES = SUPPORTED_LANGUAGES;
 export const CAREER_PLAYBOOK_FREEFORM_TEXT_MAX_LENGTH = 20_000;
@@ -39,6 +40,9 @@ export type CareerPlaybookWizardPhase = z.infer<typeof CareerPlaybookWizardPhase
 
 export const CareerPlaybookVisibilitySchema = z.enum(['private', 'organization', 'public']);
 export type CareerPlaybookVisibility = z.infer<typeof CareerPlaybookVisibilitySchema>;
+
+export const CareerPlaybookImageStatusSchema = enrichmentStatusSchema;
+export type CareerPlaybookImageStatus = z.infer<typeof CareerPlaybookImageStatusSchema>;
 
 export interface CareerPlaybookViewerPermissions {
   canEdit: boolean;
@@ -711,6 +715,10 @@ export interface CareerPlaybookViewerSnapshot {
   blocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   shareSlug?: string | null;
   organizationSlug?: string | null;
+  imageUrl?: string | null;
+  imageStatus?: CareerPlaybookImageStatus | null;
+  imageAltText?: string | null;
+  imageErrorMessage?: string | null;
   isPublic?: boolean;
   visibility?: CareerPlaybookVisibility;
   ownerId?: string | null;

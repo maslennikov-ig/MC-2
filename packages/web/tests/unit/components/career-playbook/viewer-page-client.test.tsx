@@ -141,6 +141,16 @@ const messages = {
       inspectorLanguage: 'Document language: {language}',
       inspectorNextStep: 'Next step: create an adaptation course',
       inspectorPrepare: 'Prepare for rollout',
+      imageStatusTitle: 'Image',
+      imageRegenerate: 'Regenerate',
+      imageUnavailable: 'Image has not been created yet',
+      imageStatusLabels: {
+        pending: 'Pending',
+        queued: 'Queued',
+        generating: 'Generating',
+        completed: 'Completed',
+        failed: 'Failed',
+      },
       waitingBlock: 'This block is waiting for generation.',
       editorTitle: 'Edit block',
       editorDescription:
@@ -340,6 +350,16 @@ const ruMessages = {
       inspectorLanguage: 'Язык документа: {language}',
       inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
       inspectorPrepare: 'Подготовить к внедрению',
+      imageStatusTitle: 'Изображение',
+      imageRegenerate: 'Перегенерировать',
+      imageUnavailable: 'Изображение ещё не создано',
+      imageStatusLabels: {
+        pending: 'Ожидает',
+        queued: 'В очереди',
+        generating: 'Генерируется',
+        completed: 'Готово',
+        failed: 'Ошибка',
+      },
       localPreviewTitle: 'Превью должностной инструкции',
       localPreviewContent:
         '# Превью должностной инструкции\n\nСерверный просмотр ещё не подключён.',

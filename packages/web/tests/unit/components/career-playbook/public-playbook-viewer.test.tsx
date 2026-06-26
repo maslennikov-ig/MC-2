@@ -25,12 +25,20 @@ describe('PublicPlaybookViewer', () => {
           department: 'sales',
           level: 'lead',
           language: 'en',
+          imageUrl: 'https://cdn.example.test/career-playbooks/pb-1/card.webp',
+          imageAltText: 'Role Guide image: Head of Sales',
+          imageStatus: 'completed',
+          imageErrorMessage: null,
           createdAt: '2026-05-14T10:00:00.000Z',
         }}
       />
     )
 
     expect(screen.getByRole('heading', { name: 'Head of Sales' })).toBeInTheDocument()
+    expect(screen.getByAltText('Role Guide image: Head of Sales')).toHaveAttribute(
+      'src',
+      expect.stringContaining('career-playbooks')
+    )
     expect(screen.getByTestId('career-playbook-public-document')).toBeInTheDocument()
     expect(markdownRenderer).toHaveBeenCalledWith(
       expect.objectContaining({

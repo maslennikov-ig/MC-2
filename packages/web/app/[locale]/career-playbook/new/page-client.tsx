@@ -523,7 +523,7 @@ export default function CareerPlaybookNewPageClient({
 
   useEffect(() => {
     if (!completedViewerHref || generationAutoOpenRef.current === completedViewerHref) return
-    if (process.env.NODE_ENV === 'test') return
+    if (process.env.NODE_ENV === 'test' || process.env.NEXT_PUBLIC_E2E === '1') return
 
     generationAutoOpenRef.current = completedViewerHref
     const timeout = window.setTimeout(() => {
