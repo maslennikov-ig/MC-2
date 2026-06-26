@@ -261,3 +261,4 @@
 {"id":"int-b88479d4","kind":"field_change","created_at":"2026-06-26T05:32:42.223611486Z","actor":"maslennikov-ig","issue_id":"mc2-db696.11","extra":{"field":"status","new_value":"blocked","old_value":"in_progress"}}
 {"id":"int-b791b294","kind":"field_change","created_at":"2026-06-26T05:35:19.858077547Z","actor":"maslennikov-ig","issue_id":"mc2-g24ex","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
 {"id":"int-5fc2255a","kind":"field_change","created_at":"2026-06-26T05:35:19.858203731Z","actor":"maslennikov-ig","issue_id":"mc2-g24ex","extra":{"field":"assignee","new_value":"maslennikov-ig","old_value":""}}
+{"id":"int-eeebe4a8","kind":"field_change","created_at":"2026-06-26T05:43:24.436740956Z","actor":"maslennikov-ig","issue_id":"mc2-g24ex","extra":{"field":"status","new_value":"blocked","old_value":"in_progress"}}
