@@ -1,50 +1,45 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-26
-Stage: `mc2-db696.83` Career Playbook live-smoke fixes completed locally
+Stage: `mc2-db696.86` Career Playbook Qdrant follow-ups locally closed; cloud endpoint blocked
 Branch: `codex/career-playbook-live-smoke-fixes`
-Beads: `mc2-db696.83`, `mc2-db696.84`, `mc2-db696.85`, `mc2-6g1rr` ready to close after final closeout; follow-ups `mc2-db696.86`, `mc2-db696.87` open
+Beads: `mc2-db696.87` closed; `mc2-db696.86` blocked on valid cloud Qdrant endpoint/key for cloud-backed validation after tracked dev-compose fix
 
 ## Current State
 
-- Implemented rollout-compatible Career Playbook public share fallback for environments missing image columns, plus idempotent repair migration `20260626153000_repair_career_playbook_image_columns.sql`.
-- Hardened shared Jina embedding generation with provider-side `truncate: true` and adaptive split/retry for late-chunking token-window 422 responses.
-- Updated official Career Playbook live smoke to submit `business_context`, support resume mode, wait for course document-processing status, and surface course bridge document-processing failures.
-- Added Career Playbook group-generator fallback content and critical structured quality issues when required model group blocks are missing.
-- Fixed backend tRPC auth header extraction so lowercase `authorization` works in local/live smoke clients.
-- Live mutation smoke passed on a disposable fixture using local API/worker and dedicated queue.
-- Smoke cleanup completed and was verified: generated playbooks/courses/files/jobs/errors/org/user/auth user removed, local upload directory removed, queue obliterated, and Qdrant vectors for smoke course IDs deleted.
+- Previous stage `mc2-db696.83` remains pushed at `ac7987de` on `origin/codex/career-playbook-live-smoke-fixes`.
+- `mc2-db696.87`: `create-collection.ts` import side effect is fixed locally and the Beads issue is closed. The direct-execution guard now compares full resolved paths instead of basename suffixes.
+- `mc2-db696.87`: added `tests/unit/shared/qdrant/create-collection.test.ts`; RED reproduced import-time Qdrant call, GREEN passed after fix.
+- `mc2-db696.86`: read-only Qdrant probe confirmed the configured cloud endpoint returns plain HTTP 404 on `/collections`; this is endpoint/config-level, not missing `course_embeddings`.
+- `mc2-db696.86`: `docker-compose.dev.yml` now forces `api-dev`, `worker-dev`, and `worker-stage6-dev` to use `QDRANT_URL=http://qdrant-dev:6333`, matching the existing dev-local Qdrant service and health check.
+- Volta debugger subagent completed Qdrant diagnosis and was closed.
 
 ## Verification
 
-- `git diff --check` passed before closeout metadata edits.
-- Targeted backend unit tests passed: `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/career-playbook-library-service.test.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/shared/embeddings/generate.test.ts tests/unit/smoke/career-playbook-live-smoke.test.ts tests/unit/stages/stage-career-playbook/group-generator.test.ts tests/unit/stages/stage-career-playbook/final-assembler.test.ts` — 6 files / 88 tests.
-- `pnpm type-check` passed.
-- `pnpm build` passed.
-- Live Career Playbook mutation smoke with `--include-course-bridge` passed:
-  - all 27 required blocks generated;
-  - deterministic checks passed;
-  - PDF export succeeded;
-  - public share resolved through slug;
-  - course bridge created a course and document processing reached `stage_2_awaiting_approval`.
+- `orch-prompts docs-resolve --package @qdrant/js-client-rest --topic ...` returned `fallback-needed`; official Qdrant docs were checked for REST endpoint behavior.
+- `orch-prompts prompt-check` passed for the Qdrant diagnostic and cleanup worker prompts.
+- Masked read-only Qdrant probe reproduced plain 404 on `/collections` for the configured cloud endpoint; no cloud mutation was performed.
+- `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/qdrant/create-collection.test.ts`: failed before fix as expected, then passed after fix.
+- `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/qdrant/create-collection.test.ts tests/unit/shared/qdrant/lifecycle.test.ts tests/unit/shared/rag/document-availability.test.ts`: passed, 3 files / 11 tests.
+- `docker compose -f docker-compose.dev.yml config --no-interpolate --quiet`: passed.
+- `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.86`: passed, including `pnpm type-check`, `pnpm build`, and process verification.
+- `git diff --check`: passed.
 
 ## Explicit defers
 
-- `mc2-db696.86`: configured dev/staging cloud Qdrant endpoint returned `Not Found`; live E2E passed by overriding to local Docker Qdrant. Fix endpoint/key/collection config before relying on deployed dev worker course bridge Stage 2.
-- `mc2-db696.87`: Career Playbook cleanup helper has an import-time side effect in tsx stdin/script contexts; cleanup used an inline safe script. Make cleanup utilities import-safe.
-- Pre-existing build warnings were not fixed: stale Browserslist `caniuse-lite` data and Node `[DEP0169] url.parse()` deprecation during Next build.
-- No merge/deploy has been performed for this stage yet.
+- `mc2-db696.86`: valid cloud Qdrant database endpoint/API key is still required for cloud-backed validation. Current configured cloud endpoint returns route-level `404 page not found` on `/collections`.
+- No merge/deploy has been performed for this follow-up stage.
 
 ## Next recommended
 
 Next stage id: `mc2-db696.86`
-Recommended action: finish stage closeout, commit and push `codex/career-playbook-live-smoke-fixes`, then deliver to `develop` via the repo's normal dev path only after explicit merge/deploy authorization.
+Recommended action: commit and push this follow-up stage. Keep `mc2-db696.86` blocked unless a valid active Qdrant cloud endpoint/key is provided, because cloud validation cannot be completed from repo code alone.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Continue from branch `codex/career-playbook-live-smoke-fixes` and stage `mc2-db696.83`. The implementation and live mutation smoke passed; verify closeout state, ensure Beads/stage artifacts are current, then push the feature branch. Do not merge to `develop` or deploy without explicit current authorization. Track remaining work in `mc2-db696.86` and `mc2-db696.87`.
+Use $orchestrator-stage in `/home/me/code/mc2`. Continue stage `mc2-db696.86` on branch `codex/career-playbook-live-smoke-fixes`. Local verification and closeout passed; commit/push if not already done. Do not create/delete Qdrant cloud collections or run live smoke unless a valid endpoint/key and explicit mutation authorization are present.
 
 ## Closeout Markers
 
-docs-reviewed: no-change-needed - touched behavior is internal backend/smoke resilience and one DB repair migration; stable project index already lists the relevant entrypoints and no public/operator docs need new instructions beyond Beads defers.
-graph-reviewed: updated - `graphify update . --force` rebuilt the local code graph, then `graphify cluster-only . --no-viz` refreshed `GRAPH_REPORT.md`; final report shows 52,602 nodes, 77,116 edges, and 3,273 communities.
+docs-reviewed: no-change-needed - current changes are internal dev compose wiring and Qdrant tooling import-safety; stable project index already lists deploy/Qdrant entrypoints.
+graph-reviewed: updated - `graphify update . --force` and `graphify cluster-only . --no-viz` completed; final report shows 52,430 nodes, 76,670 edges, and 3,272 communities.

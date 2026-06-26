@@ -17,6 +17,8 @@
 import 'dotenv/config';
 import { qdrantClient } from './client';
 import { logger } from '../logger/index.js';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Type guard for Qdrant API errors with status property
@@ -314,11 +316,19 @@ async function main(): Promise<void> {
   }
 }
 
+function isDirectExecution(metaUrl: string, argvPath = process.argv[1]): boolean {
+  if (!argvPath) {
+    return false;
+  }
+
+  return resolve(fileURLToPath(metaUrl)) === resolve(argvPath);
+}
+
 // Execute if run directly (ESM compatible)
-// Note: This check only works when running with tsx or node directly
-const isMainModule = import.meta.url.endsWith(
-  process.argv[1]?.replace(/\\/g, '/').split('/').pop() || ''
-);
+// Note: This check only works when running with tsx or node directly.
+// Compare full resolved paths so importing from another script with the same
+// basename cannot trigger collection creation.
+const isMainModule = isDirectExecution(import.meta.url);
 if (isMainModule) {
   main().catch(error => {
     logger.error(
@@ -333,4 +343,4 @@ if (isMainModule) {
 }
 
 // Export for programmatic use
-export { createCourseEmbeddingsCollection };
+export { createCourseEmbeddingsCollection, isDirectExecution };
