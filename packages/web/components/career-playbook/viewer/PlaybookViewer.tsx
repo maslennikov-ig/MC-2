@@ -1127,6 +1127,14 @@ function ImageStatusSection({
           </Button>
         ) : null}
       </div>
+
+      {snapshot.imageUrl ? (
+        <PlaybookCardImage
+          key={snapshot.imageUrl}
+          src={snapshot.imageUrl}
+          alt={snapshot.imageAltText ?? `Role Guide image: ${snapshot.title}`}
+        />
+      ) : null}
     </section>
   )
 }
@@ -1463,8 +1471,6 @@ function DocumentPaper({
         spacious ? 'px-6 py-8 md:px-12 md:py-12' : 'px-5 py-6 md:px-8 md:py-8'
       )}
     >
-      <DocumentHeroImage snapshot={snapshot} />
-
       <header className="career-playbook-document-rule mb-7 flex flex-wrap items-start justify-between gap-4 border-b pb-5">
         <div className="min-w-0">
           <div className="career-playbook-pill mb-3 inline-flex px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -1601,15 +1607,13 @@ function DocumentPaper({
   )
 }
 
-function DocumentHeroImage({ snapshot }: { snapshot: CareerPlaybookViewerSnapshot }) {
+function PlaybookCardImage({ src, alt }: { src: string; alt: string }) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
 
-  if (!snapshot.imageUrl) return null
-
   return (
     <div
-      className="relative mb-7 aspect-square max-h-[520px] overflow-hidden rounded-md border border-[#d6c2a6] bg-[#f3f0ea] dark:border-slate-700 dark:bg-slate-900"
+      className="relative mt-3 aspect-square w-full overflow-hidden rounded-md border border-[#d6c2a6] bg-[#f3f0ea] dark:border-slate-700 dark:bg-slate-900"
       aria-busy={!isLoaded && !hasError}
     >
       {!isLoaded && !hasError ? <ImageSkeleton gradient /> : null}
@@ -1620,15 +1624,15 @@ function DocumentHeroImage({ snapshot }: { snapshot: CareerPlaybookViewerSnapsho
         />
       ) : null}
       <Image
-        src={snapshot.imageUrl}
-        alt={snapshot.imageAltText ?? `Role Guide image: ${snapshot.title}`}
+        src={src}
+        alt={alt}
         fill
         unoptimized
         className={cn(
           'object-cover transition-opacity duration-300',
           isLoaded && !hasError ? 'opacity-100' : 'opacity-0'
         )}
-        sizes="(max-width: 768px) 100vw, 760px"
+        sizes="(max-width: 768px) 100vw, 360px"
         onLoad={() => setIsLoaded(true)}
         onError={() => setHasError(true)}
       />
