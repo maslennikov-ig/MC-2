@@ -632,13 +632,46 @@ jobs:
             ${{ matrix.image == 'web' && format('NEXT_PUBLIC_USERBACK_TOKEN={0}', secrets.NEXT_PUBLIC_USERBACK_TOKEN) || '' }}
 
   # ============================================
+  # Migration drift gate (read-only)
+  # Fails the deploy if repo Supabase migrations are not applied to the shared
+  # database (dev + staging share one project). Skips (passes) until the repo
+  # secret SUPABASE_DB_URL is configured, so it is safe to merge before that
+  # secret is provisioned. See beads mc2-hnkmf.
+  # ============================================
+  migration-drift-check:
+    name: Migration Drift Check
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: always() && needs.changes.outputs.should_deploy == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || inputs.force_deploy)
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Migration drift gate not configured
+        if: env.SUPABASE_DB_URL == ''
+        run: echo "::warning::SUPABASE_DB_URL not set; migration drift gate skipped. Add the repo secret to enable (mc2-hnkmf)."
+      - name: Check migration drift
+        if: env.SUPABASE_DB_URL != ''
+        run: pnpm -F course-gen-platform exec tsx scripts/check-migration-drift.ts
+
+  # ============================================
   # STAGE 6: Deploy to Production
   # ============================================
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [changes, build-docker]
-    if: always() && needs.changes.outputs.should_deploy == 'true' && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped') && (github.ref == 'refs/heads/master' || inputs.force_deploy)
+    needs: [changes, build-docker, migration-drift-check]
+    if: always() && needs.changes.outputs.should_deploy == 'true' && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped') && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && (github.ref == 'refs/heads/master' || inputs.force_deploy)
     timeout-minutes: 10
     environment:
       name: production
@@ -808,8 +841,8 @@ jobs:
   deploy-dev:
     name: Deploy to Dev
     runs-on: ubuntu-latest
-    needs: [changes, build-docker]
-    if: always() && needs.changes.outputs.should_deploy == 'true' && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped') && github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: [changes, build-docker, migration-drift-check]
+    if: always() && needs.changes.outputs.should_deploy == 'true' && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped') && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && github.ref == 'refs/heads/develop' && github.event_name == 'push'
     timeout-minutes: 20
     environment:
       name: development
