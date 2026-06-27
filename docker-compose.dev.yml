@@ -124,6 +124,7 @@ services:
       - NODE_ENV=production
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
+      - QDRANT_URL=http://qdrant-dev:6333
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
       - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
@@ -183,6 +184,7 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
+      - QDRANT_URL=http://qdrant-dev:6333
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       - DOCLING_CACHE_PATH=/app/docling-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
@@ -231,6 +233,7 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
+      - QDRANT_URL=http://qdrant-dev:6333
       # Enable dedicated Stage 6 worker mode (30 concurrent)
       - STAGE6_WORKER=true
       # DEV queue isolation - listens to DEV-only stage6 queue

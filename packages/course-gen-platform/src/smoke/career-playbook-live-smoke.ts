@@ -46,6 +46,7 @@ export interface CareerPlaybookLiveSmokeOptions {
   pollTimeoutMs?: number;
   pollIntervalMs?: number;
   includeCourseBridge?: boolean;
+  resumePlaybookId?: string;
 }
 
 export interface CareerPlaybookLiveSmokeCheck {
@@ -91,6 +92,14 @@ export interface CareerPlaybookLiveSmokeGenerationStatus {
   generatedBlocks?: unknown;
 }
 
+export interface CareerPlaybookLiveSmokeCourseGenerationStatus {
+  courseId: string;
+  status: string;
+  progress?: number;
+  currentPhase?: string | null;
+  error?: string | null;
+}
+
 export interface CareerPlaybookLiveSmokeLibraryDetail {
   id: string;
   status: CareerPlaybookPlaybookStatus;
@@ -103,7 +112,7 @@ export interface CareerPlaybookLiveSmokeClient {
   startSession: (input: { language: Language }) => Promise<CareerPlaybookLiveSmokeSessionResponse>;
   submitAnswer: (input: {
     playbookId: string;
-    phase: 'fixed' | 'followup' | 'freeform';
+    phase: 'fixed' | 'followup' | 'freeform' | 'business_context';
     answer: CareerPlaybookAnswerSubmission;
   }) => Promise<unknown>;
   requestFollowups: (input: {
@@ -129,6 +138,9 @@ export interface CareerPlaybookLiveSmokeClient {
     playbookId: string;
     includeWebResearch: boolean;
   }) => Promise<{ courseId: string; redirectUrl: string; sourceDocumentIds: string[] }>;
+  getCourseStatus: (input: {
+    courseId: string;
+  }) => Promise<CareerPlaybookLiveSmokeCourseGenerationStatus>;
 }
 
 export interface CareerPlaybookLiveSmokeDependencies {
@@ -178,7 +190,7 @@ export interface CareerPlaybookCleanupManifest {
 }
 
 const DEFAULT_QUEUE_NAME = 'course-generation';
-const DEFAULT_POLL_TIMEOUT_MS = 20 * 60 * 1000;
+const DEFAULT_POLL_TIMEOUT_MS = 45 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 
 const SALES_MANAGER_B2B_FIXED_ANSWERS: CareerPlaybookFixedAnswer[] = [
@@ -190,6 +202,16 @@ const SALES_MANAGER_B2B_FIXED_ANSWERS: CareerPlaybookFixedAnswer[] = [
   { question_key: 'company_stage', value: 'growth' },
   { question_key: 'content_language', value: 'en' },
 ];
+
+const LIVE_SMOKE_BUSINESS_CONTEXT: CareerPlaybookAnswerSubmission = {
+  business_context: {
+    mode: 'universal',
+    status: 'skipped',
+    digest: null,
+    source_ids: [],
+    skip_reason: 'live_smoke_universal_business_context',
+  },
+};
 
 function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -364,6 +386,14 @@ export function buildCareerPlaybookLiveSmokePlan(
       'Explicit live mutation confirmation supplied.',
       'Pass --confirm-live-mutation for mutation-smoke mode.'
     ),
+    check(
+      'business-context',
+      mode === 'plan' ? 'skipped' : 'pass',
+      mode === 'mutation-smoke',
+      mode === 'plan'
+        ? 'Plan mode documents the required business_context skipped submit before requestFollowups without mutating.'
+        : 'Live smoke will submit skipped universal business_context before requestFollowups.'
+    ),
   ];
 
   return {
@@ -440,6 +470,54 @@ async function waitForCompletion(
   throw new Error(`Career Playbook live smoke timed out waiting for ${playbookId}`);
 }
 
+function isCourseDocumentProcessingDone(status: string): boolean {
+  return (
+    status === 'stage_2_complete' ||
+    status === 'stage_2_awaiting_approval' ||
+    status.startsWith('stage_3') ||
+    status.startsWith('stage_4') ||
+    status.startsWith('stage_5') ||
+    status.startsWith('stage_6') ||
+    status === 'finalizing' ||
+    status === 'completed'
+  );
+}
+
+async function waitForCourseDocumentProcessing(
+  client: CareerPlaybookLiveSmokeClient,
+  courseId: string,
+  options: CareerPlaybookLiveSmokeOptions,
+  dependencies: CareerPlaybookLiveSmokeDependencies
+): Promise<CareerPlaybookLiveSmokeCourseGenerationStatus> {
+  const sleep = dependencies.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
+  const now = dependencies.now ?? (() => new Date());
+  const timeoutMs = options.pollTimeoutMs ?? DEFAULT_POLL_TIMEOUT_MS;
+  const intervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const startedAt = now().getTime();
+  let lastStatus: CareerPlaybookLiveSmokeCourseGenerationStatus | null = null;
+
+  while (now().getTime() - startedAt <= timeoutMs) {
+    const status = await client.getCourseStatus({ courseId });
+    lastStatus = status;
+
+    if (status.status === 'failed' || status.status === 'cancelled') {
+      throw new Error(
+        `Course bridge document processing failed for ${courseId}: ${status.error ?? status.status}`
+      );
+    }
+
+    if (isCourseDocumentProcessingDone(status.status)) return status;
+
+    await sleep(intervalMs);
+  }
+
+  throw new Error(
+    `Career Playbook course bridge timed out waiting for document processing on ${courseId}; last status: ${
+      lastStatus?.status ?? 'unknown'
+    }`
+  );
+}
+
 export async function runCareerPlaybookLiveSmoke(
   options: CareerPlaybookLiveSmokeOptions = {},
   dependencies: CareerPlaybookLiveSmokeDependencies = {}
@@ -466,36 +544,48 @@ export async function runCareerPlaybookLiveSmoke(
     };
   }
 
-  const session = await client.startSession({ language: 'en' });
-  const playbookId = session.playbookId;
+  const resumePlaybookId = options.resumePlaybookId?.trim();
+  let playbookId = resumePlaybookId;
 
-  for (const fixedAnswer of SALES_MANAGER_B2B_FIXED_ANSWERS) {
+  if (!playbookId) {
+    const session = await client.startSession({ language: 'en' });
+    playbookId = session.playbookId;
+
+    for (const fixedAnswer of SALES_MANAGER_B2B_FIXED_ANSWERS) {
+      await client.submitAnswer({
+        playbookId,
+        phase: 'fixed',
+        answer: {
+          question_key: fixedAnswer.question_key,
+          value: fixedAnswer.value,
+        },
+      });
+    }
+
     await client.submitAnswer({
       playbookId,
-      phase: 'fixed',
-      answer: {
-        question_key: fixedAnswer.question_key,
-        value: fixedAnswer.value,
-      },
+      phase: 'business_context',
+      answer: LIVE_SMOKE_BUSINESS_CONTEXT,
     });
-  }
 
-  const followups = await client.requestFollowups({
-    playbookId,
-    fixedAnswers: fixedAnswerRecord(),
-    followupAnswers: {},
-    contentLanguage: 'en',
-  });
-
-  for (const question of followups.questions) {
-    await client.submitAnswer({
+    const followups = await client.requestFollowups({
       playbookId,
-      phase: 'followup',
-      answer: followupAnswerFor(question),
+      fixedAnswers: fixedAnswerRecord(),
+      followupAnswers: {},
+      contentLanguage: 'en',
     });
+
+    for (const question of followups.questions) {
+      await client.submitAnswer({
+        playbookId,
+        phase: 'followup',
+        answer: followupAnswerFor(question),
+      });
+    }
+
+    await client.approveAndGenerate({ playbookId });
   }
 
-  await client.approveAndGenerate({ playbookId });
   await waitForCompletion(client, playbookId, options, dependencies);
   const detail = await client.getLibraryDetail({ playbookId });
   const pdf = await client.exportPdf({ playbookId });
@@ -514,6 +604,7 @@ export async function runCareerPlaybookLiveSmoke(
   let courseId: string | undefined;
   let sourceDocumentIds: string[] = [];
   let redirectUrl: string | undefined;
+  let courseDocumentProcessingStatus: CareerPlaybookLiveSmokeCourseGenerationStatus | undefined;
   if (options.includeCourseBridge) {
     const course = await client.createCourseFromPlaybook({
       playbookId,
@@ -522,6 +613,12 @@ export async function runCareerPlaybookLiveSmoke(
     courseId = course.courseId;
     sourceDocumentIds = course.sourceDocumentIds;
     redirectUrl = course.redirectUrl;
+    courseDocumentProcessingStatus = await waitForCourseDocumentProcessing(
+      client,
+      course.courseId,
+      options,
+      dependencies
+    );
   }
 
   const evidence = validateCareerPlaybookSmokeEvidence({
@@ -543,6 +640,8 @@ export async function runCareerPlaybookLiveSmoke(
           courseId,
           redirectUrl,
           sourceDocumentIds,
+          documentProcessingStatus: courseDocumentProcessingStatus?.status ?? null,
+          documentProcessingError: courseDocumentProcessingStatus?.error ?? null,
         }
       : undefined,
     requireSurfaces: true,

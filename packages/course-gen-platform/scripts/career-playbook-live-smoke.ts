@@ -19,6 +19,9 @@ interface ParsedArgs {
   queueName?: string;
   cleanupScope?: CareerPlaybookCleanupScope;
   maxCostUsd?: number;
+  pollTimeoutMs?: number;
+  pollIntervalMs?: number;
+  resumePlaybookId?: string;
   confirmLiveMutation: boolean;
   includeCourseBridge: boolean;
   json: boolean;
@@ -41,6 +44,9 @@ Options:
   --cleanup-scope <playbook-only|playbook-and-course>
                                            Exact cleanup scope after evidence capture
   --max-cost-usd <number>                  Numeric API/LLM budget cap for this run
+  --poll-timeout-ms <number>               Max wait time for generated artifacts (default: 2700000)
+  --poll-interval-ms <number>              Poll interval while waiting (default: 5000)
+  --resume-playbook-id <uuid>              Resume post-generation evidence capture for an existing playbook
   --confirm-live-mutation                  Required for mutation-smoke
   --include-course-bridge                  Also create the bridge course; requires cleanup coverage
   --json                                   Print JSON report
@@ -127,6 +133,28 @@ function parseArgs(argv: string[]): ParsedArgs {
         index += 1;
         break;
       }
+      case '--poll-timeout-ms': {
+        const value = Number(readValue(argv, index, arg));
+        if (!Number.isFinite(value) || value <= 0) {
+          throw new Error('--poll-timeout-ms must be a positive number');
+        }
+        parsed.pollTimeoutMs = value;
+        index += 1;
+        break;
+      }
+      case '--poll-interval-ms': {
+        const value = Number(readValue(argv, index, arg));
+        if (!Number.isFinite(value) || value <= 0) {
+          throw new Error('--poll-interval-ms must be a positive number');
+        }
+        parsed.pollIntervalMs = value;
+        index += 1;
+        break;
+      }
+      case '--resume-playbook-id':
+        parsed.resumePlaybookId = readValue(argv, index, arg);
+        index += 1;
+        break;
       case '--confirm-live-mutation':
         parsed.confirmLiveMutation = true;
         break;
@@ -175,6 +203,7 @@ function createTrpcLiveSmokeClient(trpcUrl: string, token: string): CareerPlaybo
     getPublicShare: input => trpc.careerPlaybook.share.getPublicBySlug.query(input),
     createCourseFromPlaybook: input =>
       trpc.careerPlaybook.courseBridge.createCourseFromPlaybook.mutate(input),
+    getCourseStatus: input => trpc.generation.getStatus.query(input),
   };
 }
 
@@ -207,13 +236,18 @@ async function main(): Promise<void> {
       queueName: args.queueName,
       cleanupScope: args.cleanupScope,
       maxCostUsd: args.maxCostUsd,
+      pollTimeoutMs: args.pollTimeoutMs,
+      pollIntervalMs: args.pollIntervalMs,
+      resumePlaybookId: args.resumePlaybookId,
       confirmLiveMutation: args.confirmLiveMutation,
       includeCourseBridge: args.includeCourseBridge,
     },
     { client }
   );
 
-  console.log(args.json ? JSON.stringify(report, null, 2) : formatCareerPlaybookLiveSmokeReport(report));
+  console.log(
+    args.json ? JSON.stringify(report, null, 2) : formatCareerPlaybookLiveSmokeReport(report)
+  );
   process.exit(exitCodeFor(report.status));
 }
 

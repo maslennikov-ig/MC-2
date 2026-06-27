@@ -164,6 +164,12 @@ function validateJinaConfig(): void {
   }
 }
 
+type JinaV3RequestWithProviderTruncation = JinaV3Request & { truncate: true };
+
+function withProviderTruncation(payload: JinaV3Request): JinaV3RequestWithProviderTruncation {
+  return { ...payload, truncate: true };
+}
+
 // Rate limiter: using shared jinaRateLimiter from jina-client.ts (100 RPM)
 const rateLimiter = jinaRateLimiter;
 
@@ -193,13 +199,19 @@ function isRetryableError(error: unknown): boolean {
  * Extracts error message from Jina API error response
  */
 function extractJinaErrorMessage(response: Response, errorData: JinaAPIErrorData): string {
-  return (
-    errorData.error?.message ||
-    errorData.error?.detail ||
-    errorData.detail ||
-    errorData.message ||
-    `Jina API request failed with status ${response.status}`
-  );
+  const message =
+    errorData.error?.message ?? errorData.error?.detail ?? errorData.detail ?? errorData.message;
+
+  if (typeof message === 'string') return message;
+  if (message && typeof message === 'object') {
+    try {
+      return JSON.stringify(message);
+    } catch {
+      return String(message);
+    }
+  }
+
+  return `Jina API request failed with status ${response.status}`;
 }
 
 /**
@@ -530,13 +542,15 @@ export async function generateQueryEmbedding(queryText: string): Promise<number[
   // Note: rateLimiter.waitForSlot() is called inside makeJinaV3Request(),
   // so we don't call it here to avoid double-waiting
 
-  const response = await makeJinaV3Request({
-    model: 'jina-embeddings-v3',
-    input: [queryText],
-    task: 'retrieval.query', // Use query-specific adapter
-    dimensions: 768,
-    late_chunking: false, // Not needed for single query
-  });
+  const response = await makeJinaV3Request(
+    withProviderTruncation({
+      model: 'jina-embeddings-v3',
+      input: [queryText],
+      task: 'retrieval.query', // Use query-specific adapter
+      dimensions: 768,
+      late_chunking: false, // Not needed for single query
+    })
+  );
 
   const embedding = response.data[0].embedding;
 
@@ -578,13 +592,15 @@ export async function healthCheck(): Promise<boolean> {
   try {
     validateJinaConfig();
 
-    const testResponse = await makeJinaV3Request({
-      model: 'jina-embeddings-v3',
-      input: ['test'],
-      task: 'retrieval.query',
-      dimensions: 768,
-      late_chunking: false,
-    });
+    const testResponse = await makeJinaV3Request(
+      withProviderTruncation({
+        model: 'jina-embeddings-v3',
+        input: ['test'],
+        task: 'retrieval.query',
+        dimensions: 768,
+        late_chunking: false,
+      })
+    );
 
     return testResponse.data[0].embedding.length === 768;
   } catch (error) {
@@ -709,6 +725,95 @@ async function cacheNewEmbeddings(
   }
 }
 
+function isLateChunkingTokenizationWindowError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('late_chunking') &&
+    (message.includes('beyond the truncation window') ||
+      message.includes('could not be tokenized') ||
+      message.includes('truncation window'))
+  );
+}
+
+async function requestAndCacheEmbeddingsWithAdaptiveSplit(input: {
+  textsToEmbed: string[];
+  chunkIndexMap: number[];
+  batch: EnrichedChunk[];
+  task: 'retrieval.passage' | 'retrieval.query';
+  late_chunking: boolean;
+  batchNumber: number;
+  cachedResults: Map<number, number[]>;
+  splitDepth?: number;
+}): Promise<number> {
+  const {
+    textsToEmbed,
+    chunkIndexMap,
+    batch,
+    task,
+    late_chunking,
+    batchNumber,
+    cachedResults,
+    splitDepth = 0,
+  } = input;
+
+  try {
+    const response = await makeJinaV3Request(
+      withProviderTruncation({
+        model: 'jina-embeddings-v3',
+        input: textsToEmbed,
+        task,
+        dimensions: 768, // Match Qdrant collection
+        late_chunking, // Enable context-aware embeddings
+      })
+    );
+
+    // Validate and extract embeddings
+    if (response.data.length !== textsToEmbed.length) {
+      throw new Error(
+        `Embedding count mismatch: expected ${textsToEmbed.length}, got ${response.data.length}`
+      );
+    }
+
+    await cacheNewEmbeddings(response, chunkIndexMap, batch, task, cachedResults);
+
+    return response.usage.total_tokens;
+  } catch (error) {
+    if (late_chunking && textsToEmbed.length > 1 && isLateChunkingTokenizationWindowError(error)) {
+      const midpoint = Math.ceil(textsToEmbed.length / 2);
+      logger.warn(
+        {
+          batchNumber,
+          splitDepth,
+          originalBatchSize: textsToEmbed.length,
+          leftBatchSize: midpoint,
+          rightBatchSize: textsToEmbed.length - midpoint,
+          err: error instanceof Error ? error.message : String(error),
+        },
+        'Jina late_chunking batch exceeded provider truncation window, retrying as split batches'
+      );
+
+      const leftTokens = await requestAndCacheEmbeddingsWithAdaptiveSplit({
+        ...input,
+        textsToEmbed: textsToEmbed.slice(0, midpoint),
+        chunkIndexMap: chunkIndexMap.slice(0, midpoint),
+        splitDepth: splitDepth + 1,
+      });
+      const rightTokens = await requestAndCacheEmbeddingsWithAdaptiveSplit({
+        ...input,
+        textsToEmbed: textsToEmbed.slice(midpoint),
+        chunkIndexMap: chunkIndexMap.slice(midpoint),
+        splitDepth: splitDepth + 1,
+      });
+
+      return leftTokens + rightTokens;
+    }
+
+    throw error;
+  }
+}
+
 /**
  * Processes a single batch for embedding generation
  */
@@ -735,26 +840,15 @@ async function processSingleBatch(
   // If we have texts that need embedding, call API
   if (textsToEmbed.length > 0) {
     try {
-      // Make request with late chunking enabled
-      const response = await makeJinaV3Request({
-        model: 'jina-embeddings-v3',
-        input: textsToEmbed,
+      tokensUsed = await requestAndCacheEmbeddingsWithAdaptiveSplit({
+        textsToEmbed,
+        chunkIndexMap,
+        batch,
         task,
-        dimensions: 768, // Match Qdrant collection
-        late_chunking, // Enable context-aware embeddings
+        late_chunking,
+        batchNumber: batchCount + 1,
+        cachedResults,
       });
-
-      // Validate and extract embeddings
-      if (response.data.length !== textsToEmbed.length) {
-        throw new Error(
-          `Embedding count mismatch: expected ${textsToEmbed.length}, got ${response.data.length}`
-        );
-      }
-
-      // Cache newly generated embeddings
-      await cacheNewEmbeddings(response, chunkIndexMap, batch, task, cachedResults);
-
-      tokensUsed = response.usage.total_tokens;
     } catch (error) {
       // Content policy errors propagate as-is (user-facing, not technical)
       if (error instanceof ContentPolicyError) {
