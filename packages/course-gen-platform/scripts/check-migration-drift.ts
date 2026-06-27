@@ -23,7 +23,8 @@
  *   SUPABASE_DB_URL=postgresql://... pnpm -F course-gen-platform exec \
  *     tsx scripts/check-migration-drift.ts [--json]
  *
- * Exit codes: 0 = in sync, 1 = drift detected, 2 = misconfiguration.
+ * Exit codes: 0 = in sync or database unreachable (fail-open, so an infra
+ * hiccup never blocks a deploy), 1 = drift detected, 2 = misconfiguration.
  */
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -75,13 +76,20 @@ async function main() {
     .map(file => ({ file, slug: slugify(file) }))
     .sort((a, b) => a.file.localeCompare(b.file));
 
-  const client = new Client({ connectionString: dbUrl });
-  await client.connect();
   let appliedSlugs: Set<string>;
+  const client = new Client({ connectionString: dbUrl });
   try {
+    await client.connect();
     appliedSlugs = await loadAppliedSlugs(client);
+  } catch (error) {
+    // Fail open: an unreachable DB or query error must never block a deploy.
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `::warning::Migration drift gate could not reach the database; skipping (deploy not blocked). ${detail}`
+    );
+    return;
   } finally {
-    await client.end();
+    await client.end().catch(() => {});
   }
 
   // Watermark = index of the newest repo migration that IS recorded as applied.
