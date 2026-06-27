@@ -36,6 +36,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ImageSkeleton } from '@/components/ui/image-skeleton'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -103,6 +110,7 @@ export interface PlaybookViewerCopy {
   qualityIssueSuggestionLabel?: string
   qualityIssueLegacyTitle?: string
   qualityIssueSeverityLabel?: (severity: CareerPlaybookQualityIssue['severity']) => string
+  qualityIssuesOpenDetails?: string
   visibilityLabel?: string
   visibilityValueLabel?: (visibility: CareerPlaybookVisibility) => string
   inspectorReadyBlocks?: (ready: number, total: number) => string
@@ -194,6 +202,7 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   qualityIssueLegacyTitle: 'Системное предупреждение',
   qualityIssueSeverityLabel: (severity) =>
     severity === 'critical' ? 'Критично' : severity === 'warning' ? 'Предупреждение' : 'Инфо',
+  qualityIssuesOpenDetails: 'Открыть предупреждения',
   visibilityLabel: 'Видимость',
   visibilityValueLabel: (visibility) => DEFAULT_VISIBILITY_LABELS[visibility],
   inspectorReadyBlocks: (ready, total) => `Готово блоков: ${ready} из ${total}`,
@@ -955,6 +964,7 @@ function QualityWarningsSummary({
   onEditBlock: (blockId: CareerPlaybookBlockId) => void
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
 }) {
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const blockTitleById = new Map(
     blocks.map((block) => [block.blockId, labels.blockTitle(block.blockId, block.title)])
   )
@@ -974,8 +984,16 @@ function QualityWarningsSummary({
   if (visibleIssues.length === 0) return null
 
   const groupedIssues = groupQualityIssues(visibleIssues)
+  const severityOrder: CareerPlaybookQualityIssue['severity'][] = ['critical', 'warning', 'info']
+  const severityCounts = severityOrder
+    .map((severity) => ({
+      severity,
+      count: visibleIssues.filter((issue) => issue.severity === severity).length,
+    }))
+    .filter((entry) => entry.count > 0)
 
   const openBlock = (blockId: CareerPlaybookBlockId) => {
+    setIsDetailsOpen(false)
     const element = document.getElementById(blockId)
     element?.scrollIntoView({ block: 'start', behavior: 'smooth' })
     if (window.location.hash !== `#${blockId}`) {
@@ -985,6 +1003,16 @@ function QualityWarningsSummary({
         `${window.location.pathname}${window.location.search}#${blockId}`
       )
     }
+  }
+
+  const editBlock = (blockId: CareerPlaybookBlockId) => {
+    setIsDetailsOpen(false)
+    onEditBlock(blockId)
+  }
+
+  const regenerateBlock = (blockId: CareerPlaybookBlockId) => {
+    setIsDetailsOpen(false)
+    onRegenerateBlock(blockId)
   }
 
   return (
@@ -998,82 +1026,116 @@ function QualityWarningsSummary({
           </p>
         </div>
       </div>
-      <div className="mt-3 grid gap-2">
-        {groupedIssues.map((group) => (
-          <details
-            key={group.key}
-            open
-            className="rounded-md bg-white/75 p-2 text-xs leading-5 dark:bg-slate-950/35"
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {severityCounts.map(({ severity, count }) => (
+          <Badge
+            key={severity}
+            variant="outline"
+            className="rounded-md border-amber-300 px-1.5 py-0.5 text-[11px] text-amber-800 dark:text-amber-100"
           >
-            <summary className="cursor-pointer list-none font-semibold text-amber-950 dark:text-amber-50">
-              <span>
-                {group.blockId
-                  ? (blockTitleById.get(group.blockId) ?? group.blockId)
-                  : labels.qualityIssueLegacyTitle}
-              </span>
-              <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-300/15 dark:text-amber-100">
-                {group.issues.length}
-              </span>
-            </summary>
-            <div className="mt-2 grid gap-2">
-              {group.issues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="rounded-md border border-amber-200/70 bg-white/80 p-2 dark:border-amber-300/15 dark:bg-slate-950/40"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="rounded-md border-amber-300 px-1.5 py-0 text-[10px] text-amber-800 dark:text-amber-100"
-                    >
-                      {labels.qualityIssueSeverityLabel(issue.severity)}
-                    </Badge>
-                    <span className="font-semibold">{issue.title}</span>
-                  </div>
-                  <p className="mt-1 text-amber-900 dark:text-amber-50/90">{issue.message}</p>
-                  {issue.suggestion ? (
-                    <p className="mt-1 text-amber-800 dark:text-amber-100/80">
-                      <span className="font-semibold">{labels.qualityIssueSuggestionLabel}: </span>
-                      {issue.suggestion}
-                    </p>
-                  ) : null}
-                  {issue.blockId ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 rounded-md px-2 text-[11px]"
-                        onClick={() => openBlock(issue.blockId!)}
-                      >
-                        {labels.qualityIssueOpenBlock}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 rounded-md px-2 text-[11px]"
-                        onClick={() => onEditBlock(issue.blockId!)}
-                      >
-                        {labels.qualityIssueEditBlock}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 rounded-md px-2 text-[11px]"
-                        onClick={() => onRegenerateBlock(issue.blockId!)}
-                      >
-                        {labels.qualityIssueRegenerateBlock}
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </details>
+            {labels.qualityIssueSeverityLabel(severity)}: {count}
+          </Badge>
         ))}
       </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-3 h-7 rounded-md px-2 text-[11px]"
+        onClick={() => setIsDetailsOpen(true)}
+      >
+        {labels.qualityIssuesOpenDetails}
+      </Button>
+
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="flex max-h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b border-amber-200 p-4 text-left dark:border-amber-300/20">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" aria-hidden />
+              {labels.inspectorWarningsTitle}
+            </DialogTitle>
+            <DialogDescription>{labels.inspectorWarningsDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 overflow-y-auto p-4">
+            {groupedIssues.map((group) => (
+              <details
+                key={group.key}
+                open
+                className="rounded-md border border-amber-200 bg-amber-50/70 p-2 text-xs leading-5 dark:border-amber-300/15 dark:bg-amber-300/5"
+              >
+                <summary className="cursor-pointer list-none font-semibold text-amber-950 dark:text-amber-50">
+                  <span>
+                    {group.blockId
+                      ? (blockTitleById.get(group.blockId) ?? group.blockId)
+                      : labels.qualityIssueLegacyTitle}
+                  </span>
+                  <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-300/15 dark:text-amber-100">
+                    {group.issues.length}
+                  </span>
+                </summary>
+                <div className="mt-2 grid gap-2">
+                  {group.issues.map((issue) => (
+                    <div
+                      key={issue.id}
+                      className="rounded-md border border-amber-200/70 bg-white/80 p-2 dark:border-amber-300/15 dark:bg-slate-950/40"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="rounded-md border-amber-300 px-1.5 py-0 text-[10px] text-amber-800 dark:text-amber-100"
+                        >
+                          {labels.qualityIssueSeverityLabel(issue.severity)}
+                        </Badge>
+                        <span className="font-semibold">{issue.title}</span>
+                      </div>
+                      <p className="mt-1 text-amber-900 dark:text-amber-50/90">{issue.message}</p>
+                      {issue.suggestion ? (
+                        <p className="mt-1 text-amber-800 dark:text-amber-100/80">
+                          <span className="font-semibold">
+                            {labels.qualityIssueSuggestionLabel}:{' '}
+                          </span>
+                          {issue.suggestion}
+                        </p>
+                      ) : null}
+                      {issue.blockId ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 rounded-md px-2 text-[11px]"
+                            onClick={() => openBlock(issue.blockId!)}
+                          >
+                            {labels.qualityIssueOpenBlock}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 rounded-md px-2 text-[11px]"
+                            onClick={() => editBlock(issue.blockId!)}
+                          >
+                            {labels.qualityIssueEditBlock}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 rounded-md px-2 text-[11px]"
+                            onClick={() => regenerateBlock(issue.blockId!)}
+                          >
+                            {labels.qualityIssueRegenerateBlock}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
@@ -1127,6 +1189,14 @@ function ImageStatusSection({
           </Button>
         ) : null}
       </div>
+
+      {snapshot.imageUrl ? (
+        <PlaybookCardImage
+          key={snapshot.imageUrl}
+          src={snapshot.imageUrl}
+          alt={snapshot.imageAltText ?? `Role Guide image: ${snapshot.title}`}
+        />
+      ) : null}
     </section>
   )
 }
@@ -1463,8 +1533,6 @@ function DocumentPaper({
         spacious ? 'px-6 py-8 md:px-12 md:py-12' : 'px-5 py-6 md:px-8 md:py-8'
       )}
     >
-      <DocumentHeroImage snapshot={snapshot} />
-
       <header className="career-playbook-document-rule mb-7 flex flex-wrap items-start justify-between gap-4 border-b pb-5">
         <div className="min-w-0">
           <div className="career-playbook-pill mb-3 inline-flex px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -1601,15 +1669,13 @@ function DocumentPaper({
   )
 }
 
-function DocumentHeroImage({ snapshot }: { snapshot: CareerPlaybookViewerSnapshot }) {
+function PlaybookCardImage({ src, alt }: { src: string; alt: string }) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
 
-  if (!snapshot.imageUrl) return null
-
   return (
     <div
-      className="relative mb-7 aspect-square max-h-[520px] overflow-hidden rounded-md border border-[#d6c2a6] bg-[#f3f0ea] dark:border-slate-700 dark:bg-slate-900"
+      className="relative mt-3 aspect-square w-full overflow-hidden rounded-md border border-[#d6c2a6] bg-[#f3f0ea] dark:border-slate-700 dark:bg-slate-900"
       aria-busy={!isLoaded && !hasError}
     >
       {!isLoaded && !hasError ? <ImageSkeleton gradient /> : null}
@@ -1620,15 +1686,15 @@ function DocumentHeroImage({ snapshot }: { snapshot: CareerPlaybookViewerSnapsho
         />
       ) : null}
       <Image
-        src={snapshot.imageUrl}
-        alt={snapshot.imageAltText ?? `Role Guide image: ${snapshot.title}`}
+        src={src}
+        alt={alt}
         fill
         unoptimized
         className={cn(
           'object-cover transition-opacity duration-300',
           isLoaded && !hasError ? 'opacity-100' : 'opacity-0'
         )}
-        sizes="(max-width: 768px) 100vw, 760px"
+        sizes="(max-width: 768px) 100vw, 360px"
         onLoad={() => setIsLoaded(true)}
         onError={() => setHasError(true)}
       />
