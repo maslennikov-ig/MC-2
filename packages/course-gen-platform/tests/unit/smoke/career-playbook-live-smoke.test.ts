@@ -119,6 +119,12 @@ function buildLiveSmokeClient(
       redirectUrl: '/courses/demo/sales-manager-b2b/generating',
       sourceDocumentIds: ['55555555-5555-5555-5555-555555555555'],
     }),
+    getCourseStatus: vi.fn().mockResolvedValue({
+      courseId: '44444444-4444-4444-4444-444444444444',
+      status: 'stage_2_awaiting_approval',
+      progress: 35,
+      currentPhase: 'document_processing',
+    }),
     ...overrides,
   };
 }
@@ -136,6 +142,7 @@ describe('Career Playbook live smoke gates', () => {
       toggleShare: vi.fn(),
       getPublicShare: vi.fn(),
       createCourseFromPlaybook: vi.fn(),
+      getCourseStatus: vi.fn(),
     };
 
     const report = await runCareerPlaybookLiveSmoke(
@@ -163,6 +170,14 @@ describe('Career Playbook live smoke gates', () => {
       expect.objectContaining({
         id: 'auth-token',
         status: 'blocked',
+      })
+    );
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'business-context',
+        status: 'skipped',
+        mutates: false,
+        note: expect.stringContaining('business_context skipped submit before requestFollowups'),
       })
     );
     expect(client.startSession).not.toHaveBeenCalled();
@@ -220,6 +235,45 @@ describe('Career Playbook live smoke gates', () => {
 });
 
 describe('Career Playbook live smoke mutation report', () => {
+  it('submits skipped business context before requesting followups', async () => {
+    const client = buildLiveSmokeClient();
+
+    await runCareerPlaybookLiveSmoke(
+      {
+        mode: 'mutation-smoke',
+        targetEnvironment: 'staging',
+        trpcUrl: 'https://staging.example.test/trpc',
+        expectedUserId: '11111111-1111-1111-1111-111111111111',
+        expectedOrganizationId: '22222222-2222-2222-2222-222222222222',
+        cleanupScope: 'playbook-only',
+        maxCostUsd: 3,
+        confirmLiveMutation: true,
+        env: {
+          TOKEN: 'secret-token',
+          BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
+        },
+      },
+      { client }
+    );
+
+    expect(client.submitAnswer).toHaveBeenNthCalledWith(8, {
+      playbookId: '33333333-3333-3333-3333-333333333333',
+      phase: 'business_context',
+      answer: {
+        business_context: {
+          mode: 'universal',
+          status: 'skipped',
+          digest: null,
+          source_ids: [],
+          skip_reason: 'live_smoke_universal_business_context',
+        },
+      },
+    });
+    expect(vi.mocked(client.submitAnswer).mock.invocationCallOrder[7]).toBeLessThan(
+      vi.mocked(client.requestFollowups).mock.invocationCallOrder[0]
+    );
+  });
+
   it('keeps course bridge optional while recording exact fixture cleanup IDs from env', async () => {
     const report = await runCareerPlaybookLiveSmoke(
       {
@@ -252,6 +306,102 @@ describe('Career Playbook live smoke mutation report', () => {
           id: '22222222-2222-2222-2222-222222222222',
         }),
       ])
+    );
+  });
+
+  it('waits for course bridge document processing when course bridge is included', async () => {
+    const client = buildLiveSmokeClient({
+      getCourseStatus: vi
+        .fn()
+        .mockResolvedValueOnce({
+          courseId: '44444444-4444-4444-4444-444444444444',
+          status: 'stage_2_processing',
+          progress: 12,
+          currentPhase: 'document_processing',
+        })
+        .mockResolvedValueOnce({
+          courseId: '44444444-4444-4444-4444-444444444444',
+          status: 'stage_2_awaiting_approval',
+          progress: 35,
+          currentPhase: 'stage_2_review',
+        }),
+    });
+
+    const report = await runCareerPlaybookLiveSmoke(
+      {
+        mode: 'mutation-smoke',
+        targetEnvironment: 'staging',
+        trpcUrl: 'https://staging.example.test/trpc',
+        expectedUserId: '11111111-1111-1111-1111-111111111111',
+        expectedOrganizationId: '22222222-2222-2222-2222-222222222222',
+        cleanupScope: 'playbook-and-course',
+        maxCostUsd: 3,
+        confirmLiveMutation: true,
+        includeCourseBridge: true,
+        pollIntervalMs: 1,
+        env: {
+          TOKEN: 'secret-token',
+          BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
+        },
+      },
+      { client, sleep: vi.fn().mockResolvedValue(undefined) }
+    );
+
+    expect(client.getCourseStatus).toHaveBeenCalledTimes(2);
+    expect(client.getCourseStatus).toHaveBeenCalledWith({
+      courseId: '44444444-4444-4444-4444-444444444444',
+    });
+    expect(report.status).toBe('pass');
+    expect(report.evidence?.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'course-bridge',
+        status: 'pass',
+        note: expect.stringContaining('stage_2_awaiting_approval'),
+      })
+    );
+  });
+
+  it('resumes evidence capture for an existing playbook without starting a new session', async () => {
+    const client = buildLiveSmokeClient({
+      getStatus: vi.fn().mockResolvedValue({
+        playbookId: '77777777-7777-7777-7777-777777777777',
+        status: 'completed',
+        progress: 100,
+      }),
+    });
+
+    const report = await runCareerPlaybookLiveSmoke(
+      {
+        mode: 'mutation-smoke',
+        targetEnvironment: 'staging',
+        trpcUrl: 'https://staging.example.test/trpc',
+        expectedUserId: '11111111-1111-1111-1111-111111111111',
+        expectedOrganizationId: '22222222-2222-2222-2222-222222222222',
+        cleanupScope: 'playbook-only',
+        maxCostUsd: 3,
+        confirmLiveMutation: true,
+        resumePlaybookId: '77777777-7777-7777-7777-777777777777',
+        env: {
+          TOKEN: 'secret-token',
+          BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
+        },
+      },
+      { client }
+    );
+
+    expect(client.startSession).not.toHaveBeenCalled();
+    expect(client.submitAnswer).not.toHaveBeenCalled();
+    expect(client.requestFollowups).not.toHaveBeenCalled();
+    expect(client.approveAndGenerate).not.toHaveBeenCalled();
+    expect(client.getStatus).toHaveBeenCalledWith({
+      playbookId: '77777777-7777-7777-7777-777777777777',
+    });
+    expect(report.status).toBe('pass');
+    expect(report.cleanupManifest?.items).toContainEqual(
+      expect.objectContaining({
+        type: 'career_playbook',
+        id: '77777777-7777-7777-7777-777777777777',
+      })
     );
   });
 

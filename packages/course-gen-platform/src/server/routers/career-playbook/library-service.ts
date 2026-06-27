@@ -361,6 +361,59 @@ function buildCareerPlaybookImageFields(
   };
 }
 
+const CAREER_PLAYBOOK_IMAGE_COLUMN_NAMES = [
+  'image_status',
+  'image_content',
+  'image_metadata',
+  'image_generation_attempt',
+  'image_error_message',
+  'image_updated_at',
+];
+
+function errorField(error: unknown, field: 'code' | 'message' | 'details' | 'hint'): string {
+  if (!error || typeof error !== 'object') return '';
+  const value = (error as Record<string, unknown>)[field];
+  return typeof value === 'string' ? value : '';
+}
+
+function isNotFoundDbError(error: unknown): boolean {
+  return errorField(error, 'code') === 'PGRST116';
+}
+
+function isMissingCareerPlaybookImageColumnError(error: unknown): boolean {
+  if (errorField(error, 'code') !== '42703') return false;
+
+  const text = [
+    errorField(error, 'message'),
+    errorField(error, 'details'),
+    errorField(error, 'hint'),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return CAREER_PLAYBOOK_IMAGE_COLUMN_NAMES.some(column => text.includes(column));
+}
+
+function throwPublicShareNotFound(error?: unknown): never {
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: 'Career Playbook not found',
+    cause: error,
+  });
+}
+
+function withNullImageFields(row: CareerPlaybookRow): CareerPlaybookRow {
+  return {
+    ...row,
+    image_status: null,
+    image_content: null,
+    image_metadata: null,
+    image_generation_attempt: 0,
+    image_error_message: null,
+    image_updated_at: null,
+  };
+}
+
 const PUBLIC_PLAYBOOK_COLUMNS = [
   'id',
   'user_id',
@@ -379,6 +432,44 @@ const PUBLIC_PLAYBOOK_COLUMNS = [
   'image_generation_attempt',
   'image_error_message',
   'image_updated_at',
+  'share_slug',
+  'is_public',
+  'visibility',
+  'created_at',
+  'updated_at',
+  'completed_at',
+].join(',');
+
+const PUBLIC_PLAYBOOK_COLUMNS_WITHOUT_IMAGE = [
+  'id',
+  'user_id',
+  'organization_id',
+  'status',
+  'language',
+  'slug',
+  'position_title',
+  'department',
+  'specialization',
+  'level',
+  'final_markdown',
+  'share_slug',
+  'is_public',
+  'visibility',
+  'created_at',
+  'updated_at',
+  'completed_at',
+].join(',');
+
+const LIBRARY_PLAYBOOK_COLUMNS_WITHOUT_IMAGE = [
+  'id',
+  'user_id',
+  'organization_id',
+  'status',
+  'language',
+  'position_title',
+  'department',
+  'specialization',
+  'level',
   'share_slug',
   'is_public',
   'visibility',
@@ -892,13 +983,12 @@ export async function updateCareerPlaybookNumericFact(
   };
 }
 
-export async function listCareerPlaybooks(
-  ctx: Context,
-  input: CareerPlaybookLibraryListInput
-): Promise<CareerPlaybookLibraryListResponse> {
-  const user = requireUser(ctx);
+async function queryCareerPlaybookListRows(
+  user: UserContext,
+  columns: string
+): Promise<{ data: CareerPlaybookRow[] | null; error: unknown }> {
   const supabase = getCareerPlaybookSupabase();
-  let query = supabase.from('career_playbooks').select(LIBRARY_PLAYBOOK_COLUMNS);
+  let query = supabase.from('career_playbooks').select(columns);
 
   if (user.role !== 'superadmin') {
     query = query.or(
@@ -906,12 +996,38 @@ export async function listCareerPlaybooks(
     );
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  return query.order('created_at', { ascending: false });
+}
+
+export async function listCareerPlaybooks(
+  ctx: Context,
+  input: CareerPlaybookLibraryListInput
+): Promise<CareerPlaybookLibraryListResponse> {
+  const user = requireUser(ctx);
+  const primary = await queryCareerPlaybookListRows(user, LIBRARY_PLAYBOOK_COLUMNS);
+  let error = primary.error;
+  let rows = primary.data ?? [];
+
+  // Rollout-safe fallback: the same image-column migration gap that the public
+  // share path handles can also break the authenticated library list. Retry
+  // without image fields instead of taking the whole catalog down.
+  if (isMissingCareerPlaybookImageColumnError(error)) {
+    logger.warn(
+      { userId: user.id, error },
+      'Career Playbook library image columns unavailable; retrying without image fields'
+    );
+    const fallback = await queryCareerPlaybookListRows(
+      user,
+      LIBRARY_PLAYBOOK_COLUMNS_WITHOUT_IMAGE
+    );
+    error = fallback.error;
+    rows = (fallback.data ?? []).map(withNullImageFields);
+  }
 
   if (error) throwOnDbError(error, 'Failed to list Career Playbooks');
 
   const lowerSearch = input.search?.trim().toLowerCase();
-  const readableRows = (data ?? []).map(mapPlaybookRow).filter(row => canListPlaybook(row, user));
+  const readableRows = rows.map(mapPlaybookRow).filter(row => canListPlaybook(row, user));
 
   const scopedRows = readableRows
     .filter(row => {
@@ -1103,7 +1219,7 @@ export async function getPublicCareerPlaybookBySlug(input: {
   shareSlug: string;
 }): Promise<CareerPlaybookPublicShareResponse> {
   const supabase = getCareerPlaybookSupabase();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('career_playbooks')
     .select(PUBLIC_PLAYBOOK_COLUMNS)
     .eq('share_slug', input.shareSlug)
@@ -1111,11 +1227,29 @@ export async function getPublicCareerPlaybookBySlug(input: {
     .eq('status', 'completed')
     .single();
 
-  if (error || !data) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Career Playbook not found',
-    });
+  if (isMissingCareerPlaybookImageColumnError(error)) {
+    logger.warn(
+      { shareSlug: input.shareSlug, error },
+      'Career Playbook public share image columns unavailable; retrying without image fields'
+    );
+    const fallback = await supabase
+      .from('career_playbooks')
+      .select(PUBLIC_PLAYBOOK_COLUMNS_WITHOUT_IMAGE)
+      .eq('share_slug', input.shareSlug)
+      .eq('visibility', 'public')
+      .eq('status', 'completed')
+      .single();
+    data = fallback.data ? withNullImageFields(fallback.data) : null;
+    error = fallback.error;
+  }
+
+  if (error) {
+    if (isNotFoundDbError(error)) throwPublicShareNotFound(error);
+    throwOnDbError(error, 'Failed to load public Career Playbook share');
+  }
+
+  if (!data) {
+    throwPublicShareNotFound();
   }
 
   const mapped = mapPlaybookRow(data);
@@ -1124,10 +1258,7 @@ export async function getPublicCareerPlaybookBySlug(input: {
     mapped.status !== 'completed' ||
     !mapped.final_markdown?.trim()
   ) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Career Playbook not found',
-    });
+    throwPublicShareNotFound();
   }
 
   const organizationSlug = await loadOrganizationSlug(mapped.organization_id);

@@ -395,6 +395,46 @@ Decision text`,
     );
   });
 
+  it('fills missing model-output blocks with safe fallback content and quality issues', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: groupSixMarkdown.replace(
+        `## 18. FAQ
+
+| Вопрос | Ответ |
+| --- | --- |
+| Как понять успех? | По KPI и Definition of Done |
+
+`,
+        ''
+      ),
+      model: 'mock-career-model',
+      inputTokens: 100,
+      outputTokens: 200,
+      costUsd: 0.012,
+    });
+
+    const result = await generateCareerPlaybookGroup(
+      {
+        groupKey: 'group_6_wrap',
+        roleProfileSpec: spec,
+        language: 'ru',
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(result.blocks.block_18.content).toContain('## 18. Частые вопросы');
+    expect(result.blocks.block_18.content).toContain('восстановлен автоматически');
+    expect(result.qualityIssues).toContainEqual(
+      expect.objectContaining({
+        source: 'system',
+        severity: 'critical',
+        blockId: 'block_18',
+        action: 'regenerate',
+      })
+    );
+  });
+
   it('rejects group markdown that omits required block headings', () => {
     const group = getCareerPlaybookGroupSpec('group_1_foundation');
 
