@@ -361,7 +361,7 @@ function buildCareerPlaybookImageFields(
   };
 }
 
-const PUBLIC_PLAYBOOK_IMAGE_COLUMN_NAMES = [
+const CAREER_PLAYBOOK_IMAGE_COLUMN_NAMES = [
   'image_status',
   'image_content',
   'image_metadata',
@@ -380,7 +380,7 @@ function isNotFoundDbError(error: unknown): boolean {
   return errorField(error, 'code') === 'PGRST116';
 }
 
-function isMissingPublicPlaybookImageColumnError(error: unknown): boolean {
+function isMissingCareerPlaybookImageColumnError(error: unknown): boolean {
   if (errorField(error, 'code') !== '42703') return false;
 
   const text = [
@@ -391,7 +391,7 @@ function isMissingPublicPlaybookImageColumnError(error: unknown): boolean {
     .join(' ')
     .toLowerCase();
 
-  return PUBLIC_PLAYBOOK_IMAGE_COLUMN_NAMES.some(column => text.includes(column));
+  return CAREER_PLAYBOOK_IMAGE_COLUMN_NAMES.some(column => text.includes(column));
 }
 
 function throwPublicShareNotFound(error?: unknown): never {
@@ -452,6 +452,24 @@ const PUBLIC_PLAYBOOK_COLUMNS_WITHOUT_IMAGE = [
   'specialization',
   'level',
   'final_markdown',
+  'share_slug',
+  'is_public',
+  'visibility',
+  'created_at',
+  'updated_at',
+  'completed_at',
+].join(',');
+
+const LIBRARY_PLAYBOOK_COLUMNS_WITHOUT_IMAGE = [
+  'id',
+  'user_id',
+  'organization_id',
+  'status',
+  'language',
+  'position_title',
+  'department',
+  'specialization',
+  'level',
   'share_slug',
   'is_public',
   'visibility',
@@ -965,13 +983,12 @@ export async function updateCareerPlaybookNumericFact(
   };
 }
 
-export async function listCareerPlaybooks(
-  ctx: Context,
-  input: CareerPlaybookLibraryListInput
-): Promise<CareerPlaybookLibraryListResponse> {
-  const user = requireUser(ctx);
+async function queryCareerPlaybookListRows(
+  user: UserContext,
+  columns: string
+): Promise<{ data: CareerPlaybookRow[] | null; error: unknown }> {
   const supabase = getCareerPlaybookSupabase();
-  let query = supabase.from('career_playbooks').select(LIBRARY_PLAYBOOK_COLUMNS);
+  let query = supabase.from('career_playbooks').select(columns);
 
   if (user.role !== 'superadmin') {
     query = query.or(
@@ -979,12 +996,38 @@ export async function listCareerPlaybooks(
     );
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  return query.order('created_at', { ascending: false });
+}
+
+export async function listCareerPlaybooks(
+  ctx: Context,
+  input: CareerPlaybookLibraryListInput
+): Promise<CareerPlaybookLibraryListResponse> {
+  const user = requireUser(ctx);
+  const primary = await queryCareerPlaybookListRows(user, LIBRARY_PLAYBOOK_COLUMNS);
+  let error = primary.error;
+  let rows = primary.data ?? [];
+
+  // Rollout-safe fallback: the same image-column migration gap that the public
+  // share path handles can also break the authenticated library list. Retry
+  // without image fields instead of taking the whole catalog down.
+  if (isMissingCareerPlaybookImageColumnError(error)) {
+    logger.warn(
+      { userId: user.id, error },
+      'Career Playbook library image columns unavailable; retrying without image fields'
+    );
+    const fallback = await queryCareerPlaybookListRows(
+      user,
+      LIBRARY_PLAYBOOK_COLUMNS_WITHOUT_IMAGE
+    );
+    error = fallback.error;
+    rows = (fallback.data ?? []).map(withNullImageFields);
+  }
 
   if (error) throwOnDbError(error, 'Failed to list Career Playbooks');
 
   const lowerSearch = input.search?.trim().toLowerCase();
-  const readableRows = (data ?? []).map(mapPlaybookRow).filter(row => canListPlaybook(row, user));
+  const readableRows = rows.map(mapPlaybookRow).filter(row => canListPlaybook(row, user));
 
   const scopedRows = readableRows
     .filter(row => {
@@ -1184,7 +1227,7 @@ export async function getPublicCareerPlaybookBySlug(input: {
     .eq('status', 'completed')
     .single();
 
-  if (isMissingPublicPlaybookImageColumnError(error)) {
+  if (isMissingCareerPlaybookImageColumnError(error)) {
     logger.warn(
       { shareSlug: input.shareSlug, error },
       'Career Playbook public share image columns unavailable; retrying without image fields'

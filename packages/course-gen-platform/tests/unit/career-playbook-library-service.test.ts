@@ -437,6 +437,60 @@ flowchart TD
     });
   });
 
+  it('falls back without image columns when library list hits rollout schema drift', async () => {
+    const {
+      image_status: _imageStatus,
+      image_content: _imageContent,
+      image_metadata: _imageMetadata,
+      image_generation_attempt: _imageGenerationAttempt,
+      image_error_message: _imageErrorMessage,
+      image_updated_at: _imageUpdatedAt,
+      ...rowWithoutImageColumns
+    } = {
+      ...baseRow,
+      organization_id: null,
+      visibility: 'private' as const,
+      is_public: false,
+    };
+
+    const primaryQuery = chainResult({
+      data: null,
+      error: {
+        code: '42703',
+        message: 'column career_playbooks.image_status does not exist',
+      },
+    });
+    const fallbackQuery = chainResult({
+      data: [rowWithoutImageColumns],
+      error: null,
+    });
+
+    let careerPlaybookCall = 0;
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'career_playbooks') {
+        careerPlaybookCall += 1;
+        return careerPlaybookCall === 1 ? primaryQuery : fallbackQuery;
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await listCareerPlaybooks(ctx(owner), {
+      limit: 20,
+      sort: 'created_desc',
+    });
+
+    expect(primaryQuery.select).toHaveBeenCalledWith(expect.stringContaining('image_status'));
+    expect(fallbackQuery.select).toHaveBeenCalledWith(expect.not.stringContaining('image_status'));
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      id: baseRow.id,
+      imageStatus: null,
+      imageUrl: null,
+      imageAltText: null,
+      imageErrorMessage: null,
+    });
+  });
+
   it('rejects non-owner visibility changes', async () => {
     fromMock.mockReturnValue(chainResult({ data: baseRow, error: null }));
 
