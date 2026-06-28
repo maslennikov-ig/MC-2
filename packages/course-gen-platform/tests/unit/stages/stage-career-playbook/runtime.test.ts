@@ -3,6 +3,55 @@ import { z } from 'zod';
 import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/nodes/runtime';
 
 describe('Career Playbook runtime', () => {
+  it('times out hung LLM calls and retries with the fallback model', async () => {
+    vi.useFakeTimers();
+    try {
+      const firstInvoke = vi.fn(() => new Promise<{ content: string }>(() => {}));
+      const fallbackInvoke = vi.fn().mockResolvedValue({ content: 'ok' });
+      const createModel = vi.fn((modelId: string) => ({
+        invoke: modelId === 'fast-model' ? firstInvoke : fallbackInvoke,
+      }));
+      const runtime = createCareerPlaybookRuntime({
+        promptService: { renderPrompt: vi.fn() },
+        modelConfigService: {
+          getModelForPhase: vi.fn().mockResolvedValue({
+            modelId: 'fast-model',
+            fallbackModelId: 'adult-model',
+            temperature: 0.2,
+            maxTokens: 1000,
+            maxRetries: 1,
+            timeoutMs: 5,
+          }),
+        },
+        createModel,
+      });
+
+      const resultPromise = runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_judge',
+        promptKey: 'career_playbook_cross_block_judge',
+        node: 'crossBlockJudge',
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(6);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await expect(resultPromise).resolves.toEqual(
+        expect.objectContaining({
+          content: 'ok',
+          model: 'adult-model',
+        })
+      );
+      expect(firstInvoke).toHaveBeenCalledTimes(1);
+      expect(fallbackInvoke).toHaveBeenCalledTimes(1);
+      expect(createModel).toHaveBeenNthCalledWith(1, 'fast-model', 0.2, 1000, 5);
+      expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000, 5);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('retries failed LLM calls and escalates to the configured fallback model', async () => {
     const invoke = vi
       .fn()
@@ -43,8 +92,8 @@ describe('Career Playbook runtime', () => {
       undefined,
       undefined
     );
-    expect(createModel).toHaveBeenNthCalledWith(1, 'fast-model', 0.2, 1000);
-    expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000);
+    expect(createModel).toHaveBeenNthCalledWith(1, 'fast-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000, 300_000);
     expect(invoke).toHaveBeenCalledTimes(2);
   });
 
@@ -73,7 +122,7 @@ describe('Career Playbook runtime', () => {
       maxTokensMultiplier: 1.25,
     });
 
-    expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1250);
+    expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1250, 300_000);
   });
 
   it('uses LangChain structured output when a schema is provided', async () => {

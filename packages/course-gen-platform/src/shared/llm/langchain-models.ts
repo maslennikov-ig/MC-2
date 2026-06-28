@@ -404,7 +404,8 @@ const PHASE_FALLBACK_CONFIG: Record<
 export function createOpenRouterModel(
   modelId: string,
   temperature: number = 0.7,
-  maxTokens: number = 4096
+  maxTokens: number = 4096,
+  timeoutMs?: number
 ): ChatOpenAI {
   const apiKey = getApiKeySync('openrouter');
 
@@ -423,6 +424,7 @@ export function createOpenRouterModel(
     apiKey: apiKey,
     temperature,
     maxTokens,
+    ...(timeoutMs ? { timeout: timeoutMs } : {}),
     // Request token usage from OpenRouter (some providers don't return it by default)
     // See: https://openrouter.ai/docs/api-reference/parameters
     modelKwargs: {
@@ -449,7 +451,8 @@ export function createOpenRouterModel(
 export async function createOpenRouterModelAsync(
   modelId: string,
   temperature: number = 0.7,
-  maxTokens: number = 4096
+  maxTokens: number = 4096,
+  timeoutMs?: number
 ): Promise<ChatOpenAI> {
   const apiKey = await getOpenRouterApiKey();
 
@@ -467,6 +470,7 @@ export async function createOpenRouterModelAsync(
     apiKey: apiKey,
     temperature,
     maxTokens,
+    ...(timeoutMs ? { timeout: timeoutMs } : {}),
     // Request token usage from OpenRouter (some providers don't return it by default)
     // See: https://openrouter.ai/docs/api-reference/parameters
     modelKwargs: {
