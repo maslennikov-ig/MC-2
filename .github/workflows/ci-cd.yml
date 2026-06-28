@@ -670,8 +670,8 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [changes, build-docker, migration-drift-check]
-    if: always() && needs.changes.outputs.should_deploy == 'true' && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped') && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && (github.ref == 'refs/heads/master' || inputs.force_deploy)
+    needs: [changes, ci-success, build-docker, migration-drift-check]
+    if: always() && needs.changes.outputs.should_deploy == 'true' && needs.ci-success.result == 'success' && (needs.build-docker.result == 'success' || (needs.build-docker.result == 'skipped' && needs.changes.outputs.should_build_docker != 'true')) && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && (github.ref == 'refs/heads/master' || inputs.force_deploy)
     timeout-minutes: 10
     environment:
       name: production
@@ -841,8 +841,8 @@ jobs:
   deploy-dev:
     name: Deploy to Dev
     runs-on: ubuntu-latest
-    needs: [changes, build-docker, migration-drift-check]
-    if: always() && needs.changes.outputs.should_deploy == 'true' && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped') && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: [changes, ci-success, build-docker, migration-drift-check]
+    if: always() && needs.changes.outputs.should_deploy == 'true' && needs.ci-success.result == 'success' && (needs.build-docker.result == 'success' || (needs.build-docker.result == 'skipped' && needs.changes.outputs.should_build_docker != 'true')) && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && github.ref == 'refs/heads/develop' && github.event_name == 'push'
     timeout-minutes: 20
     environment:
       name: development

@@ -159,23 +159,24 @@ See `.env.production.example` for complete list.
 
 ### Automatic Deployment
 
-The pipeline automatically triggers on push to `main` branch:
+The current pipeline lives in `.github/workflows/ci-cd.yml` and automatically
+triggers on pushes to `develop` (development) and `master` (production):
 
-1. **CI Pipeline** (`.github/workflows/ci.yml`):
+1. **CI gates**:
    - Lint code
    - Type check
    - Build all packages
    - Run tests
    - Security audit
+   - Require the aggregate `ci-success` job before any deploy job can run
 
-2. **CD Pipeline** (`.github/workflows/deploy.yml`):
-   - Wait for CI to pass
-   - Build Docker images
-   - Push to GitHub Container Registry
-   - SSH to production server
+2. **Docker and deploy gates**:
+   - Build and push only the Docker images affected by the change
+   - Allow a skipped Docker build only when Docker was not required for the change
+   - SSH to the target server
    - Execute rolling deployment
    - Verify health checks
-   - Rollback on failure
+   - Roll back production only when the production deploy job itself fails
 
 ### Manual Deployment
 
