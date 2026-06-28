@@ -14,6 +14,9 @@ import {
   CareerPlaybookQADataSchema,
   CareerPlaybookRoleProfileSpecSchema,
   SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES,
+  dedupeCareerPlaybookQualityIssues,
+  getUserVisibleCareerPlaybookWarnings,
+  isInternalCareerPlaybookGenerationWarning,
   isCareerPlaybookFollowupResponseReady,
   normalizeCareerPlaybookFollowupResponseReadiness,
 } from '../src/career-playbook';
@@ -147,6 +150,60 @@ describe('Career Playbook shared schemas', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('dedupes Career Playbook quality issues by user-visible diagnostic semantics', () => {
+    const issues = dedupeCareerPlaybookQualityIssues([
+      {
+        id: 'carrier-block-1:target-block-7',
+        source: 'cross_block_judge',
+        severity: 'warning',
+        action: 'regenerate',
+        blockId: 'block_7',
+        message: '  Competency matrix repeats generic wording. ',
+        suggestion: 'Add role-specific examples.',
+      },
+      {
+        id: 'carrier-block-2:target-block-7',
+        source: 'cross_block_judge',
+        severity: 'warning',
+        action: 'regenerate',
+        blockId: 'block_7',
+        message: 'Competency matrix repeats   generic wording.',
+        suggestion: ' Add role-specific examples. ',
+      },
+      {
+        id: 'carrier-block-3:target-block-8',
+        source: 'cross_block_judge',
+        severity: 'warning',
+        action: 'regenerate',
+        blockId: 'block_8',
+        message: 'Competency matrix repeats generic wording.',
+        suggestion: 'Add role-specific examples.',
+      },
+    ]);
+
+    expect(issues.map(issue => issue.id)).toEqual([
+      'carrier-block-1:target-block-7',
+      'carrier-block-3:target-block-8',
+    ]);
+  });
+
+  it('keeps internal Career Playbook retry warnings out of user-visible warnings', () => {
+    expect(
+      isInternalCareerPlaybookGenerationWarning(
+        'crossBlockJudge advanced after max regeneration attempts for block_7'
+      )
+    ).toBe(true);
+
+    expect(
+      getUserVisibleCareerPlaybookWarnings([
+        '',
+        '  Missing concrete KPI benchmark in block 6. ',
+        'crossBlockJudge advanced after max regeneration attempts for block_7',
+        'Missing concrete KPI benchmark in block 6.',
+      ])
+    ).toEqual(['Missing concrete KPI benchmark in block 6.']);
   });
 
   it('validates guided business context for company-specific and universal Role Guides', () => {

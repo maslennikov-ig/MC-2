@@ -5,7 +5,9 @@ import type {
 } from '@megacampus/shared-types';
 import {
   buildOtherBlocksBrief,
+  CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   regenerateCareerPlaybookBlock,
+  selectPendingCareerPlaybookRegeneration,
 } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 
 const spec: CareerPlaybookRoleProfileSpec = {
@@ -164,5 +166,36 @@ describe('Career Playbook block regenerator', () => {
         { renderPrompt, invokeLLM }
       )
     ).rejects.toThrow(expectedMessage);
+  });
+
+  it('chooses the flagged block with the fewest attempts before repeating another block', () => {
+    const pending = selectPendingCareerPlaybookRegeneration({
+      verdict: {
+        pass: false,
+        score: 45,
+        issues: [
+          {
+            block_id: 'block_4',
+            severity: 'critical',
+            description: 'Block 4 is fallback content.',
+            suggestion: 'Regenerate block 4.',
+          },
+          {
+            block_id: 'block_6',
+            severity: 'critical',
+            description: 'Block 6 is fallback content.',
+            suggestion: 'Regenerate block 6.',
+          },
+        ],
+        needs_regeneration: ['block_4', 'block_6'],
+      },
+      blockIds: ['block_4', 'block_6'],
+      attempts: { block_4: 1, block_6: 0 },
+      maxAttempts: CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
+      maxWindowAttempts: 4,
+    });
+
+    expect(pending?.blockId).toBe('block_6');
+    expect(pending?.attempts).toBe(0);
   });
 });

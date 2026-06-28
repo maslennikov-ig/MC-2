@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -171,6 +171,15 @@ const messages = {
       sharePending: 'Share links are unavailable until the backend action is connected',
       shareCopied: 'Public link copied',
       shareUnavailable: 'Make the guide public before sharing',
+      shareCopyError: 'Could not copy public link',
+      shareConfirmTitle: 'Make this Role Guide public?',
+      shareConfirmDescription:
+        'Anyone with the link will be able to view this Role Guide. The link will be copied automatically.',
+      shareConfirmCancel: 'Cancel',
+      shareConfirmAction: 'Make public and copy link',
+      shareLinkLabel: 'Public link',
+      shareCopyButton: 'Copy',
+      sharePublishError: 'Could not create public link',
       coursePending: 'Course creation is unavailable until the backend action is connected',
       deletePending: 'Delete is unavailable until the backend action is connected',
       pdfPending: 'PDF export is unavailable until the backend action is connected',
@@ -365,6 +374,17 @@ const ruMessages = {
         '# Превью должностной инструкции\n\nСерверный просмотр ещё не подключён.',
       viewerBackendPending:
         'Серверный просмотр пока недоступен; показываем локальное превью до подключения интеграции.',
+      shareCopied: 'Публичная ссылка скопирована',
+      shareUnavailable: 'Сделать публичную ссылку может только владелец или администратор',
+      shareCopyError: 'Не удалось скопировать публичную ссылку',
+      shareConfirmTitle: 'Сделать инструкцию публичной?',
+      shareConfirmDescription:
+        'Любой человек со ссылкой сможет открыть эту должностную инструкцию. Ссылка скопируется автоматически.',
+      shareConfirmCancel: 'Отмена',
+      shareConfirmAction: 'Сделать публичной и скопировать ссылку',
+      shareLinkLabel: 'Публичная ссылка',
+      shareCopyButton: 'Скопировать',
+      sharePublishError: 'Не удалось создать публичную ссылку',
       statusLabels: {
         draft: 'Черновик',
         answering_fixed: 'Ответы на основные вопросы',
@@ -777,6 +797,214 @@ describe('CareerPlaybookViewerPageClient', () => {
       'http://localhost:3000/en/career-playbooks/mega-campus/head-of-sales-a1b2c3'
     )
     expect(screen.getByText('Public link copied')).toBeInTheDocument()
+  })
+
+  it('asks before publishing a private viewer for sharing and respects cancel', async () => {
+    const user = userEvent.setup()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    await user.click(await screen.findByRole('button', { name: 'Поделиться' }))
+
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Сделать инструкцию публичной?',
+    })
+    expect(within(dialog).getByText(/Любой человек со ссылкой сможет открыть/)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Отмена' }))
+
+    expect(updateVisibility).not.toHaveBeenCalled()
+    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Публичная ссылка')).not.toBeInTheDocument()
+  })
+
+  it('publishes a private viewer, auto-copies the URL, and shows the public link block', async () => {
+    const user = userEvent.setup()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    updateVisibility.mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      isPublic: true,
+      visibility: 'public',
+      shareSlug: 'rukovoditel-prodazh-a1b2c3',
+      organizationSlug: 'mega-campus',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    await user.click(await screen.findByRole('button', { name: 'Поделиться' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'Сделать публичной и скопировать ссылку' })
+    )
+
+    const expectedUrl =
+      'http://localhost:3000/ru/career-playbooks/mega-campus/rukovoditel-prodazh-a1b2c3'
+
+    expect(updateVisibility).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000002001',
+      'public',
+      'ru'
+    )
+    expect(copyToClipboard).toHaveBeenCalledWith(expectedUrl)
+    expect(await screen.findByLabelText('Публичная ссылка')).toHaveValue(expectedUrl)
+    expect(screen.getByText('Публичная ссылка скопирована')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(useCareerPlaybookStore.getState().viewer?.visibility).toBe('public')
+    })
+  })
+
+  it('copies the visible public link again from the inline share block', async () => {
+    const user = userEvent.setup()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Head of Sales',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      visibility: 'public',
+      isPublic: true,
+      shareSlug: 'head-of-sales-a1b2c3',
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Head of Sales',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'en' })
+
+    await user.click(await screen.findByRole('button', { name: 'Share' }))
+    await user.click(await screen.findByRole('button', { name: 'Copy' }))
+
+    expect(copyToClipboard).toHaveBeenCalledTimes(2)
+    expect(copyToClipboard).toHaveBeenLastCalledWith(
+      'http://localhost:3000/en/career-playbooks/mega-campus/head-of-sales-a1b2c3'
+    )
+  })
+
+  it('does not show a public link when publishing succeeds without a share slug', async () => {
+    const user = userEvent.setup()
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Руководитель продаж',
+      department: 'Продажи',
+      level: 'lead',
+      contentLanguage: 'ru',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: {
+          content: '# Руководитель продаж',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    updateVisibility.mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      isPublic: true,
+      visibility: 'public',
+      shareSlug: null,
+      organizationSlug: 'mega-campus',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'ru' })
+
+    await user.click(await screen.findByRole('button', { name: 'Поделиться' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'Сделать публичной и скопировать ссылку' })
+    )
+
+    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Публичная ссылка')).not.toBeInTheDocument()
+    expect(await screen.findByText('Не удалось создать публичную ссылку')).toBeInTheDocument()
   })
 
   it('clears a previous viewer when the URL points at another playbook', async () => {

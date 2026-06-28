@@ -320,6 +320,36 @@ describe('Career Playbook graph', () => {
     );
   });
 
+  it('stops after specBuilder failure instead of advancing without roleProfileSpec', async () => {
+    const progressReporter = vi.fn();
+    const runtime = {
+      renderPrompt: vi.fn().mockImplementation((promptKey: string) => Promise.resolve(promptKey)),
+      invokeLLM: vi.fn().mockResolvedValue({
+        content: JSON.stringify({ position: 'B2B Sales Manager', block_boundaries: [] }),
+        model: 'mock-career-model',
+        inputTokens: 10,
+        outputTokens: 20,
+        costUsd: 0.001,
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+      progressReporter,
+    });
+
+    const result = await graph.invoke(initialGraphState());
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('specBuilder failed');
+    expect(result.errors[0]).not.toContain('group1Generator');
+    expect(result.currentNode).toBe('specBuilder');
+    expect(progressReporter).toHaveBeenCalledTimes(1);
+    expect(progressReporter).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'building_profile', percent: 72 })
+    );
+  });
+
   it('routes failed group judge verdicts through targeted block regeneration before the next group', async () => {
     const invokedPrompts: string[] = [];
     let judgeCalls = 0;

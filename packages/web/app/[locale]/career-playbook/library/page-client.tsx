@@ -66,8 +66,8 @@ import type {
   CareerPlaybookLibraryItem,
   CareerPlaybookLibraryStatus,
   CareerPlaybookVisibility,
-  CareerPlaybookViewerPermissions,
 } from '@/components/career-playbook/library/types'
+import { normalizeVisibilityUpdateResponse } from '@/components/career-playbook/library/normalizers'
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import { copyToClipboard } from '@/lib/utils/clipboard'
 import type { Locale } from '@/src/i18n/config'
@@ -132,60 +132,6 @@ const visibilityConfig: Record<
 }
 
 const visibilityOptions = Object.keys(visibilityConfig) as CareerPlaybookVisibility[]
-
-function readViewerPermissions(value: unknown): CareerPlaybookViewerPermissions | null {
-  if (!value || typeof value !== 'object') return null
-  const record = value as Record<string, unknown>
-  const canEdit = typeof record.canEdit === 'boolean' ? record.canEdit : null
-  const canManageVisibility =
-    typeof record.canManageVisibility === 'boolean' ? record.canManageVisibility : null
-  const canCreateCourse =
-    typeof record.canCreateCourse === 'boolean' ? record.canCreateCourse : null
-  const canDelete = typeof record.canDelete === 'boolean' ? record.canDelete : null
-
-  if (
-    canEdit === null ||
-    canManageVisibility === null ||
-    canCreateCourse === null ||
-    canDelete === null
-  ) {
-    return null
-  }
-
-  return {
-    canEdit,
-    canManageVisibility,
-    canCreateCourse,
-    canDelete,
-  }
-}
-
-function readVisibilityResult(value: unknown) {
-  if (!value || typeof value !== 'object') return null
-  const record = value as Record<string, unknown>
-  const playbookId = typeof record.playbookId === 'string' ? record.playbookId : null
-  const isPublic = typeof record.isPublic === 'boolean' ? record.isPublic : null
-  const visibility: CareerPlaybookVisibility | null =
-    record.visibility === 'private' ||
-    record.visibility === 'organization' ||
-    record.visibility === 'public'
-      ? record.visibility
-      : null
-  const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
-  const organizationSlug =
-    typeof record.organizationSlug === 'string' ? record.organizationSlug : null
-
-  if (!playbookId || isPublic === null || !visibility) return null
-
-  return {
-    playbookId,
-    isPublic,
-    visibility,
-    shareSlug,
-    organizationSlug,
-    viewerPermissions: readViewerPermissions(record.viewerPermissions),
-  }
-}
 
 function buildFacetOptions(items: CareerPlaybookLibraryItem[], values: string[] | undefined) {
   if (values && values.length > 0) return values
@@ -332,7 +278,7 @@ export default function CareerPlaybookLibraryPageClient({
     setLoadMoreError(null)
 
     try {
-      const result = readVisibilityResult(
+      const result = normalizeVisibilityUpdateResponse(
         await updateCareerPlaybookVisibility(item.id, visibility, locale)
       )
 

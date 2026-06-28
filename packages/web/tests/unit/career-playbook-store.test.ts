@@ -805,6 +805,110 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().generationStatusError).toBeNull()
   })
 
+  it('keeps active generation progress monotonic for the same playbook', async () => {
+    const approveAndGenerate = vi
+      .fn<NonNullable<CareerPlaybookClient['approveAndGenerate']>>()
+      .mockResolvedValue({
+        playbookId: '00000000-0000-4000-8000-000000000915',
+        status: 'generating',
+        phase: 'completion',
+        progress: 98,
+        progressDetails: {
+          stage: 'assembling',
+          percent: 98,
+          updated_at: '2026-06-08T17:02:00.000Z',
+        },
+      })
+    const getGenerationStatus = vi
+      .fn<NonNullable<CareerPlaybookClient['getGenerationStatus']>>()
+      .mockResolvedValue({
+        playbookId: '00000000-0000-4000-8000-000000000915',
+        status: 'generating',
+        phase: 'completion',
+        progress: 72,
+        progressDetails: {
+          stage: 'building_profile',
+          percent: 72,
+          updated_at: '2026-06-08T17:01:00.000Z',
+        },
+      })
+    setCareerPlaybookClientForTests({
+      approveAndGenerate,
+      getGenerationStatus,
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000915',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+    ).resolves.toEqual({ ok: true })
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(98)
+    expect(useCareerPlaybookStore.getState().generationProgressDetails?.stage).toBe('assembling')
+
+    await expect(
+      useCareerPlaybookStore.getState().refreshCareerPlaybookGenerationStatus()
+    ).resolves.toBe(true)
+
+    expect(useCareerPlaybookStore.getState().status).toBe('generating')
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(98)
+    expect(useCareerPlaybookStore.getState().generationProgressDetails?.stage).toBe('assembling')
+  })
+
+  it('does not regress a completed generation when an older active status arrives', async () => {
+    const getGenerationStatus = vi
+      .fn<NonNullable<CareerPlaybookClient['getGenerationStatus']>>()
+      .mockResolvedValue({
+        playbookId: '00000000-0000-4000-8000-000000000916',
+        status: 'generating',
+        phase: 'completion',
+        progress: 72,
+        progressDetails: {
+          stage: 'building_profile',
+          percent: 72,
+          updated_at: '2026-06-08T17:01:00.000Z',
+        },
+      })
+    setCareerPlaybookClientForTests({
+      getGenerationStatus,
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000916',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'completed',
+      generationProgress: 100,
+      progressDetails: {
+        stage: 'completed',
+        percent: 100,
+        updated_at: '2026-06-08T17:02:00.000Z',
+      },
+      finalMarkdown: '# Product Lead Role Guide',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().refreshCareerPlaybookGenerationStatus()
+    ).resolves.toBe(false)
+
+    expect(useCareerPlaybookStore.getState().status).toBe('completed')
+    expect(useCareerPlaybookStore.getState().phase).toBe('completion')
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(100)
+    expect(useCareerPlaybookStore.getState().generationProgressDetails?.stage).toBe('completed')
+    expect(useCareerPlaybookStore.getState().finalMarkdown).toBe('# Product Lead Role Guide')
+    expect(useCareerPlaybookStore.getState().generationStatusError).toBeNull()
+  })
+
   it('ignores stale generation approval and status responses for another playbook', async () => {
     const approveAndGenerate = vi
       .fn<NonNullable<CareerPlaybookClient['approveAndGenerate']>>()

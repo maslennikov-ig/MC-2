@@ -129,6 +129,50 @@ describe('Career Playbook spec builder', () => {
     expect(parsed.context.region).toBeUndefined();
   });
 
+  it('treats null optional string fields as missing and preserves valid optional strings', () => {
+    const parsedWithNulls = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...roleProfileSpec,
+        position: {
+          ...roleProfileSpec.position,
+          specialization: null,
+        },
+        context: {
+          ...roleProfileSpec.context,
+          subordinates_description: null,
+          industry: null,
+          region: null,
+        },
+      })
+    );
+
+    expect(parsedWithNulls.position.specialization).toBeUndefined();
+    expect(parsedWithNulls.context.subordinates_description).toBeUndefined();
+    expect(parsedWithNulls.context.industry).toBeUndefined();
+    expect(parsedWithNulls.context.region).toBeUndefined();
+
+    const parsedWithStrings = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...roleProfileSpec,
+        position: {
+          ...roleProfileSpec.position,
+          specialization: 'Enterprise sales',
+        },
+        context: {
+          ...roleProfileSpec.context,
+          subordinates_description: '3 SDRs',
+          industry: 'B2B SaaS',
+          region: 'EMEA',
+        },
+      })
+    );
+
+    expect(parsedWithStrings.position.specialization).toBe('Enterprise sales');
+    expect(parsedWithStrings.context.subordinates_description).toBe('3 SDRs');
+    expect(parsedWithStrings.context.industry).toBe('B2B SaaS');
+    expect(parsedWithStrings.context.region).toBe('EMEA');
+  });
+
   it('builds exactly three role-specific web research queries', () => {
     const queries = buildCareerPlaybookResearchQueries(qaData);
 

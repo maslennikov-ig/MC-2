@@ -403,6 +403,56 @@ export const CareerPlaybookQualityIssueSchema = z.object({
 });
 export type CareerPlaybookQualityIssue = z.infer<typeof CareerPlaybookQualityIssueSchema>;
 
+function normalizeCareerPlaybookDiagnosticText(value: string | undefined): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+export function isInternalCareerPlaybookGenerationWarning(warning: string): boolean {
+  return /^crossBlockJudge advanced after max regeneration attempts\b/i.test(warning.trim());
+}
+
+export function getUserVisibleCareerPlaybookWarnings(warnings: string[]): string[] {
+  const visible: string[] = [];
+  const seen = new Set<string>();
+
+  for (const warning of warnings) {
+    const normalized = normalizeCareerPlaybookDiagnosticText(warning);
+    if (!normalized || isInternalCareerPlaybookGenerationWarning(normalized)) continue;
+    if (seen.has(normalized)) continue;
+    visible.push(normalized);
+    seen.add(normalized);
+  }
+
+  return visible;
+}
+
+export function careerPlaybookQualityIssueKey(issue: CareerPlaybookQualityIssue): string {
+  return JSON.stringify([
+    issue.source,
+    issue.severity,
+    issue.action,
+    issue.blockId ?? '',
+    normalizeCareerPlaybookDiagnosticText(issue.message),
+    normalizeCareerPlaybookDiagnosticText(issue.suggestion),
+  ]);
+}
+
+export function dedupeCareerPlaybookQualityIssues(
+  issues: CareerPlaybookQualityIssue[]
+): CareerPlaybookQualityIssue[] {
+  const deduped: CareerPlaybookQualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of issues) {
+    const key = careerPlaybookQualityIssueKey(issue);
+    if (seen.has(key)) continue;
+    deduped.push(issue);
+    seen.add(key);
+  }
+
+  return deduped;
+}
+
 export const CareerPlaybookQADataSchema = z.object({
   fixed: z.array(CareerPlaybookFixedAnswerSchema).default([]),
   followups: z.array(CareerPlaybookFollowupAnswerSchema).default([]),

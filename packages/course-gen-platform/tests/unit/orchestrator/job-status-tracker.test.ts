@@ -318,6 +318,45 @@ describe('job-status-tracker', () => {
       await vi.advanceTimersByTimeAsync(1000);
       await expect(promise).resolves.toBeUndefined();
     });
+
+    it('should clear stale error fields when a retried job becomes active', async () => {
+      const quickCheck = mockChain({
+        data: { completed_at: null, failed_at: null, cancelled: false, status: 'delayed' },
+        error: null,
+      });
+      const postDelayCheck = mockChain({
+        data: { completed_at: null, failed_at: null, cancelled: false, status: 'delayed' },
+        error: null,
+      });
+      const existingStatus = mockChain({
+        data: {
+          started_at: null,
+          created_at: '2025-01-01T09:59:00.000Z',
+          completed_at: null,
+          status: 'delayed',
+          attempts: 1,
+        },
+        error: null,
+      });
+      const finalCheck = mockChain({ data: { completed_at: null }, error: null });
+      const updateChain = mockChain({ data: [{ id: 'status-1' }], error: null });
+      const chains = [quickCheck, postDelayCheck, existingStatus, finalCheck, updateChain];
+      mockSupabase.from.mockImplementation(() => chains.shift() ?? updateChain);
+
+      const job = createMockJob({ attemptsMade: 1, opts: { attempts: 3 } });
+      const promise = markJobActive(job);
+      await vi.advanceTimersByTimeAsync(1000);
+      await promise;
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: JobStatus.ACTIVE,
+          attempts: 2,
+          error_message: null,
+          error_stack: null,
+        })
+      );
+    });
   });
 
   // --------------------------------------------------------------------------

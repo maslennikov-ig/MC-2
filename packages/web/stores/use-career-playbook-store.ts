@@ -888,6 +888,53 @@ function isCompletionPlaybookStatus(status: CareerPlaybookPlaybookStatus) {
   )
 }
 
+function shouldKeepCurrentGenerationProgress(
+  state: CareerPlaybookStoreState,
+  response: CareerPlaybookGenerationStatus
+) {
+  if (response.status !== 'generating') return false
+
+  const currentPercent = Math.max(
+    state.generationProgress ?? -1,
+    state.generationProgressDetails?.percent ?? -1
+  )
+  const nextPercent = Math.max(response.progress ?? -1, response.progressDetails?.percent ?? -1)
+  const currentUpdatedAt = Date.parse(state.generationProgressDetails?.updated_at ?? '')
+  const nextUpdatedAt = Date.parse(response.progressDetails?.updated_at ?? '')
+
+  if (
+    Number.isFinite(currentUpdatedAt) &&
+    Number.isFinite(nextUpdatedAt) &&
+    nextUpdatedAt > currentUpdatedAt
+  ) {
+    return false
+  }
+
+  return currentPercent >= 0 && nextPercent >= 0 && nextPercent < currentPercent
+}
+
+function applyCareerPlaybookGenerationStatus(
+  state: CareerPlaybookStoreState,
+  response: CareerPlaybookGenerationStatus
+) {
+  if (shouldKeepCurrentGenerationProgress(state, response)) {
+    return false
+  }
+
+  state.status = response.status
+  state.phase = response.phase ?? 'completion'
+
+  if (response.status === 'completed') {
+    state.generationProgress = response.progress ?? 100
+    state.generationProgressDetails = response.progressDetails ?? state.generationProgressDetails
+    return true
+  }
+
+  state.generationProgress = response.progress ?? state.generationProgress
+  state.generationProgressDetails = response.progressDetails ?? state.generationProgressDetails
+  return true
+}
+
 function hasPendingCareerPlaybookAutosaveWork(state: CareerPlaybookStoreState) {
   return (
     state.dirtyFixedQuestionKeys.length > 0 ||
@@ -2291,15 +2338,13 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           }
 
           set((state) => {
-            state.status = response.status
-            state.phase = response.phase ?? 'completion'
-            state.generationProgress = response.progress ?? state.generationProgress
-            state.generationProgressDetails =
-              response.progressDetails ?? state.generationProgressDetails
-            state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
+            const accepted = applyCareerPlaybookGenerationStatus(state, response)
+            if (accepted) {
+              state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
+              state.generationStartError = response.error ?? null
+              state.generationStatusError = response.error ?? null
+            }
             state.isStartingGeneration = false
-            state.generationStartError = response.error ?? null
-            state.generationStatusError = response.error ?? null
           })
 
           return response.error ? { ok: false, error: response.error } : { ok: true }
@@ -2341,16 +2386,14 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           }
 
           set((state) => {
-            state.status = response.status
-            state.phase = response.phase ?? 'completion'
-            state.generationProgress = response.progress ?? state.generationProgress
-            state.generationProgressDetails =
-              response.progressDetails ?? state.generationProgressDetails
-            state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
-            state.generationStatusError = response.error ?? null
+            const accepted = applyCareerPlaybookGenerationStatus(state, response)
+            if (accepted) {
+              state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
+              state.generationStatusError = response.error ?? null
+            }
           })
 
-          return response.status === 'generating'
+          return get().status === 'generating'
         } catch (error) {
           const message =
             error instanceof Error ? error.message : 'Role Guide generation status failed'

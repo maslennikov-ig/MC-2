@@ -12,6 +12,15 @@ import type {
 
 type RawRecord = Record<string, unknown>
 
+export interface CareerPlaybookVisibilityUpdateResult {
+  playbookId: string
+  isPublic: boolean
+  visibility: CareerPlaybookVisibility
+  shareSlug: string | null
+  organizationSlug: string | null
+  viewerPermissions: CareerPlaybookViewerPermissions | null
+}
+
 function isLibraryStatus(value: unknown): value is CareerPlaybookLibraryStatus {
   return (
     value === 'draft' ||
@@ -98,6 +107,32 @@ function normalizeViewerPermissions(raw: unknown): CareerPlaybookViewerPermissio
       readBoolean(record, 'canManageVisibility', 'can_manage_visibility') ?? false,
     canCreateCourse: readBoolean(record, 'canCreateCourse', 'can_create_course') ?? false,
     canDelete: readBoolean(record, 'canDelete', 'can_delete') ?? false,
+  }
+}
+
+function normalizeOptionalViewerPermissions(raw: unknown): CareerPlaybookViewerPermissions | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  const record = raw as RawRecord
+  const canEdit = readBoolean(record, 'canEdit', 'can_edit')
+  const canManageVisibility = readBoolean(record, 'canManageVisibility', 'can_manage_visibility')
+  const canCreateCourse = readBoolean(record, 'canCreateCourse', 'can_create_course')
+  const canDelete = readBoolean(record, 'canDelete', 'can_delete')
+
+  if (
+    canEdit === null ||
+    canManageVisibility === null ||
+    canCreateCourse === null ||
+    canDelete === null
+  ) {
+    return null
+  }
+
+  return {
+    canEdit,
+    canManageVisibility,
+    canCreateCourse,
+    canDelete,
   }
 }
 
@@ -226,6 +261,31 @@ export function normalizeLibraryItem(rawItem: unknown): CareerPlaybookLibraryIte
     organizationSlug: readString(row, 'organization_slug', 'organizationSlug', 'orgSlug'),
     linkedCourse: normalizeLinkedCourse(readRecord(row, 'linkedCourse', 'linked_course')),
     language: readString(row, 'language'),
+  }
+}
+
+export function normalizeVisibilityUpdateResponse(
+  value: unknown
+): CareerPlaybookVisibilityUpdateResult | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  const record = value as RawRecord
+  const playbookId = readString(record, 'playbookId', 'playbook_id')
+  const isPublic = readBoolean(record, 'isPublic', 'is_public')
+  const visibilityRaw = readString(record, 'visibility')
+  const visibility = isVisibility(visibilityRaw) ? visibilityRaw : null
+
+  if (!playbookId || isPublic === null || !visibility) return null
+
+  return {
+    playbookId,
+    isPublic,
+    visibility,
+    shareSlug: readString(record, 'shareSlug', 'share_slug'),
+    organizationSlug: readString(record, 'organizationSlug', 'organization_slug', 'orgSlug'),
+    viewerPermissions: normalizeOptionalViewerPermissions(
+      readRecord(record, 'viewerPermissions', 'viewer_permissions')
+    ),
   }
 }
 

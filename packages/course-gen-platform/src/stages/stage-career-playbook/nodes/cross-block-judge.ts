@@ -17,6 +17,7 @@ import type {
 } from '../state';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 import {
+  CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
   countCareerPlaybookRegenerationAttemptsForBlocks,
 } from './block-regenerator';
@@ -328,10 +329,18 @@ function capRegenerationWhenBudgetExhausted(params: {
     params.attempts,
     params.currentBlockIds
   );
+  const windowBudgetExhausted =
+    attemptCount >= CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS;
+  const perBlockBudgetExhausted = scopedNeedsRegeneration.every(
+    blockId => (params.attempts[blockId] ?? 0) >= CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS
+  );
 
-  if (attemptCount < CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS) {
+  if (!windowBudgetExhausted && !perBlockBudgetExhausted) {
     return { verdict: params.verdict, warnings: [] };
   }
+  const budgetLabel = windowBudgetExhausted
+    ? `${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}`
+    : `per-block ${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}/${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}; total ${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}`;
 
   return {
     verdict: {
@@ -341,7 +350,7 @@ function capRegenerationWhenBudgetExhausted(params: {
       ),
     },
     warnings: [
-      `crossBlockJudge advanced after max regeneration attempts (${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}) for ${params.currentBlockIds.join(', ')}; unresolved issues remain in judge verdict.`,
+      `crossBlockJudge advanced after max regeneration attempts (${budgetLabel}) for ${params.currentBlockIds.join(', ')}; unresolved issues remain in judge verdict.`,
     ],
   };
 }

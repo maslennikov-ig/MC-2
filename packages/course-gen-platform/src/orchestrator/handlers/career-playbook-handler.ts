@@ -6,6 +6,8 @@ import {
   JobType,
   CareerPlaybookBlockIdSchema,
   CareerPlaybookQualityIssueSchema,
+  dedupeCareerPlaybookQualityIssues,
+  isInternalCareerPlaybookGenerationWarning,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookCostBreakdown,
@@ -134,16 +136,25 @@ function issueId(
   return `${source}:${blockId ?? 'system'}:${index}`;
 }
 
+function judgeIssueId(
+  carrierBlockId: CareerPlaybookBlockId,
+  targetBlockId: CareerPlaybookBlockId,
+  index: number
+): string {
+  return `cross_block_judge:${carrierBlockId}:${targetBlockId}:${index}`;
+}
+
 function collectJudgeQualityIssues(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): CareerPlaybookQualityIssue[] {
   const issues: CareerPlaybookQualityIssue[] = [];
 
-  for (const [rawBlockId, block] of Object.entries(generatedBlocks)) {
+  for (const [rawCarrierBlockId, block] of Object.entries(generatedBlocks)) {
+    const carrierBlockId = rawCarrierBlockId;
     const verdictIssues = block?.judge_verdict?.issues ?? [];
     for (const [index, issue] of verdictIssues.entries()) {
       issues.push({
-        id: issueId('cross_block_judge', rawBlockId, index),
+        id: judgeIssueId(carrierBlockId, issue.block_id, index),
         source: 'cross_block_judge',
         severity: issue.severity,
         blockId: issue.block_id,
@@ -172,6 +183,8 @@ function collectWarningQualityIssues(warnings: string[]): CareerPlaybookQualityI
   const issues: CareerPlaybookQualityIssue[] = [];
 
   for (const [index, warning] of warnings.entries()) {
+    if (isInternalCareerPlaybookGenerationWarning(warning)) continue;
+
     const blockIds = extractWarningBlockIds(warning);
     if (blockIds.length === 0) {
       issues.push({
@@ -206,16 +219,7 @@ function collectWarningQualityIssues(warnings: string[]): CareerPlaybookQualityI
 function mergeQualityIssues(
   ...groups: CareerPlaybookQualityIssue[][]
 ): CareerPlaybookQualityIssue[] {
-  const merged: CareerPlaybookQualityIssue[] = [];
-  const seen = new Set<string>();
-
-  for (const issue of groups.flat()) {
-    if (seen.has(issue.id)) continue;
-    merged.push(issue);
-    seen.add(issue.id);
-  }
-
-  return merged;
+  return dedupeCareerPlaybookQualityIssues(groups.flat());
 }
 
 function buildCareerPlaybookQualityIssues(
@@ -233,6 +237,10 @@ function hasGeneratedBlocks(
   value: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ) {
   return Object.keys(value).length > 0;
+}
+
+function isTerminalGenerationStage(stage: CareerPlaybookGenerationProgress['stage']): boolean {
+  return stage === 'completed' || stage === 'failed';
 }
 
 export class CareerPlaybookHandler {
@@ -515,6 +523,26 @@ export class CareerPlaybookHandler {
   ) {
     try {
       const storedQAData = await this.loadStoredQAData(jobData);
+      const previousProgress = CareerPlaybookGenerationProgressSchema.safeParse(
+        storedQAData.generation_progress
+      );
+      if (
+        previousProgress.success &&
+        !isTerminalGenerationStage(previousProgress.data.stage) &&
+        !isTerminalGenerationStage(progress.stage) &&
+        previousProgress.data.percent > progress.percent
+      ) {
+        logger.debug(
+          {
+            playbookId: jobData.playbookId,
+            previousProgress: previousProgress.data,
+            nextProgress: progress,
+          },
+          'Skipping stale Career Playbook generation progress update'
+        );
+        return;
+      }
+
       const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
       const generationProgress = this.buildGenerationProgress(
         jobData,
@@ -554,7 +582,10 @@ export class CareerPlaybookHandler {
     return CareerPlaybookGenerationProgressSchema.parse({
       stage: progress.stage,
       percent: progress.percent,
-      started_at: previous.success ? previous.data.started_at : jobData.createdAt || now,
+      started_at:
+        previous.success && !isTerminalGenerationStage(previous.data.stage)
+          ? previous.data.started_at
+          : jobData.createdAt || now,
       updated_at: now,
     });
   }
