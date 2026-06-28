@@ -37,6 +37,7 @@ export interface CareerPlaybookRuntime {
 }
 
 const FALLBACK_MODEL = 'google/gemini-3-flash-preview';
+const DEFAULT_TIMEOUT_MS = 300_000;
 
 interface CareerPlaybookPromptService {
   renderPrompt: (promptKey: string, variables: Record<string, string>) => Promise<string>;
@@ -66,11 +67,47 @@ interface CareerPlaybookModel {
 export interface CareerPlaybookRuntimeDependencies {
   promptService?: CareerPlaybookPromptService;
   modelConfigService?: CareerPlaybookModelConfigService;
-  createModel?: (modelId: string, temperature: number, maxTokens: number) => CareerPlaybookModel;
+  createModel?: (
+    modelId: string,
+    temperature: number,
+    maxTokens: number,
+    timeoutMs?: number
+  ) => CareerPlaybookModel;
 }
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+function normalizeTimeoutMs(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function timeoutErrorMessage(options: CareerPlaybookLLMCallOptions, timeoutMs: number): string {
+  return `Career Playbook LLM call timed out after ${timeoutMs}ms (${options.phaseName}/${options.node})`;
+}
+
+async function withLLMTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number | undefined,
+  options: CareerPlaybookLLMCallOptions
+): Promise<T> {
+  if (!timeoutMs) return operation;
+
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(timeoutErrorMessage(options, timeoutMs))),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 export function createCareerPlaybookRuntime(
@@ -98,10 +135,15 @@ export function createCareerPlaybookRuntime(
           (options.maxTokens ?? phaseConfig.maxTokens ?? 12_000) * tokenMultiplier
         );
         const temperature = options.temperature ?? phaseConfig.temperature ?? 0.7;
+        const timeoutMs = normalizeTimeoutMs(phaseConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
         try {
-          const model = createModel(modelId, temperature, maxTokens);
-          const content = await invokeModelWithOptionalStructuredOutput(model, prompt, options);
+          const model = createModel(modelId, temperature, maxTokens, timeoutMs);
+          const content = await withLLMTimeout(
+            invokeModelWithOptionalStructuredOutput(model, prompt, options),
+            timeoutMs,
+            options
+          );
 
           return {
             content,
@@ -162,6 +204,7 @@ async function resolvePhaseConfig(
       temperature: config.temperature ?? 0.7,
       maxTokens: config.maxTokens ?? 12_000,
       maxRetries: config.maxRetries ?? 2,
+      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     };
   } catch {
     return {
@@ -170,6 +213,7 @@ async function resolvePhaseConfig(
       temperature: 0.7,
       maxTokens: 12_000,
       maxRetries: 2,
+      timeoutMs: DEFAULT_TIMEOUT_MS,
     };
   }
 }

@@ -1027,7 +1027,7 @@ describe('CompletionScreen', () => {
     )
     expect(handleEditFollowup).toHaveBeenCalledWith(followupOpenQuestion.question_id)
 
-    await user.click(screen.getByRole('button', { name: 'Сгенерировать должностную инструкцию' }))
+    await user.click(screen.getByRole('button', { name: 'Сгенерировать инструкцию' }))
     expect(handleGenerate).toHaveBeenCalledTimes(1)
   })
 
@@ -1099,8 +1099,6 @@ describe('CompletionScreen', () => {
       screen.getByText('После завершения откроем инструкцию автоматически.')
     ).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '72')
-    expect(
-      screen.getByRole('button', { name: 'Сгенерировать должностную инструкцию' })
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Сгенерировать инструкцию' })).toBeDisabled()
   })
 })

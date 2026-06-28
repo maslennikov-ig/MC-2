@@ -76,8 +76,9 @@ RUN node -p "require('./packages/web/package.json').version" > /tmp/app_version.
 RUN pnpm --filter @megacampus/shared-types build
 RUN pnpm --filter @megacampus/shared-logger build
 RUN pnpm --filter @megacampus/shared-utils build
-# Build all remaining packages
-RUN pnpm build
+# Web imports AppRouter as a type from the backend package, so generate only declarations.
+RUN pnpm --filter @megacampus/course-gen-platform exec tsc -p tsconfig.json --emitDeclarationOnly
+RUN pnpm --filter @megacampus/web build
 
 # Stage 3: Runner
 FROM node:22-alpine AS runner

@@ -90,7 +90,7 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   completeness: 'Полнота',
   skipped: 'Пропущено',
   edit: 'Редактировать',
-  generate: 'Сгенерировать должностную инструкцию',
+  generate: 'Сгенерировать инструкцию',
   generationHandoffTitle: 'Черновик готов к генерации',
   generationHandoffDescription:
     'Контекст сохранён. Генерация продолжится после подключения серверного обработчика.',
