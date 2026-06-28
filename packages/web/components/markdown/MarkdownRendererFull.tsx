@@ -49,6 +49,7 @@ import { escapeCurrencyDollarSigns } from './utils/escape-currency'
 import { parseCalloutFromChildren } from './utils/callout-parser'
 import { normalizeMalformedMarkdownTables } from './utils/normalize-markdown-tables'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getCareerPlaybookNumericFactDomId } from '@/lib/career-playbook/numeric-facts'
 import type { PresetName, FeatureFlags } from './types'
 import type { CareerPlaybookNumericFact } from '@megacampus/shared-types'
 import type { Components } from 'react-markdown'
@@ -310,41 +311,17 @@ export function MarkdownRendererFull({
       </em>
     ),
 
-    h1: ({ children }) => (
-      <h1>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </h1>
-    ),
+    h1: ({ children }) => <h1>{children}</h1>,
 
-    h2: ({ children }) => (
-      <h2>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </h2>
-    ),
+    h2: ({ children }) => <h2>{children}</h2>,
 
-    h3: ({ children }) => (
-      <h3>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </h3>
-    ),
+    h3: ({ children }) => <h3>{children}</h3>,
 
-    h4: ({ children }) => (
-      <h4>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </h4>
-    ),
+    h4: ({ children }) => <h4>{children}</h4>,
 
-    h5: ({ children }) => (
-      <h5>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </h5>
-    ),
+    h5: ({ children }) => <h5>{children}</h5>,
 
-    h6: ({ children }) => (
-      <h6>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </h6>
-    ),
+    h6: ({ children }) => <h6>{children}</h6>,
 
     // Custom link component with external link handling
     a: ({ href, children, title }) => (
@@ -677,10 +654,13 @@ function NumericFactInlineTrigger({
     'focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none',
     getNumericFactStatusClassName(fact.status)
   )
+  const triggerId = getCareerPlaybookNumericFactDomId(fact.id)
   const trigger = onClick ? (
     <button
+      id={triggerId}
       type="button"
       className={className}
+      data-numeric-fact-id={fact.id}
       data-numeric-fact-status={fact.status}
       data-testid="career-playbook-numeric-fact"
       onClick={() => onClick(fact)}
@@ -689,7 +669,9 @@ function NumericFactInlineTrigger({
     </button>
   ) : (
     <span
+      id={triggerId}
       className={className}
+      data-numeric-fact-id={fact.id}
       data-numeric-fact-status={fact.status}
       data-testid="career-playbook-numeric-fact"
       tabIndex={0}
@@ -717,6 +699,9 @@ function NumericFactInlineTrigger({
             </p>
           ) : null}
           <p>{fact.explanation}</p>
+          <p className="text-slate-500 dark:text-slate-300">
+            {getNumericFactActionLabel(language)}
+          </p>
         </div>
       </TooltipContent>
     </Tooltip>
@@ -773,4 +758,10 @@ function getConfidenceLabel(confidence: number, language?: string) {
   return language?.toLowerCase().startsWith('ru')
     ? `Уверенность: ${value}%`
     : `Confidence: ${value}%`
+}
+
+function getNumericFactActionLabel(language?: string) {
+  return language?.toLowerCase().startsWith('ru')
+    ? 'Что сделать: исправьте значение, подтвердите его в источнике или оставьте без проверки.'
+    : 'What to do: correct the value, confirm it in a source, or leave it unverified.'
 }

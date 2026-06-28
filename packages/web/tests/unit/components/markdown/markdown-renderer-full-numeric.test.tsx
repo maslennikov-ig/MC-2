@@ -59,4 +59,28 @@ describe('MarkdownRendererFull numeric annotations', () => {
     expect(screen.getAllByTestId('career-playbook-numeric-fact')).toHaveLength(1)
     expect(screen.getByText('18%', { selector: 'code' })).toBeInTheDocument()
   })
+
+  it('does not annotate headings and gives inline triggers a stable DOM id', () => {
+    render(
+      <MarkdownRendererFull
+        content={['## 2.6. Checklist', '', 'Review this 18% before publishing.'].join('\n')}
+        preset="minimal"
+        numericFacts={[
+          numericFact('fact-heading', 0, {
+            raw_text: '2',
+            normalized_value: '2',
+          }),
+          numericFact('fact-visible', 0),
+        ]}
+        onNumericFactClick={vi.fn()}
+      />
+    )
+
+    expect(screen.getAllByTestId('career-playbook-numeric-fact')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '18%' })).toHaveAttribute(
+      'id',
+      'career-playbook-numeric-fact-fact-visible'
+    )
+    expect(screen.getByRole('heading', { name: '2.6. Checklist' })).toBeInTheDocument()
+  })
 })
