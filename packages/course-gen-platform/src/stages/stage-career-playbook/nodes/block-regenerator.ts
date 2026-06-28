@@ -14,7 +14,7 @@ import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } fro
 export const BLOCK_REGENERATOR_PROMPT_KEY = 'career_playbook_block_regenerator';
 export const BLOCK_REGENERATOR_PHASE = 'stage_career_playbook_regenerator';
 export const CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS = 2;
-export const CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS = 2;
+export const CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS = 8;
 
 const BLOCK_NAMES: Record<CareerPlaybookBlockId, string> = {
   header: 'Header',
@@ -246,20 +246,24 @@ export function selectPendingCareerPlaybookRegeneration(input: {
     return null;
   }
 
-  for (const blockId of verdict.needs_regeneration) {
-    if (!input.blockIds.includes(blockId)) continue;
+  const candidates = verdict.needs_regeneration
+    .map((blockId, order) => ({
+      blockId,
+      order,
+      attempts: input.attempts[blockId] ?? 0,
+    }))
+    .filter(candidate => input.blockIds.includes(candidate.blockId))
+    .filter(candidate => candidate.attempts < maxAttempts)
+    .sort((left, right) => left.attempts - right.attempts || left.order - right.order);
 
-    const attempts = input.attempts[blockId] ?? 0;
-    if (attempts < maxAttempts) {
-      return {
-        blockId,
-        issue: issueForBlock(verdict, blockId),
-        attempts,
-      };
-    }
-  }
-
-  return null;
+  const pending = candidates[0];
+  return pending
+    ? {
+        blockId: pending.blockId,
+        issue: issueForBlock(verdict, pending.blockId),
+        attempts: pending.attempts,
+      }
+    : null;
 }
 
 export function countCareerPlaybookRegenerationAttemptsForBlocks(

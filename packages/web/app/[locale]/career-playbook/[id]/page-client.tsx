@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 import type {
   CareerPlaybookBlockGroupKey,
   CareerPlaybookQualityIssue,
-  CareerPlaybookViewerPermissions,
   CareerPlaybookViewerSnapshot,
   CareerPlaybookVisibility,
 } from '@megacampus/shared-types'
@@ -17,10 +16,21 @@ import {
   updateCareerPlaybookVisibility,
 } from '@/components/career-playbook/library/client-adapter'
 import { buildCareerPlaybookLinkedCoursePath } from '@/components/career-playbook/library/linked-course-url'
+import { normalizeVisibilityUpdateResponse } from '@/components/career-playbook/library/normalizers'
 import { buildCareerPlaybookPublicUrl } from '@/components/career-playbook/library/public-url'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
 import Header from '@/components/layouts/header'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { copyToClipboard } from '@/lib/utils/clipboard'
 import type { Locale } from '@/src/i18n/config'
@@ -106,60 +116,6 @@ function getViewerBlockTitleKey(blockId: CareerPlaybookBlockId) {
   return VIEWER_BLOCK_TITLE_KEYS[key]
 }
 
-function readViewerPermissions(value: unknown): CareerPlaybookViewerPermissions | null {
-  if (!value || typeof value !== 'object') return null
-  const record = value as Record<string, unknown>
-  const canEdit = typeof record.canEdit === 'boolean' ? record.canEdit : null
-  const canManageVisibility =
-    typeof record.canManageVisibility === 'boolean' ? record.canManageVisibility : null
-  const canCreateCourse =
-    typeof record.canCreateCourse === 'boolean' ? record.canCreateCourse : null
-  const canDelete = typeof record.canDelete === 'boolean' ? record.canDelete : null
-
-  if (
-    canEdit === null ||
-    canManageVisibility === null ||
-    canCreateCourse === null ||
-    canDelete === null
-  ) {
-    return null
-  }
-
-  return {
-    canEdit,
-    canManageVisibility,
-    canCreateCourse,
-    canDelete,
-  }
-}
-
-function readVisibilityUpdateResult(value: unknown) {
-  if (!value || typeof value !== 'object') return null
-  const record = value as Record<string, unknown>
-  const playbookId = typeof record.playbookId === 'string' ? record.playbookId : null
-  const isPublic = typeof record.isPublic === 'boolean' ? record.isPublic : null
-  const visibility: CareerPlaybookVisibility | null =
-    record.visibility === 'private' ||
-    record.visibility === 'organization' ||
-    record.visibility === 'public'
-      ? record.visibility
-      : null
-  const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
-  const organizationSlug =
-    typeof record.organizationSlug === 'string' ? record.organizationSlug : null
-
-  if (!playbookId || isPublic === null || !visibility) return null
-
-  return {
-    playbookId,
-    isPublic,
-    visibility,
-    shareSlug,
-    organizationSlug,
-    viewerPermissions: readViewerPermissions(record.viewerPermissions),
-  }
-}
-
 function isViewerImageStatus(value: unknown): value is ViewerImageStatus {
   return (
     value === 'pending' ||
@@ -196,6 +152,9 @@ export default function CareerPlaybookViewerPageClient({
   const [selectedBlockId, setSelectedBlockId] = useState<CareerPlaybookBlockId | null>(null)
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
   const [isRegeneratingImage, setIsRegeneratingImage] = useState(false)
+  const [isShareConfirmOpen, setIsShareConfirmOpen] = useState(false)
+  const [isPublishingForShare, setIsPublishingForShare] = useState(false)
+  const [publicShareUrl, setPublicShareUrl] = useState<string | null>(null)
   const [readerMode, setReaderMode] = useState<ReaderMode>(() => {
     if (typeof window === 'undefined') return 'standard'
     return new URLSearchParams(window.location.search).get('mode') === 'reading'
@@ -289,6 +248,8 @@ export default function CareerPlaybookViewerPageClient({
         actionsLabel: t('actionsLabel'),
         pdf: t('pdf'),
         share: t('share'),
+        shareLinkLabel: t('shareLinkLabel'),
+        shareCopyButton: t('shareCopyButton'),
         createCourse: t('createCourse'),
         openCourse: t('openCourse'),
         delete: t('delete'),
@@ -369,6 +330,31 @@ export default function CareerPlaybookViewerPageClient({
     useCareerPlaybookStore.setState({ viewerActionMessage: message })
   }
 
+  useEffect(() => {
+    setPublicShareUrl(null)
+    setIsShareConfirmOpen(false)
+  }, [state.viewer?.playbookId])
+
+  const hydrateViewerFromVisibilityResult = (
+    currentViewer: CareerPlaybookViewerSnapshot,
+    result: NonNullable<ReturnType<typeof normalizeVisibilityUpdateResponse>>
+  ) => {
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
+      ...currentViewer,
+      isPublic: result.isPublic,
+      visibility: result.visibility,
+      shareSlug: result.shareSlug,
+      organizationSlug: result.organizationSlug ?? currentViewer.organizationSlug ?? null,
+      viewerPermissions: result.viewerPermissions ?? currentViewer.viewerPermissions,
+    })
+  }
+
+  const copyAndShowShareUrl = async (url: string) => {
+    setPublicShareUrl(url)
+    const copied = await copyToClipboard(url)
+    setBackendPendingMessage(copied ? t('shareCopied') : t('shareCopyError'))
+  }
+
   const handleVisibilityChange = async (visibility: CareerPlaybookVisibility) => {
     const viewer = useCareerPlaybookStore.getState().viewer
     if (!viewer || isUpdatingVisibility) return
@@ -380,7 +366,7 @@ export default function CareerPlaybookViewerPageClient({
     useCareerPlaybookStore.setState({ viewerActionMessage: null })
 
     try {
-      const result = readVisibilityUpdateResult(
+      const result = normalizeVisibilityUpdateResponse(
         await updateCareerPlaybookVisibility(viewer.playbookId, visibility, locale)
       )
 
@@ -392,14 +378,8 @@ export default function CareerPlaybookViewerPageClient({
       const currentViewer = useCareerPlaybookStore.getState().viewer
       if (!currentViewer || currentViewer.playbookId !== result.playbookId) return
 
-      useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
-        ...currentViewer,
-        isPublic: result.isPublic,
-        visibility: result.visibility,
-        shareSlug: result.shareSlug,
-        organizationSlug: result.organizationSlug ?? currentViewer.organizationSlug ?? null,
-        viewerPermissions: result.viewerPermissions ?? currentViewer.viewerPermissions,
-      })
+      hydrateViewerFromVisibilityResult(currentViewer, result)
+      if (result.visibility !== 'public') setPublicShareUrl(null)
       setBackendPendingMessage(tc('visibility.changeSuccess'))
     } catch {
       setBackendPendingMessage(tc('visibility.changeError'))
@@ -444,19 +424,76 @@ export default function CareerPlaybookViewerPageClient({
 
   const handleShare = async () => {
     const viewer = useCareerPlaybookStore.getState().viewer
-    if (!viewer || viewer.visibility !== 'public') {
+    if (!viewer) return
+
+    if (viewer.visibility !== 'public') {
+      if (viewer.viewerPermissions?.canManageVisibility) {
+        setIsShareConfirmOpen(true)
+        return
+      }
+
       setBackendPendingMessage(t('shareUnavailable'))
       return
     }
 
     const url = buildCareerPlaybookPublicUrl(locale, viewer.organizationSlug, viewer.shareSlug)
     if (!url) {
-      setBackendPendingMessage(t('shareUnavailable'))
+      setBackendPendingMessage(t('sharePublishError'))
       return
     }
 
-    const copied = await copyToClipboard(url)
-    setBackendPendingMessage(copied ? t('shareCopied') : t('shareCopyError'))
+    await copyAndShowShareUrl(url)
+  }
+
+  const handlePublishForShare = async () => {
+    const viewer = useCareerPlaybookStore.getState().viewer
+    if (!viewer || isPublishingForShare) return
+
+    setIsPublishingForShare(true)
+    useCareerPlaybookStore.setState({ viewerActionMessage: null })
+
+    try {
+      const showPublishError = () => {
+        setIsShareConfirmOpen(false)
+        setBackendPendingMessage(t('sharePublishError'))
+      }
+
+      const result = normalizeVisibilityUpdateResponse(
+        await updateCareerPlaybookVisibility(viewer.playbookId, 'public', locale)
+      )
+
+      if (!result || result.playbookId !== viewer.playbookId || result.visibility !== 'public') {
+        showPublishError()
+        return
+      }
+
+      const currentViewer = useCareerPlaybookStore.getState().viewer
+      if (!currentViewer || currentViewer.playbookId !== result.playbookId) {
+        showPublishError()
+        return
+      }
+
+      hydrateViewerFromVisibilityResult(currentViewer, result)
+
+      const url = buildCareerPlaybookPublicUrl(
+        locale,
+        result.organizationSlug ?? currentViewer.organizationSlug,
+        result.shareSlug
+      )
+
+      if (!url) {
+        showPublishError()
+        return
+      }
+
+      setIsShareConfirmOpen(false)
+      await copyAndShowShareUrl(url)
+    } catch {
+      setIsShareConfirmOpen(false)
+      setBackendPendingMessage(t('sharePublishError'))
+    } finally {
+      setIsPublishingForShare(false)
+    }
   }
 
   if (state.isLoadingViewer && !state.viewer) {
@@ -564,6 +601,10 @@ export default function CareerPlaybookViewerPageClient({
           })
         }
         onShare={() => void handleShare()}
+        publicShareUrl={state.viewer.visibility === 'public' ? publicShareUrl : null}
+        onCopyShareLink={() => {
+          if (publicShareUrl) void copyAndShowShareUrl(publicShareUrl)
+        }}
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         createCourseAction={
           canCreateCourse && !linkedCourseHref
@@ -597,6 +638,28 @@ export default function CareerPlaybookViewerPageClient({
           return true
         }}
       />
+      <AlertDialog open={isShareConfirmOpen} onOpenChange={setIsShareConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('shareConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('shareConfirmDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPublishingForShare}>
+              {t('shareConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPublishingForShare}
+              onClick={(event) => {
+                event.preventDefault()
+                void handlePublishForShare()
+              }}
+            >
+              {t('shareConfirmAction')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {commonEditor}
     </>
   )

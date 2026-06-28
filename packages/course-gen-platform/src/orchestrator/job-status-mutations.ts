@@ -27,8 +27,8 @@ interface JobStatusUpdate {
   cancelled?: boolean;
   cancelled_at?: string;
   cancelled_by?: string;
-  error_message?: string;
-  error_stack?: string;
+  error_message?: string | null;
+  error_stack?: string | null;
   progress?: Record<string, unknown>;
   updated_at?: string;
 }
@@ -205,6 +205,8 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
       // Just update the attempt count without changing started_at
       await updateJobStatus(job.id!, {
         attempts: currentAttempt,
+        error_message: null,
+        error_stack: null,
       });
       return;
     }
@@ -212,6 +214,8 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     const updates: JobStatusUpdate = {
       status: JobStatus.ACTIVE,
       attempts: currentAttempt,
+      error_message: null,
+      error_stack: null,
     };
 
     // Only set started_at if it hasn't been set yet

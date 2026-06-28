@@ -171,6 +171,14 @@ function routeAfterBlockRegeneration(state: CareerPlaybookGraphStateType) {
   return group?.judgeNode ?? 'finalJudge';
 }
 
+function routeAfterSpecBuilder(state: CareerPlaybookGraphStateType) {
+  if ((state.errors?.length ?? 0) > 0 || !state.roleProfileSpec) {
+    return END;
+  }
+
+  return 'group1Generator';
+}
+
 export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOptions = {}) {
   const runtime = options.runtime ?? createCareerPlaybookRuntime();
   const group1BlockIds = getGroupBlockIds('group_1_foundation');
@@ -323,7 +331,7 @@ export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOpti
       )
     )
     .addEdge(START, 'specBuilder')
-    .addEdge('specBuilder', 'group1Generator')
+    .addConditionalEdges('specBuilder', routeAfterSpecBuilder)
     .addEdge('group1Generator', 'group1Judge')
     .addEdge('group2Generator', 'group2Judge')
     .addEdge('group3Generator', 'group3Judge')

@@ -23,11 +23,13 @@ import {
   Pencil,
   RefreshCw,
 } from 'lucide-react'
-import type {
-  CareerPlaybookNumericFact,
-  CareerPlaybookQualityIssue,
-  CareerPlaybookViewerSnapshot,
-  CareerPlaybookVisibility,
+import {
+  dedupeCareerPlaybookQualityIssues,
+  isInternalCareerPlaybookGenerationWarning,
+  type CareerPlaybookNumericFact,
+  type CareerPlaybookQualityIssue,
+  type CareerPlaybookViewerSnapshot,
+  type CareerPlaybookVisibility,
 } from '@megacampus/shared-types'
 
 import { MarkdownRendererFull } from '@/components/markdown/MarkdownRendererFull'
@@ -147,6 +149,8 @@ interface PlaybookViewerProps {
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
   onPdf: () => void
   onShare: () => void
+  publicShareUrl?: string | null
+  onCopyShareLink?: () => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   openCourseHref?: string | null
@@ -232,6 +236,8 @@ const defaultActionsCopy: Required<ActionsBarCopy> = {
   actionsLabel: 'Действия с должностной инструкцией',
   pdf: 'PDF',
   share: 'Поделиться',
+  shareLinkLabel: 'Публичная ссылка',
+  shareCopyButton: 'Скопировать',
   createCourse: 'Создать курс из инструкции',
   openCourse: 'Перейти в курс',
   delete: 'Удалить',
@@ -367,6 +373,8 @@ export function PlaybookViewer({
   onRegenerateBlock,
   onPdf,
   onShare,
+  publicShareUrl,
+  onCopyShareLink,
   onCreateCourse,
   createCourseAction,
   openCourseHref,
@@ -639,6 +647,8 @@ export function PlaybookViewer({
                 onVisibilityChange={onVisibilityChange}
                 onPdf={onPdf}
                 onShare={onShare}
+                publicShareUrl={publicShareUrl}
+                onCopyShareLink={onCopyShareLink}
                 onEditBlock={onEditBlock}
                 onRegenerateBlock={onRegenerateBlock}
                 onCreateCourse={onCreateCourse}
@@ -839,6 +849,8 @@ function InspectorRail({
   onVisibilityChange,
   onPdf,
   onShare,
+  publicShareUrl,
+  onCopyShareLink,
   onEditBlock,
   onRegenerateBlock,
   onCreateCourse,
@@ -863,6 +875,8 @@ function InspectorRail({
   onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
   onPdf: () => void
   onShare: () => void
+  publicShareUrl?: string | null
+  onCopyShareLink?: () => void
   onEditBlock: (blockId: CareerPlaybookBlockId) => void
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
   onCreateCourse: () => void
@@ -877,7 +891,7 @@ function InspectorRail({
     <aside
       role="complementary"
       aria-label={labels.inspectorLabel}
-      className="career-playbook-panel xl:sticky xl:top-20 xl:self-start"
+      className="career-playbook-panel xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
     >
       <div className="border-b border-[#d6c2a6] p-4 dark:border-slate-700">
         <div className="flex items-center gap-2 text-sm font-semibold">
@@ -886,11 +900,21 @@ function InspectorRail({
         </div>
       </div>
       <div className="grid gap-4 p-4">
+        <ImageStatusSection
+          snapshot={snapshot}
+          labels={labels}
+          canRegenerateImage={canRegenerateImage}
+          isRegeneratingImage={isRegeneratingImage}
+          onRegenerateImage={onRegenerateImage}
+        />
+
         <ActionsBar
           actionMessage={actionMessage}
           copy={labels.actions}
           onPdf={onPdf}
           onShare={onShare}
+          publicShareUrl={publicShareUrl}
+          onCopyShareLink={onCopyShareLink}
           onCreateCourse={onCreateCourse}
           createCourseAction={createCourseAction}
           canCreateCourse={canCreateCourse}
@@ -907,14 +931,6 @@ function InspectorRail({
           labels={labels}
           onEditBlock={onEditBlock}
           onRegenerateBlock={onRegenerateBlock}
-        />
-
-        <ImageStatusSection
-          snapshot={snapshot}
-          labels={labels}
-          canRegenerateImage={canRegenerateImage}
-          isRegeneratingImage={isRegeneratingImage}
-          onRegenerateImage={onRegenerateImage}
         />
 
         {canManageVisibility && onVisibilityChange ? (
@@ -972,6 +988,7 @@ function QualityWarningsSummary({
   const legacyIssues: CareerPlaybookQualityIssue[] =
     warnings
       ?.filter((warning) => warning.trim().length > 0)
+      .filter((warning) => !isInternalCareerPlaybookGenerationWarning(warning))
       .map((warning, index) => ({
         id: `legacy-warning:${index}`,
         source: 'system',
@@ -980,7 +997,7 @@ function QualityWarningsSummary({
         message: warning.trim(),
         action: 'review',
       })) ?? []
-  const visibleIssues = [...structuredIssues, ...legacyIssues]
+  const visibleIssues = dedupeCareerPlaybookQualityIssues([...structuredIssues, ...legacyIssues])
   if (visibleIssues.length === 0) return null
 
   const groupedIssues = groupQualityIssues(visibleIssues)

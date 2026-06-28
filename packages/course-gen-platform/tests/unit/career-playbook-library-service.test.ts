@@ -215,6 +215,71 @@ describe('career-playbook library visibility service', () => {
     expect(detail.generatedBlocks.header?.content).toBe('# Header');
   });
 
+  it('deduplicates legacy quality issues and filters internal retry warnings on detail read', async () => {
+    const rowWithDuplicatedDiagnostics: CareerPlaybookRow = {
+      ...baseRow,
+      q_a_data: {
+        generation_warnings: [
+          'crossBlockJudge advanced after max regeneration attempts (7/2) for block_4, block_6; unresolved issues remain in judge verdict.',
+          'crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: malformed JSON',
+        ],
+        quality_issues: [
+          {
+            id: 'cross_block_judge:block_1:0',
+            source: 'cross_block_judge',
+            severity: 'critical',
+            blockId: 'block_4',
+            title: 'Проблема качества блока',
+            message: 'Block 4 was restored as fallback content.',
+            suggestion: 'Regenerate block 4 with concrete duties.',
+            action: 'regenerate',
+          },
+          {
+            id: 'cross_block_judge:block_2:0',
+            source: 'cross_block_judge',
+            severity: 'critical',
+            blockId: 'block_4',
+            title: 'Проблема качества блока',
+            message: 'Block 4 was restored as fallback content.',
+            suggestion: 'Regenerate block 4 with concrete duties.',
+            action: 'regenerate',
+          },
+          {
+            id: 'system:block_4:0',
+            source: 'system',
+            severity: 'critical',
+            blockId: 'block_4',
+            title: 'Блок восстановлен автоматически',
+            message: 'Модель не вернула обязательный блок block_4.',
+            suggestion: 'Откройте блок и запустите регенерацию.',
+            action: 'regenerate',
+          },
+        ],
+      },
+    };
+    fromMock.mockReturnValue(chainResult({ data: rowWithDuplicatedDiagnostics, error: null }));
+
+    const detail = await getCareerPlaybookFromLibrary(ctx(owner), {
+      playbookId: baseRow.id,
+    });
+
+    expect(detail.qualityWarnings).toEqual([
+      'crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: malformed JSON',
+    ]);
+    expect(detail.qualityIssues).toEqual([
+      expect.objectContaining({
+        id: 'cross_block_judge:block_1:0',
+        source: 'cross_block_judge',
+        blockId: 'block_4',
+      }),
+      expect.objectContaining({
+        id: 'system:block_4:0',
+        source: 'system',
+        blockId: 'block_4',
+      }),
+    ]);
+  });
+
   it('returns the linked course for a playbook detail when a course already exists', async () => {
     const playbookQuery = chainResult({ data: baseRow, error: null });
     const organizationQuery = chainResult({ data: { slug: 'mega-campus' }, error: null });

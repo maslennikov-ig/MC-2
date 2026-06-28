@@ -237,6 +237,64 @@ describe('Career Playbook viewer components', () => {
     expect(handleRegenerateImage).toHaveBeenCalledTimes(1)
   })
 
+  it('places image status before inspector actions and keeps the right rail scrollable', () => {
+    const blocks = makeBlocks()
+    const blockSix = blocks.find((block) => block.blockId === 'block_6')
+    if (blockSix) {
+      blockSix.state = {
+        content: '## 6. KPI\n\nWin rate: 18%.',
+        status: 'generated',
+        attempt: 1,
+        numeric_facts: [
+          {
+            id: 'block_6-18-percent-0',
+            block_id: 'block_6',
+            raw_text: '18%',
+            normalized_value: '18%',
+            status: 'needs_review',
+            source: 'model_suggestion',
+            confidence: 0.45,
+            occurrence_index: 0,
+            explanation: 'Точное значение не найдено в источниках.',
+          },
+        ],
+      }
+    }
+
+    render(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          imageUrl: 'https://cdn.example.test/career-playbooks/pb-1/card.webp',
+          imageAltText: 'Role Guide image: Head of Sales',
+          imageStatus: 'completed',
+        }}
+        blocks={blocks}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    const title = within(inspector).getByText('Инспектор документа')
+    const imageHeading = within(inspector).getByRole('heading', { name: 'Изображение' })
+    const pdfAction = within(inspector).getByRole('button', { name: 'PDF' })
+    const numericHeading = within(inspector).getByRole('heading', { name: 'Цифры' })
+
+    expect(inspector).toHaveClass('xl:max-h-[calc(100vh-6rem)]')
+    expect(inspector).toHaveClass('xl:overflow-y-auto')
+    expect(title.compareDocumentPosition(imageHeading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(imageHeading.compareDocumentPosition(pdfAction)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(imageHeading.compareDocumentPosition(numericHeading)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  })
+
   it('highlights and scrolls the active contents item as document blocks enter the viewport', async () => {
     const originalIntersectionObserver = globalThis.IntersectionObserver
     const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
@@ -491,23 +549,94 @@ describe('Career Playbook viewer components', () => {
 
     const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
     expect(within(inspector).getByText('Предупреждения качества')).toBeInTheDocument()
-    expect(within(inspector).getByText('Что не входит в роль')).toBeInTheDocument()
-    expect(within(inspector).getByText('Недостаточно анти-целей')).toBeInTheDocument()
+    await user.click(within(inspector).getByRole('button', { name: 'Открыть предупреждения' }))
+
+    const detailsDialog = await screen.findByRole('dialog', { name: 'Предупреждения качества' })
+    expect(within(detailsDialog).getByText('Что не входит в роль')).toBeInTheDocument()
+    expect(within(detailsDialog).getByText('Недостаточно анти-целей')).toBeInTheDocument()
     expect(
-      within(inspector).getByText('В разделе перечислено только 2 анти-цели.')
+      within(detailsDialog).getByText('В разделе перечислено только 2 анти-цели.')
     ).toBeInTheDocument()
     expect(
-      within(inspector).getByText('Добавьте минимум 4 конкретные анти-цели с владельцами.')
+      within(detailsDialog).getByText('Добавьте минимум 4 конкретные анти-цели с владельцами.')
     ).toBeInTheDocument()
 
-    await user.click(within(inspector).getByRole('button', { name: 'Редактировать' }))
+    await user.click(within(detailsDialog).getByRole('button', { name: 'Редактировать' }))
     expect(handleEdit).toHaveBeenCalledWith('block_2')
 
-    await user.click(within(inspector).getByRole('button', { name: 'Перегенерировать' }))
+    await user.click(within(inspector).getByRole('button', { name: 'Открыть предупреждения' }))
+    const reopenedDetailsDialog = await screen.findByRole('dialog', {
+      name: 'Предупреждения качества',
+    })
+    await user.click(
+      within(reopenedDetailsDialog).getByRole('button', { name: 'Перегенерировать' })
+    )
     expect(handleRegenerate).toHaveBeenCalledWith('block_2')
   })
 
-  it('still renders legacy generation quality warning strings in the inspector rail', () => {
+  it('deduplicates structured quality issues and hides internal retry warnings', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          qualityWarnings: [
+            'crossBlockJudge advanced after max regeneration attempts (7/2) for block_4, block_6; unresolved issues remain in judge verdict.',
+            'crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: malformed JSON',
+          ],
+          qualityIssues: [
+            {
+              id: 'cross_block_judge:block_1:0',
+              source: 'cross_block_judge',
+              severity: 'critical',
+              blockId: 'block_4',
+              title: 'Проблема качества блока',
+              message: 'Block 4 was restored as fallback content.',
+              suggestion: 'Regenerate block 4 with concrete duties.',
+              action: 'regenerate',
+            },
+            {
+              id: 'cross_block_judge:block_2:0',
+              source: 'cross_block_judge',
+              severity: 'critical',
+              blockId: 'block_4',
+              title: 'Проблема качества блока',
+              message: 'Block 4 was restored as fallback content.',
+              suggestion: 'Regenerate block 4 with concrete duties.',
+              action: 'regenerate',
+            },
+          ],
+        }}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    expect(within(inspector).getByText('Критично: 1')).toBeInTheDocument()
+    expect(within(inspector).getByText('Предупреждение: 1')).toBeInTheDocument()
+    await user.click(within(inspector).getByRole('button', { name: 'Открыть предупреждения' }))
+
+    const detailsDialog = await screen.findByRole('dialog', { name: 'Предупреждения качества' })
+    expect(
+      within(detailsDialog).getAllByText('Block 4 was restored as fallback content.')
+    ).toHaveLength(1)
+    expect(
+      within(detailsDialog).queryByText(/advanced after max regeneration attempts/)
+    ).not.toBeInTheDocument()
+    expect(within(detailsDialog).getByText(/degraded to deterministic checks/)).toBeInTheDocument()
+  })
+
+  it('still renders legacy generation quality warning strings in the inspector rail', async () => {
+    const user = userEvent.setup()
+
     render(
       <PlaybookViewer
         snapshot={{
@@ -528,9 +657,12 @@ describe('Career Playbook viewer components', () => {
     )
 
     const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
-    expect(within(inspector).getAllByText('Системное предупреждение').length).toBeGreaterThan(0)
+    await user.click(within(inspector).getByRole('button', { name: 'Открыть предупреждения' }))
+
+    const detailsDialog = await screen.findByRole('dialog', { name: 'Предупреждения качества' })
+    expect(within(detailsDialog).getAllByText('Системное предупреждение').length).toBeGreaterThan(0)
     expect(
-      within(inspector).getByText(/crossBlockJudge degraded to deterministic checks/)
+      within(detailsDialog).getByText(/crossBlockJudge degraded to deterministic checks/)
     ).toBeInTheDocument()
   })
 

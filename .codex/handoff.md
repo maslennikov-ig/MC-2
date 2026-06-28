@@ -1,45 +1,56 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-26
-Stage: `mc2-db696.86` Career Playbook Qdrant follow-ups locally closed; cloud endpoint blocked
-Branch: `codex/career-playbook-live-smoke-fixes`
-Beads: `mc2-db696.87` closed; `mc2-db696.86` blocked on valid cloud Qdrant endpoint/key for cloud-backed validation after tracked dev-compose fix
+Updated: 2026-06-28
+Stage: `mc2-db696.94` Career Playbook shared helper consolidation
+Branch: `develop`
+Beads: `mc2-db696.88`, `.89`, `.90`, `.91`, `.92`, `.94`, and `.98` closed locally; delivery still uncommitted/unpushed
 
 ## Current State
 
-- Previous stage `mc2-db696.83` remains pushed at `ac7987de` on `origin/codex/career-playbook-live-smoke-fixes`.
-- `mc2-db696.87`: `create-collection.ts` import side effect is fixed locally and the Beads issue is closed. The direct-execution guard now compares full resolved paths instead of basename suffixes.
-- `mc2-db696.87`: added `tests/unit/shared/qdrant/create-collection.test.ts`; RED reproduced import-time Qdrant call, GREEN passed after fix.
-- `mc2-db696.86`: read-only Qdrant probe confirmed the configured cloud endpoint returns plain HTTP 404 on `/collections`; this is endpoint/config-level, not missing `course_embeddings`.
-- `mc2-db696.86`: `docker-compose.dev.yml` now forces `api-dev`, `worker-dev`, and `worker-stage6-dev` to use `QDRANT_URL=http://qdrant-dev:6333`, matching the existing dev-local Qdrant service and health check.
-- Volta debugger subagent completed Qdrant diagnosis and was closed.
+- `mc2-db696.94`: implemented locally. Career Playbook quality diagnostic dedupe/filter helpers now live in `@megacampus/shared-types` and are reused by backend handler/library mapping and the web viewer.
+- `mc2-db696.98`: implemented locally. Reader and library pages now share `normalizeVisibilityUpdateResponse` from `packages/web/components/career-playbook/library/normalizers.ts`.
+- `mc2-db696.91`: locally resolved/not reproduced. `pnpm build` originally passed on stale local `next@15.5.12`; lockfile requires `15.5.19`. After `pnpm install --frozen-lockfile`, local `node_modules` uses `next@15.5.19` and `pnpm build` passes through trace collection.
+- `mc2-db696.92`: review-and-fix pass remains closed locally. Accepted reviewer findings are implemented and verified.
+- `mc2-db696.90`: quality diagnostics dedupe/filtering/fair retry implementation remains closed locally.
+- `mc2-db696.89`: private share confirmation/public-link UX remains closed locally.
+- `mc2-db696.88`: generation stability fix remains closed locally.
+- Existing dirty Beads state before these stages is still present:
+  - staged `.beads/issues.jsonl` closes unrelated `mc2-hnkmf`
+  - unstaged `.beads/interactions.jsonl` adds the matching interaction
+- Current worktree is intentionally mixed and not ready for blind push/PR. Preserve all dirty Career Playbook and Beads files; do not revert unrelated lines.
 
 ## Verification
 
-- `orch-prompts docs-resolve --package @qdrant/js-client-rest --topic ...` returned `fallback-needed`; official Qdrant docs were checked for REST endpoint behavior.
-- `orch-prompts prompt-check` passed for the Qdrant diagnostic and cleanup worker prompts.
-- Masked read-only Qdrant probe reproduced plain 404 on `/collections` for the configured cloud endpoint; no cloud mutation was performed.
-- `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/qdrant/create-collection.test.ts`: failed before fix as expected, then passed after fix.
-- `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/qdrant/create-collection.test.ts tests/unit/shared/qdrant/lifecycle.test.ts tests/unit/shared/rag/document-availability.test.ts`: passed, 3 files / 11 tests.
-- `docker compose -f docker-compose.dev.yml config --no-interpolate --quiet`: passed.
-- `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.86`: passed, including `pnpm type-check`, `pnpm build`, and process verification.
-- `git diff --check`: passed.
+- RED checks:
+  - `pnpm --filter @megacampus/shared-types test -- tests/career-playbook.test.ts`: failed before shared diagnostic helper implementation.
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/library-normalizers.test.ts`: failed before visibility normalizer implementation.
+- Targeted tests after `pnpm install --frozen-lockfile`:
+  - `pnpm --filter @megacampus/shared-types test -- tests/career-playbook.test.ts`: passed.
+  - `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/orchestrator/handlers/career-playbook-handler.test.ts tests/unit/stages/stage-career-playbook/graph.test.ts tests/unit/stages/stage-career-playbook/block-regenerator.test.ts tests/unit/career-playbook-library-service.test.ts`: passed.
+  - `pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/library-normalizers.test.ts`: passed.
+- Repo gates:
+  - `git diff --check`: passed.
+  - `pnpm type-check`: passed.
+  - `pnpm build`: passed on `next@15.5.19`.
+- Stage summary:
+  - `.codex/stages/mc2-db696.94/summary.md`
 
 ## Explicit defers
 
-- `mc2-db696.86`: valid cloud Qdrant database endpoint/API key is still required for cloud-backed validation. Current configured cloud endpoint returns route-level `404 page not found` on `/collections`.
-- No merge/deploy has been performed for this follow-up stage.
+- No code/test defers for `mc2-db696.94` or `mc2-db696.98`.
+- `mc2-db696.91` was closed as locally resolved/not reproduced after synchronizing `node_modules` to the lockfile and passing `pnpm build`; no tracked code change was needed.
+- Delivery is deferred: commit/push/PR were not performed because the worktree contains mixed local Beads and Career Playbook changes from multiple stages and there is no explicit current delivery authorization.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.86`
-Recommended action: commit and push this follow-up stage. Keep `mc2-db696.86` blocked unless a valid active Qdrant cloud endpoint/key is provided, because cloud validation cannot be completed from repo code alone.
+Next stage id: delivery staging for the local Career Playbook fixes.
+Recommended action: inspect and stage only intended code, tests, `.codex/stages`, handoff, and Beads changes for the Career Playbook stages; preserve the pre-existing `mc2-hnkmf` Beads state.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Continue stage `mc2-db696.86` on branch `codex/career-playbook-live-smoke-fixes`. Local verification and closeout passed; commit/push if not already done. Do not create/delete Qdrant cloud collections or run live smoke unless a valid endpoint/key and explicit mutation authorization are present.
+Use $orchestrator-stage in `/home/me/code/mc2`. Stage `mc2-db696.94` consolidated shared Career Playbook diagnostics helpers into `@megacampus/shared-types`, added a shared web visibility response normalizer, synchronized local `node_modules` to lockfile (`next@15.5.19`), and passed targeted tests, `git diff --check`, `pnpm type-check`, and `pnpm build`. Work remains uncommitted/unpushed in a mixed dirty tree. Preserve prior `.88/.89/.90/.92` changes and pre-existing Beads state.
 
 ## Closeout Markers
 
-docs-reviewed: no-change-needed - current changes are internal dev compose wiring and Qdrant tooling import-safety; stable project index already lists deploy/Qdrant entrypoints.
-graph-reviewed: updated - `graphify update . --force` and `graphify cluster-only . --no-viz` completed; final report shows 52,430 nodes, 76,670 edges, and 3,272 communities.
+docs-reviewed: no-change-needed - no public API, schema, route, migration, deployment, or operator workflow changed.
+graph-reviewed: blocked - Graphify was used for routing; post-change `graphify update .` refused non-force overwrite because the new graph had 52,429 nodes vs existing 52,442. No `--force` was run in the mixed dirty worktree.

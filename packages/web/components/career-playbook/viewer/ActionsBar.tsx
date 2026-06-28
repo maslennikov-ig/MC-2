@@ -2,14 +2,18 @@
 
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { BookOpen, Download, ExternalLink, Share2, Trash2 } from 'lucide-react'
+import { BookOpen, Copy, Download, ExternalLink, Share2, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export interface ActionsBarCopy {
   actionsLabel?: string
   pdf?: string
   share?: string
+  shareLinkLabel?: string
+  shareCopyButton?: string
   createCourse?: string
   openCourse?: string
   delete?: string
@@ -20,6 +24,8 @@ interface ActionsBarProps {
   copy?: ActionsBarCopy
   onPdf: () => void
   onShare: () => void
+  publicShareUrl?: string | null
+  onCopyShareLink?: () => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   canCreateCourse?: boolean
@@ -31,6 +37,8 @@ const defaultCopy: Required<ActionsBarCopy> = {
   actionsLabel: 'Role Guide actions',
   pdf: 'PDF',
   share: 'Share',
+  shareLinkLabel: 'Public link',
+  shareCopyButton: 'Copy',
   createCourse: 'Create course',
   openCourse: 'Open course',
   delete: 'Delete',
@@ -41,6 +49,8 @@ export function ActionsBar({
   copy,
   onPdf,
   onShare,
+  publicShareUrl,
+  onCopyShareLink,
   onCreateCourse,
   createCourseAction,
   canCreateCourse = true,
@@ -101,6 +111,33 @@ export function ActionsBar({
           {labels.delete}
         </Button>
       </div>
+
+      {publicShareUrl ? (
+        <div className="career-playbook-muted-card grid gap-2 p-3">
+          <Label htmlFor="career-playbook-public-share-url" className="text-xs font-medium">
+            {labels.shareLinkLabel}
+          </Label>
+          <div className="flex min-w-0 gap-2">
+            <Input
+              id="career-playbook-public-share-url"
+              value={publicShareUrl}
+              readOnly
+              className="min-w-0 flex-1 font-mono text-xs"
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCopyShareLink}
+              disabled={!onCopyShareLink}
+            >
+              <Copy className="mr-2 h-4 w-4" aria-hidden />
+              {labels.shareCopyButton}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {actionMessage ? (
         <p role="status" className="min-h-5 text-xs leading-5 text-slate-600 dark:text-slate-300">

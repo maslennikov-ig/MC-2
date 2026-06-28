@@ -408,7 +408,7 @@ describe('CareerPlaybookHandler', () => {
     );
   });
 
-  it('persists structured quality issues from judge verdicts and legacy warnings', async () => {
+  it('persists judge quality issues while keeping internal retry warnings diagnostic-only', async () => {
     const generatedBlocks = {
       block_10: {
         content: '## 10. Dependencies',
@@ -479,17 +479,214 @@ describe('CareerPlaybookHandler', () => {
               suggestion: 'Add named stakeholder handoffs.',
               action: 'regenerate',
             }),
-            expect.objectContaining({
-              source: 'system',
-              severity: 'warning',
-              blockId: 'block_10',
-              title: 'Системное предупреждение',
-              action: 'regenerate',
-            }),
           ]),
         }),
       })
     );
+    const persisted = builder.update.mock.calls.find(([payload]) =>
+      Boolean((payload as { generated_blocks?: unknown }).generated_blocks)
+    )?.[0] as {
+      q_a_data?: { quality_issues?: Array<{ source?: string }> };
+    };
+    expect(persisted.q_a_data?.quality_issues).toHaveLength(1);
+    expect(persisted.q_a_data?.quality_issues?.some(issue => issue.source === 'system')).toBe(
+      false
+    );
+  });
+
+  it('deduplicates copied cross-block judge issues by semantic content', async () => {
+    const duplicatedJudgeVerdict = {
+      pass: false,
+      score: 45,
+      issues: [
+        {
+          block_id: 'block_4' as const,
+          severity: 'critical' as const,
+          description: 'Block 4 was restored as fallback content.',
+          suggestion: 'Regenerate block 4 with concrete duties.',
+        },
+        {
+          block_id: 'block_6' as const,
+          severity: 'warning' as const,
+          description: 'Block 6 KPI content is too generic.',
+          suggestion: 'Add measurable KPI examples.',
+        },
+      ],
+      needs_regeneration: ['block_4' as const, 'block_6' as const],
+    };
+    const generatedBlocks = {
+      block_1: {
+        content: '## 1. Mission\n\nMission content',
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 1,
+        judge_verdict: duplicatedJudgeVerdict,
+      },
+      block_2: {
+        content: '## 2. Anti-goals\n\nAnti-goals content',
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 1,
+        judge_verdict: duplicatedJudgeVerdict,
+      },
+      block_4: {
+        content: '## 4. Duties\n\nFallback content',
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 1,
+        judge_verdict: duplicatedJudgeVerdict,
+      },
+    };
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+      followups: [],
+      freeform: [],
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        generatedBlocks,
+        finalMarkdown: '# B2B Sales Manager',
+        roleProfileSpec,
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    const persisted = builder.update.mock.calls.find(([payload]) =>
+      Boolean((payload as { generated_blocks?: unknown }).generated_blocks)
+    )?.[0] as {
+      q_a_data?: {
+        quality_issues?: Array<{ id: string; source: string; blockId?: string; message: string }>;
+      };
+    };
+
+    expect(persisted.q_a_data?.quality_issues).toEqual([
+      expect.objectContaining({
+        id: 'cross_block_judge:block_1:block_4:0',
+        source: 'cross_block_judge',
+        blockId: 'block_4',
+        message: 'Block 4 was restored as fallback content.',
+      }),
+      expect.objectContaining({
+        id: 'cross_block_judge:block_1:block_6:1',
+        source: 'cross_block_judge',
+        blockId: 'block_6',
+        message: 'Block 6 KPI content is too generic.',
+      }),
+    ]);
+  });
+
+  it('keeps unique ids for distinct cross-block judge issues targeting the same block', async () => {
+    const generatedBlocks = {
+      block_1: {
+        content: '## 1. Mission\n\nMission content',
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 1,
+        judge_verdict: {
+          pass: false,
+          score: 65,
+          issues: [
+            {
+              block_id: 'block_4' as const,
+              severity: 'critical' as const,
+              description: 'Block 4 lacks concrete duty examples.',
+              suggestion: 'Add duty examples from the role profile.',
+            },
+          ],
+          needs_regeneration: ['block_4' as const],
+        },
+      },
+      block_2: {
+        content: '## 2. Anti-goals\n\nAnti-goals content',
+        status: 'generated' as const,
+        generated_at: '2026-05-19T00:01:00.000Z',
+        llm_model: 'mock-model',
+        attempt: 1,
+        judge_verdict: {
+          pass: false,
+          score: 65,
+          issues: [
+            {
+              block_id: 'block_4' as const,
+              severity: 'warning' as const,
+              description: 'Block 4 repeats anti-goals already covered elsewhere.',
+              suggestion: 'Remove repeated anti-goal content from block 4.',
+            },
+          ],
+          needs_regeneration: ['block_4' as const],
+        },
+      },
+    };
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+      followups: [],
+      freeform: [],
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        generatedBlocks,
+        finalMarkdown: '# B2B Sales Manager',
+        roleProfileSpec,
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    const persisted = builder.update.mock.calls.find(([payload]) =>
+      Boolean((payload as { generated_blocks?: unknown }).generated_blocks)
+    )?.[0] as {
+      q_a_data?: {
+        quality_issues?: Array<{ id: string; source: string; blockId?: string; message: string }>;
+      };
+    };
+
+    expect(persisted.q_a_data?.quality_issues).toEqual([
+      expect.objectContaining({
+        id: 'cross_block_judge:block_1:block_4:0',
+        source: 'cross_block_judge',
+        blockId: 'block_4',
+        message: 'Block 4 lacks concrete duty examples.',
+      }),
+      expect.objectContaining({
+        id: 'cross_block_judge:block_2:block_4:0',
+        source: 'cross_block_judge',
+        blockId: 'block_4',
+        message: 'Block 4 repeats anti-goals already covered elsewhere.',
+      }),
+    ]);
   });
 
   it('remediates invalid Mermaid from graph output before completed persistence', async () => {
@@ -639,6 +836,108 @@ flowchart TD
             updated_at: expect.any(String),
           }),
         }),
+      })
+    );
+  });
+
+  it('does not persist lower active generation progress over a newer stored percent', async () => {
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+      followups: [],
+      freeform: [],
+      generation_progress: {
+        stage: 'assembling',
+        percent: 98,
+        started_at: '2026-05-19T00:00:00.000Z',
+        updated_at: '2026-05-19T00:02:00.000Z',
+      },
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockImplementation(((options: {
+      progressReporter?: (progress: { stage: string; percent: number }) => Promise<void> | void;
+    }) => ({
+      invoke: vi.fn().mockImplementation(async () => {
+        await options.progressReporter?.({ stage: 'building_profile', percent: 72 });
+        throw new Error('retryable graph failure');
+      }),
+    })) as unknown as typeof getCareerPlaybookGraphMock);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job(
+          {
+            ...baseJobData(),
+            operation: 'GENERATE_PLAYBOOK',
+            qaData: { fixed: [], followups: [], freeform: [] },
+          },
+          {
+            attemptsMade: 0,
+            opts: { attempts: 3 },
+          } as Partial<Job<CareerPlaybookJobData>>
+        )
+      )
+    ).rejects.toThrow('retryable graph failure');
+
+    const generatingUpdates = builder.update.mock.calls.filter(
+      ([payload]) => (payload as { status?: string }).status === 'generating'
+    );
+    expect(generatingUpdates).toHaveLength(0);
+  });
+
+  it('allows active retry progress to clear stale generation_error after terminal failure', async () => {
+    const existingQAData = {
+      fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+      followups: [],
+      freeform: [],
+      generation_error: 'Previous failed attempt',
+      generation_progress: {
+        stage: 'failed',
+        percent: 100,
+        started_at: '2026-05-19T00:00:00.000Z',
+        updated_at: '2026-05-19T00:02:00.000Z',
+      },
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockRejectedValue(new Error('retryable graph failure')),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job(
+          {
+            ...baseJobData(),
+            operation: 'GENERATE_PLAYBOOK',
+            qaData: { fixed: [], followups: [], freeform: [] },
+          },
+          {
+            attemptsMade: 0,
+            opts: { attempts: 3 },
+          } as Partial<Job<CareerPlaybookJobData>>
+        )
+      )
+    ).rejects.toThrow('retryable graph failure');
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'generating',
+        q_a_data: {
+          fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
+          followups: [],
+          freeform: [],
+          generation_progress: expect.objectContaining({
+            stage: 'preparing_context',
+            percent: 70,
+          }),
+        },
       })
     );
   });

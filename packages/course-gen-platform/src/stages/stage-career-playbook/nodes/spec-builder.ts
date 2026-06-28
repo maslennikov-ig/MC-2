@@ -75,9 +75,9 @@ export function parseRoleProfileSpecFromLLM(rawContent: string): CareerPlaybookR
   return CareerPlaybookRoleProfileSpecSchema.parse(normalizeRoleProfileSpecCandidate(parsed));
 }
 
-function dropBlankOptionalString(record: Record<string, unknown>, key: string): void {
+function dropEmptyOptionalString(record: Record<string, unknown>, key: string): void {
   const value = record[key];
-  if (typeof value === 'string' && value.trim().length === 0) {
+  if (value === null || (typeof value === 'string' && value.trim().length === 0)) {
     delete record[key];
   }
 }
@@ -91,7 +91,7 @@ function normalizeRoleProfileSpecCandidate(candidate: unknown): unknown {
     typeof normalized.position === 'object' &&
     !Array.isArray(normalized.position)
   ) {
-    dropBlankOptionalString(normalized.position as Record<string, unknown>, 'specialization');
+    dropEmptyOptionalString(normalized.position as Record<string, unknown>, 'specialization');
   }
   if (
     normalized.context &&
@@ -99,9 +99,9 @@ function normalizeRoleProfileSpecCandidate(candidate: unknown): unknown {
     !Array.isArray(normalized.context)
   ) {
     const context = normalized.context as Record<string, unknown>;
-    dropBlankOptionalString(context, 'subordinates_description');
-    dropBlankOptionalString(context, 'industry');
-    dropBlankOptionalString(context, 'region');
+    dropEmptyOptionalString(context, 'subordinates_description');
+    dropEmptyOptionalString(context, 'industry');
+    dropEmptyOptionalString(context, 'region');
   }
 
   return normalized;

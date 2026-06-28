@@ -1,5 +1,10 @@
 import { TRPCError } from '@trpc/server';
-import { JobType, cardEnrichmentContentSchema } from '@megacampus/shared-types';
+import {
+  JobType,
+  cardEnrichmentContentSchema,
+  dedupeCareerPlaybookQualityIssues,
+  getUserVisibleCareerPlaybookWarnings,
+} from '@megacampus/shared-types';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
@@ -725,16 +730,7 @@ function sortRows(
 function mergeQualityIssues(
   ...groups: CareerPlaybookQualityIssue[][]
 ): CareerPlaybookQualityIssue[] {
-  const merged: CareerPlaybookQualityIssue[] = [];
-  const seen = new Set<string>();
-
-  for (const issue of groups.flat()) {
-    if (seen.has(issue.id)) continue;
-    merged.push(issue);
-    seen.add(issue.id);
-  }
-
-  return merged;
+  return dedupeCareerPlaybookQualityIssues(groups.flat());
 }
 
 async function mapRowToLibraryDetail(
@@ -763,7 +759,7 @@ async function mapRowToLibraryDetail(
     finalMarkdown: markdownRemediation.modified
       ? markdownRemediation.content
       : mapped.final_markdown,
-    qualityWarnings: qaData.generation_warnings,
+    qualityWarnings: getUserVisibleCareerPlaybookWarnings(qaData.generation_warnings),
     qualityIssues: mergeQualityIssues(qaData.quality_issues, blockRemediation.qualityIssues),
   };
 }
