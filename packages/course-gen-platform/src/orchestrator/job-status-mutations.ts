@@ -192,8 +192,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 
     // If this is a retry (attempt > 1) and we're still active from previous attempt,
     // we need to be extra careful with timestamps to avoid constraint violations
-    const isRetry = currentAttempt > 1;
-    if (isRetry && existingStatus?.status === 'active') {
+    if (currentAttempt > 1 && existingStatus?.status === 'active') {
       logger.debug(
         {
           jobId: job.id,
@@ -232,10 +231,10 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
         const createdAt = new Date(existingStatus.created_at);
         // If current time is before or equal to created_at, set started_at to created_at + appropriate offset
         // For retries, add more offset to avoid collisions
-        const offsetMs = isRetry ? currentAttempt * 10 : 1;
+        const offsetMs = currentAttempt > 1 ? currentAttempt * 10 : 1;
         if (now <= createdAt) {
           startedAt = new Date(createdAt.getTime() + offsetMs);
-        } else if (isRetry) {
+        } else if (currentAttempt > 1) {
           // Even if now > created_at, add a small offset for retries to ensure separation
           startedAt = new Date(now.getTime() + offsetMs);
         }
@@ -289,7 +288,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
           jobId: job.id,
           attemptsMade: job.attemptsMade,
           currentAttempt,
-          isRetry,
+          isRetry: currentAttempt > 1,
           startedAt: updates.started_at.toISOString(),
           createdAt: existingStatus?.created_at,
         },
