@@ -33,7 +33,7 @@ export default function HeroContent() {
   const t = useTranslations('common.hero')
 
   const createRoleAction: HeroAction = {
-    href: '/career-playbook/new',
+    href: '/career-playbook/new?fresh=1',
     label: t('createRoleGuide'),
     icon: <FileText className="h-4 w-4" aria-hidden="true" />,
   }

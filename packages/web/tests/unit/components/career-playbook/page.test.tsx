@@ -32,7 +32,12 @@ vi.mock('@/app/[locale]/career-playbook/new/page-client', () => ({
 }))
 
 vi.mock('@/app/[locale]/career-playbook/new/auth-required-client', () => ({
-  default: () => <div data-testid="career-playbook-auth-required">Authorization Required</div>,
+  default: ({ returnTo }: { returnTo?: string }) => (
+    <div data-testid="career-playbook-auth-required">
+      Authorization Required
+      <span data-testid="career-playbook-auth-return-to">{returnTo ?? ''}</span>
+    </div>
+  ),
 }))
 
 const mockedGetCurrentUser = vi.mocked(getCurrentUser)
@@ -49,6 +54,21 @@ describe('CareerPlaybookNewPage', () => {
 
     expect(screen.getByTestId('career-playbook-auth-required')).toBeInTheDocument()
     expect(screen.queryByTestId('career-playbook-wizard')).not.toBeInTheDocument()
+  })
+
+  it('preserves the fresh constructor intent through authentication', async () => {
+    mockedGetCurrentUser.mockResolvedValue(null)
+
+    render(
+      await CareerPlaybookNewPage({
+        params: Promise.resolve({ locale: 'en' }),
+        searchParams: Promise.resolve({ fresh: '1' }),
+      })
+    )
+
+    expect(screen.getByTestId('career-playbook-auth-return-to')).toHaveTextContent(
+      '/en/career-playbook/new?fresh=1'
+    )
   })
 
   it('renders the wizard only for authenticated users', async () => {

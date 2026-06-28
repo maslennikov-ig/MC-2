@@ -80,7 +80,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 <span>{nav?.courseLibrary || nav?.catalog || 'Каталог курсов'}</span>
               </Link>
               <Link
-                href="/career-playbook/new"
+                href="/career-playbook/new?fresh=1"
                 aria-label={nav?.createRoleDescriptionAria || 'Создать описание роли'}
                 className="group flex items-center gap-1.5 rounded-full border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:from-purple-100 hover:to-blue-100 hover:text-purple-600 dark:border-purple-500/20 dark:from-purple-500/5 dark:to-blue-500/5 dark:text-gray-300 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 dark:hover:text-purple-400"
               >

@@ -1051,14 +1051,15 @@ describe('CompletionScreen', () => {
         onGenerate={vi.fn()}
         generationStatus="completed"
         viewGeneratedHref="/career-playbook/123"
-        copy={{ viewGenerated: 'Open Role Guide' }}
       />
     )
 
-    expect(screen.getByRole('link', { name: 'Open Role Guide' })).toHaveAttribute(
-      'href',
-      '/career-playbook/123'
-    )
+    const viewerLink = screen.getByRole('link', { name: 'Открыть должностную инструкцию' })
+    expect(viewerLink).toHaveAttribute('href', '/career-playbook/123')
+    expect(viewerLink).toHaveClass('h-auto')
+    expect(viewerLink).toHaveClass('whitespace-normal')
+    expect(viewerLink).toHaveClass('leading-snug')
+    expect(viewerLink.querySelector('span')).toHaveClass('min-w-0')
     expect(screen.getAllByText(longAnswer)[0]).toHaveClass('break-words')
   })
 

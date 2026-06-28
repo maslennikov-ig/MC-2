@@ -72,7 +72,7 @@ export default function Header({
       icon: <FileText className="h-4 w-4" aria-hidden="true" />,
     },
     {
-      href: '/career-playbook/new',
+      href: '/career-playbook/new?fresh=1',
       label: t('createRoleDescription'),
       ariaLabel: t('createRoleDescriptionAria'),
       icon: <Plus className="h-4 w-4" aria-hidden="true" />,

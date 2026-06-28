@@ -12,7 +12,7 @@ test.describe('Career Playbook landing', () => {
     ).toBeVisible()
     await expect(
       page.getByRole('link', { name: 'Create your Career Playbook' }).first()
-    ).toHaveAttribute('href', '/en/career-playbook/new')
+    ).toHaveAttribute('href', '/en/career-playbook/new?fresh=1')
     await expect(page.getByRole('link', { name: 'View sample guide' })).toHaveAttribute(
       'href',
       '#example'

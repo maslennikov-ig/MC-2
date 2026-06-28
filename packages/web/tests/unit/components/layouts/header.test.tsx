@@ -156,7 +156,7 @@ describe('Header', () => {
     )
     expect(screen.getByRole('menuitem', { name: 'Создать описание роли' })).toHaveAttribute(
       'href',
-      '/career-playbook/new'
+      '/career-playbook/new?fresh=1'
     )
     expect(
       screen.getByRole('menuitem', { name: 'Открыть каталог должностных инструкций' })
