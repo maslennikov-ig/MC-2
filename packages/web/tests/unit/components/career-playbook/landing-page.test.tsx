@@ -90,7 +90,7 @@ describe('CareerPlaybookLandingPage', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /create your career playbook/i })).toHaveAttribute(
       'href',
-      '/career-playbook/new'
+      '/career-playbook/new?fresh=1'
     )
     expect(screen.getAllByText('Netflix Context over Control').length).toBeGreaterThan(1)
     expect(screen.getByText('Annotated B2B sales Role Guide preview')).toBeInTheDocument()

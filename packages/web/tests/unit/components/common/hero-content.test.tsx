@@ -52,7 +52,7 @@ describe('HeroContent', () => {
 
     expect(screen.getByRole('link', { name: /Создать инструкцию/ })).toHaveAttribute(
       'href',
-      '/career-playbook/new'
+      '/career-playbook/new?fresh=1'
     )
     expect(screen.getByRole('link', { name: /Создать курс/ })).toHaveAttribute('href', '/create')
 

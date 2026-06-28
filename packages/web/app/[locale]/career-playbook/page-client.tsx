@@ -149,7 +149,7 @@ export default function CareerPlaybookLandingPageClient() {
                   size="lg"
                   className="bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 rounded-md shadow-lg"
                 >
-                  <Link href="/career-playbook/new">
+                  <Link href="/career-playbook/new?fresh=1">
                     {t('ctaPrimary')}
                     <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                   </Link>
@@ -335,7 +335,7 @@ export default function CareerPlaybookLandingPageClient() {
                 size="lg"
                 className="bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 mt-8 rounded-md shadow-lg"
               >
-                <Link href="/career-playbook/new" aria-label={t('finalCtaTitle')}>
+                <Link href="/career-playbook/new?fresh=1" aria-label={t('finalCtaTitle')}>
                   {t('finalCtaButton')}
                   <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                 </Link>

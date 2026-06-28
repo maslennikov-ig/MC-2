@@ -22,10 +22,6 @@ export default async function CareerPlaybookNewPage({ params, searchParams }: Pr
   setRequestLocale(locale)
   const user = await getCurrentUser()
 
-  if (!user) {
-    return <CareerPlaybookAuthRequiredClient locale={locale} />
-  }
-
   const freshParam = Array.isArray(resolvedSearchParams.fresh)
     ? resolvedSearchParams.fresh[0]
     : resolvedSearchParams.fresh
@@ -33,6 +29,16 @@ export default async function CareerPlaybookNewPage({ params, searchParams }: Pr
     ? resolvedSearchParams.resume[0]
     : resolvedSearchParams.resume
   const resumePlaybookId = freshParam === '1' ? undefined : resumeParam
+  const authReturnTo =
+    freshParam === '1'
+      ? `/${locale}/career-playbook/new?fresh=1`
+      : resumePlaybookId
+        ? `/${locale}/career-playbook/new?resume=${encodeURIComponent(resumePlaybookId)}`
+        : undefined
+
+  if (!user) {
+    return <CareerPlaybookAuthRequiredClient locale={locale} returnTo={authReturnTo} />
+  }
 
   return (
     <CareerPlaybookNewPageClient
