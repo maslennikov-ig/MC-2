@@ -1,12 +1,13 @@
 # Orchestrator Handoff
 
 Updated: 2026-06-28
-Stage: `mc2-db696.94` Career Playbook shared helper consolidation
+Stage: `mc2-db696.99` Career Playbook delivery
 Branch: `develop`
-Beads: `mc2-db696.88`, `.89`, `.90`, `.91`, `.92`, `.94`, and `.98` closed locally; delivery still uncommitted/unpushed
+Beads: `mc2-db696.88`, `.89`, `.90`, `.91`, `.92`, `.94`, `.98`, and `.99` closed
 
 ## Current State
 
+- `mc2-db696.99`: delivery completed. Commit `7cbf74d7` was pushed to `origin/develop`; `.claude/scripts/deploy.sh --yes` passed `pnpm type-check` and `pnpm build`, merged `develop` into `master`, and pushed merge commit `ec7f033d` to `origin/master`.
 - `mc2-db696.94`: implemented locally. Career Playbook quality diagnostic dedupe/filter helpers now live in `@megacampus/shared-types` and are reused by backend handler/library mapping and the web viewer.
 - `mc2-db696.98`: implemented locally. Reader and library pages now share `normalizeVisibilityUpdateResponse` from `packages/web/components/career-playbook/library/normalizers.ts`.
 - `mc2-db696.91`: locally resolved/not reproduced. `pnpm build` originally passed on stale local `next@15.5.12`; lockfile requires `15.5.19`. After `pnpm install --frozen-lockfile`, local `node_modules` uses `next@15.5.19` and `pnpm build` passes through trace collection.
@@ -14,10 +15,7 @@ Beads: `mc2-db696.88`, `.89`, `.90`, `.91`, `.92`, `.94`, and `.98` closed local
 - `mc2-db696.90`: quality diagnostics dedupe/filtering/fair retry implementation remains closed locally.
 - `mc2-db696.89`: private share confirmation/public-link UX remains closed locally.
 - `mc2-db696.88`: generation stability fix remains closed locally.
-- Existing dirty Beads state before these stages is still present:
-  - staged `.beads/issues.jsonl` closes unrelated `mc2-hnkmf`
-  - unstaged `.beads/interactions.jsonl` adds the matching interaction
-- Current worktree is intentionally mixed and not ready for blind push/PR. Preserve all dirty Career Playbook and Beads files; do not revert unrelated lines.
+- Current worktree should be clean after the follow-up Beads/handoff delivery-state commit is pushed.
 
 ## Verification
 
@@ -39,18 +37,18 @@ Beads: `mc2-db696.88`, `.89`, `.90`, `.91`, `.92`, `.94`, and `.98` closed local
 
 - No code/test defers for `mc2-db696.94` or `mc2-db696.98`.
 - `mc2-db696.91` was closed as locally resolved/not reproduced after synchronizing `node_modules` to the lockfile and passing `pnpm build`; no tracked code change was needed.
-- Delivery is deferred: commit/push/PR were not performed because the worktree contains mixed local Beads and Career Playbook changes from multiple stages and there is no explicit current delivery authorization.
+- No delivery defer remains. Dev and production/staging delivery were explicitly authorized and completed.
 
 ## Next recommended
 
-Next stage id: delivery staging for the local Career Playbook fixes.
-Recommended action: inspect and stage only intended code, tests, `.codex/stages`, handoff, and Beads changes for the Career Playbook stages; preserve the pre-existing `mc2-hnkmf` Beads state.
+Next stage id: new issue as selected by Beads.
+Recommended action: monitor GitHub/Vercel runtime deploy status if needed; no local follow-up is required for the Career Playbook delivery unless production smoke checks expose a runtime-only problem.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Stage `mc2-db696.94` consolidated shared Career Playbook diagnostics helpers into `@megacampus/shared-types`, added a shared web visibility response normalizer, synchronized local `node_modules` to lockfile (`next@15.5.19`), and passed targeted tests, `git diff --check`, `pnpm type-check`, and `pnpm build`. Work remains uncommitted/unpushed in a mixed dirty tree. Preserve prior `.88/.89/.90/.92` changes and pre-existing Beads state.
+Use $orchestrator-stage in `/home/me/code/mc2` for new medium/complex work. Career Playbook stages `.88/.89/.90/.92/.94/.98` were delivered in commit `7cbf74d7`; dev push succeeded and deploy merged to `master` as `ec7f033d`. Local verification included targeted tests, `git diff --check`, `pnpm type-check`, and `pnpm build`; deploy script re-ran `type-check` and `build`.
 
 ## Closeout Markers
 
-docs-reviewed: no-change-needed - no public API, schema, route, migration, deployment, or operator workflow changed.
+docs-reviewed: updated - handoff now records completed dev/prod delivery state; no public API, schema, route, migration, deployment procedure, or operator workflow docs changed.
 graph-reviewed: blocked - Graphify was used for routing; post-change `graphify update .` refused non-force overwrite because the new graph had 52,429 nodes vs existing 52,442. No `--force` was run in the mixed dirty worktree.
