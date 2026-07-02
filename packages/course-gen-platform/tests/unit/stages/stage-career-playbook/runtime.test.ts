@@ -163,4 +163,65 @@ describe('Career Playbook runtime', () => {
     });
     expect(structuredInvoke).toHaveBeenCalledWith('prompt');
   });
+
+  it('reports real token usage and a catalog-based cost when the model returns usage', async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      content: 'ok',
+      usage_metadata: { input_tokens: 1000, output_tokens: 500 },
+    });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'deepseek/deepseek-v4-flash',
+          fallbackModelId: 'google/gemini-3-flash-preview',
+          temperature: 0.3,
+          maxTokens: 1000,
+          maxRetries: 0,
+        }),
+      },
+      createModel,
+    });
+
+    const result = await runtime.invokeLLM('prompt', {
+      phaseName: 'stage_career_playbook_spec',
+      promptKey: 'career_playbook_spec_builder',
+      node: 'specBuilder',
+    });
+
+    expect(result.inputTokens).toBe(1000);
+    expect(result.outputTokens).toBe(500);
+    // deepseek/deepseek-v4-flash: $0.10/1M input + $0.20/1M output
+    // 1000 * 0.10/1e6 + 500 * 0.20/1e6 = 0.0001 + 0.0001 = 0.0002
+    expect(result.costUsd).toBeCloseTo(0.0002, 10);
+  });
+
+  it('falls back to token estimates and still prices when usage is absent', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'abcd' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'deepseek/deepseek-v4-flash',
+          fallbackModelId: 'google/gemini-3-flash-preview',
+          temperature: 0.3,
+          maxTokens: 1000,
+          maxRetries: 0,
+        }),
+      },
+      createModel,
+    });
+
+    const result = await runtime.invokeLLM('prompt-1234', {
+      phaseName: 'stage_career_playbook_spec',
+      promptKey: 'career_playbook_spec_builder',
+      node: 'specBuilder',
+    });
+
+    expect(result.inputTokens).toBe(Math.ceil('prompt-1234'.length / 4));
+    expect(result.outputTokens).toBe(Math.ceil('abcd'.length / 4));
+    expect(result.costUsd).toBeGreaterThan(0);
+  });
 });

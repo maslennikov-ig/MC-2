@@ -1,6 +1,7 @@
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
+import { estimateCost } from '@/shared/llm/cost-calculator';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import type { z } from 'zod';
 
@@ -52,8 +53,20 @@ interface CareerPlaybookModelConfigService {
   ) => Promise<Partial<PhaseModelConfig> & { modelId: string }>;
 }
 
+interface CareerPlaybookModelUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+}
+
+interface CareerPlaybookModelInvocation {
+  content: string;
+  usage?: CareerPlaybookModelUsage;
+}
+
 interface CareerPlaybookModel {
-  invoke: (prompt: string) => Promise<{ content: unknown }>;
+  invoke: (
+    prompt: string
+  ) => Promise<{ content: unknown; usage_metadata?: CareerPlaybookModelUsage }>;
   withStructuredOutput?: (
     schema: z.ZodTypeAny | Record<string, unknown>,
     config?: {
@@ -139,18 +152,24 @@ export function createCareerPlaybookRuntime(
 
         try {
           const model = createModel(modelId, temperature, maxTokens, timeoutMs);
-          const content = await withLLMTimeout(
+          const invocation = await withLLMTimeout(
             invokeModelWithOptionalStructuredOutput(model, prompt, options),
             timeoutMs,
             options
           );
 
+          // Prefer real OpenRouter usage (requested via usage.include); fall back to
+          // a length/4 estimate when the provider/structured-output path omits it.
+          const inputTokens = invocation.usage?.input_tokens ?? estimateTokens(prompt);
+          const outputTokens =
+            invocation.usage?.output_tokens ?? estimateTokens(invocation.content);
+
           return {
-            content,
+            content: invocation.content,
             model: modelId,
-            inputTokens: estimateTokens(prompt),
-            outputTokens: estimateTokens(content),
-            costUsd: 0,
+            inputTokens,
+            outputTokens,
+            costUsd: estimateCost(modelId, inputTokens + outputTokens, inputTokens),
           };
         } catch (error) {
           lastError = error;
@@ -166,7 +185,7 @@ async function invokeModelWithOptionalStructuredOutput(
   model: CareerPlaybookModel,
   prompt: string,
   options: CareerPlaybookLLMCallOptions
-): Promise<string> {
+): Promise<CareerPlaybookModelInvocation> {
   if (options.structuredOutputSchema) {
     if (!model.withStructuredOutput) {
       throw new Error(
@@ -179,12 +198,18 @@ async function invokeModelWithOptionalStructuredOutput(
       method: options.structuredOutputMethod,
       strict: options.structuredOutputStrict,
     });
+    // Structured output returns the parsed value, not the raw AIMessage, so usage
+    // metadata is unavailable here; token counts fall back to estimation.
     const response = await structuredModel.invoke(prompt);
-    return typeof response === 'string' ? response : JSON.stringify(response);
+    return { content: typeof response === 'string' ? response : JSON.stringify(response) };
   }
 
   const response = await model.invoke(prompt);
-  return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+  return {
+    content:
+      typeof response.content === 'string' ? response.content : JSON.stringify(response.content),
+    usage: response.usage_metadata,
+  };
 }
 
 async function resolvePhaseConfig(
