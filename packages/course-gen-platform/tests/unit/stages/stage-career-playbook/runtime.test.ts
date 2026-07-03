@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/nodes/runtime';
+import { logger } from '@/shared/logger';
 
 describe('Career Playbook runtime', () => {
   it('times out hung LLM calls and retries with the fallback model', async () => {
@@ -89,7 +90,7 @@ describe('Career Playbook runtime', () => {
     expect(modelConfigService.getModelForPhase).toHaveBeenCalledWith(
       'stage_career_playbook_department_classifier',
       undefined,
-      undefined,
+      Math.ceil('prompt'.length / 4),
       undefined
     );
     expect(createModel).toHaveBeenNthCalledWith(1, 'fast-model', 0.2, 1000, 300_000);
@@ -230,5 +231,135 @@ describe('Career Playbook runtime', () => {
     expect(result.inputTokens).toBe(Math.ceil('prompt-1234'.length / 4));
     expect(result.outputTokens).toBe(Math.ceil('abcd'.length / 4));
     expect(result.costUsd).toBeGreaterThan(0);
+  });
+
+  it('threads the rendered prompt token count into model routing', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const getModelForPhase = vi.fn().mockResolvedValue({
+      modelId: 'fast-model',
+      fallbackModelId: 'adult-model',
+      temperature: 0.2,
+      maxTokens: 1000,
+      maxRetries: 0,
+      maxContextTokens: 128_000,
+    });
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: { getModelForPhase },
+      createModel,
+    });
+
+    const prompt = 'x'.repeat(4000); // ~1000 estimated tokens
+    await runtime.invokeLLM(prompt, {
+      phaseName: 'stage_career_playbook_spec',
+      promptKey: 'career_playbook_spec_builder',
+      node: 'specBuilder',
+    });
+
+    expect(getModelForPhase).toHaveBeenCalledWith(
+      'stage_career_playbook_spec',
+      undefined,
+      Math.ceil(prompt.length / 4),
+      undefined
+    );
+    // Fits comfortably inside a 128k window, so the output budget is untouched.
+    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+  });
+
+  it('clamps the output budget to the resolved model context window', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 4000,
+          maxRetries: 0,
+          maxContextTokens: 2000,
+        }),
+      },
+      createModel,
+    });
+
+    // ~1000 estimated prompt tokens; 2000 context - 1000 prompt = 1000 for output.
+    await runtime.invokeLLM('x'.repeat(4000), {
+      phaseName: 'stage_career_playbook_spec',
+      promptKey: 'career_playbook_spec_builder',
+      node: 'specBuilder',
+    });
+
+    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+  });
+
+  it('leaves the output budget untouched when the model context window is unknown', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 4000,
+          maxRetries: 0,
+          maxContextTokens: null,
+        }),
+      },
+      createModel,
+    });
+
+    await runtime.invokeLLM('x'.repeat(4000), {
+      phaseName: 'stage_career_playbook_spec',
+      promptKey: 'career_playbook_spec_builder',
+      node: 'specBuilder',
+    });
+
+    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 4000, 300_000);
+  });
+
+  it('warns and floors the output budget when the prompt exceeds the context window', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
+      const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+      const createModel = vi.fn(() => ({ invoke }));
+      const runtime = createCareerPlaybookRuntime({
+        promptService: { renderPrompt: vi.fn() },
+        modelConfigService: {
+          getModelForPhase: vi.fn().mockResolvedValue({
+            modelId: 'fast-model',
+            fallbackModelId: 'adult-model',
+            temperature: 0.2,
+            maxTokens: 4000,
+            maxRetries: 0,
+            maxContextTokens: 1100,
+          }),
+        },
+        createModel,
+      });
+
+      // 1100 context - 1000 prompt = 100 available (< 512 floor) -> warn + floor at 512.
+      await runtime.invokeLLM('x'.repeat(4000), {
+        phaseName: 'stage_career_playbook_spec',
+        promptKey: 'career_playbook_spec_builder',
+        node: 'specBuilder',
+      });
+
+      expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 512, 300_000);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phaseName: 'stage_career_playbook_spec',
+          node: 'specBuilder',
+          maxContextTokens: 1100,
+        }),
+        'Career Playbook prompt exceeds model context window; extended-tier routing may be misconfigured'
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

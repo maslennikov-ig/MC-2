@@ -6,6 +6,7 @@ import {
 import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
 import { estimateCost, estimateTokenCount } from '@/shared/llm/cost-calculator';
 import { createPromptService } from '@/shared/prompts/prompt-service';
+import { logger } from '@/shared/logger';
 import type { z } from 'zod';
 
 export interface CareerPlaybookLLMCallOptions {
@@ -41,6 +42,10 @@ export interface CareerPlaybookRuntime {
 }
 
 const DEFAULT_TIMEOUT_MS = 300_000;
+
+// Floor for the output-token budget when the max-context guard has to clamp it
+// so a still-usable generation is attempted instead of a zero/negative budget.
+const MIN_GUARDED_OUTPUT_TOKENS = 512;
 
 interface CareerPlaybookPromptService {
   renderPrompt: (promptKey: string, variables: Record<string, string>) => Promise<string>;
@@ -132,7 +137,11 @@ export function createCareerPlaybookRuntime(
   return {
     renderPrompt: (promptKey, variables) => promptService.renderPrompt(promptKey, variables),
     invokeLLM: async (prompt, options) => {
-      const phaseConfig = await resolvePhaseConfig(modelConfigService, options);
+      // Feed the rendered prompt size into model routing so large source-evidence
+      // packs resolve the extended-context tier instead of always defaulting to
+      // standard (which previously happened because tokenCount was never passed).
+      const promptTokens = estimateTokenCount(prompt);
+      const phaseConfig = await resolvePhaseConfig(modelConfigService, options, promptTokens);
       const attempts = Math.max(1, (phaseConfig.maxRetries ?? 0) + 1);
       let lastError: unknown = null;
 
@@ -143,8 +152,14 @@ export function createCareerPlaybookRuntime(
             ? phaseConfig.fallbackModelId
             : phaseConfig.modelId;
         const tokenMultiplier = options.maxTokensMultiplier ?? (attempt >= 2 ? 1.25 : 1);
-        const maxTokens = Math.ceil(
+        const requestedMaxTokens = Math.ceil(
           (options.maxTokens ?? phaseConfig.maxTokens ?? 12_000) * tokenMultiplier
+        );
+        const maxTokens = guardOutputAgainstContextWindow(
+          promptTokens,
+          requestedMaxTokens,
+          phaseConfig.maxContextTokens,
+          options
         );
         const temperature = options.temperature ?? phaseConfig.temperature ?? 0.7;
         const timeoutMs = normalizeTimeoutMs(phaseConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -158,8 +173,9 @@ export function createCareerPlaybookRuntime(
           );
 
           // Prefer real OpenRouter usage (requested via usage.include); fall back to
-          // a length/4 estimate when the provider/structured-output path omits it.
-          const inputTokens = invocation.usage?.input_tokens ?? estimateTokenCount(prompt);
+          // the already-computed length/4 estimate when the provider/structured-output
+          // path omits it.
+          const inputTokens = invocation.usage?.input_tokens ?? promptTokens;
           const outputTokens =
             invocation.usage?.output_tokens ?? estimateTokenCount(invocation.content);
 
@@ -219,15 +235,60 @@ async function invokeModelWithOptionalStructuredOutput(
   };
 }
 
+/**
+ * Validate the output-token budget against the resolved model's context window.
+ * Passing the rendered prompt size into routing already prefers the extended
+ * tier for large source-evidence packs; this is the last-line guard that keeps
+ * `prompt + requested output` inside the selected model so an oversized request
+ * is clamped (or surfaced) up front instead of burning retries on provider-side
+ * context-length rejections, which is one driver of the observed cost/TTL runaways.
+ */
+function guardOutputAgainstContextWindow(
+  promptTokens: number,
+  requestedMaxTokens: number,
+  maxContextTokens: number | null | undefined,
+  options: CareerPlaybookLLMCallOptions
+): number {
+  if (!maxContextTokens || maxContextTokens <= 0) {
+    // Unknown context window (no DB/default value): nothing to guard against.
+    return requestedMaxTokens;
+  }
+
+  const availableForOutput = maxContextTokens - promptTokens;
+  if (availableForOutput >= requestedMaxTokens) {
+    return requestedMaxTokens;
+  }
+
+  if (availableForOutput >= MIN_GUARDED_OUTPUT_TOKENS) {
+    // Prompt fits but leaves less room than requested: clamp output to fit.
+    return availableForOutput;
+  }
+
+  // Prompt alone (near-)fills the window; clamping output cannot make it fit.
+  // Surface it so extended-tier routing/config can be corrected.
+  logger.warn(
+    {
+      phaseName: options.phaseName,
+      node: options.node,
+      promptTokens,
+      maxContextTokens,
+      requestedMaxTokens,
+    },
+    'Career Playbook prompt exceeds model context window; extended-tier routing may be misconfigured'
+  );
+  return Math.min(requestedMaxTokens, MIN_GUARDED_OUTPUT_TOKENS);
+}
+
 async function resolvePhaseConfig(
   modelConfigService: CareerPlaybookModelConfigService,
-  options: CareerPlaybookLLMCallOptions
+  options: CareerPlaybookLLMCallOptions,
+  promptTokens?: number
 ) {
   try {
     const config = await modelConfigService.getModelForPhase(
       options.phaseName,
       options.courseId,
-      undefined,
+      promptTokens,
       options.language
     );
     return {
@@ -237,6 +298,7 @@ async function resolvePhaseConfig(
       maxTokens: config.maxTokens ?? 12_000,
       maxRetries: config.maxRetries ?? 2,
       timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      maxContextTokens: config.maxContextTokens ?? null,
     };
   } catch {
     return {
@@ -246,6 +308,7 @@ async function resolvePhaseConfig(
       maxTokens: 12_000,
       maxRetries: 2,
       timeoutMs: DEFAULT_TIMEOUT_MS,
+      maxContextTokens: null,
     };
   }
 }
