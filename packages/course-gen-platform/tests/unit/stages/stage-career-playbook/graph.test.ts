@@ -597,4 +597,128 @@ describe('Career Playbook graph', () => {
     );
     expect(result.errors).toEqual([]);
   });
+
+  it('registers the full data-driven node topology derived from the group pipeline', async () => {
+    const runtime = {
+      renderPrompt: vi.fn().mockResolvedValue(''),
+      invokeLLM: vi.fn().mockResolvedValue({
+        content: '',
+        model: 'mock-career-model',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+      }),
+    };
+    const graph = createCareerPlaybookGraph({ runtime });
+    const drawable = await graph.getGraphAsync();
+    const nodeNames = new Set(Object.values(drawable.nodes).map(node => node.name));
+
+    const expectedNodeNames = [
+      'specBuilder',
+      'group1Generator',
+      'group2Generator',
+      'group3Generator',
+      'group4Generator',
+      'group5Generator',
+      'group6Generator',
+      'group1Judge',
+      'group2Judge',
+      'group3Judge',
+      'group4Judge',
+      'group5Judge',
+      'group6Judge',
+      'blockRegenerator',
+      'finalAssembler',
+      'finalJudge',
+    ];
+
+    for (const expectedNodeName of expectedNodeNames) {
+      expect(nodeNames.has(expectedNodeName)).toBe(true);
+    }
+  });
+
+  it('re-derives finalMarkdown after a post-assembly finalJudge regeneration', async () => {
+    const regeneratedFaqBlock = `## 18. FAQ
+
+REGENERATED_FAQ_TOKEN_N1: refreshed answer produced after assembly.`;
+    const passVerdict = JSON.stringify({
+      pass: true,
+      score: 95,
+      issues: [],
+      needs_regeneration: [],
+    });
+    const failFinalVerdict = JSON.stringify({
+      pass: false,
+      score: 60,
+      issues: [
+        {
+          block_id: 'block_18',
+          severity: 'critical',
+          description: 'FAQ block is too generic and must be regenerated.',
+          suggestion: 'Rewrite the FAQ with concrete answers.',
+        },
+      ],
+      needs_regeneration: ['block_18'],
+    });
+
+    let finalJudgeCalls = 0;
+    const runtime = {
+      renderPrompt: vi
+        .fn()
+        .mockImplementation((promptKey: string, variables?: Record<string, string>) =>
+          Promise.resolve(
+            promptKey === 'career_playbook_cross_block_judge'
+              ? `career_playbook_cross_block_judge::${variables?.group_id ?? ''}`
+              : promptKey
+          )
+        ),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        const build = (content: string) => ({
+          content,
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve(build(JSON.stringify(roleProfileSpec)));
+        }
+        if (prompt === 'career_playbook_block_regenerator') {
+          return Promise.resolve(build(regeneratedFaqBlock));
+        }
+        if (prompt.startsWith('career_playbook_cross_block_judge')) {
+          // Only the final judge spans the whole document (header .. block_26);
+          // group judges scope to a single group.
+          const isFinalJudge = prompt.includes('header') && prompt.includes('block_26');
+          if (!isFinalJudge) {
+            return Promise.resolve(build(passVerdict));
+          }
+          finalJudgeCalls += 1;
+          return Promise.resolve(build(finalJudgeCalls === 1 ? failFinalVerdict : passVerdict));
+        }
+
+        return Promise.resolve(build(groupMarkdownByPromptKey[prompt] ?? passVerdict));
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+    const graphResult = result as typeof result & { finalMarkdown?: string | null };
+    const regeneratedBlock = result.generatedBlocks.block_18;
+
+    // The final judge requested one post-assembly regeneration and then passed.
+    expect(finalJudgeCalls).toBe(2);
+    expect(result.blockRegenerationAttempts.block_18).toBe(1);
+    expect(result.errors).toEqual([]);
+
+    // generatedBlocks holds the regenerated FAQ content ...
+    expect(regeneratedBlock?.content).toContain('REGENERATED_FAQ_TOKEN_N1');
+    // ... and finalMarkdown was re-derived from it instead of staying stale.
+    expect(graphResult.finalMarkdown).toContain('REGENERATED_FAQ_TOKEN_N1');
+    expect(graphResult.finalMarkdown).toContain(regeneratedBlock?.content.trim() ?? '');
+  });
 });
