@@ -1,64 +1,56 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-02
-Stage: `mc2-irt6v` Restore dev and staging site availability
+Updated: 2026-07-03
+Stage: Career Playbook — model-routing hardening + shipped-fix validation
 Branch: `develop`
-Beads: `mc2-irt6v` blocked
+Beads: `mc2-db696.62` closed; `mc2-gusxd` open (follow-up); `mc2-db696.61` open (data-blocked); `mc2-irt6v` recovered (see below)
 
 ## Current State
 
-- `mc2-irt6v`: `https://ai.megacampus.ru` and `https://dev.ai.megacampus.ru` are both unavailable. DNS for both domains resolves to `95.81.98.230`.
-- Root-cause boundary found: the VPS/network perimeter is unreachable, not a known application/container/CI failure. Local checks timed out for both public URLs; `ssh megacampus-prod` to `95.81.98.230:22` timed out; ping had 100% packet loss; TCP probes to `22`, `80`, and `443` timed out.
-- Independent global check-host nodes timed out for TCP `22`, `80`, `443`, and HTTP checks against both stage and dev domains.
-- Latest GitHub Actions CI/CD runs for `develop` and `master` on 2026-06-28 were successful, so there is no current evidence of a failed deploy causing this outage.
-- Blocker: no documented out-of-band provider/API reboot path is available locally. All repo recovery commands require SSH access to `megacampus-prod`, which is currently unreachable.
+- `mc2-db696.62` DONE and delivered: Career Playbook LLM runtime now threads the rendered prompt token count into `getModelForPhase` (fixes always-`standard`-tier routing so large source-evidence packs can reach the extended-context model) and adds a max-context output guard (`guardOutputAgainstContextWindow`) that clamps output tokens to `maxContextTokens` (warn + 512 floor when the prompt over-fills the window). Commits `d90d0a91` (code) + `321d7b68` (beads), pushed to `origin/develop`, in sync.
+- Verified: `pnpm type-check` exit 0; 139 career-playbook stage unit tests pass (4 new `runtime.test.ts` cases); independent correctness review APPROVE, no blockers; CI/CD run `28657970161` green and **Deploy to Dev success** — fixes are live on `https://dev.ai.megacampus.ru` (health 200).
+- `mc2-gusxd` (P2, open): follow-up for `concern-4` — passing `tokenCount` now makes `determinePhaseTier` do a per-call 2-tier DB fetch and bypass the phase SWR cache. Functionally correct; fix belongs in shared `model-config-service`, out of `db696.62` scope.
+- `mc2-db696.61` (P2, open): evaluate phase-specific source-evidence budgets — kept in evaluate/measure state; genuinely blocked on post-fix empirical cost data (see criterion #1 below).
+- `mc2-irt6v` (still marked BLOCKED but appears RECOVERED): both `https://ai.megacampus.ru` and `https://dev.ai.megacampus.ru` now return HTTP 200; the develop→dev CI/CD deploy succeeded, so the VPS/network perimeter is reachable again. No code fix was applied here; recovery was infra-side. User to confirm and close.
 
-## Verification
+## Career Playbook shipped-fix validation (criterion #1)
 
-- `curl -sS -I --max-time 12 https://ai.megacampus.ru`: timed out.
-- `curl -sS -I --max-time 12 https://dev.ai.megacampus.ru`: timed out.
-- `ssh -o BatchMode=yes -o ConnectTimeout=10 megacampus-prod 'hostname && uptime'`: timed out connecting to `95.81.98.230:22`.
-- `ping -c 4 -W 3 95.81.98.230`: 100% packet loss.
-- `nc -vz -w 5 95.81.98.230 22 80 443`: all timed out.
-- Windows `Test-NetConnection 95.81.98.230 -Port 443` and `-Port 22`: failed via `AmneziaVPN`.
-- check-host TCP `443`: Germany, Indonesia, Moldova, Romania, USA all timed out.
-- check-host TCP `22`: UAE, Brazil, India, Netherlands, Ukraine all timed out.
-- check-host TCP `80`: Switzerland, Netherlands, Russia, Slovenia, USA all timed out.
-- check-host HTTP `https://ai.megacampus.ru`: Germany, Hungary, Netherlands, Serbia, USA all timed out.
-- check-host HTTP `https://dev.ai.megacampus.ru`: Austria, Bulgaria, Hungary, Iran, Russia all timed out.
-- `gh run list --workflow "CI/CD Pipeline" --limit 10`: latest `develop` and `master` deploy-relevant runs from 2026-06-28 are successful.
+- Code-level: CONFIRMED — 140 stage/orchestrator/cost tests pass across the shipped fixes (graph, cross-block-judge, processor-ttl, model-config-service, admin costs, runtime).
+- Live-data: all persisted `career_playbooks` rows predate the 2026-07-03 fixes and carry `cost_breakdown.total_cost_usd = 0`. Pre-fix TTL runaways confirmed in data (167 / 1928 / 113 min) — the P1 attempts cap targets these.
+- Live-generation: fixes are now deployed to dev, but a REAL generation requires the credential-gated mutation-smoke (bearer token + disposable fixtures + budget + `course-generation-dev` queue). Must be launched by a human holding the token — see runbook below.
 
-## Explicit defers
+## Runbook — real dev generation for criterion #1
 
-- Actual server recovery is deferred until provider console access, VPS reboot, or SSH/network restoration is available.
-- No code/config changes were made because the failure is below the application layer.
+Non-mutating preflight (safe): `pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan --target dev`
+
+Real run (human supplies token + disposable fixtures + budget):
+
+```
+export CAREER_PLAYBOOK_SMOKE_TOKEN=<disposable dev user bearer token>
+pnpm --dir packages/course-gen-platform smoke:career-playbook:live \
+  --mode mutation-smoke --target dev --confirm-live-mutation \
+  --trpc-url https://dev.ai.megacampus.ru/api/trpc \
+  --queue course-generation-dev \
+  --expected-user-id <disposable dev user uuid> \
+  --expected-organization-id <disposable dev org uuid> \
+  --cleanup-scope playbook-only \
+  --max-cost-usd 5 \
+  --poll-timeout-ms 7200000 --json
+```
+
+Queue MUST be `course-generation-dev` (the dev worker's queue) or the job hangs. `--poll-timeout-ms 7200000` (120 min) matches the TTL cap so the poll does not give up early.
+
+Post-run verification (shared Supabase `diqooqbuchsliypgwksu`, table `career_playbooks`), newest row must show:
+`cost_breakdown->>'total_cost_usd' > 0`, `language='ru'` with no wrong-language/`{{…}}` leakage in `final_markdown`, and duration `< 120 min`.
 
 ## Next recommended
 
-Next stage id: continue `mc2-irt6v`.
-Recommended action:
-
-1. Reboot/check VPS `95.81.98.230` from the FVDS/CLODO provider panel or obtain console access.
-2. Once SSH returns, run the documented recovery sequence:
-   - `cd /opt/megacampus`
-   - `docker compose -f docker-compose.infra.yml up -d`
-   - `docker compose -f docker-compose.app.yml --env-file .env.$(cat active_color) up -d --force-recreate`
-   - `docker compose -f docker-compose.production.yml up -d`
-   - `docker compose -f docker-compose.dev.yml up -d`
-   - `sudo nginx -t && sudo nginx -s reload`
-3. Verify local and public endpoints:
-   - `curl -f http://localhost:3010`
-   - `curl -f http://localhost:4010/health`
-   - `curl -f http://localhost:4001/health` or `4002` according to `active_color`
-   - `curl -f https://ai.megacampus.ru/api/health`
-   - `curl -f https://dev.ai.megacampus.ru/health`
-
-## Starter prompt for next orchestrator
-
-Use $orchestrator-stage in `/home/me/code/mc2` to continue `mc2-irt6v`. The issue is blocked because VPS `95.81.98.230` is globally unreachable on `22/80/443`; do not start with app debugging until SSH or provider console access is restored. After provider reboot/network recovery, run the documented Docker Compose/nginx recovery sequence and smoke both dev and stage.
+1. Run the mutation-smoke above to close criterion #1 empirically; then reassess `mc2-db696.61` with real per-phase cost data.
+2. Address `mc2-gusxd` (cache-aware token routing) in `model-config-service`.
+3. Confirm/close `mc2-irt6v` now that both sites are reachable.
 
 ## Closeout Markers
 
-docs-reviewed: updated - handoff and stage summary record the ops blocker and recovery path.
-project-index: reviewed-no-change - no stable repo entrypoints, routes, integrations, or verification commands changed.
-graph-reviewed: no-change-needed - Graphify report was read for repo orientation; no code, architecture, contract, route, or durable workflow change was made.
+docs-reviewed: updated - handoff rewritten to current state; runbook + verification query recorded.
+project-index: reviewed-no-change - no stable routes/entrypoints/verification commands changed.
+graph-reviewed: updated - `graphify update . --force` after the runtime.ts change; graph now at `b3386855` code state (52435 nodes).
