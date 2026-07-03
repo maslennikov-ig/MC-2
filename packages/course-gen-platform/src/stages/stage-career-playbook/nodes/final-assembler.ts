@@ -210,7 +210,7 @@ function formatFillableField(rawLabel: string, language: string): string {
   return language === 'ru' ? `поле для заполнения: ${label}` : `field to fill: ${label}`;
 }
 
-function shouldTreatBracketAsFillableField(label: string): boolean {
+export function shouldTreatBracketAsFillableField(label: string): boolean {
   const normalized = label.trim().toLocaleLowerCase('ru');
   return (
     /^(имя|name)$/.test(normalized) ||
@@ -222,7 +222,7 @@ function shouldTreatBracketAsFillableField(label: string): boolean {
   );
 }
 
-function shouldTreatBraceAsFillableField(label: string): boolean {
+export function shouldTreatBraceAsFillableField(label: string): boolean {
   const normalized = label.trim().toLocaleLowerCase('ru');
   return (
     normalized === 'заполните' ||

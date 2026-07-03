@@ -17,26 +17,10 @@
  *  - only known fill-in labels (name/number/date/url/company name/...) match
  */
 
-function shouldTreatBracketAsFillableField(label: string): boolean {
-  const normalized = label.trim().toLocaleLowerCase('ru');
-  return (
-    /^(имя|name)$/.test(normalized) ||
-    /^(число|number|value)$/.test(normalized) ||
-    /^(дата|date|dd\.mm\.yyyy|дд\.мм\.гггг)(?:\b|$)/.test(normalized) ||
-    /^(url|ссылка|link)(?:\b|$)/.test(normalized) ||
-    /^название(?: компании)?$/.test(normalized) ||
-    /^company name$/.test(normalized)
-  );
-}
-
-function shouldTreatBraceAsFillableField(label: string): boolean {
-  const normalized = label.trim().toLocaleLowerCase('ru');
-  return (
-    normalized === 'заполните' ||
-    shouldTreatBracketAsFillableField(normalized) ||
-    /^требуется ли /.test(normalized)
-  );
-}
+import {
+  shouldTreatBracketAsFillableField,
+  shouldTreatBraceAsFillableField,
+} from './final-assembler';
 
 /**
  * Returns the raw placeholder tokens (e.g. `[дата]`, `{заполните}`) that remain
