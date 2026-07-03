@@ -51,6 +51,7 @@ import {
   type StoredQAData,
   type WizardPhase,
 } from './service-mappers';
+import { appendCareerPlaybookNodeCost } from './cost-breakdown';
 import { getCareerPlaybookGenerationJobId } from './job-ids';
 import { listCareerPlaybookBusinessContextSourceSummaries } from './sources.service';
 
@@ -640,6 +641,7 @@ export async function requestCareerPlaybookFollowups(
     followup_questions: mergedQuestions,
     followup_generation_count: existingQAData.followup_generation_count + 1,
   };
+  const costBreakdown = appendCareerPlaybookNodeCost(row.cost_breakdown, result.nodeCost);
   const supabase = getCareerPlaybookSupabase();
   const { error } = await supabase
     .from('career_playbooks')
@@ -647,6 +649,7 @@ export async function requestCareerPlaybookFollowups(
       status,
       language: input.contentLanguage,
       q_a_data: toJson(storedQAData),
+      cost_breakdown: toJson(costBreakdown),
     })
     .eq('id', input.playbookId)
     .select('*')

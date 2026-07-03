@@ -27,6 +27,7 @@ import type {
   CareerPlaybookRow,
   CareerPlaybookSupabase,
 } from '../../server/routers/career-playbook/service-mappers';
+import { sumCareerPlaybookNodeCosts } from '../../server/routers/career-playbook/cost-breakdown';
 import {
   getCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
@@ -65,7 +66,7 @@ function buildCostBreakdown(result: CareerPlaybookGraphResult) {
 
   return {
     nodeCosts: result.nodeCosts,
-    total_cost_usd: result.nodeCosts.reduce((sum, item) => sum + item.cost_usd, 0),
+    total_cost_usd: sumCareerPlaybookNodeCosts(result.nodeCosts),
   };
 }
 
