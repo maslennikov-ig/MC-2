@@ -52,6 +52,7 @@ type CareerPlaybookGraphResult = {
   webResearch?: unknown;
   costBreakdown?: CareerPlaybookCostBreakdown | null;
   nodeCosts?: CareerPlaybookCostBreakdown['nodeCosts'];
+  blockRegenerationAttempts?: Partial<Record<CareerPlaybookBlockId, number>>;
   warnings?: string[];
   qualityIssues?: unknown;
 };
@@ -60,13 +61,32 @@ function toJson(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
+function normalizeRegenerationAttempts(
+  attempts: CareerPlaybookGraphResult['blockRegenerationAttempts']
+): Record<string, number> | undefined {
+  if (!attempts || typeof attempts !== 'object') return undefined;
+
+  const entries = Object.entries(attempts).filter(
+    (entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0
+  );
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 function buildCostBreakdown(result: CareerPlaybookGraphResult) {
-  if (result.costBreakdown) return result.costBreakdown;
+  const regenerationAttempts = normalizeRegenerationAttempts(result.blockRegenerationAttempts);
+
+  if (result.costBreakdown) {
+    return regenerationAttempts
+      ? { ...result.costBreakdown, regeneration_attempts: regenerationAttempts }
+      : result.costBreakdown;
+  }
   if (!Array.isArray(result.nodeCosts)) return undefined;
 
   return {
     nodeCosts: result.nodeCosts,
     total_cost_usd: sumCareerPlaybookNodeCosts(result.nodeCosts),
+    ...(regenerationAttempts ? { regeneration_attempts: regenerationAttempts } : {}),
   };
 }
 
@@ -309,6 +329,22 @@ export class CareerPlaybookHandler {
       await this.throwAfterGenerationFailure(jobData, job, errorMessageFrom(error), error);
       throw error;
     }
+
+    // Regeneration attempts are the ground truth for the judge<->regenerator loop:
+    // the regenerator's catch path increments attempts without emitting a nodeCost,
+    // so node costs alone under-report the loop. Log the summary for A/B analysis.
+    const regenerationAttempts = normalizeRegenerationAttempts(result.blockRegenerationAttempts);
+    logger.info(
+      {
+        playbookId: jobData.playbookId,
+        regenerationAttempts: regenerationAttempts ?? {},
+        totalRegenerationAttempts: regenerationAttempts
+          ? Object.values(regenerationAttempts).reduce((sum, value) => sum + value, 0)
+          : 0,
+        nodeCostCount: Array.isArray(result.nodeCosts) ? result.nodeCosts.length : 0,
+      },
+      'Career Playbook generation graph completed'
+    );
 
     const errors = result.errors ?? [];
     if (errors.length > 0) {

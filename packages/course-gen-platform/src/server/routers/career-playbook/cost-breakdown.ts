@@ -22,9 +22,14 @@ export function appendCareerPlaybookNodeCost(
   nodeCost: CareerPlaybookNodeCost
 ): CareerPlaybookCostBreakdown {
   const parsed = CareerPlaybookCostBreakdownSchema.safeParse(existing);
-  const nodeCosts = [...(parsed.success ? parsed.data.nodeCosts : []), nodeCost];
+  const priorBreakdown = parsed.success ? parsed.data : null;
+  const nodeCosts = [...(priorBreakdown?.nodeCosts ?? []), nodeCost];
 
+  // Spread the parsed prior breakdown so schema-known extras (e.g.
+  // regeneration_attempts) survive a manual single-block regeneration instead of
+  // being dropped when only nodeCosts/total are rewritten.
   return {
+    ...(priorBreakdown ?? {}),
     nodeCosts,
     total_cost_usd: sumCareerPlaybookNodeCosts(nodeCosts),
   };

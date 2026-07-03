@@ -619,4 +619,157 @@ flowchart LR
     expect(block22Issue?.description).toContain('[дата]');
     expect(block22Issue?.description).toContain('{заполните}');
   });
+
+  const validDecisionMatrix = `## 5. Матрица решений
+
+| Решение | Автономия | Действие |
+| --- | --- | --- |
+| Daily priorities | Full | Decide |
+| Discount 10% | Inform | Use policy |
+| Discount 20% | Recommend | Ask CRO |
+| Legal terms | Approval | Ask Legal |`;
+
+  const validAntiGoals = `## 2. Анти-цели
+
+| Анти-цель | Владелец |
+| --- | --- |
+| Product roadmap | Product |
+| Legal terms | Legal |
+| Support tickets | Support |
+| Hiring plan | CRO |`;
+
+  const criticalBlock5Judge = JSON.stringify({
+    pass: false,
+    score: 60,
+    issues: [
+      {
+        block_id: 'block_5',
+        severity: 'critical',
+        description: 'Decision matrix authority is still too generic.',
+        suggestion: 'Regenerate block 5 with concrete escalation owners.',
+      },
+    ],
+    needs_regeneration: ['block_5'],
+  });
+
+  function baseJudgeState(overrides: {
+    generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
+    blockRegenerationAttempts: Partial<Record<CareerPlaybookBlockId, number>>;
+  }) {
+    return {
+      playbookId: 'playbook-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'ru',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: overrides.generatedBlocks,
+      judgeVerdicts: [],
+      lastJudgeVerdict: null,
+      lastJudgedBlockIds: [],
+      blockRegenerationAttempts: overrides.blockRegenerationAttempts,
+      finalMarkdown: null,
+      nodeCosts: [],
+      errors: [],
+      warnings: [],
+      qualityIssues: [],
+      currentNode: 'group2Generator' as const,
+    };
+  }
+
+  it('advances with a warning (not an error) when the judge window budget is exhausted', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: criticalBlock5Judge,
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_2', 'block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    // block_2 absorbs the whole 8-attempt window budget while block_5 (the flagged
+    // block) is well under its per-block cap, isolating the window-cap path.
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([
+          ['block_2', validAntiGoals],
+          ['block_5', validDecisionMatrix],
+        ]),
+        blockRegenerationAttempts: { block_2: 8, block_5: 0 },
+      })
+    );
+
+    expect(update.errors).toBeUndefined();
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
+    expect(update.warnings?.[0]).toContain(
+      'crossBlockJudge advanced after max regeneration attempts'
+    );
+    expect(update.warnings?.[0]).toContain('8/8');
+  });
+
+  it('advances with a warning when the per-block regeneration cap is exhausted', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: criticalBlock5Judge,
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    // Window budget is nowhere near 8, but block_5 has already used its 2 per-block
+    // attempts, so the per-block cap path clears it and warns.
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+        blockRegenerationAttempts: { block_5: 2 },
+      })
+    );
+
+    expect(update.errors).toBeUndefined();
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
+    expect(update.warnings?.[0]).toContain(
+      'crossBlockJudge advanced after max regeneration attempts'
+    );
+    expect(update.warnings?.[0]).toContain('per-block 2/2');
+  });
+
+  it('keeps the block flagged for regeneration while it is still under both caps', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: criticalBlock5Judge,
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+        blockRegenerationAttempts: { block_5: 1 },
+      })
+    );
+
+    expect(update.errors).toBeUndefined();
+    expect(update.warnings).toBeUndefined();
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_5']);
+  });
 });

@@ -198,6 +198,10 @@ services:
       # Stage 7 queue name - needed for triggerCourseCard() after Stage 5
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+      # mc2-b7zm3 A/B (dev only): judge on v4-flash with pro fallback; llm_model_config
+      # DB rows are shared with staging so the override must stay env-scoped here.
+      # Remove or promote to a DB migration after the A/B run validates quality.
+      - 'CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES={"stage_career_playbook_judge":{"modelId":"deepseek/deepseek-v4-flash","fallbackModelId":"deepseek/deepseek-v4-pro"}}'
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-cache

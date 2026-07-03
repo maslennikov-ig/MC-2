@@ -31,6 +31,11 @@ export interface CareerPlaybookLLMResult {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  // Total wall-clock across every attempt this call consumed, and how many attempts
+  // ran before success. Required so downstream node-cost sites and the retry audit
+  // always carry timing/attempt ground truth.
+  durationMs: number;
+  attemptCount: number;
 }
 
 export interface CareerPlaybookRuntime {
@@ -144,6 +149,7 @@ export function createCareerPlaybookRuntime(
       const phaseConfig = await resolvePhaseConfig(modelConfigService, options, promptTokens);
       const attempts = Math.max(1, (phaseConfig.maxRetries ?? 0) + 1);
       let lastError: unknown = null;
+      const callStartedAt = Date.now();
 
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         const useFallback = Boolean(options.preferFallbackModel) || attempt > 0;
@@ -163,6 +169,7 @@ export function createCareerPlaybookRuntime(
         );
         const temperature = options.temperature ?? phaseConfig.temperature ?? 0.7;
         const timeoutMs = normalizeTimeoutMs(phaseConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+        const attemptStartedAt = Date.now();
 
         try {
           const model = createModel(modelId, temperature, maxTokens, timeoutMs);
@@ -178,16 +185,51 @@ export function createCareerPlaybookRuntime(
           const inputTokens = invocation.usage?.input_tokens ?? promptTokens;
           const outputTokens =
             invocation.usage?.output_tokens ?? estimateTokenCount(invocation.content);
+          const costUsd = estimateCost(modelId, inputTokens + outputTokens, inputTokens);
+          const durationMs = Date.now() - attemptStartedAt;
+          const totalDurationMs = Date.now() - callStartedAt;
+
+          logger.info(
+            {
+              phaseName: options.phaseName,
+              node: options.node,
+              promptKey: options.promptKey,
+              modelId,
+              attempt,
+              durationMs,
+              totalDurationMs,
+              inputTokens,
+              outputTokens,
+              costUsd,
+            },
+            'Career Playbook LLM call succeeded'
+          );
 
           return {
             content: invocation.content,
             model: modelId,
             inputTokens,
             outputTokens,
-            costUsd: estimateCost(modelId, inputTokens + outputTokens, inputTokens),
+            costUsd,
+            durationMs: totalDurationMs,
+            attemptCount: attempt + 1,
           };
         } catch (error) {
           lastError = error;
+          // The pre-instrumentation catch swallowed retries silently; the failed-attempt
+          // warning is the single most valuable diagnostic line for latency/cost runaways.
+          logger.warn(
+            {
+              phaseName: options.phaseName,
+              node: options.node,
+              promptKey: options.promptKey,
+              modelId,
+              attempt,
+              durationMs: Date.now() - attemptStartedAt,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Career Playbook LLM call attempt failed'
+          );
         }
       }
 
@@ -279,11 +321,83 @@ function guardOutputAgainstContextWindow(
   return Math.min(requestedMaxTokens, MIN_GUARDED_OUTPUT_TOKENS);
 }
 
+interface CareerPlaybookPhaseModelOverride {
+  modelId: string;
+  fallbackModelId?: string;
+}
+
+// Track the last malformed override payload we warned about so a stable bad env
+// value logs exactly once instead of on every LLM call, while a changed value can
+// still surface a fresh warning.
+let lastWarnedPhaseModelOverridesRaw: string | null = null;
+
+/**
+ * Parse `CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES` (JSON: phaseName -> {modelId,
+ * fallbackModelId?}). Default-off: an unset/empty value yields no overrides.
+ * Malformed JSON is ignored (warn once) so a bad env value can never break
+ * generation — it just falls back to the DB-routed model config.
+ */
+function parseCareerPlaybookPhaseModelOverrides(
+  raw: string | undefined
+): Record<string, CareerPlaybookPhaseModelOverride> {
+  if (!raw || raw.trim().length === 0) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('overrides must be a JSON object keyed by phase name');
+    }
+
+    const overrides: Record<string, CareerPlaybookPhaseModelOverride> = {};
+    for (const [phase, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const candidate = value as Record<string, unknown>;
+      if (typeof candidate.modelId !== 'string' || candidate.modelId.trim().length === 0) continue;
+
+      overrides[phase] = {
+        modelId: candidate.modelId,
+        ...(typeof candidate.fallbackModelId === 'string' &&
+        candidate.fallbackModelId.trim().length > 0
+          ? { fallbackModelId: candidate.fallbackModelId }
+          : {}),
+      };
+    }
+    return overrides;
+  } catch (error) {
+    if (lastWarnedPhaseModelOverridesRaw !== raw) {
+      lastWarnedPhaseModelOverridesRaw = raw;
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Ignoring malformed CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES'
+      );
+    }
+    return {};
+  }
+}
+
+function applyCareerPlaybookPhaseModelOverride<
+  T extends { modelId: string; fallbackModelId: string },
+>(config: T, override: CareerPlaybookPhaseModelOverride | undefined): T {
+  if (!override) return config;
+
+  return {
+    ...config,
+    modelId: override.modelId,
+    fallbackModelId: override.fallbackModelId ?? config.fallbackModelId,
+  };
+}
+
 async function resolvePhaseConfig(
   modelConfigService: CareerPlaybookModelConfigService,
   options: CareerPlaybookLLMCallOptions,
   promptTokens?: number
 ) {
+  const override = parseCareerPlaybookPhaseModelOverrides(
+    process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES
+  )[options.phaseName];
+
   try {
     const config = await modelConfigService.getModelForPhase(
       options.phaseName,
@@ -291,24 +405,30 @@ async function resolvePhaseConfig(
       promptTokens,
       options.language
     );
-    return {
-      modelId: config.modelId || EMERGENCY_FALLBACK_MODEL,
-      fallbackModelId: config.fallbackModelId ?? EMERGENCY_FALLBACK_MODEL,
-      temperature: config.temperature ?? 0.7,
-      maxTokens: config.maxTokens ?? 12_000,
-      maxRetries: config.maxRetries ?? 2,
-      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      maxContextTokens: config.maxContextTokens ?? null,
-    };
+    return applyCareerPlaybookPhaseModelOverride(
+      {
+        modelId: config.modelId || EMERGENCY_FALLBACK_MODEL,
+        fallbackModelId: config.fallbackModelId ?? EMERGENCY_FALLBACK_MODEL,
+        temperature: config.temperature ?? 0.7,
+        maxTokens: config.maxTokens ?? 12_000,
+        maxRetries: config.maxRetries ?? 2,
+        timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        maxContextTokens: config.maxContextTokens ?? null,
+      },
+      override
+    );
   } catch {
-    return {
-      modelId: EMERGENCY_FALLBACK_MODEL,
-      fallbackModelId: EMERGENCY_FALLBACK_MODEL,
-      temperature: 0.7,
-      maxTokens: 12_000,
-      maxRetries: 2,
-      timeoutMs: DEFAULT_TIMEOUT_MS,
-      maxContextTokens: null,
-    };
+    return applyCareerPlaybookPhaseModelOverride(
+      {
+        modelId: EMERGENCY_FALLBACK_MODEL,
+        fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+        temperature: 0.7,
+        maxTokens: 12_000,
+        maxRetries: 2,
+        timeoutMs: DEFAULT_TIMEOUT_MS,
+        maxContextTokens: null,
+      },
+      override
+    );
   }
 }

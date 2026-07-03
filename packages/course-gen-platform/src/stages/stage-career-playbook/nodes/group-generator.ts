@@ -531,6 +531,8 @@ export async function generateCareerPlaybookGroup(
       input_tokens: llmResult.inputTokens,
       output_tokens: llmResult.outputTokens,
       cost_usd: llmResult.costUsd,
+      duration_ms: llmResult.durationMs,
+      attempts: llmResult.attemptCount,
     },
   };
 }

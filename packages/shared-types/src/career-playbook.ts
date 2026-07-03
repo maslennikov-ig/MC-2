@@ -786,12 +786,20 @@ export const CareerPlaybookNodeCostSchema = z.object({
   input_tokens: z.number().int().nonnegative(),
   output_tokens: z.number().int().nonnegative(),
   cost_usd: z.number().nonnegative(),
+  // Per-call telemetry (optional for backward compatibility with rows written
+  // before instrumentation): total wall-clock across all attempts and the number
+  // of attempts consumed by the LLM call that produced this node cost.
+  duration_ms: z.number().nonnegative().optional(),
+  attempts: z.number().int().positive().optional(),
 });
 export type CareerPlaybookNodeCost = z.infer<typeof CareerPlaybookNodeCostSchema>;
 
 export const CareerPlaybookCostBreakdownSchema = z.object({
   nodeCosts: z.array(CareerPlaybookNodeCostSchema).default([]),
   total_cost_usd: z.number().nonnegative().default(0),
+  // Ground-truth block regeneration counts keyed by block id. Optional so legacy
+  // breakdowns without the field still parse and round-trip unchanged.
+  regeneration_attempts: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 export type CareerPlaybookCostBreakdown = z.infer<typeof CareerPlaybookCostBreakdownSchema>;
 

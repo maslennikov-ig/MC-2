@@ -721,4 +721,109 @@ REGENERATED_FAQ_TOKEN_N1: обновлённый ответ, сформиров�
     expect(graphResult.finalMarkdown).toContain('REGENERATED_FAQ_TOKEN_N1');
     expect(graphResult.finalMarkdown).toContain(regeneratedBlock?.content.trim() ?? '');
   });
+
+  it('regenerates every block a single judge flags in one batch before the next judge call', async () => {
+    // Group 1 comes back with both block_2 (2 anti-goals) and block_5 (2 decision rows)
+    // below the deterministic minimum, so one judge verdict flags both blocks at once.
+    const groupOneWithTwoWeakBlocks = `## Header
+
+# B2B Sales Manager
+
+## 1. Миссия и ключевые результаты
+
+Mission
+
+## 2. Анти-цели: что эта роль НЕ делает
+
+- Product roadmap
+- Legal approval
+
+## 5. Матрица решений (Decision Authority)
+
+| Decision | Owner |
+| --- | --- |
+| Daily priority | Role |
+| Discount 10% | Role |`;
+    const regeneratedBlock2 = `## 2. Анти-цели: что эта роль НЕ делает
+
+- Product roadmap
+- Legal approval
+- Support ownership
+- Hiring plan`;
+    const regeneratedBlock5 = `## 5. Матрица решений (Decision Authority)
+
+| Decision | Owner |
+| --- | --- |
+| Daily priority | Role |
+| Discount 10% | Role |
+| Discount 20% | CRO |
+| Legal terms | Legal |`;
+
+    const invokedPrompts: string[] = [];
+    const runtime = {
+      renderPrompt: vi
+        .fn()
+        .mockImplementation((promptKey: string, variables?: Record<string, string>) =>
+          Promise.resolve(
+            promptKey === 'career_playbook_block_regenerator'
+              ? `career_playbook_block_regenerator::${variables?.block_id ?? ''}`
+              : promptKey
+          )
+        ),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        invokedPrompts.push(prompt);
+        const build = (content: string) => ({
+          content,
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve(build(JSON.stringify(roleProfileSpec)));
+        }
+        if (prompt === 'career_playbook_group_1_foundation') {
+          return Promise.resolve(build(groupOneWithTwoWeakBlocks));
+        }
+        if (prompt === 'career_playbook_block_regenerator::block_2') {
+          return Promise.resolve(build(regeneratedBlock2));
+        }
+        if (prompt === 'career_playbook_block_regenerator::block_5') {
+          return Promise.resolve(build(regeneratedBlock5));
+        }
+        if (prompt === 'career_playbook_cross_block_judge') {
+          return Promise.resolve(build(JSON.stringify({ pass: true, score: 95 })));
+        }
+
+        return Promise.resolve(build(groupMarkdownByPromptKey[prompt]));
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+
+    const g1Index = invokedPrompts.indexOf('career_playbook_group_1_foundation');
+    const g2Index = invokedPrompts.indexOf('career_playbook_group_2_operations');
+    const windowPrompts = invokedPrompts.slice(g1Index + 1, g2Index);
+    const judgeCallsInWindow = windowPrompts.filter(
+      prompt => prompt === 'career_playbook_cross_block_judge'
+    ).length;
+    const block2RegenIndex = windowPrompts.indexOf('career_playbook_block_regenerator::block_2');
+    const block5RegenIndex = windowPrompts.indexOf('career_playbook_block_regenerator::block_5');
+
+    // Both blocks are regenerated ...
+    expect(block2RegenIndex).toBeGreaterThan(-1);
+    expect(block5RegenIndex).toBeGreaterThan(-1);
+    // ... in one batch (adjacent, no judge call between them) ...
+    expect(Math.abs(block2RegenIndex - block5RegenIndex)).toBe(1);
+    // ... so the window needs only two judge calls (flag + re-judge), not three.
+    expect(judgeCallsInWindow).toBe(2);
+    expect(result.generatedBlocks.block_2?.content).toBe(regeneratedBlock2);
+    expect(result.generatedBlocks.block_5?.content).toBe(regeneratedBlock5);
+    expect(result.errors).toEqual([]);
+  });
 });

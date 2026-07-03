@@ -33,6 +33,8 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  durationMs?: number;
+  attemptCount?: number;
 }): CareerPlaybookNodeCost {
   return {
     node: 'specBuilder',
@@ -40,6 +42,8 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    duration_ms: result.durationMs,
+    attempts: result.attemptCount,
   };
 }
 

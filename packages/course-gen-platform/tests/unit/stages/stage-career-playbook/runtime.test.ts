@@ -362,4 +362,247 @@ describe('Career Playbook runtime', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('reports total wall-clock duration and a single attempt on first-try success', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    const result = await runtime.invokeLLM('prompt', {
+      phaseName: 'stage_career_playbook_spec',
+      promptKey: 'career_playbook_spec_builder',
+      node: 'specBuilder',
+    });
+
+    expect(result.attemptCount).toBe(1);
+    expect(typeof result.durationMs).toBe('number');
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts every attempt and logs success plus a warning per failed attempt', async () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+    try {
+      const invoke = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('transient provider error'))
+        .mockResolvedValueOnce({ content: 'ok' });
+      const createModel = vi.fn(() => ({ invoke }));
+      const runtime = createCareerPlaybookRuntime({
+        promptService: { renderPrompt: vi.fn() },
+        modelConfigService: {
+          getModelForPhase: vi.fn().mockResolvedValue({
+            modelId: 'fast-model',
+            fallbackModelId: 'adult-model',
+            temperature: 0.2,
+            maxTokens: 1000,
+            maxRetries: 2,
+          }),
+        },
+        createModel,
+      });
+
+      const result = await runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_judge',
+        promptKey: 'career_playbook_cross_block_judge',
+        node: 'crossBlockJudge',
+      });
+
+      expect(result.attemptCount).toBe(2);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phaseName: 'stage_career_playbook_judge',
+          node: 'crossBlockJudge',
+          attempt: 0,
+          error: 'transient provider error',
+        }),
+        'Career Playbook LLM call attempt failed'
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phaseName: 'stage_career_playbook_judge',
+          attempt: 1,
+          totalDurationMs: expect.any(Number),
+        }),
+        'Career Playbook LLM call succeeded'
+      );
+    } finally {
+      infoSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('throws the last error and never exceeds maxRetries+1 invocations when every attempt fails', async () => {
+    const invoke = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('error 1'))
+      .mockRejectedValueOnce(new Error('error 2'))
+      .mockRejectedValueOnce(new Error('error 3 final'));
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    await expect(
+      runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_spec',
+        promptKey: 'career_playbook_spec_builder',
+        node: 'specBuilder',
+      })
+    ).rejects.toThrow('error 3 final');
+    // maxRetries=2 -> exactly 3 attempts, retry semantics unchanged.
+    expect(invoke).toHaveBeenCalledTimes(3);
+  });
+
+  it('applies an env phase-model override for the matching phase only', async () => {
+    process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES = JSON.stringify({
+      stage_career_playbook_judge: {
+        modelId: 'deepseek/deepseek-v4-flash',
+        fallbackModelId: 'deepseek/deepseek-v4-pro',
+      },
+    });
+    try {
+      const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+      const createModel = vi.fn(() => ({ invoke }));
+      const runtime = createCareerPlaybookRuntime({
+        promptService: { renderPrompt: vi.fn() },
+        modelConfigService: {
+          getModelForPhase: vi.fn().mockResolvedValue({
+            modelId: 'deepseek/deepseek-v4-pro',
+            fallbackModelId: 'deepseek/deepseek-v4-pro',
+            temperature: 0.2,
+            maxTokens: 1000,
+            maxRetries: 0,
+          }),
+        },
+        createModel,
+      });
+
+      // Judge phase is overridden to the flash model ...
+      await runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_judge',
+        promptKey: 'career_playbook_cross_block_judge',
+        node: 'crossBlockJudge',
+      });
+      expect(createModel).toHaveBeenCalledWith('deepseek/deepseek-v4-flash', 0.2, 1000, 300_000);
+
+      // ... while a different phase keeps its DB-routed model untouched.
+      createModel.mockClear();
+      await runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_spec',
+        promptKey: 'career_playbook_spec_builder',
+        node: 'specBuilder',
+      });
+      expect(createModel).toHaveBeenCalledWith('deepseek/deepseek-v4-pro', 0.2, 1000, 300_000);
+    } finally {
+      delete process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES;
+    }
+  });
+
+  it('escalates an overridden phase to its override fallback on validation retries', async () => {
+    process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES = JSON.stringify({
+      stage_career_playbook_judge: {
+        modelId: 'deepseek/deepseek-v4-flash',
+        fallbackModelId: 'deepseek/deepseek-v4-pro',
+      },
+    });
+    try {
+      const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+      const createModel = vi.fn(() => ({ invoke }));
+      const runtime = createCareerPlaybookRuntime({
+        promptService: { renderPrompt: vi.fn() },
+        modelConfigService: {
+          getModelForPhase: vi.fn().mockResolvedValue({
+            modelId: 'deepseek/deepseek-v4-pro',
+            fallbackModelId: 'deepseek/deepseek-v4-pro',
+            temperature: 0.2,
+            maxTokens: 1000,
+            maxRetries: 0,
+          }),
+        },
+        createModel,
+      });
+
+      await runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_judge',
+        promptKey: 'career_playbook_cross_block_judge',
+        node: 'crossBlockJudge',
+        preferFallbackModel: true,
+      });
+
+      expect(createModel).toHaveBeenCalledWith('deepseek/deepseek-v4-pro', 0.2, 1000, 300_000);
+    } finally {
+      delete process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES;
+    }
+  });
+
+  it('ignores a malformed override env value and warns exactly once', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+    // The warn-once dedup lives in module-level state keyed by the raw env value and
+    // survives across test cases. Any new test asserting this warning needs its own
+    // unique malformed string, or the warning will be silently deduped away.
+    process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES = '{ this is::not valid json for override';
+    try {
+      const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+      const createModel = vi.fn(() => ({ invoke }));
+      const runtime = createCareerPlaybookRuntime({
+        promptService: { renderPrompt: vi.fn() },
+        modelConfigService: {
+          getModelForPhase: vi.fn().mockResolvedValue({
+            modelId: 'fast-model',
+            fallbackModelId: 'adult-model',
+            temperature: 0.2,
+            maxTokens: 1000,
+            maxRetries: 0,
+          }),
+        },
+        createModel,
+      });
+
+      await runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_judge',
+        promptKey: 'career_playbook_cross_block_judge',
+        node: 'crossBlockJudge',
+      });
+      await runtime.invokeLLM('prompt', {
+        phaseName: 'stage_career_playbook_judge',
+        promptKey: 'career_playbook_cross_block_judge',
+        node: 'crossBlockJudge',
+      });
+
+      // Malformed JSON is ignored: the DB-routed model is used unchanged ...
+      expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+      // ... and the warning fires once for the stable bad value, not per call.
+      const overrideWarnings = warnSpy.mock.calls.filter(
+        call => call[1] === 'Ignoring malformed CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES'
+      );
+      expect(overrideWarnings).toHaveLength(1);
+    } finally {
+      delete process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES;
+      warnSpy.mockRestore();
+    }
+  });
 });

@@ -161,6 +161,8 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  durationMs?: number;
+  attemptCount?: number;
 }): CareerPlaybookNodeCost {
   return {
     node: 'followupGenerator',
@@ -168,6 +170,8 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    duration_ms: result.durationMs,
+    attempts: result.attemptCount,
   };
 }
 
@@ -177,6 +181,7 @@ function buildAggregatedNodeCost(
     inputTokens: number;
     outputTokens: number;
     costUsd: number;
+    durationMs?: number;
   }[]
 ): CareerPlaybookNodeCost {
   const finalResult = results.at(-1);
@@ -184,12 +189,21 @@ function buildAggregatedNodeCost(
     throw new Error('Cannot build Career Playbook follow-up cost without LLM results');
   }
 
+  // Aggregate wall-clock over the retry chain; attempts are per-call and not
+  // meaningful once folded together, so they are omitted for the aggregate row.
+  const durationValues = results
+    .map(result => result.durationMs)
+    .filter((value): value is number => typeof value === 'number');
+
   return {
     node: 'followupGenerator',
     model: finalResult.model,
     input_tokens: results.reduce((sum, result) => sum + result.inputTokens, 0),
     output_tokens: results.reduce((sum, result) => sum + result.outputTokens, 0),
     cost_usd: results.reduce((sum, result) => sum + result.costUsd, 0),
+    ...(durationValues.length > 0
+      ? { duration_ms: durationValues.reduce((sum, value) => sum + value, 0) }
+      : {}),
   };
 }
 

@@ -55,6 +55,8 @@ describe('Career Playbook department classifier', () => {
         inputTokens: 10,
         outputTokens: 5,
         costUsd: 0,
+        durationMs: 12,
+        attemptCount: 1,
       })
       .mockResolvedValueOnce({
         content: JSON.stringify({
@@ -64,6 +66,8 @@ describe('Career Playbook department classifier', () => {
         inputTokens: 10,
         outputTokens: 8,
         costUsd: 0,
+        durationMs: 18,
+        attemptCount: 1,
       });
 
     const result = await resolveCareerPlaybookDepartmentOptions(
