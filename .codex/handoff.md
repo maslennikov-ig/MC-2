@@ -3,14 +3,15 @@
 Updated: 2026-07-03
 Stage: Career Playbook — model-routing hardening + shipped-fix validation
 Branch: `develop`
-Beads: `mc2-db696.62` closed; `mc2-gusxd` open (follow-up); `mc2-db696.61` open (data-blocked); `mc2-irt6v` recovered (see below)
+Beads: `mc2-db696.62` + `mc2-gusxd` + `mc2-t5auh` closed; `mc2-db696.61` open (evaluate/measure, unblocked, needs one real run); `mc2-irt6v` recovered (see below)
 
 ## Current State
 
 - `mc2-db696.62` DONE and delivered: Career Playbook LLM runtime now threads the rendered prompt token count into `getModelForPhase` (fixes always-`standard`-tier routing so large source-evidence packs can reach the extended-context model) and adds a max-context output guard (`guardOutputAgainstContextWindow`) that clamps output tokens to `maxContextTokens` (warn + 512 floor when the prompt over-fills the window). Commits `d90d0a91` (code) + `321d7b68` (beads), pushed to `origin/develop`, in sync.
 - Verified: `pnpm type-check` exit 0; 139 career-playbook stage unit tests pass (4 new `runtime.test.ts` cases); independent correctness review APPROVE, no blockers; CI/CD run `28657970161` green and **Deploy to Dev success** — fixes are live on `https://dev.ai.megacampus.ru` (health 200).
-- `mc2-gusxd` (P2, open): follow-up for `concern-4` — passing `tokenCount` now makes `determinePhaseTier` do a per-call 2-tier DB fetch and bypass the phase SWR cache. Functionally correct; fix belongs in shared `model-config-service`, out of `db696.62` scope.
-- `mc2-db696.61` (P2, open): evaluate phase-specific source-evidence budgets — kept in evaluate/measure state; genuinely blocked on post-fix empirical cost data (see criterion #1 below).
+- `mc2-gusxd` DONE (`70e3b87a`): cache-first tier resolution (`resolvePhaseTierFromCache`) removes the per-call 2-tier DB fetch + phase-cache bypass introduced by token-aware routing; model selection unchanged. 37 model-config tests (+5) + 330 stage/shared tests pass.
+- `mc2-t5auh` DONE (`d8ef574f`): follow-up-questions LLM cost now persisted into `cost_breakdown` via a shared accumulator; handler reuses the shared sum. Digest-refresh is deterministic (no LLM cost). Closes the follow-up cost-accounting hole.
+- `mc2-db696.61` (P2, open): evaluate phase-specific source-evidence budgets — evaluation recorded (real target = follow-up-questions generator's 250k reuse; proposed ~24–32k override; block/group gen is a no-op). Now UNBLOCKED (t5auh persists follow-up cost) but stays evaluate/measure pending ONE real large-corpus run to justify the ~1-line override.
 - `mc2-irt6v` (still marked BLOCKED but appears RECOVERED): both `https://ai.megacampus.ru` and `https://dev.ai.megacampus.ru` now return HTTP 200; the develop→dev CI/CD deploy succeeded, so the VPS/network perimeter is reachable again. No code fix was applied here; recovery was infra-side. User to confirm and close.
 
 ## Career Playbook shipped-fix validation (criterion #1)
