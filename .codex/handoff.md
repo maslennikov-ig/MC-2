@@ -3,7 +3,7 @@
 Updated: 2026-07-03
 Stage: Career Playbook — model-routing hardening + shipped-fix validation
 Branch: `develop`
-Beads: `mc2-db696.62` + `mc2-gusxd` + `mc2-t5auh` closed; `mc2-db696.61` open (evaluate/measure, unblocked, needs one real run); `mc2-irt6v` recovered (see below)
+Beads: `mc2-db696.62` + `mc2-gusxd` + `mc2-t5auh` + `mc2-irt6v` closed; criterion #1 PASSED on real dev run; `mc2-db696.61` open (evaluate/measure — needs a LARGE-CORPUS run, the smoke was universal/no-source); `mc2-1nots` open (P3, runner getStatus auth quirk)
 
 ## Current State
 
@@ -12,13 +12,17 @@ Beads: `mc2-db696.62` + `mc2-gusxd` + `mc2-t5auh` closed; `mc2-db696.61` open (e
 - `mc2-gusxd` DONE (`70e3b87a`): cache-first tier resolution (`resolvePhaseTierFromCache`) removes the per-call 2-tier DB fetch + phase-cache bypass introduced by token-aware routing; model selection unchanged. 37 model-config tests (+5) + 330 stage/shared tests pass.
 - `mc2-t5auh` DONE (`d8ef574f`): follow-up-questions LLM cost now persisted into `cost_breakdown` via a shared accumulator; handler reuses the shared sum. Digest-refresh is deterministic (no LLM cost). Closes the follow-up cost-accounting hole.
 - `mc2-db696.61` (P2, open): evaluate phase-specific source-evidence budgets — evaluation recorded (real target = follow-up-questions generator's 250k reuse; proposed ~24–32k override; block/group gen is a no-op). Now UNBLOCKED (t5auh persists follow-up cost) but stays evaluate/measure pending ONE real large-corpus run to justify the ~1-line override.
-- `mc2-irt6v` (still marked BLOCKED but appears RECOVERED): both `https://ai.megacampus.ru` and `https://dev.ai.megacampus.ru` now return HTTP 200; the develop→dev CI/CD deploy succeeded, so the VPS/network perimeter is reachable again. No code fix was applied here; recovery was infra-side. User to confirm and close.
+- `mc2-irt6v` CLOSED: both `https://ai.megacampus.ru` and `https://dev.ai.megacampus.ru` return HTTP 200; develop→dev deploy succeeded. Recovery was infra-side (no code fix).
 
-## Career Playbook shipped-fix validation (criterion #1)
+## Career Playbook shipped-fix validation (criterion #1) — PASSED
 
-- Code-level: CONFIRMED — 140 stage/orchestrator/cost tests pass across the shipped fixes (graph, cross-block-judge, processor-ttl, model-config-service, admin costs, runtime).
-- Live-data: all persisted `career_playbooks` rows predate the 2026-07-03 fixes and carry `cost_breakdown.total_cost_usd = 0`. Pre-fix TTL runaways confirmed in data (167 / 1928 / 113 min) — the P1 attempts cap targets these.
-- Live-generation: fixes are now deployed to dev, but a REAL generation requires the credential-gated mutation-smoke (bearer token + disposable fixtures + budget + `course-generation-dev` queue). Must be launched by a human holding the token — see runbook below.
+- Code-level: CONFIRMED — 330 stage/orchestrator/shared tests + `pnpm type-check` green.
+- Live-generation (2026-07-03, dev, playbook `6b55ca50`, universal "Sales Manager B2B" fixture, since deleted): ALL criterion-#1 checks passed on real data:
+  - `cost_breakdown.total_cost_usd = $0.4963` across 65 nodeCosts (real per-node accounting + persisted follow-up cost).
+  - No wrong-language leakage (en fixture → zero Cyrillic); no `{{…}}`/`[[…]]` unresolved placeholders; 27 blocks, `final_markdown` 152 429 chars.
+  - Duration 73.4 min (< 120-min TTL cap — no runaway).
+- Note: the smoke run was UNIVERSAL (no source files), so it did NOT exercise the 250k source-evidence pack — `mc2-db696.61` still needs a large-corpus run to measure the follow-up-questions budget.
+- Runner artifact: the live-smoke runner exited on a getStatus auth quirk (`mc2-1nots`); generation completed server-side regardless and was validated + cleaned up via Supabase directly.
 
 ## Runbook — real dev generation for criterion #1
 
@@ -46,9 +50,9 @@ Post-run verification (shared Supabase `diqooqbuchsliypgwksu`, table `career_pla
 
 ## Next recommended
 
-1. Run the mutation-smoke above to close criterion #1 empirically; then reassess `mc2-db696.61` with real per-phase cost data.
-2. Address `mc2-gusxd` (cache-aware token routing) in `model-config-service`.
-3. Confirm/close `mc2-irt6v` now that both sites are reachable.
+1. `mc2-db696.61`: run ONE large-corpus (uploaded sources, raw >100k tokens) mutation-smoke to measure the follow-up-questions 250k-pack cost (now persisted); then decide on the ~24–32k override.
+2. `mc2-1nots` (P3): fix the runner getStatus auth quirk so the live-smoke can self-validate + self-clean without manual Supabase steps.
+3. Optional: investigate the ~47-min early-phase latency observed once (universal playbook, spec/research appeared late) if it recurs.
 
 ## Closeout Markers
 
