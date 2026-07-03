@@ -127,7 +127,10 @@ describe('Career Playbook runtime', () => {
 
   it('uses LangChain structured output when a schema is provided', async () => {
     const invoke = vi.fn().mockResolvedValue({ content: 'plain text should not be used' });
-    const structuredInvoke = vi.fn().mockResolvedValue({ answer: 'ok' });
+    const structuredInvoke = vi.fn().mockResolvedValue({
+      raw: { usage_metadata: { input_tokens: 30, output_tokens: 15 } },
+      parsed: { answer: 'ok' },
+    });
     const withStructuredOutput = vi.fn(() => ({ invoke: structuredInvoke }));
     const createModel = vi.fn(() => ({ invoke, withStructuredOutput }));
     const runtime = createCareerPlaybookRuntime({
@@ -155,11 +158,15 @@ describe('Career Playbook runtime', () => {
     });
 
     expect(result.content).toBe(JSON.stringify({ answer: 'ok' }));
+    // Real usage flows through from the raw AIMessage instead of being estimated.
+    expect(result.inputTokens).toBe(30);
+    expect(result.outputTokens).toBe(15);
     expect(invoke).not.toHaveBeenCalled();
     expect(withStructuredOutput).toHaveBeenCalledWith(expect.any(Object), {
       name: 'career_playbook_followups',
       method: 'jsonSchema',
       strict: true,
+      includeRaw: true,
     });
     expect(structuredInvoke).toHaveBeenCalledWith('prompt');
   });

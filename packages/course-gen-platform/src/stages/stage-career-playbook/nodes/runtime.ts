@@ -75,6 +75,7 @@ interface CareerPlaybookModel {
       name?: string;
       method?: 'functionCalling' | 'jsonMode' | 'jsonSchema';
       strict?: boolean;
+      includeRaw?: boolean;
     }
   ) => { invoke: (prompt: string) => Promise<unknown> };
 }
@@ -195,11 +196,19 @@ async function invokeModelWithOptionalStructuredOutput(
       name: options.structuredOutputName,
       method: options.structuredOutputMethod,
       strict: options.structuredOutputStrict,
+      // includeRaw returns { raw, parsed }, so we can read real usage_metadata off
+      // the underlying AIMessage instead of always estimating token counts.
+      includeRaw: true,
     });
-    // Structured output returns the parsed value, not the raw AIMessage, so usage
-    // metadata is unavailable here; token counts fall back to estimation.
-    const response = await structuredModel.invoke(prompt);
-    return { content: typeof response === 'string' ? response : JSON.stringify(response) };
+    const response = (await structuredModel.invoke(prompt)) as {
+      raw?: { usage_metadata?: CareerPlaybookModelUsage };
+      parsed?: unknown;
+    };
+    const parsed = response?.parsed;
+    return {
+      content: typeof parsed === 'string' ? parsed : JSON.stringify(parsed),
+      usage: response?.raw?.usage_metadata,
+    };
   }
 
   const response = await model.invoke(prompt);
