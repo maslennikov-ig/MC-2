@@ -26,6 +26,8 @@ import {
   StructuredJudgeOutputError,
 } from './cross-block-judge-structured';
 import { validateCareerPlaybookMermaidSyntax } from './mermaid-quality';
+import { getTargetLanguageTextViolations } from './language-consistency';
+import { findUnresolvedFillablePlaceholders } from './placeholder-detection';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
 
@@ -43,6 +45,11 @@ export interface ValidateMermaidCoverageOptions {
 export interface RunDeterministicChecksInput {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   mermaid?: ValidateMermaidCoverageOptions;
+  /**
+   * Content language of the generated blocks (e.g. 'ru'). When provided, blocks
+   * are checked for target-language violations. Omit to skip the language check.
+   */
+  contentLanguage?: string;
 }
 
 export interface CreateCrossBlockJudgeNodeOptions {
@@ -173,6 +180,54 @@ export function validateMermaidCoverage(
   });
 }
 
+export function validateBlockLanguageConsistency(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  contentLanguage: string
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(generatedBlocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const violations = getTargetLanguageTextViolations(content, contentLanguage, blockId);
+    if (violations.length === 0) continue;
+
+    issues.push({
+      block_id: blockId,
+      severity: 'critical',
+      description: `${blockId} contains text that is not in the target content language (${contentLanguage}): ${violations.join('; ')}`,
+      suggestion: `Rewrite ${blockId} so all user-facing text is in the target content language (${contentLanguage}).`,
+    });
+  }
+
+  return issues;
+}
+
+export function validateFillablePlaceholderResolution(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(generatedBlocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const placeholders = findUnresolvedFillablePlaceholders(content);
+    if (placeholders.length === 0) continue;
+
+    const uniquePlaceholders = Array.from(new Set(placeholders));
+    issues.push({
+      block_id: blockId,
+      severity: 'critical',
+      description: `${blockId} contains ${uniquePlaceholders.length} unresolved fillable placeholder(s): ${uniquePlaceholders.join(', ')}.`,
+      suggestion: `Replace each raw placeholder in ${blockId} with a concrete value or an explicit "field to fill" phrase.`,
+    });
+  }
+
+  return issues;
+}
+
 function scoreFromIssues(issues: CareerPlaybookJudgeIssue[]): number {
   return Math.max(
     0,
@@ -284,6 +339,12 @@ export async function runCareerPlaybookDeterministicChecks(
 
   issues.push(...validateMermaidCoverage(generatedBlocks, input.mermaid));
   issues.push(...(await validateCareerPlaybookMermaidSyntax(generatedBlocks)));
+
+  if (input.contentLanguage) {
+    issues.push(...validateBlockLanguageConsistency(generatedBlocks, input.contentLanguage));
+  }
+
+  issues.push(...validateFillablePlaceholderResolution(generatedBlocks));
 
   return verdictFromIssues(issues);
 }
@@ -442,6 +503,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
 
     const deterministicVerdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: currentBlocks,
+      contentLanguage: state.language,
     });
 
     let verdict = deterministicVerdict;

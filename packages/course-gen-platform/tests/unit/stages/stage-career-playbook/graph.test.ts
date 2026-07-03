@@ -98,9 +98,9 @@ AI collaboration
 
 Candidate
 
-## 13. Day in the life
+## 13. Один день из жизни роли
 
-Day`,
+День`,
   career_playbook_group_4_growth: `## 11. Карьерная траектория
 
 Career path

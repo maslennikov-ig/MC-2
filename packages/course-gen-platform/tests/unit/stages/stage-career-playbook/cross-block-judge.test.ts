@@ -532,4 +532,91 @@ flowchart LR
       },
     ]);
   });
+
+  it('flags a block whose text is not in the target content language', async () => {
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_13',
+          `## 13. Один день из жизни роли
+
+Please choose the decision authority for each item before you start.`,
+        ],
+      ]),
+      contentLanguage: 'ru',
+    });
+
+    expect(verdict.pass).toBe(false);
+    expect(verdict.needs_regeneration).toContain('block_13');
+    expect(verdict.issues).toContainEqual(
+      expect.objectContaining({
+        block_id: 'block_13',
+        severity: 'critical',
+        description: expect.stringContaining('not in the target content language'),
+      })
+    );
+  });
+
+  it('does not flag legitimate Russian content, and skips the language check when omitted', async () => {
+    const russianBlock = blocks([
+      [
+        'block_13',
+        `## 13. Один день из жизни роли
+
+Утро начинается с приоритизации задач и синхронизации с командой.`,
+      ],
+    ]);
+
+    const withLanguage = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: russianBlock,
+      contentLanguage: 'ru',
+    });
+    expect(withLanguage.pass).toBe(true);
+
+    // English-heavy content is untouched when contentLanguage is not provided
+    // (backward-compatible with existing deterministic-check callers).
+    const withoutLanguage = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([['block_13', '## 13. Day in the life\n\nA day in the life.']]),
+    });
+    expect(withoutLanguage.pass).toBe(true);
+  });
+
+  it('flags unresolved fillable placeholders while sparing Markdown links and Mermaid nodes', async () => {
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_22',
+          `## 22. Role README
+
+- Дедлайн: [дата]
+- Ответственный: {заполните}`,
+        ],
+        [
+          'block_23',
+          `## 23. Continuity plan
+
+Смотрите [дата](https://example.com/calendar) для планирования.
+
+\`\`\`mermaid
+flowchart LR
+  Start["дата"] --> Done["ссылка"]
+\`\`\``,
+        ],
+      ]),
+    });
+
+    expect(verdict.pass).toBe(false);
+    expect(verdict.needs_regeneration).toContain('block_22');
+    expect(verdict.needs_regeneration).not.toContain('block_23');
+    expect(verdict.issues).toContainEqual(
+      expect.objectContaining({
+        block_id: 'block_22',
+        severity: 'critical',
+        description: expect.stringContaining('unresolved fillable placeholder'),
+      })
+    );
+    const block22Issue = verdict.issues.find(issue => issue.block_id === 'block_22');
+    expect(block22Issue?.description).toContain('[дата]');
+    expect(block22Issue?.description).toContain('{заполните}');
+  });
 });
