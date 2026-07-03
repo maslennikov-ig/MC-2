@@ -117,6 +117,9 @@ const GROUP_PIPELINE = [
   nextNode: string;
 }>;
 
+type CareerPlaybookGroupGeneratorNodeName = (typeof GROUP_PIPELINE)[number]['generatorNode'];
+type CareerPlaybookGroupJudgeNodeName = (typeof GROUP_PIPELINE)[number]['judgeNode'];
+
 const CAREER_PLAYBOOK_GRAPH_REGENERATION_STEP_COST = 2;
 const CAREER_PLAYBOOK_GRAPH_RECURSION_BUFFER_STEPS = 5;
 
@@ -168,7 +171,17 @@ function routeAfterBlockRegeneration(state: CareerPlaybookGraphStateType) {
     hasSameBlockIdSet(getGroupBlockIds(entry.groupKey), state.lastJudgedBlockIds)
   );
 
-  return group?.judgeNode ?? 'finalJudge';
+  if (group) {
+    return group.judgeNode;
+  }
+
+  // Post-assembly regeneration: the finalJudge window spans the full final-block
+  // order rather than a single group, so no group matches here. Route back through
+  // finalAssembler so finalMarkdown is re-derived from the regenerated blocks and
+  // stays in sync with generatedBlocks before finalJudge/END. Routing straight to
+  // finalJudge would leave finalMarkdown stale while generatedBlocks moved on, and
+  // the handler persists both.
+  return 'finalAssembler';
 }
 
 function routeAfterSpecBuilder(state: CareerPlaybookGraphStateType) {
@@ -181,12 +194,36 @@ function routeAfterSpecBuilder(state: CareerPlaybookGraphStateType) {
 
 export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOptions = {}) {
   const runtime = options.runtime ?? createCareerPlaybookRuntime();
-  const group1BlockIds = getGroupBlockIds('group_1_foundation');
-  const group2BlockIds = getGroupBlockIds('group_2_operations');
-  const group3BlockIds = getGroupBlockIds('group_3_people');
-  const group4BlockIds = getGroupBlockIds('group_4_growth');
-  const group5BlockIds = getGroupBlockIds('group_5_system');
-  const group6BlockIds = getGroupBlockIds('group_6_wrap');
+
+  // Data-drive the six group generator/judge nodes from GROUP_PIPELINE so node
+  // names, withProgress wrapping, and per-group block IDs stay in a single source
+  // of truth. Batch addNode preserves the literal node-name union in the graph
+  // type so the explicit edges below remain type-checked.
+  const groupGeneratorNodes = Object.fromEntries(
+    GROUP_PIPELINE.map(entry => [
+      entry.generatorNode,
+      withProgress(
+        entry.generatorNode,
+        createGroupGeneratorNode(entry.groupKey, runtime),
+        options.progressReporter
+      ),
+    ])
+  ) as Record<CareerPlaybookGroupGeneratorNodeName, CareerPlaybookNodeFunction>;
+
+  const groupJudgeNodes = Object.fromEntries(
+    GROUP_PIPELINE.map(entry => [
+      entry.judgeNode,
+      withProgress(
+        entry.judgeNode,
+        createCrossBlockJudgeNode({
+          runtime,
+          useLLMJudge: true,
+          currentBlockIds: getGroupBlockIds(entry.groupKey),
+        }),
+        options.progressReporter
+      ),
+    ])
+  ) as Record<CareerPlaybookGroupJudgeNodeName, CareerPlaybookNodeFunction>;
 
   const builder = new StateGraph(CareerPlaybookGraphState)
     .addNode(
@@ -197,131 +234,13 @@ export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOpti
         options.progressReporter
       )
     )
-    .addNode(
-      'group1Generator',
-      withProgress(
-        'group1Generator',
-        createGroupGeneratorNode('group_1_foundation', runtime),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group2Generator',
-      withProgress(
-        'group2Generator',
-        createGroupGeneratorNode('group_2_operations', runtime),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group3Generator',
-      withProgress(
-        'group3Generator',
-        createGroupGeneratorNode('group_3_people', runtime),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group4Generator',
-      withProgress(
-        'group4Generator',
-        createGroupGeneratorNode('group_4_growth', runtime),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group5Generator',
-      withProgress(
-        'group5Generator',
-        createGroupGeneratorNode('group_5_system', runtime),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group6Generator',
-      withProgress(
-        'group6Generator',
-        createGroupGeneratorNode('group_6_wrap', runtime),
-        options.progressReporter
-      )
-    )
+    .addNode(groupGeneratorNodes)
     .addNode('blockRegenerator', createBlockRegeneratorNode(runtime))
     .addNode(
       'finalAssembler',
       withProgress('finalAssembler', createFinalAssemblerNode(), options.progressReporter)
     )
-    .addNode(
-      'group1Judge',
-      withProgress(
-        'group1Judge',
-        createCrossBlockJudgeNode({
-          runtime,
-          useLLMJudge: true,
-          currentBlockIds: group1BlockIds,
-        }),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group2Judge',
-      withProgress(
-        'group2Judge',
-        createCrossBlockJudgeNode({
-          runtime,
-          useLLMJudge: true,
-          currentBlockIds: group2BlockIds,
-        }),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group3Judge',
-      withProgress(
-        'group3Judge',
-        createCrossBlockJudgeNode({
-          runtime,
-          useLLMJudge: true,
-          currentBlockIds: group3BlockIds,
-        }),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group4Judge',
-      withProgress(
-        'group4Judge',
-        createCrossBlockJudgeNode({
-          runtime,
-          useLLMJudge: true,
-          currentBlockIds: group4BlockIds,
-        }),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group5Judge',
-      withProgress(
-        'group5Judge',
-        createCrossBlockJudgeNode({
-          runtime,
-          useLLMJudge: true,
-          currentBlockIds: group5BlockIds,
-        }),
-        options.progressReporter
-      )
-    )
-    .addNode(
-      'group6Judge',
-      withProgress(
-        'group6Judge',
-        createCrossBlockJudgeNode({
-          runtime,
-          useLLMJudge: true,
-          currentBlockIds: group6BlockIds,
-        }),
-        options.progressReporter
-      )
-    )
+    .addNode(groupJudgeNodes)
     .addNode(
       'finalJudge',
       withProgress(
@@ -329,24 +248,24 @@ export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOpti
         createCrossBlockJudgeNode({ runtime, useLLMJudge: true }),
         options.progressReporter
       )
-    )
+    );
+
+  builder
     .addEdge(START, 'specBuilder')
     .addConditionalEdges('specBuilder', routeAfterSpecBuilder)
-    .addEdge('group1Generator', 'group1Judge')
-    .addEdge('group2Generator', 'group2Judge')
-    .addEdge('group3Generator', 'group3Judge')
-    .addEdge('group4Generator', 'group4Judge')
-    .addEdge('group5Generator', 'group5Judge')
-    .addEdge('group6Generator', 'group6Judge')
     .addEdge('finalAssembler', 'finalJudge')
-    .addConditionalEdges('group1Judge', routeAfterJudge(group1BlockIds, 'group2Generator'))
-    .addConditionalEdges('group2Judge', routeAfterJudge(group2BlockIds, 'group3Generator'))
-    .addConditionalEdges('group3Judge', routeAfterJudge(group3BlockIds, 'group4Generator'))
-    .addConditionalEdges('group4Judge', routeAfterJudge(group4BlockIds, 'group5Generator'))
-    .addConditionalEdges('group5Judge', routeAfterJudge(group5BlockIds, 'group6Generator'))
-    .addConditionalEdges('group6Judge', routeAfterJudge(group6BlockIds, 'finalAssembler'))
     .addConditionalEdges('finalJudge', routeAfterJudge(CAREER_PLAYBOOK_FINAL_BLOCK_ORDER, END))
     .addConditionalEdges('blockRegenerator', routeAfterBlockRegeneration);
+
+  for (const entry of GROUP_PIPELINE) {
+    builder.addEdge(entry.generatorNode, entry.judgeNode);
+  }
+  for (const entry of GROUP_PIPELINE) {
+    builder.addConditionalEdges(
+      entry.judgeNode,
+      routeAfterJudge(getGroupBlockIds(entry.groupKey), entry.nextNode)
+    );
+  }
 
   return builder.compile();
 }
