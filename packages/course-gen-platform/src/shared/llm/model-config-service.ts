@@ -348,6 +348,71 @@ class ModelConfigServiceImpl {
   }
 
   /**
+   * Cache-first tier resolution for token-aware phase routing.
+   *
+   * Reproduces determinePhaseTier()'s dynamic-threshold decision, but reads the
+   * standard-tier config's maxContextTokens from a FRESH cached entry instead of
+   * hitting the database. This avoids the redundant 2-tier DB fetch on warm
+   * calls while keeping standard/extended selection byte-for-byte identical.
+   *
+   * @returns
+   * - `{ kind: 'config' }` when the selected tier is served fully from a fresh
+   *   cache entry (no DB fetch needed),
+   * - `{ kind: 'tier' }` when the tier is known from cache but the selected
+   *   tier's config is not fresh (caller fetches only that tier),
+   * - `null` when the standard cache is cold/stale and the caller must run the
+   *   existing 2-tier DB fetch.
+   */
+  private async resolvePhaseTierFromCache(
+    phaseName: string,
+    courseId: string | undefined,
+    tokenCount: number,
+    language: LanguageCode | undefined
+  ): Promise<
+    | { kind: 'config'; tier: 'standard' | 'extended'; config: ModelConfigDB.PhaseModelConfig }
+    | { kind: 'tier'; tier: 'standard' | 'extended' }
+    | null
+  > {
+    // Dynamic tier selection depends on the standard-tier config's
+    // maxContextTokens, so a cache-first decision requires a FRESH standard
+    // entry. A cold/stale standard cache defers to the 2-tier DB fetch.
+    const standardKey = `phase:${phaseName}:${courseId || 'global'}:standard`;
+    const cachedStandard = this.phaseCache.get(standardKey);
+    if (!cachedStandard || cachedStandard.isStale) {
+      return null;
+    }
+
+    // Compute the tier exactly as determinePhaseTier() does, but read
+    // maxContextTokens from the fresh cached standard config instead of the DB.
+    let tier: 'standard' | 'extended';
+    const maxContextTokens = cachedStandard.data.maxContextTokens;
+    if (maxContextTokens !== null && maxContextTokens > 0) {
+      const lang = normalizeLanguageForReserve(language);
+      const dynamicThreshold = await this.calculateDynamicThreshold(maxContextTokens, lang);
+      tier = tokenCount > dynamicThreshold ? 'extended' : 'standard';
+    } else {
+      // Mirror the hardcoded-threshold fallback branch of determinePhaseTier.
+      tier = tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
+    }
+
+    // Standard tier: the fresh entry we already hold is the answer.
+    if (tier === 'standard') {
+      return { kind: 'config', tier, config: cachedStandard.data };
+    }
+
+    // Extended tier: serve from cache only when a fresh extended entry exists.
+    const extendedKey = `phase:${phaseName}:${courseId || 'global'}:extended`;
+    const cachedExtended = this.phaseCache.get(extendedKey);
+    if (cachedExtended && !cachedExtended.isStale) {
+      return { kind: 'config', tier, config: cachedExtended.data };
+    }
+
+    // Tier is known but the selected-tier config is not fresh: signal the caller
+    // to fetch only that tier (single fetch instead of two).
+    return { kind: 'tier', tier };
+  }
+
+  /**
    * Get model configuration for phase-based routing (legacy)
    *
    * Uses Stale-While-Revalidate pattern:
@@ -373,17 +438,66 @@ class ModelConfigServiceImpl {
     tokenCount?: number,
     language?: LanguageCode
   ): Promise<ModelConfigDB.PhaseModelConfig> {
-    // Step 0: Determine tier using dynamic threshold calculation
-    const tierResult = await this.determinePhaseTier(phaseName, courseId, tokenCount, language);
-    const tier = tierResult.tier;
+    // Step 0: Determine tier.
+    //
+    // Tier selection is derived from the standard-tier config's maxContextTokens
+    // (used to compute the dynamic threshold). When a tokenCount is supplied we
+    // FIRST try to resolve the tier from a fresh cached standard-tier config,
+    // which lets warm calls skip the 2-tier DB fetch entirely. Only a cold or
+    // stale standard cache falls back to determinePhaseTier()'s 2-tier fetch.
+    // This preserves identical standard/extended selection for the same inputs
+    // while removing redundant DB work on cache hits.
+    let tier: 'standard' | 'extended';
+    let preloadedConfigs:
+      | [ModelConfigDB.PhaseModelConfig | null, ModelConfigDB.PhaseModelConfig | null]
+      | undefined;
 
-    // Use pre-fetched config if available (optimization to avoid second DB query)
-    if (tierResult.preloadedConfigs) {
-      const [standardConfig, extendedConfig] = tierResult.preloadedConfigs;
+    if (tokenCount === undefined) {
+      // No token count → always 'standard' (matches determinePhaseTier).
+      tier = 'standard';
+    } else {
+      const cacheResolved = await this.resolvePhaseTierFromCache(
+        phaseName,
+        courseId,
+        tokenCount,
+        language
+      );
+      if (cacheResolved?.kind === 'config') {
+        // Fully served from a fresh cache entry — zero DB fetches for this call.
+        logger.debug(
+          {
+            cacheKey: `phase:${phaseName}:${courseId || 'global'}:${cacheResolved.tier}`,
+            tier: cacheResolved.tier,
+          },
+          'Phase config cache hit (fresh, token-aware fast path)'
+        );
+        return cacheResolved.config;
+      }
+      if (cacheResolved?.kind === 'tier') {
+        // Tier resolved from the fresh standard cache, but the selected tier's
+        // config is not fresh → fetch only that tier via the normal DB path.
+        tier = cacheResolved.tier;
+      } else {
+        // Cold/stale standard cache → existing 2-tier DB fetch + threshold calc.
+        const tierResult = await this.determinePhaseTier(phaseName, courseId, tokenCount, language);
+        tier = tierResult.tier;
+        preloadedConfigs = tierResult.preloadedConfigs;
+      }
+    }
+
+    // Use pre-fetched configs when the 2-tier DB fetch ran (optimization to
+    // avoid a second DB query). Cache BOTH tiers so a subsequent token-aware
+    // call can resolve the tier straight from the standard cache entry.
+    if (preloadedConfigs) {
+      const [standardConfig, extendedConfig] = preloadedConfigs;
+      if (standardConfig) {
+        this.phaseCache.set(`phase:${phaseName}:${courseId || 'global'}:standard`, standardConfig);
+      }
+      if (extendedConfig) {
+        this.phaseCache.set(`phase:${phaseName}:${courseId || 'global'}:extended`, extendedConfig);
+      }
       const selectedConfig = tier === 'extended' ? extendedConfig : standardConfig;
       if (selectedConfig) {
-        const cacheKey = `phase:${phaseName}:${courseId || 'global'}:${tier}`;
-        this.phaseCache.set(cacheKey, selectedConfig);
         return selectedConfig;
       }
     }
