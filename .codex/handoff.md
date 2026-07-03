@@ -52,7 +52,7 @@ Post-run verification (shared Supabase `diqooqbuchsliypgwksu`, table `career_pla
 
 1. `mc2-db696.61`: run ONE large-corpus (uploaded sources, raw >100k tokens) mutation-smoke to measure the follow-up-questions 250k-pack cost (now persisted); then decide on the ~24–32k override.
 2. `mc2-1nots` (P3): fix the runner getStatus auth quirk so the live-smoke can self-validate + self-clean without manual Supabase steps.
-3. Optional: investigate the ~47-min early-phase latency observed once (universal playbook, spec/research appeared late) if it recurs.
+3. Optional perf (not a bug): the 73-min run was root-caused via dev worker logs — spec-builder took ~2 min; the time is the block-gen + judge↔block-regenerator quality loop (deepseek-v4-pro, ~136 judge/regen log lines) running ~68 min, single attempt, no queue wait. Mid-run empty snapshots were a DB-write-timing artifact (row columns persisted only at final assembly). Speed levers: cap per-block regeneration iterations, use v4-flash for judge/regenerator, or parallelize more.
 
 ## Closeout Markers
 
