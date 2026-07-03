@@ -640,7 +640,7 @@ describe('Career Playbook graph', () => {
   it('re-derives finalMarkdown after a post-assembly finalJudge regeneration', async () => {
     const regeneratedFaqBlock = `## 18. FAQ
 
-REGENERATED_FAQ_TOKEN_N1: refreshed answer produced after assembly.`;
+REGENERATED_FAQ_TOKEN_N1: обновлённый ответ, сформированный уже после финальной сборки.`;
     const passVerdict = JSON.stringify({
       pass: true,
       score: 95,
