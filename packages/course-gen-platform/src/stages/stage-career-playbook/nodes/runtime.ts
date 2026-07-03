@@ -1,7 +1,10 @@
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { createModelConfigService } from '@/shared/llm/model-config-service';
+import {
+  createModelConfigService,
+  EMERGENCY_FALLBACK_MODEL,
+} from '@/shared/llm/model-config-service';
 import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
-import { estimateCost } from '@/shared/llm/cost-calculator';
+import { estimateCost, estimateTokenCount } from '@/shared/llm/cost-calculator';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import type { z } from 'zod';
 
@@ -37,7 +40,6 @@ export interface CareerPlaybookRuntime {
   ) => Promise<CareerPlaybookLLMResult>;
 }
 
-const FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 const DEFAULT_TIMEOUT_MS = 300_000;
 
 interface CareerPlaybookPromptService {
@@ -86,10 +88,6 @@ export interface CareerPlaybookRuntimeDependencies {
     maxTokens: number,
     timeoutMs?: number
   ) => CareerPlaybookModel;
-}
-
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
 }
 
 function normalizeTimeoutMs(value: number | null | undefined): number | undefined {
@@ -160,9 +158,9 @@ export function createCareerPlaybookRuntime(
 
           // Prefer real OpenRouter usage (requested via usage.include); fall back to
           // a length/4 estimate when the provider/structured-output path omits it.
-          const inputTokens = invocation.usage?.input_tokens ?? estimateTokens(prompt);
+          const inputTokens = invocation.usage?.input_tokens ?? estimateTokenCount(prompt);
           const outputTokens =
-            invocation.usage?.output_tokens ?? estimateTokens(invocation.content);
+            invocation.usage?.output_tokens ?? estimateTokenCount(invocation.content);
 
           return {
             content: invocation.content,
@@ -224,8 +222,8 @@ async function resolvePhaseConfig(
       options.language
     );
     return {
-      modelId: config.modelId || FALLBACK_MODEL,
-      fallbackModelId: config.fallbackModelId ?? FALLBACK_MODEL,
+      modelId: config.modelId || EMERGENCY_FALLBACK_MODEL,
+      fallbackModelId: config.fallbackModelId ?? EMERGENCY_FALLBACK_MODEL,
       temperature: config.temperature ?? 0.7,
       maxTokens: config.maxTokens ?? 12_000,
       maxRetries: config.maxRetries ?? 2,
@@ -233,8 +231,8 @@ async function resolvePhaseConfig(
     };
   } catch {
     return {
-      modelId: FALLBACK_MODEL,
-      fallbackModelId: FALLBACK_MODEL,
+      modelId: EMERGENCY_FALLBACK_MODEL,
+      fallbackModelId: EMERGENCY_FALLBACK_MODEL,
       temperature: 0.7,
       maxTokens: 12_000,
       maxRetries: 2,

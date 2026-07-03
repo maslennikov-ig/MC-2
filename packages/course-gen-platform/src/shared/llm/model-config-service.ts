@@ -29,9 +29,10 @@ import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+import { getModelPricing } from './cost-calculator';
 
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
+export const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 import * as ModelConfigDB from './model-config-db';
 import { StaleWhileRevalidateCache } from './swr-cache';
 
@@ -80,6 +81,106 @@ export function isMissingChatPhaseConfigError(error: unknown): error is Error {
     message.includes('Chat phase') &&
     (message.includes('has no config') || message.includes('no active config'))
   );
+}
+
+// ============================================================================
+// MODEL PRICING HEALTH CHECK (IMP-4)
+// ============================================================================
+
+/**
+ * Minimal shape of a phase config for pricing coverage checks.
+ * Structural so callers can pass PhaseModelConfig rows or bare model ids.
+ */
+export interface PhasePricingConfigLike {
+  modelId?: string | null;
+  fallbackModelId?: string | null;
+}
+
+/** A configured phase model that is missing from the OpenRouter pricing catalog. */
+export interface ModelPricingHealthFinding {
+  phaseName: string;
+  role: 'primary' | 'fallback';
+  modelId: string;
+}
+
+/** Result of a phase-model pricing coverage health check. */
+export interface ModelPricingHealthResult {
+  /** True when every configured phase model has a pricing catalog entry. */
+  ok: boolean;
+  /** Distinct model ids that were resolved and checked. */
+  checkedModelIds: string[];
+  /**
+   * Configured models with no OPENROUTER_PRICING entry. estimateCost() prices
+   * these at $0, silently voiding cost tracking, so they are surfaced explicitly.
+   */
+  unpricedModels: ModelPricingHealthFinding[];
+  /** Phases with no resolvable config (non-fatal; e.g. DB-only phases when offline). */
+  missingPhases: string[];
+}
+
+/**
+ * True when the model has an entry in the OpenRouter pricing catalog
+ * (cost-calculator OPENROUTER_PRICING). Unknown/deprecated models are priced
+ * at $0 by estimateCost(), which silently voids cost tracking.
+ */
+export function isModelPriced(modelId: string): boolean {
+  return getModelPricing(modelId) !== null;
+}
+
+/**
+ * Resolve the offline default config for a phase the same way getModelForPhase
+ * falls back when the database is unavailable: the phase-specific default, then
+ * global_default. Network-free (reads DEFAULT_PHASE_CONFIGS only).
+ */
+export function resolveDefaultPhaseConfig(
+  phaseName: string
+): ModelConfigDB.PhaseModelConfig | null {
+  return DEFAULT_PHASE_CONFIGS[phaseName] ?? DEFAULT_PHASE_CONFIGS['global_default'] ?? null;
+}
+
+/**
+ * Read-only health check: verify every configured phase model (primary and
+ * fallback) is present in the OpenRouter pricing catalog. Reuses the existing
+ * pricing catalog via getModelPricing; builds no new pricing table.
+ *
+ * @param phaseConfigs - Map of phase name to its resolved config (primary/fallback ids).
+ * @param options.isPriced - Override the pricing predicate (for testing).
+ */
+export function checkPhaseModelPricingHealth(
+  phaseConfigs: Record<string, PhasePricingConfigLike | null | undefined>,
+  options: { isPriced?: (modelId: string) => boolean } = {}
+): ModelPricingHealthResult {
+  const isPriced = options.isPriced ?? isModelPriced;
+  const checked = new Set<string>();
+  const unpricedModels: ModelPricingHealthFinding[] = [];
+  const missingPhases: string[] = [];
+
+  for (const [phaseName, config] of Object.entries(phaseConfigs)) {
+    if (!config) {
+      missingPhases.push(phaseName);
+      continue;
+    }
+
+    const roles: Array<['primary' | 'fallback', string | null | undefined]> = [
+      ['primary', config.modelId],
+      ['fallback', config.fallbackModelId],
+    ];
+
+    for (const [role, modelId] of roles) {
+      if (!modelId) continue;
+      checked.add(modelId);
+      if (!isPriced(modelId)) {
+        unpricedModels.push({ phaseName, role, modelId });
+      }
+    }
+  }
+
+  return {
+    ok: unpricedModels.length === 0,
+    checkedModelIds: [...checked].sort(),
+    unpricedModels,
+    missingPhases,
+  };
 }
 
 // ============================================================================

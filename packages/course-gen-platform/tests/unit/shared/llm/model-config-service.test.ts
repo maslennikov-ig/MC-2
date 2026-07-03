@@ -5,7 +5,12 @@ import {
   isMissingChatPhaseConfigError,
   resolveModelWithFallback,
   DEFAULT_PHASE_CONFIGS,
+  EMERGENCY_FALLBACK_MODEL,
+  checkPhaseModelPricingHealth,
+  isModelPriced,
+  resolveDefaultPhaseConfig,
 } from '@/shared/llm/model-config-service';
+import { getModelPricing } from '@/shared/llm/cost-calculator';
 import * as ModelConfigDB from '@/shared/llm/model-config-db';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
@@ -372,5 +377,66 @@ describe('model-config-service', () => {
       // simulate complete failure
       vi.spyOn(console, 'error').mockImplementation(() => {});
     });
+  });
+});
+
+describe('model pricing health check (IMP-4)', () => {
+  it('reports an unknown/deprecated model id as unpriced and a known catalog model as priced', () => {
+    const result = checkPhaseModelPricingHealth({
+      known_phase: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'openai/gpt-oss-20b' },
+      drifted_phase: {
+        modelId: 'openai/gpt-oss-120b', // retired/deprecated id, no pricing entry
+        fallbackModelId: 'deepseek/deepseek-v4-pro',
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.unpricedModels).toEqual([
+      { phaseName: 'drifted_phase', role: 'primary', modelId: 'openai/gpt-oss-120b' },
+    ]);
+    // Distinct, sorted, and only the priced models are silently accepted.
+    expect(result.checkedModelIds).toContain('deepseek/deepseek-v4-flash');
+    expect(result.checkedModelIds).toContain('deepseek/deepseek-v4-pro');
+    expect(result.missingPhases).toEqual([]);
+  });
+
+  it('passes when every configured model is present in the pricing catalog', () => {
+    const result = checkPhaseModelPricingHealth({
+      phase_a: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'deepseek/deepseek-v4-pro' },
+      phase_b: { modelId: EMERGENCY_FALLBACK_MODEL },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.unpricedModels).toEqual([]);
+  });
+
+  it('honors an injected pricing predicate and records unresolved phases', () => {
+    const result = checkPhaseModelPricingHealth(
+      {
+        resolvable: { modelId: 'model-x' },
+        unresolved: null,
+      },
+      { isPriced: (modelId: string) => modelId !== 'model-x' }
+    );
+
+    expect(result.unpricedModels).toEqual([
+      { phaseName: 'resolvable', role: 'primary', modelId: 'model-x' },
+    ]);
+    expect(result.missingPhases).toEqual(['unresolved']);
+  });
+
+  it('isModelPriced mirrors the OpenRouter pricing catalog', () => {
+    expect(isModelPriced(EMERGENCY_FALLBACK_MODEL)).toBe(getModelPricing(EMERGENCY_FALLBACK_MODEL) !== null);
+    expect(isModelPriced('definitely/not-a-real-model')).toBe(false);
+  });
+
+  it('resolveDefaultPhaseConfig falls back to global_default for unseeded phases', () => {
+    expect(resolveDefaultPhaseConfig('stage_career_playbook_group_1')).toBe(
+      DEFAULT_PHASE_CONFIGS['global_default']
+    );
+    // The offline default career-playbook fallback chain must stay priceable.
+    const config = resolveDefaultPhaseConfig('stage_career_playbook_group_1');
+    expect(config).not.toBeNull();
+    expect(isModelPriced(config!.modelId)).toBe(true);
   });
 });
