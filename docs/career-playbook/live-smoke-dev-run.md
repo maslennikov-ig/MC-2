@@ -1,7 +1,9 @@
 # Career Playbook — live smoke (dev) run helper
 
 Runbook для эмпирической проверки shipped-фиксов (критерий #1) на реальной генерации в dev.
-Фикстуры уже подставлены под аккаунт `maslennikov.ig@gmail.com`. Секрет — только токен, вставляется в рантайме.
+Никаких значений, привязанных к конкретному аккаунту, здесь нет: `user_id` и `organization_id`
+берутся из claims твоего же JWT (сниппет ниже печатает их вместе с токеном), ключи/URL — из
+`packages/course-gen-platform/.env`. Секрет — только токен, вставляется в рантайме.
 
 ## Шаг 1. Получить bearer-токен (JWT)
 
@@ -12,15 +14,15 @@ Runbook для эмпирической проверки shipped-фиксов (�
 
 1. Залогиниться на https://dev.ai.megacampus.ru своим аккаунтом.
 2. DevTools (F12) → вкладка **Console**.
-3. Вставить сниппет — он собирает cookie `sb-<ref>-auth-token` (может быть разбита на
-   `.0`/`.1`), снимает префикс `base64-`, декодирует base64url и достаёт `access_token`:
+3. Вставить сниппет — он сам находит cookie `sb-*-auth-token` (без хардкода project-ref; cookie
+   может быть разбита на `.0`/`.1`), снимает префикс `base64-`, декодирует base64url и печатает
+   токен вместе с `user_id`/`organization_id` из его claims (они нужны на Шаге 2):
 
 ```js
 (() => {
-  const ref = 'diqooqbuchsliypgwksu';
   const parts = document.cookie
     .split('; ')
-    .filter(c => c.startsWith(`sb-${ref}-auth-token`))
+    .filter(c => /^sb-.*-auth-token/.test(c))
     .sort() // .0 перед .1
     .map(c => c.slice(c.indexOf('=') + 1));
   let raw = decodeURIComponent(parts.join(''));
@@ -28,13 +30,14 @@ Runbook для эмпирической проверки shipped-фиксов (�
     raw = atob(raw.slice('base64-'.length).replace(/-/g, '+').replace(/_/g, '/'));
   }
   const token = JSON.parse(raw).access_token;
-  console.log(token);
+  const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  console.log({ token, userId: claims.user_id, organizationId: claims.organization_id });
   return token;
 })();
 ```
 
 Если консоль вернула пустую строку — cookie помечена **HttpOnly** и в `document.cookie` не видна:
-открой Application → **Cookies** → `https://dev.ai.megacampus.ru` → `sb-diqooqbuchsliypgwksu-auth-token`,
+открой Application → **Cookies** → домен dev → cookie `sb-<ref>-auth-token`,
 скопируй значение (склей `.0`/`.1`), убери префикс `base64-` и раскодируй как base64url → JSON, поле `access_token`.
 
 ### Вариант B — Network (заголовок Authorization)
@@ -48,14 +51,17 @@ Runbook для эмпирической проверки shipped-фиксов (�
 
 Логин прямо в Supabase Auth по email+паролю → свежий `access_token` в env.
 Пароль вводится скрыто (`read -s`), в историю не попадает. Требует `jq` и наличие пароля у аккаунта
-(если вход только через Google — см. примечание ниже).
+(если вход только через Google — см. примечание ниже). URL и anon-ключ не хранятся в этом документе —
+они берутся из `packages/course-gen-platform/.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
 
 ```bash
-read -s -p "Supabase password for maslennikov.ig@gmail.com: " SB_PW; echo
+export SUPABASE_URL=$(grep -m1 '^SUPABASE_URL=' packages/course-gen-platform/.env | cut -d= -f2-)
+export SUPABASE_ANON_KEY=$(grep -m1 '^SUPABASE_ANON_KEY=' packages/course-gen-platform/.env | cut -d= -f2-)
+read -p "Supabase email: " SB_EMAIL; read -s -p "Supabase password: " SB_PW; echo
 ```
 
 ```bash
-export CAREER_PLAYBOOK_SMOKE_TOKEN=$(curl -s "https://diqooqbuchsliypgwksu.supabase.co/auth/v1/token?grant_type=password" -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpcW9vcWJ1Y2hzbGl5cGd3a3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5OTczNTIsImV4cCI6MjA3NTU3MzM1Mn0.NgS0kl5nL0HR5S3RJw1TeGQNaZy3xmhzmrBLcdBAn3w" -H "Content-Type: application/json" -d "{\"email\":\"maslennikov.ig@gmail.com\",\"password\":\"$SB_PW\"}" | jq -r .access_token); unset SB_PW
+export CAREER_PLAYBOOK_SMOKE_TOKEN=$(curl -s "$SUPABASE_URL/auth/v1/token?grant_type=password" -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d "{\"email\":\"$SB_EMAIL\",\"password\":\"$SB_PW\"}" | jq -r .access_token); unset SB_PW
 ```
 
 ```bash
@@ -63,11 +69,7 @@ echo "token length: ${#CAREER_PLAYBOOK_SMOKE_TOKEN}"
 ```
 
 Длина ~600–1200 → ок, переходи к Шагу 2 (trpc-url/user-id/org-id/queue) и Шагу 4.
-Если длина маленькая (`null`) — посмотри сырой ответ (покажет причину):
-
-```bash
-read -s -p "Supabase password: " SB_PW; echo; curl -s "https://diqooqbuchsliypgwksu.supabase.co/auth/v1/token?grant_type=password" -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpcW9vcWJ1Y2hzbGl5cGd3a3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5OTczNTIsImV4cCI6MjA3NTU3MzM1Mn0.NgS0kl5nL0HR5S3RJw1TeGQNaZy3xmhzmrBLcdBAn3w" -H "Content-Type: application/json" -d "{\"email\":\"maslennikov.ig@gmail.com\",\"password\":\"$SB_PW\"}"; unset SB_PW
-```
+Если длина маленькая (`null`) — убери `| jq -r .access_token` из команды и посмотри сырой ответ (покажет причину).
 
 Примечание: если аккаунт заведён только через Google (без пароля), password-grant вернёт
 `invalid_grant` / `Invalid login credentials` — тогда либо задай пароль через «Забыли пароль?»,
@@ -75,13 +77,18 @@ read -s -p "Supabase password: " SB_PW; echo; curl -s "https://diqooqbuchsliypgw
 
 ## Шаг 2. Экспортировать окружение
 
-Вставь блок целиком, заменив только `ТВОЙ_РЕАЛЬНЫЙ_JWT` в первой строке:
+`USER_ID` и `ORGANIZATION_ID` — это claims `user_id` и `organization_id` твоего JWT: сниппет из
+Варианта A печатает их сразу; для токена из Варианта B/C раскодируй payload
+(`echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{user_id, organization_id}'`).
+Раннер проверяет их строгим сравнением как гейт «одноразовый пользователь тот, что ожидался».
+
+Вставь блок, заменив три плейсхолдера:
 
 ```bash
 export CAREER_PLAYBOOK_SMOKE_TOKEN='ТВОЙ_РЕАЛЬНЫЙ_JWT'
 export CAREER_PLAYBOOK_SMOKE_TRPC_URL='https://dev.ai.megacampus.ru/api/trpc'
-export CAREER_PLAYBOOK_SMOKE_USER_ID='ca704da8-5522-4a39-9691-23f36b85d0ce'
-export CAREER_PLAYBOOK_SMOKE_ORGANIZATION_ID='9b98a7d5-27ea-4441-81dc-de79d488e5db'
+export CAREER_PLAYBOOK_SMOKE_USER_ID='<user_id из claims>'
+export CAREER_PLAYBOOK_SMOKE_ORGANIZATION_ID='<organization_id из claims>'
 export BULLMQ_QUEUE_NAME='course-generation-dev'
 ```
 
@@ -96,7 +103,7 @@ echo "token length: ${#CAREER_PLAYBOOK_SMOKE_TOKEN}"
 ## Шаг 3. (Опционально) Сухой прогон — без мутаций, трат и токена
 
 ```bash
-pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan --target dev
+pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke:career-playbook:live --mode plan --target dev
 ```
 
 Статус `blocked` в plan-режиме — это норма, он лишь перечисляет требуемые гейты.
@@ -106,12 +113,13 @@ pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan -
 Одной строкой (раннер сам подхватит token/trpc-url/user-id/org-id/queue из env):
 
 ```bash
-pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode mutation-smoke --target dev --confirm-live-mutation --cleanup-scope playbook-only --max-cost-usd 5 --poll-timeout-ms 7200000 --json
+pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke:career-playbook:live --mode mutation-smoke --target dev --confirm-live-mutation --cleanup-scope playbook-only --max-cost-usd 1 --poll-timeout-ms 7200000 --json
 ```
 
 Что произойдёт / безопасность:
 
-- Создаётся ОДИН новый playbook под аккаунтом, генерируется (реальные LLM-траты, потолок **$5**), снимаются evidence.
+- Создаётся ОДИН новый playbook под аккаунтом, генерируется (реальные LLM-траты; `--max-cost-usd 1` — аварийный потолок, ~4x от наблюдаемой стоимости $0.08–0.13 за прогон), снимаются evidence.
+- `--dir` задан абсолютным путём через `git rev-parse` — относительный путь ломается, если шелл не в корне репо.
 - Существующие playbook'и аккаунта не трогаются; курс не создаётся (нет `--include-course-bridge`).
 - Поллинг до 120 мин (совпадает с TTL-cap). `--json` даёт машинный отчёт со статусом `pass` / `warn` / `blocked` / `fail`.
 - **Cleanup ничего не удаляет — только описывает** (см. раздел «Cleanup-семантика» ниже).
@@ -154,7 +162,7 @@ pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode mutati
 (shared Supabase `diqooqbuchsliypgwksu`):
 
 - `cost_breakdown->>'total_cost_usd' > 0` (теперь включая стоимость follow-up — фикс `mc2-t5auh`)
-- `language = 'ru'`, без wrong-language и без `{{…}}`-плейсхолдеров в `final_markdown`
+- `language` соответствует QA-фикстуре раннера (текущая smoke-фикстура англоязычная → `en`; детерминированная проверка ловит wrong-language-вкрапления относительно неё), без `{{…}}`-плейсхолдеров в `final_markdown`
 - длительность `< 120 мин` (TTL-cap `mc2-db696.62`/P1)
 
 На этих реальных данных переоценивается `mc2-db696.61` (нужен ли source-evidence override ~24–32k для генератора follow-up-вопросов).
