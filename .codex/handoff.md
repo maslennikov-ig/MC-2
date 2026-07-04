@@ -22,6 +22,11 @@ Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93r
 
 1. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
 
+## Staging aligned (2026-07-04 ~17:06 UTC)
+
+- `/deploy` merged develop → master (`4128a938`, 44 commits) and Blue/Green deployed staging: worker/worker-stage6/worker-stage7/api-blue/web-blue recreated on fresh images, health checks green. Staging code now matches the judge=flash DB routing (delta re-judge, size gate, stub fix included) — the post-promotion staging risk window is closed.
+- Runbook de-hardcoded (`070f3c13`): cookie found by pattern, user/org ids from JWT claims, anon key/URL from package .env, cap documented as $1, cwd-independent --dir, language expectation = en fixture.
+
 ## Verification run #3 (dea26647, 2026-07-04 15:18–15:33 UTC) — both open observations CLOSED
 
 - DB-served judge=flash confirmed live (container env has no override; 11/11 judge calls flash attempt=1, zero timeouts, max input 22.8k).
