@@ -20,8 +20,13 @@ Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93r
 
 ## Next
 
-1. Next routine dev run: visually confirm no stub diagrams in blocks 10/11/16 (fix `15c47795`) and that DB-served judge=flash behaves like the env-override A/B (zero timeouts).
-2. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+1. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+
+## Verification run #3 (dea26647, 2026-07-04 15:18–15:33 UTC) — both open observations CLOSED
+
+- DB-served judge=flash confirmed live (container env has no override; 11/11 judge calls flash attempt=1, zero timeouts, max input 22.8k).
+- Stub diagrams GONE (fix `15c47795`): blocks 10/11/16 each carry exactly their own rich diagram; zero canonical stub headings.
+- Metrics trend across the three runs: 44.4 min / $0.240 / 39 regens (baseline, old code) → 19.7 / $0.128 / 14 (fix package) → **15.6 / $0.078 / 5 regens, zero caps** (fix package + stub fix + DB routing). Evidence pass, headings canonical, CTA present.
 
 ## mc2-m17al CLOSED (owner-approved, 2026-07-04)
 
