@@ -20,9 +20,14 @@ Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93r
 
 ## Next
 
-1. `mc2-m17al` (owner decision — staging impact): promote judge→v4-flash to `llm_model_config`. Decision data now strong: on new code flash handled ALL 12 judge calls including the final one (inputs ≤21k after delta re-judge); the 28k fallback gate (`CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD`) covers the large-input tail. Regenerator→flash still needs its own quality A/B.
-2. Next routine dev run: visually confirm no stub diagrams in blocks 10/11/16 (fix `15c47795`).
-3. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+1. Next routine dev run: visually confirm no stub diagrams in blocks 10/11/16 (fix `15c47795`) and that DB-served judge=flash behaves like the env-override A/B (zero timeouts).
+2. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+
+## mc2-m17al CLOSED (owner-approved, 2026-07-04)
+
+- Judge promoted to v4-flash/pro-fallback in `llm_model_config` — migration `20260704150000_promote_career_playbook_judge_flash.sql` APPLIED to the shared DB (deliberate staging impact) and verified; routing test pins it. Note: CI does NOT auto-apply migrations — this one was applied manually via Supabase MCP; the committed file keeps history consistent.
+- `CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES` removed from `docker-compose.dev.yml` (routing now DB-served, identical effective config; lands on dev with the CI deploy).
+- Regenerator stays on pro (decision recorded on the bead: convergence-critical, flash risks cap-exhaustion criterion-#1 leaks for ~$0.05/run).
 
 ## Explicit defers
 
