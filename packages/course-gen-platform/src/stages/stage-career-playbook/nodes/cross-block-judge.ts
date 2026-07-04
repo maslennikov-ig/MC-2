@@ -3,6 +3,7 @@ import {
   CareerPlaybookBlockIdSchema,
   CareerPlaybookJudgeIssueSchema,
   CareerPlaybookJudgeVerdictSchema,
+  isCareerPlaybookJudgeCriticalCategory,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookJudgeIssue,
@@ -354,21 +355,41 @@ export function parseCareerPlaybookJudgeVerdict(rawContent: string): CareerPlayb
   return CareerPlaybookJudgeVerdictSchema.parse(normalizeJudgeVerdictCandidate(parsed));
 }
 
+/**
+ * Severity gate for LLM judge issues: a `critical` issue only stays critical when
+ * its `category` is in the regeneration taxonomy (spec contradiction, missing
+ * format minimum, wrong language, unresolved placeholder, invented number). A
+ * critical issue that is stylistic, or that the model left uncategorized, is
+ * defensively downgraded to `warning` so it stays visible but can never drive
+ * block regeneration. Deterministic issues never reach this path — they carry no
+ * category and are merged through unchanged.
+ */
+function downgradeNonTaxonomyCriticalIssues(
+  issues: CareerPlaybookJudgeIssue[]
+): CareerPlaybookJudgeIssue[] {
+  return issues.map(issue => {
+    if (issue.severity !== 'critical') return issue;
+    if (isCareerPlaybookJudgeCriticalCategory(issue.category)) return issue;
+    return { ...issue, severity: 'warning' as const };
+  });
+}
+
 function mergeJudgeVerdicts(
   deterministic: CareerPlaybookJudgeVerdict,
   llm: CareerPlaybookJudgeVerdict
 ): CareerPlaybookJudgeVerdict {
-  const criticalLLMIssueBlockIds = uniqueBlockIds(
-    llm.issues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
+  const gatedLLMIssues = downgradeNonTaxonomyCriticalIssues(llm.issues);
+  const regenerationEligibleBlockIds = uniqueBlockIds(
+    gatedLLMIssues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
   );
 
   return {
     pass: deterministic.pass && llm.pass,
     score: Math.min(deterministic.score, llm.score),
-    issues: [...deterministic.issues, ...llm.issues],
+    issues: [...deterministic.issues, ...gatedLLMIssues],
     needs_regeneration: uniqueBlockIds([
       ...deterministic.needs_regeneration,
-      ...llm.needs_regeneration.filter(blockId => criticalLLMIssueBlockIds.includes(blockId)),
+      ...llm.needs_regeneration.filter(blockId => regenerationEligibleBlockIds.includes(blockId)),
     ]),
   };
 }

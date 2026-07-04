@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   CareerPlaybookBlockIdSchema,
+  CareerPlaybookJudgeIssueCategorySchema,
   type CareerPlaybookJudgeVerdict,
   type CareerPlaybookNodeCost,
 } from '@megacampus/shared-types';
@@ -38,6 +39,9 @@ export function resolveJudgeFallbackTokenThreshold(
 const LLMStructuredJudgeIssueSchema = z.object({
   block_id: CareerPlaybookBlockIdSchema,
   severity: z.enum(['critical', 'warning', 'info']),
+  // Required: the judge must classify every issue so the regeneration gate can tell
+  // taxonomy-backed criticals apart from stylistic ones.
+  category: CareerPlaybookJudgeIssueCategorySchema,
   description: z.string().min(1),
   suggestion: z.string().min(1).nullable(),
 });
@@ -100,6 +104,7 @@ Return only a valid JSON object matching this shape:
     {
       "block_id": "header or block_1 through block_26",
       "severity": "critical | warning | info",
+      "category": "contradiction | format_minimum | wrong_language | unresolved_placeholder | invented_number | style",
       "description": "clear issue",
       "suggestion": "clear repair suggestion or null"
     }

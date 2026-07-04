@@ -471,9 +471,50 @@ export const CareerPlaybookQADataSchema = z.object({
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
 
+export const CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES = [
+  'contradiction',
+  'format_minimum',
+  'wrong_language',
+  'unresolved_placeholder',
+  'invented_number',
+  'style',
+] as const;
+export const CareerPlaybookJudgeIssueCategorySchema = z.enum(
+  CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES
+);
+export type CareerPlaybookJudgeIssueCategory = z.infer<
+  typeof CareerPlaybookJudgeIssueCategorySchema
+>;
+
+// Critical taxonomy: the only issue categories that justify LLM-driven block
+// regeneration. 'style' is intentionally excluded — stylistic/tone findings stay
+// visible as warnings but never trigger regeneration, because the deterministic
+// checks already gate the hard failures and forcing style opinions into
+// regeneration only burns cycles.
+export const CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES = [
+  'contradiction',
+  'format_minimum',
+  'wrong_language',
+  'unresolved_placeholder',
+  'invented_number',
+] as const satisfies readonly CareerPlaybookJudgeIssueCategory[];
+export type CareerPlaybookJudgeCriticalCategory =
+  (typeof CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES)[number];
+
+export function isCareerPlaybookJudgeCriticalCategory(
+  category: string | null | undefined
+): category is CareerPlaybookJudgeCriticalCategory {
+  return (
+    typeof category === 'string' &&
+    (CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES as readonly string[]).includes(category)
+  );
+}
+
 export const CareerPlaybookJudgeIssueSchema = z.object({
   block_id: CareerPlaybookBlockIdSchema,
   severity: z.enum(['critical', 'warning', 'info']),
+  // Optional so verdicts persisted before the severity rubric landed still parse.
+  category: CareerPlaybookJudgeIssueCategorySchema.optional(),
   description: z.string().min(1),
   suggestion: z.string().min(1).optional(),
 });

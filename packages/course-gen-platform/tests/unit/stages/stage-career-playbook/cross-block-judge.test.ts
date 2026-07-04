@@ -236,7 +236,8 @@ flowchart LR
           {
             block_id: 'block_5',
             severity: 'critical',
-            description: 'Autonomy levels are too generic.',
+            category: 'contradiction',
+            description: 'Autonomy levels contradict the ownership defined in block_3.',
           },
         ],
         needs_regeneration: ['block_5'],
@@ -341,7 +342,8 @@ flowchart LR
             {
               block_id: 'block_5',
               severity: 'critical',
-              description: 'Approval boundaries need clearer escalation.',
+              category: 'contradiction',
+              description: 'Approval boundaries contradict the decision owner named in block_3.',
               suggestion: null,
             },
           ],
@@ -639,6 +641,8 @@ flowchart LR
 | Support tickets | Support |
 | Hiring plan | CRO |`;
 
+  // Taxonomy-backed critical (category: contradiction) so the regeneration gate
+  // keeps block_5 flagged and the cap/budget paths below are actually exercised.
   const criticalBlock5Judge = JSON.stringify({
     pass: false,
     score: 60,
@@ -646,8 +650,10 @@ flowchart LR
       {
         block_id: 'block_5',
         severity: 'critical',
-        description: 'Decision matrix authority is still too generic.',
-        suggestion: 'Regenerate block 5 with concrete escalation owners.',
+        category: 'contradiction',
+        description:
+          'Decision matrix repeats responsibility-zone ownership already defined in block_3.',
+        suggestion: 'Regenerate block 5 to reference block_3 instead of restating its ownership.',
       },
     ],
     needs_regeneration: ['block_5'],
@@ -772,6 +778,186 @@ flowchart LR
     expect(update.errors).toBeUndefined();
     expect(update.warnings).toBeUndefined();
     expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_5']);
+  });
+
+  const insufficientAntiGoals = `## 2. Анти-цели
+
+| Анти-цель | Владелец |
+| --- | --- |
+| Продуктовая дорожная карта | Продукт |
+| Юридические условия | Юристы |
+| Тикеты поддержки | Поддержка |`;
+
+  function judgeVerdictContent(
+    issue: Record<string, unknown>,
+    needsRegeneration: string[]
+  ): string {
+    return JSON.stringify({
+      pass: false,
+      score: 78,
+      issues: [issue],
+      needs_regeneration: needsRegeneration,
+    });
+  }
+
+  it('downgrades an LLM style-category critical to a warning and never regenerates it', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: judgeVerdictContent(
+        {
+          block_id: 'block_5',
+          severity: 'critical',
+          category: 'style',
+          description: 'Reads like generic HR jargon; make it punchier.',
+          suggestion: 'Tighten the wording.',
+        },
+        ['block_5']
+      ),
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+        blockRegenerationAttempts: {},
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
+    expect(update.lastJudgeVerdict?.issues).toContainEqual(
+      expect.objectContaining({ block_id: 'block_5', severity: 'warning', category: 'style' })
+    );
+  });
+
+  it('regenerates an LLM critical whose category is in the regeneration taxonomy', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: judgeVerdictContent(
+        {
+          block_id: 'block_5',
+          severity: 'critical',
+          category: 'contradiction',
+          description: 'Decision matrix contradicts responsibility zones owned by block_3.',
+          suggestion: null,
+        },
+        ['block_5']
+      ),
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+        blockRegenerationAttempts: {},
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_5']);
+    expect(update.lastJudgeVerdict?.issues).toContainEqual(
+      expect.objectContaining({
+        block_id: 'block_5',
+        severity: 'critical',
+        category: 'contradiction',
+      })
+    );
+  });
+
+  it('defensively downgrades an LLM critical that carries no category', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: judgeVerdictContent(
+        {
+          block_id: 'block_5',
+          severity: 'critical',
+          description: 'Uncategorized critical from a malformed judge response.',
+          suggestion: null,
+        },
+        ['block_5']
+      ),
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+        blockRegenerationAttempts: {},
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
+    expect(update.lastJudgeVerdict?.issues).toContainEqual(
+      expect.objectContaining({ block_id: 'block_5', severity: 'warning' })
+    );
+  });
+
+  it('keeps deterministic criticals for regeneration even when the LLM critical is style-gated', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: judgeVerdictContent(
+        {
+          block_id: 'block_5',
+          severity: 'critical',
+          category: 'style',
+          description: 'Tone could be crisper.',
+          suggestion: null,
+        },
+        ['block_5']
+      ),
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_2', 'block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    // block_2 fails the deterministic anti-goals minimum (3 < 4); the LLM adds only a
+    // style critical on block_5. The deterministic regen must survive the gate while
+    // the style critical is downgraded.
+    const update = await node(
+      baseJudgeState({
+        generatedBlocks: blocks([
+          ['block_2', insufficientAntiGoals],
+          ['block_5', validDecisionMatrix],
+        ]),
+        blockRegenerationAttempts: {},
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_2']);
+    expect(update.lastJudgeVerdict?.issues).toContainEqual(
+      expect.objectContaining({ block_id: 'block_2', severity: 'critical' })
+    );
+    expect(update.lastJudgeVerdict?.issues).toContainEqual(
+      expect.objectContaining({ block_id: 'block_5', severity: 'warning', category: 'style' })
+    );
   });
 
   it('passes the input-size fallback routing threshold to the judge LLM call', async () => {

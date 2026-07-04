@@ -564,7 +564,8 @@ describe('Career Playbook graph', () => {
                 {
                   block_id: 'block_5',
                   severity: 'critical',
-                  description: 'Decision matrix is still too generic.',
+                  category: 'contradiction',
+                  description: 'Decision matrix repeats ownership already defined in block_3.',
                   suggestion: 'Regenerate block 5.',
                 },
               ],
@@ -662,7 +663,9 @@ REGENERATED_FAQ_TOKEN_N1: обновлённый ответ, сформиров�
         {
           block_id: 'block_18',
           severity: 'critical',
-          description: 'FAQ block is too generic and must be regenerated.',
+          category: 'contradiction',
+          description:
+            'FAQ block repeats answers that contradict block_22 and must be regenerated.',
           suggestion: 'Rewrite the FAQ with concrete answers.',
         },
       ],

@@ -536,11 +536,19 @@ RoleProfileSpec:
     promptTemplate: `SYSTEM:
 Review generated Career Playbook blocks for consistency against RoleProfileSpec and previous groups.
 
-Checks:
-- No repetition against RoleProfileSpec.block_boundaries.
-- Cross-references are coherent: competencies with tools, KPIs with responsibilities, anti-goals with duties.
-- Format requirements are satisfied: anti-goals >= 4, decision matrix >= 4, failure modes >= 3, and Mermaid coverage for career path, dependencies, and main process.
-- Output is actionable business-owner language, not generic HR jargon.
+Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these five categories:
+- "contradiction": the block contradicts RoleProfileSpec, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block.
+- "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a required Mermaid diagram (career path, dependencies, or main process) is absent.
+- "wrong_language": user-facing text is not in the target content language.
+- "unresolved_placeholder": raw template placeholders remain (e.g. [дата], {fill}).
+- "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence.
+
+Everything else — tone, "too generic", "not actionable enough", "reads like HR jargon", phrasing, style preferences — is at most "warning" (or "info"), and is NEVER grounds for regeneration. Reason: the deterministic layer already blocks the hard failures reliably, so routing style opinions into regeneration only burns cycles without improving correctness; prefer author freedom over rigid style rules.
+
+Rules:
+- Every issue MUST include a "category" field. Use "style" for any non-critical stylistic or tone finding.
+- Use severity "critical" ONLY for issues in the five critical categories above; use "warning" or "info" for everything else.
+- List a block id in "needs_regeneration" only when it has a critical issue in one of the five critical categories.
 
 Return only valid JSON:
 {
@@ -550,6 +558,7 @@ Return only valid JSON:
     {
       "block_id": "block_5",
       "severity": "critical" | "warning" | "info",
+      "category": "contradiction" | "format_minimum" | "wrong_language" | "unresolved_placeholder" | "invented_number" | "style",
       "description": "...",
       "suggestion": "..."
     }
