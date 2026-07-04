@@ -837,6 +837,77 @@ Mission
     expect(result.generatedBlocks.block_5?.content).toBe(regeneratedBlock5);
     expect(result.errors).toEqual([]);
   });
+
+  it('scopes the in-window re-judge to only the regenerated block after a regeneration', async () => {
+    // Group 1 comes back with too few anti-goals, so the first group-1 judge flags block_2;
+    // after regenerating it, the in-window re-judge must review only block_2 (delta re-judge),
+    // while the final full-document judge still spans header .. block_26.
+    const groupOneWithTooFewAntiGoals = groupMarkdownByPromptKey[
+      'career_playbook_group_1_foundation'
+    ].replace('- Support ownership\n- Hiring plan\n', '');
+    const regeneratedAntiGoals = `## 2. Анти-цели: что эта роль НЕ делает
+
+- Product roadmap
+- Legal approval
+- Support ownership
+- Hiring plan`;
+
+    const judgeGroupIds: string[] = [];
+    const runtime = {
+      renderPrompt: vi
+        .fn()
+        .mockImplementation((promptKey: string, variables?: Record<string, string>) => {
+          if (promptKey === 'career_playbook_cross_block_judge') {
+            judgeGroupIds.push(variables?.group_id ?? '');
+          }
+          return Promise.resolve(promptKey);
+        }),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        const build = (content: string) => ({
+          content,
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve(build(JSON.stringify(roleProfileSpec)));
+        }
+        if (prompt === 'career_playbook_group_1_foundation') {
+          return Promise.resolve(build(groupOneWithTooFewAntiGoals));
+        }
+        if (prompt === 'career_playbook_block_regenerator') {
+          return Promise.resolve(build(regeneratedAntiGoals));
+        }
+        if (prompt === 'career_playbook_cross_block_judge') {
+          return Promise.resolve(build(JSON.stringify({ pass: true, score: 95 })));
+        }
+
+        return Promise.resolve(build(groupMarkdownByPromptKey[prompt]));
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+
+    // The first judge of group 1 sees the whole group ...
+    expect(judgeGroupIds[0]).toContain('block_2');
+    expect(judgeGroupIds[0]).toContain('block_5');
+    // ... the second judge of group 1 (the in-window re-judge after regenerating block_2)
+    // is scoped to only the regenerated block.
+    expect(judgeGroupIds[1]).toBe('block_2');
+    // The final full-document judge still spans the whole document (header .. block_26).
+    const finalGroupId = judgeGroupIds[judgeGroupIds.length - 1];
+    expect(finalGroupId).toContain('header');
+    expect(finalGroupId).toContain('block_26');
+
+    expect(result.generatedBlocks.block_2?.content).toBe(regeneratedAntiGoals);
+    expect(result.errors).toEqual([]);
+  });
 });
 
 describe('routeAfterBlockRegeneration', () => {

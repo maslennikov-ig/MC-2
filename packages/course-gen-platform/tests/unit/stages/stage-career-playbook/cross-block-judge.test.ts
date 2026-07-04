@@ -7,8 +7,10 @@ import type {
 import {
   countMermaidDiagrams,
   createCrossBlockJudgeNode,
+  isCareerPlaybookDeltaReJudgeEnabled,
   parseCareerPlaybookJudgeVerdict,
   runCareerPlaybookDeterministicChecks,
+  selectDeltaReJudgeBlockIds,
   validateMermaidCoverage,
 } from '@/stages/stage-career-playbook/nodes/cross-block-judge';
 import { resolveJudgeFallbackTokenThreshold } from '@/stages/stage-career-playbook/nodes/cross-block-judge-structured';
@@ -958,6 +960,166 @@ flowchart LR
     expect(update.lastJudgeVerdict?.issues).toContainEqual(
       expect.objectContaining({ block_id: 'block_5', severity: 'warning', category: 'style' })
     );
+  });
+
+  const acceptedVerdict = {
+    pass: true,
+    score: 95,
+    issues: [],
+    needs_regeneration: [],
+  };
+
+  function judgedBlock(content: string): CareerPlaybookBlockState {
+    return { ...block(content), judge_verdict: acceptedVerdict };
+  }
+
+  describe('delta re-judge scoping', () => {
+    it('returns the whole window on the first judge (every block still unjudged)', () => {
+      const window: CareerPlaybookBlockId[] = ['block_2', 'block_5'];
+      const generatedBlocks = blocks([
+        ['block_2', validAntiGoals],
+        ['block_5', validDecisionMatrix],
+      ]);
+
+      expect(selectDeltaReJudgeBlockIds(window, generatedBlocks)).toEqual(['block_2', 'block_5']);
+    });
+
+    it('narrows to regenerated blocks when a window sibling is already judged', () => {
+      const window: CareerPlaybookBlockId[] = ['block_2', 'block_5'];
+      // block_2 carries a prior verdict (accepted); block_5 was just regenerated (null verdict).
+      const generatedBlocks = {
+        block_2: judgedBlock(validAntiGoals),
+        block_5: block(validDecisionMatrix),
+      };
+
+      expect(selectDeltaReJudgeBlockIds(window, generatedBlocks)).toEqual(['block_5']);
+    });
+
+    it('falls back to the whole window when no block was regenerated (all judged)', () => {
+      const window: CareerPlaybookBlockId[] = ['block_2', 'block_5'];
+      const generatedBlocks = {
+        block_2: judgedBlock(validAntiGoals),
+        block_5: judgedBlock(validDecisionMatrix),
+      };
+
+      expect(selectDeltaReJudgeBlockIds(window, generatedBlocks)).toEqual(['block_2', 'block_5']);
+    });
+
+    it('defaults on and honors the disable values for the env flag', () => {
+      expect(isCareerPlaybookDeltaReJudgeEnabled(undefined)).toBe(true);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('')).toBe(true);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('1')).toBe(true);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('true')).toBe(true);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('0')).toBe(false);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('false')).toBe(false);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('OFF')).toBe(false);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('no')).toBe(false);
+      expect(isCareerPlaybookDeltaReJudgeEnabled('disabled')).toBe(false);
+    });
+
+    it('shows the judge only the regenerated block and keeps siblings on their last verdict', async () => {
+      const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+      const invokeLLM = vi.fn().mockResolvedValue({
+        content: JSON.stringify({ pass: true, score: 95, issues: [], needs_regeneration: [] }),
+        model: 'mock-judge-model',
+        inputTokens: 50,
+        outputTokens: 40,
+        costUsd: 0.004,
+      });
+
+      const node = createCrossBlockJudgeNode({
+        currentBlockIds: ['block_2', 'block_5'],
+        useLLMJudge: true,
+        runtime: { renderPrompt, invokeLLM },
+      });
+      const update = await node(
+        baseJudgeState({
+          generatedBlocks: {
+            block_2: judgedBlock(validAntiGoals),
+            block_5: block(validDecisionMatrix),
+          },
+          blockRegenerationAttempts: { block_5: 1 },
+        })
+      );
+
+      // Only block_5 (null verdict) reaches the judge; block_2's accepted content is excluded.
+      const promptVars = renderPrompt.mock.calls[0][1] as Record<string, string>;
+      expect(promptVars.group_id).toBe('block_5');
+      expect(promptVars.current_group_content).toContain('Матрица решений');
+      expect(promptVars.current_group_content).not.toContain('Анти-цели');
+
+      // Only block_5 receives the new verdict; block_2 is absent from the update, so state
+      // keeps the verdict its previous judge pass attached (delta merge semantics).
+      expect(update.generatedBlocks?.block_5?.judge_verdict).toMatchObject({ pass: true });
+      expect(update.generatedBlocks?.block_2).toBeUndefined();
+
+      // Routing/cap accounting still spans the full window.
+      expect(update.lastJudgedBlockIds).toEqual(['block_2', 'block_5']);
+    });
+
+    it('re-judges the whole window when delta re-judge is disabled', async () => {
+      const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+      const invokeLLM = vi.fn().mockResolvedValue({
+        content: JSON.stringify({ pass: true, score: 95, issues: [], needs_regeneration: [] }),
+        model: 'mock-judge-model',
+        inputTokens: 50,
+        outputTokens: 40,
+        costUsd: 0.004,
+      });
+
+      const node = createCrossBlockJudgeNode({
+        currentBlockIds: ['block_2', 'block_5'],
+        useLLMJudge: true,
+        deltaReJudge: false,
+        runtime: { renderPrompt, invokeLLM },
+      });
+      await node(
+        baseJudgeState({
+          generatedBlocks: {
+            block_2: judgedBlock(validAntiGoals),
+            block_5: block(validDecisionMatrix),
+          },
+          blockRegenerationAttempts: { block_5: 1 },
+        })
+      );
+
+      const promptVars = renderPrompt.mock.calls[0][1] as Record<string, string>;
+      expect(promptVars.group_id).toBe('block_2, block_5');
+      expect(promptVars.current_group_content).toContain('Анти-цели');
+      expect(promptVars.current_group_content).toContain('Матрица решений');
+    });
+
+    it('shows the whole group on the first judge even with delta re-judge enabled', async () => {
+      const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+      const invokeLLM = vi.fn().mockResolvedValue({
+        content: JSON.stringify({ pass: true, score: 95, issues: [], needs_regeneration: [] }),
+        model: 'mock-judge-model',
+        inputTokens: 50,
+        outputTokens: 40,
+        costUsd: 0.004,
+      });
+
+      const node = createCrossBlockJudgeNode({
+        currentBlockIds: ['block_2', 'block_5'],
+        useLLMJudge: true,
+        runtime: { renderPrompt, invokeLLM },
+      });
+      await node(
+        baseJudgeState({
+          // Both blocks freshly generated (null verdict) => first judge => full group.
+          generatedBlocks: blocks([
+            ['block_2', validAntiGoals],
+            ['block_5', validDecisionMatrix],
+          ]),
+          blockRegenerationAttempts: {},
+        })
+      );
+
+      const promptVars = renderPrompt.mock.calls[0][1] as Record<string, string>;
+      expect(promptVars.group_id).toBe('block_2, block_5');
+      expect(promptVars.current_group_content).toContain('Анти-цели');
+      expect(promptVars.current_group_content).toContain('Матрица решений');
+    });
   });
 
   it('passes the input-size fallback routing threshold to the judge LLM call', async () => {
