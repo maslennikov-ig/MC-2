@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   CareerPlaybookBlockIdSchema,
+  CareerPlaybookJudgeIssueCategorySchema,
   type CareerPlaybookJudgeVerdict,
   type CareerPlaybookNodeCost,
 } from '@megacampus/shared-types';
@@ -9,9 +10,38 @@ import type { CareerPlaybookRuntime } from './runtime';
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
 const JUDGE_PHASE = 'stage_career_playbook_judge';
 
+// Estimated-prompt-token threshold above which a judge call starts on the fallback
+// model instead of the primary. The final full-document judge (~31.5k tokens) used
+// to start on v4-flash and burn a 300s timeout before the retry net escalated to
+// v4-pro; starting large-input judge calls fallback-first removes that waste while
+// the retry net stays as the safety net. Group-window judges have smaller input, so
+// this size gate leaves them on the primary model.
+const DEFAULT_JUDGE_FALLBACK_TOKEN_THRESHOLD = 28_000;
+const JUDGE_FALLBACK_TOKEN_THRESHOLD_ENV = 'CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD';
+
+/**
+ * Resolve the judge large-input routing threshold (estimated prompt tokens) from
+ * `CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD`. An unset, non-numeric, or
+ * non-positive value yields the default so a bad env value can never silently
+ * disable the routing.
+ */
+export function resolveJudgeFallbackTokenThreshold(
+  value: string | undefined = process.env[JUDGE_FALLBACK_TOKEN_THRESHOLD_ENV]
+): number {
+  if (!value) return DEFAULT_JUDGE_FALLBACK_TOKEN_THRESHOLD;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    return DEFAULT_JUDGE_FALLBACK_TOKEN_THRESHOLD;
+  }
+  return parsed;
+}
+
 const LLMStructuredJudgeIssueSchema = z.object({
   block_id: CareerPlaybookBlockIdSchema,
   severity: z.enum(['critical', 'warning', 'info']),
+  // Required: the judge must classify every issue so the regeneration gate can tell
+  // taxonomy-backed criticals apart from stylistic ones.
+  category: CareerPlaybookJudgeIssueCategorySchema,
   description: z.string().min(1),
   suggestion: z.string().min(1).nullable(),
 });
@@ -38,6 +68,8 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  durationMs?: number;
+  attemptCount?: number;
 }): CareerPlaybookNodeCost {
   return {
     node: 'crossBlockJudge',
@@ -45,6 +77,8 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    duration_ms: result.durationMs,
+    attempts: result.attemptCount,
   };
 }
 
@@ -70,6 +104,7 @@ Return only a valid JSON object matching this shape:
     {
       "block_id": "header or block_1 through block_26",
       "severity": "critical | warning | info",
+      "category": "contradiction | format_minimum | wrong_language | unresolved_placeholder | invented_number | style",
       "description": "clear issue",
       "suggestion": "clear repair suggestion or null"
     }
@@ -94,6 +129,9 @@ export async function invokeStructuredJudgeWithRepair(
     language,
     temperature: 0.2,
     maxTokens: 4_000,
+    // Route the large final-document judge onto the fallback model up front so it
+    // does not burn a primary-model timeout before the retry net escalates.
+    preferFallbackModelAboveTokens: resolveJudgeFallbackTokenThreshold(),
     structuredOutputSchema: LLMStructuredJudgeVerdictSchema,
     structuredOutputName: 'career_playbook_cross_block_judge',
     structuredOutputMethod: 'jsonSchema' as const,

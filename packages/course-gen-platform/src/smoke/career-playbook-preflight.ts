@@ -1,5 +1,13 @@
 import type { RedisOptions } from 'ioredis';
 
+import {
+  checkPhaseModelPricingHealth,
+  resolveDefaultPhaseConfig,
+  EMERGENCY_FALLBACK_MODEL,
+  type ModelPricingHealthResult,
+  type PhasePricingConfigLike,
+} from '@/shared/llm/model-config-service';
+
 export type CareerPlaybookSmokeEnv = NodeJS.ProcessEnv | Record<string, string | undefined>;
 export type CareerPlaybookSmokeMode = 'read-only' | 'mutation-smoke';
 export type CareerPlaybookTargetEnvironment =
@@ -78,6 +86,7 @@ export interface CareerPlaybookSmokeProbes {
   checkSupabaseSchema?: (env: CareerPlaybookSmokeEnv) => Promise<SupabaseSchemaProbeResult>;
   checkRedisReadiness?: (env: CareerPlaybookSmokeEnv) => Promise<RedisReadinessProbeResult>;
   mutationProbe?: () => Promise<unknown>;
+  checkModelPricingHealth?: () => ModelPricingHealthResult | Promise<ModelPricingHealthResult>;
 }
 
 interface ReadOnlySupabaseProbeClient {
@@ -99,6 +108,76 @@ const REQUIRED_BACKEND_ENV = [
 
 const DEFAULT_QUEUE_NAME = 'course-generation';
 const REDIS_PROBE_CONNECT_TIMEOUT_MS = 2000;
+
+/**
+ * Career Playbook phases whose configured models are billed through estimateCost().
+ * Mirrors the phase names used by the stage-career-playbook nodes; kept here (the
+ * canonical constants are unexported/inline in the node files) so the preflight can
+ * verify pricing coverage without importing stage-specific node modules.
+ */
+const CAREER_PLAYBOOK_PRICED_PHASES = [
+  'stage_career_playbook_department_classifier',
+  'stage_career_playbook_spec',
+  'stage_career_playbook_followup',
+  'stage_career_playbook_judge',
+  'stage_career_playbook_regenerator',
+  'stage_career_playbook_group_1',
+  'stage_career_playbook_group_2',
+  'stage_career_playbook_group_3',
+  'stage_career_playbook_group_4',
+  'stage_career_playbook_group_5',
+  'stage_career_playbook_group_6',
+] as const;
+
+/** Pseudo-phase label so the runtime emergency fallback model is pricing-checked too. */
+const EMERGENCY_FALLBACK_PHASE = 'career_playbook_emergency_fallback';
+
+/**
+ * Default (network-free) model-pricing health probe.
+ *
+ * Resolves each Career Playbook phase to its offline default config (the same
+ * DEFAULT_PHASE_CONFIGS → global_default chain getModelForPhase uses when the DB
+ * is unavailable) plus the runtime emergency fallback, then verifies every model
+ * id is present in the OpenRouter pricing catalog. Reuses the shared pricing
+ * catalog and config service; builds no new pricing table and performs no I/O.
+ */
+export function defaultModelPricingHealthProbe(): ModelPricingHealthResult {
+  const phaseConfigs: Record<string, PhasePricingConfigLike> = {};
+  for (const phase of CAREER_PLAYBOOK_PRICED_PHASES) {
+    phaseConfigs[phase] = resolveDefaultPhaseConfig(phase) ?? {};
+  }
+  phaseConfigs[EMERGENCY_FALLBACK_PHASE] = { modelId: EMERGENCY_FALLBACK_MODEL };
+  return checkPhaseModelPricingHealth(phaseConfigs);
+}
+
+/**
+ * Run the model-pricing health probe and fold its result into the planned
+ * `model-config-pricing` read-only check. Extracted from the runner so the main
+ * preflight stays within its complexity budget.
+ */
+async function applyModelPricingCheck(
+  checks: CareerPlaybookPreflightCheck[],
+  probes: CareerPlaybookSmokeProbes
+): Promise<void> {
+  const pricingIndex = checks.findIndex(check => check.id === 'model-config-pricing');
+  if (pricingIndex < 0) return;
+
+  const health = await (probes.checkModelPricingHealth ?? defaultModelPricingHealthProbe)();
+  const unpriced = health.unpricedModels;
+  const note =
+    unpriced.length > 0
+      ? `Configured Career Playbook models missing from OPENROUTER_PRICING (estimateCost prices them at $0, silently voiding cost tracking): ${unpriced
+          .map(finding => `${finding.modelId} (${finding.phaseName}/${finding.role})`)
+          .join(', ')}. Add pricing or update the phase config.`
+      : `All ${health.checkedModelIds.length} configured Career Playbook model ids are present in the OpenRouter pricing catalog; cost tracking is priceable.`;
+
+  checks[pricingIndex] = {
+    ...checks[pricingIndex],
+    status: unpriced.length > 0 ? 'warn' : 'pass',
+    origin: 'read-only-probe',
+    note,
+  };
+}
 
 function normalizeMode(mode: CareerPlaybookSmokeInput['mode']): CareerPlaybookSmokeMode {
   return mode ?? 'read-only';
@@ -262,6 +341,14 @@ function buildReadOnlyChecks(envChecks: CareerPlaybookEnvCheck[]): CareerPlayboo
         ? 'Ready to resolve the BullMQ queue name after Redis responds; no jobs will be added.'
         : 'Skipped because queue readiness depends on REDIS_URL.',
     },
+    {
+      id: 'model-config-pricing',
+      label: 'Model config pricing coverage',
+      status: 'skipped',
+      mutates: false,
+      origin: 'planner',
+      note: 'Ready to verify configured Career Playbook models are present in the OpenRouter pricing catalog; no I/O or generation.',
+    },
   ];
 }
 
@@ -420,6 +507,8 @@ export async function runCareerPlaybookSmokePreflight(
       };
     }
   }
+
+  await applyModelPricingCheck(checks, probes);
 
   const allChecks = [...checks, ...plan.mutationChecks];
 

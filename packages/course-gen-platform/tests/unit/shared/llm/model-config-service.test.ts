@@ -5,7 +5,12 @@ import {
   isMissingChatPhaseConfigError,
   resolveModelWithFallback,
   DEFAULT_PHASE_CONFIGS,
+  EMERGENCY_FALLBACK_MODEL,
+  checkPhaseModelPricingHealth,
+  isModelPriced,
+  resolveDefaultPhaseConfig,
 } from '@/shared/llm/model-config-service';
+import { getModelPricing } from '@/shared/llm/cost-calculator';
 import * as ModelConfigDB from '@/shared/llm/model-config-db';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
@@ -246,6 +251,86 @@ describe('model-config-service', () => {
           STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.fallbackModelId
         );
       });
+
+      describe('token-aware cache-first tier routing (mc2-gusxd)', () => {
+        // Both tiers carry maxContextTokens so the dynamic threshold is derived
+        // from the standard config: ru reserve 0.25 → threshold = 100000 * 0.75 = 75000.
+        const primeTwoTierMock = () =>
+          vi
+            .mocked(ModelConfigDB.fetchPhaseConfigFromDb)
+            .mockImplementation((_phase: any, _course: any, tier: any) => {
+              if (tier === 'standard')
+                return Promise.resolve({
+                  modelId: 'std-model',
+                  maxContextTokens: 100000,
+                  tier: 'standard',
+                } as any);
+              if (tier === 'extended')
+                return Promise.resolve({
+                  modelId: 'ext-model',
+                  maxContextTokens: 200000,
+                  tier: 'extended',
+                  cacheReadEnabled: true,
+                } as any);
+              return Promise.resolve(null);
+            });
+
+        it('cold call fetches from DB and selects standard below the dynamic threshold', async () => {
+          primeTwoTierMock();
+          // 50000 < 75000 → standard
+          const config = await service.getModelForPhase('cache_phase', 'course1', 50000, 'ru');
+          expect(config.modelId).toBe('std-model');
+          expect(ModelConfigDB.fetchPhaseConfigFromDb).toHaveBeenCalled();
+        });
+
+        it('cold call fetches from DB and selects extended above the dynamic threshold', async () => {
+          primeTwoTierMock();
+          // 150000 > 75000 → extended
+          const config = await service.getModelForPhase('cache_phase', 'course1', 150000, 'ru');
+          expect(config.modelId).toBe('ext-model');
+          expect(ModelConfigDB.fetchPhaseConfigFromDb).toHaveBeenCalled();
+        });
+
+        it('warm standard call reuses cache without any fetchPhaseConfigFromDb call', async () => {
+          primeTwoTierMock();
+          // Cold call primes BOTH tier caches
+          const cold = await service.getModelForPhase('cache_phase', 'course1', 50000, 'ru');
+          expect(cold.modelId).toBe('std-model');
+
+          vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockClear();
+
+          const warm = await service.getModelForPhase('cache_phase', 'course1', 50000, 'ru');
+          expect(warm.modelId).toBe('std-model'); // same tier selected
+          expect(ModelConfigDB.fetchPhaseConfigFromDb).toHaveBeenCalledTimes(0);
+        });
+
+        it('warm extended call reuses cache without any fetchPhaseConfigFromDb call', async () => {
+          primeTwoTierMock();
+          // Priming with a standard-selecting call still caches the extended tier
+          await service.getModelForPhase('cache_phase', 'course1', 50000, 'ru');
+
+          vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockClear();
+
+          const warm = await service.getModelForPhase('cache_phase', 'course1', 150000, 'ru');
+          expect(warm.modelId).toBe('ext-model'); // extended tier served from cache
+          expect(ModelConfigDB.fetchPhaseConfigFromDb).toHaveBeenCalledTimes(0);
+        });
+
+        it('warm cache preserves identical tier selection across the threshold', async () => {
+          primeTwoTierMock();
+          const coldStd = await service.getModelForPhase('cache_phase', 'course1', 50000, 'ru');
+          const coldExt = await service.getModelForPhase('cache_phase', 'course1', 150000, 'ru');
+
+          vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockClear();
+
+          const warmStd = await service.getModelForPhase('cache_phase', 'course1', 50000, 'ru');
+          const warmExt = await service.getModelForPhase('cache_phase', 'course1', 150000, 'ru');
+
+          expect(warmStd.modelId).toBe(coldStd.modelId);
+          expect(warmExt.modelId).toBe(coldExt.modelId);
+          expect(ModelConfigDB.fetchPhaseConfigFromDb).toHaveBeenCalledTimes(0);
+        });
+      });
     });
 
     describe('getJudgeModels', () => {
@@ -372,5 +457,71 @@ describe('model-config-service', () => {
       // simulate complete failure
       vi.spyOn(console, 'error').mockImplementation(() => {});
     });
+  });
+});
+
+describe('model pricing health check (IMP-4)', () => {
+  it('reports an unknown/deprecated model id as unpriced and a known catalog model as priced', () => {
+    const result = checkPhaseModelPricingHealth({
+      known_phase: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'openai/gpt-oss-20b' },
+      drifted_phase: {
+        modelId: 'openai/gpt-oss-120b', // retired/deprecated id, no pricing entry
+        fallbackModelId: 'deepseek/deepseek-v4-pro',
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.unpricedModels).toEqual([
+      { phaseName: 'drifted_phase', role: 'primary', modelId: 'openai/gpt-oss-120b' },
+    ]);
+    // Distinct, sorted, and only the priced models are silently accepted.
+    expect(result.checkedModelIds).toContain('deepseek/deepseek-v4-flash');
+    expect(result.checkedModelIds).toContain('deepseek/deepseek-v4-pro');
+    expect(result.missingPhases).toEqual([]);
+  });
+
+  it('passes when every configured model is present in the pricing catalog', () => {
+    const result = checkPhaseModelPricingHealth({
+      phase_a: {
+        modelId: 'deepseek/deepseek-v4-flash',
+        fallbackModelId: 'deepseek/deepseek-v4-pro',
+      },
+      phase_b: { modelId: EMERGENCY_FALLBACK_MODEL },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.unpricedModels).toEqual([]);
+  });
+
+  it('honors an injected pricing predicate and records unresolved phases', () => {
+    const result = checkPhaseModelPricingHealth(
+      {
+        resolvable: { modelId: 'model-x' },
+        unresolved: null,
+      },
+      { isPriced: (modelId: string) => modelId !== 'model-x' }
+    );
+
+    expect(result.unpricedModels).toEqual([
+      { phaseName: 'resolvable', role: 'primary', modelId: 'model-x' },
+    ]);
+    expect(result.missingPhases).toEqual(['unresolved']);
+  });
+
+  it('isModelPriced mirrors the OpenRouter pricing catalog', () => {
+    expect(isModelPriced(EMERGENCY_FALLBACK_MODEL)).toBe(
+      getModelPricing(EMERGENCY_FALLBACK_MODEL) !== null
+    );
+    expect(isModelPriced('definitely/not-a-real-model')).toBe(false);
+  });
+
+  it('resolveDefaultPhaseConfig falls back to global_default for unseeded phases', () => {
+    expect(resolveDefaultPhaseConfig('stage_career_playbook_group_1')).toBe(
+      DEFAULT_PHASE_CONFIGS['global_default']
+    );
+    // The offline default career-playbook fallback chain must stay priceable.
+    const config = resolveDefaultPhaseConfig('stage_career_playbook_group_1');
+    expect(config).not.toBeNull();
+    expect(isModelPriced(config!.modelId)).toBe(true);
   });
 });

@@ -1,10 +1,16 @@
 import { extractJSON, safeJSONParse } from '@/shared/workspace-utils';
+import { logger } from '@/shared/logger';
 import {
   CareerPlaybookRoleProfileSpecSchema,
   type CareerPlaybookNodeCost,
   type CareerPlaybookQAData,
   type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
+import {
+  buildCanonicalBlockTopicCorrectionPrompt,
+  findCanonicalBlockTopicDeviations,
+  normalizeRoleProfileSpecToCanonicalBlockTopics,
+} from './spec-builder-canonical';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 import {
   buildCareerPlaybookResearchQueries,
@@ -33,6 +39,8 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  durationMs?: number;
+  attemptCount?: number;
 }): CareerPlaybookNodeCost {
   return {
     node: 'specBuilder',
@@ -40,6 +48,8 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    duration_ms: result.durationMs,
+    attempts: result.attemptCount,
   };
 }
 
@@ -106,6 +116,15 @@ function normalizeRoleProfileSpecCandidate(candidate: unknown): unknown {
 
   return normalized;
 }
+
+export {
+  buildCanonicalBlockTopicCorrectionPrompt,
+  findCanonicalBlockTopicDeviations,
+  normalizeRoleProfileSpecToCanonicalBlockTopics,
+  type CareerPlaybookBlockTopicDeviation,
+  type CareerPlaybookBlockTopicDeviationKind,
+  type NormalizeCanonicalBlockTopicsResult,
+} from './spec-builder-canonical';
 
 export function buildSpecBuilderPromptVariables(
   qaData: CareerPlaybookQAData,
@@ -179,6 +198,83 @@ async function invokeRoleProfileSpecWithFallback(
   }
 }
 
+const SPEC_TOPIC_RETRY_TEMPERATURE = 0.2;
+
+/**
+ * Enforce the canonical 26-block topic layout on a freshly built spec. If the
+ * spec deviates, retry the spec call once with an explicit correction prompt,
+ * then always run deterministic normalization as the guaranteed-valid backstop.
+ * Returns any extra LLM results so their cost is accounted for.
+ */
+async function enforceCanonicalBlockTopics(
+  runtime: CareerPlaybookRuntime,
+  basePrompt: string,
+  spec: CareerPlaybookRoleProfileSpec
+): Promise<{
+  spec: CareerPlaybookRoleProfileSpec;
+  extraLLMResults: Awaited<ReturnType<CareerPlaybookRuntime['invokeLLM']>>[];
+}> {
+  const extraLLMResults: Awaited<ReturnType<CareerPlaybookRuntime['invokeLLM']>>[] = [];
+  const deviations = findCanonicalBlockTopicDeviations(spec);
+  let workingSpec = spec;
+  let retried = false;
+
+  // Only a topic the model actively got wrong (renamed or reassigned a block)
+  // justifies paying for a retry; boundaries the model merely omitted are filled
+  // losslessly by deterministic normalization below.
+  const substantiveDeviations = deviations.filter(deviation => deviation.kind !== 'missing');
+
+  if (substantiveDeviations.length > 0) {
+    try {
+      const correctionPrompt = buildCanonicalBlockTopicCorrectionPrompt(
+        basePrompt,
+        substantiveDeviations
+      );
+      const retryResult = await runtime.invokeLLM(correctionPrompt, {
+        phaseName: SPEC_BUILDER_PHASE,
+        promptKey: SPEC_BUILDER_PROMPT_KEY,
+        node: 'specBuilder',
+        temperature: SPEC_TOPIC_RETRY_TEMPERATURE,
+        maxTokens: 8_000,
+      });
+      extraLLMResults.push(retryResult);
+      retried = true;
+
+      const retrySpec = parseRoleProfileSpecFromLLM(retryResult.content);
+      const retrySubstantive = findCanonicalBlockTopicDeviations(retrySpec).filter(
+        deviation => deviation.kind !== 'missing'
+      );
+      if (retrySubstantive.length < substantiveDeviations.length) {
+        workingSpec = retrySpec;
+      }
+    } catch (retryError) {
+      logger.warn(
+        { error: errorMessageFrom(retryError) },
+        'career playbook spec canonical-topic retry failed; normalizing original spec'
+      );
+    }
+  }
+
+  const { spec: normalizedSpec, changedBlockIds } =
+    normalizeRoleProfileSpecToCanonicalBlockTopics(workingSpec);
+
+  if (deviations.length > 0 || changedBlockIds.length > 0) {
+    logger.info(
+      {
+        deviations: deviations.map(deviation => ({
+          blockId: deviation.blockId,
+          kind: deviation.kind,
+        })),
+        retried,
+        changedBlockIds,
+      },
+      'career playbook spec block topics normalized to canonical layout'
+    );
+  }
+
+  return { spec: normalizedSpec, extraLLMResults };
+}
+
 export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}) {
   const runtime = options.runtime ?? createCareerPlaybookRuntime();
 
@@ -207,11 +303,16 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
         runtime,
         prompt
       );
+      const { spec: canonicalSpec, extraLLMResults } = await enforceCanonicalBlockTopics(
+        runtime,
+        prompt,
+        roleProfileSpec
+      );
 
       return {
-        roleProfileSpec,
+        roleProfileSpec: canonicalSpec,
         webResearch,
-        nodeCosts: llmResults.map(buildNodeCost),
+        nodeCosts: [...llmResults, ...extraLLMResults].map(buildNodeCost),
         currentNode: 'group1Generator',
       };
     } catch (error) {

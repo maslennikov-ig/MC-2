@@ -471,9 +471,50 @@ export const CareerPlaybookQADataSchema = z.object({
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
 
+export const CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES = [
+  'contradiction',
+  'format_minimum',
+  'wrong_language',
+  'unresolved_placeholder',
+  'invented_number',
+  'style',
+] as const;
+export const CareerPlaybookJudgeIssueCategorySchema = z.enum(
+  CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES
+);
+export type CareerPlaybookJudgeIssueCategory = z.infer<
+  typeof CareerPlaybookJudgeIssueCategorySchema
+>;
+
+// Critical taxonomy: the only issue categories that justify LLM-driven block
+// regeneration. 'style' is intentionally excluded — stylistic/tone findings stay
+// visible as warnings but never trigger regeneration, because the deterministic
+// checks already gate the hard failures and forcing style opinions into
+// regeneration only burns cycles.
+export const CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES = [
+  'contradiction',
+  'format_minimum',
+  'wrong_language',
+  'unresolved_placeholder',
+  'invented_number',
+] as const satisfies readonly CareerPlaybookJudgeIssueCategory[];
+export type CareerPlaybookJudgeCriticalCategory =
+  (typeof CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES)[number];
+
+export function isCareerPlaybookJudgeCriticalCategory(
+  category: string | null | undefined
+): category is CareerPlaybookJudgeCriticalCategory {
+  return (
+    typeof category === 'string' &&
+    (CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES as readonly string[]).includes(category)
+  );
+}
+
 export const CareerPlaybookJudgeIssueSchema = z.object({
   block_id: CareerPlaybookBlockIdSchema,
   severity: z.enum(['critical', 'warning', 'info']),
+  // Optional so verdicts persisted before the severity rubric landed still parse.
+  category: CareerPlaybookJudgeIssueCategorySchema.optional(),
   description: z.string().min(1),
   suggestion: z.string().min(1).optional(),
 });
@@ -786,12 +827,20 @@ export const CareerPlaybookNodeCostSchema = z.object({
   input_tokens: z.number().int().nonnegative(),
   output_tokens: z.number().int().nonnegative(),
   cost_usd: z.number().nonnegative(),
+  // Per-call telemetry (optional for backward compatibility with rows written
+  // before instrumentation): total wall-clock across all attempts and the number
+  // of attempts consumed by the LLM call that produced this node cost.
+  duration_ms: z.number().nonnegative().optional(),
+  attempts: z.number().int().positive().optional(),
 });
 export type CareerPlaybookNodeCost = z.infer<typeof CareerPlaybookNodeCostSchema>;
 
 export const CareerPlaybookCostBreakdownSchema = z.object({
   nodeCosts: z.array(CareerPlaybookNodeCostSchema).default([]),
   total_cost_usd: z.number().nonnegative().default(0),
+  // Ground-truth block regeneration counts keyed by block id. Optional so legacy
+  // breakdowns without the field still parse and round-trip unchanged.
+  regeneration_attempts: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 export type CareerPlaybookCostBreakdown = z.infer<typeof CareerPlaybookCostBreakdownSchema>;
 

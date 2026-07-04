@@ -3,6 +3,7 @@ import {
   CareerPlaybookBlockIdSchema,
   CareerPlaybookJudgeIssueSchema,
   CareerPlaybookJudgeVerdictSchema,
+  isCareerPlaybookJudgeCriticalCategory,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookJudgeIssue,
@@ -26,23 +27,38 @@ import {
   StructuredJudgeOutputError,
 } from './cross-block-judge-structured';
 import { validateCareerPlaybookMermaidSyntax } from './mermaid-quality';
+import { getTargetLanguageTextViolations } from './language-consistency';
+import { findUnresolvedFillablePlaceholders } from './placeholder-detection';
+
+import {
+  validateAntiGoalsMinimum,
+  validateDecisionMatrixMinimum,
+  validateFailureModesMinimum,
+  validateMermaidCoverage,
+  type ValidateMermaidCoverageOptions,
+} from './cross-block-judge-checks';
+
+export {
+  CAREER_PLAYBOOK_MERMAID_REQUIREMENTS,
+  countMermaidDiagrams,
+  validateAntiGoalsMinimum,
+  validateDecisionMatrixMinimum,
+  validateFailureModesMinimum,
+  validateMermaidCoverage,
+  type MermaidDiagramRequirement,
+  type ValidateMermaidCoverageOptions,
+} from './cross-block-judge-checks';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
-
-export interface MermaidDiagramRequirement {
-  blockId: CareerPlaybookBlockId;
-  label: string;
-  minDiagrams: number;
-}
-
-export interface ValidateMermaidCoverageOptions {
-  requirements?: MermaidDiagramRequirement[];
-  requireAll?: boolean;
-}
 
 export interface RunDeterministicChecksInput {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   mermaid?: ValidateMermaidCoverageOptions;
+  /**
+   * Content language of the generated blocks (e.g. 'ru'). When provided, blocks
+   * are checked for target-language violations. Omit to skip the language check.
+   */
+  contentLanguage?: string;
 }
 
 export interface CreateCrossBlockJudgeNodeOptions {
@@ -50,127 +66,108 @@ export interface CreateCrossBlockJudgeNodeOptions {
   useLLMJudge?: boolean;
   runtime?: CareerPlaybookRuntime;
   currentNode?: CareerPlaybookGraphNode;
+  /**
+   * Delta re-judge: after a regeneration, re-review only the regenerated blocks in a
+   * bounded group window instead of the whole window. Defaults to the
+   * CAREER_PLAYBOOK_DELTA_REJUDGE env flag (on unless explicitly disabled). Only applies
+   * when `currentBlockIds` is set — the final full-document judge always reviews every
+   * block so it stays the cross-block safety net.
+   */
+  deltaReJudge?: boolean;
 }
 
-export const CAREER_PLAYBOOK_MERMAID_REQUIREMENTS: MermaidDiagramRequirement[] = [
-  { blockId: 'block_10', label: 'dependencies', minDiagrams: 1 },
-  { blockId: 'block_11', label: 'career path', minDiagrams: 1 },
-  { blockId: 'block_16', label: 'main process', minDiagrams: 1 },
-];
+const DELTA_REJUDGE_ENV_KEY = 'CAREER_PLAYBOOK_DELTA_REJUDGE';
 
-const TABLE_SEPARATOR_PATTERN = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
-
-function isTableLine(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed.startsWith('|') && trimmed.includes('|', 1);
+/**
+ * Whether delta re-judge is enabled. Defaults to on; set CAREER_PLAYBOOK_DELTA_REJUDGE to
+ * one of 0/false/off/no/disabled to revert to full-window re-judge (the reliability-first
+ * escape hatch — the final full-document judge stays the cross-block safety net either way).
+ */
+export function isCareerPlaybookDeltaReJudgeEnabled(
+  value = process.env[DELTA_REJUDGE_ENV_KEY]
+): boolean {
+  if (value == null) return true;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '') return true;
+  return !['0', 'false', 'off', 'no', 'disabled'].includes(normalized);
 }
 
-function isNonEmptyTableRow(line: string): boolean {
-  return (
-    line
-      .split('|')
-      .map(cell => cell.trim())
-      .filter(Boolean).length > 0
+/**
+ * Split a judge window into the block ids that should actually be re-reviewed this pass.
+ *
+ * After a regeneration only the regenerated blocks carry a null `judge_verdict` (the
+ * regenerator clears it); every already-accepted sibling still carries the verdict this
+ * window's previous judge pass attached. When the window is a strict mix of the two, only
+ * the regenerated delta is re-reviewed and the accepted siblings keep their last verdict.
+ *
+ * The FIRST judge of a window (every block still unjudged) and the all-failed-regeneration
+ * fallback (no block was cleared, so the delta would be empty) both return the whole window,
+ * preserving the original full-window behavior.
+ */
+export function selectDeltaReJudgeBlockIds(
+  windowBlockIds: CareerPlaybookBlockId[],
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookBlockId[] {
+  const regenerated = windowBlockIds.filter(
+    blockId => generatedBlocks[blockId]?.judge_verdict == null
   );
-}
+  const alreadyJudged = windowBlockIds.filter(
+    blockId => generatedBlocks[blockId]?.judge_verdict != null
+  );
 
-function countMarkdownTableBodyRows(markdown: string): number {
-  const lines = markdown.split(/\r?\n/);
-  let total = 0;
-
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!TABLE_SEPARATOR_PATTERN.test(lines[index])) {
-      continue;
-    }
-
-    let rowIndex = index + 1;
-    while (rowIndex < lines.length && isTableLine(lines[rowIndex])) {
-      if (!TABLE_SEPARATOR_PATTERN.test(lines[rowIndex]) && isNonEmptyTableRow(lines[rowIndex])) {
-        total += 1;
-      }
-      rowIndex += 1;
-    }
+  if (regenerated.length > 0 && alreadyJudged.length > 0) {
+    return regenerated;
   }
 
-  return total;
+  return windowBlockIds;
 }
 
-function countMarkdownListItems(markdown: string): number {
-  return markdown.split(/\r?\n/).filter(line => /^\s*(?:[-*+]|\d+[.)])\s+\S/.test(line)).length;
-}
-
-function countStructuredItems(markdown: string): number {
-  return Math.max(countMarkdownTableBodyRows(markdown), countMarkdownListItems(markdown));
-}
-
-function buildMinimumIssue(
-  blockId: CareerPlaybookBlockId,
-  label: string,
-  found: number,
-  minimum: number
-): CareerPlaybookJudgeIssue {
-  return {
-    block_id: blockId,
-    severity: 'critical',
-    description: `Expected ${blockId} to contain at least ${minimum} ${label}; found ${found}.`,
-    suggestion: `Add concrete rows until ${blockId} has at least ${minimum} ${label}.`,
-  };
-}
-
-export function validateAntiGoalsMinimum(
-  markdown: string,
-  minimum = 4
-): CareerPlaybookJudgeIssue[] {
-  const found = countStructuredItems(markdown);
-  return found >= minimum ? [] : [buildMinimumIssue('block_2', 'anti-goals', found, minimum)];
-}
-
-export function validateDecisionMatrixMinimum(
-  markdown: string,
-  minimum = 4
-): CareerPlaybookJudgeIssue[] {
-  const found = countStructuredItems(markdown);
-  return found >= minimum ? [] : [buildMinimumIssue('block_5', 'decisions', found, minimum)];
-}
-
-export function validateFailureModesMinimum(
-  markdown: string,
-  minimum = 3
-): CareerPlaybookJudgeIssue[] {
-  const found = countStructuredItems(markdown);
-  return found >= minimum ? [] : [buildMinimumIssue('block_21', 'failure modes', found, minimum)];
-}
-
-export function countMermaidDiagrams(markdown: string): number {
-  return markdown.match(/```mermaid[\s\S]*?```/gi)?.length ?? 0;
-}
-
-export function validateMermaidCoverage(
+export function validateBlockLanguageConsistency(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
-  options: ValidateMermaidCoverageOptions = {}
+  contentLanguage: string
 ): CareerPlaybookJudgeIssue[] {
-  const requirements = options.requirements ?? CAREER_PLAYBOOK_MERMAID_REQUIREMENTS;
-  const applicableRequirements = options.requireAll
-    ? requirements
-    : requirements.filter(requirement => Boolean(generatedBlocks[requirement.blockId]?.content));
+  const issues: CareerPlaybookJudgeIssue[] = [];
 
-  return applicableRequirements.flatMap(requirement => {
-    const content = generatedBlocks[requirement.blockId]?.content ?? '';
-    const found = countMermaidDiagrams(content);
+  for (const [blockId, blockState] of Object.entries(generatedBlocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
 
-    if (found >= requirement.minDiagrams) {
-      return [];
-    }
+    const violations = getTargetLanguageTextViolations(content, contentLanguage, blockId);
+    if (violations.length === 0) continue;
 
-    return [
-      {
-        block_id: requirement.blockId,
-        severity: 'critical',
-        description: `Expected ${requirement.label} Mermaid coverage in ${requirement.blockId}: at least ${requirement.minDiagrams} diagram(s), found ${found}.`,
-        suggestion: `Add a fenced mermaid diagram for the ${requirement.label} view.`,
-      } satisfies CareerPlaybookJudgeIssue,
-    ];
-  });
+    issues.push({
+      block_id: blockId,
+      severity: 'critical',
+      description: `${blockId} contains text that is not in the target content language (${contentLanguage}): ${violations.join('; ')}`,
+      suggestion: `Rewrite ${blockId} so all user-facing text is in the target content language (${contentLanguage}).`,
+    });
+  }
+
+  return issues;
+}
+
+export function validateFillablePlaceholderResolution(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(generatedBlocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const placeholders = findUnresolvedFillablePlaceholders(content);
+    if (placeholders.length === 0) continue;
+
+    const uniquePlaceholders = Array.from(new Set(placeholders));
+    issues.push({
+      block_id: blockId,
+      severity: 'critical',
+      description: `${blockId} contains ${uniquePlaceholders.length} unresolved fillable placeholder(s): ${uniquePlaceholders.join(', ')}.`,
+      suggestion: `Replace each raw placeholder in ${blockId} with a concrete value or an explicit "field to fill" phrase.`,
+    });
+  }
+
+  return issues;
 }
 
 function scoreFromIssues(issues: CareerPlaybookJudgeIssue[]): number {
@@ -285,6 +282,12 @@ export async function runCareerPlaybookDeterministicChecks(
   issues.push(...validateMermaidCoverage(generatedBlocks, input.mermaid));
   issues.push(...(await validateCareerPlaybookMermaidSyntax(generatedBlocks)));
 
+  if (input.contentLanguage) {
+    issues.push(...validateBlockLanguageConsistency(generatedBlocks, input.contentLanguage));
+  }
+
+  issues.push(...validateFillablePlaceholderResolution(generatedBlocks));
+
   return verdictFromIssues(issues);
 }
 
@@ -293,21 +296,41 @@ export function parseCareerPlaybookJudgeVerdict(rawContent: string): CareerPlayb
   return CareerPlaybookJudgeVerdictSchema.parse(normalizeJudgeVerdictCandidate(parsed));
 }
 
+/**
+ * Severity gate for LLM judge issues: a `critical` issue only stays critical when
+ * its `category` is in the regeneration taxonomy (spec contradiction, missing
+ * format minimum, wrong language, unresolved placeholder, invented number). A
+ * critical issue that is stylistic, or that the model left uncategorized, is
+ * defensively downgraded to `warning` so it stays visible but can never drive
+ * block regeneration. Deterministic issues never reach this path — they carry no
+ * category and are merged through unchanged.
+ */
+function downgradeNonTaxonomyCriticalIssues(
+  issues: CareerPlaybookJudgeIssue[]
+): CareerPlaybookJudgeIssue[] {
+  return issues.map(issue => {
+    if (issue.severity !== 'critical') return issue;
+    if (isCareerPlaybookJudgeCriticalCategory(issue.category)) return issue;
+    return { ...issue, severity: 'warning' as const };
+  });
+}
+
 function mergeJudgeVerdicts(
   deterministic: CareerPlaybookJudgeVerdict,
   llm: CareerPlaybookJudgeVerdict
 ): CareerPlaybookJudgeVerdict {
-  const criticalLLMIssueBlockIds = uniqueBlockIds(
-    llm.issues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
+  const gatedLLMIssues = downgradeNonTaxonomyCriticalIssues(llm.issues);
+  const regenerationEligibleBlockIds = uniqueBlockIds(
+    gatedLLMIssues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
   );
 
   return {
     pass: deterministic.pass && llm.pass,
     score: Math.min(deterministic.score, llm.score),
-    issues: [...deterministic.issues, ...llm.issues],
+    issues: [...deterministic.issues, ...gatedLLMIssues],
     needs_regeneration: uniqueBlockIds([
       ...deterministic.needs_regeneration,
-      ...llm.needs_regeneration.filter(blockId => criticalLLMIssueBlockIds.includes(blockId)),
+      ...llm.needs_regeneration.filter(blockId => regenerationEligibleBlockIds.includes(blockId)),
     ]),
   };
 }
@@ -430,18 +453,39 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
   return async function crossBlockJudgeNode(
     state: CareerPlaybookGraphStateType
   ): Promise<CareerPlaybookGraphStateUpdate> {
-    const currentBlocks = selectGeneratedBlocks(state.generatedBlocks, options.currentBlockIds);
-    const currentBlockIds = Object.keys(currentBlocks);
+    // The window is the full set of blocks this judge is responsible for (a fixed group, or
+    // the whole document for the final judge). Routing, cap accounting, and lastJudgedBlockIds
+    // always operate on the full window so the regeneration loop and window budget are
+    // unchanged; only the content actually shown to the judge (currentBlocks) may narrow to
+    // the regenerated delta on a re-judge.
+    const windowBlocks = selectGeneratedBlocks(state.generatedBlocks, options.currentBlockIds);
+    const windowBlockIds = Object.keys(windowBlocks);
 
-    if (currentBlockIds.length === 0) {
+    if (windowBlockIds.length === 0) {
       return {
         errors: ['crossBlockJudge failed: no generated blocks to judge'],
         currentNode: options.currentNode ?? 'crossBlockJudge',
       };
     }
 
+    // Delta re-judge only applies to bounded group windows (options.currentBlockIds set); the
+    // final full-document judge (no currentBlockIds) always reviews every block so it stays the
+    // cross-block safety net after any regeneration.
+    const deltaReJudgeEnabled =
+      Boolean(options.currentBlockIds) &&
+      (options.deltaReJudge ?? isCareerPlaybookDeltaReJudgeEnabled());
+    const scopedBlockIds = deltaReJudgeEnabled
+      ? selectDeltaReJudgeBlockIds(windowBlockIds, state.generatedBlocks)
+      : windowBlockIds;
+    const currentBlocks =
+      scopedBlockIds === windowBlockIds
+        ? windowBlocks
+        : selectGeneratedBlocks(state.generatedBlocks, scopedBlockIds);
+    const currentBlockIds = Object.keys(currentBlocks);
+
     const deterministicVerdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: currentBlocks,
+      contentLanguage: state.language,
     });
 
     let verdict = deterministicVerdict;
@@ -452,7 +496,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         return {
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           lastJudgeVerdict: deterministicVerdict,
-          lastJudgedBlockIds: currentBlockIds,
+          lastJudgedBlockIds: windowBlockIds,
           errors: ['crossBlockJudge failed: roleProfileSpec is missing'],
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
@@ -462,11 +506,14 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         const prompt = await runtime.renderPrompt(JUDGE_PROMPT_KEY, {
           group_id: currentBlockIds.join(', '),
           spec_json: JSON.stringify(state.roleProfileSpec, null, 2),
+          // Exclude the whole current window (not just the delta) from the previous-groups
+          // context so a delta re-judge keeps the same prior-groups view as the first judge;
+          // the delta block's accepted siblings are neither re-shown nor duplicated here.
           prev_groups_content:
             joinPreviousGroupMarkdown(
               state.generatedGroups,
               state.generatedBlocks,
-              currentBlockIds
+              windowBlockIds
             ) || 'none',
           current_group_content: joinBlockMarkdown(currentBlocks),
         });
@@ -488,7 +535,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           judgeVerdicts: [deterministicVerdict],
           lastJudgeVerdict: deterministicVerdict,
-          lastJudgedBlockIds: currentBlockIds,
+          lastJudgedBlockIds: windowBlockIds,
           nodeCosts,
           warnings: [
             `crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: ${
@@ -500,17 +547,21 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       }
     }
 
+    // Cap/window-budget accounting always spans the full window so the per-block (2) and
+    // per-window (8) regeneration caps are unchanged by delta scoping.
     const capped = capRegenerationWhenBudgetExhausted({
       verdict,
-      currentBlockIds,
+      currentBlockIds: windowBlockIds,
       attempts: state.blockRegenerationAttempts ?? {},
     });
 
     return {
+      // Only the re-reviewed blocks receive the new verdict; accepted siblings retain the
+      // verdict a previous pass of this window attached (delta merge semantics).
       generatedBlocks: attachVerdictToBlocks(currentBlocks, capped.verdict),
       judgeVerdicts: [capped.verdict],
       lastJudgeVerdict: capped.verdict,
-      lastJudgedBlockIds: currentBlockIds,
+      lastJudgedBlockIds: windowBlockIds,
       nodeCosts,
       ...(capped.warnings.length > 0 ? { warnings: capped.warnings } : {}),
       currentNode: options.currentNode ?? 'crossBlockJudge',

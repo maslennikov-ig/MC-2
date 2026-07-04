@@ -89,6 +89,28 @@ describe('Career Playbook smoke preflight planner', () => {
     );
   });
 
+  it('plans a read-only model-config pricing coverage check', () => {
+    const plan = buildCareerPlaybookSmokePlan({
+      env: {
+        NODE_ENV: 'development',
+        SUPABASE_URL: 'https://project.supabase.co',
+        SUPABASE_SERVICE_KEY: 'service-secret',
+        SUPABASE_ANON_KEY: 'anon-secret',
+        REDIS_URL: 'redis://example.redis:6379',
+      },
+      mode: 'read-only',
+      targetEnvironment: 'local',
+    });
+
+    expect(plan.readOnlyChecks).toContainEqual(
+      expect.objectContaining({
+        id: 'model-config-pricing',
+        status: 'skipped',
+        mutates: false,
+      })
+    );
+  });
+
   it('blocks staging readiness when the queue name is missing or shared default', async () => {
     const buildReport = (queueName?: string) =>
       runCareerPlaybookSmokePreflight(
@@ -334,6 +356,81 @@ describe('Career Playbook smoke preflight runner', () => {
       expect.objectContaining({
         id: 'redis-readiness',
         status: 'pass',
+      })
+    );
+  });
+
+  it('warns when a configured model id is missing from the OpenRouter pricing catalog', async () => {
+    const report = await runCareerPlaybookSmokePreflight(
+      {
+        env: {
+          NODE_ENV: 'development',
+          SUPABASE_URL: 'https://project.supabase.co',
+          SUPABASE_SERVICE_KEY: 'service-secret',
+          SUPABASE_ANON_KEY: 'anon-secret',
+          REDIS_URL: 'redis://localhost:6379',
+        },
+        mode: 'read-only',
+        targetEnvironment: 'local',
+      },
+      {
+        checkSupabaseSchema: vi.fn(async () => ({ ok: true, status: 'schema-present' })),
+        checkRedisReadiness: vi.fn(async () => ({
+          ok: true,
+          status: 'PONG',
+          queueName: 'career-playbook-smoke',
+        })),
+        checkModelPricingHealth: vi.fn(() => ({
+          ok: false,
+          checkedModelIds: ['deprecated/model-x'],
+          unpricedModels: [
+            { phaseName: 'stage_career_playbook_spec', role: 'primary' as const, modelId: 'deprecated/model-x' },
+          ],
+          missingPhases: [],
+        })),
+      }
+    );
+
+    expect(report.status).toBe('warn');
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'model-config-pricing',
+        status: 'warn',
+        mutates: false,
+        note: expect.stringContaining('deprecated/model-x'),
+      })
+    );
+  });
+
+  it('passes model-config pricing using the network-free default probe', async () => {
+    const report = await runCareerPlaybookSmokePreflight(
+      {
+        env: {
+          NODE_ENV: 'development',
+          SUPABASE_URL: 'https://project.supabase.co',
+          SUPABASE_SERVICE_KEY: 'service-secret',
+          SUPABASE_ANON_KEY: 'anon-secret',
+          REDIS_URL: 'redis://localhost:6379',
+        },
+        mode: 'read-only',
+        targetEnvironment: 'local',
+      },
+      {
+        checkSupabaseSchema: vi.fn(async () => ({ ok: true, status: 'schema-present' })),
+        checkRedisReadiness: vi.fn(async () => ({
+          ok: true,
+          status: 'PONG',
+          queueName: 'career-playbook-smoke',
+        })),
+        // checkModelPricingHealth intentionally omitted -> default (offline) probe runs.
+      }
+    );
+
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'model-config-pricing',
+        status: 'pass',
+        origin: 'read-only-probe',
       })
     );
   });

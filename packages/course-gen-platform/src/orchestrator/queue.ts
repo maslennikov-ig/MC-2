@@ -75,6 +75,46 @@ export function getQueue(): Queue<JobData> {
 }
 
 /**
+ * Maximum job-level attempts for Career Playbook generation jobs.
+ *
+ * Career Playbook jobs run under a long processor TTL (up to 120 minutes via
+ * CAREER_PLAYBOOK_PROCESSOR_MAX_TTL_MS). When that hard TTL fires, the sandboxed
+ * processor calls `process.exit()`, which BullMQ treats as a failed attempt. The
+ * LangGraph pipeline has NO resumable checkpoint, so every retry restarts the
+ * full, expensive generation from scratch — an observed 153-minute run cost ~3x.
+ * Capping attempts at 1 prevents a single TTL kill from spawning further full
+ * re-runs. The graph already performs per-phase internal retries, so genuine
+ * transient sub-failures are still handled inside a single attempt. (mc2-1maah)
+ */
+export const CAREER_PLAYBOOK_MAX_ATTEMPTS = 1;
+
+/**
+ * Resolve the effective BullMQ job options for a job.
+ *
+ * Reproduces the historical merge of per-job-type defaults with caller overrides,
+ * then applies the Career Playbook attempts cap. Extracted as a pure function so
+ * the cost-critical attempts policy can be unit-tested without a Redis connection.
+ *
+ * Behavior for every non-CAREER_PLAYBOOK job type is byte-for-byte identical to
+ * the previous inline merge.
+ */
+export function resolveJobOptions(
+  jobType: JobType,
+  customOptions?: import('bullmq').JobsOptions
+): import('bullmq').JobsOptions {
+  const defaultOptions = DEFAULT_JOB_OPTIONS[jobType];
+  const merged = customOptions ? { ...defaultOptions, ...customOptions } : defaultOptions;
+
+  if (jobType === JobType.CAREER_PLAYBOOK) {
+    // Force the cap last so it wins over both the shared-types default (3) and
+    // any caller-supplied attempts value.
+    return { ...merged, attempts: CAREER_PLAYBOOK_MAX_ATTEMPTS };
+  }
+
+  return merged;
+}
+
+/**
  * Add a job to the queue with type-specific options
  *
  * @param {JobType} jobType - The type of job to add
@@ -103,8 +143,7 @@ export async function addJob(
   customOptions?: import('bullmq').JobsOptions
 ) {
   const queue = getQueue();
-  const defaultOptions = DEFAULT_JOB_OPTIONS[jobType];
-  const options = customOptions ? { ...defaultOptions, ...customOptions } : defaultOptions;
+  const options = resolveJobOptions(jobType, customOptions);
 
   const job = await queue.add(jobType, jobData, options);
 

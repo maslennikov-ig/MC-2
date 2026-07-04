@@ -1,76 +1,54 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-28
-Stage: `mc2-db696.102` Career Playbook marketing manager generation stuck
+Updated: 2026-07-04 (evening)
+Stage: Career Playbook — judge/regen fix package (epic `mc2-db696.104`) CLOSED: A/B run e12a46ad on new worker code passed all epic gates
 Branch: `develop`
-Beads: `mc2-db696.102`, `.103`, `.88`, `.89`, `.90`, `.91`, `.92`, `.94`, `.98`, `.99`, `.100`, and `.101` closed
+Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93rrp` CLOSED; `mc2-m17al` open (owner decision — judge→flash DB promotion, now with strong data); `mc2-db696.61` open
 
 ## Current State
 
-- `mc2-db696.102`: live Career Playbook for `Менеджер маркетинга` (`6bb32d29-bf64-4195-94ea-90ca769bf0d3`) was orphaned in production: DB stayed `generating` / `reviewing_foundation` / `78%`, but Redis/BullMQ no longer had job `career-playbook-6bb32d29-bf64-4195-94ea-90ca769bf0d3`. With user authorization to restart the stuck generation, the same jobId was requeued in production at `2026-06-28 14:05 UTC`; BullMQ returned `active`, and live DB moved to `reviewing_operations` / `83%` by `14:06 UTC`.
-- Root cause found for `.102`: Career Playbook `llm_model_config.timeout_ms` is configured as `300000`, but `nodes/runtime.ts` ignored timeoutMs and could wait for a hung LangChain/OpenRouter invoke until the 120-minute processor TTL. Local fix now enforces timeoutMs with a runtime `Promise.race` and passes timeout to `ChatOpenAI` factory. The fix is local only; no commit, push, merge, or deploy has been performed for `.102`.
-- `mc2-db696.103`: fixed the Russian Career Playbook generation CTA overflow by shortening `Сгенерировать должностную инструкцию` to `Сгенерировать инструкцию` in the wizard messages and fallback copy. RED/GREEN wizard unit coverage was updated.
-- Secondary ops finding for `.102`: Supabase Edge Function `detect-stuck-generations` cron is returning `401`, and that function targets `courses`, not `career_playbooks`, so it would not recover this Career Playbook orphan even if invoked successfully.
-- `mc2-db696.101`: handoff state refresh remains local metadata from the previous delivery.
-- `mc2-db696.100`: delivery lint hotfix completed. Commit `db3786cc` was pushed to `origin/develop`; `.claude/scripts/deploy.sh --yes` passed `pnpm type-check` and `pnpm build`, merged `develop` into `master`, and pushed merge commit `3c286763` to `origin/master`. GitHub Actions completed successfully for both develop and master.
-- `mc2-db696.99`: delivery completed. Commit `7cbf74d7` was pushed to `origin/develop`; `.claude/scripts/deploy.sh --yes` passed `pnpm type-check` and `pnpm build`, merged `develop` into `master`, and pushed merge commit `ec7f033d` to `origin/master`. A follow-up handoff/Beads state commit `db8e2fcb` was later merged to master as `f4e8b8d6`.
-- `mc2-db696.94`: implemented locally. Career Playbook quality diagnostic dedupe/filter helpers now live in `@megacampus/shared-types` and are reused by backend handler/library mapping and the web viewer.
-- `mc2-db696.98`: implemented locally. Reader and library pages now share `normalizeVisibilityUpdateResponse` from `packages/web/components/career-playbook/library/normalizers.ts`.
-- `mc2-db696.91`: locally resolved/not reproduced. `pnpm build` originally passed on stale local `next@15.5.12`; lockfile requires `15.5.19`. After `pnpm install --frozen-lockfile`, local `node_modules` uses `next@15.5.19` and `pnpm build` passes through trace collection.
-- `mc2-db696.92`: review-and-fix pass remains closed locally. Accepted reviewer findings are implemented and verified.
-- `mc2-db696.90`: quality diagnostics dedupe/filtering/fair retry implementation remains closed locally.
-- `mc2-db696.89`: private share confirmation/public-link UX remains closed locally.
-- `mc2-db696.88`: generation stability fix remains closed locally.
-- Current worktree is dirty with `.102` timeout fix, `.103` CTA fix, Beads/handoff/stage updates; Beads are closed after local verification, but no commit, push, merge, or deploy has been performed for this combined delivery.
+- **A/B run #2 (playbook `e12a46ad`, 2026-07-04 14:13–14:33 UTC, NEW worker code) vs baseline b866d2f5**:
+  - Wall-clock **19.7 min** vs 44.4 (**-56%**); cost **$0.1278** vs $0.2404 (**-47%**).
+  - Regen attempts **14** (11 blocks, 3 at 2-cap) vs 39 calls (13/26 at cap); no window near the 8-cap.
+  - Judge: **12 calls, all v4-flash, all attempt=1, zero 300s timeouts** (baseline: 2×300s + pro escalations). Max judge input 21.2k tok (delta re-judge bounded it below the 28k fallback gate — gate armed but unneeded).
+  - Structural proof of new code: spec `deviations=[]` + normalization log (canonical topics), all 26 doc headings canonical, CTA in block 25, field-to-fill only as genuine template fields, no duplicate deal-stage models, criterion #1 pass (evidence pass, PDF, share).
+  - **Run #1 caveat** (playbook `35602db1`, 11:13 UTC): executed OLD worker code (CI lint 96/95 blocked Deploy to Dev) — invalid for attribution but a same-code variance data point (12 regens/24 min/$0.084): single-run deltas < ~2x are noise; structural markers are the real evidence.
+- **Late root cause found via run #2**: byte-identical stub diagrams in blocks 10/11/16 come from `final-assembler.ts` `appendMermaidSection` (exact-heading check → hardcoded stub appended next to rich diagrams), NOT from judge/regenerator prompts. Fixed in `15c47795` (any fenced mermaid satisfies the section; fallback kept for zero-diagram blocks), unit-pinned; lands on dev with the CI deploy of that commit — confirm visually on the next routine run.
+- Commits this session (develop, all pushed): `59ef88d5` 93rrp docs, `c588a9d4` .104.2, `9da92802` .104.6, `fa88561b` .104.5, `4db7cd97` 1slzl, `de74537a` .104.1, `8967b2db` .104.4 prompts, `d856aff7` .104.3, `14efe1e0` handoff, `19e6d8c3` lint refactor (module extraction), `15c47795` assembler stub fix.
+- CI: lint budget is `eslint src --max-warnings=95` (course-gen-platform) — one new max-lines warning fails Lint and silently skips Deploy to Dev. Always verify `megacampus-worker-dev` image date before attributing live-run behavior to new code.
+- Run artifacts (gitignored): `packages/course-gen-platform/artifacts/career-playbook-smoke/` — b866d2f5-era baseline row still in DB + two run artifacts (35602db1, e12a46ad) for future A/B.
 
-## Verification
+## Next
 
-- RED checks:
-  - `pnpm --filter @megacampus/shared-types test -- tests/career-playbook.test.ts`: failed before shared diagnostic helper implementation.
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/library-normalizers.test.ts`: failed before visibility normalizer implementation.
-- Targeted tests after `pnpm install --frozen-lockfile`:
-  - `pnpm --filter @megacampus/shared-types test -- tests/career-playbook.test.ts`: passed.
-  - `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/orchestrator/handlers/career-playbook-handler.test.ts tests/unit/stages/stage-career-playbook/graph.test.ts tests/unit/stages/stage-career-playbook/block-regenerator.test.ts tests/unit/career-playbook-library-service.test.ts`: passed.
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store.test.ts tests/unit/components/career-playbook/viewer.test.tsx tests/unit/components/career-playbook/viewer-page-client.test.tsx tests/unit/components/career-playbook/library-page-client.test.tsx tests/unit/components/career-playbook/library-normalizers.test.ts`: passed.
-- Repo gates:
-  - `pnpm lint`: passed after `mc2-db696.100` reduced backend warning count back to the configured `--max-warnings=95` budget.
-  - `git diff --check`: passed.
-  - `pnpm type-check`: passed.
-  - `pnpm build`: passed on `next@15.5.19`.
-- `mc2-db696.102` local verification:
-  - RED: `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/runtime.test.ts` failed because a hung LLM promise stayed `pending` and fallback was not reached.
-  - `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/runtime.test.ts`: passed, 4/4.
-  - `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/runtime.test.ts tests/unit/stages/stage-career-playbook/cross-block-judge.test.ts tests/unit/stages/stage-career-playbook/graph.test.ts`: passed, 21/21.
-  - `pnpm --filter @megacampus/course-gen-platform type-check`: passed.
-  - `pnpm --filter @megacampus/course-gen-platform build`: passed.
-  - `git diff --check`: passed.
-- `mc2-db696.103` local verification:
-  - RED: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx` failed before the copy change because the button still exposed `Сгенерировать должностную инструкцию`.
-  - `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/wizard.test.tsx`: passed, 35/35.
-- Combined pre-delivery verification:
-  - `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/runtime.test.ts tests/unit/stages/stage-career-playbook/cross-block-judge.test.ts tests/unit/stages/stage-career-playbook/graph.test.ts`: passed, 21/21.
-  - `git diff --check`: passed.
-  - `pnpm type-check`: passed.
-  - `pnpm build`: passed with existing Browserslist and `url.parse()` warnings.
-- Stage summary:
-  - `.codex/stages/mc2-db696.102/summary.md`
+1. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+
+## Verification run #3 (dea26647, 2026-07-04 15:18–15:33 UTC) — both open observations CLOSED
+
+- DB-served judge=flash confirmed live (container env has no override; 11/11 judge calls flash attempt=1, zero timeouts, max input 22.8k).
+- Stub diagrams GONE (fix `15c47795`): blocks 10/11/16 each carry exactly their own rich diagram; zero canonical stub headings.
+- Metrics trend across the three runs: 44.4 min / $0.240 / 39 regens (baseline, old code) → 19.7 / $0.128 / 14 (fix package) → **15.6 / $0.078 / 5 regens, zero caps** (fix package + stub fix + DB routing). Evidence pass, headings canonical, CTA present.
+
+## mc2-m17al CLOSED (owner-approved, 2026-07-04)
+
+- Judge promoted to v4-flash/pro-fallback in `llm_model_config` — migration `20260704150000_promote_career_playbook_judge_flash.sql` APPLIED to the shared DB (deliberate staging impact) and verified; routing test pins it. Note: CI does NOT auto-apply migrations — this one was applied manually via Supabase MCP; the committed file keeps history consistent.
+- `CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES` removed from `docker-compose.dev.yml` (routing now DB-served, identical effective config; lands on dev with the CI deploy).
+- Regenerator stays on pro (decision recorded on the bead: convergence-critical, flash risks cap-exhaustion criterion-#1 leaks for ~$0.05/run).
 
 ## Explicit defers
 
-- No code/test defers for `mc2-db696.94` or `mc2-db696.98`.
-- `mc2-db696.91` was closed as locally resolved/not reproduced after synchronizing `node_modules` to the lockfile and passing `pnpm build`; no tracked code change was needed.
-- `.102`/`.103` delivery is now authorized by the user with "Push, Merge, Deploy"; direct live requeue was performed for the stuck playbook after user authorization. No DB cleanup, cancel, deploy, or production code change has been performed yet in this turn.
+- `mc2-m17al`: owner decision (shared DB diqooqbuchsliypgwksu, staging impact).
+- .104.2 complement (per-block digests for final-judge input) — unnecessary at current input sizes; recorded on the closed bead.
+- routeAfterJudge vs blockRegenerator block-id selection divergence — recorded on closed `mc2-db696.104.6`; low priority now that zero-regen skip covers the symptom.
+- mc2-1slzl option B (spec-driven dynamic topics) — owner decision if ever wanted; option A shipped and validated.
 
-## Next recommended
+## Runbook — real dev generation
 
-Next stage id: continue `mc2-db696.102`.
-Recommended action: commit, push to `develop`, merge/deploy through the normal repo delivery flow, then run post-deploy smoke checks. Separately add/fix a Career Playbook stuck-generation recovery path. Keep monitoring live playbook `6bb32d29-bf64-4195-94ea-90ca769bf0d3`, which was requeued and had reached `reviewing_operations` / `83%` at `2026-06-28 14:11 UTC`.
-
-## Starter prompt for next orchestrator
-
-Use $orchestrator-stage in `/home/me/code/mc2` to continue combined delivery for `mc2-db696.102` and `mc2-db696.103`. Preserve dirty `.beads/issues.jsonl`, `.codex/handoff.md`, `.codex/stages/mc2-db696.102/summary.md`, backend timeout files, and Career Playbook wizard CTA files. Local root cause: Career Playbook runtime ignored configured timeoutMs, so hung LLM calls could wait until the 120-minute processor TTL. UI fix: Russian CTA is now `Сгенерировать инструкцию`. Live playbook `6bb32d29-bf64-4195-94ea-90ca769bf0d3` was requeued in production after the old BullMQ job was confirmed missing; it had reached `reviewing_operations` / `83%` by `2026-06-28 14:11 UTC`.
+Non-mutating preflight: `pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan --target dev`
+Full runbook (browser-console token method is primary): `docs/career-playbook/live-smoke-dev-run.md`. Queue MUST be `course-generation-dev`; poll `--poll-timeout-ms 7200000`; cap `--max-cost-usd 1` is 4x the observed cost. Use an ABSOLUTE `--dir` path (relative resolves against the shell cwd).
+Before any run meant to validate new pipeline code: `ssh megacampus-prod "docker inspect megacampus-worker-dev --format '{{.Created}}'"` — CI Deploy to Dev only runs on fully green CI.
+Artifacts auto-persist to `packages/course-gen-platform/artifacts/career-playbook-smoke/`; cleanup is manifest-only (row deletion is a manual step by exact id).
 
 ## Closeout Markers
 
-docs-reviewed: updated - handoff records live `.102` diagnosis and local timeout fix; no public API, schema, route, migration, deployment procedure, or operator workflow docs changed.
-graph-reviewed: blocked - Graphify was used for routing; post-change `graphify update . && graphify cluster-only . --no-viz` refused non-force overwrite because the new graph had 52,453 nodes vs existing 52,456. No `--force` was run.
+docs-reviewed: updated — handoff rewritten with A/B results and CI/deploy gotchas; runbook already updated this session (artifacts, cleanup semantics, token method).
+graph-reviewed: updated — `graphify update --force` after the final refactor/assembler fix (node count legitimately dropped 52503→52495 from module extraction).

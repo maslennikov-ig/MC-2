@@ -49,6 +49,7 @@ const CareerPlaybookCostNodeEvidenceSchema = z.object({
   outputTokens: z.number().int().nonnegative(),
   totalTokens: z.number().int().nonnegative(),
   costUsd: z.number().nonnegative(),
+  durationMs: z.number().nonnegative().optional(),
 });
 
 const CareerPlaybookCostEvidenceItemSchema = z.object({
@@ -136,6 +137,7 @@ function mapCostRow(row: CareerPlaybookCostRow) {
       outputTokens,
       totalTokens: inputTokens + outputTokens,
       costUsd: nodeCost.cost_usd,
+      ...(typeof nodeCost.duration_ms === 'number' ? { durationMs: nodeCost.duration_ms } : {}),
     };
   });
   const totalInputTokens = nodes.reduce((sum, node) => sum + node.inputTokens, 0);

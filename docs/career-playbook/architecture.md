@@ -20,6 +20,22 @@
 - Business context source migration: `packages/course-gen-platform/supabase/migrations/20260603110000_add_career_playbook_sources.sql`
 - Business context source cleanup migration: `packages/course-gen-platform/supabase/migrations/20260603123000_cascade_career_playbook_source_file_catalog.sql`
 
+## Prompt Serving Source
+
+Career Playbook stage prompts (`career_playbook_cross_block_judge`,
+`career_playbook_block_regenerator`, `career_playbook_group_1..6*`,
+`career_playbook_spec_builder`, follow-up keys, etc.) are served from the
+hardcoded registry in
+`packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts`.
+The prompt service (`prompt-service.ts`) prefers `prompt_templates` DB rows,
+but no rows exist for these keys — the only seeded career key is
+`career_playbook_card` (card image feature, see the
+`20260626121000_seed_career_playbook_card_prompt.sql` migration). The
+`Using hardcoded prompt fallback` log lines (~29 per run) are therefore the
+expected serving path, not an error. Single source of truth for stage prompt
+text is the code registry; do not seed partial DB rows for these keys without
+deciding a full migration of all career playbook prompt keys (see mc2-93rrp).
+
 ## Visibility And Owner-Only Management
 
 Career Playbooks use the same visibility vocabulary as courses:

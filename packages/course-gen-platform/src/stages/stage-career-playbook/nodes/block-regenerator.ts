@@ -160,6 +160,8 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  durationMs?: number;
+  attemptCount?: number;
 }): CareerPlaybookNodeCost {
   return {
     node: 'blockRegenerator',
@@ -167,6 +169,8 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    duration_ms: result.durationMs,
+    attempts: result.attemptCount,
   };
 }
 
@@ -224,26 +228,38 @@ function issueForBlock(
   );
 }
 
-export function selectPendingCareerPlaybookRegeneration(input: {
+export interface SelectCareerPlaybookRegenerationInput {
   verdict?: CareerPlaybookJudgeVerdict | null;
   blockIds: CareerPlaybookBlockId[];
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
   maxAttempts?: number;
   maxWindowAttempts?: number;
-}): CareerPlaybookPendingRegeneration | null {
+}
+
+/**
+ * Select every block the current judge verdict flags that can still be regenerated
+ * within the caps, ordered fewest-attempts-first. Applies the same per-block cap and
+ * window budget as the singular selector, then trims the batch to whatever window
+ * budget remains so caps are never exceeded across a single judge window. Batching
+ * lets one blockRegenerator visit fix all flagged blocks before the next re-judge,
+ * shrinking judge calls per window without loosening any cap.
+ */
+export function selectPendingCareerPlaybookRegenerations(
+  input: SelectCareerPlaybookRegenerationInput
+): CareerPlaybookPendingRegeneration[] {
   const maxAttempts = input.maxAttempts ?? CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS;
   const maxWindowAttempts =
     input.maxWindowAttempts ?? CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS;
   const verdict = input.verdict;
   if (!verdict?.needs_regeneration.length || verdict.pass) {
-    return null;
+    return [];
   }
 
-  if (
-    countCareerPlaybookRegenerationAttemptsForBlocks(input.attempts, input.blockIds) >=
-    maxWindowAttempts
-  ) {
-    return null;
+  const remainingWindow =
+    maxWindowAttempts -
+    countCareerPlaybookRegenerationAttemptsForBlocks(input.attempts, input.blockIds);
+  if (remainingWindow <= 0) {
+    return [];
   }
 
   const candidates = verdict.needs_regeneration
@@ -256,14 +272,17 @@ export function selectPendingCareerPlaybookRegeneration(input: {
     .filter(candidate => candidate.attempts < maxAttempts)
     .sort((left, right) => left.attempts - right.attempts || left.order - right.order);
 
-  const pending = candidates[0];
-  return pending
-    ? {
-        blockId: pending.blockId,
-        issue: issueForBlock(verdict, pending.blockId),
-        attempts: pending.attempts,
-      }
-    : null;
+  return candidates.slice(0, remainingWindow).map(candidate => ({
+    blockId: candidate.blockId,
+    issue: issueForBlock(verdict, candidate.blockId),
+    attempts: candidate.attempts,
+  }));
+}
+
+export function selectPendingCareerPlaybookRegeneration(
+  input: SelectCareerPlaybookRegenerationInput
+): CareerPlaybookPendingRegeneration | null {
+  return selectPendingCareerPlaybookRegenerations(input)[0] ?? null;
 }
 
 export function countCareerPlaybookRegenerationAttemptsForBlocks(
@@ -282,59 +301,90 @@ export function createBlockRegeneratorNode(
     if (!state.roleProfileSpec) {
       return {
         errors: ['blockRegenerator failed: roleProfileSpec is missing'],
+        lastRegenerationBatchSize: 0,
         currentNode: 'blockRegenerator',
       };
     }
 
-    const pending = selectPendingCareerPlaybookRegeneration({
+    const roleProfileSpec = state.roleProfileSpec;
+    const pendingBatch = selectPendingCareerPlaybookRegenerations({
       verdict: state.lastJudgeVerdict,
       blockIds: state.lastJudgedBlockIds,
       attempts: state.blockRegenerationAttempts,
     });
 
-    if (!pending) {
+    if (pendingBatch.length === 0) {
+      // Nothing eligible: every flagged block sits at its per-block/window cap, so this
+      // pass makes zero LLM calls and zero changes. Record the empty batch so the router
+      // advances instead of re-judging identical content.
       return {
+        lastRegenerationBatchSize: 0,
         currentNode: 'blockRegenerator',
       };
     }
 
-    const originalBlock = state.generatedBlocks[pending.blockId];
-    if (!originalBlock) {
-      return {
-        errors: [`blockRegenerator failed: ${pending.blockId} is missing`],
-        currentNode: 'blockRegenerator',
-      };
-    }
+    // Snapshot generatedBlocks before the batch so every regenerated block reads the
+    // same pre-batch sibling briefs; the full re-judge of the window gates them
+    // together regardless, so intra-batch staleness is acceptable.
+    const otherBlocksSnapshot = state.generatedBlocks;
+    const regenerable = pendingBatch.filter(pending =>
+      Boolean(state.generatedBlocks[pending.blockId])
+    );
+    const missing = pendingBatch.filter(pending => !state.generatedBlocks[pending.blockId]);
 
-    try {
-      const result = await regenerateCareerPlaybookBlock(
-        {
-          blockId: pending.blockId,
-          roleProfileSpec: state.roleProfileSpec,
-          language: state.language,
-          originalBlock,
-          issue: pending.issue,
-          otherBlocks: state.generatedBlocks,
-        },
-        runtime
+    const settled = await Promise.allSettled(
+      regenerable.map(pending =>
+        regenerateCareerPlaybookBlock(
+          {
+            blockId: pending.blockId,
+            roleProfileSpec,
+            language: state.language,
+            originalBlock: state.generatedBlocks[pending.blockId],
+            issue: pending.issue,
+            otherBlocks: otherBlocksSnapshot,
+          },
+          runtime
+        )
+      )
+    );
+
+    const generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> = {};
+    const blockRegenerationAttempts: Partial<Record<CareerPlaybookBlockId, number>> = {};
+    const nodeCosts: CareerPlaybookNodeCost[] = [];
+    const warnings: string[] = [];
+    // A selected-but-missing block cannot be regenerated; preserve the prior
+    // single-block behavior of surfacing it as an error (without consuming an attempt).
+    const errors = missing.map(pending => `blockRegenerator failed: ${pending.blockId} is missing`);
+
+    settled.forEach((outcome, index) => {
+      const pending = regenerable[index];
+      // Consume one attempt for every attempted block (success and failure alike) to
+      // keep the window-budget accounting identical to the single-block path.
+      blockRegenerationAttempts[pending.blockId] = pending.attempts + 1;
+
+      if (outcome.status === 'fulfilled') {
+        generatedBlocks[pending.blockId] = outcome.value.block;
+        nodeCosts.push(outcome.value.nodeCost);
+        return;
+      }
+
+      warnings.push(
+        `blockRegenerator retained ${pending.blockId}: ${
+          outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)
+        }`
       );
+    });
 
-      return {
-        generatedBlocks: { [pending.blockId]: result.block },
-        blockRegenerationAttempts: { [pending.blockId]: pending.attempts + 1 },
-        nodeCosts: [result.nodeCost],
-        currentNode: 'blockRegenerator',
-      };
-    } catch (error) {
-      return {
-        blockRegenerationAttempts: { [pending.blockId]: pending.attempts + 1 },
-        warnings: [
-          `blockRegenerator retained ${pending.blockId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        ],
-        currentNode: 'blockRegenerator',
-      };
-    }
+    return {
+      ...(Object.keys(generatedBlocks).length > 0 ? { generatedBlocks } : {}),
+      ...(Object.keys(blockRegenerationAttempts).length > 0 ? { blockRegenerationAttempts } : {}),
+      ...(nodeCosts.length > 0 ? { nodeCosts } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+      ...(errors.length > 0 ? { errors } : {}),
+      // Non-zero eligible batch: this pass attempted regeneration (success or failure),
+      // so the window must be re-judged to gate the changed content.
+      lastRegenerationBatchSize: pendingBatch.length,
+      currentNode: 'blockRegenerator',
+    };
   };
 }

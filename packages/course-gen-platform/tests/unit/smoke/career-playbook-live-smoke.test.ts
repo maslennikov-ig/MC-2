@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
 
@@ -6,8 +10,13 @@ import {
   buildCareerPlaybookLiveSmokePlan,
   runCareerPlaybookLiveSmoke,
   type CareerPlaybookLiveSmokeClient,
+  type CareerPlaybookLiveSmokeReport,
 } from '@/smoke/career-playbook-live-smoke';
 import { validateCareerPlaybookSmokeEvidence } from '@/smoke/career-playbook-validation';
+import {
+  buildCareerPlaybookSmokeArtifact,
+  writeCareerPlaybookSmokeArtifact,
+} from '../../../scripts/career-playbook-live-smoke';
 
 function generatedBlock(content: string): CareerPlaybookBlockState {
   return {
@@ -532,5 +541,143 @@ describe('Career Playbook live smoke cleanup manifest', () => {
       ])
     );
     expect(serialized).not.toContain('super-secret-token');
+  });
+});
+
+function buildSmokeArtifactReport(
+  overrides: Partial<CareerPlaybookLiveSmokeReport> = {}
+): CareerPlaybookLiveSmokeReport {
+  return {
+    mode: 'mutation-smoke',
+    targetEnvironment: 'dev',
+    status: 'pass',
+    mutates: true,
+    checks: [],
+    playbookId: '33333333-3333-3333-3333-333333333333',
+    evidence: {
+      status: 'pass',
+      checks: [
+        { id: 'completed-playbook', status: 'pass', note: 'completed with final markdown' },
+        { id: 'generated-blocks', status: 'pass', note: 'all blocks present' },
+      ],
+    },
+    cleanupManifest: {
+      runId: 'career-playbook-smoke-20260704',
+      targetEnvironment: 'dev',
+      queueName: 'course-generation-dev',
+      mutates: false,
+      items: [
+        {
+          type: 'career_playbook',
+          id: '33333333-3333-3333-3333-333333333333',
+          note: 'Delete by exact playbook id.',
+        },
+      ],
+    },
+    ...overrides,
+  };
+}
+
+const SAMPLE_ARTIFACT_TIMINGS = {
+  startedAt: '2026-07-04T10:00:00.000Z',
+  finishedAt: '2026-07-04T10:44:24.000Z',
+  durationMs: 2664000,
+  pollTimeoutMs: 7200000,
+  pollIntervalMs: 5000,
+};
+
+describe('Career Playbook live smoke artifact writer', () => {
+  it('derives filenames from the timestamp + playbookId and records cost/timings/evidence', () => {
+    const files = buildCareerPlaybookSmokeArtifact({
+      generatedAt: '2026-07-04T10:44:25.123Z',
+      report: buildSmokeArtifactReport(),
+      finalMarkdown: '# Sales Manager B2B\n\nRich generated content.',
+      finalMarkdownSource: 'trpc-library-detail',
+      costBreakdown: { nodeCosts: [{ cost_usd: 0.12 }], total_cost_usd: 0.24 },
+      costSource: 'supabase-row',
+      language: 'ru',
+      timings: SAMPLE_ARTIFACT_TIMINGS,
+    });
+
+    expect(files.markdownFileName).toBe(
+      '2026-07-04T10-44-25-123Z-33333333-3333-3333-3333-333333333333.md'
+    );
+    expect(files.jsonFileName).toBe(
+      '2026-07-04T10-44-25-123Z-33333333-3333-3333-3333-333333333333.json'
+    );
+    expect(files.markdown).toBe('# Sales Manager B2B\n\nRich generated content.');
+
+    const meta = JSON.parse(files.json) as Record<string, unknown> & {
+      costBreakdown: { total_cost_usd: number };
+      timings: { durationMs: number };
+      evidence: { status: string; checks: { id: string; status: string }[] };
+    };
+    expect(meta.playbookId).toBe('33333333-3333-3333-3333-333333333333');
+    expect(meta.costBreakdown.total_cost_usd).toBe(0.24);
+    expect(meta.costSource).toBe('supabase-row');
+    expect(meta.timings.durationMs).toBe(2664000);
+    expect(meta.finalMarkdownSource).toBe('trpc-library-detail');
+    expect(meta.finalMarkdownFile).toBe(files.markdownFileName);
+    expect(meta.evidence.status).toBe('pass');
+    expect(meta.evidence.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'generated-blocks', status: 'pass' }),
+      ])
+    );
+  });
+
+  it('writes a diagnostic placeholder and unavailable cost when nothing was captured', () => {
+    const files = buildCareerPlaybookSmokeArtifact({
+      generatedAt: '2026-07-04T10:44:25.000Z',
+      report: buildSmokeArtifactReport({ status: 'fail' }),
+      finalMarkdown: null,
+      finalMarkdownSource: 'none',
+      costBreakdown: null,
+      costSource: 'unavailable',
+      language: null,
+      timings: SAMPLE_ARTIFACT_TIMINGS,
+    });
+
+    expect(files.markdown).toContain('no final_markdown captured');
+    expect(files.markdown).toContain('runStatus=fail');
+    const meta = JSON.parse(files.json) as { costBreakdown: unknown; costSource: string; finalMarkdownSource: string };
+    expect(meta.costBreakdown).toBeNull();
+    expect(meta.costSource).toBe('unavailable');
+    expect(meta.finalMarkdownSource).toBe('none');
+  });
+
+  it('persists both files to disk and never serializes secrets', async () => {
+    const files = buildCareerPlaybookSmokeArtifact({
+      generatedAt: '2026-07-04T10:44:25.000Z',
+      report: buildSmokeArtifactReport(),
+      finalMarkdown: '# content only, no secrets',
+      finalMarkdownSource: 'supabase-row',
+      costBreakdown: { total_cost_usd: 0.5 },
+      costSource: 'supabase-row',
+      language: 'ru',
+      timings: SAMPLE_ARTIFACT_TIMINGS,
+    });
+
+    const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cp-smoke-artifact-'));
+    try {
+      const paths = await writeCareerPlaybookSmokeArtifact(files, baseDir);
+
+      expect(paths.markdownPath).toBe(path.join(baseDir, files.markdownFileName));
+      expect(paths.jsonPath).toBe(path.join(baseDir, files.jsonFileName));
+
+      const writtenMarkdown = await fs.readFile(paths.markdownPath, 'utf8');
+      const writtenJson = await fs.readFile(paths.jsonPath, 'utf8');
+      expect(writtenMarkdown).toBe(files.markdown);
+      expect((JSON.parse(writtenJson) as { playbookId: string }).playbookId).toBe(
+        '33333333-3333-3333-3333-333333333333'
+      );
+
+      const serialized = writtenMarkdown + writtenJson;
+      expect(serialized).not.toMatch(/Bearer /);
+      expect(serialized).not.toMatch(/eyJ[A-Za-z0-9_-]+\./); // JWT-shaped token
+      expect(serialized).not.toContain('SUPABASE_SERVICE');
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
   });
 });

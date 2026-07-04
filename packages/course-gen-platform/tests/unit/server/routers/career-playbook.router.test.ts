@@ -490,6 +490,111 @@ describe('careerPlaybookRouter transport', () => {
     );
   });
 
+  it('accumulates follow-up LLM cost into a fresh persisted cost breakdown', async () => {
+    const followupResponse = {
+      questions: [],
+      completeness_score: 0.55,
+      stop_recommendation: 'ask_more' as const,
+    };
+    const nodeCost = {
+      node: 'followupGenerator',
+      model: 'mock-model',
+      input_tokens: 120,
+      output_tokens: 80,
+      cost_usd: 0.25,
+    };
+    mocks.generateCareerPlaybookFollowups.mockResolvedValue({
+      response: followupResponse,
+      nodeCost,
+    });
+    const builder = createBuilder([
+      {
+        data: playbookRow({ status: 'answering_followups', cost_breakdown: null }),
+        error: null,
+      },
+      { data: playbookRow({ status: 'answering_followups' }), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    await caller.generation.requestFollowups({
+      playbookId,
+      fixedAnswers: {
+        position: { question_key: 'position', value: 'Product Lead' },
+      },
+      followupAnswers: {},
+      contentLanguage: 'en',
+    });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cost_breakdown: {
+          nodeCosts: [nodeCost],
+          total_cost_usd: 0.25,
+        },
+      })
+    );
+  });
+
+  it('appends follow-up LLM cost onto a pre-existing cost breakdown and re-sums the total', async () => {
+    const followupResponse = {
+      questions: [],
+      completeness_score: 0.55,
+      stop_recommendation: 'ask_more' as const,
+    };
+    const existingNodeCost = {
+      node: 'specBuilder',
+      model: 'mock-model',
+      input_tokens: 100,
+      output_tokens: 200,
+      cost_usd: 0.5,
+    };
+    const nodeCost = {
+      node: 'followupGenerator',
+      model: 'mock-model',
+      input_tokens: 120,
+      output_tokens: 80,
+      cost_usd: 0.25,
+    };
+    mocks.generateCareerPlaybookFollowups.mockResolvedValue({
+      response: followupResponse,
+      nodeCost,
+    });
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'answering_followups',
+          cost_breakdown: {
+            nodeCosts: [existingNodeCost],
+            total_cost_usd: 0.5,
+          },
+        }),
+        error: null,
+      },
+      { data: playbookRow({ status: 'answering_followups' }), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    await caller.generation.requestFollowups({
+      playbookId,
+      fixedAnswers: {
+        position: { question_key: 'position', value: 'Product Lead' },
+      },
+      followupAnswers: {},
+      contentLanguage: 'en',
+    });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cost_breakdown: {
+          nodeCosts: [existingNodeCost, nodeCost],
+          total_cost_usd: 0.75,
+        },
+      })
+    );
+  });
+
   it('refuses follow-up generation after the playbook leaves the follow-up phase', async () => {
     const builder = createBuilder([
       {

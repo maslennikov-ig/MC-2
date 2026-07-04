@@ -2,11 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { CareerPlaybookQAData } from '@megacampus/shared-types';
 import {
   buildSpecBuilderPromptVariables,
+  buildCanonicalBlockTopicCorrectionPrompt,
   buildCareerPlaybookResearchQueries,
   createSpecBuilderNode,
+  findCanonicalBlockTopicDeviations,
+  normalizeRoleProfileSpecToCanonicalBlockTopics,
   parseRoleProfileSpecFromLLM,
   runCareerPlaybookWebResearch,
 } from '@/stages/stage-career-playbook/nodes/spec-builder';
+import { careerPlaybookPrompts } from '@/shared/prompts/career-playbook-prompts';
+import {
+  CAREER_PLAYBOOK_CANONICAL_BLOCK_TOPICS,
+  CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS,
+} from '@/shared/prompts/career-playbook-block-topics';
 
 const qaData: CareerPlaybookQAData = {
   fixed: [
@@ -92,6 +100,52 @@ const roleProfileSpec = {
     },
   },
   content_language: 'ru',
+};
+
+function canonicalBlockBoundaries(): Record<
+  string,
+  { primary_topics: string[]; do_not_repeat: string[] }
+> {
+  return Object.fromEntries(
+    CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS.map(entry => [
+      entry.blockId,
+      { primary_topics: [entry.primaryTopic], do_not_repeat: [] },
+    ])
+  );
+}
+
+const canonicalRoleProfileSpec = {
+  ...roleProfileSpec,
+  block_boundaries: canonicalBlockBoundaries(),
+};
+
+// Mirrors the block-topic reassignment seen in A/B run b866d2f5 (bead mc2-1slzl):
+// block_11=Forecasting, block_23=Career Pathing, block_25=Compliance.
+const deviantRoleProfileSpec = {
+  ...roleProfileSpec,
+  block_boundaries: {
+    ...canonicalBlockBoundaries(),
+    block_11: {
+      primary_topics: ['Forecasting / Revenue Projections'],
+      do_not_repeat: ['career path'],
+    },
+    block_23: { primary_topics: ['Career Pathing'], do_not_repeat: [] },
+    block_25: { primary_topics: ['Compliance'], do_not_repeat: [] },
+  },
+};
+
+const baseSpecBuilderState = {
+  playbookId: '33333333-3333-4333-8333-333333333333',
+  userId: '11111111-1111-4111-8111-111111111111',
+  organizationId: '22222222-2222-4222-8222-222222222222',
+  language: 'ru',
+  qaData,
+  currentNode: 'specBuilder' as const,
+  roleProfileSpec: null,
+  webResearch: null,
+  generatedBlocks: {},
+  nodeCosts: [],
+  errors: [],
 };
 
 describe('Career Playbook spec builder', () => {
@@ -234,7 +288,7 @@ describe('Career Playbook spec builder', () => {
         costUsd: 0,
       })
       .mockResolvedValueOnce({
-        content: JSON.stringify(roleProfileSpec),
+        content: JSON.stringify(canonicalRoleProfileSpec),
         model: 'fallback-model',
         inputTokens: 20,
         outputTokens: 20,
@@ -275,5 +329,190 @@ describe('Career Playbook spec builder', () => {
         maxTokensMultiplier: 1.25,
       })
     );
+  });
+
+  it('exposes a single canonical layout of the header plus 26 boundary blocks', () => {
+    expect(CAREER_PLAYBOOK_CANONICAL_BLOCK_TOPICS).toHaveLength(27);
+    expect(CAREER_PLAYBOOK_CANONICAL_BLOCK_TOPICS[0].blockId).toBe('header');
+    expect(CAREER_PLAYBOOK_CANONICAL_BLOCK_TOPICS[0].hasBoundaries).toBe(false);
+    expect(CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS).toHaveLength(26);
+    expect(CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS.every(entry => entry.hasBoundaries)).toBe(
+      true
+    );
+  });
+
+  it('injects the canonical 26-block layout and routing rules into the spec builder prompt', () => {
+    const specPrompt = careerPlaybookPrompts.find(
+      prompt => prompt.promptKey === 'career_playbook_spec_builder'
+    );
+
+    expect(specPrompt?.promptTemplate).toContain('block_11: career growth');
+    expect(specPrompt?.promptTemplate).toContain('block_23: continuity protocol');
+    expect(specPrompt?.promptTemplate).toContain(
+      'block_25: footer, revision cadence, and MegaCampus CTA'
+    );
+    expect(specPrompt?.promptTemplate).toMatch(/MUST NOT move a topic to a different block id/);
+  });
+
+  it('flags block topic reassignment against the canonical layout', () => {
+    const deviations = findCanonicalBlockTopicDeviations(
+      parseRoleProfileSpecFromLLM(JSON.stringify(deviantRoleProfileSpec))
+    );
+
+    // block_11 lost its own topic and forecasting belongs to block_6.
+    expect(
+      deviations.some(
+        deviation => deviation.blockId === 'block_11' && deviation.kind === 'missing_anchor'
+      )
+    ).toBe(true);
+    expect(
+      deviations.some(
+        deviation =>
+          deviation.blockId === 'block_11' &&
+          deviation.kind === 'cross_assignment' &&
+          deviation.conflictingBlockIds?.includes('block_6')
+      )
+    ).toBe(true);
+    // block_23 borrowed block_11's career pathing.
+    expect(
+      deviations.some(
+        deviation =>
+          deviation.blockId === 'block_23' &&
+          deviation.kind === 'cross_assignment' &&
+          deviation.conflictingBlockIds?.includes('block_11')
+      )
+    ).toBe(true);
+    // block_25 lost its footer/CTA anchor.
+    expect(
+      deviations.some(
+        deviation => deviation.blockId === 'block_25' && deviation.kind === 'missing_anchor'
+      )
+    ).toBe(true);
+  });
+
+  it('normalizes deviant block boundaries back to the canonical layout', () => {
+    const { spec, changedBlockIds } = normalizeRoleProfileSpecToCanonicalBlockTopics(
+      parseRoleProfileSpecFromLLM(JSON.stringify(deviantRoleProfileSpec))
+    );
+
+    expect(spec.block_boundaries.block_11.primary_topics).toEqual(['career growth']);
+    expect(spec.block_boundaries.block_23.primary_topics).toEqual(['continuity protocol']);
+    expect(spec.block_boundaries.block_25.primary_topics[0]).toContain('MegaCampus');
+    // Foreign topic dropped and self-contradicting do_not_repeat stripped.
+    expect(spec.block_boundaries.block_11.primary_topics).not.toContain(
+      'Forecasting / Revenue Projections'
+    );
+    expect(spec.block_boundaries.block_11.do_not_repeat).toEqual([]);
+    // Every content block has a canonical boundary and no deviations remain.
+    expect(Object.keys(spec.block_boundaries)).toHaveLength(26);
+    expect(findCanonicalBlockTopicDeviations(spec)).toEqual([]);
+    expect(changedBlockIds).toEqual(expect.arrayContaining(['block_11', 'block_23', 'block_25']));
+  });
+
+  it('preserves role-specific wording that still belongs to the block', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...roleProfileSpec,
+        block_boundaries: {
+          ...canonicalBlockBoundaries(),
+          block_6: {
+            primary_topics: ['KPI and metrics', 'forecast accuracy for enterprise pipeline'],
+            do_not_repeat: [],
+          },
+        },
+      })
+    );
+
+    const { spec: normalized } = normalizeRoleProfileSpecToCanonicalBlockTopics(spec);
+
+    expect(normalized.block_boundaries.block_6.primary_topics[0]).toBe('KPI and metrics');
+    expect(normalized.block_boundaries.block_6.primary_topics).toContain(
+      'forecast accuracy for enterprise pipeline'
+    );
+  });
+
+  it('builds a correction prompt that names the deviating block ids', () => {
+    const spec = parseRoleProfileSpecFromLLM(JSON.stringify(deviantRoleProfileSpec));
+    const correction = buildCanonicalBlockTopicCorrectionPrompt(
+      'base spec prompt',
+      findCanonicalBlockTopicDeviations(spec)
+    );
+
+    expect(correction).toContain('did not follow the fixed 26-block layout');
+    expect(correction).toContain('block_25');
+    expect(correction).toContain('footer + revision cadence + MegaCampus CTA');
+  });
+
+  it('retries the spec once then normalizes to canonical topics when boundaries deviate', async () => {
+    const invokeLLM = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: JSON.stringify(deviantRoleProfileSpec),
+        model: 'fast-model',
+        inputTokens: 10,
+        outputTokens: 10,
+        costUsd: 0,
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(canonicalRoleProfileSpec),
+        model: 'fast-model',
+        inputTokens: 12,
+        outputTokens: 12,
+        costUsd: 0,
+      });
+    const specBuilderNode = createSpecBuilderNode({
+      runtime: {
+        renderPrompt: vi.fn().mockResolvedValue('base spec prompt'),
+        invokeLLM,
+      },
+      webResearch: { client: () => Promise.resolve([]) },
+      businessContextSourceExcerpts: () => Promise.resolve('- none'),
+    });
+
+    const result = await specBuilderNode(baseSpecBuilderState);
+
+    expect(result.errors).toBeUndefined();
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
+    expect(invokeLLM).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('did not follow the fixed 26-block layout'),
+      expect.objectContaining({ node: 'specBuilder' })
+    );
+    expect(result.roleProfileSpec?.block_boundaries.block_11.primary_topics).toEqual([
+      'career growth',
+    ]);
+    expect(result.roleProfileSpec?.block_boundaries.block_25.primary_topics[0]).toContain(
+      'MegaCampus'
+    );
+    expect(findCanonicalBlockTopicDeviations(result.roleProfileSpec!)).toEqual([]);
+    expect(result.nodeCosts).toHaveLength(2);
+  });
+
+  it('falls back to deterministic normalization when the single retry still deviates', async () => {
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: JSON.stringify(deviantRoleProfileSpec),
+      model: 'fast-model',
+      inputTokens: 10,
+      outputTokens: 10,
+      costUsd: 0,
+    });
+    const specBuilderNode = createSpecBuilderNode({
+      runtime: {
+        renderPrompt: vi.fn().mockResolvedValue('base spec prompt'),
+        invokeLLM,
+      },
+      webResearch: { client: () => Promise.resolve([]) },
+      businessContextSourceExcerpts: () => Promise.resolve('- none'),
+    });
+
+    const result = await specBuilderNode(baseSpecBuilderState);
+
+    expect(result.errors).toBeUndefined();
+    // First spec call plus exactly one bounded topic-correction retry.
+    expect(invokeLLM).toHaveBeenCalledTimes(2);
+    expect(result.roleProfileSpec?.block_boundaries.block_23.primary_topics).toEqual([
+      'continuity protocol',
+    ]);
+    expect(findCanonicalBlockTopicDeviations(result.roleProfileSpec!)).toEqual([]);
   });
 });

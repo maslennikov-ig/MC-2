@@ -1,13 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CareerPlaybookQAData, CareerPlaybookRoleProfileSpec } from '@megacampus/shared-types';
+import { END } from '@langchain/langgraph';
+import type {
+  CareerPlaybookBlockId,
+  CareerPlaybookQAData,
+  CareerPlaybookRoleProfileSpec,
+} from '@megacampus/shared-types';
 import {
   CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT,
   DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT,
   createCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
+  routeAfterBlockRegeneration,
 } from '@/stages/stage-career-playbook/graph';
 import { CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from '@/stages/stage-career-playbook/nodes/final-assembler';
+import { getCareerPlaybookGroupSpec } from '@/stages/stage-career-playbook/nodes/group-generator';
+import type { CareerPlaybookGraphStateType } from '@/stages/stage-career-playbook/state';
 
 const qaData: CareerPlaybookQAData = {
   fixed: [
@@ -98,9 +106,9 @@ AI collaboration
 
 Candidate
 
-## 13. Day in the life
+## 13. Один день из жизни роли
 
-Day`,
+День`,
   career_playbook_group_4_growth: `## 11. Карьерная траектория
 
 Career path
@@ -556,7 +564,8 @@ describe('Career Playbook graph', () => {
                 {
                   block_id: 'block_5',
                   severity: 'critical',
-                  description: 'Decision matrix is still too generic.',
+                  category: 'contradiction',
+                  description: 'Decision matrix repeats ownership already defined in block_3.',
                   suggestion: 'Regenerate block 5.',
                 },
               ],
@@ -596,5 +605,367 @@ describe('Career Playbook graph', () => {
       expect.stringContaining('crossBlockJudge advanced after max regeneration attempts')
     );
     expect(result.errors).toEqual([]);
+  });
+
+  it('registers the full data-driven node topology derived from the group pipeline', async () => {
+    const runtime = {
+      renderPrompt: vi.fn().mockResolvedValue(''),
+      invokeLLM: vi.fn().mockResolvedValue({
+        content: '',
+        model: 'mock-career-model',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+      }),
+    };
+    const graph = createCareerPlaybookGraph({ runtime });
+    const drawable = await graph.getGraphAsync();
+    const nodeNames = new Set(Object.values(drawable.nodes).map(node => node.name));
+
+    const expectedNodeNames = [
+      'specBuilder',
+      'group1Generator',
+      'group2Generator',
+      'group3Generator',
+      'group4Generator',
+      'group5Generator',
+      'group6Generator',
+      'group1Judge',
+      'group2Judge',
+      'group3Judge',
+      'group4Judge',
+      'group5Judge',
+      'group6Judge',
+      'blockRegenerator',
+      'finalAssembler',
+      'finalJudge',
+    ];
+
+    for (const expectedNodeName of expectedNodeNames) {
+      expect(nodeNames.has(expectedNodeName)).toBe(true);
+    }
+  });
+
+  it('re-derives finalMarkdown after a post-assembly finalJudge regeneration', async () => {
+    const regeneratedFaqBlock = `## 18. FAQ
+
+REGENERATED_FAQ_TOKEN_N1: обновлённый ответ, сформированный уже после финальной сборки.`;
+    const passVerdict = JSON.stringify({
+      pass: true,
+      score: 95,
+      issues: [],
+      needs_regeneration: [],
+    });
+    const failFinalVerdict = JSON.stringify({
+      pass: false,
+      score: 60,
+      issues: [
+        {
+          block_id: 'block_18',
+          severity: 'critical',
+          category: 'contradiction',
+          description:
+            'FAQ block repeats answers that contradict block_22 and must be regenerated.',
+          suggestion: 'Rewrite the FAQ with concrete answers.',
+        },
+      ],
+      needs_regeneration: ['block_18'],
+    });
+
+    let finalJudgeCalls = 0;
+    const runtime = {
+      renderPrompt: vi
+        .fn()
+        .mockImplementation((promptKey: string, variables?: Record<string, string>) =>
+          Promise.resolve(
+            promptKey === 'career_playbook_cross_block_judge'
+              ? `career_playbook_cross_block_judge::${variables?.group_id ?? ''}`
+              : promptKey
+          )
+        ),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        const build = (content: string) => ({
+          content,
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve(build(JSON.stringify(roleProfileSpec)));
+        }
+        if (prompt === 'career_playbook_block_regenerator') {
+          return Promise.resolve(build(regeneratedFaqBlock));
+        }
+        if (prompt.startsWith('career_playbook_cross_block_judge')) {
+          // Only the final judge spans the whole document (header .. block_26);
+          // group judges scope to a single group.
+          const isFinalJudge = prompt.includes('header') && prompt.includes('block_26');
+          if (!isFinalJudge) {
+            return Promise.resolve(build(passVerdict));
+          }
+          finalJudgeCalls += 1;
+          return Promise.resolve(build(finalJudgeCalls === 1 ? failFinalVerdict : passVerdict));
+        }
+
+        return Promise.resolve(build(groupMarkdownByPromptKey[prompt] ?? passVerdict));
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+    const graphResult = result as typeof result & { finalMarkdown?: string | null };
+    const regeneratedBlock = result.generatedBlocks.block_18;
+
+    // The final judge requested one post-assembly regeneration and then passed.
+    expect(finalJudgeCalls).toBe(2);
+    expect(result.blockRegenerationAttempts.block_18).toBe(1);
+    expect(result.errors).toEqual([]);
+
+    // generatedBlocks holds the regenerated FAQ content ...
+    expect(regeneratedBlock?.content).toContain('REGENERATED_FAQ_TOKEN_N1');
+    // ... and finalMarkdown was re-derived from it instead of staying stale.
+    expect(graphResult.finalMarkdown).toContain('REGENERATED_FAQ_TOKEN_N1');
+    expect(graphResult.finalMarkdown).toContain(regeneratedBlock?.content.trim() ?? '');
+  });
+
+  it('regenerates every block a single judge flags in one batch before the next judge call', async () => {
+    // Group 1 comes back with both block_2 (2 anti-goals) and block_5 (2 decision rows)
+    // below the deterministic minimum, so one judge verdict flags both blocks at once.
+    const groupOneWithTwoWeakBlocks = `## Header
+
+# B2B Sales Manager
+
+## 1. Миссия и ключевые результаты
+
+Mission
+
+## 2. Анти-цели: что эта роль НЕ делает
+
+- Product roadmap
+- Legal approval
+
+## 5. Матрица решений (Decision Authority)
+
+| Decision | Owner |
+| --- | --- |
+| Daily priority | Role |
+| Discount 10% | Role |`;
+    const regeneratedBlock2 = `## 2. Анти-цели: что эта роль НЕ делает
+
+- Product roadmap
+- Legal approval
+- Support ownership
+- Hiring plan`;
+    const regeneratedBlock5 = `## 5. Матрица решений (Decision Authority)
+
+| Decision | Owner |
+| --- | --- |
+| Daily priority | Role |
+| Discount 10% | Role |
+| Discount 20% | CRO |
+| Legal terms | Legal |`;
+
+    const invokedPrompts: string[] = [];
+    const runtime = {
+      renderPrompt: vi
+        .fn()
+        .mockImplementation((promptKey: string, variables?: Record<string, string>) =>
+          Promise.resolve(
+            promptKey === 'career_playbook_block_regenerator'
+              ? `career_playbook_block_regenerator::${variables?.block_id ?? ''}`
+              : promptKey
+          )
+        ),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        invokedPrompts.push(prompt);
+        const build = (content: string) => ({
+          content,
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve(build(JSON.stringify(roleProfileSpec)));
+        }
+        if (prompt === 'career_playbook_group_1_foundation') {
+          return Promise.resolve(build(groupOneWithTwoWeakBlocks));
+        }
+        if (prompt === 'career_playbook_block_regenerator::block_2') {
+          return Promise.resolve(build(regeneratedBlock2));
+        }
+        if (prompt === 'career_playbook_block_regenerator::block_5') {
+          return Promise.resolve(build(regeneratedBlock5));
+        }
+        if (prompt === 'career_playbook_cross_block_judge') {
+          return Promise.resolve(build(JSON.stringify({ pass: true, score: 95 })));
+        }
+
+        return Promise.resolve(build(groupMarkdownByPromptKey[prompt]));
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+
+    const g1Index = invokedPrompts.indexOf('career_playbook_group_1_foundation');
+    const g2Index = invokedPrompts.indexOf('career_playbook_group_2_operations');
+    const windowPrompts = invokedPrompts.slice(g1Index + 1, g2Index);
+    const judgeCallsInWindow = windowPrompts.filter(
+      prompt => prompt === 'career_playbook_cross_block_judge'
+    ).length;
+    const block2RegenIndex = windowPrompts.indexOf('career_playbook_block_regenerator::block_2');
+    const block5RegenIndex = windowPrompts.indexOf('career_playbook_block_regenerator::block_5');
+
+    // Both blocks are regenerated ...
+    expect(block2RegenIndex).toBeGreaterThan(-1);
+    expect(block5RegenIndex).toBeGreaterThan(-1);
+    // ... in one batch (adjacent, no judge call between them) ...
+    expect(Math.abs(block2RegenIndex - block5RegenIndex)).toBe(1);
+    // ... so the window needs only two judge calls (flag + re-judge), not three.
+    expect(judgeCallsInWindow).toBe(2);
+    expect(result.generatedBlocks.block_2?.content).toBe(regeneratedBlock2);
+    expect(result.generatedBlocks.block_5?.content).toBe(regeneratedBlock5);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('scopes the in-window re-judge to only the regenerated block after a regeneration', async () => {
+    // Group 1 comes back with too few anti-goals, so the first group-1 judge flags block_2;
+    // after regenerating it, the in-window re-judge must review only block_2 (delta re-judge),
+    // while the final full-document judge still spans header .. block_26.
+    const groupOneWithTooFewAntiGoals = groupMarkdownByPromptKey[
+      'career_playbook_group_1_foundation'
+    ].replace('- Support ownership\n- Hiring plan\n', '');
+    const regeneratedAntiGoals = `## 2. Анти-цели: что эта роль НЕ делает
+
+- Product roadmap
+- Legal approval
+- Support ownership
+- Hiring plan`;
+
+    const judgeGroupIds: string[] = [];
+    const runtime = {
+      renderPrompt: vi
+        .fn()
+        .mockImplementation((promptKey: string, variables?: Record<string, string>) => {
+          if (promptKey === 'career_playbook_cross_block_judge') {
+            judgeGroupIds.push(variables?.group_id ?? '');
+          }
+          return Promise.resolve(promptKey);
+        }),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) => {
+        const build = (content: string) => ({
+          content,
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        });
+
+        if (prompt === 'career_playbook_spec_builder') {
+          return Promise.resolve(build(JSON.stringify(roleProfileSpec)));
+        }
+        if (prompt === 'career_playbook_group_1_foundation') {
+          return Promise.resolve(build(groupOneWithTooFewAntiGoals));
+        }
+        if (prompt === 'career_playbook_block_regenerator') {
+          return Promise.resolve(build(regeneratedAntiGoals));
+        }
+        if (prompt === 'career_playbook_cross_block_judge') {
+          return Promise.resolve(build(JSON.stringify({ pass: true, score: 95 })));
+        }
+
+        return Promise.resolve(build(groupMarkdownByPromptKey[prompt]));
+      }),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    const result = await graph.invoke(initialGraphState());
+
+    // The first judge of group 1 sees the whole group ...
+    expect(judgeGroupIds[0]).toContain('block_2');
+    expect(judgeGroupIds[0]).toContain('block_5');
+    // ... the second judge of group 1 (the in-window re-judge after regenerating block_2)
+    // is scoped to only the regenerated block.
+    expect(judgeGroupIds[1]).toBe('block_2');
+    // The final full-document judge still spans the whole document (header .. block_26).
+    const finalGroupId = judgeGroupIds[judgeGroupIds.length - 1];
+    expect(finalGroupId).toContain('header');
+    expect(finalGroupId).toContain('block_26');
+
+    expect(result.generatedBlocks.block_2?.content).toBe(regeneratedAntiGoals);
+    expect(result.errors).toEqual([]);
+  });
+});
+
+describe('routeAfterBlockRegeneration', () => {
+  const group1BlockIds = getCareerPlaybookGroupSpec('group_1_foundation').blocks.map(
+    block => block.blockId
+  );
+
+  function routeState(overrides: {
+    lastRegenerationBatchSize: number;
+    lastJudgedBlockIds: CareerPlaybookBlockId[];
+  }): CareerPlaybookGraphStateType {
+    return {
+      lastRegenerationBatchSize: overrides.lastRegenerationBatchSize,
+      lastJudgedBlockIds: overrides.lastJudgedBlockIds,
+    } as CareerPlaybookGraphStateType;
+  }
+
+  it('advances a group window to the next generator when the regenerator pass changed nothing', () => {
+    // Zero eligible blocks (all flagged blocks at their per-block/window cap) -> re-judging
+    // identical content is redundant, so the group advances instead of returning to its judge.
+    const next = routeAfterBlockRegeneration(
+      routeState({ lastRegenerationBatchSize: 0, lastJudgedBlockIds: group1BlockIds })
+    );
+
+    expect(next).toBe('group2Generator');
+    expect(next).not.toBe('group1Judge');
+  });
+
+  it('re-judges a group window when the regenerator pass regenerated at least one block', () => {
+    const next = routeAfterBlockRegeneration(
+      routeState({ lastRegenerationBatchSize: 1, lastJudgedBlockIds: group1BlockIds })
+    );
+
+    expect(next).toBe('group1Judge');
+  });
+
+  it('ends the final judge window when the post-assembly regenerator pass changed nothing', () => {
+    // The final window spans the whole document, so no group matches; a zero-change pass
+    // ends directly instead of re-assembling and re-judging identical content.
+    const next = routeAfterBlockRegeneration(
+      routeState({
+        lastRegenerationBatchSize: 0,
+        lastJudgedBlockIds: [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      })
+    );
+
+    expect(next).toBe(END);
+    expect(next).not.toBe('finalAssembler');
+  });
+
+  it('re-assembles the final window when the post-assembly regenerator pass changed a block', () => {
+    const next = routeAfterBlockRegeneration(
+      routeState({
+        lastRegenerationBatchSize: 1,
+        lastJudgedBlockIds: [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      })
+    );
+
+    expect(next).toBe('finalAssembler');
   });
 });

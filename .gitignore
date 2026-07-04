@@ -32,6 +32,9 @@ build/
 .eslintcache
 .cache/
 
+# --- Career Playbook live-smoke artifacts (final_markdown + cost snapshots) ---
+packages/course-gen-platform/artifacts/
+
 # --- Environment Variables & Secrets (CRITICAL) ---
 .env
 .env.local

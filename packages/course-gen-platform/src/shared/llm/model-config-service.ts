@@ -29,9 +29,10 @@ import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+import { getModelPricing } from './cost-calculator';
 
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
+export const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 import * as ModelConfigDB from './model-config-db';
 import { StaleWhileRevalidateCache } from './swr-cache';
 
@@ -80,6 +81,106 @@ export function isMissingChatPhaseConfigError(error: unknown): error is Error {
     message.includes('Chat phase') &&
     (message.includes('has no config') || message.includes('no active config'))
   );
+}
+
+// ============================================================================
+// MODEL PRICING HEALTH CHECK (IMP-4)
+// ============================================================================
+
+/**
+ * Minimal shape of a phase config for pricing coverage checks.
+ * Structural so callers can pass PhaseModelConfig rows or bare model ids.
+ */
+export interface PhasePricingConfigLike {
+  modelId?: string | null;
+  fallbackModelId?: string | null;
+}
+
+/** A configured phase model that is missing from the OpenRouter pricing catalog. */
+export interface ModelPricingHealthFinding {
+  phaseName: string;
+  role: 'primary' | 'fallback';
+  modelId: string;
+}
+
+/** Result of a phase-model pricing coverage health check. */
+export interface ModelPricingHealthResult {
+  /** True when every configured phase model has a pricing catalog entry. */
+  ok: boolean;
+  /** Distinct model ids that were resolved and checked. */
+  checkedModelIds: string[];
+  /**
+   * Configured models with no OPENROUTER_PRICING entry. estimateCost() prices
+   * these at $0, silently voiding cost tracking, so they are surfaced explicitly.
+   */
+  unpricedModels: ModelPricingHealthFinding[];
+  /** Phases with no resolvable config (non-fatal; e.g. DB-only phases when offline). */
+  missingPhases: string[];
+}
+
+/**
+ * True when the model has an entry in the OpenRouter pricing catalog
+ * (cost-calculator OPENROUTER_PRICING). Unknown/deprecated models are priced
+ * at $0 by estimateCost(), which silently voids cost tracking.
+ */
+export function isModelPriced(modelId: string): boolean {
+  return getModelPricing(modelId) !== null;
+}
+
+/**
+ * Resolve the offline default config for a phase the same way getModelForPhase
+ * falls back when the database is unavailable: the phase-specific default, then
+ * global_default. Network-free (reads DEFAULT_PHASE_CONFIGS only).
+ */
+export function resolveDefaultPhaseConfig(
+  phaseName: string
+): ModelConfigDB.PhaseModelConfig | null {
+  return DEFAULT_PHASE_CONFIGS[phaseName] ?? DEFAULT_PHASE_CONFIGS['global_default'] ?? null;
+}
+
+/**
+ * Read-only health check: verify every configured phase model (primary and
+ * fallback) is present in the OpenRouter pricing catalog. Reuses the existing
+ * pricing catalog via getModelPricing; builds no new pricing table.
+ *
+ * @param phaseConfigs - Map of phase name to its resolved config (primary/fallback ids).
+ * @param options.isPriced - Override the pricing predicate (for testing).
+ */
+export function checkPhaseModelPricingHealth(
+  phaseConfigs: Record<string, PhasePricingConfigLike | null | undefined>,
+  options: { isPriced?: (modelId: string) => boolean } = {}
+): ModelPricingHealthResult {
+  const isPriced = options.isPriced ?? isModelPriced;
+  const checked = new Set<string>();
+  const unpricedModels: ModelPricingHealthFinding[] = [];
+  const missingPhases: string[] = [];
+
+  for (const [phaseName, config] of Object.entries(phaseConfigs)) {
+    if (!config) {
+      missingPhases.push(phaseName);
+      continue;
+    }
+
+    const roles: Array<['primary' | 'fallback', string | null | undefined]> = [
+      ['primary', config.modelId],
+      ['fallback', config.fallbackModelId],
+    ];
+
+    for (const [role, modelId] of roles) {
+      if (!modelId) continue;
+      checked.add(modelId);
+      if (!isPriced(modelId)) {
+        unpricedModels.push({ phaseName, role, modelId });
+      }
+    }
+  }
+
+  return {
+    ok: unpricedModels.length === 0,
+    checkedModelIds: [...checked].sort(),
+    unpricedModels,
+    missingPhases,
+  };
 }
 
 // ============================================================================
@@ -247,6 +348,71 @@ class ModelConfigServiceImpl {
   }
 
   /**
+   * Cache-first tier resolution for token-aware phase routing.
+   *
+   * Reproduces determinePhaseTier()'s dynamic-threshold decision, but reads the
+   * standard-tier config's maxContextTokens from a FRESH cached entry instead of
+   * hitting the database. This avoids the redundant 2-tier DB fetch on warm
+   * calls while keeping standard/extended selection byte-for-byte identical.
+   *
+   * @returns
+   * - `{ kind: 'config' }` when the selected tier is served fully from a fresh
+   *   cache entry (no DB fetch needed),
+   * - `{ kind: 'tier' }` when the tier is known from cache but the selected
+   *   tier's config is not fresh (caller fetches only that tier),
+   * - `null` when the standard cache is cold/stale and the caller must run the
+   *   existing 2-tier DB fetch.
+   */
+  private async resolvePhaseTierFromCache(
+    phaseName: string,
+    courseId: string | undefined,
+    tokenCount: number,
+    language: LanguageCode | undefined
+  ): Promise<
+    | { kind: 'config'; tier: 'standard' | 'extended'; config: ModelConfigDB.PhaseModelConfig }
+    | { kind: 'tier'; tier: 'standard' | 'extended' }
+    | null
+  > {
+    // Dynamic tier selection depends on the standard-tier config's
+    // maxContextTokens, so a cache-first decision requires a FRESH standard
+    // entry. A cold/stale standard cache defers to the 2-tier DB fetch.
+    const standardKey = `phase:${phaseName}:${courseId || 'global'}:standard`;
+    const cachedStandard = this.phaseCache.get(standardKey);
+    if (!cachedStandard || cachedStandard.isStale) {
+      return null;
+    }
+
+    // Compute the tier exactly as determinePhaseTier() does, but read
+    // maxContextTokens from the fresh cached standard config instead of the DB.
+    let tier: 'standard' | 'extended';
+    const maxContextTokens = cachedStandard.data.maxContextTokens;
+    if (maxContextTokens !== null && maxContextTokens > 0) {
+      const lang = normalizeLanguageForReserve(language);
+      const dynamicThreshold = await this.calculateDynamicThreshold(maxContextTokens, lang);
+      tier = tokenCount > dynamicThreshold ? 'extended' : 'standard';
+    } else {
+      // Mirror the hardcoded-threshold fallback branch of determinePhaseTier.
+      tier = tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
+    }
+
+    // Standard tier: the fresh entry we already hold is the answer.
+    if (tier === 'standard') {
+      return { kind: 'config', tier, config: cachedStandard.data };
+    }
+
+    // Extended tier: serve from cache only when a fresh extended entry exists.
+    const extendedKey = `phase:${phaseName}:${courseId || 'global'}:extended`;
+    const cachedExtended = this.phaseCache.get(extendedKey);
+    if (cachedExtended && !cachedExtended.isStale) {
+      return { kind: 'config', tier, config: cachedExtended.data };
+    }
+
+    // Tier is known but the selected-tier config is not fresh: signal the caller
+    // to fetch only that tier (single fetch instead of two).
+    return { kind: 'tier', tier };
+  }
+
+  /**
    * Get model configuration for phase-based routing (legacy)
    *
    * Uses Stale-While-Revalidate pattern:
@@ -272,17 +438,66 @@ class ModelConfigServiceImpl {
     tokenCount?: number,
     language?: LanguageCode
   ): Promise<ModelConfigDB.PhaseModelConfig> {
-    // Step 0: Determine tier using dynamic threshold calculation
-    const tierResult = await this.determinePhaseTier(phaseName, courseId, tokenCount, language);
-    const tier = tierResult.tier;
+    // Step 0: Determine tier.
+    //
+    // Tier selection is derived from the standard-tier config's maxContextTokens
+    // (used to compute the dynamic threshold). When a tokenCount is supplied we
+    // FIRST try to resolve the tier from a fresh cached standard-tier config,
+    // which lets warm calls skip the 2-tier DB fetch entirely. Only a cold or
+    // stale standard cache falls back to determinePhaseTier()'s 2-tier fetch.
+    // This preserves identical standard/extended selection for the same inputs
+    // while removing redundant DB work on cache hits.
+    let tier: 'standard' | 'extended';
+    let preloadedConfigs:
+      | [ModelConfigDB.PhaseModelConfig | null, ModelConfigDB.PhaseModelConfig | null]
+      | undefined;
 
-    // Use pre-fetched config if available (optimization to avoid second DB query)
-    if (tierResult.preloadedConfigs) {
-      const [standardConfig, extendedConfig] = tierResult.preloadedConfigs;
+    if (tokenCount === undefined) {
+      // No token count → always 'standard' (matches determinePhaseTier).
+      tier = 'standard';
+    } else {
+      const cacheResolved = await this.resolvePhaseTierFromCache(
+        phaseName,
+        courseId,
+        tokenCount,
+        language
+      );
+      if (cacheResolved?.kind === 'config') {
+        // Fully served from a fresh cache entry — zero DB fetches for this call.
+        logger.debug(
+          {
+            cacheKey: `phase:${phaseName}:${courseId || 'global'}:${cacheResolved.tier}`,
+            tier: cacheResolved.tier,
+          },
+          'Phase config cache hit (fresh, token-aware fast path)'
+        );
+        return cacheResolved.config;
+      }
+      if (cacheResolved?.kind === 'tier') {
+        // Tier resolved from the fresh standard cache, but the selected tier's
+        // config is not fresh → fetch only that tier via the normal DB path.
+        tier = cacheResolved.tier;
+      } else {
+        // Cold/stale standard cache → existing 2-tier DB fetch + threshold calc.
+        const tierResult = await this.determinePhaseTier(phaseName, courseId, tokenCount, language);
+        tier = tierResult.tier;
+        preloadedConfigs = tierResult.preloadedConfigs;
+      }
+    }
+
+    // Use pre-fetched configs when the 2-tier DB fetch ran (optimization to
+    // avoid a second DB query). Cache BOTH tiers so a subsequent token-aware
+    // call can resolve the tier straight from the standard cache entry.
+    if (preloadedConfigs) {
+      const [standardConfig, extendedConfig] = preloadedConfigs;
+      if (standardConfig) {
+        this.phaseCache.set(`phase:${phaseName}:${courseId || 'global'}:standard`, standardConfig);
+      }
+      if (extendedConfig) {
+        this.phaseCache.set(`phase:${phaseName}:${courseId || 'global'}:extended`, extendedConfig);
+      }
       const selectedConfig = tier === 'extended' ? extendedConfig : standardConfig;
       if (selectedConfig) {
-        const cacheKey = `phase:${phaseName}:${courseId || 'global'}:${tier}`;
-        this.phaseCache.set(cacheKey, selectedConfig);
         return selectedConfig;
       }
     }

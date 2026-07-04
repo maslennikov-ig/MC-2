@@ -94,6 +94,27 @@ flowchart LR
     expect(markdown).toContain('Current --> Lead');
   });
 
+  it('does not append a stub next to an existing rich diagram under a non-canonical heading', () => {
+    const blocks = completeBlocks();
+    blocks.block_11 = block(`## 11. Career growth
+
+### Dual-track growth map
+
+\`\`\`mermaid
+flowchart LR
+  IC["Senior IC"] --> Principal["Principal"]
+  Manager["Team Lead"] --> Director["Director"]
+\`\`\``);
+
+    const markdown = assembleCareerPlaybookFinalMarkdown({ generatedBlocks: blocks });
+
+    expect(markdown).not.toContain('### Career Path Diagram');
+    expect(markdown).not.toContain('Entry role');
+    expect(markdown).toContain('Dual-track growth map');
+    // Blocks 10 and 16 still have no diagram at all, so only their fallbacks are added.
+    expect(markdown.match(/```mermaid/g)).toHaveLength(3);
+  });
+
   it('remediates invalid Mermaid before final persistence and records a quality issue', async () => {
     const blocks = completeBlocks();
     blocks.block_10 = block(`## 10. Dependencies

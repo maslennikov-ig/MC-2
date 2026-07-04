@@ -36,7 +36,7 @@ import { blockRegenerationHandler } from './handlers/block-regeneration-handler.
 import { careerPlaybookHandler } from './handlers/career-playbook-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 import { getJobCourseId } from './job-data-fields.js';
-import { getProcessorMaxTtlMsForJobType } from './processor-ttl.js';
+import { getProcessorMaxTtlMsForJobType, getProcessorSoftBudgetMs } from './processor-ttl.js';
 
 /**
  * Track current job reference globally so uncaughtException handler can access it.
@@ -589,7 +589,33 @@ const TTL_EXIT_CODE = 10;
  */
 export default async function (job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
   let hasCompleted = false;
-  const processorMaxTtlMs = getProcessorMaxTtlMsForJobType(String(job.name));
+  const jobType = String(job.name);
+  const processorMaxTtlMs = getProcessorMaxTtlMsForJobType(jobType);
+
+  // Soft budget warning - fires shortly before the hard kill for the expensive
+  // Career Playbook job class only. A hard-kill is terminal for these jobs
+  // (attempts capped at 1 in the queue to avoid full-regeneration cost runaways),
+  // so this warning is the last chance to surface a slow run in logs/metrics
+  // before an expensive job is abandoned. getProcessorSoftBudgetMs returns 0 for
+  // every other job type, so non-CAREER_PLAYBOOK jobs arm no soft timer and keep
+  // their behavior byte-for-byte unchanged. (mc2-1maah)
+  const softBudgetMs = getProcessorSoftBudgetMs(jobType);
+  const softBudgetTimeout =
+    softBudgetMs > 0
+      ? setTimeout(() => {
+          if (!hasCompleted) {
+            logger.warn(
+              {
+                jobId: job.id,
+                jobType: job.name,
+                softBudgetMs,
+                ttlMs: processorMaxTtlMs,
+              },
+              'Processor soft budget exceeded - job at risk of TTL hard-kill (will not auto-retry)'
+            );
+          }
+        }, softBudgetMs)
+      : null;
 
   // Hard kill timeout - exits process if job doesn't complete
   // This catches infinite loops that block the event loop
@@ -612,7 +638,8 @@ export default async function (job: SandboxedJob<JobData>, token?: string): Prom
     hasCompleted = true;
     return result;
   } finally {
-    // Always clear timeout - allows process reuse for next job
+    // Always clear timeouts - allows process reuse for next job
+    if (softBudgetTimeout) clearTimeout(softBudgetTimeout);
     clearTimeout(hardKillTimeout);
   }
 }
