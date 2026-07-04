@@ -301,6 +301,7 @@ export function createBlockRegeneratorNode(
     if (!state.roleProfileSpec) {
       return {
         errors: ['blockRegenerator failed: roleProfileSpec is missing'],
+        lastRegenerationBatchSize: 0,
         currentNode: 'blockRegenerator',
       };
     }
@@ -313,7 +314,11 @@ export function createBlockRegeneratorNode(
     });
 
     if (pendingBatch.length === 0) {
+      // Nothing eligible: every flagged block sits at its per-block/window cap, so this
+      // pass makes zero LLM calls and zero changes. Record the empty batch so the router
+      // advances instead of re-judging identical content.
       return {
+        lastRegenerationBatchSize: 0,
         currentNode: 'blockRegenerator',
       };
     }
@@ -376,6 +381,9 @@ export function createBlockRegeneratorNode(
       ...(nodeCosts.length > 0 ? { nodeCosts } : {}),
       ...(warnings.length > 0 ? { warnings } : {}),
       ...(errors.length > 0 ? { errors } : {}),
+      // Non-zero eligible batch: this pass attempted regeneration (success or failure),
+      // so the window must be re-judged to gate the changed content.
+      lastRegenerationBatchSize: pendingBatch.length,
       currentNode: 'blockRegenerator',
     };
   };

@@ -166,21 +166,35 @@ function routeAfterJudge(blockIds: CareerPlaybookBlockId[], nextNode: string) {
   };
 }
 
-function routeAfterBlockRegeneration(state: CareerPlaybookGraphStateType) {
+export function routeAfterBlockRegeneration(state: CareerPlaybookGraphStateType) {
+  // A regenerator pass that selected no eligible blocks (all flagged blocks already at
+  // their per-block/window cap) made zero LLM calls and left content byte-identical, so
+  // re-judging it cannot produce new information. Advance instead; the judge already
+  // emitted the capRegeneration warning that records the unresolved issues. This is
+  // reliability-neutral: after any real regeneration (batch size > 0) the window is
+  // still re-judged exactly as before.
+  const regeneratedNothing = (state.lastRegenerationBatchSize ?? 0) === 0;
+
   const group = GROUP_PIPELINE.find(entry =>
     hasSameBlockIdSet(getGroupBlockIds(entry.groupKey), state.lastJudgedBlockIds)
   );
 
   if (group) {
-    return group.judgeNode;
+    return regeneratedNothing ? group.nextNode : group.judgeNode;
   }
 
   // Post-assembly regeneration: the finalJudge window spans the full final-block
-  // order rather than a single group, so no group matches here. Route back through
-  // finalAssembler so finalMarkdown is re-derived from the regenerated blocks and
-  // stays in sync with generatedBlocks before finalJudge/END. Routing straight to
-  // finalJudge would leave finalMarkdown stale while generatedBlocks moved on, and
-  // the handler persists both.
+  // order rather than a single group, so no group matches here.
+  if (regeneratedNothing) {
+    // finalMarkdown already matches generatedBlocks (nothing changed), so END directly
+    // rather than re-assembling and re-judging identical content.
+    return END;
+  }
+
+  // Route back through finalAssembler so finalMarkdown is re-derived from the
+  // regenerated blocks and stays in sync with generatedBlocks before finalJudge/END.
+  // Routing straight to finalJudge would leave finalMarkdown stale while generatedBlocks
+  // moved on, and the handler persists both.
   return 'finalAssembler';
 }
 

@@ -1,13 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CareerPlaybookQAData, CareerPlaybookRoleProfileSpec } from '@megacampus/shared-types';
+import { END } from '@langchain/langgraph';
+import type {
+  CareerPlaybookBlockId,
+  CareerPlaybookQAData,
+  CareerPlaybookRoleProfileSpec,
+} from '@megacampus/shared-types';
 import {
   CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT,
   DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT,
   createCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
+  routeAfterBlockRegeneration,
 } from '@/stages/stage-career-playbook/graph';
 import { CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from '@/stages/stage-career-playbook/nodes/final-assembler';
+import { getCareerPlaybookGroupSpec } from '@/stages/stage-career-playbook/nodes/group-generator';
+import type { CareerPlaybookGraphStateType } from '@/stages/stage-career-playbook/state';
 
 const qaData: CareerPlaybookQAData = {
   fixed: [
@@ -825,5 +833,65 @@ Mission
     expect(result.generatedBlocks.block_2?.content).toBe(regeneratedBlock2);
     expect(result.generatedBlocks.block_5?.content).toBe(regeneratedBlock5);
     expect(result.errors).toEqual([]);
+  });
+});
+
+describe('routeAfterBlockRegeneration', () => {
+  const group1BlockIds = getCareerPlaybookGroupSpec('group_1_foundation').blocks.map(
+    block => block.blockId
+  );
+
+  function routeState(overrides: {
+    lastRegenerationBatchSize: number;
+    lastJudgedBlockIds: CareerPlaybookBlockId[];
+  }): CareerPlaybookGraphStateType {
+    return {
+      lastRegenerationBatchSize: overrides.lastRegenerationBatchSize,
+      lastJudgedBlockIds: overrides.lastJudgedBlockIds,
+    } as CareerPlaybookGraphStateType;
+  }
+
+  it('advances a group window to the next generator when the regenerator pass changed nothing', () => {
+    // Zero eligible blocks (all flagged blocks at their per-block/window cap) -> re-judging
+    // identical content is redundant, so the group advances instead of returning to its judge.
+    const next = routeAfterBlockRegeneration(
+      routeState({ lastRegenerationBatchSize: 0, lastJudgedBlockIds: group1BlockIds })
+    );
+
+    expect(next).toBe('group2Generator');
+    expect(next).not.toBe('group1Judge');
+  });
+
+  it('re-judges a group window when the regenerator pass regenerated at least one block', () => {
+    const next = routeAfterBlockRegeneration(
+      routeState({ lastRegenerationBatchSize: 1, lastJudgedBlockIds: group1BlockIds })
+    );
+
+    expect(next).toBe('group1Judge');
+  });
+
+  it('ends the final judge window when the post-assembly regenerator pass changed nothing', () => {
+    // The final window spans the whole document, so no group matches; a zero-change pass
+    // ends directly instead of re-assembling and re-judging identical content.
+    const next = routeAfterBlockRegeneration(
+      routeState({
+        lastRegenerationBatchSize: 0,
+        lastJudgedBlockIds: [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      })
+    );
+
+    expect(next).toBe(END);
+    expect(next).not.toBe('finalAssembler');
+  });
+
+  it('re-assembles the final window when the post-assembly regenerator pass changed a block', () => {
+    const next = routeAfterBlockRegeneration(
+      routeState({
+        lastRegenerationBatchSize: 1,
+        lastJudgedBlockIds: [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      })
+    );
+
+    expect(next).toBe('finalAssembler');
   });
 });

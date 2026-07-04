@@ -304,6 +304,8 @@ describe('Career Playbook block regenerator', () => {
       })
     );
 
+    // The eligible batch size (2) is recorded so the router re-judges the changed window.
+    expect(update.lastRegenerationBatchSize).toBe(2);
     // Both attempted blocks consume exactly one attempt (success and failure alike).
     expect(update.blockRegenerationAttempts).toEqual({ block_2: 1, block_5: 1 });
     // Only the successful block lands in generatedBlocks and emits a node cost ...
@@ -317,6 +319,46 @@ describe('Career Playbook block regenerator', () => {
     // ... while the failed block is retained with a warning and no error.
     expect(update.warnings).toHaveLength(1);
     expect(update.warnings?.[0]).toContain('blockRegenerator retained block_5');
+    expect(update.errors).toBeUndefined();
+  });
+
+  it('records a zero batch and makes no LLM call when every flagged block is at its cap', async () => {
+    const renderPrompt = vi.fn();
+    const invokeLLM = vi.fn();
+
+    const node = createBlockRegeneratorNode({ renderPrompt, invokeLLM });
+    const update = await node(
+      baseRegeneratorState({
+        generatedBlocks: {
+          block_2: generatedBlock('## 2. Анти-цели\n\n- Product roadmap\n- Legal terms', 2),
+          block_5: generatedBlock('## 5. Матрица решений\n\n| a | b |\n| --- | --- |', 2),
+        },
+        lastJudgedBlockIds: ['block_2', 'block_5'],
+        lastJudgeVerdict: {
+          pass: false,
+          score: 40,
+          issues: [
+            { block_id: 'block_2', severity: 'critical', description: 'x', suggestion: 'y' },
+            { block_id: 'block_5', severity: 'critical', description: 'x', suggestion: 'y' },
+          ],
+          needs_regeneration: ['block_2', 'block_5'],
+        },
+        // Both flagged blocks are already at the per-block cap, so nothing is eligible.
+        blockRegenerationAttempts: {
+          block_2: CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
+          block_5: CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
+        },
+      })
+    );
+
+    // No LLM call, no content change, no consumed attempt — just the zero-batch signal
+    // so the router advances instead of re-judging identical content.
+    expect(renderPrompt).not.toHaveBeenCalled();
+    expect(invokeLLM).not.toHaveBeenCalled();
+    expect(update.lastRegenerationBatchSize).toBe(0);
+    expect(update.generatedBlocks).toBeUndefined();
+    expect(update.blockRegenerationAttempts).toBeUndefined();
+    expect(update.nodeCosts).toBeUndefined();
     expect(update.errors).toBeUndefined();
   });
 

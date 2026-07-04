@@ -80,6 +80,16 @@ export const CareerPlaybookGraphState = Annotation.Root({
     reducer: (current, update) => ({ ...current, ...update }),
     default: () => ({}),
   }),
+  // Size of the eligible batch the most recent blockRegenerator pass selected.
+  // Zero means the pass regenerated nothing — every flagged block was already at its
+  // per-block/window cap — so re-judging identical content would be redundant and the
+  // graph can advance. Every blockRegenerator return sets this so the router reads the
+  // current pass, never a stale value; recomputing it in the router is impossible once
+  // the pass has consumed regeneration attempts.
+  lastRegenerationBatchSize: Annotation<number>({
+    reducer: (current, update) => update ?? current,
+    default: () => 0,
+  }),
   finalMarkdown: Annotation<string | null>({
     reducer: (current, update) => update ?? current,
     default: () => null,
