@@ -163,7 +163,14 @@ function appendMermaidSection(
 ): string {
   const normalizedContent = normalizeMermaidSectionHeading(content, section, language);
   const localizedHeading = section.heading[resolveContentLanguage(roleProfileSpec)];
-  if (hasMermaidSection(normalizedContent, Object.values(section.heading))) {
+  // Any diagram already in the block satisfies coverage (validateMermaidCoverage counts
+  // fenced mermaid blocks, not headings). Appending the canonical stub next to an existing
+  // rich diagram produced the duplicate 3-4 node stubs seen in runs b866d2f5/35602db1
+  // (mc2-db696.104.4); the fallback stub is only for blocks with no diagram at all.
+  if (
+    hasMermaidSection(normalizedContent, Object.values(section.heading)) ||
+    /```mermaid[\s\S]*?```/i.test(normalizedContent)
+  ) {
     return normalizedContent.trim();
   }
 
