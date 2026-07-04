@@ -1,42 +1,47 @@
 # Orchestrator Handoff
 
 Updated: 2026-07-04
-Stage: Career Playbook — speed tranche (mc2-b7zm3) CLOSED: A/B run passed (-40% wall-clock, -52% cost)
+Stage: Career Playbook — judge/regen fix package (epic `mc2-db696.104`) CODE-COMPLETE; epic close gated on a paid dev A/B live-smoke run (owner token + go-ahead required)
 Branch: `develop`
-Beads: `mc2-b7zm3` closed (A/B evidence in comments); `mc2-m17al` unblocked (judge→flash DB promotion — convergence data attached, needs owner decision on staging impact); `mc2-93rrp` open (hardcoded prompt fallback observation); `mc2-db696.61` open (large-corpus run); `mc2-1nots` open (P3, runner getStatus auth quirk — did NOT reproduce this run)
+Beads: `mc2-93rrp` CLOSED (prompt serving source resolved); `mc2-1slzl`, `mc2-db696.104.1..6` in_progress (code landed, live acceptance pending); `mc2-m17al` open (owner decision — judge→flash DB promotion); `mc2-db696.61`, `mc2-1nots` open (unrelated)
 
 ## Current State
 
-- **A/B run completed 2026-07-04** (playbook `b866d2f5-c2ee-4968-9917-ce3775ff600c`, "Sales Manager B2B", dev mutation-smoke, runner exit 0, all evidence checks pass):
-  - Wall-clock **44.4 min** vs baseline 73.4 min (**-40%**); cost **$0.2404** vs $0.4963 (**-52%**).
-  - Criterion #1 PASS: 27/27 blocks, deterministic checks (Mermaid/anti-goal/decision-matrix/failure-mode), PDF export 546KB, public share rendered. Success rate not degraded.
-  - New telemetry live in `cost_breakdown`: per-call `duration_ms` + `regeneration_attempts` map (26 blocks tracked, block_8 needed no regen, 13/26 hit the 2-attempt cap).
-  - Judge on v4-flash: 19/21 judge calls (785s, $0.036). **2 final cross-block judge calls (largest contexts ~31.5k input tokens) failed on flash and escalated to v4-pro via phase retry net** (attempts=2 each, 649s = 24% of wall-clock; one returned only 29 output tokens — check response validity before m17al promotion). Escalation worked as designed; run still passed.
-  - Regenerator (v4-pro) is now the dominant node: 39 calls, 1434s serial, $0.157 of $0.2404 total.
-  - mc2-1nots (getStatus auth quirk) did not reproduce — runner polled to completion despite token expiring mid-run window.
-- Smoke playbook `b866d2f5` left in dev DB as A/B evidence (cleanup manifest emitted by runner but not executed; delete by exact id when evidence no longer needed — user/org in the manifest are NOT disposable, do not touch).
-- Prior tranche state (code, docs, reviews, verification) — see git history and closed `mc2-b7zm3`; retry baseline in `docs/career-playbook/retry-strategy.md`, runbook in `docs/career-playbook/live-smoke-dev-run.md`.
+- **All 7 fix-package tasks implemented, unit-verified, committed to develop** (one commit per bead):
+  - `59ef88d5` mc2-93rrp: prompt serving source = hardcoded registry (prompt_templates has zero career stage-key rows; only `career_playbook_card`). Documented in `docs/career-playbook/architecture.md`; prompt edits in `career-playbook-prompts.ts` are effective. Bead CLOSED.
+  - `c588a9d4` .104.2: judge calls with estimated prompt tokens > `CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD` (default 28000) start on the fallback model (pro) — kills the 2x300s final-judge flash timeouts. Retry net untouched. Fix-plan item 2 (per-block digests for final-judge input) deferred — comment on the bead.
+  - `9da92802` .104.6: zero-regen pass (all flagged blocks at caps) routes forward instead of re-judging identical content (`state.lastRegenerationBatchSize`). Root-cause finding (routeAfterJudge vs blockRegenerator blockIds divergence) recorded on the bead.
+  - `fa88561b` .104.5: live-smoke runner persists `<timestamp>-<playbookId>.md` + `.json` (cost_breakdown from DB row — no tRPC surface exposes it) to gitignored `packages/course-gen-platform/artifacts/career-playbook-smoke/`; `--no-artifact`/`--artifact-dir`; secrets whitelist-pinned by test. Runbook updated (artifacts, manifest-only cleanup semantics, browser-console token as primary path).
+  - `4db7cd97` mc2-1slzl: canonical 26-block topic map (`src/shared/prompts/career-playbook-block-topics.ts`) drives the spec-builder prompt + deterministic post-spec normalization (retry-once on substantive deviation, then normalize; invalid spec impossible by construction). Block 25 canon = footer + MegaCampus CTA; forecasting-class role emphasis routed to block_6/block_4 (no dedicated Forecasting block — that would be option B, needs owner decision).
+  - `de74537a` .104.1: judge severity by category — 5 critical classes (contradiction, format_minimum, wrong_language, unresolved_placeholder, invented_number); style/tone never regenerates. Category required in LLM structured schema, optional in stored schema; defensive downgrade gate in `mergeJudgeVerdicts`; deterministic verdicts untouched.
+  - `8967b2db` .104.4: prompt fixes — no named stub diagrams (judge wording + regenerator "improve existing diagram"), placeholder rule rewritten (realistic examples vs genuine fill-in fields), Mermaid label syntax (double-quoted labels), deterministic minimums stated in owning group prompts, do_not_repeat surfaced to generators (they never referenced block_boundaries before — finding on the bead).
+  - `d856aff7` .104.3: delta re-judge — in-window re-judge reviews only regenerated blocks (detected via `judge_verdict` cleared by the regenerator); caps/routing stay full-window; final judge always full; escape hatch `CAREER_PLAYBOOK_DELTA_REJUDGE=off`.
+- **Verification (fresh, this session)**: stage+smoke+prompt-contract vitest 245/245; repo-root `pnpm type-check` exit 0; repo-root `pnpm build` exit 0. Pre-commit eslint OOM'd once (fa88561b) — gate run manually with `--max-old-space-size=8192`, exit 0, noted in the commit message.
+- Orchestration: 7 parallel worker subagents (waves 1–3, disjoint write zones in the shared worktree); every diff verified by the orchestrator before commit.
 
 ## Next
 
-1. `mc2-m17al` (owner decision required — staging impact): promote judge→v4-flash from compose env override to `llm_model_config` DB rows; before that, investigate the 2 large-context flash judge failures + the 29-output-token pro response (truncation/validity). If large-context judge stayed on flash, run would be ~34 min.
-2. `mc2-93rrp`: hardcoded-prompt-fallback investigation (29x per run).
-3. `mc2-db696.61`: large-corpus run.
+1. **Paid dev A/B live-smoke run** (STOP: needs owner bearer token + explicit go-ahead; budget <= $5, queue `course-generation-dev`):
+   - Preflight (non-mutating): `pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan --target dev`
+   - Full runbook incl. token via browser console: `docs/career-playbook/live-smoke-dev-run.md`
+   - Compare vs baseline b866d2f5 (39 regen calls, 21 judge calls, 2x300s timeouts, 44.4 min, $0.2404): expect regen calls well below 39, zero `timed out after 300000ms` judge lines in `megacampus-worker-dev` logs, wall-clock <= 44 min, criterion #1 pass, forecasting content in block_6, block-25 footer with MegaCampus CTA, no stub diagrams / `field to fill` artifacts / duplicate deal-stage models. Artifacts now auto-persist for the comparison.
+2. Close `mc2-1slzl` + `mc2-db696.104.1..6` + epic `mc2-db696.104` after the run passes; else file findings per bead.
+3. `mc2-m17al` (owner decision — staging impact): judge→flash DB promotion; .104.2 provides the size-gated routing it was waiting for.
+
+## Explicit defers
+
+- `mc2-m17al`: judge→flash `llm_model_config` migration + regenerator→flash evaluation — owner decision (shared DB, staging impact).
+- .104.2 fix-plan item 2 (shrink final-judge input via per-block digests) — deferred complement, recorded on the bead; consider only if the size-gated routing proves insufficient.
+- routeAfterJudge vs blockRegenerator block-id selection divergence — recorded on `mc2-db696.104.6`; candidate follow-up bead after the A/B run.
+- mc2-1slzl option B (spec-driven dynamic topics) — needs owner decision; option A landed.
 
 ## Runbook — real dev generation
 
 Non-mutating preflight: `pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan --target dev`
-Full runbook with token acquisition and env: `docs/career-playbook/live-smoke-dev-run.md`. Queue MUST be `course-generation-dev`; poll `--poll-timeout-ms 7200000`.
-Token без пароля: браузерная консоль на dev (cookie `sb-…-auth-token`, base64url после префикса `base64-`) или Network → `Authorization: Bearer …`.
-Post-run verification (shared Supabase `diqooqbuchsliypgwksu`, `career_playbooks`): `cost_breakdown->>'total_cost_usd' > 0`, `regeneration_attempts` present, no wrong-language/`{{…}}` in `final_markdown`, duration < 120 min.
-
-## Explicit defers
-
-- `mc2-m17al`: judge→flash DB migration + regenerator→flash evaluation — A/B passed; still gated on owner approval (staging impact) and the large-context flash-failure investigation above.
-- `mc2-93rrp`: hardcoded-prompt-fallback investigation — out of b7zm3 scope by design.
+Full runbook with token acquisition (browser-console cookie method is primary) and env: `docs/career-playbook/live-smoke-dev-run.md`. Queue MUST be `course-generation-dev`; poll `--poll-timeout-ms 7200000`.
+Post-run verification (shared Supabase `diqooqbuchsliypgwksu`, `career_playbooks`): `cost_breakdown->>'total_cost_usd' > 0`, `regeneration_attempts` present, no wrong-language/`{{…}}` in `final_markdown`, duration < 120 min. Run artifacts land in `packages/course-gen-platform/artifacts/career-playbook-smoke/` (gitignored).
 
 ## Closeout Markers
 
-docs-reviewed: updated — handoff rewritten with A/B results; runbook unchanged (token-via-browser hint added here).
-project-index: reviewed-no-change — no code changed this session (run + analysis only).
-graph-reviewed: no-change-needed — no code/architecture changes; docs-only handoff update.
+docs-reviewed: updated — architecture.md (prompt serving source), live-smoke-dev-run.md (artifacts, cleanup semantics, token method), handoff rewritten.
+graph-reviewed: updated — `graphify update .` after code changes (52503 nodes, exit 0).
