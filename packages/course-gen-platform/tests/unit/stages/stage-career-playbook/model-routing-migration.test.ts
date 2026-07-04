@@ -10,6 +10,10 @@ const departmentClassifierMigrationPath = resolve(
   __dirname,
   '../../../../supabase/migrations/20260528193000_add_career_playbook_department_classifier.sql'
 );
+const judgeFlashPromotionMigrationPath = resolve(
+  __dirname,
+  '../../../../supabase/migrations/20260704150000_promote_career_playbook_judge_flash.sql'
+);
 
 const EXPECTED_ROUTING = {
   stage_career_playbook_followup: {
@@ -90,5 +94,21 @@ describe('Career Playbook DeepSeek V4 Pro routing migration', () => {
     expect(sql).toContain("'deepseek/deepseek-v4-flash'");
     expect(sql).toContain("'deepseek/deepseek-v4-pro'");
     expect(sql).toContain('max_retries');
+  });
+
+  it('promotes the judge to flash primary with pro fallback and leaves the regenerator alone', () => {
+    const sql = readFileSync(judgeFlashPromotionMigrationPath, 'utf8');
+    const rows = extractCareerPlaybookRows(sql);
+
+    // Fallback MUST stay pro: the size-gated fallback-first routing
+    // (CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD) sends large-context
+    // judge calls to fallback_model_id, which has to be the stronger model.
+    expect(Object.fromEntries(rows)).toEqual({
+      stage_career_playbook_judge: {
+        model: 'deepseek/deepseek-v4-flash',
+        fallback: 'deepseek/deepseek-v4-pro',
+      },
+    });
+    expect(sql).not.toContain('stage_career_playbook_regenerator');
   });
 });
