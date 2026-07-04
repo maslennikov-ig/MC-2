@@ -11,6 +11,7 @@ import {
   runCareerPlaybookDeterministicChecks,
   validateMermaidCoverage,
 } from '@/stages/stage-career-playbook/nodes/cross-block-judge';
+import { resolveJudgeFallbackTokenThreshold } from '@/stages/stage-career-playbook/nodes/cross-block-judge-structured';
 
 function block(content: string): CareerPlaybookBlockState {
   return {
@@ -771,5 +772,101 @@ flowchart LR
     expect(update.errors).toBeUndefined();
     expect(update.warnings).toBeUndefined();
     expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_5']);
+  });
+
+  it('passes the input-size fallback routing threshold to the judge LLM call', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: JSON.stringify({ pass: true, score: 95, issues: [], needs_regeneration: [] }),
+      model: 'mock-judge-model',
+      inputTokens: 50,
+      outputTokens: 40,
+      costUsd: 0.004,
+    });
+
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_5'],
+      useLLMJudge: true,
+      runtime: { renderPrompt, invokeLLM },
+    });
+    await node({
+      playbookId: 'playbook-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'ru',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'group2Generator',
+    });
+
+    // The judge wires the (default 28k) size gate so the runtime can start the
+    // large final-document judge on the fallback model instead of timing out.
+    expect(invokeLLM).toHaveBeenCalledWith(
+      'rendered judge prompt',
+      expect.objectContaining({ preferFallbackModelAboveTokens: 28_000 })
+    );
+  });
+
+  it('honors CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD when wiring the judge call', async () => {
+    process.env.CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD = '20000';
+    try {
+      const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
+      const invokeLLM = vi.fn().mockResolvedValue({
+        content: JSON.stringify({ pass: true, score: 95, issues: [], needs_regeneration: [] }),
+        model: 'mock-judge-model',
+        inputTokens: 50,
+        outputTokens: 40,
+        costUsd: 0.004,
+      });
+
+      const node = createCrossBlockJudgeNode({
+        currentBlockIds: ['block_5'],
+        useLLMJudge: true,
+        runtime: { renderPrompt, invokeLLM },
+      });
+      await node({
+        playbookId: 'playbook-1',
+        userId: 'user-1',
+        organizationId: 'org-1',
+        language: 'ru',
+        qaData: { fixed: [], followups: [], freeform: [] },
+        roleProfileSpec,
+        webResearch: null,
+        generatedGroups: {},
+        generatedBlocks: blocks([['block_5', validDecisionMatrix]]),
+        nodeCosts: [],
+        errors: [],
+        currentNode: 'group2Generator',
+      });
+
+      expect(invokeLLM).toHaveBeenCalledWith(
+        'rendered judge prompt',
+        expect.objectContaining({ preferFallbackModelAboveTokens: 20_000 })
+      );
+    } finally {
+      delete process.env.CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD;
+    }
+  });
+
+  describe('resolveJudgeFallbackTokenThreshold', () => {
+    it('defaults to 28000 when the env var is unset', () => {
+      expect(resolveJudgeFallbackTokenThreshold(undefined)).toBe(28_000);
+    });
+
+    it('uses a valid positive override', () => {
+      expect(resolveJudgeFallbackTokenThreshold('22000')).toBe(22_000);
+    });
+
+    it('falls back to the default for non-numeric or non-positive values', () => {
+      expect(resolveJudgeFallbackTokenThreshold('not-a-number')).toBe(28_000);
+      expect(resolveJudgeFallbackTokenThreshold('0')).toBe(28_000);
+      expect(resolveJudgeFallbackTokenThreshold('-5')).toBe(28_000);
+      expect(resolveJudgeFallbackTokenThreshold('')).toBe(28_000);
+    });
   });
 });

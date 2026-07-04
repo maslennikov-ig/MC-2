@@ -126,6 +126,130 @@ describe('Career Playbook runtime', () => {
     expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1250, 300_000);
   });
 
+  it('starts large-input calls on the fallback model when preferFallbackModelAboveTokens is exceeded', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    // ~30k estimated tokens (120k chars / 4) is above the 28k threshold, so the
+    // very first attempt uses the fallback model — no doomed primary attempt.
+    const result = await runtime.invokeLLM('x'.repeat(120_000), {
+      phaseName: 'stage_career_playbook_judge',
+      promptKey: 'career_playbook_cross_block_judge',
+      node: 'crossBlockJudge',
+      preferFallbackModelAboveTokens: 28_000,
+    });
+
+    expect(result.model).toBe('adult-model');
+    expect(createModel).toHaveBeenCalledTimes(1);
+    expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1000, 300_000);
+  });
+
+  it('keeps sub-threshold calls on the primary model even when preferFallbackModelAboveTokens is set', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    // ~1k estimated tokens (4k chars / 4) is well below the 28k threshold.
+    const result = await runtime.invokeLLM('x'.repeat(4000), {
+      phaseName: 'stage_career_playbook_judge',
+      promptKey: 'career_playbook_cross_block_judge',
+      node: 'crossBlockJudge',
+      preferFallbackModelAboveTokens: 28_000,
+    });
+
+    expect(result.model).toBe('fast-model');
+    expect(createModel).toHaveBeenCalledTimes(1);
+    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+  });
+
+  it('preserves the retry net for large-input calls: a failed first fallback attempt still retries', async () => {
+    const invoke = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('provider 500'))
+      .mockResolvedValueOnce({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    const result = await runtime.invokeLLM('x'.repeat(120_000), {
+      phaseName: 'stage_career_playbook_judge',
+      promptKey: 'career_playbook_cross_block_judge',
+      node: 'crossBlockJudge',
+      preferFallbackModelAboveTokens: 28_000,
+    });
+
+    expect(result.model).toBe('adult-model');
+    // Both attempts run on the fallback model: fallback-first, retry net intact.
+    expect(createModel).toHaveBeenNthCalledWith(1, 'adult-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000, 300_000);
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a non-positive preferFallbackModelAboveTokens and keeps normal primary-first routing', async () => {
+    const invoke = vi.fn().mockResolvedValue({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    // A threshold of 0 disables the size gate; even a large prompt stays primary-first.
+    const result = await runtime.invokeLLM('x'.repeat(120_000), {
+      phaseName: 'stage_career_playbook_judge',
+      promptKey: 'career_playbook_cross_block_judge',
+      node: 'crossBlockJudge',
+      preferFallbackModelAboveTokens: 0,
+    });
+
+    expect(result.model).toBe('fast-model');
+    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+  });
+
   it('uses LangChain structured output when a schema is provided', async () => {
     const invoke = vi.fn().mockResolvedValue({ content: 'plain text should not be used' });
     const structuredInvoke = vi.fn().mockResolvedValue({

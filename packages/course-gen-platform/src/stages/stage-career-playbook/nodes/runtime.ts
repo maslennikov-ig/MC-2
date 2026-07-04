@@ -18,6 +18,11 @@ export interface CareerPlaybookLLMCallOptions {
   temperature?: number;
   maxTokens?: number;
   preferFallbackModel?: boolean;
+  // When set, a call whose estimated prompt tokens exceed this threshold starts on
+  // the fallback model instead of the primary. Lets large-context callers (the
+  // final full-document judge) skip a first attempt the primary would almost
+  // certainly time out on, while the retry net below still escalates on failure.
+  preferFallbackModelAboveTokens?: number;
   maxTokensMultiplier?: number;
   structuredOutputSchema?: z.ZodTypeAny | Record<string, unknown>;
   structuredOutputName?: string;
@@ -148,11 +153,32 @@ export function createCareerPlaybookRuntime(
       const promptTokens = estimateTokenCount(prompt);
       const phaseConfig = await resolvePhaseConfig(modelConfigService, options, promptTokens);
       const attempts = Math.max(1, (phaseConfig.maxRetries ?? 0) + 1);
+      // Large-context inputs (e.g. the final full-document judge) start on the
+      // fallback model so the doomed primary-model first attempt/timeout is skipped.
+      // The retry loop below is unchanged — it still escalates on failure — so this
+      // only removes wasted primary attempts, it never weakens the safety net.
+      const startOnFallbackForLargeInput =
+        typeof options.preferFallbackModelAboveTokens === 'number' &&
+        options.preferFallbackModelAboveTokens > 0 &&
+        promptTokens > options.preferFallbackModelAboveTokens;
+      if (startOnFallbackForLargeInput) {
+        logger.info(
+          {
+            phaseName: options.phaseName,
+            node: options.node,
+            promptKey: options.promptKey,
+            promptTokens,
+            preferFallbackModelAboveTokens: options.preferFallbackModelAboveTokens,
+          },
+          'Career Playbook large-input call routed to fallback model first'
+        );
+      }
       let lastError: unknown = null;
       const callStartedAt = Date.now();
 
       for (let attempt = 0; attempt < attempts; attempt += 1) {
-        const useFallback = Boolean(options.preferFallbackModel) || attempt > 0;
+        const useFallback =
+          Boolean(options.preferFallbackModel) || startOnFallbackForLargeInput || attempt > 0;
         const modelId =
           useFallback && phaseConfig.fallbackModelId
             ? phaseConfig.fallbackModelId
