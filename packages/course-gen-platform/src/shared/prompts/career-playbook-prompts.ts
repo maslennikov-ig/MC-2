@@ -302,8 +302,10 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
 - Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+- Deterministic format minimums (verified automatically, so meet them on the first draft): Block 2 lists at least 4 anti-goals; Block 5 lists at least 4 decision rows.
 - Use exactly these top-level headings:
 {{heading_header}}
 {{heading_block_1}}
@@ -340,8 +342,9 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
 - Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
 - Use exactly these top-level headings:
 {{heading_block_3}}
 {{heading_block_4}}
@@ -379,8 +382,9 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
 - Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
 - Use exactly these top-level headings:
 {{heading_block_7}}
 {{heading_block_9}}
@@ -418,9 +422,11 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
 - Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Include a Mermaid flowchart TB career diagram in Block 11.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+- Include a Mermaid flowchart TB career diagram in Block 11 (verified automatically, so include it on the first draft).
+- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
 {{heading_block_11}}
 {{heading_block_14}}
@@ -459,9 +465,11 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
 - Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Include Mermaid diagrams in Blocks 10 and 16.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+- Include Mermaid diagrams in Blocks 10 and 16, and keep at least 3 failure modes in Block 21 (all verified automatically, so satisfy them on the first draft).
+- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
 {{heading_block_10}}
 {{heading_block_16}}
@@ -503,8 +511,9 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not output raw template placeholders in square or curly brackets. If a value must be filled later, write it as an explicit field to fill.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
 - Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
 - Use exactly these top-level headings:
 {{heading_block_18}}
 {{heading_block_22}}
@@ -538,7 +547,7 @@ Review generated Career Playbook blocks for consistency against RoleProfileSpec 
 
 Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these five categories:
 - "contradiction": the block contradicts RoleProfileSpec, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block.
-- "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a required Mermaid diagram (career path, dependencies, or main process) is absent.
+- "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a block that must contain a Mermaid diagram has none. The deterministic layer already enforces which blocks require a diagram, so only flag an entirely absent one; never ask for an extra, renamed, or duplicate diagram when the block already has one.
 - "wrong_language": user-facing text is not in the target content language.
 - "unresolved_placeholder": raw template placeholders remain (e.g. [дата], {fill}).
 - "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence.
@@ -600,6 +609,9 @@ Current group output:
     promptTemplate: `SYSTEM:
 Regenerate exactly one Career Playbook block: {{block_id}} ({{block_name}}).
 Preserve the block format contract and fix the judge issue without repeating unrelated blocks.
+- If the block already contains a Mermaid diagram, improve that existing diagram instead of appending a new one; add a diagram only when the block has none and its contract requires one.
+- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
+- For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example; do not leave raw bracket placeholders like [Name] or {value}, and never rewrite a narrative name into a "field to fill" phrase inside a sentence. Reserve "field to fill" wording for genuine blank template fields the reader completes later.
 
 Original block content:
 {{original_content}}
