@@ -5,19 +5,46 @@ Runbook для эмпирической проверки shipped-фиксов (�
 
 ## Шаг 1. Получить bearer-токен (JWT)
 
-Приложение (Next.js/SSR) хранит сессию Supabase в cookie, а НЕ в Local Storage,
-поэтому проще всего взять токен из Network:
+Приложение (Next.js/SSR) хранит сессию Supabase в cookie, а НЕ в Local Storage.
+Основной путь **без пароля** — вытащить `access_token` из cookie через консоль браузера.
+
+### Вариант A (основной, без пароля) — браузерная консоль
 
 1. Залогиниться на https://dev.ai.megacampus.ru своим аккаунтом.
-2. DevTools (F12) → вкладка **Network** → в фильтре набрать `trpc`.
-3. Обновить страницу (F5) или открыть библиотеку Career Playbook, чтобы полетели запросы.
-4. Кликнуть любой запрос на `…/api/trpc/…` → **Headers** → **Request Headers**.
-5. Найти `authorization: Bearer eyJ…` и скопировать всё **после `Bearer `** — это токен.
+2. DevTools (F12) → вкладка **Console**.
+3. Вставить сниппет — он собирает cookie `sb-<ref>-auth-token` (может быть разбита на
+   `.0`/`.1`), снимает префикс `base64-`, декодирует base64url и достаёт `access_token`:
 
-Альтернатива: Application → **Cookies** → `https://dev.ai.megacampus.ru` →
-`sb-diqooqbuchsliypgwksu-auth-token` (может быть разбит на `.0`/`.1`, значение в base64 — доставать `access_token` муторно).
+```js
+(() => {
+  const ref = 'diqooqbuchsliypgwksu';
+  const parts = document.cookie
+    .split('; ')
+    .filter(c => c.startsWith(`sb-${ref}-auth-token`))
+    .sort() // .0 перед .1
+    .map(c => c.slice(c.indexOf('=') + 1));
+  let raw = decodeURIComponent(parts.join(''));
+  if (raw.startsWith('base64-')) {
+    raw = atob(raw.slice('base64-'.length).replace(/-/g, '+').replace(/_/g, '/'));
+  }
+  const token = JSON.parse(raw).access_token;
+  console.log(token);
+  return token;
+})();
+```
 
-### Вариант B (командой, без DevTools)
+Если консоль вернула пустую строку — cookie помечена **HttpOnly** и в `document.cookie` не видна:
+открой Application → **Cookies** → `https://dev.ai.megacampus.ru` → `sb-diqooqbuchsliypgwksu-auth-token`,
+скопируй значение (склей `.0`/`.1`), убери префикс `base64-` и раскодируй как base64url → JSON, поле `access_token`.
+
+### Вариант B — Network (заголовок Authorization)
+
+1. DevTools (F12) → вкладка **Network** → в фильтре набрать `trpc`.
+2. Обновить страницу (F5) или открыть библиотеку Career Playbook, чтобы полетели запросы.
+3. Кликнуть любой запрос на `…/api/trpc/…` → **Headers** → **Request Headers**.
+4. Найти `authorization: Bearer eyJ…` и скопировать всё **после `Bearer `** — это токен.
+
+### Вариант C (командой, по паролю)
 
 Логин прямо в Supabase Auth по email+паролю → свежий `access_token` в env.
 Пароль вводится скрыто (`read -s`), в историю не попадает. Требует `jq` и наличие пароля у аккаунта
@@ -84,9 +111,42 @@ pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode mutati
 
 Что произойдёт / безопасность:
 
-- Создаётся ОДИН новый playbook под аккаунтом, генерируется (реальные LLM-траты, потолок **$5**), снимаются evidence, затем `--cleanup-scope playbook-only` удаляет **только этот** созданный playbook.
+- Создаётся ОДИН новый playbook под аккаунтом, генерируется (реальные LLM-траты, потолок **$5**), снимаются evidence.
 - Существующие playbook'и аккаунта не трогаются; курс не создаётся (нет `--include-course-bridge`).
-- Поллинг до 120 мин (совпадает с TTL-cap). `--json` даёт машинный отчёт со статусом `pass` / `warn` / `blocked`.
+- Поллинг до 120 мин (совпадает с TTL-cap). `--json` даёт машинный отчёт со статусом `pass` / `warn` / `blocked` / `fail`.
+- **Cleanup ничего не удаляет — только описывает** (см. раздел «Cleanup-семантика» ниже).
+
+## Артефакты прогона (A/B-сравнимость)
+
+После снятия evidence раннер сохраняет то, что он проверял — на **pass И на fail** (для диагностики) —
+в gitignore-каталог `packages/course-gen-platform/artifacts/career-playbook-smoke/`:
+
+- `<timestamp>-<playbookId>.md` — полный `final_markdown` сгенерированного playbook (тело для A/B-сравнения качества).
+- `<timestamp>-<playbookId>.json` — метаданные: `playbookId`, `timings` (длительность прогона, poll-настройки, DB `created_at`/`completed_at`), `costBreakdown` + `costSource`, результаты evidence-проверок, `cleanupManifest`, `finalMarkdownSource`.
+
+Пути печатаются в отчёте раннера (в `--json` — поле `artifacts`; в текстовом выводе — блок `Artifacts:`).
+
+Источники данных:
+
+- `final_markdown` — сначала из tRPC `library.get` (то, что реально рендерит UI), при недоступности клиента — из строки БД `career_playbooks`.
+- `cost_breakdown` — **только** из строки БД `career_playbooks` (ни один tRPC-эндпоинт его не отдаёт); нужен Supabase-admin env (`SUPABASE_URL` + `SUPABASE_SERVICE_KEY`). Если его нет или чтение упало — `costSource: "unavailable"`, `costBreakdown: null`, но остальной артефакт всё равно пишется.
+
+Секреты (bearer-токен, service-key, `process.env`) в артефакты **не** попадают — сериализуются только whitelisted-поля.
+
+Отключить запись: `--no-artifact`. Сменить каталог: `--artifact-dir <path>`. Каталог в `.gitignore`
+(`packages/course-gen-platform/artifacts/`), поэтому артефакты локальные — при необходимости приложи `.md`/`.json`
+к бид-комментарию вручную.
+
+## Cleanup-семантика (важно)
+
+`--cleanup-scope playbook-only|playbook-and-course` **не удаляет ничего автоматически**. Раннер лишь строит
+и печатает **манифест** (`cleanupManifest`, `mutates: false`) — список точных id (playbook, bullmq-job, share; при
+`playbook-and-course` — курс/документы/upload-пути) с пометками «удалять по точному id». Строка playbook
+после прогона **остаётся** в БД (так было с run `b866d2f5`; старые заметки, где это читалось как «self-delete», неверны).
+
+Это сделано намеренно: теперь, когда контент persist-ится в артефакт, оставшаяся строка — это A/B-baseline,
+который удобно поднять снова; авто-удаление стирало бы именно её. Удаление — **ручной шаг по точному id**
+(например, `careerPlaybook.library.delete` через tRPC или SQL по `id` из манифеста) после того, как артефакт снят.
 
 ## Шаг 5. После прогона — проверка критерия #1
 
