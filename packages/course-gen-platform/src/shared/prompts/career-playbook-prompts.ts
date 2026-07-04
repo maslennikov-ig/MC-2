@@ -1,4 +1,7 @@
 import type { HardcodedPrompt } from './types.js';
+import { formatCareerPlaybookCanonicalLayoutForPrompt } from './career-playbook-block-topics.js';
+
+const CAREER_PLAYBOOK_CANONICAL_LAYOUT = formatCareerPlaybookCanonicalLayoutForPrompt();
 
 const specJsonVariable = {
   name: 'spec_json',
@@ -197,8 +200,24 @@ Previous follow-ups answered: {{previous_followups_json}}`,
 Build a RoleProfileSpec JSON object from the user Q&A and web research.
 This spec is the contract for generating 26 Role Guide blocks.
 
+The Role Guide has a FIXED 26-block layout. Each block id owns one fixed topic.
+Canonical block topics (block id: topic):
+${CAREER_PLAYBOOK_CANONICAL_LAYOUT}
+
 Critical requirements:
-- Fill block_boundaries to prevent repetition between blocks.
+- Fill block_boundaries for every content block block_1 through block_26.
+- block_boundaries[block_id].primary_topics MUST use the canonical topic for that
+  exact block id above. You may refine the wording or add role-specific emphasis,
+  but you MUST NOT move a topic to a different block id or rename a block's subject
+  (e.g. block_11 is always career growth, block_23 is always continuity protocol,
+  block_25 is always footer + revision cadence + MegaCampus CTA).
+- Route role-specific emphasis into the canonical block that already owns it:
+  recurring metrics or forecasting go into block_6 KPI and metrics and block_4
+  duties; ownership areas go into block_3 responsibility zones; strategic ties go
+  into block_20 business goals. Never invent a new block or repurpose a block id
+  for a role emphasis such as forecasting, compliance, or career pathing.
+- Put each topic in do_not_repeat only when another block id owns it; never list a
+  block's own canonical topic in its own do_not_repeat.
 - Extract anti_goals and failure_patterns explicitly.
 - Keep client business_context separate from web research. Business context is first-party user/company data; web research is external benchmark data.
 - If business_context_mode is "universal", do not invent product, customer, sales, process, or metric facts. Build a benchmark Role Guide and mark company-specific details as adaptation points.
