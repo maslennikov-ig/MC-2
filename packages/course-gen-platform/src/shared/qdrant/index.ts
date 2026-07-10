@@ -12,7 +12,10 @@ export { createCourseEmbeddingsCollection, COLLECTION_CONFIG } from './create-co
 export {
   ensureCourseEmbeddingsCollection,
   verifyCourseEmbeddingsCollection,
+  verifyPhysicalCourseEmbeddingsCollection,
   type EnsureCollectionOptions,
+  type VerifyPhysicalCollectionOptions,
+  type PhysicalSchemaVerificationResult,
   type SchemaVerificationResult,
 } from './collection-manager';
 export { COLLECTION_CREATE_PARAMS, PAYLOAD_INDEXES } from './collection-schema';
