@@ -24,6 +24,11 @@ write_zone:
   - packages/course-gen-platform/src/shared/qdrant/collection-manager.ts
   - packages/course-gen-platform/tests/unit/shared/qdrant/collection-manager.test.ts
   - packages/course-gen-platform/src/shared/qdrant/index.ts
+  - packages/course-gen-platform/src/shared/qdrant/upload-helpers.ts
+  - packages/course-gen-platform/src/shared/qdrant/upload-types.ts
+  - packages/course-gen-platform/src/shared/qdrant/lifecycle.ts
+  - packages/course-gen-platform/tests/unit/shared/qdrant/upload-helpers.test.ts
+  - packages/course-gen-platform/tests/unit/shared/qdrant/lifecycle-refcount.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.8.md
 success_criteria:
   - Plan classifies recoverable, missing, unsupported, and already-enqueued identities deterministically without mutation.
@@ -76,10 +81,21 @@ verification:
   - Execute RED: command module absent; GREEN: plan read-only, alias/run refusal, deterministic IDs, existing-job idempotency, default concurrency 2, artifact sanitization, and verify failure tests passed.
   - Dry fixture RED: loader absent; GREEN: validated fixture dependencies and no-live CLI routing passed.
   - Jina estimate RED: fixed /100 estimate contradicted token-aware Stage 2 batching; GREEN: known request bounds and explicit unknown maximum passed.
-  - Focused combined suite after final formatting: 5 files and 50 tests passed, including exact-schema read-only verification and the full Stage 2 job-threading path.
+  - Independent Q7 review verdict `FAIL/FIX` was reproduced against source before correction; every Critical, Important, and Minor finding received a RED regression and no item was deferred.
+  - Source enumeration RED: the single Supabase query could truncate at 1000; GREEN: ordered 500-row keyset pages, independent exact-count equality, course batches of at most 200, and a 1205-row adapter regression passed. A 1001-row integration proved the same paged loader feeds plan, execute, and verify without truncation.
+  - Point identity RED: identical chunk IDs in different documents produced global 32-bit collisions; GREEN: upload and lifecycle duplication use deterministic document-scoped SHA-256 UUIDv8 IDs, with identical-content cross-document regressions.
+  - Point-loss RED: verify accepted a present document with fewer points than `chunk_count`; GREEN: paged Qdrant scroll counts every point and per-document known counts plus total known/indexed points are strict verification inputs.
+  - Processing concurrency RED: `--concurrency` bounded only `queue.add`; GREEN: default BullMQ handles separate acceptance from bounded terminal waits, default concurrency is 2, each wait has a bounded 2-hour default/24-hour maximum, and retained failed jobs are removed then retried.
+  - Durable ledger RED: partial enqueue failure lost run truth; GREEN: schema-v2 mode-0600 manifest checkpoints planned/accepted/completed/failed/pending IDs before and during mutation, is target/run-bound, sanitizes failure state, and survives BullMQ retention.
+  - Ledger fail-safe self-review RED/GREEN: accepted-only state missing from Redis is retried rather than inferred completed; only durable completed IDs are skipped. Pending includes accepted-not-terminal jobs, and failed status is monotonic under concurrent late completion so crash-time snapshots cannot downgrade to running.
+  - Source path RED: absolute, traversal, and symlink escapes were treated as readable; GREEN: lexical plus realpath upload-root containment emits `invalid_source_path`, and the verified realpath is threaded into the Stage 2 job to close the symlink TOCTOU window.
+  - Operator output RED: CLI printed JSON only; GREEN: sanitized PLAN/EXECUTE/VERIFY summaries go to stderr while machine-readable JSON remains isolated on stdout.
+  - Large verify input self-review: native RU/EN relevance fixture reads batch source IDs by 200 and a >1000 regression reaches a late RU fixture without oversized `.in()` queries.
+  - Pre-review focused baseline: 5 files and 50 tests passed before the independent `FAIL/FIX` review.
+  - Review-fix focused suite after self-review: 7 files and 85 tests passed (`reindex-plan`, reindex command, upload identity, lifecycle duplication, Phase 6, orchestrator threading, and physical verifier).
   - CLI help and dry plan/execute/verify with TMPDIR=/tmp: passed; plan reported Jina request bounds 3..12, dry execute wrote a mode-0600 sanitized artifact with 2 mocked enqueues and 1 existing identity, and dry verify passed 3/3 parity and RU/EN checks.
   - Direct CLI gap semantics: passed with exit 2; pnpm lifecycle intentionally wraps a nonzero child status as 1, so the direct entrypoint was used to prove the application exit code.
-  - Targeted typed ESLint: passed with zero errors; the approved two-file tool boundary leaves one visible max-lines warning in the CLI file and no disabled rules.
+  - Targeted typed ESLint: passed with zero errors; the expanded reviewed CLI boundary leaves two visible warnings (max-lines and execute complexity) and no disabled rules.
   - Root `pnpm lint`: passed with repository baseline warnings and no errors; targeted changed tools/tests had zero errors and one max-lines warning.
   - Root `pnpm type-check`: passed across all workspaces.
   - Root `pnpm build`: passed across all workspaces using the repository's canonical non-secret test Supabase environment; the preceding no-env attempt correctly stopped at existing web env validation.
@@ -91,11 +107,16 @@ changed_files:
   - packages/shared-types/src/bullmq-jobs.ts
   - packages/course-gen-platform/src/shared/qdrant/collection-manager.ts
   - packages/course-gen-platform/src/shared/qdrant/index.ts
+  - packages/course-gen-platform/src/shared/qdrant/upload-helpers.ts
+  - packages/course-gen-platform/src/shared/qdrant/upload-types.ts
+  - packages/course-gen-platform/src/shared/qdrant/lifecycle.ts
   - packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-qdrant-upload.ts
   - packages/course-gen-platform/tools/qdrant/reindex-plan.ts
   - packages/course-gen-platform/tools/qdrant/reindex-course-embeddings.ts
   - packages/course-gen-platform/package.json
   - packages/course-gen-platform/tests/unit/shared/qdrant/collection-manager.test.ts
+  - packages/course-gen-platform/tests/unit/shared/qdrant/upload-helpers.test.ts
+  - packages/course-gen-platform/tests/unit/shared/qdrant/lifecycle-refcount.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage2-document-processing/phase-6-qdrant-upload.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage2-document-processing/orchestrator-phase-helpers.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/reindex-plan.test.ts
@@ -103,7 +124,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/tools/qdrant/fixtures/reindex-dry-fixture.json
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.8.md
 explicit_defers:
-  - Q5 owns pinned local Qdrant runtime integration; this Q7 stream intentionally used only injected mocks and dry fixtures.
+  - Q5 pinned runtime integration is independently accepted; this Q7 review-fix pass intentionally used only injected mocks and dry fixtures before the explicitly authorized compatibility merge/gate.
   - Q10 owns durable operator documentation after acceptance; Q12 owns any live reindex, alias cutover, deploy, or staging mutation with explicit authorization.
 ---
 
@@ -111,9 +132,9 @@ explicit_defers:
 
 Implemented source-driven Qdrant recovery planning, bounded deterministic execute jobs, and strict verify parity without contacting live Supabase, Redis, Jina, or Qdrant in this task. The shared Stage 2 contract carries an optional physical target and reindex run UUID; upload forwards the target only when present, so normal jobs still use the stable alias default.
 
-Plan derives only from `file_catalog` metadata, canonical upload-storage path resolution, and joined `courses.user_id/language`. Missing files, unsupported Stage 2 formats, missing ownership, and file/course tenant mismatches are explicit gaps. Point estimates report known `chunk_count` plus unknown counts; Jina volume is a bounded range because the production embedder batches by an 8194-token limit rather than a fixed chunk count.
+Plan derives only from paged `file_catalog` metadata, canonical realpath-contained upload storage, and batched `courses.user_id/language`. Exact source count mismatches fail closed. Missing files, invalid paths, unsupported Stage 2 formats, missing ownership, and file/course tenant mismatches are explicit gaps. Point estimates report known `chunk_count` plus unknown counts; Jina volume is a bounded range because the production embedder batches by an 8194-token limit rather than a fixed chunk count.
 
-Execute refuses the logical alias and invalid run UUIDs before source or service reads, exact-verifies the physical schema through the authorized Q2 read-only API, skips retained deterministic jobs, limits enqueue concurrency to two by default, and atomically writes a mode-0600 artifact containing counts/job IDs/gaps only. Verify scrolls distinct document identities, checks tenant/course/organization parity, requires exact schema, and requires one native hybrid relevance check for each RU and EN.
+Execute refuses the logical alias and invalid run UUIDs before source or service reads, exact-verifies the physical schema through the authorized Q2 read-only API, and limits actual in-flight Stage 2 jobs to two by awaiting terminal QueueEvents with bounded timeouts. Its target-bound schema-v2 mode-0600 ledger checkpoints sanitized planned/accepted/completed/failed/pending truth monotonically; only durable completed jobs survive retention as skip evidence. Verify scrolls and counts all points, checks per-document `chunk_count`, tenant/course/organization parity, exact schema, and one native hybrid relevance check for each RU and EN. Global point identity is now a deterministic document-scoped UUIDv8 shared by normal upload and lifecycle duplication.
 
 # Scope / Routing
 

@@ -25,6 +25,7 @@ export type ReindexGapReason =
   | 'missing_course'
   | 'missing_user'
   | 'organization_mismatch'
+  | 'invalid_source_path'
   | 'source_missing'
   | 'unsupported_mime';
 
@@ -37,6 +38,7 @@ export interface ReindexPlan {
   eligible: number;
   recoverable: number;
   missingSource: number;
+  invalidSourcePath: number;
   unsupported: number;
   alreadyEnqueued: number;
   estimatedDocuments: number;
@@ -52,7 +54,7 @@ export interface ReindexPlan {
   gaps: ReindexGap[];
 }
 
-export type ReindexSourceProbe = (row: ReindexSourceRow) => boolean;
+export type ReindexSourceProbe = (row: ReindexSourceRow) => boolean | 'invalid_source_path';
 
 const UPLOAD_MIME_TYPES = new Set<string>(Object.values(MIME_TYPES_BY_TIER).flat());
 const PLAIN_TEXT_MIME_TYPES = new Set(['text/plain', 'text/markdown']);
@@ -74,6 +76,7 @@ export function buildReindexPlan(
   let eligible = 0;
   let recoverable = 0;
   let missingSource = 0;
+  let invalidSourcePath = 0;
   let unsupported = 0;
   let alreadyEnqueued = 0;
   let estimatedPoints = 0;
@@ -112,7 +115,13 @@ export function buildReindexPlan(
     }
 
     eligible += 1;
-    if (!sourceProbe(row)) {
+    const sourceStatus = sourceProbe(row);
+    if (sourceStatus === 'invalid_source_path') {
+      invalidSourcePath += 1;
+      addGap(gaps, row.id, 'invalid_source_path');
+      continue;
+    }
+    if (!sourceStatus) {
       missingSource += 1;
       addGap(gaps, row.id, 'source_missing');
       continue;
@@ -139,6 +148,7 @@ export function buildReindexPlan(
     eligible,
     recoverable,
     missingSource,
+    invalidSourcePath,
     unsupported,
     alreadyEnqueued,
     estimatedDocuments: recoverable,
@@ -178,19 +188,61 @@ export interface DatabaseCourseSourceRow {
 }
 
 export interface ReindexSourceDatabase {
-  listFileCatalogSources: (courseId?: string) => Promise<DatabaseFileCatalogSourceRow[]>;
+  countFileCatalogSources: (courseId?: string) => Promise<number>;
+  listFileCatalogSourcesPage: (input: {
+    courseId?: string;
+    afterId?: string;
+    limit: number;
+  }) => Promise<DatabaseFileCatalogSourceRow[]>;
   listCourseSources: (courseIds: readonly string[]) => Promise<DatabaseCourseSourceRow[]>;
 }
+
+const FILE_SOURCE_PAGE_SIZE = 500;
+const COURSE_SOURCE_BATCH_SIZE = 200;
 
 export async function loadReindexSources(
   database: ReindexSourceDatabase,
   courseId?: string
 ): Promise<ReindexSourceRow[]> {
-  const files = await database.listFileCatalogSources(courseId);
+  const expectedFileCount = await database.countFileCatalogSources(courseId);
+  if (!Number.isSafeInteger(expectedFileCount) || expectedFileCount < 0) {
+    throw new Error(`Invalid exact source count: ${expectedFileCount}`);
+  }
+
+  const files: DatabaseFileCatalogSourceRow[] = [];
+  let afterId: string | undefined;
+  while (files.length < expectedFileCount) {
+    const page = await database.listFileCatalogSourcesPage({
+      courseId,
+      afterId,
+      limit: FILE_SOURCE_PAGE_SIZE,
+    });
+    if (page.length === 0) break;
+
+    for (const file of page) {
+      if (afterId !== undefined && file.id <= afterId) {
+        throw new Error(`Non-increasing file_catalog keyset page at ${file.id}`);
+      }
+      afterId = file.id;
+      files.push(file);
+    }
+    if (page.length < FILE_SOURCE_PAGE_SIZE) break;
+  }
+
+  if (files.length !== expectedFileCount) {
+    throw new Error(
+      `Paged file_catalog rows ${files.length} do not match independent exact source count ${expectedFileCount}`
+    );
+  }
+
   const courseIds = [
     ...new Set(files.flatMap(file => (file.course_id ? [file.course_id] : []))),
   ].sort();
-  const courses = courseIds.length > 0 ? await database.listCourseSources(courseIds) : [];
+  const courses: DatabaseCourseSourceRow[] = [];
+  for (let index = 0; index < courseIds.length; index += COURSE_SOURCE_BATCH_SIZE) {
+    const batch = courseIds.slice(index, index + COURSE_SOURCE_BATCH_SIZE);
+    courses.push(...(await database.listCourseSources(batch)));
+  }
   return mapDatabaseReindexSources(files, courses);
 }
 
@@ -228,6 +280,7 @@ export interface IndexedDocumentIdentity {
   documentId: string;
   courseId: string;
   organizationId: string;
+  pointCount: number;
 }
 
 export interface ReindexSchemaVerification {
@@ -256,14 +309,23 @@ export interface ReindexCountMismatch {
   actual: number;
 }
 
+export interface ReindexPointCountMismatch {
+  documentId: string;
+  expected: number;
+  actual: number;
+}
+
 export interface ReindexVerificationResult {
   ok: boolean;
   expectedDocuments: number;
   indexedDocuments: number;
+  expectedKnownPoints: number;
+  indexedPoints: number;
   missingDocumentIds: string[];
   extraDocumentIds: string[];
   contextMismatches: ReindexContextMismatch[];
   countMismatches: ReindexCountMismatch[];
+  pointCountMismatches: ReindexPointCountMismatch[];
   schemaMismatches: string[];
   relevanceFailures: ReindexLocale[];
 }
@@ -358,6 +420,20 @@ export function verifyReindexParity(input: VerifyReindexParityInput): ReindexVer
     ...compareCounts('course', expectedCounts.courses, actualCounts.courses),
     ...compareCounts('organization', expectedCounts.organizations, actualCounts.organizations),
   ];
+  const pointCountMismatches = expectedIds.flatMap(documentId => {
+    const expected = expectedById.get(documentId)!;
+    const actual = indexedById.get(documentId);
+    if (!actual || expected.chunkCount === null || actual.pointCount === expected.chunkCount) {
+      return [];
+    }
+    return [
+      {
+        documentId,
+        expected: expected.chunkCount,
+        actual: actual.pointCount,
+      },
+    ];
+  });
   const relevanceFailures = (['ru', 'en'] as const).filter(language => {
     const checks = input.relevanceChecks.filter(check => check.language === language);
     return checks.length !== 1 || !checks[0].passed || !checks[0].nativeHybrid;
@@ -371,13 +447,23 @@ export function verifyReindexParity(input: VerifyReindexParityInput): ReindexVer
       extraDocumentIds.length === 0 &&
       contextMismatches.length === 0 &&
       countMismatches.length === 0 &&
+      pointCountMismatches.length === 0 &&
       relevanceFailures.length === 0,
     expectedDocuments: expectedById.size,
     indexedDocuments: indexedById.size,
+    expectedKnownPoints: input.expectedSources.reduce(
+      (total, source) => total + (source.chunkCount ?? 0),
+      0
+    ),
+    indexedPoints: input.indexedDocuments.reduce(
+      (total, document) => total + document.pointCount,
+      0
+    ),
     missingDocumentIds,
     extraDocumentIds,
     contextMismatches,
     countMismatches,
+    pointCountMismatches,
     schemaMismatches,
     relevanceFailures,
   };

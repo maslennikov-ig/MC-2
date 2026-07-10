@@ -148,6 +148,16 @@ describe('buildReindexPlan', () => {
       gaps: [{ fileId: SOURCE_BASE.id, reason: 'organization_mismatch' }],
     });
   });
+
+  it('classifies a non-canonical source path as an explicit integrity gap', () => {
+    const plan = buildReindexPlan([SOURCE_BASE], () => 'invalid_source_path');
+
+    expect(plan).toMatchObject({
+      recoverable: 0,
+      invalidSourcePath: 1,
+      gaps: [{ fileId: SOURCE_BASE.id, reason: 'invalid_source_path' }],
+    });
+  });
 });
 
 describe('mapDatabaseReindexSources', () => {
@@ -202,15 +212,80 @@ describe('mapDatabaseReindexSources', () => {
       language: 'ru',
     };
     const database = {
-      listFileCatalogSources: vi.fn().mockResolvedValue([file]),
+      countFileCatalogSources: vi.fn().mockResolvedValue(1),
+      listFileCatalogSourcesPage: vi.fn().mockResolvedValue([file]),
       listCourseSources: vi.fn().mockResolvedValue([course]),
     };
 
     const result = await loadReindexSources(database, SOURCE_BASE.courseId!);
 
-    expect(database.listFileCatalogSources).toHaveBeenCalledWith(SOURCE_BASE.courseId);
+    expect(database.countFileCatalogSources).toHaveBeenCalledWith(SOURCE_BASE.courseId);
+    expect(database.listFileCatalogSourcesPage).toHaveBeenCalledWith({
+      courseId: SOURCE_BASE.courseId,
+      afterId: undefined,
+      limit: 500,
+    });
     expect(database.listCourseSources).toHaveBeenCalledWith([SOURCE_BASE.courseId]);
     expect(result).toEqual([{ ...SOURCE_BASE, courseOrganizationId: SOURCE_BASE.organizationId }]);
+  });
+
+  it('keyset-pages more than 1000 files and batches every course lookup deterministically', async () => {
+    const files = Array.from({ length: 1205 }, (_, index) => {
+      const suffix = String(index).padStart(4, '0');
+      return {
+        id: `file-${suffix}`,
+        organization_id: SOURCE_BASE.organizationId,
+        course_id: `course-${suffix}`,
+        storage_path: `uploads/org/course/source-${suffix}.pdf`,
+        mime_type: SOURCE_BASE.mimeType,
+        priority: SOURCE_BASE.priority,
+        vector_status: SOURCE_BASE.vectorStatus,
+        chunk_count: 1,
+      };
+    });
+    const listFileCatalogSourcesPage = vi.fn(
+      ({ afterId, limit }: { afterId?: string; limit: number }) => {
+        const start = afterId ? files.findIndex(file => file.id === afterId) + 1 : 0;
+        return Promise.resolve(files.slice(start, start + limit));
+      }
+    );
+    const listCourseSources = vi.fn((courseIds: readonly string[]) =>
+      Promise.resolve(
+        courseIds.map(id => ({
+          id,
+          organization_id: SOURCE_BASE.organizationId,
+          user_id: SOURCE_BASE.userId!,
+          language: 'ru',
+        }))
+      )
+    );
+
+    const result = await loadReindexSources({
+      countFileCatalogSources: vi.fn().mockResolvedValue(files.length),
+      listFileCatalogSourcesPage,
+      listCourseSources,
+    });
+
+    expect(result).toHaveLength(files.length);
+    expect(result.at(-1)?.id).toBe('file-1204');
+    expect(listFileCatalogSourcesPage).toHaveBeenCalledTimes(3);
+    expect(listFileCatalogSourcesPage.mock.calls.map(([input]) => input.afterId)).toEqual([
+      undefined,
+      'file-0499',
+      'file-0999',
+    ]);
+    expect(listCourseSources.mock.calls.every(([ids]) => ids.length <= 200)).toBe(true);
+    expect(listCourseSources.mock.calls.flatMap(([ids]) => ids)).toHaveLength(files.length);
+  });
+
+  it('fails closed when paged source rows do not match the independent exact count', async () => {
+    await expect(
+      loadReindexSources({
+        countFileCatalogSources: vi.fn().mockResolvedValue(2),
+        listFileCatalogSourcesPage: vi.fn().mockResolvedValue([]),
+        listCourseSources: vi.fn().mockResolvedValue([]),
+      })
+    ).rejects.toThrow(/exact source count/i);
   });
 });
 
@@ -230,11 +305,13 @@ describe('verifyReindexParity', () => {
           documentId: SOURCE_BASE.id,
           courseId: SOURCE_BASE.courseId!,
           organizationId: SOURCE_BASE.organizationId,
+          pointCount: SOURCE_BASE.chunkCount!,
         },
         {
           documentId: secondSource.id,
           courseId: secondSource.courseId!,
           organizationId: secondSource.organizationId,
+          pointCount: secondSource.chunkCount!,
         },
       ],
       schemaVerification: { ok: true, mismatches: [] },
@@ -248,10 +325,13 @@ describe('verifyReindexParity', () => {
       ok: true,
       expectedDocuments: 2,
       indexedDocuments: 2,
+      expectedKnownPoints: 14,
+      indexedPoints: 14,
       missingDocumentIds: [],
       extraDocumentIds: [],
       contextMismatches: [],
       countMismatches: [],
+      pointCountMismatches: [],
       schemaMismatches: [],
       relevanceFailures: [],
     });
@@ -269,11 +349,13 @@ describe('verifyReindexParity', () => {
           documentId: SOURCE_BASE.id,
           courseId: wrongCourseId,
           organizationId: SOURCE_BASE.organizationId,
+          pointCount: SOURCE_BASE.chunkCount!,
         },
         {
           documentId: extraId,
           courseId: secondSource.courseId!,
           organizationId: wrongOrganizationId,
+          pointCount: secondSource.chunkCount!,
         },
       ],
       schemaVerification: { ok: false, mismatches: ['vectors.dense.size'] },
@@ -303,5 +385,33 @@ describe('verifyReindexParity', () => {
     );
     expect(result.schemaMismatches).toEqual(['vectors.dense.size']);
     expect(result.relevanceFailures).toEqual(['en']);
+  });
+
+  it('fails when a present document has fewer points than its persisted chunk count', () => {
+    const result = verifyReindexParity({
+      expectedSources: [SOURCE_BASE],
+      indexedDocuments: [
+        {
+          documentId: SOURCE_BASE.id,
+          courseId: SOURCE_BASE.courseId!,
+          organizationId: SOURCE_BASE.organizationId,
+          pointCount: SOURCE_BASE.chunkCount! - 1,
+        },
+      ],
+      schemaVerification: { ok: true, mismatches: [] },
+      relevanceChecks: [
+        { language: 'ru', passed: true, nativeHybrid: true },
+        { language: 'en', passed: true, nativeHybrid: true },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.pointCountMismatches).toEqual([
+      {
+        documentId: SOURCE_BASE.id,
+        expected: SOURCE_BASE.chunkCount,
+        actual: SOURCE_BASE.chunkCount! - 1,
+      },
+    ]);
   });
 });

@@ -4,22 +4,29 @@
  * @module shared/qdrant/upload-helpers
  */
 
+import { createHash } from 'node:crypto';
 import type { EmbeddingResult } from '../embeddings/generate';
 import { toQdrantPayload } from '../embeddings/metadata-enricher';
 import type { QdrantUploadPoint, QdrantUpsertPoint, QdrantNamedVector } from './upload-types';
 import { createBm25Document } from './config';
 
 /**
- * Generates a numeric ID from chunk_id string
+ * Generates a deterministic document-scoped UUIDv8 point ID.
+ *
+ * Qdrant point IDs are global inside a collection. Hashing only chunk_id made
+ * identical chunks from different documents overwrite each other, while the
+ * previous 32-bit output also had a small collision space. This keeps 122 bits
+ * of a SHA-256 digest and marks the UUID as RFC 9562 version 8.
  */
-export function generateNumericId(chunk_id: string): number {
-  let hash = 0;
-  for (let i = 0; i < chunk_id.length; i++) {
-    const char = chunk_id.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
+export function generatePointId(documentId: string, chunkId: string): string {
+  const digest = createHash('sha256')
+    .update(JSON.stringify([documentId, chunkId]), 'utf8')
+    .digest()
+    .subarray(0, 16);
+  digest[6] = (digest[6] & 0x0f) | 0x80;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = digest.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function compactPayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -56,7 +63,7 @@ export function toQdrantPoint(
   };
 
   return {
-    id: generateNumericId(chunk.chunk_id),
+    id: generatePointId(chunk.document_id, chunk.chunk_id),
     vector,
     payload: compactPayload(rawPayload),
   };

@@ -31,6 +31,7 @@ import type {
   QdrantVectorPayload,
 } from '../types/database-queries';
 import * as LifecycleHelpers from './lifecycle-helpers';
+import { generatePointId } from './upload-helpers';
 
 /**
  * UUID validation regex pattern
@@ -111,22 +112,6 @@ function getSupabaseClient() {
  */
 export function calculateFileHash(buffer: Buffer): string {
   return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
-/**
- * Generates numeric ID from string (for Qdrant point IDs)
- *
- * @param str - Input string
- * @returns Numeric ID
- */
-function generateNumericId(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
 }
 
 /**
@@ -269,9 +254,8 @@ export async function duplicateVectorsForNewCourse(
     const newPoints = originalPoints.map(point => {
       const payload = (point.payload as QdrantVectorPayload) || {};
 
-      // Generate new unique point ID - use chunk_id if available, otherwise timestamp
-      const chunkIdStr = payload.chunk_id ? String(payload.chunk_id) : String(Date.now());
-      const newPointId = generateNumericId(`${newFileId}-${chunkIdStr}`);
+      const chunkIdStr = payload.chunk_id ? String(payload.chunk_id) : String(point.id);
+      const newPointId = generatePointId(newFileId, chunkIdStr);
 
       // Extract vector (handle both named and unnamed vectors)
       const vectorData = point.vector;

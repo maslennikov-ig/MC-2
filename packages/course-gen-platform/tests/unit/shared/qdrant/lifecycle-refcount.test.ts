@@ -17,14 +17,14 @@ const { mockCreateClient, mockQdrantDelete, mockQdrantScroll, mockQdrantUpsert, 
   }));
 
 vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn((...args) => mockCreateClient(...args)),
+  createClient: mockCreateClient,
 }));
 
 vi.mock('@/shared/qdrant/client', () => ({
   qdrantClient: {
-    delete: vi.fn((...args) => mockQdrantDelete(...args)),
-    scroll: vi.fn((...args) => mockQdrantScroll(...args)),
-    upsert: vi.fn((...args) => mockQdrantUpsert(...args)),
+    delete: mockQdrantDelete,
+    scroll: mockQdrantScroll,
+    upsert: mockQdrantUpsert,
   },
 }));
 
@@ -256,6 +256,22 @@ describe('qdrant lifecycle reference count ownership', () => {
     expect(insertSupabase.rpc).not.toHaveBeenCalledWith(
       'increment_file_reference_count',
       expect.anything()
+    );
+    expect(mockQdrantUpsert).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        points: [
+          expect.objectContaining({
+            id: expect.stringMatching(
+              /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+            ),
+            payload: expect.objectContaining({
+              document_id: 'reference-file-id',
+              chunk_id: 'chunk-1',
+            }),
+          }),
+        ],
+      })
     );
   });
 
