@@ -33,6 +33,10 @@ function collectionInfo(
     missingIndex?: string;
     strictMaxQueryLimit?: number;
     pointsCount?: number;
+    unexpectedDense?: boolean;
+    unexpectedSparse?: boolean;
+    unexpectedIndex?: boolean;
+    unexpectedStrictRestriction?: boolean;
   } = {}
 ) {
   const payloadSchema = Object.fromEntries(
@@ -49,6 +53,13 @@ function collectionInfo(
       },
     ])
   );
+  if (overrides.unexpectedIndex) {
+    payloadSchema.unexpected_index = {
+      data_type: 'keyword',
+      params: { type: 'keyword' },
+      points: 0,
+    };
+  }
 
   return {
     status: 'green',
@@ -62,6 +73,11 @@ function collectionInfo(
             ...COLLECTION_CREATE_PARAMS.vectors.dense,
             size: overrides.denseSize ?? COLLECTION_CREATE_PARAMS.vectors.dense.size,
           },
+          ...(overrides.unexpectedDense
+            ? {
+                unexpected_dense: COLLECTION_CREATE_PARAMS.vectors.dense,
+              }
+            : {}),
         },
         sparse_vectors: {
           sparse: {
@@ -69,6 +85,11 @@ function collectionInfo(
             modifier:
               overrides.sparseModifier ?? COLLECTION_CREATE_PARAMS.sparse_vectors.sparse.modifier,
           },
+          ...(overrides.unexpectedSparse
+            ? {
+                unexpected_sparse: COLLECTION_CREATE_PARAMS.sparse_vectors.sparse,
+              }
+            : {}),
         },
         shard_number: COLLECTION_CREATE_PARAMS.shard_number,
         replication_factor: COLLECTION_CREATE_PARAMS.replication_factor,
@@ -82,6 +103,7 @@ function collectionInfo(
         max_query_limit:
           overrides.strictMaxQueryLimit ??
           COLLECTION_CREATE_PARAMS.strict_mode_config.max_query_limit,
+        ...(overrides.unexpectedStrictRestriction ? { search_allow_exact: false } : {}),
       },
     },
     payload_schema: payloadSchema,
@@ -94,13 +116,24 @@ function createClient(
     collectionInfo?: ReturnType<typeof collectionInfo>;
     legacyInfo?: ReturnType<typeof collectionInfo>;
     aliases?: Array<{ alias_name: string; collection_name: string }>;
+    aliasUpdateResult?: boolean;
+    serverVersion?: string;
+    versionError?: Error;
   } = {}
 ) {
   const calls: string[] = [];
   const mutations: string[] = [];
   const info = options.collectionInfo ?? collectionInfo();
+  const serverVersion = options.serverVersion ?? '1.18.2';
 
   const client = {
+    versionInfo: vi.fn(() => {
+      calls.push(`versionInfo:${options.versionError ? 'error' : serverVersion}`);
+      if (options.versionError) {
+        return Promise.reject(options.versionError);
+      }
+      return Promise.resolve({ title: 'qdrant', version: serverVersion });
+    }),
     getCollections: vi.fn(() => {
       calls.push('getCollections');
       return Promise.resolve({
@@ -132,7 +165,7 @@ function createClient(
       const call = `updateCollectionAliases:${create?.alias_name}->${create?.collection_name}`;
       calls.push(call);
       mutations.push(call);
-      return Promise.resolve(true);
+      return Promise.resolve(options.aliasUpdateResult ?? true);
     }),
     deleteCollection: vi.fn((name: string) => {
       calls.push(`deleteCollection:${name}`);
@@ -161,6 +194,7 @@ describe('Qdrant collection manager', () => {
       mismatches: [],
     });
     expect(calls).toEqual([
+      'versionInfo:1.18.2',
       'getCollections',
       `createCollection:${PHYSICAL_NAME}`,
       ...PAYLOAD_INDEXES.map(index => `createPayloadIndex:${index.field_name}`),
@@ -226,6 +260,38 @@ describe('Qdrant collection manager', () => {
     );
   });
 
+  it('fails bootstrap when Qdrant returns false for alias creation', async () => {
+    const { client } = createClient({ aliasUpdateResult: false });
+
+    await expect(ensureCourseEmbeddingsCollection({ client })).rejects.toThrow(
+      `Qdrant refused to create alias ${ALIAS_NAME} for ${PHYSICAL_NAME}`
+    );
+  });
+
+  it('blocks every mutation when the server is not the pinned Qdrant version', async () => {
+    const { client, calls, mutations } = createClient({ serverVersion: '1.18.1' });
+
+    await expect(ensureCourseEmbeddingsCollection({ client })).rejects.toThrow(
+      'Unsupported Qdrant server version 1.18.1; required 1.18.2 for @qdrant/js-client-rest 1.18.0'
+    );
+
+    expect(calls).toEqual(['versionInfo:1.18.1']);
+    expect(mutations).toEqual([]);
+  });
+
+  it('blocks every mutation when the server version cannot be read', async () => {
+    const { client, calls, mutations } = createClient({
+      versionError: new Error('connection refused'),
+    });
+
+    await expect(ensureCourseEmbeddingsCollection({ client })).rejects.toThrow(
+      'Unable to verify required Qdrant server 1.18.2 for @qdrant/js-client-rest 1.18.0: connection refused'
+    );
+
+    expect(calls).toEqual(['versionInfo:error']);
+    expect(mutations).toEqual([]);
+  });
+
   it.each([
     ['dense vector size', { denseSize: 384 }, 'vectors.dense.size'],
     ['sparse modifier', { sparseModifier: 'none' }, 'sparse_vectors.sparse.modifier'],
@@ -242,6 +308,64 @@ describe('Qdrant collection manager', () => {
 
     expect(result.ok).toBe(false);
     expect(result.mismatches).toEqual([expect.stringContaining(path)]);
+    expect(mutations).toEqual([]);
+  });
+
+  it('reports an unexpected dense vector name without mutation', async () => {
+    const { client, mutations } = createClient({
+      collections: [PHYSICAL_NAME],
+      collectionInfo: collectionInfo({ unexpectedDense: true }),
+      aliases: [{ alias_name: ALIAS_NAME, collection_name: PHYSICAL_NAME }],
+    });
+
+    const verification = await ensureCourseEmbeddingsCollection({ client });
+
+    expect(verification.ok).toBe(false);
+    expect(verification.mismatches).toEqual([expect.stringContaining('unexpected_dense')]);
+    expect(mutations).toEqual([]);
+  });
+
+  it('reports an unexpected sparse vector name without mutation', async () => {
+    const { client, mutations } = createClient({
+      collections: [PHYSICAL_NAME],
+      collectionInfo: collectionInfo({ unexpectedSparse: true }),
+      aliases: [{ alias_name: ALIAS_NAME, collection_name: PHYSICAL_NAME }],
+    });
+
+    const verification = await ensureCourseEmbeddingsCollection({ client });
+
+    expect(verification.ok).toBe(false);
+    expect(verification.mismatches).toEqual([expect.stringContaining('unexpected_sparse')]);
+    expect(mutations).toEqual([]);
+  });
+
+  it('reports an unexpected payload index without mutation', async () => {
+    const { client, mutations } = createClient({
+      collections: [PHYSICAL_NAME],
+      collectionInfo: collectionInfo({ unexpectedIndex: true }),
+      aliases: [{ alias_name: ALIAS_NAME, collection_name: PHYSICAL_NAME }],
+    });
+
+    const verification = await ensureCourseEmbeddingsCollection({ client });
+
+    expect(verification.ok).toBe(false);
+    expect(verification.mismatches).toEqual([expect.stringContaining('unexpected_index')]);
+    expect(mutations).toEqual([]);
+  });
+
+  it('reports an unexpected active strict-mode restriction without mutation', async () => {
+    const { client, mutations } = createClient({
+      collections: [PHYSICAL_NAME],
+      collectionInfo: collectionInfo({ unexpectedStrictRestriction: true }),
+      aliases: [{ alias_name: ALIAS_NAME, collection_name: PHYSICAL_NAME }],
+    });
+
+    const verification = await ensureCourseEmbeddingsCollection({ client });
+
+    expect(verification.ok).toBe(false);
+    expect(verification.mismatches).toEqual([
+      expect.stringContaining('strict_mode_config.search_allow_exact'),
+    ]);
     expect(mutations).toEqual([]);
   });
 
