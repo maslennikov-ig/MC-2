@@ -1,9 +1,9 @@
 ---
 stage_id: mc2-jz6y0.1
 task_id: mc2-jz6y0.1
-status: in_progress
+status: closed
 branch: codex/self-hosted-qdrant-platform-plan
-delivery_method: feature-branch
+delivery_method: pushed-feature-branch
 ---
 
 # Self-Hosted Qdrant Planning Stage
@@ -45,6 +45,12 @@ delivery_method: feature-branch
 - Placeholder/debt-marker scan over all three artifacts returned no matches.
 - `git diff --check` passed before closeout.
 - E2E/smoke: not applicable; this stage changes planning/orchestration documentation only and explicitly forbids runtime mutation.
+
+## Delivery
+
+- Commit: `77e3ebf4` (`docs(qdrant): add self-hosted implementation handoff`).
+- Branch: `origin/codex/self-hosted-qdrant-platform-plan`.
+- Beads: planning child `mc2-jz6y0.1` closed; implementation epic `mc2-jz6y0` remains open; obsolete Cloud endpoint bug `mc2-db696.86` closed as superseded.
 
 ## Documentation
 

@@ -1,9 +1,9 @@
 # Orchestrator Handoff
 
 Updated: 2026-07-10
-Stage: Self-hosted Qdrant planning package (`mc2-jz6y0.1`) ready to close; implementation epic `mc2-jz6y0` open
+Stage: Self-hosted Qdrant planning package (`mc2-jz6y0.1`) CLOSED; implementation epic `mc2-jz6y0` open
 Branch: `codex/self-hosted-qdrant-platform-plan`
-Beads: `mc2-jz6y0` open; `mc2-jz6y0.1` in progress pending planning closeout; prior Career Playbook close state remains unchanged
+Beads: `mc2-jz6y0` open; `mc2-jz6y0.1` closed; superseded Cloud bug `mc2-db696.86` closed; prior Career Playbook close state remains unchanged
 
 ## Current State
 
