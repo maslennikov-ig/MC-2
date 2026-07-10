@@ -119,3 +119,23 @@ Returned for orchestrator review on `codex/qdrant-q3-native-ingestion`. Acceptan
 # Risks / Follow-ups / Explicit Defers
 
 No Q3 implementation debt is hidden. Formula ranking, grouping, cache keys and score-mutation removal remain Q4 by explicit scope boundary. Runtime multilingual ranking against Qdrant 1.18.2 remains the blocking Q5 integration proof. The legacy live experiment was not executed because live-service mutation was forbidden.
+
+# Review Fix
+
+The correctness review finding is resolved without changing Q3 production behavior. `experiments/**/*.ts` and `tools/**/*.ts` remain included in `packages/course-gen-platform/tsconfig.eslint.json` for typed parsing, but both globs were removed from the relaxed ESLint override. The original type-safety rules now report their existing warnings while remaining hook-compatible.
+
+## Review-Fix RED→GREEN Evidence
+
+- RED: a focused static check found both experiment/tool globs inside the relaxed override, proving the review's rule-weakening finding.
+- RED: a focused coverage check found no assertions for missing weight, both inclusive boundaries, or a later invalid input preventing every upsert.
+- GREEN: `upload-helpers.test.ts` now passes 12 tests, including omitted missing weight, accepted `0.5`/`1.0`, and a valid-first/invalid-second upload with `batch_size: 1` and zero `qdrantClient.upsert()` calls.
+- GREEN: the complete focused Q3 suite passes 21 tests across five files; no production source change was required because validation already occurs while building the complete point array before the batch loop.
+- GREEN: package type-check passes and the custom-BM25 runtime reference gate has zero matches.
+- GREEN: typed ESLint with the original safety rules passes with zero errors and 27 visible pre-existing warnings across the changed experiment/tool paths.
+- GREEN: targeted Prettier and `git diff --check` pass.
+
+## Review-Fix Changed Files
+
+- `eslint.config.mjs`
+- `packages/course-gen-platform/tests/unit/shared/qdrant/upload-helpers.test.ts`
+- `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.4.md`

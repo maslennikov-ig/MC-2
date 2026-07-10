@@ -89,8 +89,6 @@ export default tseslint.config(
       '**/tests/**/*.ts',
       '**/tests/**/*.tsx',
       '**/scripts/**/*.ts',
-      '**/experiments/**/*.ts',
-      '**/tools/**/*.ts',
     ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

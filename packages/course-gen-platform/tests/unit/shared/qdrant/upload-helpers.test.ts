@@ -1,9 +1,30 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EmbeddingResult } from '@/shared/embeddings/generate';
 import type { EnrichedChunk } from '@/shared/embeddings/metadata-enricher';
 import { toQdrantPayload } from '@/shared/embeddings/metadata-enricher';
 import { createBm25Document } from '@/shared/qdrant/config';
 import { toQdrantPoint } from '@/shared/qdrant/upload-helpers';
+
+const { mockQdrantUpsert, mockLogger } = vi.hoisted(() => ({
+  mockQdrantUpsert: vi.fn(),
+  mockLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock('@/shared/qdrant/client', () => ({
+  qdrantClient: {
+    upsert: mockQdrantUpsert,
+  },
+}));
+
+vi.mock('@/shared/logger/index.js', () => ({
+  logger: mockLogger,
+  default: mockLogger,
+}));
 
 function createChunk(overrides: Partial<EnrichedChunk> = {}): EnrichedChunk {
   return {
@@ -52,6 +73,10 @@ function createEmbedding(chunk: EnrichedChunk): EmbeddingResult {
 }
 
 describe('Qdrant upload conversion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('stores the native BM25 document and complete compacted enriched payload', () => {
     const chunk = createChunk();
 
@@ -102,4 +127,48 @@ describe('Qdrant upload conversion', () => {
       );
     }
   );
+
+  it('omits missing document_weight so the query default can apply', () => {
+    const chunk = createChunk({ document_weight: undefined as unknown as number });
+
+    const point = toQdrantPoint(createEmbedding(chunk), true);
+
+    expect(point.payload).not.toHaveProperty('document_weight');
+  });
+
+  it.each([0.5, 1])('accepts document_weight boundary %s', documentWeight => {
+    const chunk = createChunk({ document_weight: documentWeight });
+
+    const point = toQdrantPoint(createEmbedding(chunk), true);
+
+    expect(point.payload.document_weight).toBe(documentWeight);
+  });
+
+  it('rejects a later invalid input before any Qdrant upsert', async () => {
+    const originalSupabaseUrl = process.env.SUPABASE_URL;
+    const originalSupabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_KEY;
+
+    try {
+      const { uploadChunksToQdrant } = await import('@/shared/qdrant/upload');
+      const validFirst = createEmbedding(
+        createChunk({ chunk_id: 'chunk-valid', document_weight: 0.5 })
+      );
+      const invalidSecond = createEmbedding(
+        createChunk({ chunk_id: 'chunk-invalid', document_weight: 1.01 })
+      );
+
+      await expect(
+        uploadChunksToQdrant([validFirst, invalidSecond], {
+          batch_size: 1,
+          enable_sparse: true,
+        })
+      ).rejects.toThrow('document_weight must be a finite number between 0.5 and 1.0');
+      expect(mockQdrantUpsert).not.toHaveBeenCalled();
+    } finally {
+      process.env.SUPABASE_URL = originalSupabaseUrl;
+      process.env.SUPABASE_SERVICE_KEY = originalSupabaseKey;
+    }
+  });
 });
