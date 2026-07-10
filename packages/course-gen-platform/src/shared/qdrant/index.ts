@@ -33,6 +33,7 @@ export {
   type SearchResult,
   type SearchFilters,
   type SearchOptions,
+  type ResolvedSearchOptions,
   type SearchMetadata,
   type SearchResponse,
 } from './search';

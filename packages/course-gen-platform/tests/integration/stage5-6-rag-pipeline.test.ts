@@ -60,14 +60,19 @@ vi.mock('@/shared/trace-logger', () => ({
 
 // Mock reranking to pass through (sort by score, take top N)
 vi.mock('@/stages/stage6-lesson-content/rag/reranking', () => ({
-  rerankChunks: vi.fn().mockImplementation(
-    (chunks: Array<{ similarity_score: number }>, _queries: string[], _lessonId: string, topN: number) =>
-      Promise.resolve(
-        [...chunks]
-          .sort((a, b) => b.similarity_score - a.similarity_score)
-          .slice(0, topN)
-      )
-  ),
+  rerankChunks: vi
+    .fn()
+    .mockImplementation(
+      (
+        chunks: Array<{ similarity_score: number }>,
+        _queries: string[],
+        _lessonId: string,
+        topN: number
+      ) =>
+        Promise.resolve(
+          [...chunks].sort((a, b) => b.similarity_score - a.similarity_score).slice(0, topN)
+        )
+    ),
 }));
 
 // Mock coverage to return a fixed score
@@ -96,7 +101,8 @@ function createTestSection(overrides?: Partial<Section>): Section {
   return {
     section_number: 1,
     section_title: 'Introduction to Machine Learning Fundamentals',
-    section_description: 'This section covers the core principles and foundational concepts of machine learning.',
+    section_description:
+      'This section covers the core principles and foundational concepts of machine learning.',
     learning_objectives: [
       'Explain the difference between supervised and unsupervised learning approaches',
       'Apply basic classification algorithms to structured datasets for prediction tasks',
@@ -236,6 +242,7 @@ function createMockSearchResponse(
       search_type: 'hybrid',
       embedding_time_ms: 50,
       search_time_ms: 100,
+      fallback_used: false,
       filters_applied: {},
     },
   };
@@ -409,7 +416,11 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
           content_archetype: 'concept_explainer',
         },
         learning_objectives: [
-          { id: 'LO-1.1.1', objective: 'Machine Learning basics overview', bloom_level: 'understand' },
+          {
+            id: 'LO-1.1.1',
+            objective: 'Machine Learning basics overview',
+            bloom_level: 'understand',
+          },
         ],
         intro_blueprint: {
           hook_strategy: 'question',
@@ -421,7 +432,11 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
             title: 'ML Fundamentals',
             content_archetype: 'concept_explainer',
             rag_context_id: '1',
-            constraints: { depth: 'detailed_analysis', required_keywords: [], prohibited_terms: [] },
+            constraints: {
+              depth: 'detailed_analysis',
+              required_keywords: [],
+              prohibited_terms: [],
+            },
             key_points_to_cover: ['Machine Learning basics overview'], // Same as learning objective
           },
         ],
@@ -468,8 +483,15 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
           title: `Section ${i + 1}`,
           content_archetype: 'concept_explainer' as const,
           rag_context_id: '1',
-          constraints: { depth: 'detailed_analysis' as const, required_keywords: [], prohibited_terms: [] },
-          key_points_to_cover: [`Key point A for section ${i + 1}`, `Key point B for section ${i + 1}`],
+          constraints: {
+            depth: 'detailed_analysis' as const,
+            required_keywords: [],
+            prohibited_terms: [],
+          },
+          key_points_to_cover: [
+            `Key point A for section ${i + 1}`,
+            `Key point B for section ${i + 1}`,
+          ],
         })),
         exercises: [],
         rag_context: {
@@ -602,7 +624,11 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
             title: 'ML Fundamentals',
             content_archetype: 'concept_explainer',
             rag_context_id: '1',
-            constraints: { depth: 'detailed_analysis', required_keywords: [], prohibited_terms: [] },
+            constraints: {
+              depth: 'detailed_analysis',
+              required_keywords: [],
+              prohibited_terms: [],
+            },
             key_points_to_cover: ['ML fundamentals overview'],
           },
         ],
@@ -639,7 +665,8 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
       const lessonSpecEmpty: LessonSpecificationV2 = {
         lesson_id: '2.1',
         title: 'Test Lesson without document filtering',
-        description: 'A test lesson that verifies empty primary_documents means no document filtering.',
+        description:
+          'A test lesson that verifies empty primary_documents means no document filtering.',
         metadata: {
           target_audience: 'practitioner',
           tone: 'conversational-professional',
@@ -656,14 +683,19 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
         intro_blueprint: {
           hook_strategy: 'challenge',
           hook_topic: 'Data Structures',
-          key_learning_objectives: 'Analyze data structures and algorithms for performance optimization',
+          key_learning_objectives:
+            'Analyze data structures and algorithms for performance optimization',
         },
         sections: [
           {
             title: 'Data Structures',
             content_archetype: 'concept_explainer',
             rag_context_id: '2',
-            constraints: { depth: 'detailed_analysis', required_keywords: [], prohibited_terms: [] },
+            constraints: {
+              depth: 'detailed_analysis',
+              required_keywords: [],
+              prohibited_terms: [],
+            },
             key_points_to_cover: ['Data structures overview'],
           },
         ],
@@ -818,15 +850,11 @@ describe('Stage 5 -> Stage 6 RAG Pipeline Integration', () => {
       expect(hasAreaQuery).toBe(true);
 
       // Should have lesson-level queries (from learning objectives)
-      const hasObjectiveQuery = queries.some(q =>
-        q.includes('core concepts of machine learning')
-      );
+      const hasObjectiveQuery = queries.some(q => q.includes('core concepts of machine learning'));
       expect(hasObjectiveQuery).toBe(true);
 
       // Should have key_points (from sections -> key_points_to_cover)
-      const hasKeyPoint = queries.some(q =>
-        q.includes('Machine Learning definition')
-      );
+      const hasKeyPoint = queries.some(q => q.includes('Machine Learning definition'));
       expect(hasKeyPoint).toBe(true);
     });
   });
