@@ -54,6 +54,16 @@ Implementation scope: Q1-Q11 local implementation and verification; Q12 requires
 ## Accepted Streams
 
 - Q1 / `mc2-jz6y0.2`: accepted and integrated from commit `91ecd115` (`origin/codex/qdrant-q1-schema`). Independent review: spec compliant, task quality approved, no findings. Integrated rerun: focused Vitest 4/4 and package type-check passed. Dedicated local worktree/branch cleaned; remote evidence branch retained.
+- D / authoritative docs: accepted read-only research with 40 first-party references and exact Qdrant 1.18.2/client 1.18.0 shapes. Confirmed core architecture; recorded required corrections for Formula input normalization, S3 restore transport, alias recreation, external backup/fallback metrics, notification delivery, image health probing, and version freshness.
+
+## Decision Gates From Authoritative Docs
+
+- Formula has no clamp/min/max expression: Q3/Q4 must validate and normalize `document_weight` before storage and use Formula defaults only for missing values.
+- Qdrant S3 snapshots exclude aliases and do not document raw `s3://` recovery: Q8 must prove an authenticated download/upload or supported recovery transport and re-verify the alias.
+- Prometheus cannot ingest mounted textfiles directly; Q9 needs an explicit exporter path. Qdrant also lacks container-limit and application fallback signals.
+- Prometheus rules do not deliver notifications; Q9 needs Grafana Alerting provisioning or Alertmanager.
+- Exact Prometheus 3.11.3 and Grafana 12.4.0 tags exist, but are superseded; the security/version policy needs an explicit decision before Q6/Q9 implementation.
+- Pinned Qdrant image has no curl/wget; Q6 health checks must be proven with an available probe rather than copied blindly.
 
 ## Closeout Expectations
 
