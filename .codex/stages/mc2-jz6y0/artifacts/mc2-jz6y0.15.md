@@ -45,11 +45,11 @@ depends_on_streams:
   - mc2-jz6y0.4
   - mc2-jz6y0.5
 parallel_decision: sequential correction because Q5 runtime is blocked on the canonical schema; Q7 has a non-overlapping write zone
-status: returned
-delivery_method: not accepted
+status: merged
+delivery_method: merge
 accepted_by_orchestrator: no
 cleanup_status: pending
-cleanup_notes: Branch and dedicated worktree are retained for independent review and orchestrator integration.
+cleanup_notes: Integrated as 449e7ab1 for the blocking Q5 pinned runtime rerun; dedicated worktree/branch remain until 9/9 acceptance.
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -65,13 +65,16 @@ verification:
   - targeted Prettier check: passed
   - git diff --check: passed
   - scripts/orchestration/validate_artifact.py: passed
+  - independent correctness review of d9e01ac0: passed with no Critical/Important/Minor findings; Spec Compliance PASS and Task Quality PASS/MERGE
+  - integrated affected Q1/Q3/Q4 suite at 449e7ab1: passed, 45 tests across 4 files
+  - integrated package type-check at 449e7ab1: passed
 changed_files:
   - packages/course-gen-platform/src/shared/qdrant/collection-schema.ts
   - packages/course-gen-platform/tests/unit/shared/qdrant/collection-schema.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.15.md
 explicit_defers:
   - mc2-jz6y0.6 must rerun the exact pinned Qdrant 1.18.2 Formula test after integration and prove 9/9; current runtime evidence remains 8/9 with HTTP 400 for the missing document_weight numeric index.
-  - Independent correctness review, orchestrator acceptance/integration, shared Graphify refresh, and safe worktree cleanup remain pending.
+  - Orchestrator acceptance, Beads closure and safe worktree cleanup remain pending on Q5 pinned runtime 9/9.
 ---
 
 # Summary
@@ -92,7 +95,7 @@ These checks do not prove pinned runtime success. The exact Q5 Formula scenario 
 
 # Delivery / Cleanup
 
-Returned on `codex/qdrant-formula-index-fix` for independent review. It is not accepted or integrated, and the dedicated worktree/branch remain available for review and cleanup by the orchestrator.
+The reviewed branch commit `d9e01ac002ab110c4e1308c6c2bf1c8fa3101a46` is integrated as `449e7ab1` so Q5 can rerun its unchanged pinned Formula gate. Unit/type acceptance is green, but this correction is not yet accepted or closed: the dedicated worktree remains until Q5 proves 9/9 and the remote evidence branch is retained.
 
 # Risks / Follow-ups / Explicit Defers
 
