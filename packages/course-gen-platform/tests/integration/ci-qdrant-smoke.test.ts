@@ -3,13 +3,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import type { EmbeddingResult } from '../../src/shared/embeddings/generate';
 import type { EnrichedChunk } from '../../src/shared/embeddings/metadata-enricher';
+import { toQdrantPayload } from '../../src/shared/embeddings/metadata-enricher';
 import {
   ensureCourseEmbeddingsCollection,
   verifyCourseEmbeddingsCollection,
 } from '../../src/shared/qdrant/collection-manager';
 import { PAYLOAD_INDEXES } from '../../src/shared/qdrant/collection-schema';
 import { createBm25Document } from '../../src/shared/qdrant/config';
-import { generateNumericId } from '../../src/shared/qdrant/upload-helpers';
+import { compactPayload, generateNumericId } from '../../src/shared/qdrant/upload-helpers';
 import { uploadChunksToQdrant } from '../../src/shared/qdrant/upload';
 import {
   buildHybridPrefetch,
@@ -322,14 +323,7 @@ describe('CI Qdrant native retrieval gate', () => {
     });
 
     expect(points).toHaveLength(1);
-    expect(points[0].payload).toMatchObject({
-      chunk_id: source.chunk_id,
-      document_id: source.document_id,
-      organization_id: source.organization_id,
-      course_id: source.course_id,
-      document_priority: 'CORE',
-      document_weight: 1,
-    });
+    expect(points[0].payload).toEqual(compactPayload(toQdrantPayload(source)));
   });
 
   it('matches Russian and English evidence with native BM25', async () => {
