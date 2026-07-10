@@ -4,7 +4,18 @@
  * @module shared/qdrant/upload-types
  */
 
-import type { SparseVector } from '../embeddings/bm25';
+import type { Schemas } from '@qdrant/js-client-rest';
+
+export type QdrantBm25Document = Schemas['Document'];
+
+/**
+ * Qdrant named vectors accepted by the pinned REST client.
+ */
+export interface QdrantNamedVector {
+  [name: string]: Schemas['Vector'] | undefined;
+  dense: number[];
+  sparse?: QdrantBm25Document;
+}
 
 /**
  * Point structure for Qdrant upload with named vectors
@@ -13,12 +24,7 @@ export interface QdrantUploadPoint {
   /** Unique point ID (chunk_id hash) */
   id: string | number;
   /** Named vectors for hybrid search */
-  vector: {
-    /** Dense semantic vector (Jina-v3) */
-    dense: number[];
-    /** Sparse BM25 vector (optional) */
-    sparse?: SparseVector;
-  };
+  vector: QdrantNamedVector;
   /** Chunk metadata payload */
   payload: Record<string, unknown>;
 }
@@ -61,14 +67,6 @@ export interface VectorStatusUpdate {
   updated_at: string;
   chunk_count?: number;
   error_message?: string | null;
-}
-
-/**
- * Qdrant named vector for upload
- */
-export interface QdrantNamedVector {
-  dense: number[];
-  sparse?: SparseVector;
 }
 
 /**

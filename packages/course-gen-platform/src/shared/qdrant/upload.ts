@@ -3,7 +3,7 @@
  *
  * Implements batch upload of chunks to Qdrant with:
  * - Dense vectors (768D Jina-v3 embeddings)
- * - Sparse vectors (Production BM25 with IDF for lexical search)
+ * - Qdrant-native BM25 documents with collection-side IDF for lexical search
  * - Comprehensive metadata payload
  * - Efficient batching (100-500 vectors per request)
  * - Automatic database status updates (file_catalog.vector_status)
@@ -19,12 +19,7 @@ import type { EmbeddingResult } from '../embeddings/generate';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@megacampus/shared-types';
 import type { UploadOptions, UploadResult } from './upload-types';
-import {
-  buildCorpusStatistics,
-  toQdrantPoint,
-  toUpsertPoints,
-  getUniqueDocumentIds,
-} from './upload-helpers';
+import { toQdrantPoint, toUpsertPoints, getUniqueDocumentIds } from './upload-helpers';
 import { logger } from '../logger/index.js';
 
 /**
@@ -168,11 +163,6 @@ export async function uploadChunksToQdrant(
       };
     }
 
-    // Build corpus statistics if sparse vectors are enabled
-    if (config.enable_sparse) {
-      buildCorpusStatistics(embeddingResults);
-    }
-
     // Convert to Qdrant points
     const points = embeddingResults.map(result => toQdrantPoint(result, config.enable_sparse));
 
@@ -197,15 +187,9 @@ export async function uploadChunksToQdrant(
       const uploadPoints = toUpsertPoints(batch, config.enable_sparse);
 
       try {
-        // Safe: Cast through unknown since QdrantNamedVector structure is compatible with SDK
-        // but TypeScript can't verify the index signature match
         await qdrantClient.upsert(config.collection_name, {
           wait: config.wait,
-          points: uploadPoints as unknown as {
-            id: string | number;
-            vector: Record<string, number[]>;
-            payload?: Record<string, unknown>;
-          }[],
+          points: uploadPoints,
         });
 
         uploadedCount += batch.length;
