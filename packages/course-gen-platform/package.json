@@ -63,7 +63,7 @@
     "@megacampus/shared-types": "workspace:*",
     "@megacampus/shared-utils": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@qdrant/js-client-rest": "^1.18.0",
+    "@qdrant/js-client-rest": "1.18.0",
     "@sentry/node": "^10.38.0",
     "@supabase/supabase-js": "^2.87.2",
     "@trpc/server": "^11.9.0",
