@@ -52,11 +52,11 @@ depends_on_streams:
   - mc2-jz6y0.2
   - mc2-jz6y0.4
 parallel_decision: parallel with Q2 because collection-manager and search write zones do not overlap
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Dedicated worktree remains until independent review and orchestrator acceptance.
+status: merged
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Dedicated local worktree and local branch were removed after integration; the pushed remote evidence branch is retained.
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -78,6 +78,10 @@ verification:
   - independent correctness review of 68cad733: request shapes confirmed; two Important cache/fallback findings required fixes
   - review-fix RED: focused search-operations suite failed exactly on include_payload/exact-query cache collisions and repeated boosted Formula fallback, 2 failed and 10 passed
   - review-fix GREEN: focused search suites passed, 14 tests across 2 files
+  - independent correctness re-review of 4159c2f4: passed with no Critical/Important/Minor findings; Spec Compliance PASS and Task Quality PASS
+  - integrated focused Q4/Stage 5/6 unit suite at 7a5f40df: passed, 34 tests across 6 files
+  - integrated package type-check at 7a5f40df: passed
+  - integrated native-only/client-score-mutation scan at 7a5f40df: passed, zero matches
   - default integration-config attempt for stage5-6-rag-pipeline.test.ts: blocked in global setup by absent local QDRANT_URL/QDRANT_API_KEY and no server; this is the explicit Q5 pinned integration gate, not a Q4 unit failure
 changed_files:
   - packages/course-gen-platform/src/shared/qdrant/search-operations.ts
@@ -93,7 +97,7 @@ changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.5.md
 explicit_defers:
   - Q5 owns pinned Qdrant 1.18.2 RU/EN/Formula/grouping integration and the production grouping activation decision.
-  - Correctness re-review, review-fix commit/push evidence and cleanup remain pending before acceptance.
+  - Q5 owns the remaining pinned runtime proof and production grouping activation decision.
 ---
 
 # Summary
@@ -116,7 +120,7 @@ The legacy client-side RRF function/helper and client-side priority mapping/sort
 
 # Delivery / Cleanup
 
-Returned in the dedicated Q4 worktree for final fresh gates, commit/push and independent correctness review. It is not accepted or integrated yet.
+Accepted after the review-fix commit `4159c2f4`, independent clean re-review and fresh orchestrator verification. Integrated as merge commit `7a5f40df`; the dedicated local worktree/branch were cleaned and the remote evidence branch is retained.
 
 # Risks / Follow-ups / Explicit Defers
 
