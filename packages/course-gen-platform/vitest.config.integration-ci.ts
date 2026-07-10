@@ -16,9 +16,10 @@ export default mergeConfig(
       include: [
         'tests/integration/career-playbook-schema.test.ts',
         'tests/integration/ci-qdrant-smoke.test.ts',
+        'tests/integration/qdrant.test.ts',
       ],
       testTimeout: 30000,
-      hookTimeout: 15000,
+      hookTimeout: 30000,
       teardownTimeout: 10000,
       fileParallelism: false,
       maxWorkers: 1,
