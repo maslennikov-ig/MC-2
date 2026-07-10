@@ -10,14 +10,19 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import type { EmbeddingResult } from '../../src/shared/embeddings/generate';
 import type { EnrichedChunk } from '../../src/shared/embeddings/metadata-enricher';
+import { toQdrantPayload } from '../../src/shared/embeddings/metadata-enricher';
 import {
   ensureCourseEmbeddingsCollection,
   verifyCourseEmbeddingsCollection,
 } from '../../src/shared/qdrant/collection-manager';
 import { PAYLOAD_INDEXES } from '../../src/shared/qdrant/collection-schema';
 import { createBm25Document } from '../../src/shared/qdrant/config';
-import { deleteChunksByCourseId, uploadChunksToQdrant } from '../../src/shared/qdrant/upload';
-import { generateNumericId } from '../../src/shared/qdrant/upload-helpers';
+import {
+  deleteChunksByCourseId,
+  uploadChunksToQdrant,
+  type UploadResult,
+} from '../../src/shared/qdrant/upload';
+import { compactPayload, generateNumericId } from '../../src/shared/qdrant/upload-helpers';
 
 const TEST_ORG_1 = '81000000-0000-4000-8000-000000000001';
 const TEST_ORG_2 = '81000000-0000-4000-8000-000000000002';
@@ -127,22 +132,27 @@ const EMBEDDINGS: EmbeddingResult[] = [
   },
 ];
 
-async function uploadWithoutSupabaseMutation(collectionName: string): Promise<void> {
+async function uploadWithoutSupabaseMutation(
+  collectionName: string,
+  embeddings: EmbeddingResult[] = EMBEDDINGS,
+  batchSize: number = 2
+): Promise<UploadResult> {
   const previousUrl = process.env.SUPABASE_URL;
   const previousKey = process.env.SUPABASE_SERVICE_KEY;
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_SERVICE_KEY;
 
   try {
-    const result = await uploadChunksToQdrant(EMBEDDINGS, {
+    const result = await uploadChunksToQdrant(embeddings, {
       collection_name: collectionName,
-      batch_size: 4,
+      batch_size: batchSize,
       enable_sparse: true,
       wait: true,
     });
-    if (!result.success || result.points_uploaded !== EMBEDDINGS.length) {
+    if (!result.success || result.points_uploaded !== embeddings.length) {
       throw new Error(`Broad Qdrant fixture upload failed: ${JSON.stringify(result)}`);
     }
+    return result;
   } finally {
     if (previousUrl === undefined) delete process.env.SUPABASE_URL;
     else process.env.SUPABASE_URL = previousUrl;
@@ -157,6 +167,7 @@ qdrantDescribe('Qdrant Vector Database Integration Tests', () => {
   const physicalName = `broad_qdrant_physical_${runId}`;
   let client: QdrantClient;
   let bootstrapStarted = false;
+  let fixtureUpload: UploadResult;
 
   beforeAll(async () => {
     client = new QdrantClient({
@@ -173,7 +184,7 @@ qdrantDescribe('Qdrant Vector Database Integration Tests', () => {
     if (!ensured.ok) {
       throw new Error(`Broad Qdrant bootstrap drifted: ${ensured.mismatches.join('; ')}`);
     }
-    await uploadWithoutSupabaseMutation(aliasName);
+    fixtureUpload = await uploadWithoutSupabaseMutation(aliasName);
   }, 30000);
 
   afterAll(async () => {
@@ -225,6 +236,12 @@ qdrantDescribe('Qdrant Vector Database Integration Tests', () => {
   });
 
   it('uploads deterministic native sparse points with complete metadata', async () => {
+    expect(fixtureUpload).toMatchObject({
+      success: true,
+      points_uploaded: 4,
+      batch_count: 2,
+    });
+
     const source = EMBEDDINGS[0].chunk;
     const points = await client.retrieve(aliasName, {
       ids: [generateNumericId(source.chunk_id)],
@@ -233,18 +250,25 @@ qdrantDescribe('Qdrant Vector Database Integration Tests', () => {
     });
 
     expect(points).toHaveLength(1);
-    expect(points[0].payload).toMatchObject({
-      chunk_id: source.chunk_id,
-      document_id: source.document_id,
-      document_priority: 'CORE',
-      document_weight: 1,
-      organization_id: TEST_ORG_1,
-      course_id: TEST_COURSE_1,
-    });
+    expect(points[0].payload).toEqual(compactPayload(toQdrantPayload(source)));
     expect(points[0].vector).toMatchObject({
       dense: expect.any(Array),
       sparse: expect.any(Object),
     });
+  });
+
+  it('handles an empty production-adapter upload without writing points', async () => {
+    const before = await client.count(aliasName, { exact: true });
+    const emptyUpload = await uploadWithoutSupabaseMutation(aliasName, [], 2);
+    const after = await client.count(aliasName, { exact: true });
+
+    expect(emptyUpload).toEqual({
+      points_uploaded: 0,
+      batch_count: 0,
+      duration_ms: 0,
+      success: true,
+    });
+    expect(after.count).toBe(before.count);
   });
 
   it('returns sorted dense top-K results through the alias', async () => {

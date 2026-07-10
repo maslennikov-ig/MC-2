@@ -389,13 +389,19 @@ jobs:
           REDIS_URL: redis://localhost:6379
 
   # ============================================
-  # Test Tier 3: Integration Tests (only on main/master, after unit + contract)
+  # Test Tier 3: Integration Tests (delivery-branch pushes and pull requests)
   # ============================================
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [test-contract]
-    if: always() && (needs.test-contract.result == 'success' || needs.test-contract.result == 'skipped') && !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs: [setup]
+    if: >-
+      ${{ !inputs.skip_tests &&
+          ((github.event_name == 'pull_request' &&
+            (github.base_ref == 'develop' || github.base_ref == 'master')) ||
+           (github.event_name == 'push' &&
+            (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')) ||
+           github.event_name == 'workflow_dispatch') }}
     timeout-minutes: 20
     services:
       redis:
@@ -445,7 +451,7 @@ jobs:
           pnpm --filter @megacampus/shared-logger build
           pnpm --filter @megacampus/shared-utils build
 
-      - name: Build course-gen-platform (required for tests with global-setup)
+      - name: Build course-gen-platform (required for integration imports)
         run: pnpm --filter @megacampus/course-gen-platform build
 
       - name: Wait for Qdrant
@@ -544,7 +550,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint, type-check, security, build, test-unit]
+    needs: [lint, type-check, security, build, test-unit, test-integration]
     if: always()
 
     steps:
@@ -566,6 +572,15 @@ jobs:
              [ "${{ needs.test-unit.result }}" != "skipped" ]; then
             echo "Unit tests failed with result: ${{ needs.test-unit.result }}"
             exit 1
+          fi
+          if [ "${{ needs.test-integration.result }}" != "success" ]; then
+            if [ "${{ inputs.skip_tests == true }}" = "true" ] && \
+               [ "${{ needs.test-integration.result }}" = "skipped" ]; then
+              echo "Integration tests explicitly skipped by workflow input"
+            else
+              echo "Integration tests failed with result: ${{ needs.test-integration.result }}"
+              exit 1
+            fi
           fi
           echo "All critical CI checks passed!"
 
