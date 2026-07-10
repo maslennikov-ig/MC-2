@@ -56,11 +56,11 @@ depends_on_streams:
   - mc2-jz6y0.5
   - mc2-jz6y0.15
 parallel_decision: parallel with Q7 because the assigned write zones are disjoint
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Every Q5 Docker container and fixture resource was removed; the dedicated branch/worktree remains intentionally available for independent review and integration.
+status: accepted
+delivery_method: manual integration
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Every Q5 Docker container and fixture resource was removed; the dedicated clean local worktree and branch were removed after integration, while the pushed evidence branch is retained.
 risk_level: high
 docs_impact: ci-contract
 docs_reviewed: no-change-needed
@@ -87,6 +87,8 @@ verification:
   - Targeted ESLint and Prettier checks: passed.
   - Workflow static pins/local-env/blocking scans, YAML parse, and git diff --check: passed.
   - Post-fix pre-commit self-review of the seven-file review-fix diff: no new correctness, security, cleanup, or CI-DAG findings; independent orchestration re-review is still required for acceptance.
+  - Independent re-review of 5e9ca758..3c36a6a1: ACCEPT with no findings; all prior CI-DAG, exact-command isolation, and broad coverage findings are closed.
+  - Root acceptance rerun: workflow/argv regression suite passed 17 of 17, pinned integration passed 19 of 19, package type-check and build passed, post-suite collection list was empty, and the local Qdrant v1.18.2 container was removed.
 changed_files:
   - .github/workflows/ci-cd.yml
   - packages/course-gen-platform/tests/integration/ci-qdrant-smoke.test.ts
