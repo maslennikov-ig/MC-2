@@ -1,12 +1,19 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-04 (evening)
-Stage: Career Playbook — judge/regen fix package (epic `mc2-db696.104`) CLOSED: A/B run e12a46ad on new worker code passed all epic gates
-Branch: `develop`
-Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93rrp` CLOSED; `mc2-m17al` open (owner decision — judge→flash DB promotion, now with strong data); `mc2-db696.61` open
+Updated: 2026-07-10
+Stage: Self-hosted Qdrant planning package (`mc2-jz6y0.1`) ready to close; implementation epic `mc2-jz6y0` open
+Branch: `codex/self-hosted-qdrant-platform-plan`
+Beads: `mc2-jz6y0` open; `mc2-jz6y0.1` in progress pending planning closeout; prior Career Playbook close state remains unchanged
 
 ## Current State
 
+- **Self-hosted Qdrant direction approved**: the lost Cloud database was test-only; no Cloud recovery or migration is required. Qdrant remains a derived index rebuilt from authoritative source files/database metadata.
+- Planning package prepared:
+  - design: `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`;
+  - execution plan: `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`;
+  - validated Codex prompt-card: `docs/superpowers/prompts/2026-07-10-self-hosted-qdrant-orchestrator.md`.
+- Target scope: pinned single-node Qdrant `1.18.2`, native BM25/IDF, server RRF + Formula Query priority, complete strict-mode indexes, aliases, source-driven reindex, S3 snapshots/restore drill, Prometheus/Grafana/alerts, and secure loopback Web UI access.
+- No Qdrant/Docker/staging runtime was mutated during planning. Staging activation remains an explicit permission gate in Task Q12.
 - **A/B run #2 (playbook `e12a46ad`, 2026-07-04 14:13–14:33 UTC, NEW worker code) vs baseline b866d2f5**:
   - Wall-clock **19.7 min** vs 44.4 (**-56%**); cost **$0.1278** vs $0.2404 (**-47%**).
   - Regen attempts **14** (11 blocks, 3 at 2-cap) vs 39 calls (13/26 at cap); no window near the 8-cap.
@@ -18,9 +25,17 @@ Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93r
 - CI: lint budget is `eslint src --max-warnings=95` (course-gen-platform) — one new max-lines warning fails Lint and silently skips Deploy to Dev. Always verify `megacampus-worker-dev` image date before attributing live-run behavior to new code.
 - Run artifacts (gitignored): `packages/course-gen-platform/artifacts/career-playbook-smoke/` — b866d2f5-era baseline row still in DB + two run artifacts (35602db1, e12a46ad) for future A/B.
 
-## Next
+## Next recommended
 
-1. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+1. Next stage id: `mc2-jz6y0` — implement the self-hosted Qdrant spec/plan from a dedicated branch/worktree.
+2. Recommended action: launch a fresh root orchestrator with `docs/superpowers/prompts/2026-07-10-self-hosted-qdrant-orchestrator.md`; it must decompose Q1-Q12 into Beads children and visible isolated streams.
+3. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+
+## Starter prompt for next orchestrator
+
+Use $orchestrator-stage.
+
+Use `docs/superpowers/prompts/2026-07-10-self-hosted-qdrant-orchestrator.md` from `origin/codex/self-hosted-qdrant-platform-plan`.
 
 ## Staging aligned (2026-07-04 ~17:06 UTC)
 
@@ -41,6 +56,8 @@ Beads: epic `mc2-db696.104` + all 7 children CLOSED with live evidence; `mc2-93r
 
 ## Explicit defers
 
+- `mc2-jz6y0` staging cutover/live reindex/secret activation: wait for explicit current-task authorization after local Q1-Q11 gates pass.
+- Qdrant multi-node HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC: capacity/product-triggered defers documented in the design, not unfinished planning scope.
 - `mc2-m17al`: owner decision (shared DB diqooqbuchsliypgwksu, staging impact).
 - .104.2 complement (per-block digests for final-judge input) — unnecessary at current input sizes; recorded on the closed bead.
 - routeAfterJudge vs blockRegenerator block-id selection divergence — recorded on closed `mc2-db696.104.6`; low priority now that zero-regen skip covers the symptom.
@@ -55,5 +72,5 @@ Artifacts auto-persist to `packages/course-gen-platform/artifacts/career-playboo
 
 ## Closeout Markers
 
-docs-reviewed: updated — handoff rewritten with A/B results and CI/deploy gotchas; runbook already updated this session (artifacts, cleanup semantics, token method).
-graph-reviewed: updated — `graphify update --force` after the final refactor/assembler fix (node count legitimately dropped 52503→52495 from module extraction).
+docs-reviewed: updated — added the Qdrant design, implementation plan, validated orchestrator prompt, project-index navigation, and current handoff.
+graph-reviewed: updated — `graphify update .` rebuilt the local graph (52,566 nodes / 76,938 edges), then `graphify cluster-only . --no-viz` refreshed communities/report; no external semantic backend or Git hooks used.

@@ -19,6 +19,9 @@ Stable navigation map for this repository. Keep stage history and current task s
 - `.codex/project-index.md` - this stable navigation map.
 - `graphify-out/GRAPH_REPORT.md` - local ignored Graphify orientation report for architecture, impact, and unfamiliar-code navigation.
 - `.graphifyignore` - Graphify source filter for dependencies, runtime state, generated output, secrets, and noisy artifacts.
+- `docs/superpowers/specs/` - approved design specifications for agentic implementation stages.
+- `docs/superpowers/plans/` - task-by-task implementation plans with verification and delivery gates.
+- `docs/superpowers/prompts/` - validated manual start prompts for fresh orchestrator tasks.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
 - `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.
