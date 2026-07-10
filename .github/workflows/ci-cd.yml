@@ -335,7 +335,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       qdrant:
-        image: qdrant/qdrant:latest
+        image: qdrant/qdrant:v1.18.2
         env:
           QDRANT__SERVICE__API_KEY: test-qdrant-key
         ports:
@@ -384,8 +384,8 @@ jobs:
           SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-          QDRANT_URL: ${{ secrets.QDRANT_URL }}
-          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          QDRANT_URL: http://localhost:6333
+          QDRANT_API_KEY: test-qdrant-key
           REDIS_URL: redis://localhost:6379
 
   # ============================================
@@ -397,8 +397,6 @@ jobs:
     needs: [test-contract]
     if: always() && (needs.test-contract.result == 'success' || needs.test-contract.result == 'skipped') && !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     timeout-minutes: 20
-    continue-on-error: true
-
     services:
       redis:
         image: redis:7-alpine
@@ -410,7 +408,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       qdrant:
-        image: qdrant/qdrant:latest
+        image: qdrant/qdrant:v1.18.2
         env:
           QDRANT__SERVICE__API_KEY: test-qdrant-key
         ports:
