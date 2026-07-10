@@ -52,4 +52,33 @@ describe('qdrant create-collection module', () => {
     expect(isDirectExecution(moduleUrl, '/repo/src/shared/qdrant/create-collection.ts')).toBe(true);
     expect(isDirectExecution(moduleUrl, '/tmp/create-collection.ts')).toBe(false);
   });
+
+  it('parses the bootstrap target, verify mode, and explicit legacy-drop gate', async () => {
+    const { parseCollectionCliArgs } = await import('@/shared/qdrant/create-collection');
+
+    expect(
+      parseCollectionCliArgs([
+        '--',
+        '--physical',
+        'course_embeddings_v2',
+        '--alias=course_embeddings_stable',
+        '--verify-only',
+        '--allow-drop-legacy',
+      ])
+    ).toEqual({
+      physicalName: 'course_embeddings_v2',
+      aliasName: 'course_embeddings_stable',
+      verifyOnly: true,
+      allowDropLegacy: true,
+      help: false,
+    });
+  });
+
+  it('rejects unknown flags instead of silently ignoring operator input', async () => {
+    const { parseCollectionCliArgs } = await import('@/shared/qdrant/create-collection');
+
+    expect(() => parseCollectionCliArgs(['--drop-everything'])).toThrow(
+      'Unknown option: --drop-everything'
+    );
+  });
 });

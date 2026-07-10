@@ -661,18 +661,9 @@ export async function deleteVectorsForCourse(
   );
 
   try {
-    // Check if collection exists before attempting operations
-    // This prevents ERROR logs for expected scenarios (new Qdrant instance, fresh setup)
-    const collections = await qdrantClient.getCollections();
-    const collectionExists = collections.collections.some(c => c.name === COLLECTION_CONFIG.name);
-
-    if (!collectionExists) {
-      logger.info(
-        { courseId, collection: COLLECTION_CONFIG.name },
-        'Collection does not exist yet, nothing to delete'
-      );
-      return { deleted: true, approximateCount: 0 };
-    }
+    // Collection endpoints resolve both physical names and aliases. The
+    // physical-only getCollections response cannot prove that an alias is absent.
+    await qdrantClient.getCollection(COLLECTION_CONFIG.name);
 
     // Count vectors to be deleted (approximate for performance)
     //
