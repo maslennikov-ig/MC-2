@@ -45,11 +45,11 @@ depends_on_streams:
   - mc2-jz6y0.4
   - mc2-jz6y0.5
 parallel_decision: sequential correction because Q5 runtime is blocked on the canonical schema; Q7 has a non-overlapping write zone
-status: merged
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Integrated as 449e7ab1 for the blocking Q5 pinned runtime rerun; dedicated worktree/branch remain until 9/9 acceptance.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Integrated as 449e7ab1; the dedicated clean local worktree and branch were removed after Q5 runtime acceptance, while the pushed evidence branch is retained.
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -68,13 +68,14 @@ verification:
   - independent correctness review of d9e01ac0: passed with no Critical/Important/Minor findings; Spec Compliance PASS and Task Quality PASS/MERGE
   - integrated affected Q1/Q3/Q4 suite at 449e7ab1: passed, 45 tests across 4 files
   - integrated package type-check at 449e7ab1: passed
+  - Q5 causal Formula fixture after integration: passed 9 of 9 against qdrant/qdrant:v1.18.2 in three consecutive fresh-container runs; each cleanup passed
+  - root acceptance rerun of the full pinned integration gate: passed 19 of 19, with zero collections before and after and the local verification container removed
 changed_files:
   - packages/course-gen-platform/src/shared/qdrant/collection-schema.ts
   - packages/course-gen-platform/tests/unit/shared/qdrant/collection-schema.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.15.md
 explicit_defers:
-  - mc2-jz6y0.6 must rerun the exact pinned Qdrant 1.18.2 Formula test after integration and prove 9/9; current runtime evidence remains 8/9 with HTTP 400 for the missing document_weight numeric index.
-  - Orchestrator acceptance, Beads closure and safe worktree cleanup remain pending on Q5 pinned runtime 9/9.
+  - none
 ---
 
 # Summary
@@ -91,14 +92,12 @@ Official indexing documentation and pinned client types both support `float`; th
 
 TDD RED failed only on the absent `{ field_name: 'document_weight', field_schema: 'float' }` entry. GREEN passed the focused schema suite, then the affected Q1/Q3/Q4 suite passed 45 tests. Package type-check, targeted strict lint/format checks, and the diff whitespace gate also passed.
 
-These checks do not prove pinned runtime success. The exact Q5 Formula scenario must be rerun after integration.
+Q5 subsequently proved the unchanged Formula scenario 9/9 in three consecutive fresh Qdrant 1.18.2 containers. The root acceptance rerun also passed the complete 19-test pinned gate with clean pre/post collection state.
 
 # Delivery / Cleanup
 
-The reviewed branch commit `d9e01ac002ab110c4e1308c6c2bf1c8fa3101a46` is integrated as `449e7ab1` so Q5 can rerun its unchanged pinned Formula gate. Unit/type acceptance is green, but this correction is not yet accepted or closed: the dedicated worktree remains until Q5 proves 9/9 and the remote evidence branch is retained.
+The reviewed branch commit `d9e01ac002ab110c4e1308c6c2bf1c8fa3101a46` is integrated as `449e7ab1` and accepted after the unchanged pinned Formula gate passed. The dedicated local worktree/branch were cleaned; the remote evidence branch is retained.
 
 # Risks / Follow-ups / Explicit Defers
 
-Q5 remains the blocking runtime acceptance owner. Its prior run is still RED at 8/9 with the exact strict-mode HTTP 400 requiring a `document_weight` index of type `float` or `integer`; no claim of Q5 runtime GREEN is made here. After integration, Q5 must rerun unchanged against pinned Qdrant 1.18.2 and reach 9/9 before this Bead can close.
-
-The orchestrator must independently review the diff, decide acceptance, refresh the shared Graphify graph after accepted integration, and perform safe cleanup. Q10 remains the durable documentation owner after runtime truth is established.
+The blocking strict-mode defect is resolved and runtime-proven. Shared Graphify refresh remains owned by stage closeout after all concurrent code streams finish; Q10 remains the durable documentation owner.
