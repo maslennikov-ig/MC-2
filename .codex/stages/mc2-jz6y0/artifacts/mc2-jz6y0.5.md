@@ -44,7 +44,7 @@ selected_skills:
   - code-review
 selected_agents:
   - backend/search worker launch unavailable after repeated API 401; root orchestrator executed the isolated TDD stream
-  - correctness_reviewer pending after commit
+  - correctness_reviewer completed initial review with two Important findings; fix re-review pending
 catalog_candidates:
   - none - installed skills and assigned personas cover the stream
 parallel_group: S4-hybrid-formula
@@ -75,6 +75,9 @@ verification:
   - final focused Q4 and Stage 5/6 unit suite: passed, 32 tests across 6 files
   - final pnpm --filter @megacampus/course-gen-platform type-check: passed
   - final targeted Prettier check, git diff --check and artifact validation: passed
+  - independent correctness review of 68cad733: request shapes confirmed; two Important cache/fallback findings required fixes
+  - review-fix RED: focused search-operations suite failed exactly on include_payload/exact-query cache collisions and repeated boosted Formula fallback, 2 failed and 10 passed
+  - review-fix GREEN: focused search suites passed, 14 tests across 2 files
   - default integration-config attempt for stage5-6-rag-pipeline.test.ts: blocked in global setup by absent local QDRANT_URL/QDRANT_API_KEY and no server; this is the explicit Q5 pinned integration gate, not a Q4 unit failure
 changed_files:
   - packages/course-gen-platform/src/shared/qdrant/search-operations.ts
@@ -90,7 +93,7 @@ changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.5.md
 explicit_defers:
   - Q5 owns pinned Qdrant 1.18.2 RU/EN/Formula/grouping integration and the production grouping activation decision.
-  - Independent correctness review, commit/push evidence and cleanup remain pending before acceptance.
+  - Correctness re-review, review-fix commit/push evidence and cleanup remain pending before acceptance.
 ---
 
 # Summary
@@ -118,3 +121,7 @@ Returned in the dedicated Q4 worktree for final fresh gates, commit/push and ind
 # Risks / Follow-ups / Explicit Defers
 
 Unit/client-type evidence cannot prove Qdrant runtime ranking. Q5 must execute the exact nested request against pinned Qdrant `1.18.2`, verify RU/EN relevance, priority ordering, grouping diversity and strict behavior, then explicitly enable or defer production grouping without weakening the fixture.
+
+# Review Fix
+
+The independent review confirmed the RRF→Formula and `queryGroups` request shapes, then found two Important gaps. The cache key omitted `include_payload` and normalized the exact query text even though dense embeddings consume the original string. It now includes the payload flag and hashes the exact query, with casing and whitespace collision regressions. The error path for a boosted hybrid Formula request also retried Formula in `denseSearch`; it now explicitly disables priority boost for that error fallback so plain dense search remains available. Empty-result fallback retains explicitly requested Formula ranking because the preceding Formula request succeeded; only the Formula-error path degrades to plain dense.

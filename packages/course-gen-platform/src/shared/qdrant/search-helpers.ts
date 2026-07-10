@@ -18,11 +18,12 @@ import type {
  */
 export function generateSearchCacheKey(queryText: string, options: ResolvedSearchOptions): string {
   const cacheData = {
-    query: queryText.toLowerCase().trim(),
+    query: queryText,
     limit: options.limit,
     threshold: options.score_threshold,
     hybrid: options.enable_hybrid,
     collection: options.collection_name,
+    include_payload: options.include_payload,
     priority_boost: options.enable_priority_boost,
     priority_boost_factor: options.priority_boost_factor,
     group_by_document: options.group_by_document,

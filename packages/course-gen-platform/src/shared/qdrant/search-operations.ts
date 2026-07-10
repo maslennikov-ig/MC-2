@@ -241,7 +241,10 @@ export async function hybridSearchWithFallback(
       { error: error instanceof Error ? error.message : String(error) },
       'Hybrid search failed, falling back to dense-only'
     );
-    return { points: await denseSearch(queryText, options), fallbackUsed: true };
+    return {
+      points: await denseSearch(queryText, { ...options, enable_priority_boost: false }),
+      fallbackUsed: true,
+    };
   }
 }
 

@@ -267,6 +267,22 @@ describe('native Qdrant search requests', () => {
       fallbackUsed: true,
     });
   });
+
+  it('uses plain dense fallback when a boosted Formula hybrid request fails', async () => {
+    const densePoint = scoredPoint('dense-safe', 0.71);
+    mockQuery.mockRejectedValueOnce(new Error('formula request rejected'));
+    mockSearch.mockResolvedValue([densePoint]);
+
+    await expect(
+      hybridSearchWithFallback(
+        'boosted fallback query',
+        createOptions({ enable_priority_boost: true })
+      )
+    ).resolves.toEqual({ points: [densePoint], fallbackUsed: true });
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('search cache identity', () => {
@@ -286,5 +302,19 @@ describe('search cache identity', () => {
       new Set(variants.map(options => generateSearchCacheKey('same query', options))).size
     ).toBe(variants.length);
     expect(filters.document_ids).toEqual(['b', 'a']);
+  });
+
+  it('distinguishes payload shape and exact query text used by embeddings', () => {
+    const base = createOptions({ include_payload: false });
+
+    expect(generateSearchCacheKey('Exact Query', base)).not.toBe(
+      generateSearchCacheKey('Exact Query', { ...base, include_payload: true })
+    );
+    expect(generateSearchCacheKey('Exact Query', base)).not.toBe(
+      generateSearchCacheKey('exact query', base)
+    );
+    expect(generateSearchCacheKey('Exact Query', base)).not.toBe(
+      generateSearchCacheKey('Exact Query ', base)
+    );
   });
 });
