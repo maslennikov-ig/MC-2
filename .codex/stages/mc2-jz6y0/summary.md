@@ -68,6 +68,10 @@ Implementation scope: Q1-Q11 local implementation and verification; Q12 requires
 - Exact Prometheus 3.11.3 and Grafana 12.4.0 tags exist, but are superseded; the security/version policy needs an explicit decision before Q6/Q9 implementation.
 - Pinned Qdrant image has no curl/wget; Q6 health checks must be proven with an available probe rather than copied blindly.
 
+## Active Runtime Corrections
+
+- `mc2-jz6y0.15`: Q5 pinned Qdrant `1.18.2` passed 8/9 and proved strict Formula access requires a numeric `document_weight` payload index. Reviewed fix `d9e01ac0` adds the canonical `float` index and is integrated as `449e7ab1`; 45 affected tests and package type-check pass. Acceptance/cleanup remain pending until Q5 reruns the unchanged fixture and proves 9/9.
+
 ## Closeout Expectations
 
 - `docs-reviewed: updated` — retrieval, deployment, recovery, monitoring, and operator behavior change.
