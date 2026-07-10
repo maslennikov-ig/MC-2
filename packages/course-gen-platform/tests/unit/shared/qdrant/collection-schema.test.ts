@@ -45,7 +45,7 @@ describe('self-hosted Qdrant schema', () => {
     });
   });
 
-  it('indexes every field used by filters, deletes, hierarchy, and grouping', () => {
+  it('indexes every field required by filters, grouping, and strict Formula Query', () => {
     expect(PAYLOAD_INDEXES).toEqual([
       {
         field_name: 'organization_id',
@@ -61,6 +61,7 @@ describe('self-hosted Qdrant schema', () => {
       { field_name: 'has_formulas', field_schema: 'bool' },
       { field_name: 'has_tables', field_schema: 'bool' },
       { field_name: 'has_images', field_schema: 'bool' },
+      { field_name: 'document_weight', field_schema: 'float' },
     ]);
   });
 
