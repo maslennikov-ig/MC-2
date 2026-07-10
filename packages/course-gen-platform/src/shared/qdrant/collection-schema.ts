@@ -49,4 +49,5 @@ export const PAYLOAD_INDEXES = [
   { field_name: 'has_formulas', field_schema: 'bool' },
   { field_name: 'has_tables', field_schema: 'bool' },
   { field_name: 'has_images', field_schema: 'bool' },
+  { field_name: 'document_weight', field_schema: 'float' },
 ] as const satisfies readonly Schemas['CreateFieldIndex'][];
