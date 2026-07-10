@@ -50,11 +50,11 @@ parallel_group: q3-ingestion
 depends_on_streams:
   - mc2-jz6y0.2
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Branch is pushed for orchestrator review; acceptance, integration and safe worktree cleanup remain pending.
+status: merged
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Dedicated local worktree and local branch were removed after integration; the pushed remote evidence branch is retained.
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed
@@ -82,6 +82,13 @@ verification:
   - targeted Prettier check for all changed TypeScript files: passed
   - git diff --check: passed
   - python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.4.md: passed
+  - independent correctness re-review of bc0ceacf: approved, no Critical/Important/Minor findings
+  - orchestrator fresh focused Q3 suite on bc0ceacf: passed, 21 tests across 5 files
+  - orchestrator fresh package type-check on bc0ceacf: passed
+  - orchestrator fresh typed ESLint with original safety rules: passed, 0 errors and visible pre-existing warnings
+  - integrated focused Q3 suite at b3954e83: passed, 21 tests across 5 files
+  - integrated package type-check at b3954e83: passed
+  - integrated custom-BM25 runtime reference gate at b3954e83: passed, zero matches
 changed_files:
   - eslint.config.mjs
   - packages/course-gen-platform/experiments/features/test-hybrid-search.ts
@@ -114,7 +121,7 @@ Strict RED→GREEN evidence is recorded in frontmatter. The invalid-weight table
 
 # Delivery / Cleanup
 
-Returned for orchestrator review on `codex/qdrant-q3-native-ingestion`. Acceptance and cleanup are intentionally pending; this artifact must be updated by the orchestrator after content review and integration.
+Accepted after independent correctness re-review and fresh orchestrator verification, then integrated as merge commit `b3954e83`. The dedicated local worktree and local branch were safely removed; the remote evidence branch remains available.
 
 # Risks / Follow-ups / Explicit Defers
 
