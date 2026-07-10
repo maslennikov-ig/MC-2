@@ -6,11 +6,11 @@
 
 import { qdrantClient } from './client';
 import { generateQueryEmbedding } from '../embeddings/generate';
-import { getGlobalBM25Scorer } from '../embeddings/bm25';
 import type { SearchOptions, SearchFilters } from './search-types';
 import type { QdrantScoredPoint } from './types';
 import { buildQdrantFilter, reciprocalRankFusion } from './search-helpers';
 import { logger } from '../logger/index.js';
+import { createBm25Document } from './config';
 
 /**
  * Performs dense semantic search using Jina-v3 embeddings
@@ -58,22 +58,14 @@ export async function sparseSearch(
   queryText: string,
   options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
 ): Promise<QdrantScoredPoint[]> {
-  // Generate sparse vector using BM25
-  const bm25Scorer = getGlobalBM25Scorer();
-  const querySparseVector = bm25Scorer.generateSparseVector(queryText);
-
-  logger.debug({ termCount: querySparseVector.indices.length }, 'Query sparse vector generated');
-
   // Build filter
   const filter = buildQdrantFilter(options.filters);
 
-  // Search Qdrant using named vector 'sparse'
+  // Query Qdrant using its native BM25 document inference.
   const searchStartTime = Date.now();
-  const searchResults = await qdrantClient.search(options.collection_name, {
-    vector: {
-      name: 'sparse',
-      vector: querySparseVector,
-    },
+  const searchResults = await qdrantClient.query(options.collection_name, {
+    query: createBm25Document(queryText),
+    using: 'sparse',
     filter,
     limit: options.limit,
     with_payload: true,
@@ -81,11 +73,11 @@ export async function sparseSearch(
   const searchTime = Date.now() - searchStartTime;
 
   logger.info(
-    { searchTimeMs: searchTime, resultCount: searchResults.length },
+    { searchTimeMs: searchTime, resultCount: searchResults.points.length },
     'Sparse search completed'
   );
 
-  return searchResults;
+  return searchResults.points;
 }
 
 /**
@@ -105,18 +97,15 @@ export async function hybridSearchNative(
   queryText: string,
   options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
 ): Promise<QdrantScoredPoint[]> {
-  // Generate both vectors in parallel
-  const [queryVector, sparseVector] = await Promise.all([
-    generateQueryEmbedding(queryText),
-    Promise.resolve(getGlobalBM25Scorer().generateSparseVector(queryText)),
-  ]);
+  const queryVector = await generateQueryEmbedding(queryText);
+  const sparseDocument = createBm25Document(queryText);
 
   const filter = buildQdrantFilter(options.filters);
   const prefetchLimit = Math.max(options.limit * 3, 30); // Fetch more for better RRF
 
   logger.debug(
     {
-      sparseTermCount: sparseVector.indices.length,
+      sparseModel: sparseDocument.model,
       prefetchLimit,
       scoreThreshold: options.score_threshold,
     },
@@ -127,10 +116,7 @@ export async function hybridSearchNative(
   const results = await qdrantClient.query(options.collection_name, {
     prefetch: [
       {
-        query: {
-          values: sparseVector.values,
-          indices: sparseVector.indices,
-        },
+        query: sparseDocument,
         using: 'sparse',
         limit: prefetchLimit,
         filter,

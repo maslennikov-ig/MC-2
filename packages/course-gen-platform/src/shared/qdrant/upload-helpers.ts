@@ -5,9 +5,9 @@
  */
 
 import type { EmbeddingResult } from '../embeddings/generate';
-import { getGlobalBM25Scorer, type SparseVector } from '../embeddings/bm25';
+import { toQdrantPayload } from '../embeddings/metadata-enricher';
 import type { QdrantUploadPoint, QdrantUpsertPoint, QdrantNamedVector } from './upload-types';
-import { logger } from '../logger/index.js';
+import { createBm25Document } from './config';
 
 /**
  * Generates a numeric ID from chunk_id string
@@ -22,37 +22,21 @@ export function generateNumericId(chunk_id: string): number {
   return Math.abs(hash);
 }
 
-/**
- * Builds corpus statistics from embedding results
- */
-export function buildCorpusStatistics(embeddingResults: EmbeddingResult[]): void {
-  const bm25Scorer = getGlobalBM25Scorer();
-
-  // Extract all document texts for corpus statistics
-  const documents = embeddingResults.map(result => result.chunk.content);
-
-  // Build corpus statistics (calculates IDF, avg doc length, etc.)
-  logger.info({ documentCount: documents.length }, 'Building corpus statistics');
-  bm25Scorer.addDocuments(documents);
-
-  const stats = bm25Scorer.getCorpusStats();
-  logger.info(
-    {
-      totalDocuments: stats.total_documents,
-      uniqueTerms: stats.document_frequencies.size,
-      avgDocLength: Number(stats.average_document_length.toFixed(2)),
-      totalTokens: stats.total_tokens,
-    },
-    'Corpus statistics calculated'
+export function compactPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== null && value !== undefined)
   );
 }
 
-/**
- * Generates production BM25 sparse vector from text
- */
-export function generateBM25SparseVector(text: string): SparseVector {
-  const bm25Scorer = getGlobalBM25Scorer();
-  return bm25Scorer.generateSparseVector(text);
+function assertValidDocumentWeight(payload: Record<string, unknown>): void {
+  const weight = payload.document_weight;
+  if (weight === null || weight === undefined) {
+    return;
+  }
+
+  if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0.5 || weight > 1) {
+    throw new RangeError('document_weight must be a finite number between 0.5 and 1.0');
+  }
 }
 
 /**
@@ -63,78 +47,19 @@ export function toQdrantPoint(
   enable_sparse: boolean
 ): QdrantUploadPoint {
   const { chunk, dense_vector } = embeddingResult;
+  const rawPayload = toQdrantPayload(chunk);
+  assertValidDocumentWeight(rawPayload);
 
-  // Generate numeric ID from chunk_id
-  const id = generateNumericId(chunk.chunk_id);
-
-  // Prepare vector
   const vector: QdrantUploadPoint['vector'] = {
     dense: dense_vector,
+    ...(enable_sparse ? { sparse: createBm25Document(chunk.content) } : {}),
   };
 
-  // Add sparse vector if enabled
-  if (enable_sparse) {
-    vector.sparse = generateBM25SparseVector(chunk.content);
-  }
-
-  // Prepare payload (comprehensive metadata)
-  const rawPayload = {
-    // Chunk metadata
-    chunk_id: chunk.chunk_id,
-    parent_chunk_id: chunk.parent_chunk_id,
-    sibling_chunk_ids: chunk.sibling_chunk_ids,
-    level: chunk.level,
-    content: chunk.content,
-    token_count: chunk.token_count,
-    char_count: chunk.char_count,
-    chunk_index: chunk.chunk_index,
-    total_chunks: chunk.total_chunks,
-    chunk_strategy: chunk.chunk_strategy,
-    overlap_tokens: chunk.overlap_tokens,
-
-    // Document hierarchy
-    heading_path: chunk.heading_path,
-    chapter: chunk.chapter,
-    section: chunk.section,
-
-    // Document metadata
-    document_id: chunk.document_id,
-    document_name: chunk.document_name,
-    document_version: chunk.document_version,
-    version_hash: chunk.version_hash,
-
-    // Source location
-    page_number: chunk.page_number,
-    page_range: chunk.page_range,
-
-    // Content metadata
-    has_code: chunk.has_code,
-    has_formulas: chunk.has_formulas,
-    has_tables: chunk.has_tables,
-    has_images: chunk.has_images,
-
-    // Multi-tenancy
-    organization_id: chunk.organization_id,
-    course_id: chunk.course_id,
-
-    // Timestamps
-    indexed_at: chunk.indexed_at,
-    last_updated: chunk.last_updated,
-
-    // References
-    image_refs: chunk.image_refs,
-    table_refs: chunk.table_refs,
+  return {
+    id: generateNumericId(chunk.chunk_id),
+    vector,
+    payload: compactPayload(rawPayload),
   };
-
-  // Filter out null/undefined values to avoid Qdrant validation errors
-  const payload: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(rawPayload)) {
-    if (value !== null && value !== undefined) {
-      payload[key] = value;
-    }
-  }
-
-  return { id, vector, payload };
 }
 
 /**
