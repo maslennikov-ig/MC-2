@@ -45,11 +45,11 @@ parallel_group: S1-search-correctness-Q1
 depends_on_streams:
   - none
 parallel_decision: sequential
-status: returned
-delivery_method: n/a
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Acceptance and dedicated-worktree cleanup remain with the parent orchestrator.
+status: merged
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Integrated as 91ecd115 through a no-ff merge; dedicated worktree and local task branch removed after fresh integrated verification. Remote evidence branch retained.
 risk_level: medium
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -64,6 +64,9 @@ verification:
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
   - git diff --check: passed
   - python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.2.md: passed
+  - orchestrator rerun focused Vitest after integration: passed, 4 tests
+  - orchestrator rerun package type-check after integration: passed
+  - independent correctness review: spec compliant, task quality approved, no findings
 changed_files:
   - packages/course-gen-platform/src/shared/qdrant/config.ts
   - packages/course-gen-platform/src/shared/qdrant/collection-schema.ts
@@ -89,7 +92,7 @@ TDD evidence is preserved above: after supplying only the required local Supabas
 
 # Delivery / Cleanup
 
-The dedicated branch will be committed and pushed for parent review. Orchestrator acceptance and worktree/branch cleanup remain pending as required.
+Commit `91ecd115` was pushed to `origin/codex/qdrant-q1-schema`, independently reviewed, and integrated into `codex/self-hosted-qdrant-platform` with a no-ff merge. Fresh focused tests and package type-check passed on the integrated branch. The dedicated local worktree and local task branch were removed; the remote evidence branch remains available.
 
 # Risks / Follow-ups / Explicit Defers
 

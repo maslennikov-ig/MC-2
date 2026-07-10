@@ -51,6 +51,10 @@ Implementation scope: Q1-Q11 local implementation and verification; Q12 requires
 - `pnpm --filter @megacampus/course-gen-platform type-check`: passed.
 - Initial test attempt without CI placeholder env stopped in `tests/setup-unit.ts` before collection because `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` were absent; no code defect or test weakening was involved.
 
+## Accepted Streams
+
+- Q1 / `mc2-jz6y0.2`: accepted and integrated from commit `91ecd115` (`origin/codex/qdrant-q1-schema`). Independent review: spec compliant, task quality approved, no findings. Integrated rerun: focused Vitest 4/4 and package type-check passed. Dedicated local worktree/branch cleaned; remote evidence branch retained.
+
 ## Closeout Expectations
 
 - `docs-reviewed: updated` — retrieval, deployment, recovery, monitoring, and operator behavior change.
