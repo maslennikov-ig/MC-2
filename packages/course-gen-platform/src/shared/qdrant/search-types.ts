@@ -114,7 +114,16 @@ export interface SearchOptions {
    * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
    */
   priority_boost_factor?: number;
+  /** Group hybrid results by document_id (default: false). */
+  group_by_document?: boolean;
+  /** Maximum chunks returned per document group (default: 2). */
+  group_size?: number;
 }
+
+/** Search options after defaults have been resolved. */
+export type ResolvedSearchOptions = Required<Omit<SearchOptions, 'filters'>> & {
+  filters: SearchFilters;
+};
 
 /**
  * Search result metadata
@@ -130,6 +139,8 @@ export interface SearchMetadata {
   search_time_ms: number;
   /** Applied filters */
   filters_applied: SearchFilters;
+  /** Whether a hybrid request degraded to dense-only retrieval. */
+  fallback_used: boolean;
 }
 
 /**

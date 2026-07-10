@@ -78,6 +78,7 @@ describe('qdrant-search', () => {
           search_type: 'hybrid' as const,
           embedding_time_ms: 100,
           search_time_ms: 110,
+          fallback_used: false,
           filters_applied: {
             course_id: courseId,
           },
@@ -94,6 +95,7 @@ describe('qdrant-search', () => {
       expect(result.chunks[0].score).toBe(0.92);
       expect(result.metadata.total_results).toBe(1);
       expect(result.metadata.search_type).toBe('hybrid');
+      expect(result.metadata.fallback_used).toBe(false);
 
       expect(qdrantSearch.searchChunks).toHaveBeenCalledWith(
         'mass-energy equivalence formula',
@@ -116,6 +118,7 @@ describe('qdrant-search', () => {
           search_type: 'hybrid' as const,
           embedding_time_ms: 50,
           search_time_ms: 60,
+          fallback_used: false,
           filters_applied: {
             course_id: courseId,
             section_id: '2',
@@ -153,6 +156,7 @@ describe('qdrant-search', () => {
           search_type: 'hybrid' as const,
           embedding_time_ms: 50,
           search_time_ms: 60,
+          fallback_used: false,
           filters_applied: { course_id: courseId },
         },
       };

@@ -5,9 +5,8 @@
  */
 
 import { createHash } from 'crypto';
-import type { SearchOptions, SearchFilters } from './search-types';
+import type { ResolvedSearchOptions, SearchFilters } from './search-types';
 import type {
-  QdrantScoredPoint,
   QdrantPointOrScored,
   QdrantChunkPayload,
   QdrantFilterBuilder,
@@ -17,20 +16,23 @@ import type {
 /**
  * Generates cache key for search results
  */
-export function generateSearchCacheKey(
-  queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
-): string {
+export function generateSearchCacheKey(queryText: string, options: ResolvedSearchOptions): string {
   const cacheData = {
     query: queryText.toLowerCase().trim(),
     limit: options.limit,
     threshold: options.score_threshold,
     hybrid: options.enable_hybrid,
     collection: options.collection_name,
+    priority_boost: options.enable_priority_boost,
+    priority_boost_factor: options.priority_boost_factor,
+    group_by_document: options.group_by_document,
+    group_size: options.group_size,
     filters: {
       organization_id: options.filters.organization_id,
       course_id: options.filters.course_id,
-      document_ids: options.filters.document_ids?.sort(),
+      document_ids: options.filters.document_ids
+        ? [...options.filters.document_ids].sort()
+        : undefined,
       level: options.filters.level,
       chapter: options.filters.chapter,
       section: options.filters.section,
@@ -156,63 +158,4 @@ export function extractPayload(point: QdrantPointOrScored): QdrantChunkPayload {
     organization_id: payload.organization_id,
     course_id: payload.course_id,
   };
-}
-
-/**
- * Reciprocal Rank Fusion (RRF) result item
- */
-interface RRFItem {
-  point: QdrantScoredPoint;
-  score: number;
-  denseRank?: number;
-  sparseRank?: number;
-}
-
-/**
- * Reciprocal Rank Fusion (RRF) for merging search results
- */
-export function reciprocalRankFusion(
-  denseResults: QdrantScoredPoint[],
-  sparseResults: QdrantScoredPoint[],
-  k = 60
-): QdrantScoredPoint[] {
-  const scoreMap = new Map<string, RRFItem>();
-
-  // Process dense results
-  denseResults.forEach((point, rank) => {
-    const id = String(point.id);
-    const rrfScore = 1 / (k + rank + 1);
-    scoreMap.set(id, {
-      point,
-      score: rrfScore,
-      denseRank: rank + 1,
-    });
-  });
-
-  // Process sparse results
-  sparseResults.forEach((point, rank) => {
-    const id = String(point.id);
-    const rrfScore = 1 / (k + rank + 1);
-
-    if (scoreMap.has(id)) {
-      const existing = scoreMap.get(id)!;
-      existing.score += rrfScore;
-      existing.sparseRank = rank + 1;
-    } else {
-      scoreMap.set(id, {
-        point,
-        score: rrfScore,
-        sparseRank: rank + 1,
-      });
-    }
-  });
-
-  // Sort by combined RRF score (descending)
-  const merged = Array.from(scoreMap.values()).sort((a, b) => b.score - a.score);
-
-  // Return points with updated scores
-  return merged.map(({ point, score }) => ({
-    ...point,
-    score,
-  }));
 }
