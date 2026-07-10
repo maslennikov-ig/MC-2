@@ -53,11 +53,11 @@ parallel_group: S2-collection-manager-Q2
 depends_on_streams:
   - mc2-jz6y0.2
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: awaiting orchestrator acceptance
+status: merged
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Dedicated local worktree and local branch were removed after integration; the pushed remote evidence branch is retained.
 risk_level: medium
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -86,6 +86,11 @@ verification:
   - TMPDIR=/tmp QDRANT_URL=http://127.0.0.1:1 QDRANT_API_KEY=ci-placeholder pnpm --filter @megacampus/course-gen-platform qdrant:verify -- --physical course_embeddings_v1 --alias course_embeddings: failed safely with exit 1 against a deliberately unavailable loopback port; no live service was contacted
   - git diff --check: passed
   - python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.3.md: passed
+  - independent correctness re-review of 7c3702d3: passed with no Critical/Important/Minor findings; Spec Compliance PASS and Task Quality PASS
+  - integrated combined Q2-Q4 suite at fb919ea6: passed, 75 tests across 12 files
+  - integrated package type-check at fb919ea6: passed
+  - integrated qdrant:bootstrap and qdrant:verify help/import safety at fb919ea6: passed
+  - integrated legacy BM25/client-ranking scan at fb919ea6: passed, zero matches
 changed_files:
   - packages/course-gen-platform/src/shared/qdrant/collection-manager.ts
   - packages/course-gen-platform/tests/unit/shared/qdrant/collection-manager.test.ts
@@ -142,7 +147,7 @@ Self-review verdict: PASS after the original cleanup-order correction and all fo
 
 # Delivery / Cleanup
 
-The branch is returned for orchestrator review and is not yet accepted. Commit and push evidence are reported with the completion event. Workspace cleanup remains pending until the orchestrator accepts or rejects the stream.
+Accepted after review-fix commit `7c3702d3`, independent clean re-review and fresh orchestrator verification. Integrated as merge commit `fb919ea6`; the dedicated local worktree/branch were cleaned and the remote evidence branch is retained.
 
 # Risks / Follow-ups / Explicit Defers
 
