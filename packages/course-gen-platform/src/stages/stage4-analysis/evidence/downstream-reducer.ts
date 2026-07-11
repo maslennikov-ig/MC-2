@@ -9,6 +9,7 @@ import {
   buildCardMaterialUnits,
   CARD_REDUCE_TOPIC,
   CROSS_DOCUMENT_REDUCE_TOPIC,
+  DOWNSTREAM_TOKENIZER,
   estimateDownstreamReduceInputTokens,
   groupDownstreamUnits,
   splitDownstreamUnit,
@@ -84,6 +85,7 @@ function checkpointIdentity(
     language: input.language,
     target_tokens: input.targetTokens,
     max_batch_tokens: input.maxBatchTokens,
+    tokenizer: DOWNSTREAM_TOKENIZER,
   };
 }
 

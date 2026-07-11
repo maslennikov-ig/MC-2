@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
-import { tokenEstimator } from '@/shared/llm/token-estimator';
+import { get_encoding, type Tiktoken } from 'tiktoken';
 import { STRUCTURED_REDUCE_SYSTEM_PROMPT } from './card-generator';
 
 export interface DownstreamSummaryUnit {
@@ -11,12 +11,39 @@ export interface DownstreamSummaryUnit {
 export const CARD_REDUCE_TOPIC = 'Per-document advisory evidence digest';
 export const CROSS_DOCUMENT_REDUCE_TOPIC = 'Cross-document advisory evidence digest';
 
-// Covers chat role separators and provider framing outside the exact user/system strings.
-const CHAT_FORMAT_RESERVE_TOKENS = 16;
+export const DOWNSTREAM_TOKENIZER = {
+  package: 'tiktoken',
+  version: '1.0.22',
+  encoding: 'cl100k_base',
+  // Conservative reserve for role separators, message framing and assistant priming.
+  chatEnvelopeTokens: 16,
+} as const;
 const MAX_PART_COUNT_SENTINEL = 999_999;
 
-function estimate(value: string, language: 'ru' | 'en'): number {
-  return tokenEstimator.estimateTokens(value, language);
+function withEncoder<T>(operation: (encoder: Tiktoken) => T): T {
+  const encoder = get_encoding(DOWNSTREAM_TOKENIZER.encoding);
+  try {
+    return operation(encoder);
+  } finally {
+    encoder.free();
+  }
+}
+
+const STRUCTURED_REDUCE_SYSTEM_TOKENS = withEncoder(
+  encoder => encoder.encode(STRUCTURED_REDUCE_SYSTEM_PROMPT).length
+);
+
+function countRequestWithEncoder(
+  encoder: Tiktoken,
+  units: DownstreamSummaryUnit[],
+  topic: string
+): number {
+  const userPrompt = JSON.stringify({ topic, units });
+  return (
+    STRUCTURED_REDUCE_SYSTEM_TOKENS +
+    encoder.encode(userPrompt).length +
+    DOWNSTREAM_TOKENIZER.chatEnvelopeTokens
+  );
 }
 
 function hash(value: string): string {
@@ -26,12 +53,18 @@ function hash(value: string): string {
 export function estimateDownstreamReduceInputTokens(
   units: DownstreamSummaryUnit[],
   topic: string,
-  language: 'ru' | 'en'
+  _language: 'ru' | 'en'
 ): number {
-  const userPrompt = JSON.stringify({ topic, units });
-  return (
-    estimate(`${STRUCTURED_REDUCE_SYSTEM_PROMPT}\n${userPrompt}`, language) +
-    CHAT_FORMAT_RESERVE_TOKENS
+  return withEncoder(encoder => countRequestWithEncoder(encoder, units, topic));
+}
+
+export function downstreamUnitsFitBatch(
+  units: DownstreamSummaryUnit[],
+  topic: string,
+  maxBatchTokens: number
+): boolean[] {
+  return withEncoder(encoder =>
+    units.map(unit => countRequestWithEncoder(encoder, [unit], topic) <= maxBatchTokens)
   );
 }
 
@@ -39,68 +72,69 @@ export function groupDownstreamUnits(
   units: DownstreamSummaryUnit[],
   topic: string,
   maxBatchTokens: number,
-  language: 'ru' | 'en'
+  _language: 'ru' | 'en'
 ): DownstreamSummaryUnit[][] {
-  const groups: DownstreamSummaryUnit[][] = [];
-  let group: DownstreamSummaryUnit[] = [];
-  for (const unit of units) {
-    if (estimateDownstreamReduceInputTokens([unit], topic, language) > maxBatchTokens) {
-      throw new Error(`Downstream evidence unit ${unit.unitId} exceeds the bounded reduce input`);
+  return withEncoder(encoder => {
+    const groups: DownstreamSummaryUnit[][] = [];
+    let group: DownstreamSummaryUnit[] = [];
+    for (const unit of units) {
+      if (countRequestWithEncoder(encoder, [unit], topic) > maxBatchTokens) {
+        throw new Error(`Downstream evidence unit ${unit.unitId} exceeds the bounded reduce input`);
+      }
+      const candidate = [...group, unit];
+      if (group.length > 0 && countRequestWithEncoder(encoder, candidate, topic) > maxBatchTokens) {
+        groups.push(group);
+        group = [unit];
+      } else {
+        group = candidate;
+      }
     }
-    const candidate = [...group, unit];
-    if (
-      group.length > 0 &&
-      estimateDownstreamReduceInputTokens(candidate, topic, language) > maxBatchTokens
-    ) {
-      groups.push(group);
-      group = [unit];
-    } else {
-      group = candidate;
-    }
-  }
-  if (group.length > 0) groups.push(group);
-  return groups;
+    if (group.length > 0) groups.push(group);
+    return groups;
+  });
 }
 
 export function splitDownstreamUnit(
   unit: DownstreamSummaryUnit,
   topic: string,
   maxBatchTokens: number,
-  language: 'ru' | 'en'
+  _language: 'ru' | 'en'
 ): DownstreamSummaryUnit[] {
-  if (estimateDownstreamReduceInputTokens([unit], topic, language) <= maxBatchTokens) {
-    return [unit];
-  }
-  const characters = Array.from(unit.summary);
-  const chunks: string[] = [];
-  let cursor = 0;
-  while (cursor < characters.length) {
-    let low = 1;
-    let high = characters.length - cursor;
-    let accepted = 0;
-    while (low <= high) {
-      const middle = Math.floor((low + high) / 2);
-      const candidate = {
-        unitId: `${unit.unitId}:part:${MAX_PART_COUNT_SENTINEL}`,
-        summary: characters.slice(cursor, cursor + middle).join(''),
-      };
-      if (estimateDownstreamReduceInputTokens([candidate], topic, language) <= maxBatchTokens) {
-        accepted = middle;
-        low = middle + 1;
-      } else {
-        high = middle - 1;
+  return withEncoder(encoder => {
+    if (countRequestWithEncoder(encoder, [unit], topic) <= maxBatchTokens) {
+      return [unit];
+    }
+    const characters = Array.from(unit.summary);
+    const chunks: string[] = [];
+    let cursor = 0;
+    while (cursor < characters.length) {
+      let low = 1;
+      let high = characters.length - cursor;
+      let accepted = 0;
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        const candidate = {
+          unitId: `${unit.unitId}:part:${MAX_PART_COUNT_SENTINEL}`,
+          summary: characters.slice(cursor, cursor + middle).join(''),
+        };
+        if (countRequestWithEncoder(encoder, [candidate], topic) <= maxBatchTokens) {
+          accepted = middle;
+          low = middle + 1;
+        } else {
+          high = middle - 1;
+        }
       }
+      if (accepted === 0) {
+        throw new Error(`Downstream reduce framing exceeds the batch limit for ${unit.unitId}`);
+      }
+      chunks.push(characters.slice(cursor, cursor + accepted).join(''));
+      cursor += accepted;
     }
-    if (accepted === 0) {
-      throw new Error(`Downstream reduce framing exceeds the batch limit for ${unit.unitId}`);
-    }
-    chunks.push(characters.slice(cursor, cursor + accepted).join(''));
-    cursor += accepted;
-  }
-  return chunks.map((summary, index) => ({
-    unitId: `${unit.unitId}:part:${index + 1}`,
-    summary,
-  }));
+    return chunks.map((summary, index) => ({
+      unitId: `${unit.unitId}:part:${index + 1}`,
+      summary,
+    }));
+  });
 }
 
 interface MaterialItem {
@@ -170,7 +204,7 @@ function splitMaterialItem(
   card: DocumentEvidenceCard,
   item: MaterialItem,
   maxBatchTokens: number,
-  language: 'ru' | 'en'
+  encoder: Tiktoken
 ): DownstreamSummaryUnit[] {
   const characters = Array.from(item.content);
   const chunks: string[] = [];
@@ -192,10 +226,7 @@ function splitMaterialItem(
           MAX_PART_COUNT_SENTINEL
         ),
       };
-      if (
-        estimateDownstreamReduceInputTokens([candidate], CARD_REDUCE_TOPIC, language) <=
-        maxBatchTokens
-      ) {
+      if (countRequestWithEncoder(encoder, [candidate], CARD_REDUCE_TOPIC) <= maxBatchTokens) {
         accepted = middle;
         low = middle + 1;
       } else {
@@ -220,9 +251,9 @@ function splitMaterialItem(
 export function buildCardMaterialUnits(
   card: DocumentEvidenceCard,
   maxBatchTokens: number,
-  language: 'ru' | 'en'
+  _language: 'ru' | 'en'
 ): DownstreamSummaryUnit[] {
-  return materialItems(card).flatMap(item =>
-    splitMaterialItem(card, item, maxBatchTokens, language)
+  return withEncoder(encoder =>
+    materialItems(card).flatMap(item => splitMaterialItem(card, item, maxBatchTokens, encoder))
   );
 }

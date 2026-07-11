@@ -9,7 +9,8 @@ import { emptyGenerationMetrics, EvidenceCheckpointError } from './card-generato
 import type { DocumentSummaryResult } from '../handler-helpers';
 import {
   CROSS_DOCUMENT_REDUCE_TOPIC,
-  estimateDownstreamReduceInputTokens,
+  DOWNSTREAM_TOKENIZER,
+  downstreamUnitsFitBatch,
   groupDownstreamUnits,
   splitDownstreamUnit,
   type DownstreamSummaryUnit,
@@ -22,7 +23,7 @@ import {
 
 export { estimateDownstreamReduceInputTokens } from './downstream-hierarchy';
 
-const DOWNSTREAM_CONTEXT_SCHEMA_VERSION = 'document-evidence-downstream-v2';
+const DOWNSTREAM_CONTEXT_SCHEMA_VERSION = 'document-evidence-downstream-v3';
 
 export interface DownstreamEvidenceRepresentation {
   kind: 'synthetic_advisory';
@@ -107,7 +108,7 @@ function sha256(value: string): string {
 }
 
 function estimate(value: string, language: 'ru' | 'en'): number {
-  return tokenEstimator.estimateTokens(value, language);
+  return tokenEstimator.estimateTokens(value, language === 'ru' ? 'rus' : 'eng');
 }
 
 function sortedUnique(values: string[]): string[] {
@@ -206,6 +207,7 @@ export async function buildDownstreamEvidenceRepresentation(
       language: input.language,
       targetTokens: input.targetTokens,
       maxBatchTokens: input.maxBatchTokens,
+      tokenizer: DOWNSTREAM_TOKENIZER,
     })
   );
   const restored = restoreDownstreamState(input.checkpointRows, identityHash);
@@ -222,17 +224,17 @@ export async function buildDownstreamEvidenceRepresentation(
     throw new Error('Accepted evidence run is missing its durable downstream representation');
   }
 
+  const cardUnits = cards.map(card => ({ unitId: card.document_id, summary: unitText(card) }));
+  const fitsBatch = downstreamUnitsFitBatch(
+    cardUnits,
+    CROSS_DOCUMENT_REDUCE_TOPIC,
+    input.maxBatchTokens
+  );
   const units: SummaryUnit[] = [];
-  for (const card of cards) {
-    const cardUnit = { unitId: card.document_id, summary: unitText(card) };
-    if (
-      estimateDownstreamReduceInputTokens(
-        [cardUnit],
-        CROSS_DOCUMENT_REDUCE_TOPIC,
-        input.language
-      ) <= input.maxBatchTokens
-    ) {
-      units.push(cardUnit);
+  for (let index = 0; index < cards.length; index += 1) {
+    const card = cards[index];
+    if (fitsBatch[index]) {
+      units.push(cardUnits[index]);
     } else {
       units.push(
         await reduceOversizedCard(
@@ -336,6 +338,7 @@ export async function buildDownstreamEvidenceRepresentation(
         language: input.language,
         target_tokens: input.targetTokens,
         max_batch_tokens: input.maxBatchTokens,
+        tokenizer: DOWNSTREAM_TOKENIZER,
         source_document_ids: sourceDocumentIds,
         representation,
       },

@@ -1,18 +1,48 @@
 /* eslint-disable @typescript-eslint/require-await -- deterministic ports mirror async production */
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
-import type { StructuredEvidencePort } from '@/stages/stage4-analysis/evidence/card-generator';
+import { get_encoding, type Tiktoken } from 'tiktoken';
+import {
+  STRUCTURED_REDUCE_SYSTEM_PROMPT,
+  type StructuredEvidencePort,
+} from '@/stages/stage4-analysis/evidence/card-generator';
 import {
   buildDownstreamEvidenceRepresentation,
-  estimateDownstreamReduceInputTokens,
   type DownstreamContextCheckpointEvent,
 } from '@/stages/stage4-analysis/evidence/downstream-context';
+import {
+  CARD_REDUCE_TOPIC,
+  splitDownstreamUnit,
+  type DownstreamSummaryUnit,
+} from '@/stages/stage4-analysis/evidence/downstream-hierarchy';
 import { buildDocumentsContext } from '@/stages/stage4-analysis/phases/phase-2-scope';
 
 const runId = '10000000-0000-4000-8000-000000000001';
 const documentId = (value: number) =>
   `40000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
 type ReduceInput = Parameters<StructuredEvidencePort['reduceSummary']>[0];
+const CHAT_ENVELOPE_TOKENS = 16;
+
+function exactRequestTokensWithEncoder(
+  encoder: Tiktoken,
+  units: DownstreamSummaryUnit[],
+  topic: string
+): number {
+  return (
+    encoder.encode(STRUCTURED_REDUCE_SYSTEM_PROMPT).length +
+    encoder.encode(JSON.stringify({ topic, units })).length +
+    CHAT_ENVELOPE_TOKENS
+  );
+}
+
+function exactRequestTokens(units: DownstreamSummaryUnit[], topic: string): number {
+  const encoder = get_encoding('cl100k_base');
+  try {
+    return exactRequestTokensWithEncoder(encoder, units, topic);
+  } finally {
+    encoder.free();
+  }
+}
 
 function card(value: number, summary = `Summary ${value}`): DocumentEvidenceCard {
   return {
@@ -173,9 +203,10 @@ describe('buildDownstreamEvidenceRepresentation', () => {
       const maxBatchTokens = 320;
       const materialUnitIds: string[] = [];
       const materialUnitContent = new Map<string, string>();
+      const exactEncoder = get_encoding('cl100k_base');
       const reduceSummary = vi.fn(async (input: ReduceInput) => {
         expect(
-          estimateDownstreamReduceInputTokens(input.units, input.topic, input.language)
+          exactRequestTokensWithEncoder(exactEncoder, input.units, input.topic)
         ).toBeLessThanOrEqual(maxBatchTokens);
         if (input.topic === 'Per-document advisory evidence digest') {
           materialUnitIds.push(
@@ -196,18 +227,23 @@ describe('buildDownstreamEvidenceRepresentation', () => {
         };
       });
 
-      const result = await buildDownstreamEvidenceRepresentation({
-        runId,
-        cards: [source],
-        coverage: coverage(1),
-        language,
-        modelId: 'test/model',
-        evidenceVersion: 'evidence-v1',
-        targetTokens: 220,
-        maxBatchTokens,
-        maxRetries: 0,
-        port: { extractMap: vi.fn(), reduceSummary },
-      });
+      let result: Awaited<ReturnType<typeof buildDownstreamEvidenceRepresentation>>;
+      try {
+        result = await buildDownstreamEvidenceRepresentation({
+          runId,
+          cards: [source],
+          coverage: coverage(1),
+          language,
+          modelId: 'test/model',
+          evidenceVersion: 'evidence-v1',
+          targetTokens: 220,
+          maxBatchTokens,
+          maxRetries: 0,
+          port: { extractMap: vi.fn(), reduceSummary },
+        });
+      } finally {
+        exactEncoder.free();
+      }
 
       const materialItems = new Set(
         materialUnitIds.map(unitId => unitId.replace(/:part:\d+$/, ''))
@@ -254,6 +290,41 @@ describe('buildDownstreamEvidenceRepresentation', () => {
       );
     }
   );
+
+  it.each(['en', 'ru'] as const)(
+    'losslessly splits exact cl100k requests at the %s token boundary',
+    language => {
+      const unit = {
+        unitId: `boundary-${language}`,
+        summary:
+          language === 'ru'
+            ? 'ЖъФюдыЩы многоязычная граница '.repeat(30)
+            : 'camelCaseJSON boundary_without_spaces 🧪 '.repeat(30),
+      };
+      const exactBoundary = exactRequestTokens([unit], CARD_REDUCE_TOPIC);
+
+      expect(splitDownstreamUnit(unit, CARD_REDUCE_TOPIC, exactBoundary, language)).toEqual([unit]);
+      const parts = splitDownstreamUnit(unit, CARD_REDUCE_TOPIC, exactBoundary - 1, language);
+      expect(parts.map(part => part.summary).join('')).toBe(unit.summary);
+      expect(
+        parts.every(part => exactRequestTokens([part], CARD_REDUCE_TOPIC) <= exactBoundary - 1)
+      ).toBe(true);
+    }
+  );
+
+  it('rejects a limit below the exact fixed cl100k request framing', () => {
+    const unit = { unitId: 'fixed-overhead', summary: 'x' };
+    const sentinel = { unitId: `${unit.unitId}:part:999999`, summary: '' };
+    const impossibleLimit =
+      Math.min(
+        exactRequestTokens([unit], CARD_REDUCE_TOPIC),
+        exactRequestTokens([sentinel], CARD_REDUCE_TOPIC)
+      ) - 1;
+
+    expect(() => splitDownstreamUnit(unit, CARD_REDUCE_TOPIC, impossibleLimit, 'en')).toThrow(
+      'framing exceeds the batch limit'
+    );
+  });
 
   it('resumes committed per-card chunks and reductions without duplicate calls', async () => {
     const source = oversizedMaterialCard('en');
@@ -330,6 +401,18 @@ describe('buildDownstreamEvidenceRepresentation', () => {
     });
     expect(completeReplayPort.reduceSummary).not.toHaveBeenCalled();
     expect(JSON.stringify(replay)).toBe(JSON.stringify(baseline));
+    expect(
+      [...persisted, ...resumedEvents].every(
+        event =>
+          JSON.stringify(event.structuredCheckpoint.tokenizer) ===
+          JSON.stringify({
+            package: 'tiktoken',
+            version: '1.0.22',
+            encoding: 'cl100k_base',
+            chatEnvelopeTokens: 16,
+          })
+      )
+    ).toBe(true);
   });
 
   it('rejects foreign unit IDs returned by the per-card hierarchy', async () => {

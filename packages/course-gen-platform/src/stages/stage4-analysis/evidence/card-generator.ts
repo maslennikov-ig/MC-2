@@ -174,7 +174,7 @@ export const emptyGenerationMetrics = (): EvidenceGenerationMetrics => ({
 });
 
 function estimate(text: string, language: 'ru' | 'en'): number {
-  return tokenEstimator.estimateTokens(text, language);
+  return tokenEstimator.estimateTokens(text, language === 'ru' ? 'rus' : 'eng');
 }
 
 function sha256(value: string): string {
