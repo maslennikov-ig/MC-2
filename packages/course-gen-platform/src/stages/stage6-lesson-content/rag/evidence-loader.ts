@@ -87,6 +87,8 @@ function decisionRow(value: Record<string, unknown>): Stage6EvidenceDecisionRow 
       typeof value.selected_recommendation_value === 'string'
         ? value.selected_recommendation_value
         : null,
+    selected_side_handle:
+      typeof value.selected_side_handle === 'string' ? value.selected_side_handle : null,
     subject_key: value.subject_key,
     supersedes_decision_id:
       typeof value.supersedes_decision_id === 'string' ? value.supersedes_decision_id : null,

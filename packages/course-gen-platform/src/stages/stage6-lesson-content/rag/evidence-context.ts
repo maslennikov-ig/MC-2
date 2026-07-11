@@ -10,6 +10,7 @@ import {
   type DocumentEvidenceSourceManifestEntry,
   type EvidenceSourceRef,
 } from '@megacampus/shared-types';
+import { buildDocumentConflictSideHandle } from '@/stages/stage4-analysis/evidence/side-handle';
 
 export interface Stage6EvidenceDecisionRow {
   id: string;
@@ -19,6 +20,7 @@ export interface Stage6EvidenceDecisionRow {
   document_id: string | null;
   selected_resolution: string;
   selected_recommendation_value: string | null;
+  selected_side_handle: string | null;
   subject_key: string;
   supersedes_decision_id: string | null;
   decided_at: string;
@@ -127,10 +129,6 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function canonicalText(value: string): string {
-  return value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('und');
-}
-
 function canonicalRef(ref: EvidenceSourceRef): string {
   return JSON.stringify({
     document_id: ref.document_id,
@@ -147,53 +145,23 @@ function exactSorted(values: string[]): string[] {
 
 function selectedConflictSide(
   conflict: DocumentConflict,
-  decision: Stage6EvidenceDecisionRow,
-  cards: DocumentEvidenceCard[]
+  decision: Stage6EvidenceDecisionRow
 ): DocumentConflict['sides'][number] {
-  const recommendationValue = `recommendation:${conflict.conflict_id}`;
-  const alternativePrefix = `alternative:${conflict.conflict_id}:`;
-  let selectedResolution: string;
-  let allowPersistedTruncation = false;
-  if (decision.selected_recommendation_value === recommendationValue) {
-    selectedResolution = conflict.recommended_resolution;
-    allowPersistedTruncation = true;
-  } else if (decision.selected_recommendation_value?.startsWith(alternativePrefix)) {
-    const indexText = decision.selected_recommendation_value.slice(alternativePrefix.length);
-    const index = /^\d+$/u.test(indexText) ? Number.parseInt(indexText, 10) : -1;
-    const alternative = conflict.alternatives[index];
-    if (!alternative) {
-      throw new Stage6EvidenceScopeError(
-        'Stage 6 conflict decision references an unknown persisted alternative'
-      );
-    }
-    selectedResolution = alternative;
-    allowPersistedTruncation = true;
-  } else if (decision.selected_recommendation_value) {
+  if (!decision.selected_side_handle) {
     throw new Stage6EvidenceScopeError(
-      'Stage 6 conflict decision has an unsupported persisted option value'
+      decision.selected_recommendation_value
+        ? 'Stage 6 legacy conflict decision has no durable selected side'
+        : 'Stage 6 custom conflict decision has no durable selected side'
     );
-  } else {
-    selectedResolution = decision.selected_resolution;
   }
-  const selectedText = canonicalText(selectedResolution);
-  const claimTextById = new Map(
-    cards.flatMap(card =>
-      card.key_claims.map(claim => [claim.claim_id, canonicalText(claim.statement)] as const)
-    )
-  );
-  const matchingSides = conflict.sides.filter(side =>
-    side.claim_ids.some(claimId => {
-      const claimText = claimTextById.get(claimId);
-      if (!claimText) return false;
-      if (claimText === selectedText) return true;
-      return allowPersistedTruncation && claimText.startsWith(selectedText);
-    })
+  const matchingSides = conflict.sides.filter(
+    side =>
+      side.side_handle === decision.selected_side_handle &&
+      side.side_handle === buildDocumentConflictSideHandle(conflict.conflict_id, side.claim_ids)
   );
   if (matchingSides.length !== 1) {
     throw new Stage6EvidenceScopeError(
-      decision.selected_recommendation_value
-        ? 'Stage 6 persisted conflict option cannot project one selected side'
-        : 'Stage 6 custom conflict decision cannot project one selected side'
+      'Stage 6 durable conflict decision cannot project one selected side'
     );
   }
   return matchingSides[0];
@@ -267,7 +235,7 @@ export function buildStage6EvidenceContext(
         'Stage 6 evidence material conflict has no current decision'
       );
     }
-    const selectedSide = selectedConflictSide(conflict, decision, cards);
+    const selectedSide = selectedConflictSide(conflict, decision);
     selectedSide.claim_ids.forEach(claimId => selectedClaimIds.add(claimId));
     selectedSide.document_ids.forEach(documentId => addDocumentDecision(documentId, decision.id));
     conflict.sides
@@ -297,9 +265,7 @@ export function buildStage6EvidenceContext(
       if (decision.selected_recommendation_value === 'remove_document') {
         removedDocumentIds.add(decision.document_id);
       } else if (decision.selected_recommendation_value !== 'continue_limited') {
-        throw new Stage6EvidenceScopeError(
-          'Stage 6 degraded evidence decision is not terminal'
-        );
+        throw new Stage6EvidenceScopeError('Stage 6 degraded evidence decision is not terminal');
       }
       continue;
     }

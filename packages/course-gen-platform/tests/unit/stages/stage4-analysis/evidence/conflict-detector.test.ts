@@ -154,6 +154,14 @@ describe('document conflict detector', () => {
       })
     );
     expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0]).toMatchObject({
+      recommended_side_handle: expect.stringMatching(/^side:v1:[0-9a-f]{64}$/),
+      alternative_side_handles: [expect.stringMatching(/^side:v1:[0-9a-f]{64}$/)],
+      sides: [
+        expect.objectContaining({ side_handle: expect.stringMatching(/^side:v1:[0-9a-f]{64}$/) }),
+        expect.objectContaining({ side_handle: expect.stringMatching(/^side:v1:[0-9a-f]{64}$/) }),
+      ],
+    });
     expect(db.commitConflictBatch).toHaveBeenCalledWith(
       expect.objectContaining({ conflicts: result.conflicts })
     );
@@ -219,9 +227,7 @@ describe('document conflict detector', () => {
         port: port(),
         verifyMaterialSources: async () => ({
           verifiedDocumentIds: [UUID.docA],
-          sourceRefs: [
-            { documentId: '40000000-0000-4000-8000-999999999999', chunkId: 'foreign' },
-          ],
+          sourceRefs: [{ documentId: '40000000-0000-4000-8000-999999999999', chunkId: 'foreign' }],
         }),
       })
     ).rejects.toThrow(/foreign.*ref/i);
@@ -349,9 +355,7 @@ describe('document conflict detector', () => {
               ? [...ids, ids[0]]
               : [...ids.slice(1), 'foreign-cluster'];
         return {
-          partitions: [
-            { child_cluster_ids: childIds, canonical_value_key: 'reduced-policy' },
-          ],
+          partitions: [{ child_cluster_ids: childIds, canonical_value_key: 'reduced-policy' }],
           usage: { model_calls: 1, input_tokens: 1, output_tokens: 1, total_cost_usd: 0 },
         };
       });
@@ -461,9 +465,9 @@ describe('document conflict detector', () => {
     const firstPort = port();
     let committed = 0;
     vi.mocked(db.commitConflictBatch).mockImplementation(async input => {
-      const prior = db.checkpoints.find(
-        (row: any) => row.batch_key === input.batchKey
-      ) as Record<string, unknown> | undefined;
+      const prior = db.checkpoints.find((row: any) => row.batch_key === input.batchKey) as
+        | Record<string, unknown>
+        | undefined;
       if (prior && prior.input_hash !== input.inputHash) throw new Error('checkpoint collision');
       if (prior) return prior;
       const row = {
@@ -588,9 +592,9 @@ describe('document conflict detector', () => {
     expect(result.verification.verified).toBe(1);
     expect(verify).toHaveBeenCalledTimes(9);
     expect(vi.mocked(verify).mock.calls.every(([call]) => call.groupByDocument)).toBe(true);
-    expect(
-      vi.mocked(verify).mock.calls.every(([call]) => call.documentIds.length <= 16)
-    ).toBe(true);
+    expect(vi.mocked(verify).mock.calls.every(([call]) => call.documentIds.length <= 16)).toBe(
+      true
+    );
     const classification = (db.checkpoints as Array<Record<string, any>>).find(row =>
       String(row.batch_key).startsWith('classify:')
     );

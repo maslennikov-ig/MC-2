@@ -9,6 +9,7 @@ import { AnalysisResultSchema } from '../src/analysis-schemas';
 import {
   DocumentAuthorityScopeSchema,
   DocumentConflictSchema,
+  DocumentConflictSideHandleSchema,
   DocumentDecisionSubjectSchema,
   DocumentCoverageStatusSchema,
   DocumentDecisionSchema,
@@ -90,6 +91,14 @@ const card = {
 } as const;
 
 describe('document evidence canonical contracts', () => {
+  it('accepts only versioned opaque conflict-side handles', () => {
+    expect(DocumentConflictSideHandleSchema.parse(`side:v1:${'a'.repeat(64)}`)).toBe(
+      `side:v1:${'a'.repeat(64)}`
+    );
+    expect(() => DocumentConflictSideHandleSchema.parse('Retain data')).toThrow();
+    expect(() => DocumentConflictSideHandleSchema.parse(`side:v2:${'a'.repeat(64)}`)).toThrow();
+  });
+
   it('exports the canonical enum schemas', () => {
     expect(DocumentAuthorityScopeSchema.options).toEqual([
       'organization_specific',

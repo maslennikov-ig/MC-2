@@ -9,6 +9,7 @@ import {
   type EvidenceSourceRef,
 } from '@megacampus/shared-types';
 import type { DetectorCapacityIssue } from './conflict-detector';
+import { buildDocumentConflictSideHandle } from './side-handle';
 
 export interface DocumentEvidenceSuggestedAnswer {
   value: string;
@@ -138,7 +139,9 @@ function boundedRef(ref: EvidenceSourceRef): EvidenceSourceRef {
   };
 }
 
-function uniqueAnswers(answers: DocumentEvidenceSuggestedAnswer[]): DocumentEvidenceSuggestedAnswer[] {
+function uniqueAnswers(
+  answers: DocumentEvidenceSuggestedAnswer[]
+): DocumentEvidenceSuggestedAnswer[] {
   const result = new Map<string, DocumentEvidenceSuggestedAnswer>();
   for (const answer of answers) {
     if (!result.has(answer.value)) result.set(answer.value, answer);
@@ -161,6 +164,30 @@ function conflictQuestion(input: {
   maxDocumentsInMetadata: number;
 }): Omit<DocumentEvidenceQuestion, 'questionId' | 'subjectKey' | 'subjectKind'> {
   const conflict = DocumentConflictSchema.parse(input.conflict);
+  const sideHandles = conflict.sides.map(side => side.side_handle);
+  if (
+    sideHandles.some(handle => !handle) ||
+    conflict.sides.some(
+      side =>
+        side.side_handle !== buildDocumentConflictSideHandle(conflict.conflict_id, side.claim_ids)
+    ) ||
+    !conflict.recommended_side_handle ||
+    !sideHandles.includes(conflict.recommended_side_handle) ||
+    conflict.sides.filter(side => side.side_role === 'recommended').length !== 1 ||
+    conflict.sides.find(side => side.side_role === 'recommended')?.side_handle !==
+      conflict.recommended_side_handle ||
+    !conflict.alternative_side_handles ||
+    conflict.alternative_side_handles.length !== conflict.alternatives.length ||
+    conflict.alternative_side_handles.some(
+      handle => !sideHandles.includes(handle) || handle === conflict.recommended_side_handle
+    ) ||
+    conflict.alternative_side_handles.some(
+      (handle, index) =>
+        conflict.sides.find(side => side.alternative_index === index)?.side_handle !== handle
+    )
+  ) {
+    throw new Error('Document conflict lacks a complete durable side identity projection');
+  }
   const allDocumentIds = [...new Set(conflict.sides.flatMap(side => side.document_ids))].sort();
   const shownDocuments = allDocumentIds.slice(0, input.maxDocumentsInMetadata);
   const metadata = DocumentEvidenceQuestionMetadataSchema.parse({
@@ -179,6 +206,7 @@ function conflictQuestion(input: {
     })),
     document_overflow_count: allDocumentIds.length - shownDocuments.length,
     sides: conflict.sides.slice(0, 8).map(side => ({
+      side_handle: side.side_handle,
       excerpt: sanitizePlainText(side.statement, input.maxUiExcerptChars),
       source_refs: side.source_refs.slice(0, input.maxSourceRefsPerSide).map(boundedRef),
       source_ref_overflow_count: Math.max(0, side.source_refs.length - input.maxSourceRefsPerSide),
@@ -188,21 +216,23 @@ function conflictQuestion(input: {
     )}`,
     course_impact: sanitizePlainText(conflict.course_impact, 1_200),
     recommendation: sanitizePlainText(conflict.recommended_resolution, 1_200),
+    recommended_side_handle: conflict.recommended_side_handle,
     recommendation_rationale: sanitizePlainText(conflict.recommendation_rationale, 1_200),
     alternatives: conflict.alternatives
       .map(value => sanitizePlainText(value, 1_200))
       .filter(value => value.length > 0)
       .slice(0, 16),
+    alternative_side_handles: conflict.alternative_side_handles,
   });
   if (metadata.subject_kind !== 'claim_conflict') throw new Error('Invalid conflict metadata');
   const recommendation: DocumentEvidenceSuggestedAnswer = {
-    value: `recommendation:${conflict.conflict_id}`,
+    value: conflict.recommended_side_handle,
     text: metadata.recommendation,
     rationale: metadata.recommendation_rationale,
     is_recommended: true,
   };
   const alternatives = metadata.alternatives.map((text, index) => ({
-    value: `alternative:${conflict.conflict_id}:${index}`,
+    value: conflict.alternative_side_handles![index],
     text,
     rationale: metadata.recommendation_rationale,
     is_recommended: false,
@@ -221,14 +251,32 @@ function conflictQuestion(input: {
 
 const degradedCopy = {
   en: {
-    retry: ['Retry evidence processing', 'Repeat the same bounded configuration for a transient failure.'],
-    continue_limited: ['Continue with limited evidence', 'Preserve the degraded audit and continue.'],
-    remove_document: ['Exclude from advisory evidence', 'Keep source history but exclude this card downstream.'],
+    retry: [
+      'Retry evidence processing',
+      'Repeat the same bounded configuration for a transient failure.',
+    ],
+    continue_limited: [
+      'Continue with limited evidence',
+      'Preserve the degraded audit and continue.',
+    ],
+    remove_document: [
+      'Exclude from advisory evidence',
+      'Keep source history but exclude this card downstream.',
+    ],
   },
   ru: {
-    retry: ['Повторить обработку данных', 'Повторить ту же ограниченную конфигурацию после временного сбоя.'],
-    continue_limited: ['Продолжить с ограниченными данными', 'Сохранить аудит деградации и продолжить.'],
-    remove_document: ['Исключить из рекомендательных данных', 'Сохранить источник, но исключить карточку ниже по конвейеру.'],
+    retry: [
+      'Повторить обработку данных',
+      'Повторить ту же ограниченную конфигурацию после временного сбоя.',
+    ],
+    continue_limited: [
+      'Продолжить с ограниченными данными',
+      'Сохранить аудит деградации и продолжить.',
+    ],
+    remove_document: [
+      'Исключить из рекомендательных данных',
+      'Сохранить источник, но исключить карточку ниже по конвейеру.',
+    ],
   },
 } as const;
 
@@ -302,14 +350,26 @@ function capacityQuestion(input: {
     suggestedAnswers: uniqueAnswers([
       {
         value: 'abort_adjust_sources',
-        text: input.language === 'ru' ? 'Остановиться и изменить набор источников' : 'Stop and adjust source selection',
-        rationale: input.language === 'ru' ? 'Требует явного изменения корпуса или конфигурации оператором.' : 'Requires an operator to materially change the corpus or configuration.',
+        text:
+          input.language === 'ru'
+            ? 'Остановиться и изменить набор источников'
+            : 'Stop and adjust source selection',
+        rationale:
+          input.language === 'ru'
+            ? 'Требует явного изменения корпуса или конфигурации оператором.'
+            : 'Requires an operator to materially change the corpus or configuration.',
         is_recommended: false,
       },
       {
         value: 'continue_limited',
-        text: input.language === 'ru' ? 'Продолжить с ограниченной проверкой' : 'Continue with limited conflict verification',
-        rationale: input.language === 'ru' ? 'Сохраняет явный аудит ограничения.' : 'Preserves an explicit capacity audit.',
+        text:
+          input.language === 'ru'
+            ? 'Продолжить с ограниченной проверкой'
+            : 'Continue with limited conflict verification',
+        rationale:
+          input.language === 'ru'
+            ? 'Сохраняет явный аудит ограничения.'
+            : 'Preserves an explicit capacity audit.',
         is_recommended: true,
       },
     ]),
@@ -386,7 +446,9 @@ export async function resolveDocumentEvidenceDecisions(
   const conflicts = DocumentConflictSchema.array().parse(
     await dependencies.repository.listConflicts(input.runId)
   );
-  const cards = DocumentEvidenceCardsSchema.parse(await dependencies.repository.listItems(input.runId));
+  const cards = DocumentEvidenceCardsSchema.parse(
+    await dependencies.repository.listItems(input.runId)
+  );
   const capacityIssues = await dependencies.repository.listDetectorCapacityIssues(input.runId);
   const current = await dependencies.repository.listCurrentDecisions(input.runId);
   const currentKeys = new Set(current.map(value => value.subject_key));
@@ -394,7 +456,9 @@ export async function resolveDocumentEvidenceDecisions(
   const subjects: DocumentEvidenceDecisionSubject[] = [];
   const unresolvedInformationalConflictIds: string[] = [];
 
-  for (const conflict of [...conflicts].sort((a, b) => a.conflict_id.localeCompare(b.conflict_id))) {
+  for (const conflict of [...conflicts].sort((a, b) =>
+    a.conflict_id.localeCompare(b.conflict_id)
+  )) {
     const subject: DocumentEvidenceDecisionSubject = { kind: 'claim_conflict', conflict };
     const key = subjectKey(input.runId, subject);
     if (conflict.severity === 'informational') {
@@ -453,7 +517,9 @@ export async function resolveDocumentEvidenceDecisions(
       `document-decision-gate-v1:${input.runId}:${sha256(JSON.stringify(questions))}`
     ),
   });
-  const decisionIds = [...new Set([...current.map(value => value.id), ...materialized.decision_ids])].sort();
+  const decisionIds = [
+    ...new Set([...current.map(value => value.id), ...materialized.decision_ids]),
+  ].sort();
   dependencies.log?.info(
     {
       runId: input.runId,

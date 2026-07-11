@@ -5,6 +5,7 @@ import {
   resolveDocumentEvidenceDecisions,
   type DocumentDecisionRepository,
 } from '@/stages/stage4-analysis/evidence/decision-service';
+import { buildDocumentConflictSideHandle } from '@/stages/stage4-analysis/evidence/side-handle';
 
 const id = {
   run: '10000000-0000-4000-8000-000000000001',
@@ -19,32 +20,43 @@ const id = {
   decision: '70000000-0000-4000-8000-000000000001',
 };
 
-function conflict(severity: DocumentConflict['severity'] = 'important', sameDocument = false): DocumentConflict {
+function conflict(
+  severity: DocumentConflict['severity'] = 'important',
+  sameDocument = false
+): DocumentConflict {
+  const conflictId = severity === 'informational' ? id.info : id.conflict;
+  const sideA = buildDocumentConflictSideHandle(conflictId, [id.claimA]);
+  const sideB = buildDocumentConflictSideHandle(conflictId, [id.claimB]);
   return {
-    conflict_id: severity === 'informational' ? id.info : id.conflict,
+    conflict_id: conflictId,
     conflict_fingerprint: `sha256:${severity}`,
     topic: '<script>Retention</script>',
     severity,
     sides: [
       {
+        side_handle: sideA,
+        side_role: 'recommended',
         statement: '<img src=x onerror=alert(1)> Keep 30 days. '.repeat(30),
         claim_ids: [id.claimA],
         document_ids: [id.docA],
         source_refs: [{ document_id: id.docA, page_number: 1, heading_path: 'Policy' }],
       },
       {
+        side_handle: sideB,
+        side_role: 'alternative',
+        alternative_index: 0,
         statement: 'Keep 365 days.',
         claim_ids: [id.claimB],
         document_ids: [sameDocument ? id.docA : id.docB],
-        source_refs: [
-          { document_id: sameDocument ? id.docA : id.docB, chunk_id: 'chunk-b' },
-        ],
+        source_refs: [{ document_id: sameDocument ? id.docA : id.docB, chunk_id: 'chunk-b' }],
       },
     ],
     course_impact: 'The course must teach one enforceable period.',
     recommended_resolution: 'Follow the organization-specific 30-day policy.',
+    recommended_side_handle: sideA,
     recommendation_rationale: 'Organization authority has precedence.',
-    alternatives: ['Ask the owner.', 'Follow the 365-day reference.'],
+    alternatives: ['Follow the 365-day reference.'],
+    alternative_side_handles: [sideB],
   };
 }
 
@@ -78,8 +90,7 @@ function repository(): DocumentDecisionRepository {
     getDegradedRetryState: vi.fn(async () => ({ attempt: 2, maxAttempts: 2 })),
     materializeDecisionGateAtomic: vi.fn(async input => ({
       question_ids: input.questions.map(question => question.questionId),
-      decision_ids:
-        input.mode === 'automatic' && input.questions.length > 0 ? [id.decision] : [],
+      decision_ids: input.mode === 'automatic' && input.questions.length > 0 ? [id.decision] : [],
       reused: false,
     })),
   };
@@ -99,6 +110,44 @@ const input = {
 };
 
 describe('document evidence decision service', () => {
+  it('uses durable side handles for recommended and alternative option identity', () => {
+    const durable = conflict();
+    const recommendedHandle = buildDocumentConflictSideHandle(id.conflict, [id.claimA]);
+    const alternativeHandle = buildDocumentConflictSideHandle(id.conflict, [id.claimB]);
+    Object.assign(durable.sides[0], { side_handle: recommendedHandle });
+    Object.assign(durable.sides[1], { side_handle: alternativeHandle });
+    Object.assign(durable, {
+      recommended_side_handle: recommendedHandle,
+      alternative_side_handles: [alternativeHandle],
+    });
+    durable.recommended_resolution = `${'Retain data '.repeat(80)}30 days`;
+    durable.alternatives = [`${'Retain data '.repeat(80)}indefinitely`];
+
+    const question = buildDocumentEvidenceQuestion({
+      runId: id.run,
+      language: 'en',
+      subject: { kind: 'claim_conflict', conflict: durable },
+      documentNames: new Map([
+        [id.docA, 'A.pdf'],
+        [id.docB, 'B.pdf'],
+      ]),
+      maxUiExcerptChars: 240,
+      maxSourceRefsPerSide: 8,
+      maxDocumentsInMetadata: 8,
+    });
+
+    expect(question.suggestedAnswers.map(answer => answer.value)).toEqual([
+      alternativeHandle,
+      recommendedHandle,
+    ]);
+    expect(question.metadata).toMatchObject({
+      subject_kind: 'claim_conflict',
+      recommended_side_handle: recommendedHandle,
+      alternative_side_handles: [alternativeHandle],
+      sides: [{ side_handle: recommendedHandle }, { side_handle: alternativeHandle }],
+    });
+  });
+
   it('builds strict bounded same-document conflict metadata with one hashed subject', () => {
     const question = buildDocumentEvidenceQuestion({
       runId: id.run,
@@ -188,8 +237,8 @@ describe('document evidence decision service', () => {
       { repository: db }
     );
     const gate = vi.mocked(db.materializeDecisionGateAtomic).mock.calls[0][0];
-    expect(gate.questions[0].suggestedAnswers.findIndex(value => value.is_recommended)).toBe(2);
-    expect(gate.questions[0].suggestedAnswers[2].text).toContain('30-day');
+    expect(gate.questions[0].suggestedAnswers.findIndex(value => value.is_recommended)).toBe(1);
+    expect(gate.questions[0].suggestedAnswers[1].text).toContain('30-day');
     expect(result.currentDecisionIds).toEqual([id.decision]);
     expect(result.pauseRequired).toBe(false);
   });
@@ -245,7 +294,10 @@ describe('document evidence decision service', () => {
     await resolveDocumentEvidenceDecisions(input, { repository: db });
     const question = vi.mocked(db.materializeDecisionGateAtomic).mock.calls[0][0].questions[0];
     expect(question.metadata).toEqual(
-      expect.objectContaining({ subject_kind: 'detector_capacity', reason: 'detector_capacity_degraded' })
+      expect.objectContaining({
+        subject_kind: 'detector_capacity',
+        reason: 'detector_capacity_degraded',
+      })
     );
     expect(question.suggestedAnswers.map(answer => answer.value)).toEqual([
       'abort_adjust_sources',

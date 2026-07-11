@@ -25,10 +25,7 @@ import {
   type ConflictCheckpointRow,
   type DetectorCapacityIssue,
 } from './conflict-detector';
-import type {
-  DocumentEvidenceQuestion,
-  CurrentEvidenceDecision,
-} from './decision-service';
+import type { DocumentEvidenceQuestion, CurrentEvidenceDecision } from './decision-service';
 
 type EvidenceTableName =
   | 'document_evidence_runs'
@@ -139,6 +136,7 @@ export interface AppendEvidenceDecisionInput {
   clarifyingQuestionId?: string;
   selectedRecommendationIndex?: number;
   selectedRecommendationValue?: string;
+  selectedSideHandle?: string;
   supersedesDecisionId?: string;
 }
 
@@ -243,7 +241,7 @@ export class DocumentEvidenceRepository {
     }
     return result.data.map(value => {
       const row = assertRecord(value, 'list_conflicts');
-      return DocumentConflictSchema.parse({
+      const parsed = DocumentConflictSchema.parse({
         conflict_id: row.id,
         conflict_fingerprint: row.conflict_fingerprint,
         topic: row.topic,
@@ -253,6 +251,24 @@ export class DocumentEvidenceRepository {
         recommended_resolution: row.recommended_resolution,
         recommendation_rationale: row.recommendation_rationale,
         alternatives: row.alternatives,
+      });
+      const recommended = parsed.sides.filter(side => side.side_role === 'recommended');
+      const alternatives = parsed.sides
+        .filter(
+          (side): side is typeof side & { side_handle: string; alternative_index: number } =>
+            side.side_role === 'alternative' &&
+            Boolean(side.side_handle) &&
+            side.alternative_index !== undefined
+        )
+        .sort((left, right) => left.alternative_index - right.alternative_index);
+      return DocumentConflictSchema.parse({
+        ...parsed,
+        ...(recommended.length === 1 && recommended[0].side_handle
+          ? { recommended_side_handle: recommended[0].side_handle }
+          : {}),
+        ...(alternatives.length === parsed.alternatives.length
+          ? { alternative_side_handles: alternatives.map(side => side.side_handle) }
+          : {}),
       });
     });
   }
@@ -331,12 +347,14 @@ export class DocumentEvidenceRepository {
   async getPendingRetryDirectives(
     courseId: string,
     configuredMaxAttempts: number
-  ): Promise<Array<{
-    decisionId: string;
-    documentId: string;
-    attempt: number;
-    maxAttempts: number;
-  }>> {
+  ): Promise<
+    Array<{
+      decisionId: string;
+      documentId: string;
+      attempt: number;
+      maxAttempts: number;
+    }>
+  > {
     const { data, error } = await this.client.rpc('get_document_evidence_retry_directives', {
       p_course_id: courseId,
       p_configured_max_attempts: configuredMaxAttempts,
@@ -665,6 +683,7 @@ export class DocumentEvidenceRepository {
       ...(input.selectedRecommendationValue
         ? { selected_recommendation_value: input.selectedRecommendationValue }
         : {}),
+      ...(input.selectedSideHandle ? { selected_side_handle: input.selectedSideHandle } : {}),
       ...(input.supersedesDecisionId ? { supersedes_decision_id: input.supersedesDecisionId } : {}),
     };
     const { data, error } = await this.client.rpc('append_document_evidence_decision', {

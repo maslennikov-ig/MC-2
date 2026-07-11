@@ -11,6 +11,7 @@ import {
   isStage6EvidenceChunkAllowed,
   type Stage6EvidenceDecisionRow,
 } from '@/stages/stage6-lesson-content/rag/evidence-context';
+import { buildDocumentConflictSideHandle } from '@/stages/stage4-analysis/evidence/side-handle';
 
 const id = {
   run: '10000000-0000-4000-8000-000000000001',
@@ -32,6 +33,8 @@ const manifest: DocumentEvidenceSourceManifestEntry[] = [
   { document_id: id.documentB, source_version_hash: 'sha256:b', document_name: 'B.pdf' },
   { document_id: id.documentC, source_version_hash: 'sha256:c', document_name: 'C.pdf' },
 ];
+const sideHandleA = buildDocumentConflictSideHandle(id.conflict, [id.claimA]);
+const sideHandleB = buildDocumentConflictSideHandle(id.conflict, [id.claimB]);
 
 function card(input: {
   documentId: string;
@@ -100,12 +103,17 @@ const conflict: DocumentConflict = {
   severity: 'critical',
   sides: [
     {
+      side_handle: sideHandleA,
+      side_role: 'recommended',
       statement: 'Retain records for 30 days.',
       claim_ids: [id.claimA],
       document_ids: [id.documentA],
       source_refs: cards[0].key_claims[0].source_refs,
     },
     {
+      side_handle: sideHandleB,
+      side_role: 'alternative',
+      alternative_index: 0,
       statement: 'Retain records for 365 days.',
       claim_ids: [id.claimB],
       document_ids: [id.documentB],
@@ -114,8 +122,10 @@ const conflict: DocumentConflict = {
   ],
   course_impact: 'Changes the retention guidance.',
   recommended_resolution: 'Retain records for 30 days.',
+  recommended_side_handle: sideHandleA,
   recommendation_rationale: 'Organization policy wins.',
   alternatives: ['Retain records for 365 days.'],
+  alternative_side_handles: [sideHandleB],
 };
 
 function snapshot(decisionIds: string[]): DocumentEvidenceSnapshot {
@@ -137,6 +147,7 @@ function decision(overrides: Partial<Stage6EvidenceDecisionRow> = {}): Stage6Evi
     document_id: null,
     selected_resolution: 'Retain records for 30 days.',
     selected_recommendation_value: `recommendation:${id.conflict}`,
+    selected_side_handle: sideHandleA,
     subject_key: 'subject-conflict',
     supersedes_decision_id: null,
     decided_at: '2026-07-11T12:00:00.000Z',
@@ -178,6 +189,7 @@ describe('buildStage6EvidenceContext', () => {
         decision({
           selected_resolution: 'Use the 365-day rule, with an annual review.',
           selected_recommendation_value: `alternative:${id.conflict}:0`,
+          selected_side_handle: sideHandleB,
         }),
       ],
     });
@@ -197,6 +209,7 @@ describe('buildStage6EvidenceContext', () => {
       document_id: id.documentC,
       selected_resolution: 'Continue with limited evidence',
       selected_recommendation_value: 'continue_limited',
+      selected_side_handle: null,
       subject_key: 'subject-degraded',
     });
     const continued = build({
@@ -256,10 +269,50 @@ describe('buildStage6EvidenceContext', () => {
           decision({
             selected_resolution: 'Create an entirely new compromise policy.',
             selected_recommendation_value: null,
+            selected_side_handle: null,
           }),
         ],
       })
     ).toThrow(/custom.*project|selected.*side/i);
+  });
+
+  it('projects the exact durable side when both displays share the first 600 characters', () => {
+    const commonPrefix = 'Retain data '.repeat(60);
+    const ambiguousCards = structuredClone(cards);
+    ambiguousCards[0].key_claims[0].statement = `${commonPrefix}for 30 days.`;
+    ambiguousCards[1].key_claims[0].statement = `${commonPrefix}indefinitely.`;
+    const ambiguousConflict = structuredClone(conflict);
+    const handleA = sideHandleA;
+    const handleB = sideHandleB;
+    Object.assign(ambiguousConflict.sides[0], { side_handle: handleA });
+    Object.assign(ambiguousConflict.sides[1], { side_handle: handleB });
+    Object.assign(ambiguousConflict, {
+      recommended_side_handle: handleA,
+      alternative_side_handles: [handleB],
+    });
+    ambiguousConflict.recommended_resolution = ambiguousCards[0].key_claims[0].statement.slice(
+      0,
+      600
+    );
+    ambiguousConflict.alternatives = [ambiguousCards[1].key_claims[0].statement.slice(0, 600)];
+
+    const result = buildStage6EvidenceContext({
+      courseId: id.course,
+      organizationId: id.organization,
+      snapshot: snapshot([id.conflictDecision]),
+      sourceManifest: manifest,
+      cards: ambiguousCards,
+      conflicts: [ambiguousConflict],
+      decisions: [
+        decision({
+          selected_resolution: ambiguousConflict.alternatives[0],
+          selected_recommendation_value: handleB,
+          selected_side_handle: handleB,
+        } as Partial<Stage6EvidenceDecisionRow>),
+      ],
+    });
+
+    expect(result.allowedDocumentIds).toEqual([id.documentB, id.documentC]);
   });
 
   it('keeps selected and rejected chunks distinct when conflict sides share a document', () => {
@@ -330,6 +383,7 @@ describe('buildStage6EvidenceContext', () => {
       conflict_id: null,
       document_id: id.documentC,
       selected_recommendation_value: 'continue_limited',
+      selected_side_handle: null,
       subject_key: 'subject-degraded',
     });
     const first = build({
