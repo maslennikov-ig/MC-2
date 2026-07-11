@@ -924,6 +924,7 @@ export const Stage5DocumentEvidenceEnrichmentSchema = z
     provenance_hash: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
     attempted_patches: z.number().int().min(0).max(2),
     retrieved_ref_count: z.number().int().nonnegative().max(480),
+    fallback_section_count: z.number().int().nonnegative().max(30),
   })
   .strict()
   .superRefine((record, context) => {
@@ -969,7 +970,8 @@ export const Stage5DocumentEvidenceEnrichmentSchema = z
         record.accepted_run_id !== null ||
         record.accepted_decision_ids.length > 0 ||
         record.section_evidence.length > 0 ||
-        record.attempted_patches !== 0
+        record.attempted_patches !== 0 ||
+        record.fallback_section_count !== 0
       ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

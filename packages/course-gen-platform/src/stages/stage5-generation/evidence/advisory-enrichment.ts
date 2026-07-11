@@ -6,6 +6,7 @@ import {
   type CourseStructure,
   type DocumentConflict,
   type DocumentEvidenceCard,
+  type DocumentEvidenceSnapshot,
   type EvidenceSourceRef,
   type Stage5DocumentEvidenceEnrichment,
 } from '@megacampus/shared-types';
@@ -63,6 +64,7 @@ function notApplicableRecord(): Stage5DocumentEvidenceEnrichment {
     section_evidence: [],
     attempted_patches: 0,
     retrieved_ref_count: 0,
+    fallback_section_count: 0,
   };
   return Stage5DocumentEvidenceEnrichmentSchema.parse({
     ...body,
@@ -76,6 +78,7 @@ function buildRecord(input: {
   decisionIds: string[];
   materials?: Stage5EvidenceMaterial[];
   attemptedPatches?: number;
+  fallbackSectionCount?: number;
 }): Stage5DocumentEvidenceEnrichment {
   const bySection = new Map<
     number,
@@ -113,10 +116,21 @@ function buildRecord(input: {
       (total, section) => total + section.evidence_refs.length,
       0
     ),
+    fallback_section_count: input.fallbackSectionCount ?? 0,
   };
   return Stage5DocumentEvidenceEnrichmentSchema.parse({
     ...body,
     provenance_hash: sha256(body),
+  });
+}
+
+export function buildEvidenceFailureRecord(
+  snapshot: DocumentEvidenceSnapshot
+): Stage5DocumentEvidenceEnrichment {
+  return buildRecord({
+    status: 'degraded',
+    runId: snapshot.accepted_run_id,
+    decisionIds: snapshot.current_decision_ids,
   });
 }
 
@@ -189,6 +203,11 @@ function resolveDecisionPolicy(input: {
   const removedDocumentIds = new Set<string>();
   let continueLimited = false;
   let complete = true;
+  const claimStatements = new Map(
+    input.cards.flatMap(card =>
+      card.key_claims.map(claim => [claim.claim_id, claim.statement] as const)
+    )
+  );
 
   const decisionsByConflict = new Map(
     input.decisions
@@ -205,9 +224,18 @@ function resolveDecisionPolicy(input: {
       continue;
     }
     const selected = selectedConflictStatement(conflict, decision);
-    const selectedSide = selected
-      ? conflict.sides.find(side => normalizedText(side.statement) === normalizedText(selected))
-      : undefined;
+    const selectedSides = selected
+      ? conflict.sides.filter(
+          side =>
+            normalizedText(side.statement) === normalizedText(selected) ||
+            side.claim_ids.some(
+              claimId =>
+                normalizedText(claimStatements.get(claimId) ?? '') === normalizedText(selected)
+            )
+        )
+      : [];
+    const selectedSide = selectedSides.length === 1 ? selectedSides[0] : undefined;
+    if (!selectedSide) complete = false;
     const selectedDocuments = new Set(selectedSide?.document_ids ?? []);
     for (const side of conflict.sides) {
       if (side === selectedSide) continue;
@@ -320,15 +348,22 @@ function buildSearchQuery(structure: CourseStructure, sectionIndex: number): str
 
 function buildAdditions(
   card: DocumentEvidenceCard,
-  policy: ReturnType<typeof resolveDecisionPolicy>
+  policy: ReturnType<typeof resolveDecisionPolicy>,
+  returnedRefs: EvidenceSourceRef[]
 ): string[] {
-  return [
-    ...card.terminology,
-    ...card.constraints,
-    ...card.key_claims
-      .filter(claim => !policy.blockedClaimIds.has(claim.claim_id))
-      .map(claim => claim.statement),
-  ]
+  return card.key_claims
+    .filter(claim => !policy.blockedClaimIds.has(claim.claim_id))
+    .filter(claim =>
+      claim.source_refs.some(claimRef =>
+        returnedRefs.some(
+          returnedRef =>
+            claimRef.document_id === returnedRef.document_id &&
+            (!claimRef.chunk_id || claimRef.chunk_id === returnedRef.chunk_id) &&
+            (!claimRef.version_hash || claimRef.version_hash === returnedRef.version_hash)
+        )
+      )
+    )
+    .map(claim => claim.statement)
     .map(value => boundedText(value, 300))
     .filter(value => value.length >= 5 && !policy.blockedStatements.has(normalizedText(value)))
     .filter((value, index, values) => values.indexOf(value) === index)
@@ -521,6 +556,7 @@ export async function enrichBaselineWithDocumentEvidence(
 
   const materials: Stage5EvidenceMaterial[] = [];
   let failedQueries = 0;
+  let fallbackSectionCount = 0;
   for (let sectionIndex = 0; sectionIndex < input.baseline.sections.length; sectionIndex++) {
     const section = input.baseline.sections[sectionIndex];
     const sectionNumber = section.section_number ?? sectionIndex + 1;
@@ -540,6 +576,7 @@ export async function enrichBaselineWithDocumentEvidence(
           document_ids: allowedDocumentIds,
         },
       });
+      if (response.metadata.fallback_used) fallbackSectionCount += 1;
       const refsByDocument = new Map<string, Map<string, EvidenceSourceRef>>();
       for (const result of response.results) {
         const card = cardsById.get(result.document_id);
@@ -556,16 +593,17 @@ export async function enrichBaselineWithDocumentEvidence(
       )) {
         const card = cardsById.get(documentId);
         if (!card) continue;
-        const additions = buildAdditions(card, policy);
+        const evidenceRefs = [...refs.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([, ref]) => ref)
+          .slice(0, MAX_REFS_PER_SECTION);
+        const additions = buildAdditions(card, policy, evidenceRefs);
         if (additions.length === 0) continue;
         materials.push({
           sectionNumber,
           documentId,
           additions,
-          evidenceRefs: [...refs.entries()]
-            .sort(([left], [right]) => left.localeCompare(right))
-            .map(([, ref]) => ref)
-            .slice(0, MAX_REFS_PER_SECTION),
+          evidenceRefs,
           searchQuery: query,
         });
       }
@@ -590,10 +628,17 @@ export async function enrichBaselineWithDocumentEvidence(
         ? policy.continueLimited
           ? 'failed_open_with_decision'
           : 'degraded'
-        : 'no_relevant_evidence';
+        : fallbackSectionCount > 0
+          ? 'degraded'
+          : 'no_relevant_evidence';
     return {
       courseStructure: input.baseline,
-      enrichment: buildRecord({ status, runId, decisionIds: decisions.map(value => value.id) }),
+      enrichment: buildRecord({
+        status,
+        runId,
+        decisionIds: decisions.map(value => value.id),
+        fallbackSectionCount,
+      }),
     };
   }
 
@@ -605,7 +650,7 @@ export async function enrichBaselineWithDocumentEvidence(
     if (violations.length === 0) {
       const changed = JSON.stringify(candidate) !== JSON.stringify(input.baseline);
       const status = changed
-        ? failedQueries > 0
+        ? failedQueries > 0 || fallbackSectionCount > 0
           ? 'degraded'
           : 'applied'
         : 'no_relevant_evidence';
@@ -616,6 +661,7 @@ export async function enrichBaselineWithDocumentEvidence(
         decisionIds: decisions.map(value => value.id),
         materials: persistedMaterials,
         attemptedPatches: attempt,
+        fallbackSectionCount,
       });
       dependencies.log?.info(
         {
@@ -638,6 +684,7 @@ export async function enrichBaselineWithDocumentEvidence(
       runId,
       decisionIds: decisions.map(value => value.id),
       attemptedPatches: 2,
+      fallbackSectionCount,
     }),
   };
 }

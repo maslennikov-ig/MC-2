@@ -32,6 +32,7 @@ function enrichment(
     provenance_hash: `sha256:${'a'.repeat(64)}`,
     attempted_patches: 1,
     retrieved_ref_count: 0,
+    fallback_section_count: 0,
     ...overrides,
   };
 }

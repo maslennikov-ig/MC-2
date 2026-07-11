@@ -59,9 +59,9 @@ docs_review_notes: The approved evidence design and E5 execution task already do
 graph_reviewed: used
 graph_review_notes: Read the shared GRAPH_REPORT and ran a focused Stage 5 live-caller query before broad reads. The graph is stale at commit 1233be56 and returned no useful Stage 5 path; repository evidence established handler -> orchestrator -> structural gate -> evidence pass. Refresh remains parent closeout work after integration.
 verification:
-  - Shared Stage 5 enrichment plus canonical document evidence contracts: 19/19 passed.
-  - Focused Stage 5 enrichment/live/persistence plus Qdrant search operations: 44/44 passed after the final CAS hardening.
-  - Full Stage 5 unit directory: 512/512 passed after the final CAS hardening.
+  - Shared Stage 5 enrichment plus canonical document evidence contracts: 20/20 passed.
+  - Focused Stage 5 enrichment/live/persistence/handler plus Qdrant search operations: 46/46 passed after independent-review remediation.
+  - Full Stage 5 unit directory plus Qdrant search operations: 531/531 passed (519 Stage 5 and 12 shared Qdrant search-operation tests).
   - pnpm type-check: passed across all workspace packages.
   - pnpm build with local non-secret test Supabase environment values: passed across all workspace packages.
   - scripts/orchestration/run_process_verification.sh: passed.
@@ -75,6 +75,7 @@ changed_files:
   - packages/course-gen-platform/src/stages/stage5-generation/handler.ts
   - packages/course-gen-platform/src/stages/stage5-generation/orchestrator.ts
   - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment-live.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment-handler.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment-persistence.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.22.md
@@ -90,9 +91,9 @@ Stage 5 now keeps the existing generated structure as an immutable baseline and 
 
 The evidence pass reloads the accepted run, complete card ledger, conflicts and current append-only decisions. It rejects stale decision or coverage snapshots and cross-course/organization rows before retrieval. Conflict recommendations and manual alternatives are interpreted through the canonical selected value; rejected claims, statements, source refs and document-only sides cannot enter the query set or patch material. Degraded/failed cards require a current `continue_limited` or `remove_document` decision before Stage 5 can proceed.
 
-Each accepted section makes one live hybrid Qdrant query with exact organization/course filters, `group_by_document: true`, `group_size: 2`, full payload verification and a result limit of eight. A 1,000-document corpus is deterministically ranked by priority, authority, relevance, quality and ID, then bounded to 64 document filters per section. Returned refs must match tenant, course, accepted document, chunk policy and source version hash. Source/claim bodies never enter logs or the durable Stage 5 record.
+Each accepted section makes one live hybrid Qdrant query with exact organization/course filters, `group_by_document: true`, `group_size: 2`, full payload verification and a result limit of eight. A 1,000-document corpus is deterministically ranked by priority, authority, relevance, quality and ID, then bounded to 64 document filters per section. Returned refs must match tenant, course, accepted document, chunk policy and source version hash. Only claims whose source refs intersect those returned accepted chunk refs can become advisory topics; unreferenced card terminology and constraints cannot leak into a section. Source/claim bodies never enter logs, traces or the durable Stage 5 record.
 
-The deterministic production patch can only append at most two evidence-backed terminology/constraint/claim topics to the first lesson in a section and never exceed ten key topics. A generic patch contract still receives the same non-destructive checks: course metadata, section/lesson order, titles, objectives, durations and required topic prefixes cannot change. Zod and the existing live structural size gate run on every candidate; the pass retries once with explicit violation codes, then returns the baseline with honest `degraded` or `failed_open_with_decision` status.
+The deterministic production patch can only append at most two chunk-grounded claim topics to the first lesson in a section and never exceed ten key topics. A generic patch contract still receives the same non-destructive checks: course metadata, section/lesson order, titles, objectives, durations and required topic prefixes cannot change. Zod and the existing live structural size gate run on every candidate; the pass retries once with explicit violation codes, then returns the baseline with honest `degraded` or `failed_open_with_decision` status. Per-section Qdrant fallback is counted durably and forces `degraded` with or without hits.
 
 # TDD / Routing Evidence
 
@@ -101,6 +102,7 @@ The deterministic production patch can only append at most two evidence-backed t
 - Live RED: `GenerationOrchestrator.execute()` ignored the injected enricher; GREEN wired the post-baseline production caller and persisted the audit record.
 - Persistence RED: no compact snapshot updater existed; GREEN updates only `analysis_result.document_evidence.enrichment_status` when accepted run and decision sets match. A post-push self-review then found a concurrent-decision overwrite race; the final CAS plan makes the course update conditional on the exact original `analysis_result` snapshot and fails rather than erasing a newer decision.
 - Hardening RED: manual canonical values, stale coverage, unresolved degraded cards and 1,000-document query bounds failed; GREEN added exact checks and deterministic top-64 ranking.
+- Independent-review RED/GREEN: a multi-claim selected side, an unrelated first claim, fallback hit/no-hit, success/error privacy sentinels, production handler reachability and a zero-row PostgREST CAS exposed the remaining gaps. GREEN now resolves conflict sides through claim identity, grounds additions to returned chunks, records fallback sections, fails open without logging error bodies, emits only aggregate completion trace fields, and proves that stale `analysis_result` prevents the atomic structure/metadata/evidence update and every downstream write.
 - Focused Graphify was consulted first but was stale and unhelpful; repository reads were then limited to the actual Stage 5 handler/orchestrator/validation chain.
 
 # Consulted Versions and Sources

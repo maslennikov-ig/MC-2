@@ -117,7 +117,7 @@ const JobDataSchema = z.union([
  * Processes STRUCTURE_GENERATION jobs by executing the 4-phase LangGraph
  * orchestrator and storing results in the database.
  */
-class Stage5GenerationHandler {
+export class Stage5GenerationHandler {
   /**
    * Process the STRUCTURE_GENERATION job
    *

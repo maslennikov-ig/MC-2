@@ -49,6 +49,7 @@ describe('Stage 5 document evidence enrichment metadata', () => {
         provenance_hash: `sha256:${'a'.repeat(64)}`,
         attempted_patches: 1,
         retrieved_ref_count: 1,
+        fallback_section_count: 0,
       },
     });
 
@@ -68,6 +69,7 @@ describe('Stage 5 document evidence enrichment metadata', () => {
           provenance_hash: `sha256:${'0'.repeat(64)}`,
           attempted_patches: 0,
           retrieved_ref_count: 0,
+          fallback_section_count: 0,
         },
       }).success
     ).toBe(true);
@@ -106,7 +108,27 @@ describe('Stage 5 document evidence enrichment metadata', () => {
         provenance_hash: `sha256:${'a'.repeat(64)}`,
         attempted_patches: 1,
         retrieved_ref_count: 0,
+        fallback_section_count: 0,
         ...change,
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a fallback count greater than the bounded section count', () => {
+    const result = GenerationMetadataSchema.safeParse({
+      ...metadata(),
+      document_evidence_enrichment: {
+        schema_version: 'stage5-document-evidence-enrichment-v1',
+        status: 'degraded',
+        accepted_run_id: RUN_ID,
+        accepted_decision_ids: [],
+        section_evidence: [],
+        provenance_hash: `sha256:${'a'.repeat(64)}`,
+        attempted_patches: 0,
+        retrieved_ref_count: 0,
+        fallback_section_count: 31,
       },
     });
 

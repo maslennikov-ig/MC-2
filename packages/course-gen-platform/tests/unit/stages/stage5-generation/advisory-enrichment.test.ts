@@ -19,6 +19,7 @@ const id = {
   docB: '40000000-0000-4000-8000-000000000002',
   claimA: '50000000-0000-4000-8000-000000000001',
   claimB: '50000000-0000-4000-8000-000000000002',
+  claimC: '50000000-0000-4000-8000-000000000003',
   conflict: '60000000-0000-8000-8000-000000000001',
   decision: '70000000-0000-4000-8000-000000000001',
 };
@@ -364,7 +365,6 @@ describe('Stage 5 advisory evidence enrichment', () => {
     );
     expect(result.courseStructure.sections[0].lessons[0].key_topics).toEqual([
       ...original.sections[0].lessons[0].key_topics,
-      'legal hold',
       'Keep records for 30 days.',
     ]);
     expect(result.enrichment.accepted_decision_ids).toEqual([id.decision]);
@@ -425,6 +425,103 @@ describe('Stage 5 advisory evidence enrichment', () => {
         filters: expect.objectContaining({ document_ids: [id.docB] }),
       })
     );
+  });
+
+  it('selects a conflict side when the recommendation names another claim on that side', async () => {
+    const lowerClaim = card(id.docA, id.claimA, 'Keep records for at least 30 days.').key_claims[0];
+    const higherClaim = {
+      ...lowerClaim,
+      claim_id: id.claimC,
+      statement: 'Keep regulated records for 90 days.',
+      source_refs: [{ document_id: id.docA, chunk_id: 'chunk-1', version_hash: `hash-${id.docA}` }],
+    };
+    const docA = {
+      ...card(id.docA, id.claimA, lowerClaim.statement),
+      key_claims: [lowerClaim, higherClaim],
+    };
+    const multiClaimConflict: DocumentConflict = {
+      ...conflict(),
+      sides: [
+        {
+          statement: lowerClaim.statement,
+          claim_ids: [id.claimA, id.claimC],
+          document_ids: [id.docA],
+          source_refs: [{ document_id: id.docA, chunk_id: 'chunk-1' }],
+        },
+        conflict().sides[1],
+      ],
+      recommended_resolution: higherClaim.statement,
+    };
+    const search = vi.fn(async () => searchResult(id.docA));
+
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: baseline(),
+        snapshot: snapshot(),
+      },
+      {
+        repository: repository({
+          listItems: vi.fn(async () => [
+            docA,
+            card(id.docB, id.claimB, 'Keep records for 365 days.'),
+          ]),
+          listConflicts: vi.fn(async () => [multiClaimConflict]),
+        }),
+        search,
+      }
+    );
+
+    expect(search).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ filters: expect.objectContaining({ document_ids: [id.docA] }) })
+    );
+    expect(result.courseStructure.sections[0].lessons[0].key_topics).toContain(
+      higherClaim.statement
+    );
+  });
+
+  it('adds only claims grounded by the returned accepted chunk refs', async () => {
+    const docA = card(id.docA, id.claimA, 'UNRELATED FIRST CLAIM');
+    docA.key_claims[0].source_refs = [
+      { document_id: id.docA, chunk_id: 'chunk-9', version_hash: `hash-${id.docA}` },
+    ];
+    docA.key_claims.push({
+      claim_id: id.claimC,
+      statement: 'GROUNDED RETENTION CLAIM',
+      confidence: 0.95,
+      source_refs: [{ document_id: id.docA, chunk_id: 'chunk-1', version_hash: `hash-${id.docA}` }],
+    });
+    docA.terminology = ['UNREFERENCED TERM'];
+    docA.constraints = ['UNREFERENCED CONSTRAINT'];
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: baseline(),
+        snapshot: {
+          ...snapshot([]),
+          coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+        },
+      },
+      {
+        repository: repository({
+          listItems: vi.fn(async () => [docA]),
+          listConflicts: vi.fn(async () => []),
+          getLatestDecisions: vi.fn(async () => []),
+        }),
+        search: vi.fn(async () => searchResult(id.docA)),
+      }
+    );
+
+    const topics = result.courseStructure.sections[0].lessons[0].key_topics;
+    expect(topics).toContain('GROUNDED RETENTION CLAIM');
+    expect(topics).not.toContain('UNRELATED FIRST CLAIM');
+    expect(topics).not.toContain('UNREFERENCED TERM');
+    expect(topics).not.toContain('UNREFERENCED CONSTRAINT');
   });
 
   it('rejects a destructive patch, retries once with violations, and accepts a valid retry', async () => {
@@ -520,6 +617,56 @@ describe('Stage 5 advisory evidence enrichment', () => {
     );
 
     expect(result.enrichment.status).toBe('degraded');
+    expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
+  });
+
+  it('records a degraded fallback section even when fallback returns a grounded hit', async () => {
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: baseline(),
+        snapshot: snapshot(),
+      },
+      {
+        repository: repository(),
+        search: vi.fn(async () => ({
+          ...searchResult(),
+          metadata: { ...searchResult().metadata, fallback_used: true },
+        })),
+      }
+    );
+
+    expect(result.enrichment.status).toBe('degraded');
+    expect(result.enrichment.fallback_section_count).toBe(1);
+    expect(result.courseStructure.sections[0].lessons[0].key_topics).toContain(
+      'Keep records for 30 days.'
+    );
+  });
+
+  it('records a degraded fallback section when fallback returns no hits', async () => {
+    const original = baseline();
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: original,
+        snapshot: snapshot(),
+      },
+      {
+        repository: repository(),
+        search: vi.fn(async () => ({
+          ...searchResult(),
+          results: [],
+          metadata: { ...searchResult().metadata, fallback_used: true },
+        })),
+      }
+    );
+
+    expect(result.enrichment.status).toBe('degraded');
+    expect(result.enrichment.fallback_section_count).toBe(1);
     expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
   });
 

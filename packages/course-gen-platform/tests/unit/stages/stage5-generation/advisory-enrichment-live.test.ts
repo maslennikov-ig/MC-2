@@ -6,6 +6,22 @@ import type {
   Stage5DocumentEvidenceEnrichment,
 } from '@megacampus/shared-types';
 
+const pinoMocks = vi.hoisted(() => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock('pino', () => {
+  const factory = vi.fn(() => pinoMocks.logger) as ReturnType<typeof vi.fn> & {
+    destination: ReturnType<typeof vi.fn>;
+  };
+  factory.destination = vi.fn(() => ({ write: vi.fn() }));
+  return { default: factory };
+});
 vi.mock('@/shared/trace-logger', () => ({ logTrace: vi.fn() }));
 vi.mock('@/stages/stage5-generation/orchestrator-helpers', async importOriginal => {
   const actual =
@@ -36,6 +52,7 @@ vi.mock('@/stages/stage5-generation/orchestrator-helpers', async importOriginal 
 });
 
 import { GenerationOrchestrator } from '@/stages/stage5-generation/orchestrator';
+import { logTrace } from '@/shared/trace-logger';
 
 const runId = '10000000-0000-4000-8000-000000000001';
 const courseId = '20000000-0000-4000-8000-000000000001';
@@ -158,6 +175,7 @@ function input(): GenerationJobInput {
 
 describe('live Stage 5 evidence caller', () => {
   it('runs only after the baseline graph and persists the returned audit record', async () => {
+    const privateSentinel = 'PRIVATE_EVIDENCE_SENTINEL';
     const enriched: CourseStructure = {
       ...metadata(),
       sections: [
@@ -166,7 +184,7 @@ describe('live Stage 5 evidence caller', () => {
           lessons: [
             {
               ...section().lessons[0],
-              key_topics: [...section().lessons[0].key_topics, 'legal hold'],
+              key_topics: [...section().lessons[0].key_topics, privateSentinel],
             },
           ],
         },
@@ -181,6 +199,7 @@ describe('live Stage 5 evidence caller', () => {
       provenance_hash: `sha256:${'a'.repeat(64)}`,
       attempted_patches: 1,
       retrieved_ref_count: 0,
+      fallback_section_count: 0,
     };
     const evidenceEnricher = vi.fn(async () => ({ courseStructure: enriched, enrichment: audit }));
     const orchestrator = new GenerationOrchestrator(
@@ -219,7 +238,55 @@ describe('live Stage 5 evidence caller', () => {
         snapshot: expect.objectContaining({ accepted_run_id: runId }),
       })
     );
-    expect(result.course_structure.sections[0].lessons[0].key_topics).toContain('legal hold');
+    expect(result.course_structure.sections[0].lessons[0].key_topics).toContain(privateSentinel);
     expect(result.generation_metadata.document_evidence_enrichment).toEqual(audit);
+    const serializedTrace = JSON.stringify(vi.mocked(logTrace).mock.calls);
+    expect(serializedTrace).not.toContain(privateSentinel);
+    expect(serializedTrace).toContain('provenanceHash');
+    expect(
+      JSON.stringify(Object.values(pinoMocks.logger).flatMap(spy => spy.mock.calls))
+    ).not.toContain(privateSentinel);
+  });
+
+  it('fails open and sanitizes an unexpected evidence error before trace logging', async () => {
+    const privateSentinel = 'PRIVATE_ERROR_SENTINEL source body';
+    const evidenceEnricher = vi.fn(async () => {
+      throw new Error(privateSentinel);
+    });
+    const orchestrator = new GenerationOrchestrator(
+      {} as never,
+      {} as never,
+      {} as never,
+      undefined,
+      evidenceEnricher
+    );
+    (orchestrator as never as { graph: { invoke: (value: unknown) => Promise<unknown> } }).graph = {
+      invoke: vi.fn(async () => ({
+        input: input(),
+        metadata: metadata(),
+        sections: [section()],
+        qualityScores: { metadata_similarity: 1, sections_similarity: [1], overall: 1 },
+        tokenUsage: { metadata: 1, sections: 1, validation: 0, total: 2 },
+        modelUsed: { metadata: 'metadata-model', sections: 'sections-model' },
+        retryCount: { metadata: 0, sections: [0] },
+        currentPhase: 'validate_quality',
+        phaseDurations: {},
+        errors: [],
+        modelOverride: null,
+      })),
+    };
+
+    const result = await orchestrator.execute(input());
+
+    expect(result.course_structure.sections[0].lessons[0].key_topics).toEqual(
+      section().lessons[0].key_topics
+    );
+    expect(result.generation_metadata.document_evidence_enrichment).toEqual(
+      expect.objectContaining({ status: 'degraded', accepted_run_id: runId })
+    );
+    expect(JSON.stringify(vi.mocked(logTrace).mock.calls)).not.toContain(privateSentinel);
+    expect(
+      JSON.stringify(Object.values(pinoMocks.logger).flatMap(spy => spy.mock.calls))
+    ).not.toContain(privateSentinel);
   });
 });

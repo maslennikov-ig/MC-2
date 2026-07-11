@@ -45,6 +45,7 @@ import {
   validateStructuralQuality,
 } from './validators/structural-quality-validator';
 import type { Stage5EvidenceEnricher } from './evidence/types';
+import { buildEvidenceFailureRecord } from './evidence/advisory-enrichment';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -571,45 +572,62 @@ export class GenerationOrchestrator {
       const baselineCriticalCodes = new Set(
         generationMetadata.quality_scores.structure?.criticalIssues.map(issue => issue.code) ?? []
       );
-      const enriched = await this.evidenceEnricher({
-        courseId: input.course_id,
-        organizationId: input.organization_id,
-        language: input.frontend_parameters.language ?? 'en',
-        baseline: courseStructure,
-        snapshot: input.analysis_result?.document_evidence,
-        validateCandidate: candidate => {
-          const result = validateStructuralQuality({
-            input,
-            metadata: reconcileCourseMetadata(finalState.metadata!, candidate.sections, input),
-            sections: candidate.sections,
-          });
-          return result.criticalIssues
-            .filter(issue => !baselineCriticalCodes.has(issue.code))
-            .map(issue => `structural:${issue.code}`);
-        },
-      });
-      finalCourseStructure = enriched.courseStructure;
-      generationMetadata.document_evidence_enrichment = enriched.enrichment;
-      const enrichedStructuralResult = validateStructuralQuality({
-        input,
-        metadata: reconcileCourseMetadata(
-          finalState.metadata!,
-          finalCourseStructure.sections,
-          input
-        ),
-        sections: finalCourseStructure.sections,
-      });
-      const newCriticalIssues = enrichedStructuralResult.criticalIssues.filter(
-        issue => !baselineCriticalCodes.has(issue.code)
-      );
-      if (newCriticalIssues.length > 0) {
-        throw new Error(
-          `Stage 5 evidence enrichment escaped structural validation: ${newCriticalIssues
-            .map(issue => issue.code)
-            .join(',')}`
+      try {
+        const enriched = await this.evidenceEnricher({
+          courseId: input.course_id,
+          organizationId: input.organization_id,
+          language: input.frontend_parameters.language ?? 'en',
+          baseline: courseStructure,
+          snapshot: input.analysis_result?.document_evidence,
+          validateCandidate: candidate => {
+            const result = validateStructuralQuality({
+              input,
+              metadata: reconcileCourseMetadata(finalState.metadata!, candidate.sections, input),
+              sections: candidate.sections,
+            });
+            return result.criticalIssues
+              .filter(issue => !baselineCriticalCodes.has(issue.code))
+              .map(issue => `structural:${issue.code}`);
+          },
+        });
+        finalCourseStructure = enriched.courseStructure;
+        generationMetadata.document_evidence_enrichment = enriched.enrichment;
+        const enrichedStructuralResult = validateStructuralQuality({
+          input,
+          metadata: reconcileCourseMetadata(
+            finalState.metadata!,
+            finalCourseStructure.sections,
+            input
+          ),
+          sections: finalCourseStructure.sections,
+        });
+        const newCriticalIssues = enrichedStructuralResult.criticalIssues.filter(
+          issue => !baselineCriticalCodes.has(issue.code)
         );
+        if (newCriticalIssues.length > 0) {
+          throw new Error(
+            `Stage 5 evidence enrichment escaped structural validation: ${newCriticalIssues
+              .map(issue => issue.code)
+              .join(',')}`
+          );
+        }
+        generationMetadata.quality_scores.structure = enrichedStructuralResult;
+      } catch (error) {
+        this.logger.warn(
+          {
+            courseId: input.course_id,
+            runId: input.analysis_result?.document_evidence?.accepted_run_id,
+            category: 'evidence_enrichment_failed',
+            errorName: error instanceof Error ? error.name : 'unknown',
+          },
+          'Stage 5 advisory evidence pass failed open'
+        );
+        finalCourseStructure = courseStructure;
+        const snapshot = input.analysis_result?.document_evidence;
+        if (snapshot) {
+          generationMetadata.document_evidence_enrichment = buildEvidenceFailureRecord(snapshot);
+        }
       }
-      generationMetadata.quality_scores.structure = enrichedStructuralResult;
     }
 
     const result: GenerationResult = {
@@ -625,7 +643,33 @@ export class GenerationOrchestrator {
       phase: 'complete',
       stepName: 'finish',
       inputData: { courseId: input.course_id },
-      outputData: finalCourseStructure,
+      outputData: {
+        sectionsCount: finalCourseStructure.sections.length,
+        totalLessons: finalCourseStructure.sections.reduce(
+          (total, section) => total + section.lessons.length,
+          0
+        ),
+        structural: generationMetadata.quality_scores.structure
+          ? {
+              passed: generationMetadata.quality_scores.structure.passed,
+              criticalCount: generationMetadata.quality_scores.structure.criticalIssues.length,
+              warningCount: generationMetadata.quality_scores.structure.warnings.length,
+            }
+          : undefined,
+        documentEvidence: generationMetadata.document_evidence_enrichment
+          ? {
+              status: generationMetadata.document_evidence_enrichment.status,
+              acceptedRunId: generationMetadata.document_evidence_enrichment.accepted_run_id,
+              decisionCount:
+                generationMetadata.document_evidence_enrichment.accepted_decision_ids.length,
+              sectionCount: generationMetadata.document_evidence_enrichment.section_evidence.length,
+              refCount: generationMetadata.document_evidence_enrichment.retrieved_ref_count,
+              fallbackSectionCount:
+                generationMetadata.document_evidence_enrichment.fallback_section_count,
+              provenanceHash: generationMetadata.document_evidence_enrichment.provenance_hash,
+            }
+          : undefined,
+      },
       costUsd: generationMetadata.cost_usd,
       tokensUsed: generationMetadata.total_tokens.total,
       durationMs: totalDuration,
