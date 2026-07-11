@@ -17,19 +17,26 @@ import type {
   SearchOptions,
 } from '@/shared/qdrant/search-types';
 
-const { mockGenerateQueryEmbedding, mockQuery, mockQueryGroups, mockSearch, mockLogger } =
-  vi.hoisted(() => ({
-    mockGenerateQueryEmbedding: vi.fn(),
-    mockQuery: vi.fn(),
-    mockQueryGroups: vi.fn(),
-    mockSearch: vi.fn(),
-    mockLogger: {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
-  }));
+const {
+  mockGenerateQueryEmbedding,
+  mockQuery,
+  mockQueryGroups,
+  mockSearch,
+  mockLogger,
+  mockRecordHybridSearchOutcome,
+} = vi.hoisted(() => ({
+  mockGenerateQueryEmbedding: vi.fn(),
+  mockQuery: vi.fn(),
+  mockQueryGroups: vi.fn(),
+  mockSearch: vi.fn(),
+  mockRecordHybridSearchOutcome: vi.fn().mockResolvedValue(undefined),
+  mockLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 vi.mock('@/shared/embeddings/generate', () => ({
   generateQueryEmbedding: mockGenerateQueryEmbedding,
@@ -46,6 +53,10 @@ vi.mock('@/shared/qdrant/client', () => ({
 vi.mock('@/shared/logger/index.js', () => ({
   logger: mockLogger,
   default: mockLogger,
+}));
+
+vi.mock('@/shared/qdrant/metrics-textfile', () => ({
+  recordHybridSearchOutcome: mockRecordHybridSearchOutcome,
 }));
 
 function createOptions(overrides: Partial<SearchOptions> = {}): ResolvedSearchOptions {
@@ -266,6 +277,7 @@ describe('native Qdrant search requests', () => {
       points: [densePoint],
       fallbackUsed: true,
     });
+    expect(mockRecordHybridSearchOutcome).toHaveBeenCalledWith(true);
   });
 
   it('uses plain dense fallback when a boosted Formula hybrid request fails', async () => {
@@ -280,7 +292,33 @@ describe('native Qdrant search requests', () => {
       )
     ).resolves.toEqual({ points: [densePoint], fallbackUsed: true });
 
+    expect(mockRecordHybridSearchOutcome).toHaveBeenCalledWith(true);
     expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('records a successful native hybrid attempt without fallback', async () => {
+    const hybridPoint = scoredPoint('hybrid-1', 0.91);
+    mockQuery.mockResolvedValue({ points: [hybridPoint] });
+
+    await expect(hybridSearchWithFallback('native query', createOptions())).resolves.toEqual({
+      points: [hybridPoint],
+      fallbackUsed: false,
+    });
+
+    expect(mockRecordHybridSearchOutcome).toHaveBeenCalledWith(false);
+  });
+
+  it('records one fallback decision when dense fallback also fails', async () => {
+    mockQuery.mockResolvedValue({ points: [] });
+    mockSearch.mockRejectedValue(new Error('dense unavailable'));
+
+    await expect(hybridSearchWithFallback('failed fallback', createOptions())).rejects.toThrow(
+      'dense unavailable'
+    );
+
+    expect(mockRecordHybridSearchOutcome).toHaveBeenCalledTimes(1);
+    expect(mockRecordHybridSearchOutcome).toHaveBeenCalledWith(true);
     expect(mockSearch).toHaveBeenCalledTimes(1);
   });
 });

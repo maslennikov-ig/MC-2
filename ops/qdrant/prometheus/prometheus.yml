@@ -1,0 +1,44 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: staging
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+scrape_configs:
+  - job_name: qdrant
+    metrics_path: /metrics
+    params:
+      per_collection:
+        - 'true'
+    static_configs:
+      - targets:
+          - 'qdrant:6333'
+        labels:
+          environment: staging
+    http_headers:
+      api-key:
+        files:
+          - /run/secrets/qdrant_read_only_api_key
+
+  - job_name: qdrant_textfiles
+    static_configs:
+      - targets:
+          - 'node_exporter:9100'
+        labels:
+          environment: staging
+
+  - job_name: alertmanager
+    static_configs:
+      - targets:
+          - 'alertmanager:9093'
+        labels:
+          environment: staging

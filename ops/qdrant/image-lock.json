@@ -1,0 +1,22 @@
+{
+  "prometheus": {
+    "image": "prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893",
+    "platform": "linux/amd64",
+    "child_digest": "sha256:bd2dcadfb0d1096e2a4c21817ac7af918e2f19ff628e4bf25fd67a924c13dd80"
+  },
+  "grafana": {
+    "image": "grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd",
+    "platform": "linux/amd64",
+    "child_digest": "sha256:5e8dea6bf166881f31f370c16ba87a9eebe8ed33db7cce29ee6baf675d60676a"
+  },
+  "node_exporter": {
+    "image": "prom/node-exporter:v1.12.0@sha256:9b0ade5e607f9dbedb0a8e11151b6011ae5bd79304c261804cfdd2cadf200a80",
+    "platform": "linux/amd64",
+    "child_digest": "sha256:fb027a472051259b5b7cfd027fe9faf7f8ac5f5fb58af93a818a832f7a90fc57"
+  },
+  "alertmanager": {
+    "image": "prom/alertmanager:v0.33.1@sha256:9e082985f56f4c8c9f724e18f2288c6708f472e56a5286b8863d080434ea065d",
+    "platform": "linux/amd64",
+    "child_digest": "sha256:a89f8d4520954079275441eecdb71444328bd90633dd4eddfc33b9ed657f349b"
+  }
+}

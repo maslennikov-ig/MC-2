@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 1m
+
+route:
+  receiver: local-test-webhook
+  group_by: [alertname, severity]
+  group_wait: 0s
+  group_interval: 1s
+  repeat_interval: 1h
+
+receivers:
+  - name: local-test-webhook
+    webhook_configs:
+      - url_file: /run/test-webhook-url
+        send_resolved: true

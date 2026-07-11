@@ -16,6 +16,7 @@ import type { QdrantScoredPoint } from './types';
 import { buildQdrantFilter } from './search-helpers';
 import { logger } from '../logger/index.js';
 import { createBm25Document } from './config';
+import { recordHybridSearchOutcome } from './metrics-textfile';
 
 const MIN_PREFETCH_LIMIT = 30;
 const PREFETCH_LIMIT_MULTIPLIER = 3;
@@ -227,25 +228,41 @@ export async function hybridSearchWithFallback(
   queryText: string,
   options: ResolvedSearchOptions
 ): Promise<HybridSearchOutcome> {
-  try {
-    const points = await hybridSearchNative(queryText, options);
-    if (points.length > 0) {
-      logger.debug({ count: points.length }, 'Hybrid search returned results');
-      return { points, fallbackUsed: false };
+  const recordOutcome = async (fallbackUsed: boolean): Promise<void> => {
+    try {
+      await recordHybridSearchOutcome(fallbackUsed);
+    } catch (metricsError) {
+      logger.warn(
+        { error: metricsError instanceof Error ? metricsError.message : String(metricsError) },
+        'Qdrant hybrid metrics update failed'
+      );
     }
+  };
 
-    logger.info({}, 'Hybrid search empty, falling back to dense-only');
-    return { points: await denseSearch(queryText, options), fallbackUsed: true };
+  let points: QdrantScoredPoint[];
+  try {
+    points = await hybridSearchNative(queryText, options);
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : String(error) },
       'Hybrid search failed, falling back to dense-only'
     );
+    await recordOutcome(true);
     return {
       points: await denseSearch(queryText, { ...options, enable_priority_boost: false }),
       fallbackUsed: true,
     };
   }
+
+  if (points.length > 0) {
+    logger.debug({ count: points.length }, 'Hybrid search returned results');
+    await recordOutcome(false);
+    return { points, fallbackUsed: false };
+  }
+
+  logger.info({}, 'Hybrid search empty, falling back to dense-only');
+  await recordOutcome(true);
+  return { points: await denseSearch(queryText, options), fallbackUsed: true };
 }
 
 /** @deprecated Use hybridSearchWithFallback() to retain fallback metadata. */
