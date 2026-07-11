@@ -1025,6 +1025,46 @@ describe('stage6/services/job-processor', () => {
       expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
     });
 
+    it('fails the course on evidence tenant/version/ref scope violations instead of continuing', async () => {
+      const { Stage6EvidenceScopeError } = await import(
+        '@/stages/stage6-lesson-content/rag/evidence-context'
+      );
+      mockRetrieveLessonContext.mockRejectedValueOnce(
+        new Stage6EvidenceScopeError('Stage 6 Qdrant result is outside the accepted source refs')
+      );
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toContain('outside the accepted source refs');
+      expect(mockFailStage6Course).toHaveBeenCalledWith(
+        'course-uuid',
+        expect.stringContaining('outside the accepted source refs')
+      );
+      expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+    });
+
+    it('fails the course when current evidence loading detects a tenant or version scope violation', async () => {
+      const { Stage6EvidenceScopeError } = await import(
+        '@/stages/stage6-lesson-content/rag/evidence-context'
+      );
+      mockLoadStage6EvidenceForCourse.mockRejectedValueOnce(
+        new Stage6EvidenceScopeError('Stage 6 source ref version is stale')
+      );
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toContain('source ref version is stale');
+      expect(mockFailStage6Course).toHaveBeenCalledWith(
+        'course-uuid',
+        expect.stringContaining('source ref version is stale')
+      );
+      expect(mockRetrieveLessonContext).not.toHaveBeenCalled();
+      expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
+    });
+
     it('should return failure result when all retries fail', async () => {
       mockExecuteStage6Orchestrator.mockRejectedValue(new Error('All models exhausted'));
 

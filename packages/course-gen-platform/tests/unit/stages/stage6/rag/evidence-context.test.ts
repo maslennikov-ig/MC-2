@@ -8,6 +8,7 @@ import type {
 import {
   buildStage6EvidenceContext,
   getStage6EvidenceProvenance,
+  isStage6EvidenceChunkAllowed,
   type Stage6EvidenceDecisionRow,
 } from '@/stages/stage6-lesson-content/rag/evidence-context';
 
@@ -83,14 +84,12 @@ const cards: DocumentEvidenceCard[] = [
     versionHash: 'sha256:b',
     claimId: id.claimB,
     statement: 'Retain records for 365 days.',
-    coverageStatus: 'degraded',
   }),
   card({
     documentId: id.documentC,
     versionHash: 'sha256:c',
     claimId: id.claimC,
     statement: 'Audit access monthly.',
-    coverageStatus: 'degraded',
   }),
 ];
 
@@ -188,6 +187,9 @@ describe('buildStage6EvidenceContext', () => {
   });
 
   it('honors remove_document while continue_limited preserves allowlisted degraded refs', () => {
+    const degradedCards = structuredClone(cards);
+    degradedCards[2].coverage_status = 'degraded';
+    degradedCards[2].coverage_reason = 'limited_source';
     const continueLimited = decision({
       id: id.degradedDecision,
       subject_kind: 'degraded_evidence',
@@ -199,18 +201,126 @@ describe('buildStage6EvidenceContext', () => {
     });
     const continued = build({
       snapshot: snapshot([id.conflictDecision, id.degradedDecision]),
+      cards: degradedCards,
       decisions: [decision(), continueLimited],
     });
     expect(continued.allowedDocumentIds).toContain(id.documentC);
 
     const removed = build({
       snapshot: snapshot([id.conflictDecision, id.degradedDecision]),
+      cards: degradedCards,
       decisions: [
         decision(),
         { ...continueLimited, selected_recommendation_value: 'remove_document' },
       ],
     });
     expect(removed.allowedDocumentIds).not.toContain(id.documentC);
+  });
+
+  it('requires one terminal degraded-evidence decision for every degraded or failed card', () => {
+    const degradedCards = structuredClone(cards);
+    degradedCards[2].coverage_status = 'failed';
+    degradedCards[2].coverage_reason = 'parse_failed';
+    degradedCards[2].summary = undefined;
+
+    expect(() => build({ cards: degradedCards })).toThrow(/terminal.*degraded|degraded.*decision/i);
+  });
+
+  it('projects long persisted options by durable option value and fails visibly for unmapped custom text', () => {
+    const longStatement = `${'Authoritative retention policy '.repeat(30)}365 days.`;
+    const longCards = structuredClone(cards);
+    longCards[0].key_claims[0].statement = longStatement;
+    const longConflict = structuredClone(conflict);
+    longConflict.sides[0].statement = longStatement.slice(0, 800);
+    longConflict.recommended_resolution = longStatement.slice(0, 600);
+    const result = buildStage6EvidenceContext({
+      courseId: id.course,
+      organizationId: id.organization,
+      snapshot: snapshot([id.conflictDecision]),
+      sourceManifest: manifest,
+      cards: longCards,
+      conflicts: [longConflict],
+      decisions: [
+        decision({
+          selected_resolution: `recommendation:${id.conflict}`,
+          selected_recommendation_value: `recommendation:${id.conflict}`,
+        }),
+      ],
+    });
+    expect(result.allowedDocumentIds).toContain(id.documentA);
+    expect(result.allowedDocumentIds).not.toContain(id.documentB);
+
+    expect(() =>
+      build({
+        decisions: [
+          decision({
+            selected_resolution: 'Create an entirely new compromise policy.',
+            selected_recommendation_value: null,
+          }),
+        ],
+      })
+    ).toThrow(/custom.*project|selected.*side/i);
+  });
+
+  it('keeps selected and rejected chunks distinct when conflict sides share a document', () => {
+    const sameDocumentCards = structuredClone(cards);
+    sameDocumentCards[0].key_claims.push({
+      ...sameDocumentCards[1].key_claims[0],
+      source_refs: [
+        {
+          document_id: id.documentA,
+          chunk_id: 'chunk-rejected-same-document',
+          version_hash: 'sha256:a',
+        },
+      ],
+    });
+    sameDocumentCards[1].key_claims = [];
+    const sameDocumentConflict = structuredClone(conflict);
+    sameDocumentConflict.sides[1].document_ids = [id.documentA];
+    sameDocumentConflict.sides[1].source_refs = sameDocumentCards[0].key_claims[1].source_refs;
+    const context = buildStage6EvidenceContext({
+      courseId: id.course,
+      organizationId: id.organization,
+      snapshot: snapshot([id.conflictDecision]),
+      sourceManifest: manifest,
+      cards: sameDocumentCards,
+      conflicts: [sameDocumentConflict],
+      decisions: [decision()],
+    });
+
+    expect(isStage6EvidenceChunkAllowed(context, id.documentA, `chunk-${id.claimA}`)).toBe(true);
+    expect(
+      isStage6EvidenceChunkAllowed(context, id.documentA, 'chunk-rejected-same-document')
+    ).toBe(false);
+    expect(isStage6EvidenceChunkAllowed(context, id.documentA, 'unknown-same-document')).toBe(
+      false
+    );
+  });
+
+  it('treats an accepted ref without chunk_id as document-level but still denies exact rejected refs', () => {
+    const context = build();
+    context.sourceRefs = [
+      {
+        document_id: id.documentA,
+        page_number: 2,
+        version_hash: 'sha256:a',
+      },
+    ];
+    context.rejectedSourceRefs = [
+      {
+        document_id: id.documentA,
+        chunk_id: 'chunk-rejected',
+        version_hash: 'sha256:a',
+      },
+    ];
+
+    expect(isStage6EvidenceChunkAllowed(context, id.documentA, 'any-accepted-version-chunk')).toBe(
+      true
+    );
+    expect(isStage6EvidenceChunkAllowed(context, id.documentA, 'chunk-rejected')).toBe(false);
+    expect(
+      getStage6EvidenceProvenance(context, id.documentA, 'any-accepted-version-chunk').source_refs
+    ).toEqual(context.sourceRefs);
   });
 
   it('builds a stable cache identity from sorted current decisions and source refs', () => {
@@ -268,13 +378,50 @@ describe('buildStage6EvidenceContext', () => {
     expect(getStage6EvidenceProvenance(context, id.documentA, `chunk-${id.claimA}`)).toEqual({
       accepted_run_id: id.run,
       decision_ids: [id.conflictDecision],
+      decision_id_total: 1,
+      decision_id_overflow_count: 0,
+      decision_set_handle: expect.stringMatching(/^sha256:/),
       source_refs: [cards[0].key_claims[0].source_refs[0]],
+      source_ref_total: 1,
+      source_ref_overflow_count: 0,
+      source_ref_set_handle: expect.stringMatching(/^sha256:/),
     });
 
     expect(getStage6EvidenceProvenance(context, id.documentA, 'neighboring-qdrant-chunk')).toEqual({
       accepted_run_id: id.run,
-      decision_ids: [id.conflictDecision],
-      source_refs: [cards[0].key_claims[0].source_refs[0]],
+      decision_ids: [],
+      decision_id_total: 0,
+      decision_id_overflow_count: 0,
+      decision_set_handle: expect.stringMatching(/^sha256:/),
+      source_refs: [],
+      source_ref_total: 0,
+      source_ref_overflow_count: 0,
+      source_ref_set_handle: expect.stringMatching(/^sha256:/),
     });
+  });
+
+  it('caps provenance to relevant decision IDs and emits totals, overflow and hash handles', () => {
+    const context = build();
+    const relevant = Array.from(
+      { length: 12 },
+      (_, index) => `70000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`
+    );
+    const unrelated = '70000000-0000-4000-8000-000000009999';
+    context.decisionIds = [...relevant, unrelated];
+    context.decisionIdsByDocumentId = {
+      [id.documentA]: relevant,
+      [id.documentB]: [unrelated],
+    };
+    context.globalDecisionIds = [];
+
+    const provenance = getStage6EvidenceProvenance(context, id.documentA, `chunk-${id.claimA}`);
+    expect(provenance.decision_ids).toHaveLength(8);
+    expect(provenance.decision_ids).not.toContain(unrelated);
+    expect(provenance.decision_id_total).toBe(12);
+    expect(provenance.decision_id_overflow_count).toBe(4);
+    expect(provenance.decision_set_handle).toMatch(/^sha256:/);
+    expect(provenance.source_ref_total).toBe(1);
+    expect(provenance.source_ref_overflow_count).toBe(0);
+    expect(provenance.source_ref_set_handle).toMatch(/^sha256:/);
   });
 });

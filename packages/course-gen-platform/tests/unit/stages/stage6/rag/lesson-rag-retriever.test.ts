@@ -120,10 +120,21 @@ describe('lesson-rag-retriever', () => {
         version_hash: 'sha256:accepted',
       },
     ],
+    rejectedSourceRefs: [
+      {
+        document_id: '40000000-0000-4000-8000-000000000001',
+        chunk_id: 'chunk-rejected',
+        version_hash: 'sha256:accepted',
+      },
+    ],
     allowedDocumentIds: ['40000000-0000-4000-8000-000000000001'],
     sourceVersionByDocumentId: {
       '40000000-0000-4000-8000-000000000001': 'sha256:accepted',
     },
+    decisionIdsByDocumentId: {
+      '40000000-0000-4000-8000-000000000001': ['70000000-0000-4000-8000-000000000001'],
+    },
+    globalDecisionIds: [],
     cacheIdentity: 'evidence-cache-identity',
   };
 
@@ -280,6 +291,46 @@ describe('lesson-rag-retriever', () => {
     ).rejects.toThrow(/scope|tenant|stale/i);
   });
 
+  it('rejects an unknown or rejected chunk from an otherwise accepted document', async () => {
+    const { searchChunks } = await import('@/shared/qdrant/search');
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
+    vi.mocked(searchChunks).mockResolvedValue({
+      results: [
+        {
+          chunk_id: 'chunk-rejected',
+          document_id: '40000000-0000-4000-8000-000000000001',
+          document_name: 'Accepted.pdf',
+          content: 'rejected side',
+          heading_path: 'Conflict',
+          score: 0.9,
+          payload: {
+            organization_id: 'organization-1',
+            course_id: 'course-1',
+            version_hash: 'sha256:accepted',
+          },
+        },
+      ],
+      metadata: {},
+    } as any);
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        organizationId: 'organization-1',
+        lessonSpec: lessonSpec as any,
+        evidenceContext,
+        useCache: false,
+      })
+    ).rejects.toThrow(/source ref|chunk|accepted evidence/i);
+  });
+
   it('keys cached lesson context by accepted-run decision/ref identity', async () => {
     mockCacheGet.mockResolvedValueOnce({
       chunks: [],
@@ -340,6 +391,35 @@ describe('lesson-rag-retriever', () => {
           documentName: 'Stale.pdf',
           content: 'stale',
           headingPath: 'Stale',
+          score: 0.9,
+          matchedQuery: 'old decision',
+        },
+      ],
+      searchQueriesUsed: [],
+      coverageScore: 1,
+    });
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        organizationId: 'organization-1',
+        lessonSpec: lessonSpec as any,
+        evidenceContext,
+        useCache: true,
+      })
+    ).rejects.toThrow(/cache.*accepted evidence|scope/i);
+  });
+
+  it('rejects a cached rejected chunk even when its document is still accepted', async () => {
+    mockCacheGet.mockResolvedValueOnce({
+      chunks: [
+        {
+          chunkId: 'chunk-rejected',
+          documentId: '40000000-0000-4000-8000-000000000001',
+          documentName: 'Accepted.pdf',
+          content: 'rejected side',
+          headingPath: 'Conflict',
           score: 0.9,
           matchedQuery: 'old decision',
         },

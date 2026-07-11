@@ -36,8 +36,11 @@ export interface Stage6AcceptedEvidenceContext {
   decisionIds: string[];
   decisionQueries: string[];
   sourceRefs: EvidenceSourceRef[];
+  rejectedSourceRefs: EvidenceSourceRef[];
   allowedDocumentIds: string[];
   sourceVersionByDocumentId: Record<string, string>;
+  decisionIdsByDocumentId: Record<string, string[]>;
+  globalDecisionIds: string[];
   cacheIdentity: string;
 }
 
@@ -58,23 +61,66 @@ export function getStage6EvidenceProvenance(
 ): {
   accepted_run_id: string;
   decision_ids: string[];
+  decision_id_total: number;
+  decision_id_overflow_count: number;
+  decision_set_handle: string;
   source_refs: EvidenceSourceRef[];
+  source_ref_total: number;
+  source_ref_overflow_count: number;
+  source_ref_set_handle: string;
 } {
   const exact = context.sourceRefs.filter(
     ref => ref.document_id === documentId && ref.chunk_id === chunkId
   );
-  const documentRefs = context.sourceRefs.filter(ref => ref.document_id === documentId);
-  const documentLevel = documentRefs.filter(ref => !ref.chunk_id);
+  // A ref with no chunk_id deliberately authorizes the accepted document version.
+  // Page/heading fields remain provenance locators; chunk-scoped refs never broaden.
+  const documentLevel = context.sourceRefs.filter(
+    ref => ref.document_id === documentId && !ref.chunk_id
+  );
+  const sourceRefs = [...exact, ...documentLevel]
+    .sort((left, right) => canonicalRef(left).localeCompare(canonicalRef(right)))
+    .filter(
+      (ref, index, values) => index === 0 || canonicalRef(values[index - 1]) !== canonicalRef(ref)
+    );
+  const decisionIds =
+    sourceRefs.length === 0
+      ? []
+      : exactSorted([
+          ...(context.decisionIdsByDocumentId[documentId] ?? []),
+          ...context.globalDecisionIds,
+        ]);
+  const decisionLimit = 8;
+  const sourceRefLimit = 8;
   return {
     accepted_run_id: context.acceptedRunId,
-    decision_ids: context.decisionIds,
-    source_refs: (exact.length > 0
-      ? exact
-      : documentLevel.length > 0
-        ? documentLevel
-        : documentRefs
-    ).slice(0, 8),
+    decision_ids: decisionIds.slice(0, decisionLimit),
+    decision_id_total: decisionIds.length,
+    decision_id_overflow_count: Math.max(0, decisionIds.length - decisionLimit),
+    decision_set_handle: `sha256:${sha256(JSON.stringify(decisionIds))}`,
+    source_refs: sourceRefs.slice(0, sourceRefLimit),
+    source_ref_total: sourceRefs.length,
+    source_ref_overflow_count: Math.max(0, sourceRefs.length - sourceRefLimit),
+    source_ref_set_handle: `sha256:${sha256(JSON.stringify(sourceRefs))}`,
   };
+}
+
+function refAppliesToChunk(ref: EvidenceSourceRef, documentId: string, chunkId: string): boolean {
+  return ref.document_id === documentId && (!ref.chunk_id || ref.chunk_id === chunkId);
+}
+
+/**
+ * Chunk-level accepted evidence guard used for both live Qdrant and retry cache reads.
+ * Rejected exact/document-level refs win over accepted refs from the same document.
+ */
+export function isStage6EvidenceChunkAllowed(
+  context: Stage6AcceptedEvidenceContext,
+  documentId: string,
+  chunkId: string
+): boolean {
+  if (context.rejectedSourceRefs.some(ref => refAppliesToChunk(ref, documentId, chunkId))) {
+    return false;
+  }
+  return context.sourceRefs.some(ref => refAppliesToChunk(ref, documentId, chunkId));
 }
 
 function sha256(value: string): string {
@@ -99,35 +145,58 @@ function exactSorted(values: string[]): string[] {
   return [...new Set(values)].sort();
 }
 
-function selectedConflictClaimIds(
+function selectedConflictSide(
   conflict: DocumentConflict,
   decision: Stage6EvidenceDecisionRow,
   cards: DocumentEvidenceCard[]
-): Set<string> {
+): DocumentConflict['sides'][number] {
   const recommendationValue = `recommendation:${conflict.conflict_id}`;
   const alternativePrefix = `alternative:${conflict.conflict_id}:`;
-  let selectedResolution = decision.selected_resolution;
+  let selectedResolution: string;
+  let allowPersistedTruncation = false;
   if (decision.selected_recommendation_value === recommendationValue) {
     selectedResolution = conflict.recommended_resolution;
+    allowPersistedTruncation = true;
   } else if (decision.selected_recommendation_value?.startsWith(alternativePrefix)) {
     const indexText = decision.selected_recommendation_value.slice(alternativePrefix.length);
     const index = /^\d+$/u.test(indexText) ? Number.parseInt(indexText, 10) : -1;
-    if (conflict.alternatives[index]) {
-      selectedResolution = conflict.alternatives[index];
+    const alternative = conflict.alternatives[index];
+    if (!alternative) {
+      throw new Stage6EvidenceScopeError(
+        'Stage 6 conflict decision references an unknown persisted alternative'
+      );
     }
+    selectedResolution = alternative;
+    allowPersistedTruncation = true;
+  } else if (decision.selected_recommendation_value) {
+    throw new Stage6EvidenceScopeError(
+      'Stage 6 conflict decision has an unsupported persisted option value'
+    );
+  } else {
+    selectedResolution = decision.selected_resolution;
   }
   const selectedText = canonicalText(selectedResolution);
-  const matchingClaimIds = new Set(
+  const claimTextById = new Map(
     cards.flatMap(card =>
-      card.key_claims
-        .filter(claim => canonicalText(claim.statement) === selectedText)
-        .map(claim => claim.claim_id)
+      card.key_claims.map(claim => [claim.claim_id, canonicalText(claim.statement)] as const)
     )
   );
-  const selectedSide = conflict.sides.find(side =>
-    side.claim_ids.some(claimId => matchingClaimIds.has(claimId))
+  const matchingSides = conflict.sides.filter(side =>
+    side.claim_ids.some(claimId => {
+      const claimText = claimTextById.get(claimId);
+      if (!claimText) return false;
+      if (claimText === selectedText) return true;
+      return allowPersistedTruncation && claimText.startsWith(selectedText);
+    })
   );
-  return new Set(selectedSide?.claim_ids ?? []);
+  if (matchingSides.length !== 1) {
+    throw new Stage6EvidenceScopeError(
+      decision.selected_recommendation_value
+        ? 'Stage 6 persisted conflict option cannot project one selected side'
+        : 'Stage 6 custom conflict decision cannot project one selected side'
+    );
+  }
+  return matchingSides[0];
 }
 
 /**
@@ -143,15 +212,15 @@ export function buildStage6EvidenceContext(
   const conflicts = DocumentConflictSchema.array().parse(input.conflicts);
 
   if (snapshot.accepted_run_id.length === 0) {
-    throw new Error('Stage 6 evidence requires an accepted run');
+    throw new Stage6EvidenceScopeError('Stage 6 evidence requires an accepted run');
   }
   const decisions = [...input.decisions].sort((left, right) => left.id.localeCompare(right.id));
   const decisionIds = exactSorted(decisions.map(value => value.id));
   if (JSON.stringify(decisionIds) !== JSON.stringify(exactSorted(snapshot.current_decision_ids))) {
-    throw new Error('Stage 6 evidence decision snapshot is stale');
+    throw new Stage6EvidenceScopeError('Stage 6 evidence decision snapshot is stale');
   }
   if (decisions.some(decision => decision.run_id !== snapshot.accepted_run_id)) {
-    throw new Error('Stage 6 evidence decision belongs to a foreign run');
+    throw new Stage6EvidenceScopeError('Stage 6 evidence decision belongs to a foreign run');
   }
 
   const manifestByDocument = new Map(
@@ -161,7 +230,9 @@ export function buildStage6EvidenceContext(
     cards.length !== sourceManifest.length ||
     cards.some(card => !manifestByDocument.has(card.document_id))
   ) {
-    throw new Error('Stage 6 evidence cards do not match the accepted run allowlist');
+    throw new Stage6EvidenceScopeError(
+      'Stage 6 evidence cards do not match the accepted run allowlist'
+    );
   }
 
   const conflictById = new Map(conflicts.map(conflict => [conflict.conflict_id, conflict]));
@@ -173,7 +244,17 @@ export function buildStage6EvidenceContext(
   const excludedClaimIds = new Set<string>();
   const selectedClaimIds = new Set<string>();
   const removedDocumentIds = new Set<string>();
+  const terminalDegradedDocumentIds = new Set<string>();
+  const rejectedRefs = new Map<string, EvidenceSourceRef>();
+  const decisionIdsByDocument = new Map<string, Set<string>>();
+  const globalDecisionIds: string[] = [];
   const decisionQueries: string[] = [];
+
+  const addDocumentDecision = (documentId: string, decisionId: string) => {
+    const values = decisionIdsByDocument.get(documentId) ?? new Set<string>();
+    values.add(decisionId);
+    decisionIdsByDocument.set(documentId, values);
+  };
 
   for (const conflict of conflicts) {
     if (conflict.severity === 'informational') continue;
@@ -181,31 +262,75 @@ export function buildStage6EvidenceContext(
       .flatMap(side => side.claim_ids)
       .forEach(claimId => excludedClaimIds.add(claimId));
     const decision = decisionByConflict.get(conflict.conflict_id);
-    if (!decision) throw new Error('Stage 6 evidence material conflict has no current decision');
-    selectedConflictClaimIds(conflict, decision, cards).forEach(claimId =>
-      selectedClaimIds.add(claimId)
-    );
+    if (!decision) {
+      throw new Stage6EvidenceScopeError(
+        'Stage 6 evidence material conflict has no current decision'
+      );
+    }
+    const selectedSide = selectedConflictSide(conflict, decision, cards);
+    selectedSide.claim_ids.forEach(claimId => selectedClaimIds.add(claimId));
+    selectedSide.document_ids.forEach(documentId => addDocumentDecision(documentId, decision.id));
+    conflict.sides
+      .filter(side => side !== selectedSide)
+      .flatMap(side => side.source_refs)
+      .forEach(ref => rejectedRefs.set(canonicalRef(ref), ref));
     decisionQueries.push(decision.selected_resolution.trim());
   }
 
   for (const decision of decisions) {
     if (decision.subject_kind === 'claim_conflict') {
       if (!decision.conflict_id || !conflictById.has(decision.conflict_id)) {
-        throw new Error('Stage 6 evidence decision references an unknown conflict');
+        throw new Stage6EvidenceScopeError(
+          'Stage 6 evidence decision references an unknown conflict'
+        );
       }
       continue;
     }
     if (decision.subject_kind === 'degraded_evidence') {
       if (!decision.document_id || !manifestByDocument.has(decision.document_id)) {
-        throw new Error('Stage 6 degraded decision references a foreign document');
+        throw new Stage6EvidenceScopeError(
+          'Stage 6 degraded decision references a foreign document'
+        );
       }
+      terminalDegradedDocumentIds.add(decision.document_id);
+      addDocumentDecision(decision.document_id, decision.id);
       if (decision.selected_recommendation_value === 'remove_document') {
         removedDocumentIds.add(decision.document_id);
       } else if (decision.selected_recommendation_value !== 'continue_limited') {
-        throw new Error('Stage 6 degraded evidence decision is not terminal');
+        throw new Stage6EvidenceScopeError(
+          'Stage 6 degraded evidence decision is not terminal'
+        );
       }
+      continue;
+    }
+    if (decision.subject_kind === 'detector_capacity') {
+      globalDecisionIds.push(decision.id);
     }
   }
+
+  for (const card of cards) {
+    if (
+      (card.coverage_status === 'degraded' || card.coverage_status === 'failed') &&
+      !terminalDegradedDocumentIds.has(card.document_id)
+    ) {
+      throw new Stage6EvidenceScopeError(
+        'Stage 6 degraded or failed evidence requires a terminal degraded decision'
+      );
+    }
+  }
+
+  const assertAcceptedRef = (ref: EvidenceSourceRef) => {
+    const source = manifestByDocument.get(ref.document_id);
+    if (!source) {
+      throw new Stage6EvidenceScopeError(
+        'Stage 6 source ref is outside the accepted run allowlist'
+      );
+    }
+    if (!ref.version_hash || ref.version_hash !== source.source_version_hash) {
+      throw new Stage6EvidenceScopeError('Stage 6 source ref version is stale');
+    }
+  };
+  rejectedRefs.forEach(ref => assertAcceptedRef(ref));
 
   const refs = new Map<string, EvidenceSourceRef>();
   for (const card of cards) {
@@ -213,11 +338,7 @@ export function buildStage6EvidenceContext(
     for (const claim of card.key_claims) {
       if (excludedClaimIds.has(claim.claim_id) && !selectedClaimIds.has(claim.claim_id)) continue;
       for (const ref of claim.source_refs) {
-        const source = manifestByDocument.get(ref.document_id);
-        if (!source) throw new Error('Stage 6 source ref is outside the accepted run allowlist');
-        if (!ref.version_hash || ref.version_hash !== source.source_version_hash) {
-          throw new Error('Stage 6 source ref version is stale');
-        }
+        assertAcceptedRef(ref);
         refs.set(canonicalRef(ref), ref);
       }
     }
@@ -226,16 +347,21 @@ export function buildStage6EvidenceContext(
   const sourceRefs = [...refs.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, ref]) => ref);
+  const rejectedSourceRefs = [...rejectedRefs.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, ref]) => ref);
   const allowedDocumentIds = exactSorted(sourceRefs.map(ref => ref.document_id));
   const sourceVersionByDocumentId = Object.fromEntries(
     sourceManifest.map(source => [source.document_id, source.source_version_hash])
   );
   const refHash = sha256(JSON.stringify(sourceRefs));
+  const rejectedRefHash = sha256(JSON.stringify(rejectedSourceRefs));
   const cacheIdentity = sha256(
     JSON.stringify({
       accepted_run_id: snapshot.accepted_run_id,
       decision_ids: decisionIds,
       source_ref_hash: refHash,
+      rejected_source_ref_hash: rejectedRefHash,
     })
   );
 
@@ -244,8 +370,15 @@ export function buildStage6EvidenceContext(
     decisionIds,
     decisionQueries: exactSorted(decisionQueries.filter(Boolean)).slice(0, 16),
     sourceRefs,
+    rejectedSourceRefs,
     allowedDocumentIds,
     sourceVersionByDocumentId,
+    decisionIdsByDocumentId: Object.fromEntries(
+      [...decisionIdsByDocument.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([documentId, values]) => [documentId, exactSorted([...values])])
+    ),
+    globalDecisionIds: exactSorted(globalDecisionIds),
     cacheIdentity,
   };
 }

@@ -13,7 +13,12 @@ import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
 import { rerankChunks } from './reranking';
 import { calculateLessonCoverage } from './coverage';
-import { getStage6EvidenceProvenance, Stage6EvidenceScopeError } from './evidence-context';
+import {
+  getStage6EvidenceProvenance,
+  isStage6EvidenceChunkAllowed,
+  Stage6EvidenceScopeError,
+  type Stage6AcceptedEvidenceContext,
+} from './evidence-context';
 
 function requireTenantScope(organizationId: string | undefined): string {
   if (!organizationId) {
@@ -25,22 +30,26 @@ function requireTenantScope(organizationId: string | undefined): string {
 }
 
 function assertEvidenceSearchResult(input: {
-  result: { document_id: string; payload?: Record<string, unknown> };
+  result: { chunk_id: string; document_id: string; payload?: Record<string, unknown> };
   courseId: string;
   organizationId: string;
-  allowedDocumentIds: Set<string>;
-  sourceVersionByDocumentId: Record<string, string>;
+  evidenceContext: Stage6AcceptedEvidenceContext;
 }): void {
-  const { result, courseId, organizationId, allowedDocumentIds, sourceVersionByDocumentId } = input;
+  const { result, courseId, organizationId, evidenceContext } = input;
   const payload = result.payload;
-  if (!allowedDocumentIds.has(result.document_id)) {
+  if (!evidenceContext.allowedDocumentIds.includes(result.document_id)) {
     throw new Stage6EvidenceScopeError('Stage 6 Qdrant result is outside the accepted run scope');
   }
   if (!payload || payload.organization_id !== organizationId || payload.course_id !== courseId) {
     throw new Stage6EvidenceScopeError('Stage 6 Qdrant result failed tenant/course validation');
   }
-  if (payload.version_hash !== sourceVersionByDocumentId[result.document_id]) {
+  if (payload.version_hash !== evidenceContext.sourceVersionByDocumentId[result.document_id]) {
     throw new Stage6EvidenceScopeError('Stage 6 Qdrant result has a stale source version');
+  }
+  if (!isStage6EvidenceChunkAllowed(evidenceContext, result.document_id, result.chunk_id)) {
+    throw new Stage6EvidenceScopeError(
+      'Stage 6 Qdrant result is outside the accepted source-ref/chunk scope'
+    );
   }
 }
 
@@ -89,7 +98,9 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
     if (cached) {
       if (
         evidenceContext &&
-        cached.chunks.some(chunk => !evidenceContext.allowedDocumentIds.includes(chunk.documentId))
+        cached.chunks.some(
+          chunk => !isStage6EvidenceChunkAllowed(evidenceContext, chunk.documentId, chunk.chunkId)
+        )
       ) {
         throw new Stage6EvidenceScopeError(
           'Stage 6 cache contains a document outside the current accepted evidence scope'
@@ -279,8 +290,7 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
               result,
               courseId,
               organizationId: tenantOrganizationId,
-              allowedDocumentIds: new Set(evidenceContext.allowedDocumentIds),
-              sourceVersionByDocumentId: evidenceContext.sourceVersionByDocumentId,
+              evidenceContext,
             });
           }
           if (!seenChunkIds.has(result.chunk_id)) {
@@ -443,8 +453,7 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
             result,
             courseId,
             organizationId: tenantOrganizationId,
-            allowedDocumentIds: new Set(evidenceContext.allowedDocumentIds),
-            sourceVersionByDocumentId: evidenceContext.sourceVersionByDocumentId,
+            evidenceContext,
           });
         }
         if (!seenChunkIds.has(result.chunk_id)) {
