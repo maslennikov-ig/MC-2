@@ -53,11 +53,11 @@ depends_on_streams:
   - mc2-jz6y0.24.3 shadow-conflict expansion is implemented in this stream
   - mc2-jz6y0.24.4 evidence-log privacy re-review is implemented in this stream
 parallel_decision: parallel with disjoint docs/rollout write zones; implementation remained sequential within shared Stage 4 metric state
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: Disposable PostgreSQL 16 database/role, worktree-local dependencies, build outputs, generated service worker files, and metric lock/temp state were removed; the shared pre-existing PostgreSQL container was not changed.
+cleanup_notes: Disposable PostgreSQL 16 databases/roles, worktree-local dependencies, build outputs, generated service worker files, metric lock/temp state, the dedicated worktree, and the local evidence branch were removed. The shared pre-existing PostgreSQL container and remote evidence branch were retained.
 risk_level: high
 docs_impact: migration-and-ops-observability
 docs_reviewed: no-change-needed
@@ -65,6 +65,11 @@ docs_review_notes: Stable E7/Q9 prose belongs to the disjoint E7-D stream; this 
 graph_reviewed: blocked
 graph_review_notes: Read and queried the fresh parent graph at base 7b542c8d. The isolated child does not own the parent's ignored graphify-out state; parent refresh is required after integration.
 verification:
+  - Orchestrator acceptance: independent final review PASS at 7a7d54ae with P0-P3=0; integrated as merge b5262f4e and pushed to origin/codex/self-hosted-qdrant-platform
+  - Integration rerun: current 9-file focused Stage 4/5/6 metrics/privacy set passed 122/122 with synthetic local Supabase configuration
+  - Integration PostgreSQL 16 applied gate: 21/21 passed on a disposable database; the database was dropped after the run
+  - Integration Prometheus 3.13.1 digest-pinned promtool config/rules/rule-tests passed with 14 rules
+  - Integration pnpm type-check passed across all workspace packages
   - mc2-jz6y0.24.5 focused Stage 4/5/metrics/privacy gate: 124/124 passed across 9 files
   - post-hook restoration rerun: focused 124/124 and pnpm type-check passed
   - full pnpm test across workspace unit suites: passed
