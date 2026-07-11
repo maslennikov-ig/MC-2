@@ -44,6 +44,7 @@ import {
   reconcileCourseMetadata,
   validateStructuralQuality,
 } from './validators/structural-quality-validator';
+import type { Stage5EvidenceEnricher } from './evidence/types';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -146,7 +147,8 @@ export class GenerationOrchestrator {
     metadataGenerator: MetadataGenerator,
     sectionBatchGenerator: SectionBatchGenerator,
     qualityValidator: QualityValidator,
-    qdrantClient?: QdrantClient
+    qdrantClient?: QdrantClient,
+    private readonly evidenceEnricher?: Stage5EvidenceEnricher
   ) {
     this.logger = pino({
       name: 'generation-orchestrator',
@@ -564,8 +566,54 @@ export class GenerationOrchestrator {
       input
     );
 
+    let finalCourseStructure = courseStructure;
+    if (this.evidenceEnricher) {
+      const baselineCriticalCodes = new Set(
+        generationMetadata.quality_scores.structure?.criticalIssues.map(issue => issue.code) ?? []
+      );
+      const enriched = await this.evidenceEnricher({
+        courseId: input.course_id,
+        organizationId: input.organization_id,
+        language: input.frontend_parameters.language ?? 'en',
+        baseline: courseStructure,
+        snapshot: input.analysis_result?.document_evidence,
+        validateCandidate: candidate => {
+          const result = validateStructuralQuality({
+            input,
+            metadata: reconcileCourseMetadata(finalState.metadata!, candidate.sections, input),
+            sections: candidate.sections,
+          });
+          return result.criticalIssues
+            .filter(issue => !baselineCriticalCodes.has(issue.code))
+            .map(issue => `structural:${issue.code}`);
+        },
+      });
+      finalCourseStructure = enriched.courseStructure;
+      generationMetadata.document_evidence_enrichment = enriched.enrichment;
+      const enrichedStructuralResult = validateStructuralQuality({
+        input,
+        metadata: reconcileCourseMetadata(
+          finalState.metadata!,
+          finalCourseStructure.sections,
+          input
+        ),
+        sections: finalCourseStructure.sections,
+      });
+      const newCriticalIssues = enrichedStructuralResult.criticalIssues.filter(
+        issue => !baselineCriticalCodes.has(issue.code)
+      );
+      if (newCriticalIssues.length > 0) {
+        throw new Error(
+          `Stage 5 evidence enrichment escaped structural validation: ${newCriticalIssues
+            .map(issue => issue.code)
+            .join(',')}`
+        );
+      }
+      generationMetadata.quality_scores.structure = enrichedStructuralResult;
+    }
+
     const result: GenerationResult = {
-      course_structure: courseStructure,
+      course_structure: finalCourseStructure,
       generation_metadata: generationMetadata,
     };
 
@@ -577,7 +625,7 @@ export class GenerationOrchestrator {
       phase: 'complete',
       stepName: 'finish',
       inputData: { courseId: input.course_id },
-      outputData: courseStructure,
+      outputData: finalCourseStructure,
       costUsd: generationMetadata.cost_usd,
       tokensUsed: generationMetadata.total_tokens.total,
       durationMs: totalDuration,

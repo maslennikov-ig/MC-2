@@ -51,6 +51,8 @@ import { isPipelineInterrupt } from '@/shared/errors';
 import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
 import { notifyCourseError } from '@/shared/notifications';
 import { z } from 'zod';
+import { createProductionStage5EvidenceEnricher } from './evidence/production';
+import { buildEvidenceAnalysisResultUpdate } from './evidence/persistence';
 
 // Import helpers extracted from this file
 import {
@@ -227,6 +229,7 @@ class Stage5GenerationHandler {
           user_id,
           sanitizedStructure,
           result,
+          input.analysis_result,
           course,
           lockGuard,
           jobLogger
@@ -284,7 +287,8 @@ class Stage5GenerationHandler {
       new MetadataGenerator(),
       new SectionBatchGenerator(),
       new QualityValidator(),
-      qdrantClientInstance
+      qdrantClientInstance,
+      createProductionStage5EvidenceEnricher()
     );
 
     // Update status transitions
@@ -365,6 +369,7 @@ class Stage5GenerationHandler {
     _userId: string | undefined,
     sanitizedStructure: GenerationResult['course_structure'],
     result: GenerationResult,
+    analysisResult: GenerationJobInput['analysis_result'],
     course: { pause_at_stage_5: boolean },
     lockGuard: { heartbeatInterval: ReturnType<typeof setInterval>; release: () => Promise<void> },
     jobLogger: pino.Logger
@@ -382,6 +387,10 @@ class Stage5GenerationHandler {
       // Set schema_version to 2 (plan:105) — indicates stable IDs present
       schema_version: 2 as const,
     };
+    const analysisResultUpdate = buildEvidenceAnalysisResultUpdate(
+      analysisResult,
+      result.generation_metadata.document_evidence_enrichment
+    );
 
     // Save structure + sync LLM-generated title/description back to courses table
     // This ensures courses.title matches the target language even when user input was in a different language
@@ -390,6 +399,7 @@ class Stage5GenerationHandler {
       .update({
         course_structure: structureWithIds,
         generation_metadata: result.generation_metadata,
+        ...(analysisResultUpdate ? { analysis_result: analysisResultUpdate } : {}),
         ...(structureWithIds.course_title ? { title: structureWithIds.course_title } : {}),
         ...(structureWithIds.course_description
           ? { course_description: structureWithIds.course_description }
@@ -546,7 +556,10 @@ class Stage5GenerationHandler {
         await notifyCourseError(courseId, 5, error.message);
       } catch (notifyError) {
         jobLogger.warn(
-          { courseId, error: notifyError instanceof Error ? notifyError.message : String(notifyError) },
+          {
+            courseId,
+            error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+          },
           'Failed to send Stage 5 required-RAG outage notification'
         );
       }
