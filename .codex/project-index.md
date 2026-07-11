@@ -22,6 +22,8 @@ Stable navigation map for this repository. Keep stage history and current task s
 - `docs/superpowers/specs/` - approved design specifications for agentic implementation stages.
 - `docs/superpowers/plans/` - task-by-task implementation plans with verification and delivery gates.
 - `docs/superpowers/prompts/` - validated manual start prompts for fresh orchestrator tasks.
+- Self-hosted Qdrant platform design/plan: `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md` and `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`.
+- Advisory document evidence design/plan: `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md` and `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
 - `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.

@@ -1,76 +1,98 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-10
-Stage: Self-hosted Qdrant planning package (`mc2-jz6y0.1`) CLOSED; implementation epic `mc2-jz6y0` open
-Branch: `codex/self-hosted-qdrant-platform-plan`
-Beads: `mc2-jz6y0` open; `mc2-jz6y0.1` closed; superseded Cloud bug `mc2-db696.86` closed; prior Career Playbook close state remains unchanged
+Updated: 2026-07-11
+Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
+Integration branch: `codex/self-hosted-qdrant-platform`
+Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-qdrant-platform`
 
-## Current State
+## Product Truth
 
-- **Self-hosted Qdrant direction approved**: the lost Cloud database was test-only; no Cloud recovery or migration is required. Qdrant remains a derived index rebuilt from authoritative source files/database metadata.
-- Planning package prepared:
-  - design: `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`;
-  - execution plan: `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`;
-  - validated Codex prompt-card: `docs/superpowers/prompts/2026-07-10-self-hosted-qdrant-orchestrator.md`.
-- Target scope: pinned single-node Qdrant `1.18.2`, native BM25/IDF, server RRF + Formula Query priority, complete strict-mode indexes, aliases, source-driven reindex, S3 snapshots/restore drill, Prometheus/Grafana/alerts, and secure loopback Web UI access.
-- No Qdrant/Docker/staging runtime was mutated during planning. Staging activation remains an explicit permission gate in Task Q12.
-- **A/B run #2 (playbook `e12a46ad`, 2026-07-04 14:13–14:33 UTC, NEW worker code) vs baseline b866d2f5**:
-  - Wall-clock **19.7 min** vs 44.4 (**-56%**); cost **$0.1278** vs $0.2404 (**-47%**).
-  - Regen attempts **14** (11 blocks, 3 at 2-cap) vs 39 calls (13/26 at cap); no window near the 8-cap.
-  - Judge: **12 calls, all v4-flash, all attempt=1, zero 300s timeouts** (baseline: 2×300s + pro escalations). Max judge input 21.2k tok (delta re-judge bounded it below the 28k fallback gate — gate armed but unneeded).
-  - Structural proof of new code: spec `deviations=[]` + normalization log (canonical topics), all 26 doc headings canonical, CTA in block 25, field-to-fill only as genuine template fields, no duplicate deal-stage models, criterion #1 pass (evidence pass, PDF, share).
-  - **Run #1 caveat** (playbook `35602db1`, 11:13 UTC): executed OLD worker code (CI lint 96/95 blocked Deploy to Dev) — invalid for attribution but a same-code variance data point (12 regens/24 min/$0.084): single-run deltas < ~2x are noise; structural markers are the real evidence.
-- **Late root cause found via run #2**: byte-identical stub diagrams in blocks 10/11/16 come from `final-assembler.ts` `appendMermaidSection` (exact-heading check → hardcoded stub appended next to rich diagrams), NOT from judge/regenerator prompts. Fixed in `15c47795` (any fenced mermaid satisfies the section; fallback kept for zero-diagram blocks), unit-pinned; lands on dev with the CI deploy of that commit — confirm visually on the next routine run.
-- Commits this session (develop, all pushed): `59ef88d5` 93rrp docs, `c588a9d4` .104.2, `9da92802` .104.6, `fa88561b` .104.5, `4db7cd97` 1slzl, `de74537a` .104.1, `8967b2db` .104.4 prompts, `d856aff7` .104.3, `14efe1e0` handoff, `19e6d8c3` lint refactor (module extraction), `15c47795` assembler stub fix.
-- CI: lint budget is `eslint src --max-warnings=95` (course-gen-platform) — one new max-lines warning fails Lint and silently skips Deploy to Dev. Always verify `megacampus-worker-dev` image date before attributing live-run behavior to new code.
-- Run artifacts (gitignored): `packages/course-gen-platform/artifacts/career-playbook-smoke/` — b866d2f5-era baseline row still in DB + two run artifacts (35602db1, e12a46ad) for future A/B.
+- Qdrant Cloud data was test-only and is lost. Do not recover or mutate it; rebuild the derived index from authoritative sources.
+- Target remains private self-hosted Qdrant `1.18.2`, native multilingual BM25/IDF, server RRF/Formula priority, strict indexes, aliases, source reindex, S3 snapshots/restore, Prometheus/Grafana/alerts, and secure loopback Web UI.
+- Documents are optional but important advisory evidence. A course without documents remains fully supported.
+- Every uploaded document must receive a durable `assessed`, `degraded`, or `failed` coverage outcome; none may disappear through context truncation.
+- Documents supplement the baseline structure. They may add facts, terminology, constraints, examples, and source-backed topics but cannot silently replace baseline curriculum requirements.
+- Material document conflicts use a distinct required-question block. Manual mode pauses at the existing Phase 0.5 boundary. Automatic mode selects the recommendation and appends `resolved_by: system` / `answer_source: system` with rationale.
+- Large corpora use deterministic bounded batches, hierarchical summaries, claim reduction, and targeted Qdrant verification.
+- Stage 5 is two-pass: baseline first, bounded advisory enrichment second. Stage 6 consumes the same accepted decisions and evidence refs.
+
+## Read First
+
+- `AGENTS.md`
+- `.codex/orchestrator.toml`
+- `.codex/handoff.md`
+- `.codex/project-index.md`
+- `graphify-out/GRAPH_REPORT.md`
+- `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`
+- `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`
+- `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`
+- `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`
+- `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md`
+
+## Accepted and Open Work
+
+- Accepted/pushed: Q1-Q5 and strict Formula index fix `.15`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
+- Q7 `.8` is nearly complete in `/home/me/code/mc2/.worktrees/qdrant-q7-reindex`, branch `codex/qdrant-q7-reindex`, HEAD `616e8b83`.
+- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11`, Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
+- Decision `.14` remains open: confirm supported observability pins and explicit exporter/notification transport before Q6/Q9.
+- Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
+- Expansion E1-E7 are `.18` through `.24`; their exact dependency graph is in Beads and the stage summary.
+
+## First Recovery Action
+
+Q7 has one uncommitted compatibility patch in `tests/integration/ci-qdrant-smoke.test.ts`. The full pinned Q5 gate still fails 18/19 because `packages/course-gen-platform/tests/integration/qdrant.test.ts` uses the old numeric point ID.
+
+1. Replace only `generateNumericId(source.chunk_id)` and its import with `generatePointId(source.document_id, source.chunk_id)`.
+2. Rerun the pinned Qdrant `1.18.2` gate and require 19/19.
+3. Update `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.8.md` with exact output.
+4. Commit/push the Q7 branch, run independent correctness review, integrate into the integration branch, rerun the gate, clean the Q7 worktree, and close `.8`.
+
+Do not discard or overwrite this dirty Q7 worktree.
 
 ## Next recommended
 
-1. Next stage id: `mc2-jz6y0` — implement the self-hosted Qdrant spec/plan from a dedicated branch/worktree.
-2. Recommended action: launch a fresh root orchestrator with `docs/superpowers/prompts/2026-07-10-self-hosted-qdrant-orchestrator.md`; it must decompose Q1-Q12 into Beads children and visible isolated streams.
-3. `mc2-db696.61`: source-evidence budgets evaluation (unchanged).
+Next stage id: `mc2-jz6y0`
+
+Recommended action: start the continuation orchestrator, recover and accept Q7 first, then execute the Beads dependency graph with E1 parallel to safe Q6 work.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage.
 
-Use `docs/superpowers/prompts/2026-07-10-self-hosted-qdrant-orchestrator.md` from `origin/codex/self-hosted-qdrant-platform-plan`.
+Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md` from the resolved SHA of `origin/codex/self-hosted-qdrant-platform`.
 
-## Staging aligned (2026-07-04 ~17:06 UTC)
+## Parallel Execution After Q7
 
-- `/deploy` merged develop → master (`4128a938`, 44 commits) and Blue/Green deployed staging: worker/worker-stage6/worker-stage7/api-blue/web-blue recreated on fresh images, health checks green. Staging code now matches the judge=flash DB routing (delta re-judge, size gate, stub fix included) — the post-promotion staging risk window is closed.
-- Runbook de-hardcoded (`070f3c13`): cookie found by pattern, user/org ids from JWT claims, anon key/URL from package .env, cap documented as $1, cwd-independent --dir, language expectation = en fixture.
+- E1 can run alongside local Q6 decision resolution/runtime work.
+- E2 waits for E1 and accepted Q7.
+- E3 waits for E1/E2.
+- After E3, launch E4, E5, and E6 in parallel isolated worktrees.
+- Q8/Q9 may proceed when their parent-plan dependencies and decision `.14` permit.
+- E7 is the shared evidence/observability/docs gate and blocks Q10/Q11 close.
 
-## Verification run #3 (dea26647, 2026-07-04 15:18–15:33 UTC) — both open observations CLOSED
+Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
-- DB-served judge=flash confirmed live (container env has no override; 11/11 judge calls flash attempt=1, zero timeouts, max input 22.8k).
-- Stub diagrams GONE (fix `15c47795`): blocks 10/11/16 each carry exactly their own rich diagram; zero canonical stub headings.
-- Metrics trend across the three runs: 44.4 min / $0.240 / 39 regens (baseline, old code) → 19.7 / $0.128 / 14 (fix package) → **15.6 / $0.078 / 5 regens, zero caps** (fix package + stub fix + DB routing). Evidence pass, headings canonical, CTA present.
+## Required Skills and Review
 
-## mc2-m17al CLOSED (owner-approved, 2026-07-04)
+- Orchestration: `orchestrator-stage`, `task-router`, `subagent-driven-development`.
+- Behavior changes: `brainstorming` where decisions remain, `test-driven-development`, `verification-before-completion`.
+- Risk/closeout: `senior-architect`, `senior-devops`, `test-pass`, `orchestration-closeout`.
+- E4 UI: mandatory Lazyweb quick search/report with synthetic content, then frontend/browser verification.
+- Specialists: `docs_researcher`, search/data worker, `deploy_specialist`, `correctness_reviewer`, and `docs_reviewer`.
 
-- Judge promoted to v4-flash/pro-fallback in `llm_model_config` — migration `20260704150000_promote_career_playbook_judge_flash.sql` APPLIED to the shared DB (deliberate staging impact) and verified; routing test pins it. Note: CI does NOT auto-apply migrations — this one was applied manually via Supabase MCP; the committed file keeps history consistent.
-- `CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES` removed from `docker-compose.dev.yml` (routing now DB-served, identical effective config; lands on dev with the CI deploy).
-- Regenerator stays on pro (decision recorded on the bead: convergence-critical, flash risks cap-exhaustion criterion-#1 leaks for ~$0.05/run).
+## Verification and Delivery
+
+- Do not weaken RU/EN relevance, strict-mode, restore, resume, coverage, or tenant-isolation tests.
+- Required final gates: focused Stage 2/4/5/6 tests, shared contracts/migrations, pinned Qdrant integration, snapshot/restore, Compose validation, `pnpm type-check`, `pnpm build`, process verification, and canonical stage closeout.
+- Update durable docs, project index, Graphify (`graphify update .`; `graphify cluster-only . --no-viz`), Beads, artifacts, stage summary, and this handoff.
+- All accepted branches/commits must be pushed under the repo contract.
+- Primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
 
 ## Explicit defers
 
-- `mc2-jz6y0` staging cutover/live reindex/secret activation: wait for explicit current-task authorization after local Q1-Q11 gates pass.
-- Qdrant multi-node HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC: capacity/product-triggered defers documented in the design, not unfinished planning scope.
-- `mc2-m17al`: owner decision (shared DB diqooqbuchsliypgwksu, staging impact).
-- .104.2 complement (per-block digests for final-judge input) — unnecessary at current input sizes; recorded on the closed bead.
-- routeAfterJudge vs blockRegenerator block-id selection divergence — recorded on closed `mc2-db696.104.6`; low priority now that zero-regen skip covers the symptom.
-- mc2-1slzl option B (spec-driven dynamic topics) — owner decision if ever wanted; option A shipped and validated.
+- Q12 deploy, staging/live reindex, secret changes, runtime activation, and any remote mutation require explicit current-task permission after presenting exact actions, effects, rollback, and live evidence plan.
+- Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
+- Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-## Runbook — real dev generation
-
-Non-mutating preflight: `pnpm --dir packages/course-gen-platform smoke:career-playbook:live --mode plan --target dev`
-Full runbook (browser-console token method is primary): `docs/career-playbook/live-smoke-dev-run.md`. Queue MUST be `course-generation-dev`; poll `--poll-timeout-ms 7200000`; cap `--max-cost-usd 1` is 4x the observed cost. Use an ABSOLUTE `--dir` path (relative resolves against the shell cwd).
-Before any run meant to validate new pipeline code: `ssh megacampus-prod "docker inspect megacampus-worker-dev --format '{{.Created}}'"` — CI Deploy to Dev only runs on fully green CI.
-Artifacts auto-persist to `packages/course-gen-platform/artifacts/career-playbook-smoke/`; cleanup is manifest-only (row deletion is a manual step by exact id).
-
-## Closeout Markers
-
-docs-reviewed: updated — added the Qdrant design, implementation plan, validated orchestrator prompt, project-index navigation, and current handoff.
-graph-reviewed: updated — `graphify update .` rebuilt the local graph (52,566 nodes / 76,938 edges), then `graphify cluster-only . --no-viz` refreshed communities/report; no external semantic backend or Git hooks used.
+docs-reviewed: updated — approved evidence design and companion execution plan now define durable Stage 4/5/6 behavior and operator acceptance.
+graph-reviewed: used — existing report and focused Qdrant Stage 2/5/6 query informed the design; refresh is due after implementation changes during stage closeout.

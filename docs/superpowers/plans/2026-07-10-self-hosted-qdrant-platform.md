@@ -8,6 +8,15 @@
 
 **Tech Stack:** Qdrant Server `1.18.2`, `@qdrant/js-client-rest` `1.18.0`, TypeScript, Vitest, Docker Compose, Prometheus `3.11.3`, Grafana `12.4.0`, Bash/systemd, pnpm.
 
+## Approved Scope Expansion (2026-07-11)
+
+The owner approved optional-but-important document evidence, explicit conflict resolution, large-corpus processing, and advisory Stage 5 enrichment. Implement the expansion from:
+
+- design: `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`;
+- companion plan: `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`.
+
+Expansion tasks E1-E7 join this epic and must pass before Task 10 documentation and Task 11 acceptance close. They do not authorize Task 12 or any remote mutation.
+
 ## Global Constraints
 
 - Implement epic `mc2-jz6y0`; create Beads children before delegated or file-changing streams.
@@ -452,9 +461,9 @@ Use RRF as the safe default. Formula Query must implement the spec's multiplicat
 - Remove the score-mapping/sorting block from `search.ts`.
 - Include boost, factor, grouping, group size, and collection alias in cache keys.
 
-- [ ] **Step 5: Enable grouping in Stage 5/6 only behind the passing regression gate**
+- [ ] **Step 5: Enable grouping in the live Stage 5 enrichment and Stage 6 retrieval callers**
 
-Pass `group_by_document: true` and `group_size: 2` from the three production retrieval entrypoints after Task 5's RU/EN integration fixture passes. Preserve each caller's result limit. If the fixture fails, keep the option implemented but disabled and create a Beads follow-up with the exact missed query/evidence; do not weaken the fixture.
+After Task 5's RU/EN integration fixture passes, pass `group_by_document: true` and `group_size: 2` from the genuinely live Stage 5 advisory-enrichment caller introduced by companion Task E5 and the live Stage 6 retriever covered by Task E6. Preserve each caller's result limit. Dormant helpers and an arbitrary caller count are not acceptance evidence. If the fixture fails, keep the option implemented but disabled and create a Beads follow-up with the exact missed query/evidence; do not weaken the fixture.
 
 - [ ] **Step 6: Run focused search and RAG tests**
 
@@ -810,6 +819,8 @@ git commit -m "feat(qdrant): add self-hosted monitoring and alerts"
 
 ### Task 10: Documentation And Cloud Retirement
 
+**Dependency expansion:** Start only after companion Tasks E1-E6 are accepted. Include the optional-document trust model, complete coverage ledger, conflict decisions, large-corpus behavior, and Stage 5/6 evidence flow described in companion Task E7.
+
 **Files:**
 
 - Modify: `docs/quickstart.md`
@@ -854,6 +865,8 @@ git commit -m "docs(qdrant): document self-hosted operations"
 ---
 
 ### Task 11: Local And Dev Acceptance Before Any Staging Mutation
+
+**Dependency expansion:** The acceptance artifact must cover companion Task E7, including no-document generation, large-corpus coverage, manual conflict pause, persisted automatic system decisions, live Stage 5 enrichment, and decision-aware Stage 6 retrieval.
 
 **Files:**
 

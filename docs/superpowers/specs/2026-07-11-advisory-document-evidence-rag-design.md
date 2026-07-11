@@ -1,10 +1,11 @@
 # Advisory Document Evidence and RAG Design
 
-**Status:** Proposed for owner review  
-**Date:** 2026-07-11  
-**Parent epic:** `mc2-jz6y0`  
-**Design task:** `mc2-jz6y0.17`  
+**Status:** Approved for implementation
+**Date:** 2026-07-11
+**Parent epic:** `mc2-jz6y0`
+**Design task:** `mc2-jz6y0.17`
 **Extends:** `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`
+**Approved by owner:** 2026-07-11
 
 ## Summary
 

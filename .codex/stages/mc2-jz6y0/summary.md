@@ -21,6 +21,13 @@ Implementation scope: Q1-Q11 local implementation and verification; Q12 requires
 - Q10 `mc2-jz6y0.11`
 - Q11 `mc2-jz6y0.12`
 - Q12 `mc2-jz6y0.13` — authorization-required staging activation
+- E1 `mc2-jz6y0.18` — evidence contracts, persistence and RLS
+- E2 `mc2-jz6y0.19` — large-corpus preflight and allocator
+- E3 `mc2-jz6y0.20` — conflicts and manual/automatic decisions
+- E4 `mc2-jz6y0.21` — separate conflict UI block
+- E5 `mc2-jz6y0.22` — live Stage 5 advisory enrichment/grouping
+- E6 `mc2-jz6y0.23` — decision-aware Stage 6 retrieval/grouping
+- E7 `mc2-jz6y0.24` — evidence acceptance, observability and rollout
 
 ## Parallel Decomposition
 
@@ -35,6 +42,33 @@ Implementation scope: Q1-Q11 local implementation and verification; Q12 requires
 | C      | Q10 docs retirement                  | bounded worker then `docs_reviewer`          | named docs and project index                       | Q1-Q9                             | Cloud/custom-BM25 scans                              | sequential after implementation truth                             |
 | A      | Q11 acceptance/closeout              | root + reviewers                             | evidence and in-scope corrections                  | Q1-Q10                            | full local gates and canonical closeout              | sequential shared gate                                            |
 | X      | Q12 staging                          | root + deploy review                         | live evidence/state only                           | Q11 + explicit user authorization | live cutover gates                                   | blocked pending authorization                                     |
+
+## Approved Evidence Expansion (2026-07-11)
+
+Owner-approved design: `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`.
+
+Executable companion plan: `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`.
+
+Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md`.
+
+| Stream | Goal                                                  | Agent                                      | Write zone                                        | Dependencies           | Verification                                            | Decision                       |
+| ------ | ----------------------------------------------------- | ------------------------------------------ | ------------------------------------------------- | ---------------------- | ------------------------------------------------------- | ------------------------------ |
+| E1     | canonical contracts and tenant-isolated audit storage | data/backend worker + correctness reviewer | shared types, evidence migration/repository/tests | accepted Q1-Q5         | schema, migration, RLS, append-only tests               | start in parallel with Q6/Q7   |
+| E2     | complete large-corpus evidence preflight              | search/data worker + correctness reviewer  | Stage 4 allocator/evidence modules/tests          | E1 + accepted Q7       | zero/small/oversized/1,000-doc, resume, budget tests    | sequential after data contract |
+| E3     | conflict detection and auditable decisions            | high-reasoning backend worker + reviewer   | Stage 4 Phase 0.5, router/RPC, tests              | E1 + E2                | RU/EN, pause, system-answer, idempotency tests          | contract gate for consumers    |
+| E4     | distinct required conflict block                      | frontend worker + UI review                | clarifying UI/messages/tests                      | E3                     | Lazyweb, component, accessibility, Playwright           | parallel with E5/E6            |
+| E5     | non-destructive live Stage 5 enrichment               | search/data worker + reviewer              | Stage 5 evidence/live caller/tests                | E1 + E3 + Q5 + Q7      | baseline equivalence, grouping, outage tests            | parallel with E4/E6            |
+| E6     | decision-aware live Stage 6 retrieval                 | search/data worker + reviewer              | Stage 6 retriever/cache/tests                     | E1 + E3 + Q5 + Q7      | decision, grouping, required-RAG, isolation tests       | parallel with E4/E5            |
+| E7     | cross-stage acceptance and rollout                    | root + docs/correctness reviewers          | metrics/docs/artifacts/in-scope fixes             | E4 + E5 + E6 + Q8 + Q9 | pinned integration, type-check, build, process/closeout | blocks Q10/Q11 close           |
+
+`mc2-jz6y0.16` is closed as superseded: acceptance requires grouping in genuinely production-reachable Stage 5 and Stage 6 callers, not an arbitrary count of dormant helpers.
+
+## Current Recovery Point
+
+- Integration branch is pushed at `a3f24157`; this planning update will create a later handoff commit.
+- Q7 branch/worktree: `codex/qdrant-q7-reindex` at `616e8b83`, ahead of remote, with one intentional uncommitted compatibility fix in `ci-qdrant-smoke.test.ts`.
+- Full pinned Q5 gate is 18/19 because `tests/integration/qdrant.test.ts` still calls stale `generateNumericId(source.chunk_id)`. Replace it narrowly with `generatePointId(source.document_id, source.chunk_id)`, rerun 19/19, update the Q7 artifact, review, commit/push, integrate, and close Q7.
+- Q6/Q9 remain gated by decision `mc2-jz6y0.14` on observability pins and metric transport/notification path.
 
 ## Routing Evidence
 
