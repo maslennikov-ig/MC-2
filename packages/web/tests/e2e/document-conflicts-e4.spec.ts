@@ -368,7 +368,7 @@ test.describe('E4 real ClarifyingPanel with intercepted authenticated tRPC', () 
     console.log(`[E4 ${testInfo.project.name} contrast] ${JSON.stringify(contrastSamples)}`)
     for (const ratio of Object.values(contrastSamples)) expect(ratio).toBeGreaterThanOrEqual(4.5)
 
-    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page.getByText('Which escalation deadline remains current?')).toBeVisible()
     await page.getByRole('button', { name: 'Edit answer' }).click()
     const editableCard = page.locator(`[id="clarifying-question-${editableQuestionId}"]`)
@@ -383,7 +383,7 @@ test.describe('E4 real ClarifyingPanel with intercepted authenticated tRPC', () 
       expectedCurrentDecisionId: currentDecisionId,
     })
 
-    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page.getByText('Automatically resolved policy example')).toBeVisible()
     await expect(page.getByText('24 hours', { exact: true })).toBeVisible()
     await expect(page.getByText(/^recommendation:/)).toHaveCount(0)

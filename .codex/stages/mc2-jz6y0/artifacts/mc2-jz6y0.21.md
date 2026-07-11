@@ -71,6 +71,7 @@ verification:
   - Shared contract GREEN passed 2/2 plus standalone strict TypeScript compilation for optional suggestion value and current-decision token fields.
   - Focused component/policy GREEN passed 20/20 across E3/CAS parsing, unknown-field rejection, RU/EN, canonical-value mapping, stale-CAS edit retention, invalid-metadata blocking, provenance overflow, inert markup, accessible disclosure/radios/focus/progress, no-document behavior, and production fixture redirect.
   - Real-panel Playwright Chromium, mobile-chrome, and dark-mode passed 4 applicable scenarios with 2 expected non-mobile skips and 0 failures.
+  - Re-review pinned both wizard transitions to the exact accessible name `Next`, excluding the injected Next Dev Tools control; the declared webpack Chromium/mobile/dark command remained 4 passed, 2 expected skips, 0 failures.
   - Axe WCAG 2 A/AA structural/name/state analysis passed; its color-contrast rule was disabled only because axe 4.11 misreads Tailwind v4 OKLCH in Chromium 149.
   - Browser computed-style RGB/Lab/OKLCH-to-sRGB assertions covered impact, recommendation, source refs, disclosure, radio text, critical question text, badge, and pending error. Light/mobile ratios were 14.66, 17.34, 7.56, 7.35, 17.84, 14.66, 17.87, 17.61; dark ratios were 15.23, 15.76, 7.23, 14.01, 16.28, 16.28, 17.06, 18.11.
   - packages/web type-check passed.
