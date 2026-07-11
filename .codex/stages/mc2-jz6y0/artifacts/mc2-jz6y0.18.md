@@ -33,6 +33,7 @@ selected_docs:
   - Task E1 lines 43-86 of docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md
   - repository-local Supabase migration, RLS, immutable-table, RPC, and persistence patterns
 selected_skills:
+  - /mnt/c/Users/masle/.codex/superpowers/skills/receiving-code-review/SKILL.md
   - /mnt/c/Users/masle/.codex/superpowers/skills/test-driven-development/SKILL.md
   - /mnt/c/Users/masle/.codex/superpowers/skills/verification-before-completion/SKILL.md
   - /home/me/code/mc2/.agents/skills/senior-architect/SKILL.md
@@ -59,16 +60,21 @@ graph_review_notes: Read /home/me/code/mc2/graphify-out/GRAPH_REPORT.md and ran 
 verification:
   - shared contracts RED type-check: failed with 8 expected missing-schema/union/analysis-field diagnostics
   - original plan-path test discovery: blocked because package Vitest includes tests/**/*.test.ts while the plan named src/__tests__; orchestrator authorized one canonical test under packages/shared-types/tests
-  - shared contracts GREEN direct gate: passed 9 of 9 tests
+  - shared contracts GREEN direct gate before review: passed 9 of 9 tests
   - repository RED: failed because the repository module did not exist
   - migration/RLS RED: failed 6 of 6 checks because migration and rollback did not exist
   - conflict provenance RED then GREEN: failed 1 of 6, then passed 6 of 6 repository tests
   - auto-answer rollback/error semantics RED then GREEN: failed 2 of 6, then passed 6 of 6 migration/RLS checks
-  - pnpm --filter @megacampus/shared-types test -- document-evidence: passed 9 of 9 tests
+  - independent review verdict on 31bb2733: Spec FAIL and Quality CHANGES_REQUIRED because the migration test was regex-only, runs lacked exact source IDs, source deletion cascaded evidence, failure summaries were dishonest, and audit equivalence was one-way
+  - review fix RED shared contracts: failed 3 of 10 tests on missing-summary handling, iff audit semantics, and absent source_document_ids
+  - review fix RED repository: failed 4 of 10 tests on normalized source sets/counts, race mismatch reuse, summary omission, and user/system audit mismatch
+  - review fix RED applied migration: failed 4 of 8 tests; the real PostgreSQL failure was column source_document_ids does not exist
+  - pnpm --filter @megacampus/shared-types test -- document-evidence: passed 10 of 10 tests
   - pnpm --filter @megacampus/shared-types type-check: passed
-  - pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts: passed 6 of 6 tests after loading the existing local unit-test env without printing values
-  - pnpm --filter @megacampus/course-gen-platform test:integration -- document-evidence-rls: blocked as an applied-DB gate because Supabase CLI is absent and the package script forwards the requested selector as a non-targeted Vitest path
-  - direct pure migration/RLS contract command: passed 6 of 6 tests without external mutation
+  - pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts: passed 10 of 10 tests after loading the existing local unit-test env without printing values
+  - migration/RLS suite without DOCUMENT_EVIDENCE_DATABASE_URL: passed 7 static tests with the applied test explicitly skipped
+  - migration/RLS suite with DOCUMENT_EVIDENCE_DATABASE_URL against disposable PostgreSQL 15.18: passed 8 of 8 tests including real apply, RLS/service access, exact-set RPC, immutability, chain constraints, source deletion survival, and rollback
+  - pnpm exec supabase --version: passed and reported 2.106.0; no Supabase stack was needed or started because the applied harness uses direct pg against a disposable PostgreSQL database
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
   - targeted Prettier check: passed
   - git diff --check: passed
@@ -91,7 +97,7 @@ explicit_defers:
 
 # Summary
 
-Added canonical evidence schemas and the compact optional `analysis_result.document_evidence` snapshot, while keeping full cards/conflicts/decision history in durable tables. The migration provides tenant consistency checks, authenticated RLS, service access, atomic exact-count item persistence, immutable conflicts, linear append-only decisions, and a rollback that restores the prior automatic-answer source.
+Added canonical evidence schemas and the compact optional `analysis_result.document_evidence` snapshot, while keeping full cards/conflicts/decision history in durable tables. Runs now persist an immutable normalized source-ID set with a derived exact count; item persistence compares source/item sets bidirectionally, source deletion preserves the evidence audit ledger, degraded/failed cards may honestly omit summaries, and decision audit fields are equivalent in both directions. The migration provides tenant consistency checks, authenticated RLS, service access, immutable conflicts, linear append-only decisions, and a verified rollback.
 
 # Scope / Routing
 
@@ -99,9 +105,7 @@ The worker stayed in the assigned isolated branch/worktree and strict E1 write z
 
 # Verification
 
-TDD evidence includes the initial 8-diagnostic shared contract RED, repository-module RED, six missing-migration RED failures, and two focused refinement cycles for persisted conflict provenance and atomic auto-answer failure semantics. GREEN totals are 9 shared contract tests, 6 repository tests, and 6 pure migration/RLS contract tests. Both changed packages type-check and targeted TypeScript formatting/diff whitespace checks pass.
-
-The exact integration script cannot provide a local applied-PostgreSQL RLS run in this worktree: `supabase` CLI is not installed, and the package script invocation with the requested `-- document-evidence-rls` is not a file-targeted harness. The direct pure command `pnpm --filter @megacampus/course-gen-platform exec vitest run --config ../../vitest.shared.ts tests/integration/document-evidence-rls.test.ts` validates the complete migration/rollback contract without external mutation and passes 6/6.
+TDD evidence includes the initial implementation RED/GREEN cycles plus the review fix RED counts above. Review GREEN totals are 10 shared contract tests, 10 repository tests, and 8 migration/RLS tests. With the explicit disposable database URL, the integration file creates minimal PostgreSQL prerequisites and auth helpers, applies the real migration, executes RLS and integrity behavior, applies rollback, verifies evidence objects are gone and prior automatic-answer semantics are restored, then resets the disposable database. Without the explicit URL, the same file passes seven static checks and clearly skips the applied block.
 
 # Delivery / Cleanup
 
@@ -110,6 +114,6 @@ Delivery is not accepted yet. The dedicated worker branch/worktree remains retai
 # Risks / Follow-ups / Explicit Defers
 
 - Material finding: the plan's original shared test path was excluded by package Vitest configuration; the orchestrator authorized the canonical `packages/shared-types/tests/document-evidence.test.ts` path. Promote to: none (captured in this artifact and corrected locally).
-- Material finding: no local Supabase CLI/applied database harness exists in the isolated worktree, so behavioral PostgreSQL RLS execution remains an integration-stage acceptance concern. Promote to: Beads (`mc2-jz6y0.18` verification evidence).
+- Material finding: the first implementation incorrectly reported the CLI as absent; `pnpm exec supabase --version` resolves 2.106.0. The actual missing component was a running local stack. The review fix uses direct `pg` with an explicit disposable PostgreSQL URL and now provides applied behavior evidence. Promote to: none (artifact truth corrected and applied gate added).
 - No source JSON bodies are logged by the repository or migration. Repository errors expose only operation and database code.
 - No Graphify refresh, generated database type update, live database action, deployment, Beads closure, or integration was performed.

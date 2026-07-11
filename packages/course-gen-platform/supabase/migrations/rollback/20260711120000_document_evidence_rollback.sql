@@ -14,6 +14,7 @@ DROP FUNCTION IF EXISTS public.validate_document_evidence_decision_chain();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_conflict_scope();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_item_scope();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_run_tenant();
+DROP FUNCTION IF EXISTS public.enforce_document_evidence_run_source_set();
 DROP FUNCTION IF EXISTS public.set_document_evidence_updated_at();
 
 -- Restore the previous automatic-answer semantics.

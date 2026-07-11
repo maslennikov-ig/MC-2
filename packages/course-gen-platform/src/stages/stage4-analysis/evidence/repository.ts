@@ -11,6 +11,7 @@ import {
   DocumentConflictSchema,
   DocumentEvidenceCardsSchema,
   DocumentEvidenceCoverageSummarySchema,
+  DocumentEvidenceSourceIdSetSchema,
   type AnswerSource,
   type DocumentConflict,
   type DocumentEvidenceCard,
@@ -54,7 +55,7 @@ export interface GetOrCreateEvidenceRunInput {
   organizationId: string;
   inputFingerprint: string;
   evidenceVersion: string;
-  sourceCount: number;
+  sourceDocumentIds: string[];
 }
 
 export interface PersistEvidenceItemsInput {
@@ -116,12 +117,36 @@ function throwDatabaseError(operation: string, error: DatabaseError): never {
   throw new DocumentEvidenceRepositoryError(operation, error.code);
 }
 
+function assertRunSourceSet(
+  value: unknown,
+  expectedSourceDocumentIds: string[],
+  operation: string
+): Record<string, unknown> {
+  const run = assertRecord(value, operation);
+  const actualSourceDocumentIds = run.source_document_ids;
+  if (
+    !Array.isArray(actualSourceDocumentIds) ||
+    actualSourceDocumentIds.some(documentId => typeof documentId !== 'string') ||
+    actualSourceDocumentIds.length !== expectedSourceDocumentIds.length ||
+    actualSourceDocumentIds.some(
+      (documentId, index) => documentId !== expectedSourceDocumentIds[index]
+    ) ||
+    run.source_count !== expectedSourceDocumentIds.length
+  ) {
+    throw new DocumentEvidenceRepositoryError(`${operation}:source_set_mismatch`);
+  }
+  return run;
+}
+
 export class DocumentEvidenceRepository {
   constructor(private readonly client: DocumentEvidenceDatabaseClient) {}
 
   async getOrCreateRun(
     input: GetOrCreateEvidenceRunInput
   ): Promise<{ run: Record<string, unknown>; reused: boolean }> {
+    const sourceDocumentIds = DocumentEvidenceSourceIdSetSchema.parse(
+      [...new Set(input.sourceDocumentIds)].sort()
+    );
     const findExisting = async (): Promise<DatabaseResult> =>
       this.client
         .from('document_evidence_runs')
@@ -137,7 +162,10 @@ export class DocumentEvidenceRepository {
       throwDatabaseError('find_run', existing.error);
     }
     if (existing.data) {
-      return { run: assertRecord(existing.data, 'find_run'), reused: true };
+      return {
+        run: assertRunSourceSet(existing.data, sourceDocumentIds, 'find_run'),
+        reused: true,
+      };
     }
 
     const created = await this.client
@@ -148,13 +176,17 @@ export class DocumentEvidenceRepository {
         input_fingerprint: input.inputFingerprint,
         evidence_version: input.evidenceVersion,
         status: 'processing',
-        source_count: input.sourceCount,
+        source_document_ids: sourceDocumentIds,
+        source_count: sourceDocumentIds.length,
       })
       .select('*')
       .single();
 
     if (!created.error && created.data) {
-      return { run: assertRecord(created.data, 'create_run'), reused: false };
+      return {
+        run: assertRunSourceSet(created.data, sourceDocumentIds, 'create_run'),
+        reused: false,
+      };
     }
 
     // A concurrent retry may win the uniqueness race. Re-read instead of
@@ -162,7 +194,10 @@ export class DocumentEvidenceRepository {
     if (created.error?.code === '23505') {
       const concurrent = await findExisting();
       if (!concurrent.error && concurrent.data) {
-        return { run: assertRecord(concurrent.data, 'find_concurrent_run'), reused: true };
+        return {
+          run: assertRunSourceSet(concurrent.data, sourceDocumentIds, 'find_concurrent_run'),
+          reused: true,
+        };
       }
       if (concurrent.error) throwDatabaseError('find_concurrent_run', concurrent.error);
     }
@@ -238,7 +273,7 @@ export class DocumentEvidenceRepository {
 
   async appendDecision(input: AppendEvidenceDecisionInput): Promise<Record<string, unknown>> {
     const answerSource = AnswerSourceSchema.parse(input.answerSource);
-    if (input.resolvedBy === 'system' && answerSource !== 'system') {
+    if ((input.resolvedBy === 'system') !== (answerSource === 'system')) {
       throw new DocumentEvidenceRepositoryError('append_decision:invalid_system_answer_source');
     }
 

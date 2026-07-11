@@ -10,6 +10,7 @@ CREATE TABLE public.document_evidence_runs (
   evidence_version TEXT NOT NULL CHECK (btrim(evidence_version) <> ''),
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'processing', 'accepted', 'failed')),
+  source_document_ids UUID[] NOT NULL,
   source_count INTEGER NOT NULL DEFAULT 0 CHECK (source_count >= 0),
   assessed_count INTEGER NOT NULL DEFAULT 0 CHECK (assessed_count >= 0),
   degraded_count INTEGER NOT NULL DEFAULT 0 CHECK (degraded_count >= 0),
@@ -28,6 +29,10 @@ CREATE TABLE public.document_evidence_runs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT document_evidence_runs_identity_unique
     UNIQUE (course_id, input_fingerprint, evidence_version),
+  CONSTRAINT document_evidence_runs_source_set_count CHECK (
+    source_count = cardinality(source_document_ids)
+    AND array_position(source_document_ids, NULL) IS NULL
+  ),
   CONSTRAINT document_evidence_runs_coverage_bounds CHECK (
     assessed_count + degraded_count + failed_count <= source_count
   ),
@@ -46,7 +51,7 @@ CREATE TABLE public.document_evidence_items (
   run_id UUID NOT NULL REFERENCES public.document_evidence_runs(id) ON DELETE CASCADE,
   course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
   organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  document_id UUID NOT NULL REFERENCES public.file_catalog(id) ON DELETE CASCADE,
+  document_id UUID NOT NULL,
   source_version_hash TEXT NOT NULL CHECK (btrim(source_version_hash) <> ''),
   document_name TEXT NOT NULL CHECK (btrim(document_name) <> ''),
   priority TEXT NOT NULL CHECK (priority IN ('CORE', 'IMPORTANT', 'SUPPLEMENTARY')),
@@ -60,7 +65,7 @@ CREATE TABLE public.document_evidence_items (
       'full_text', 'hierarchical_summary', 'summary', 'targeted_retrieval', 'metadata_only'
     )
   ),
-  summary TEXT NOT NULL CHECK (btrim(summary) <> ''),
+  summary TEXT,
   claims JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(claims) = 'array'),
   terminology JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(terminology) = 'array'),
   constraints JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(constraints) = 'array'),
@@ -72,7 +77,14 @@ CREATE TABLE public.document_evidence_items (
   allocated_tokens INTEGER NOT NULL CHECK (allocated_tokens >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT document_evidence_items_run_document_unique UNIQUE (run_id, document_id)
+  CONSTRAINT document_evidence_items_run_document_unique UNIQUE (run_id, document_id),
+  CONSTRAINT document_evidence_items_summary_by_coverage CHECK (
+    (coverage_status = 'assessed' AND summary IS NOT NULL AND btrim(summary) <> '')
+    OR (
+      coverage_status IN ('degraded', 'failed')
+      AND (summary IS NULL OR btrim(summary) <> '')
+    )
+  )
 );
 
 CREATE TABLE public.document_evidence_conflicts (
@@ -120,7 +132,7 @@ CREATE TABLE public.document_evidence_decisions (
   CONSTRAINT document_evidence_decisions_not_self_superseding
     CHECK (supersedes_decision_id IS NULL OR supersedes_decision_id <> id),
   CONSTRAINT document_evidence_decisions_system_source CHECK (
-    resolved_by <> 'system' OR answer_source = 'system'
+    (resolved_by = 'system') = (answer_source = 'system')
   )
 );
 
@@ -157,6 +169,42 @@ CREATE TRIGGER set_document_evidence_runs_updated_at
 CREATE TRIGGER set_document_evidence_items_updated_at
   BEFORE UPDATE ON public.document_evidence_items
   FOR EACH ROW EXECUTE FUNCTION public.set_document_evidence_updated_at();
+
+CREATE OR REPLACE FUNCTION public.enforce_document_evidence_run_source_set()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_normalized_source_ids UUID[];
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND (
+       NEW.source_document_ids IS DISTINCT FROM OLD.source_document_ids
+       OR NEW.source_count IS DISTINCT FROM OLD.source_count
+     ) THEN
+    RAISE EXCEPTION 'Evidence run source document set is immutable' USING ERRCODE = '55000';
+  END IF;
+
+  SELECT COALESCE(array_agg(source_id ORDER BY source_id), '{}'::uuid[])
+    INTO v_normalized_source_ids
+  FROM (
+    SELECT DISTINCT unnest(NEW.source_document_ids) AS source_id
+  ) normalized;
+
+  IF cardinality(v_normalized_source_ids) = 0 THEN
+    RAISE EXCEPTION 'Evidence run source document set cannot be empty' USING ERRCODE = '23514';
+  END IF;
+
+  NEW.source_document_ids := v_normalized_source_ids;
+  NEW.source_count := cardinality(v_normalized_source_ids);
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER enforce_document_evidence_run_source_set
+  BEFORE INSERT OR UPDATE ON public.document_evidence_runs
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_document_evidence_run_source_set();
 
 CREATE OR REPLACE FUNCTION public.validate_document_evidence_run_tenant()
 RETURNS trigger
@@ -310,6 +358,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+  v_source_document_ids UUID[];
+  v_item_document_ids UUID[];
   v_source_count INTEGER;
   v_item_count INTEGER;
   v_assessed_count INTEGER;
@@ -320,7 +370,8 @@ BEGIN
     RAISE EXCEPTION 'Evidence items must be a JSON array' USING ERRCODE = '22023';
   END IF;
 
-  SELECT runs.source_count INTO v_source_count
+  SELECT runs.source_document_ids, runs.source_count
+    INTO v_source_document_ids, v_source_count
   FROM public.document_evidence_runs runs
   WHERE runs.id = p_run_id
     AND runs.course_id = p_course_id
@@ -340,11 +391,18 @@ BEGIN
     RAISE EXCEPTION 'Evidence run access denied' USING ERRCODE = '42501';
   END IF;
 
-  SELECT count(*), count(DISTINCT item->>'document_id')
-    INTO v_item_count, v_assessed_count
+  SELECT count(*) INTO v_item_count
   FROM jsonb_array_elements(p_items) item;
 
-  IF v_item_count <> v_source_count OR v_item_count <> v_assessed_count THEN
+  SELECT COALESCE(array_agg(document_id ORDER BY document_id), '{}'::uuid[])
+    INTO v_item_document_ids
+  FROM (
+    SELECT DISTINCT (item->>'document_id')::uuid AS document_id
+    FROM jsonb_array_elements(p_items) item
+  ) normalized_items;
+
+  IF v_item_count <> cardinality(v_item_document_ids)
+     OR v_item_document_ids IS DISTINCT FROM v_source_document_ids THEN
     RAISE EXCEPTION 'Evidence coverage must contain every source document exactly once'
       USING ERRCODE = '23514';
   END IF;

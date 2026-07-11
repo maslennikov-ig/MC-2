@@ -65,6 +65,25 @@ export const DocumentEvidenceTokenCountsSchema = z
   })
   .strict();
 
+export const DocumentEvidenceSourceIdSetSchema = z
+  .array(z.string().uuid())
+  .min(1)
+  .superRefine((documentIds, context) => {
+    if (new Set(documentIds).size !== documentIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'source_document_ids must be unique',
+      });
+    }
+    const sorted = [...documentIds].sort();
+    if (sorted.some((documentId, index) => documentId !== documentIds[index])) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'source_document_ids must be sorted',
+      });
+    }
+  });
+
 export const DocumentEvidenceCardSchema = z
   .object({
     document_id: z.string().uuid(),
@@ -74,7 +93,7 @@ export const DocumentEvidenceCardSchema = z
     content_quality: z.number().min(0).max(1),
     course_relevance: z.number().min(0).max(1),
     processing_mode: DocumentEvidenceModeSchema,
-    summary: z.string().min(1),
+    summary: z.string().min(1).nullable().optional(),
     key_claims: z.array(EvidenceClaimSchema),
     terminology: z.array(z.string().min(1)),
     constraints: z.array(z.string().min(1)),
@@ -83,7 +102,16 @@ export const DocumentEvidenceCardSchema = z
     coverage_reason: z.string().min(1),
     token_counts: DocumentEvidenceTokenCountsSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((card, context) => {
+    if (card.coverage_status === 'assessed' && !card.summary) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['summary'],
+        message: 'summary is required when coverage_status is assessed',
+      });
+    }
+  });
 
 export const DocumentEvidenceCardsSchema = z
   .array(DocumentEvidenceCardSchema)
@@ -148,11 +176,11 @@ export const DocumentDecisionSchema = z
         message: 'A decision cannot supersede itself',
       });
     }
-    if (decision.resolved_by === 'system' && decision.answer_source !== 'system') {
+    if ((decision.resolved_by === 'system') !== (decision.answer_source === 'system')) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['answer_source'],
-        message: 'System decisions must use answer_source=system',
+        message: 'resolved_by=system iff answer_source=system',
       });
     }
   });
@@ -185,6 +213,7 @@ export const DocumentEvidenceRunSummarySchema = z
     input_fingerprint: z.string().min(1),
     evidence_version: z.string().min(1),
     status: DocumentEvidenceRunStatusSchema,
+    source_document_ids: DocumentEvidenceSourceIdSetSchema,
     source_count: CountSchema,
     assessed_count: CountSchema,
     degraded_count: CountSchema,
@@ -210,6 +239,13 @@ export const DocumentEvidenceRunSummarySchema = z
   })
   .strict()
   .superRefine((summary, context) => {
+    if (summary.source_document_ids.length !== summary.source_count) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['source_document_ids'],
+        message: 'source_document_ids length must equal source_count',
+      });
+    }
     if (
       summary.status === 'accepted' &&
       summary.assessed_count + summary.degraded_count + summary.failed_count !==
@@ -242,6 +278,7 @@ export type DocumentEvidenceEnrichmentStatus = z.infer<
 export type EvidenceSourceRef = z.infer<typeof EvidenceSourceRefSchema>;
 export type EvidenceClaim = z.infer<typeof EvidenceClaimSchema>;
 export type DocumentEvidenceTokenCounts = z.infer<typeof DocumentEvidenceTokenCountsSchema>;
+export type DocumentEvidenceSourceIdSet = z.infer<typeof DocumentEvidenceSourceIdSetSchema>;
 export type DocumentEvidenceCard = z.infer<typeof DocumentEvidenceCardSchema>;
 export type DocumentConflictSide = z.infer<typeof DocumentConflictSideSchema>;
 export type DocumentConflict = z.infer<typeof DocumentConflictSchema>;

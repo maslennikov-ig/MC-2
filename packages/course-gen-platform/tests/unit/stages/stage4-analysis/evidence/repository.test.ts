@@ -126,7 +126,8 @@ describe('DocumentEvidenceRepository', () => {
       input_fingerprint: 'sha256:input-v1',
       evidence_version: '1.0.0',
       status: 'accepted',
-      source_count: 1,
+      source_document_ids: [ids.documentA, ids.documentB],
+      source_count: 2,
     };
     const { client, calls } = createScriptedClient({
       document_evidence_runs: [{ data: existingRun, error: null }],
@@ -138,12 +139,67 @@ describe('DocumentEvidenceRepository', () => {
       organizationId: ids.organization,
       inputFingerprint: 'sha256:input-v1',
       evidenceVersion: '1.0.0',
-      sourceCount: 1,
+      sourceDocumentIds: [ids.documentB, ids.documentA, ids.documentA],
     });
 
     expect(result).toEqual({ run: existingRun, reused: true });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.operations.some(([operation]) => operation === 'insert')).toBe(false);
+  });
+
+  it('creates runs with deterministic unique source IDs and a derived exact count', async () => {
+    const createdRun = {
+      id: ids.run,
+      source_document_ids: [ids.documentA, ids.documentB],
+      source_count: 2,
+    };
+    const { client, calls } = createScriptedClient({
+      document_evidence_runs: [
+        { data: null, error: null },
+        { data: createdRun, error: null },
+      ],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(
+      repository.getOrCreateRun({
+        courseId: ids.course,
+        organizationId: ids.organization,
+        inputFingerprint: 'sha256:new-input',
+        evidenceVersion: '1.0.0',
+        sourceDocumentIds: [ids.documentB, ids.documentA, ids.documentB],
+      })
+    ).resolves.toEqual({ run: createdRun, reused: false });
+
+    const insertedRun = calls[1]?.operations.find(([operation]) => operation === 'insert')?.[1];
+    expect(insertedRun).toMatchObject({
+      source_document_ids: [ids.documentA, ids.documentB],
+      source_count: 2,
+    });
+  });
+
+  it('rejects a uniqueness-race run whose immutable source set differs', async () => {
+    const { client } = createScriptedClient({
+      document_evidence_runs: [
+        { data: null, error: null },
+        { data: null, error: { code: '23505', message: 'duplicate key' } },
+        {
+          data: { id: ids.run, source_document_ids: [ids.documentA], source_count: 1 },
+          error: null,
+        },
+      ],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(
+      repository.getOrCreateRun({
+        courseId: ids.course,
+        organizationId: ids.organization,
+        inputFingerprint: 'sha256:race',
+        evidenceVersion: '1.0.0',
+        sourceDocumentIds: [ids.documentA, ids.documentB],
+      })
+    ).rejects.toThrow(/source_set_mismatch/i);
   });
 
   it('persists unique items and exact counts through one atomic RPC', async () => {
@@ -191,6 +247,34 @@ describe('DocumentEvidenceRepository', () => {
       })
     ).rejects.toThrow(/duplicate document_id/i);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('serializes degraded cards without inventing a summary', async () => {
+    const { summary: _summary, ...withoutSummary } = card;
+    const degradedCard = {
+      ...withoutSummary,
+      coverage_status: 'degraded' as const,
+      coverage_reason: 'A trustworthy summary was unavailable after retries.',
+    };
+    const { client, rpc } = createScriptedClient({
+      rpc: [
+        {
+          data: { source_count: 1, assessed_count: 0, degraded_count: 1, failed_count: 0 },
+          error: null,
+        },
+      ],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await repository.persistItems({
+      runId: ids.run,
+      courseId: ids.course,
+      organizationId: ids.organization,
+      cards: [degradedCard],
+    });
+
+    const rpcItems = rpc.mock.calls[0]?.[1].p_items as Array<Record<string, unknown>>;
+    expect(rpcItems[0]).not.toHaveProperty('summary');
   });
 
   it('reuses an immutable conflict when its run fingerprint already exists', async () => {
@@ -267,6 +351,23 @@ describe('DocumentEvidenceRepository', () => {
       'select',
       'single',
     ]);
+  });
+
+  it('rejects system answer sources for user decisions', async () => {
+    const { client } = createScriptedClient({});
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(
+      repository.appendDecision({
+        runId: ids.run,
+        conflictId: ids.conflict,
+        selectedResolution: 'Use the organization policy.',
+        resolvedBy: 'user',
+        answerSource: 'system',
+        rationale: 'Invalid audit pairing.',
+        decidedAt: '2026-07-11T10:00:00.000Z',
+      })
+    ).rejects.toThrow(/invalid_system_answer_source/i);
   });
 
   it('resolves the latest unsuperseded decision in each append-only chain', async () => {

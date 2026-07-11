@@ -24,6 +24,7 @@ import {
 const ids = {
   documentA: '10000000-0000-4000-8000-000000000001',
   documentB: '10000000-0000-4000-8000-000000000002',
+  documentC: '10000000-0000-4000-8000-000000000003',
   claimA: '20000000-0000-4000-8000-000000000001',
   claimB: '20000000-0000-4000-8000-000000000002',
   conflict: '30000000-0000-4000-8000-000000000001',
@@ -99,6 +100,33 @@ describe('document evidence canonical contracts', () => {
     expect(lowQualityAuthority.content_quality).toBe(0.28);
   });
 
+  it('allows degraded and failed cards to preserve honest missing summaries', () => {
+    const { summary: _summary, ...withoutSummary } = card;
+
+    expect(
+      DocumentEvidenceCardSchema.parse({
+        ...withoutSummary,
+        coverage_status: 'degraded',
+        coverage_reason: 'The source could not be summarized within the retry bound.',
+      })
+    ).not.toHaveProperty('summary');
+    expect(
+      DocumentEvidenceCardSchema.parse({
+        ...withoutSummary,
+        summary: null,
+        coverage_status: 'failed',
+        coverage_reason: 'Extraction failed before a trustworthy summary was produced.',
+      })
+    ).toHaveProperty('summary', null);
+    expect(() =>
+      DocumentEvidenceCardSchema.parse({
+        ...withoutSummary,
+        coverage_status: 'assessed',
+        coverage_reason: 'Assessment completed.',
+      })
+    ).toThrow(/summary.*assessed/i);
+  });
+
   it('rejects duplicate document IDs in the coverage ledger', () => {
     const duplicate = { ...card, document_name: 'Duplicate logical source.pdf' };
 
@@ -155,6 +183,20 @@ describe('document evidence canonical contracts', () => {
     expect(() =>
       DocumentDecisionSchema.parse({ ...decision, supersedes_decision_id: ids.decision })
     ).toThrow(/cannot supersede itself/i);
+    expect(() =>
+      DocumentDecisionSchema.parse({
+        ...decision,
+        resolved_by: 'system',
+        answer_source: 'modified',
+      })
+    ).toThrow(/resolved_by=system.*answer_source=system/i);
+    expect(() =>
+      DocumentDecisionSchema.parse({
+        ...decision,
+        resolved_by: 'user',
+        answer_source: 'system',
+      })
+    ).toThrow(/resolved_by=system.*answer_source=system/i);
   });
 
   it('requires exact terminal coverage counts in accepted run summaries', () => {
@@ -165,6 +207,7 @@ describe('document evidence canonical contracts', () => {
       input_fingerprint: 'sha256:run-input-v1',
       evidence_version: '1.0.0',
       status: 'accepted',
+      source_document_ids: [ids.documentA, ids.documentB, ids.documentC],
       source_count: 3,
       assessed_count: 1,
       degraded_count: 1,
@@ -184,6 +227,18 @@ describe('document evidence canonical contracts', () => {
     expect(() => DocumentEvidenceRunSummarySchema.parse({ ...summary, failed_count: 0 })).toThrow(
       /coverage counts must equal source_count/i
     );
+    expect(() =>
+      DocumentEvidenceRunSummarySchema.parse({
+        ...summary,
+        source_document_ids: [ids.documentA, ids.documentA, ids.documentC],
+      })
+    ).toThrow(/source_document_ids.*unique/i);
+    expect(() =>
+      DocumentEvidenceRunSummarySchema.parse({
+        ...summary,
+        source_document_ids: [ids.documentB, ids.documentA, ids.documentC],
+      })
+    ).toThrow(/source_document_ids.*sorted/i);
   });
 });
 
