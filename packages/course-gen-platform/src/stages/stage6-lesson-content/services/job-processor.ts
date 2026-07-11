@@ -50,6 +50,7 @@ import {
   checkAndSetStage6Complete,
 } from './database-service';
 import { extractContentMarkdown } from './content-utils';
+import { loadStage6EvidenceForCourse } from '../rag/evidence-loader';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -783,11 +784,18 @@ export async function processStage6Job(
   let ragChunks: RAGChunk[] = [];
   let ragContextId: string | null = null;
   let sourceDocuments: SourceDocument[] = [];
+  const stage6Evidence = await loadStage6EvidenceForCourse({
+    courseId,
+    requestedOrganizationId: job.data.organizationId,
+    providedAnalysisResult: job.data.analysisResult,
+  });
 
   try {
     const ragResult: LessonRAGResult = await retrieveLessonContext({
       courseId,
+      organizationId: stage6Evidence.organizationId,
       lessonSpec,
+      evidenceContext: stage6Evidence.evidenceContext,
       // Priority boost is enabled by default in retrieveLessonContext
     });
     ragChunks = ragResult.chunks;

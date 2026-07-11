@@ -1,16 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseRagAvailabilityReason } from '@/shared/rag/document-availability';
+import type { Stage6AcceptedEvidenceContext } from '@/stages/stage6-lesson-content/rag/evidence-context';
 
-const { mockAssertCourseRagReady, mockCacheGet, mockLogger } = vi.hoisted(() => ({
-  mockAssertCourseRagReady: vi.fn(),
-  mockCacheGet: vi.fn(() => Promise.resolve(null)),
-  mockLogger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+const { mockAssertCourseRagReady, mockCacheGet, mockCacheGetOrRetrieve, mockLogger } = vi.hoisted(
+  () => ({
+    mockAssertCourseRagReady: vi.fn(),
+    mockCacheGet: vi.fn(() => Promise.resolve(null)),
+    mockCacheGetOrRetrieve: vi.fn(),
+    mockLogger: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+  })
+);
 
 vi.mock('@/shared/rag/document-availability', async importOriginal => {
   const original = await importOriginal<typeof import('@/shared/rag/document-availability')>();
@@ -27,6 +31,7 @@ vi.mock('@/shared/qdrant/search', () => ({
 vi.mock('@/stages/stage5-generation/utils/rag-context-cache', () => ({
   ragContextCache: {
     get: vi.fn((...args) => mockCacheGet(...args)),
+    getOrRetrieve: vi.fn((...args) => mockCacheGetOrRetrieve(...args)),
     store: vi.fn(() => Promise.resolve()),
   },
 }));
@@ -104,6 +109,24 @@ describe('lesson-rag-retriever', () => {
     difficulty_level: 'intermediate',
   } as const;
 
+  const evidenceContext: Stage6AcceptedEvidenceContext = {
+    acceptedRunId: '10000000-0000-4000-8000-000000000001',
+    decisionIds: ['70000000-0000-4000-8000-000000000001'],
+    decisionQueries: ['Retain records for 30 days.'],
+    sourceRefs: [
+      {
+        document_id: '40000000-0000-4000-8000-000000000001',
+        chunk_id: 'chunk-accepted',
+        version_hash: 'sha256:accepted',
+      },
+    ],
+    allowedDocumentIds: ['40000000-0000-4000-8000-000000000001'],
+    sourceVersionByDocumentId: {
+      '40000000-0000-4000-8000-000000000001': 'sha256:accepted',
+    },
+    cacheIdentity: 'evidence-cache-identity',
+  };
+
   it('returns an empty result when the course has no uploaded documents', async () => {
     mockAssertCourseRagReady.mockResolvedValue({
       availability: 'optional_no_documents',
@@ -137,6 +160,7 @@ describe('lesson-rag-retriever', () => {
 
     const promise = retrieveLessonContext({
       courseId: 'course-1',
+      organizationId: 'organization-1',
       lessonSpec: lessonSpec as any,
       useCache: false,
     });
@@ -150,7 +174,7 @@ describe('lesson-rag-retriever', () => {
     expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(3);
   });
 
-  it('continues when an individual required-RAG query fails after preflight', async () => {
+  it('fails through the required-RAG policy when every live query fails after preflight', async () => {
     const { searchChunks } = await import('@/shared/qdrant/search');
 
     mockAssertCourseRagReady.mockResolvedValue({
@@ -167,14 +191,173 @@ describe('lesson-rag-retriever', () => {
     await expect(
       retrieveLessonContext({
         courseId: 'course-1',
+        organizationId: 'organization-1',
         lessonSpec: lessonSpec as any,
         useCache: false,
       })
-    ).resolves.toMatchObject({
-      lessonId: '1.1',
-      chunks: [],
-      totalRetrieved: 0,
+    ).rejects.toMatchObject({
+      reason: 'qdrant_service_unavailable',
+      retryable: true,
     });
+  });
+
+  it('uses accepted decisions and refs in grouped tenant-scoped live retrieval', async () => {
+    const { searchChunks } = await import('@/shared/qdrant/search');
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
+    vi.mocked(searchChunks).mockResolvedValue({ results: [], metadata: {} } as any);
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+    await retrieveLessonContext({
+      courseId: 'course-1',
+      organizationId: 'organization-1',
+      lessonSpec: lessonSpec as any,
+      evidenceContext,
+      useCache: false,
+    });
+
+    expect(searchChunks).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(searchChunks).mock.calls.map(([query]) => query)).toEqual([
+      'query 1',
+      'Point 1',
+    ]);
+    for (const [, options] of vi.mocked(searchChunks).mock.calls) {
+      expect(options).toMatchObject({
+        include_payload: true,
+        group_by_document: true,
+        group_size: 2,
+        filters: {
+          organization_id: 'organization-1',
+          course_id: 'course-1',
+          document_ids: evidenceContext.allowedDocumentIds,
+        },
+      });
+    }
+  });
+
+  it('rejects a cross-scope or stale Qdrant result even when the backend ignored filters', async () => {
+    const { searchChunks } = await import('@/shared/qdrant/search');
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
+    vi.mocked(searchChunks).mockResolvedValue({
+      results: [
+        {
+          chunk_id: 'foreign-chunk',
+          document_id: '40000000-0000-4000-8000-000000000099',
+          document_name: 'Foreign.pdf',
+          content: 'foreign',
+          heading_path: 'Foreign',
+          score: 0.9,
+          payload: {
+            organization_id: 'organization-2',
+            course_id: 'course-2',
+            version_hash: 'sha256:stale',
+          },
+        },
+      ],
+      metadata: {},
+    } as any);
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        organizationId: 'organization-1',
+        lessonSpec: lessonSpec as any,
+        evidenceContext,
+        useCache: false,
+      })
+    ).rejects.toThrow(/scope|tenant|stale/i);
+  });
+
+  it('keys cached lesson context by accepted-run decision/ref identity', async () => {
+    mockCacheGet.mockResolvedValueOnce({
+      chunks: [],
+      searchQueriesUsed: [],
+      coverageScore: 0,
+    });
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+    await retrieveLessonContext({
+      courseId: 'course-1',
+      organizationId: 'organization-1',
+      lessonSpec: lessonSpec as any,
+      evidenceContext,
+      useCache: true,
+    });
+
+    expect(mockCacheGet).toHaveBeenCalledWith(
+      expect.stringContaining(evidenceContext.cacheIdentity)
+    );
+    expect(mockAssertCourseRagReady).not.toHaveBeenCalled();
+  });
+
+  it('does not broaden retrieval when lesson refs are all rejected by accepted decisions', async () => {
+    const { searchChunks } = await import('@/shared/qdrant/search');
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
+    const rejectedLesson = {
+      ...lessonSpec,
+      rag_context: {
+        ...lessonSpec.rag_context,
+        primary_documents: ['40000000-0000-4000-8000-000000000099'],
+      },
+    };
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        organizationId: 'organization-1',
+        lessonSpec: rejectedLesson as any,
+        evidenceContext,
+        useCache: false,
+      })
+    ).resolves.toMatchObject({ chunks: [], totalRetrieved: 0 });
+    expect(searchChunks).not.toHaveBeenCalled();
+  });
+
+  it('rejects cached chunks outside the current accepted evidence identity', async () => {
+    mockCacheGet.mockResolvedValueOnce({
+      chunks: [
+        {
+          chunkId: 'stale-chunk',
+          documentId: '40000000-0000-4000-8000-000000000099',
+          documentName: 'Stale.pdf',
+          content: 'stale',
+          headingPath: 'Stale',
+          score: 0.9,
+          matchedQuery: 'old decision',
+        },
+      ],
+      searchQueriesUsed: [],
+      coverageScore: 1,
+    });
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        organizationId: 'organization-1',
+        lessonSpec: lessonSpec as any,
+        evidenceContext,
+        useCache: true,
+      })
+    ).rejects.toThrow(/cache.*accepted evidence|scope/i);
   });
 
   it('uses cached lesson context before checking live RAG availability', async () => {

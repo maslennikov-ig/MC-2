@@ -44,8 +44,13 @@ export function buildLessonQueries(lessonSpec: LessonSpecificationV2): string[] 
  * @param lessonId - Lesson ID
  * @returns Cache key string
  */
-export function generateCacheKey(courseId: string, lessonId: string): string {
-  return `rag_${courseId}_lesson_${lessonId}`;
+export function generateCacheKey(
+  courseId: string,
+  lessonId: string,
+  evidenceIdentity?: string
+): string {
+  const base = `rag_${courseId}_lesson_${lessonId}`;
+  return evidenceIdentity ? `${base}_evidence_${evidenceIdentity}` : base;
 }
 
 /**
