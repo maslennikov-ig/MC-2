@@ -220,6 +220,42 @@ Qdrant snapshots preserve the derived indexed refs. Evidence rows are covered by
 the PostgreSQL backup policy. A Qdrant restore does not replace database audit
 retention.
 
+## Evidence observability integration gate
+
+The semantics in this section belong to tracked remediation `mc2-jz6y0.24.5`;
+they are not a claim about the current integration tree. Treat them as rollout
+guarantees only after `.24.5` receives an independent PASS and is integrated.
+Until both conditions hold, evidence observability remains a rollout blocker.
+
+The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
+`12.4.5`, node_exporter `1.12.0`, and Alertmanager `0.33.1`.
+
+- Stage 4 work and conflict counters use durable execution deltas from the
+  current invocation. Reused or replayed checkpoints do not increment work;
+  conflict deltas count only newly durable conflicts after existing fingerprints
+  are excluded. Do not publish returned lifetime totals as new work.
+- Decision totals come from a trigger-maintained O(1) singleton derived from the
+  append-only decision ledger. The ledger remains canonical; the singleton is
+  bounded export state maintained on each insert, not permission to rewrite or
+  replace decision history.
+- Textfile read-modify-write uses a cross-process ownership-safe lock with a
+  unique owner marker, heartbeat, and stale-owner fencing. A fenced writer cannot
+  publish or unlink a successor's lock; publication remains temp-file plus atomic
+  rename while ownership is valid. A process-local mutex is not sufficient.
+- Stage 5 publishes actual Stage 5 retrieval attempts: increment immediately
+  before each live search and preserve the count through success, no-material,
+  fallback, fail-open, and unexpected completion paths. Do not infer attempts
+  from section count, accepted-run presence, or the final audit status.
+
+Database rollout is deliberately split. The partial unresolved-critical index
+uses live-write-safe `CREATE INDEX CONCURRENTLY` and its rollback uses
+`DROP INDEX CONCURRENTLY`; execute each statement in autocommit mode, never
+inside a transaction. Apply the separate transactional totals migration to
+create and reconcile the singleton plus its decision-insert trigger atomically.
+Do not combine the concurrent index statements with that transaction. Local
+verification still does not authorize applying either migration to staging or
+production.
+
 ## Rollout sequence
 
 Rollout is ordered and must not skip a step:
