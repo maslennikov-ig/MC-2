@@ -1,6 +1,7 @@
 -- Trigger-maintained O(1) reconciliation state. Canonical evidence rows remain authoritative.
 CREATE TABLE IF NOT EXISTS public.document_evidence_observability_totals (
   singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+  generation BIGINT NOT NULL DEFAULT txid_current() CHECK (generation >= 0),
   revision BIGINT NOT NULL DEFAULT 0 CHECK (revision >= 0),
   accepted_runs BIGINT NOT NULL DEFAULT 0 CHECK (accepted_runs >= 0),
   failed_runs BIGINT NOT NULL DEFAULT 0 CHECK (failed_runs >= 0),
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS public.document_evidence_observability_totals (
 
 -- Support an idempotent rerun after the earlier decision-only singleton shape.
 ALTER TABLE public.document_evidence_observability_totals
+  ADD COLUMN IF NOT EXISTS generation BIGINT NOT NULL DEFAULT txid_current() CHECK (generation >= 0),
   ADD COLUMN IF NOT EXISTS revision BIGINT NOT NULL DEFAULT 0 CHECK (revision >= 0),
   ADD COLUMN IF NOT EXISTS accepted_runs BIGINT NOT NULL DEFAULT 0 CHECK (accepted_runs >= 0),
   ADD COLUMN IF NOT EXISTS failed_runs BIGINT NOT NULL DEFAULT 0 CHECK (failed_runs >= 0),
@@ -154,6 +156,14 @@ CREATE TRIGGER increment_document_evidence_terminal_totals
     OLD.status NOT IN ('accepted', 'failed')
     AND NEW.status IN ('accepted', 'failed')
   )
+  EXECUTE FUNCTION public.increment_document_evidence_terminal_totals();
+
+DROP TRIGGER IF EXISTS increment_document_evidence_terminal_insert_totals
+  ON public.document_evidence_runs;
+CREATE TRIGGER increment_document_evidence_terminal_insert_totals
+  AFTER INSERT ON public.document_evidence_runs
+  FOR EACH ROW
+  WHEN (NEW.status IN ('accepted', 'failed'))
   EXECUTE FUNCTION public.increment_document_evidence_terminal_totals();
 
 CREATE OR REPLACE FUNCTION public.increment_document_evidence_checkpoint_totals()
@@ -294,6 +304,24 @@ WHERE singleton = TRUE;
 ALTER TABLE public.document_evidence_observability_totals ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.document_evidence_observability_totals FROM PUBLIC;
 GRANT SELECT ON public.document_evidence_observability_totals TO service_role;
+
+CREATE OR REPLACE FUNCTION public.get_document_evidence_observability_totals()
+RETURNS JSONB
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT to_jsonb(totals) || jsonb_build_object(
+    'database_start_unix_milliseconds',
+    floor(extract(epoch FROM pg_postmaster_start_time()) * 1000)::BIGINT
+  )
+  FROM public.document_evidence_observability_totals AS totals
+  WHERE singleton = TRUE
+$$;
+
+REVOKE ALL ON FUNCTION public.get_document_evidence_observability_totals() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_document_evidence_observability_totals() TO service_role;
 
 COMMENT ON TABLE public.document_evidence_observability_totals IS
   'Revisioned trigger-maintained absolute counters for O(1) Stage 4 reconciliation.';

@@ -198,25 +198,12 @@ async function loadDurableCriticalConflictState(context: AnalysisContext): Promi
 
 async function loadDurableStage4Totals(context: AnalysisContext): Promise<Stage4DurableTotals> {
   type DurableTotalsClient = {
-    from(relation: 'document_evidence_observability_totals'): {
-      select(columns: string): {
-        eq(
-          column: 'singleton',
-          value: true
-        ): {
-          single(): Promise<{ data: unknown; error: unknown }>;
-        };
-      };
-    };
+    rpc(
+      functionName: 'get_document_evidence_observability_totals'
+    ): Promise<{ data: unknown; error: unknown }>;
   };
   const totalsClient = context.supabase as unknown as DurableTotalsClient;
-  const { data, error } = await totalsClient
-    .from('document_evidence_observability_totals')
-    .select(
-      'revision,accepted_runs,failed_runs,source_documents,assessed_documents,degraded_documents,failed_documents,latest_coverage_source,latest_coverage_assessed,latest_coverage_degraded,latest_coverage_failed,full_text_documents,hierarchical_summary_documents,summary_documents,targeted_retrieval_documents,metadata_only_documents,batches,model_calls,input_tokens,output_tokens,total_cost_usd,duration_seconds,critical_conflicts,important_conflicts,informational_conflicts,user_decisions,system_decisions,degraded_automatic_decisions'
-    )
-    .eq('singleton', true)
-    .single();
+  const { data, error } = await totalsClient.rpc('get_document_evidence_observability_totals');
   if (error || !data) throw new Error('Document evidence metrics reconciliation failed');
   const row = data as Record<string, unknown>;
   const count = (column: string): number => {
@@ -234,6 +221,8 @@ async function loadDurableStage4Totals(context: AnalysisContext): Promise<Stage4
     return value;
   };
   return {
+    databaseStartUnixMilliseconds: count('database_start_unix_milliseconds'),
+    generation: count('generation'),
     revision: count('revision'),
     runs: { accepted: count('accepted_runs'), failed: count('failed_runs') },
     documents: {

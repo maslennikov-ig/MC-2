@@ -85,4 +85,30 @@ describe('E7 document evidence observability contract', () => {
     expect(dockerfile).toContain('FROM runtime-tools AS runner');
     expect(publisher).toContain("spawn('flock', ['--exclusive', '--timeout', '5', '3']");
   });
+
+  it('exposes one target-stable observability migration command with recovery epochs', () => {
+    const packageJson = JSON.parse(source('packages/course-gen-platform/package.json')) as {
+      scripts: Record<string, string>;
+    };
+    expect(packageJson.scripts['migration:document-evidence-observability:apply']).toContain(
+      'TMPDIR=${TMPDIR:-/tmp}'
+    );
+    expect(packageJson.scripts['migration:document-evidence-observability:apply']).toContain(
+      'apply-all'
+    );
+    expect(packageJson.scripts['migration:document-evidence-observability:rollback']).toContain(
+      'rollback-all'
+    );
+    const runner = source(
+      'packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts'
+    );
+    expect(runner).toContain('sslmode=verify-full');
+    expect(runner).toContain('DOCUMENT_EVIDENCE_OBSERVABILITY_REMOTE_CONFIRMATION');
+    const totals = source(
+      'packages/course-gen-platform/supabase/migrations/20260711151000_document_evidence_observability_totals.sql'
+    );
+    expect(totals).toContain('generation BIGINT');
+    expect(totals).toContain('pg_postmaster_start_time()');
+    expect(totals).toContain('increment_document_evidence_terminal_insert_totals');
+  });
 });

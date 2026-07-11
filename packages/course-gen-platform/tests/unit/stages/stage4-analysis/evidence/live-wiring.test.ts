@@ -74,6 +74,8 @@ const skippedResult = {
 };
 
 const durableTotals = (revision: number, userDecisions = 0) => ({
+  databaseStartUnixMilliseconds: 1_700_000_000_000,
+  generation: 10,
   revision,
   runs: { accepted: 1, failed: 0 },
   documents: { source: 1, assessed: 1, degraded: 0, failed: 0 },

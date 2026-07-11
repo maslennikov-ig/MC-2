@@ -17,6 +17,8 @@ type ProcessingMode =
   | 'metadata_only';
 
 export type Stage4DurableTotals = {
+  databaseStartUnixMilliseconds: number;
+  generation: number;
   revision: number;
   runs: { accepted: number; failed: number };
   documents: { source: number; assessed: number; degraded: number; failed: number };
@@ -233,6 +235,10 @@ function applyStage4(state: MetricState, event: Stage4Event): void {
   for (const severity of ['critical', 'important', 'informational'] as const) {
     state.delete(key('megacampus_document_evidence_conflicts_total', { severity }));
   }
+  for (const actor of ['user', 'system'] as const) {
+    state.delete(key('megacampus_document_evidence_decisions_total', { actor }));
+  }
+  state.delete('megacampus_document_evidence_degraded_automatic_decisions_total');
   increment(
     state,
     key('megacampus_document_evidence_stage4_invocations_total', {
@@ -273,10 +279,28 @@ function applyStage4(state: MetricState, event: Stage4Event): void {
   }
 }
 
-function applyDurableStage4Totals(state: MetricState, totals: Stage4DurableTotals): void {
+function applyDurableStage4Totals(
+  state: MetricState,
+  totals: Stage4DurableTotals
+): { olderEpoch: boolean } {
+  const databaseStart = requireCount(totals.databaseStartUnixMilliseconds, 'database start time');
+  const generation = requireCount(totals.generation, 'durable reconciliation generation');
   const revision = requireCount(totals.revision, 'durable reconciliation revision');
+  const databaseStartMetric = 'megacampus_document_evidence_database_start_unixtime_milliseconds';
+  const generationMetric = 'megacampus_document_evidence_reconciliation_generation';
   const revisionMetric = 'megacampus_document_evidence_reconciliation_revision';
-  if (revision <= (state.get(revisionMetric) ?? -1)) return;
+  const priorDatabaseStart = state.get(databaseStartMetric) ?? -1;
+  const priorGeneration = state.get(generationMetric) ?? -1;
+  const olderEpoch =
+    databaseStart < priorDatabaseStart ||
+    (databaseStart === priorDatabaseStart && generation < priorGeneration);
+  if (olderEpoch) return { olderEpoch: true };
+  const newerEpoch =
+    databaseStart > priorDatabaseStart ||
+    (databaseStart === priorDatabaseStart && generation > priorGeneration);
+  if (!newerEpoch && revision <= (state.get(revisionMetric) ?? -1)) {
+    return { olderEpoch: false };
+  }
   const documents = {
     source: requireCount(totals.documents.source, 'durable source documents'),
     assessed: requireCount(totals.documents.assessed, 'durable assessed documents'),
@@ -293,6 +317,9 @@ function applyDurableStage4Totals(state: MetricState, totals: Stage4DurableTotal
   if (latestCovered > latestCoverage.source) {
     throw new Error('Evidence metrics durable coverage is inconsistent');
   }
+  if (newerEpoch) state.clear();
+  state.set(databaseStartMetric, databaseStart);
+  state.set(generationMetric, generation);
   state.set(revisionMetric, revision);
   for (const status of ['accepted', 'failed'] as const) {
     state.set(
@@ -351,6 +378,7 @@ function applyDurableStage4Totals(state: MetricState, totals: Stage4DurableTotal
     latestCoverage.source === 0 ? 1 : latestCovered / latestCoverage.source
   );
   state.delete('megacampus_document_evidence_coverage_reconciliation_unixtime_milliseconds');
+  return { olderEpoch: false };
 }
 
 function applyStage5(state: MetricState, event: Stage5Event): void {
@@ -497,7 +525,10 @@ async function updateStage4Aggregate(
   const lock = await acquireOwnedLock(lockPath);
   try {
     const state = await readState(path, aggregateOptions);
-    if (event.durableTotals) applyDurableStage4Totals(state, event.durableTotals);
+    const durableResult = event.durableTotals
+      ? applyDurableStage4Totals(state, event.durableTotals)
+      : undefined;
+    if (durableResult?.olderEpoch) return;
     const reconciliation = event.criticalConflictState;
     if (reconciliation) {
       const observedAt = requireNumber(

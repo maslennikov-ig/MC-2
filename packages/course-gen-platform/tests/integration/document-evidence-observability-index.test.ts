@@ -1,13 +1,20 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION,
+  DOCUMENT_EVIDENCE_OBSERVABILITY_REMOTE_CONFIRMATION,
+  runDocumentEvidenceObservabilityMigration,
   runDocumentEvidenceObservabilityIndexMigration,
+  validateDocumentEvidenceObservabilityMigrationTarget,
   validateDocumentEvidenceMigrationTarget,
 } from '../../scripts/migrations/document-evidence-observability-index';
+
+const execFileAsync = promisify(execFile);
 
 const forwardPath = resolve(
   process.cwd(),
@@ -70,6 +77,38 @@ describe('document evidence observability index migration', () => {
       validateDocumentEvidenceMigrationTarget(remote, 'apply', {
         allowRemote: true,
         confirmation: DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION.apply,
+      })
+    ).toThrow(/sslmode=verify-full/iu);
+    expect(() =>
+      validateDocumentEvidenceMigrationTarget(`${remote}?sslmode=require`, 'apply', {
+        allowRemote: true,
+        confirmation: DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION.apply,
+      })
+    ).toThrow(/sslmode=verify-full/iu);
+    expect(() =>
+      validateDocumentEvidenceMigrationTarget(`${remote}?sslmode=verify-full`, 'apply', {
+        allowRemote: true,
+        confirmation: DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION.apply,
+      })
+    ).not.toThrow();
+  });
+
+  it('uses distinct exact remote confirmations for the unified migration', () => {
+    expect(DOCUMENT_EVIDENCE_OBSERVABILITY_REMOTE_CONFIRMATION).toEqual({
+      apply: 'APPLY REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711150000 20260711151000',
+      rollback: 'ROLL BACK REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711151000 20260711150000',
+    });
+    const remote = 'postgresql://postgres:secret@db.example.com:5432/postgres?sslmode=verify-full';
+    expect(() =>
+      validateDocumentEvidenceObservabilityMigrationTarget(remote, 'apply', {
+        allowRemote: true,
+        confirmation: DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION.apply,
+      })
+    ).toThrow(/confirmation/iu);
+    expect(() =>
+      validateDocumentEvidenceObservabilityMigrationTarget(remote, 'apply', {
+        allowRemote: true,
+        confirmation: DOCUMENT_EVIDENCE_OBSERVABILITY_REMOTE_CONFIRMATION.apply,
       })
     ).not.toThrow();
   });
@@ -219,6 +258,183 @@ appliedDescribe('document evidence observability index applied', () => {
     expect(history.rows).toHaveLength(1);
     expect(history.rows[0].name).toBe('document_evidence_observability_index');
     expect(history.rows[0].statements).toHaveLength(2);
+  });
+
+  it('applies both exact migrations on one target and reuses the verified live state', async () => {
+    const options = { databaseUrl: disposableUrl(databaseUrl!), direction: 'apply' as const };
+    await expect(runDocumentEvidenceObservabilityMigration(options)).resolves.toBe('applied');
+    await expect(runDocumentEvidenceObservabilityMigration(options)).resolves.toBe('reused');
+
+    const history = await client.query<{ version: string; name: string; statements: string[] }>(`
+      SELECT version,name,statements
+      FROM supabase_migrations.schema_migrations
+      WHERE version IN ('20260711150000','20260711151000')
+      ORDER BY version
+    `);
+    expect(history.rows.map(row => [row.version, row.name])).toEqual([
+      ['20260711150000', 'document_evidence_observability_index'],
+      ['20260711151000', 'document_evidence_observability_totals'],
+    ]);
+    expect(history.rows[0].statements).toHaveLength(2);
+    expect(history.rows[1].statements.length).toBeGreaterThan(10);
+
+    const live = await client.query<{
+      table_name: string | null;
+      trigger_count: string;
+      rls_enabled: boolean;
+      generation: string;
+    }>(`
+      SELECT
+        to_regclass('public.document_evidence_observability_totals')::text AS table_name,
+        (SELECT count(*)::text FROM pg_trigger
+         WHERE tgname IN (
+           'increment_document_evidence_terminal_totals',
+           'increment_document_evidence_terminal_insert_totals',
+           'increment_document_evidence_checkpoint_totals',
+           'increment_document_evidence_conflict_totals',
+           'increment_document_evidence_observability_totals'
+         ) AND NOT tgisinternal) AS trigger_count,
+        (SELECT relrowsecurity FROM pg_class
+         WHERE oid='public.document_evidence_observability_totals'::regclass) AS rls_enabled,
+        (SELECT generation::text FROM public.document_evidence_observability_totals) AS generation
+    `);
+    expect(live.rows[0]).toEqual({
+      table_name: 'document_evidence_observability_totals',
+      trigger_count: '5',
+      rls_enabled: true,
+      generation: expect.stringMatching(/^\d+$/u),
+    });
+    const rpc = (
+      await client.query<{ value: Record<string, unknown> }>(
+        'SELECT public.get_document_evidence_observability_totals() AS value'
+      )
+    ).rows[0].value;
+    expect(Number(rpc.generation)).toBeGreaterThan(0);
+    expect(Number(rpc.database_start_unix_milliseconds)).toBeGreaterThan(0);
+  });
+
+  it('keeps the totals migration and history atomic, then recovers the partial index apply', async () => {
+    await client.query('ALTER TABLE public.document_evidence_decisions DROP COLUMN subject_kind');
+    const options = { databaseUrl: disposableUrl(databaseUrl!), direction: 'apply' as const };
+    await expect(runDocumentEvidenceObservabilityMigration(options)).rejects.toThrow();
+
+    expect(await indexDefinition()).toContain(indexName);
+    expect(
+      (
+        await client.query(`
+          SELECT version FROM supabase_migrations.schema_migrations
+          WHERE version IN ('20260711150000','20260711151000') ORDER BY version
+        `)
+      ).rows
+    ).toEqual([{ version: '20260711150000' }]);
+    expect(
+      (
+        await client.query(
+          "SELECT to_regclass('public.document_evidence_observability_totals')::text AS relation"
+        )
+      ).rows[0].relation
+    ).toBeNull();
+
+    await client.query(
+      "ALTER TABLE public.document_evidence_decisions ADD COLUMN subject_kind text NOT NULL DEFAULT 'claim_conflict'"
+    );
+    await expect(runDocumentEvidenceObservabilityMigration(options)).resolves.toBe('recovered');
+  });
+
+  it('rolls back totals before the concurrent index and reapplies the full pair', async () => {
+    const target = disposableUrl(databaseUrl!);
+    await runDocumentEvidenceObservabilityMigration({ databaseUrl: target, direction: 'apply' });
+    const firstGeneration = Number(
+      (
+        await client.query<{ generation: string }>(
+          'SELECT generation FROM public.document_evidence_observability_totals'
+        )
+      ).rows[0].generation
+    );
+    await expect(
+      runDocumentEvidenceObservabilityMigration({ databaseUrl: target, direction: 'rollback' })
+    ).resolves.toBe('rolled_back');
+    expect(await indexDefinition()).toBeUndefined();
+    expect(
+      (await client.query('SELECT version FROM supabase_migrations.schema_migrations')).rows
+    ).toHaveLength(0);
+    expect(
+      (
+        await client.query(
+          "SELECT to_regclass('public.document_evidence_observability_totals')::text AS relation"
+        )
+      ).rows[0].relation
+    ).toBeNull();
+    await expect(
+      runDocumentEvidenceObservabilityMigration({ databaseUrl: target, direction: 'apply' })
+    ).resolves.toBe('applied');
+    const secondGeneration = Number(
+      (
+        await client.query<{ generation: string }>(
+          'SELECT generation FROM public.document_evidence_observability_totals'
+        )
+      ).rows[0].generation
+    );
+    expect(secondGeneration).toBeGreaterThan(firstGeneration);
+  });
+
+  it('aborts on mismatched totals history before mutating the index', async () => {
+    await client.query(`
+      INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
+      VALUES ('20260711151000','wrong_totals',ARRAY['SELECT 1'])
+    `);
+    await expect(
+      runDocumentEvidenceObservabilityMigration({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      })
+    ).rejects.toThrow(/history.*fixed migration/iu);
+    expect(await indexDefinition()).toBeUndefined();
+    expect(
+      (
+        await client.query(
+          "SELECT to_regclass('public.document_evidence_observability_totals')::text AS relation"
+        )
+      ).rows[0].relation
+    ).toBeNull();
+  });
+
+  it('runs the exact unified package apply and rollback with WSL Windows temp variables', async () => {
+    const { TMPDIR: _discarded, ...baseEnv } = process.env;
+    const env = {
+      ...baseEnv,
+      SUPABASE_DB_URL: disposableUrl(databaseUrl!),
+      TEMP: '/mnt/c/Users/test/AppData/Local/Temp',
+      TMP: '/mnt/c/Users/test/AppData/Local/Temp',
+    };
+    await execFileAsync(
+      'sh',
+      ['-lc', 'TMPDIR=${TMPDIR:-/tmp} pnpm run migration:document-evidence-observability:apply'],
+      {
+        cwd: process.cwd(),
+        env,
+      }
+    );
+    expect(await indexDefinition()).toContain(indexName);
+    expect(
+      (
+        await client.query(
+          'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version'
+        )
+      ).rows
+    ).toEqual([{ version: '20260711150000' }, { version: '20260711151000' }]);
+    await execFileAsync(
+      'sh',
+      ['-lc', 'TMPDIR=${TMPDIR:-/tmp} pnpm run migration:document-evidence-observability:rollback'],
+      {
+        cwd: process.cwd(),
+        env,
+      }
+    );
+    expect(
+      (await client.query('SELECT version FROM supabase_migrations.schema_migrations')).rows
+    ).toHaveLength(0);
+    expect(existsSync(resolve(process.cwd(), 'C:\\Users\\test\\AppData\\Local\\Temp'))).toBe(false);
   });
 
   it('rolls back cleanly and reapplies idempotently', async () => {
@@ -543,5 +759,37 @@ appliedDescribe('document evidence observability index applied', () => {
     expect(new Date(latest.latest_coverage_completed_at).toISOString()).toBe(
       '2026-01-01T00:02:00.000Z'
     );
+  });
+
+  it('counts a trusted terminal run inserted directly after trigger installation', async () => {
+    await client.query(totalsForward);
+    await client.query(`
+      INSERT INTO public.document_evidence_runs(
+        id,status,source_count,assessed_count,batch_count,model_calls,input_tokens,
+        output_tokens,total_cost_usd,started_at,completed_at
+      ) VALUES (
+        '20000000-0000-4000-8000-000000000020','accepted',1,1,1,1,10,2,0.05,
+        '2026-01-01T00:00:00Z','2026-01-01T00:00:05Z'
+      )
+    `);
+    expect(
+      (
+        await client.query(`
+          SELECT accepted_runs,source_documents,assessed_documents,batches,model_calls,
+                 input_tokens,output_tokens,total_cost_usd,duration_seconds
+          FROM public.document_evidence_observability_totals
+        `)
+      ).rows[0]
+    ).toMatchObject({
+      accepted_runs: '1',
+      source_documents: '1',
+      assessed_documents: '1',
+      batches: '1',
+      model_calls: '1',
+      input_tokens: '10',
+      output_tokens: '2',
+      total_cost_usd: '0.050000',
+      duration_seconds: '5.000000',
+    });
   });
 });

@@ -1,5 +1,13 @@
 import { execFile, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { once } from 'node:events';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -27,6 +35,8 @@ function directory(): string {
 const options = (path: string) => ({ directory: path, service: 'worker', instance: 'primary' });
 
 const durableTotals = (revision = 1) => ({
+  databaseStartUnixMilliseconds: 1_700_000_000_000,
+  generation: 10,
   revision,
   runs: { accepted: 1, failed: 0 },
   documents: { source: 4, assessed: 2, degraded: 1, failed: 1 },
@@ -254,6 +264,64 @@ describe('document evidence textfile metrics', () => {
       expect(replica).not.toContain('megacampus_document_evidence_runs_total');
       expect(replica).toContain('megacampus_document_evidence_stage4_invocations_total');
     }
+  });
+
+  it('removes legacy durable decision series from an upgraded replica file', async () => {
+    const path = directory();
+    const replicaPath = join(path, 'evidence-worker-primary.prom');
+    writeFileSync(
+      replicaPath,
+      [
+        'megacampus_document_evidence_decisions_total{service="worker",instance="primary",actor="user"} 9',
+        'megacampus_document_evidence_decisions_total{service="worker",instance="primary",actor="system"} 8',
+        'megacampus_document_evidence_degraded_automatic_decisions_total{service="worker",instance="primary"} 7',
+        '',
+      ].join('\n')
+    );
+    await publishDocumentEvidenceMetrics(stage4Event(), options(path));
+    const replica = readFileSync(replicaPath, 'utf8');
+    expect(replica).not.toContain('megacampus_document_evidence_decisions_total');
+    expect(replica).not.toContain(
+      'megacampus_document_evidence_degraded_automatic_decisions_total'
+    );
+    expect(replica).toContain('megacampus_document_evidence_stage4_invocations_total');
+  });
+
+  it('orders durable totals by database start, generation, then revision across restore and reapply', async () => {
+    const path = directory();
+    const eventWith = (
+      databaseStartUnixMilliseconds: number,
+      generation: number,
+      revision: number,
+      accepted: number
+    ): DocumentEvidenceMetricEvent => ({
+      ...stage4Event(),
+      durableTotals: {
+        ...durableTotals(revision),
+        databaseStartUnixMilliseconds,
+        generation,
+        runs: { accepted, failed: 0 },
+      },
+    });
+    const readAccepted = (): string =>
+      readFileSync(join(path, 'evidence-stage4-state.prom'), 'utf8');
+
+    await publishDocumentEvidenceMetrics(eventWith(1_000, 10, 99, 9), options(path));
+    await publishDocumentEvidenceMetrics(eventWith(1_000, 11, 0, 1), options(path));
+    expect(readAccepted()).toContain('status="accepted"} 1');
+
+    await publishDocumentEvidenceMetrics(eventWith(1_000, 10, 100, 8), options(path));
+    expect(readAccepted()).toContain('status="accepted"} 1');
+
+    await publishDocumentEvidenceMetrics(eventWith(2_000, 1, 0, 2), options(path));
+    expect(readAccepted()).toContain('status="accepted"} 2');
+
+    await publishDocumentEvidenceMetrics(eventWith(1_000, 999, 999, 7), options(path));
+    await publishDocumentEvidenceMetrics(eventWith(2_000, 1, 0, 6), options(path));
+    expect(readAccepted()).toContain('status="accepted"} 2');
+
+    await publishDocumentEvidenceMetrics(eventWith(2_000, 1, 1, 3), options(path));
+    expect(readAccepted()).toContain('status="accepted"} 3');
   });
 
   it('reconciles the same accepted run twice and counts one appended user decision once', async () => {
