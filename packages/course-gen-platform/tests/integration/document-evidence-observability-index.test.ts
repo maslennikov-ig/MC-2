@@ -650,6 +650,7 @@ appliedDescribe('document evidence observability index applied', () => {
 
   it('reconciles terminal work and conflict checkpoints exactly once in one O(1) row', async () => {
     await client.query(`
+      BEGIN;
       INSERT INTO public.document_evidence_runs(
         id,status,source_count,assessed_count,degraded_count,failed_count,
         batch_count,model_calls,input_tokens,output_tokens,total_cost_usd,
@@ -770,13 +771,19 @@ appliedDescribe('document evidence observability index applied', () => {
       ) VALUES (
         '20000000-0000-4000-8000-000000000020','accepted',1,1,1,1,10,2,0.05,
         '2026-01-01T00:00:00Z','2026-01-01T00:00:05Z'
-      )
+      );
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode) VALUES (
+        '30000000-0000-4000-8000-000000000020',
+        '20000000-0000-4000-8000-000000000020',
+        'summary'
+      );
+      COMMIT;
     `);
     expect(
       (
         await client.query(`
           SELECT accepted_runs,source_documents,assessed_documents,batches,model_calls,
-                 input_tokens,output_tokens,total_cost_usd,duration_seconds
+                 input_tokens,output_tokens,total_cost_usd,duration_seconds,summary_documents
           FROM public.document_evidence_observability_totals
         `)
       ).rows[0]
@@ -790,6 +797,36 @@ appliedDescribe('document evidence observability index applied', () => {
       output_tokens: '2',
       total_cost_usd: '0.050000',
       duration_seconds: '5.000000',
+      summary_documents: '1',
     });
+  });
+
+  it('rejects an accepted terminal insert that commits without its exact durable items', async () => {
+    await client.query(totalsForward);
+    await client.query('BEGIN');
+    await client.query(`
+      INSERT INTO public.document_evidence_runs(
+        id,status,source_count,assessed_count,started_at,completed_at
+      ) VALUES (
+        '20000000-0000-4000-8000-000000000021','accepted',1,1,
+        '2026-01-01T00:00:00Z','2026-01-01T00:00:05Z'
+      )
+    `);
+    await expect(client.query('COMMIT')).rejects.toThrow(/requires exact durable items/iu);
+    await client.query('ROLLBACK').catch(() => undefined);
+    expect(
+      (
+        await client.query(
+          "SELECT count(*)::text AS count FROM public.document_evidence_runs WHERE id='20000000-0000-4000-8000-000000000021'"
+        )
+      ).rows[0].count
+    ).toBe('0');
+    expect(
+      (
+        await client.query(
+          'SELECT accepted_runs,source_documents FROM public.document_evidence_observability_totals'
+        )
+      ).rows[0]
+    ).toEqual({ accepted_runs: '0', source_documents: '0' });
   });
 });

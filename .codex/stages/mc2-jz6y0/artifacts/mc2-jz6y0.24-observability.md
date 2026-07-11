@@ -69,7 +69,7 @@ verification:
   - post-hook restoration rerun: focused 124/124 and pnpm type-check passed
   - full pnpm test across workspace unit suites: passed
   - Stage 5 exact-attempt and sanitized post-search failure gate: 33/33 passed
-  - Unified migrations/reconciliation applied gate: 19/19 on PostgreSQL 16, including both exact history rows, transactional totals atomicity, partial recovery, full reverse rollback/reapply, direct terminal inserts, runtime epochs, invalid-index recovery, and out-of-order latest coverage
+  - Unified migrations/reconciliation applied gate: 20/20 on PostgreSQL 16, including both exact history rows, transactional totals atomicity, partial recovery, full reverse rollback/reapply, deferred direct terminal inserts with exact-item enforcement, runtime epochs, invalid-index recovery, and out-of-order latest coverage
   - Cross-process publisher proof uses 12 real child processes, inherited-fd kernel-lock contention, and killed-owner recovery
   - Privacy remediation contract: initial identity RED 4/4 failed, final GREEN 4/4 passed; outcome naming RED 2/4 failed before GREEN
   - Prometheus 3.13.1 promtool check config/check rules/test rules: passed, 14 rules

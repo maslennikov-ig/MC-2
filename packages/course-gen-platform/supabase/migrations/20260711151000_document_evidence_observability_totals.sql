@@ -84,16 +84,25 @@ DECLARE
   v_summary BIGINT;
   v_targeted BIGINT;
   v_metadata BIGINT;
+  v_item_count BIGINT;
 BEGIN
   SELECT
     count(*) FILTER (WHERE processing_mode = 'full_text'),
     count(*) FILTER (WHERE processing_mode = 'hierarchical_summary'),
     count(*) FILTER (WHERE processing_mode = 'summary'),
     count(*) FILTER (WHERE processing_mode = 'targeted_retrieval'),
-    count(*) FILTER (WHERE processing_mode = 'metadata_only')
-  INTO v_full_text, v_hierarchical, v_summary, v_targeted, v_metadata
+    count(*) FILTER (WHERE processing_mode = 'metadata_only'),
+    count(*)
+  INTO v_full_text, v_hierarchical, v_summary, v_targeted, v_metadata, v_item_count
   FROM public.document_evidence_items
   WHERE run_id = NEW.id;
+
+  IF TG_OP = 'INSERT' AND NEW.status = 'accepted' AND (
+    v_item_count <> NEW.source_count OR
+    v_full_text + v_hierarchical + v_summary + v_targeted + v_metadata <> NEW.source_count
+  ) THEN
+    RAISE EXCEPTION 'accepted terminal evidence insert requires exact durable items';
+  END IF;
 
   UPDATE public.document_evidence_observability_totals
   SET
@@ -160,8 +169,9 @@ CREATE TRIGGER increment_document_evidence_terminal_totals
 
 DROP TRIGGER IF EXISTS increment_document_evidence_terminal_insert_totals
   ON public.document_evidence_runs;
-CREATE TRIGGER increment_document_evidence_terminal_insert_totals
+CREATE CONSTRAINT TRIGGER increment_document_evidence_terminal_insert_totals
   AFTER INSERT ON public.document_evidence_runs
+  DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW
   WHEN (NEW.status IN ('accepted', 'failed'))
   EXECUTE FUNCTION public.increment_document_evidence_terminal_totals();

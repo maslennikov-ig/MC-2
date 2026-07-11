@@ -16,7 +16,7 @@ export const DOCUMENT_EVIDENCE_OBSERVABILITY_REMOTE_CONFIRMATION = {
 } as const;
 const DOCUMENT_EVIDENCE_TOTALS_MIGRATION_VERSION = '20260711151000';
 const DOCUMENT_EVIDENCE_TOTALS_MIGRATION_NAME = 'document_evidence_observability_totals';
-const TOTALS_FORWARD_SHA256 = '68978890ad4ab837976783b61b6fa782a4d9c6e39060cc5987cb93c647538475';
+const TOTALS_FORWARD_SHA256 = '2f1e28c20baaf383e76df11afdeddec9d37d917262d6e2d30aa5cb607f151b7b';
 const TOTALS_ROLLBACK_SHA256 = '2187f97fb3949d1d61a7804562391a8ff40e569ec33d0288ab2da3253f292248';
 
 const INDEX_NAME = 'idx_clarifying_pending_critical_evidence_created_at';
@@ -504,9 +504,16 @@ async function assertExactTotals(client: Client): Promise<void> {
       'Live document evidence observability totals do not match the fixed definition'
     );
   }
-  const triggers = await client.query<{ name: string; security_definer: boolean }>(
+  const triggers = await client.query<{
+    name: string;
+    security_definer: boolean;
+    deferrable: boolean;
+    initially_deferred: boolean;
+  }>(
     `
-    SELECT triggers.tgname AS name, procedures.prosecdef AS security_definer
+      SELECT triggers.tgname AS name, procedures.prosecdef AS security_definer,
+        triggers.tgdeferrable AS deferrable,
+        triggers.tginitdeferred AS initially_deferred
     FROM pg_trigger triggers
     JOIN pg_proc procedures ON procedures.oid=triggers.tgfoid
     WHERE triggers.tgrelid IN (
@@ -523,7 +530,12 @@ async function assertExactTotals(client: Client): Promise<void> {
   if (
     JSON.stringify(triggers.rows.map(row => row.name)) !==
       JSON.stringify([...TOTALS_TRIGGERS].sort()) ||
-    triggers.rows.some(row => !row.security_definer)
+    triggers.rows.some(row => !row.security_definer) ||
+    triggers.rows.some(row =>
+      row.name === 'increment_document_evidence_terminal_insert_totals'
+        ? !row.deferrable || !row.initially_deferred
+        : row.deferrable || row.initially_deferred
+    )
   ) {
     throw new Error(
       'Live document evidence observability triggers do not match the fixed definition'
