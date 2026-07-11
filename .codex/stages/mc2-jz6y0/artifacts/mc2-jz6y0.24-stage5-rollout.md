@@ -47,8 +47,8 @@ parallel_decision: parallel
 status: returned
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: Five authorized setup-only node_modules symlinks were removed; no containers, services, secrets, live data or runtime resources were created. The dedicated worktree remains until the integration acceptance commit is pushed.
+cleanup_status: cleaned
+cleanup_notes: Five authorized setup-only node_modules symlinks were removed; no containers, services, secrets, live data or runtime resources were created. After integration merge ad66dd50 and acceptance commit 0dab9df7 were pushed, the dedicated worktree and local branch were removed; the remote evidence branch remains.
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed
