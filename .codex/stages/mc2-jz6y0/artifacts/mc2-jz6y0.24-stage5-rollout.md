@@ -46,9 +46,9 @@ depends_on_streams:
 parallel_decision: parallel
 status: returned
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: cleaned
-cleanup_notes: Five authorized setup-only node_modules symlinks were removed; no containers, services, secrets, live data or runtime resources were created.
+accepted_by_orchestrator: yes
+cleanup_status: pending
+cleanup_notes: Five authorized setup-only node_modules symlinks were removed; no containers, services, secrets, live data or runtime resources were created. The dedicated worktree remains until the integration acceptance commit is pushed.
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed
@@ -64,6 +64,8 @@ verification:
   - git diff --check: passed.
   - python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-stage5-rollout.md: passed.
   - git commit 0aad2c20 and git push -u origin codex/e7-stage5-rollout: passed.
+  - Independent correctness review of 7b542c8d..b7359f32: PASS / MERGE with no branch findings; the separately found Stage 4 shadow-conflict gap is tracked by mc2-jz6y0.24.3.
+  - Integration rerun after merge: focused Stage 5 rollout/handler plus Stage 6 loader passed 14/14; @megacampus/course-gen-platform type-check passed.
 changed_files:
   - packages/course-gen-platform/src/shared/document-evidence/rollout.ts
   - packages/course-gen-platform/src/stages/stage5-generation/evidence/rollout.ts
