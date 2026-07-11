@@ -746,6 +746,7 @@ DECLARE
   v_expected_subject_keys TEXT[];
   v_question_subject_keys TEXT[];
   v_question_count INTEGER;
+  v_question_limit INTEGER;
 BEGIN
   IF (SELECT auth.role()) IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'Decision gate materialization requires service_role' USING ERRCODE = '42501';
@@ -759,16 +760,25 @@ BEGIN
   IF NOT FOUND OR v_run.status <> 'accepted' THEN
     RAISE EXCEPTION 'Decision gate requires accepted run' USING ERRCODE = '23514';
   END IF;
+  SELECT v_run.source_count
+    + (SELECT count(*) FROM public.document_evidence_conflicts conflicts
+       WHERE conflicts.run_id = p_run_id AND conflicts.severity IN ('critical', 'important'))
+    + (SELECT count(*) FROM public.document_evidence_conflict_checkpoints checkpoints
+       WHERE checkpoints.run_id = p_run_id
+         AND checkpoints.structured_checkpoint->>'kind' = 'conflict_capacity_degraded')
+  INTO v_question_limit;
   SELECT * INTO v_existing FROM public.document_evidence_conflict_checkpoints
   WHERE run_id = p_run_id AND batch_key = 'decision-gate:' || p_idempotency_key::text;
   IF FOUND THEN
     IF v_existing.input_hash IS DISTINCT FROM v_payload_hash THEN
       RAISE EXCEPTION 'Decision gate idempotency key has a changed payload' USING ERRCODE = '23514';
     END IF;
+    PERFORM public.refresh_document_evidence_decision_snapshot(p_course_id, p_run_id);
     RETURN (v_existing.structured_checkpoint->'result') || jsonb_build_object('reused', true);
   END IF;
 
-  IF jsonb_array_length(p_questions) > 256 THEN
+  IF jsonb_array_length(p_questions) > v_question_limit
+     OR octet_length(p_questions::text) > 16777216 THEN
     RAISE EXCEPTION 'Decision gate exceeds bounded question count' USING ERRCODE = '22023';
   END IF;
   WITH expected AS (
@@ -872,6 +882,7 @@ BEGIN
       v_decision_ids := v_decision_ids || jsonb_build_array(v_decision_result->>'decision_id');
     END IF;
   END LOOP;
+  PERFORM public.refresh_document_evidence_decision_snapshot(p_course_id, p_run_id);
   v_result := jsonb_build_object(
     'question_ids', (SELECT COALESCE(jsonb_agg(value ORDER BY value), '[]'::jsonb) FROM jsonb_array_elements_text(v_question_ids)),
     'decision_ids', (SELECT COALESCE(jsonb_agg(value ORDER BY value), '[]'::jsonb) FROM jsonb_array_elements_text(v_decision_ids)),
@@ -1184,22 +1195,23 @@ DECLARE
   v_expected UUID[];
   v_received UUID[];
   v_applied UUID[];
+  v_target_run public.document_evidence_runs%ROWTYPE;
 BEGIN
   IF (SELECT auth.role()) IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'Evidence retry consumption requires service_role' USING ERRCODE = '42501';
   END IF;
   IF jsonb_typeof(p_decision_ids) IS DISTINCT FROM 'array'
      OR jsonb_array_length(p_decision_ids) < 1
-     OR jsonb_array_length(p_decision_ids) > 50 THEN
+     OR jsonb_array_length(p_decision_ids) > 1000
+     OR octet_length(p_decision_ids::text) > 65536 THEN
     RAISE EXCEPTION 'Evidence retry decision set is invalid' USING ERRCODE = '22023';
   END IF;
   PERFORM 1 FROM public.courses
   WHERE id = p_course_id AND organization_id = p_organization_id FOR UPDATE;
-  IF NOT FOUND OR NOT EXISTS (
-    SELECT 1 FROM public.document_evidence_runs
-    WHERE id = p_target_run_id AND course_id = p_course_id
-      AND organization_id = p_organization_id AND status = 'accepted'
-  ) THEN
+  SELECT * INTO v_target_run FROM public.document_evidence_runs
+  WHERE id = p_target_run_id AND course_id = p_course_id
+    AND organization_id = p_organization_id AND status = 'accepted';
+  IF NOT FOUND OR v_target_run.source_count < jsonb_array_length(p_decision_ids) THEN
     RAISE EXCEPTION 'Evidence retry target run is outside scope' USING ERRCODE = '23514';
   END IF;
   SELECT array_agg(value::uuid ORDER BY value::uuid) INTO v_received

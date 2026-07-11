@@ -412,21 +412,48 @@ describe('document conflict detector', () => {
     );
   });
 
-  it('measures the exact serialized cl100k request and rejects an oversized call before the port', async () => {
+  it.each([
+    ['en', 'Extremely long audited statement. '.repeat(20_000)],
+    ['ru', 'Очень длинное проверяемое утверждение. '.repeat(20_000)],
+  ] as const)(
+    'persists detector capacity without a model call when one %s claim cannot fit',
+    async (language, statement) => {
+      const classifier = port();
+      const db = repository([evidenceCard(0, statement), cards[1]]);
+      const result = await detectDocumentConflicts(
+        { ...baseInput, language, maxInputTokens: 256 },
+        { repository: db, port: classifier }
+      );
+      expect(result.issues).toEqual([
+        expect.objectContaining({
+          kind: 'detector_capacity',
+          reason: 'detector_capacity_degraded',
+        }),
+      ]);
+      expect(classifier.mapBatch).not.toHaveBeenCalled();
+      expect(db.commitConflictBatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ verificationStatus: 'degraded' })
+      );
+    }
+  );
+
+  it('splits map batches by exact serialized tokens before the count limit', async () => {
     const classifier = port();
-    await expect(
-      detectDocumentConflicts(
-        { ...baseInput, maxInputTokens: 64 },
-        {
-          repository: repository([
-            evidenceCard(0, 'Очень длинное проверяемое утверждение. '.repeat(200)),
-            cards[1],
-          ]),
-          port: classifier,
-        }
-      )
-    ).rejects.toThrow(/token.*bound|bounded.*input/i);
-    expect(classifier.mapBatch).not.toHaveBeenCalled();
+    const result = await detectDocumentConflicts(
+      { ...baseInput, maxInputTokens: 25_000 },
+      {
+        repository: repository([
+          evidenceCard(0, 'policy '.repeat(18_000)),
+          evidenceCard(1, 'standard '.repeat(18_000)),
+        ]),
+        port: classifier,
+      }
+    );
+    expect(result.issues).toEqual([]);
+    expect(classifier.mapBatch).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(classifier.mapBatch).mock.calls.every(([request]) => request.claims.length === 1)
+    ).toBe(true);
   });
 
   it('resumes committed map batches after a crash with no replay and rejects key/hash collisions', async () => {

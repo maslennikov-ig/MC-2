@@ -186,6 +186,43 @@ function allDurableQuestions(recommendedCount = 1) {
   return [conflictQuestion(recommendedCount), degradedQuestion(), capacityQuestion()];
 }
 
+function largeDegradedQuestions(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const documentId = `40000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`;
+    return {
+      questionId: `80000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      questionText: `How should Document-${index + 1}.pdf be handled?`,
+      priority: 'important',
+      suggestedAnswers: [
+        {
+          value: 'continue_limited',
+          text: 'Continue with limited evidence',
+          rationale: 'Retain explicit degraded coverage',
+          is_recommended: true,
+        },
+        {
+          value: 'remove_document',
+          text: 'Exclude advisory evidence',
+          rationale: 'Keep source history only',
+          is_recommended: false,
+        },
+      ],
+      metadata: {
+        schema_version: 'document-conflict-question-v1',
+        subject_kind: 'degraded_evidence',
+        subject_key: subjectKey(
+          id.run,
+          `degraded:${documentId}:degraded:transient:0`
+        ),
+        run_id: id.run,
+        document_id: documentId,
+        attempt: 0,
+        max_attempts: 1,
+      },
+    };
+  });
+}
+
 function additionalConflictQuestion() {
   const question = conflictQuestion();
   return {
@@ -252,7 +289,8 @@ async function answer(
 async function resetDatabase(
   includePriorRetry = true,
   includeCapacity = true,
-  includeSecondDegraded = false
+  includeSecondDegraded = false,
+  largeDegradedCount = 0
 ): Promise<void> {
   await admin.query(`
     DROP SCHEMA IF EXISTS public CASCADE;
@@ -318,6 +356,39 @@ async function resetDatabase(
     id.courseB,
     id.orgB,
   ]);
+  if (largeDegradedCount > 0) {
+    const largeManifest = Array.from({ length: largeDegradedCount }, (_, index) => ({
+      document_id: `40000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      source_version_hash: `hash-${index + 1}`,
+      document_name: `Document-${index + 1}.pdf`,
+    }));
+    await admin.query(
+      `INSERT INTO document_evidence_runs(
+         id,course_id,organization_id,input_fingerprint,evidence_version,status,source_manifest
+       ) VALUES ($1,$2,$3,'fp-large','e2-v1','processing',$4::jsonb)`,
+      [id.run, id.courseA, id.orgA, JSON.stringify(largeManifest)]
+    );
+    await admin.query(
+      `INSERT INTO document_evidence_items(
+         run_id,course_id,organization_id,document_id,source_version_hash,document_name,
+         priority,authority_scope,content_quality,course_relevance,processing_mode,summary,claims,
+         coverage_status,coverage_reason,original_tokens,summary_tokens,allocated_tokens
+       )
+       SELECT $1,$2,$3,entry.document_id::uuid,entry.source_version_hash,entry.document_name,
+         'IMPORTANT','course_source',0.5,0.5,'metadata_only',NULL,'[]'::jsonb,
+         'degraded','transient',100,0,10
+       FROM jsonb_to_recordset($4::jsonb) AS entry(
+         document_id text, source_version_hash text, document_name text
+       )`,
+      [id.run, id.courseA, id.orgA, JSON.stringify(largeManifest)]
+    );
+    await admin.query(
+      `UPDATE document_evidence_runs SET status='accepted',degraded_count=$2,completed_at=now()
+       WHERE id=$1`,
+      [id.run, largeDegradedCount]
+    );
+    return;
+  }
   const manifest = [
     { document_id: id.docA, source_version_hash: 'hash-a', document_name: 'A.pdf' },
     { document_id: id.docB, source_version_hash: 'hash-b', document_name: 'B.pdf' },
@@ -870,6 +941,173 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
       actor_provenance: 'legacy_unknown',
     });
   });
+
+  it('persists and restores the full manual zero-system-decision snapshot', async () => {
+    await resetDatabase(true, true);
+    const first = await materialize('manual', allDurableQuestions());
+    expect(first.rows[0].result.decision_ids).toEqual([]);
+    const snapshot = (
+      await admin.query(`SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`, [
+        id.courseA,
+      ])
+    ).rows[0].value;
+    expect(snapshot).toMatchObject({
+      accepted_run_id: id.run,
+      coverage: {
+        source_count: 3,
+        assessed_count: 2,
+        degraded_count: 1,
+        failed_count: 0,
+      },
+      current_decision_ids: [],
+      unresolved_informational_conflict_ids: [id.informational],
+    });
+    await admin.query(
+      `UPDATE courses SET analysis_result=analysis_result-'document_evidence' WHERE id=$1`,
+      [id.courseA]
+    );
+    const replay = await materialize('manual', allDurableQuestions());
+    expect(replay.rows[0].result.reused).toBe(true);
+    const restored = (
+      await admin.query(`SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`, [
+        id.courseA,
+      ])
+    ).rows[0].value;
+    expect(restored).toEqual(snapshot);
+  });
+
+  it('supports the analyzing-to-manual-pause-to-approved transition path', async () => {
+    await resetDatabase(true, true);
+    await admin.query('ALTER TABLE courses DISABLE TRIGGER guard_document_evidence_course_transition');
+    await admin.query(`UPDATE courses SET generation_status='stage_4_analyzing' WHERE id=$1`, [
+      id.courseA,
+    ]);
+    await admin.query('ALTER TABLE courses ENABLE TRIGGER guard_document_evidence_course_transition');
+    await materialize('manual', allDurableQuestions());
+    await expect(
+      admin.query(`UPDATE courses SET generation_status='stage_4_clarifying' WHERE id=$1`, [
+        id.courseA,
+      ])
+    ).resolves.toBeDefined();
+    await expect(
+      admin.query(`UPDATE courses SET generation_status='stage_4_analyzing' WHERE id=$1`, [
+        id.courseA,
+      ])
+    ).rejects.toMatchObject({ code: '23514' });
+    await materialize(
+      'automatic',
+      allDurableQuestions(),
+      '90000000-0000-4000-8000-000000000096'
+    );
+    await expect(
+      admin.query(`UPDATE courses SET generation_status='stage_4_analyzing' WHERE id=$1`, [
+        id.courseA,
+      ])
+    ).resolves.toBeDefined();
+  });
+
+  it('atomically materializes the exact 1000-subject manual gate without partial questions', async () => {
+    await resetDatabase(false, false, false, 1000);
+    const questions = largeDegradedQuestions(1000);
+    const invalid = structuredClone(questions);
+    invalid[999].metadata.subject_key = 'sha256:foreign';
+    await expect(materialize('manual', invalid)).rejects.toMatchObject({ code: '23514' });
+    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe('0');
+    const result = await materialize('manual', questions);
+    expect(result.rows[0].result.question_ids).toHaveLength(1000);
+    expect(result.rows[0].result.decision_ids).toEqual([]);
+    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe(
+      '1000'
+    );
+    const snapshot = (
+      await admin.query(`SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`, [
+        id.courseA,
+      ])
+    ).rows[0].value;
+    expect(snapshot).toMatchObject({
+      accepted_run_id: id.run,
+      coverage: { source_count: 1000, degraded_count: 1000 },
+      current_decision_ids: [],
+      unresolved_informational_conflict_ids: [],
+    });
+  }, 30_000);
+
+  it.each([51, 1000])(
+    'recovers and atomically links the full %i-document pending retry set',
+    async count => {
+      await resetDatabase(false, false, false, count);
+      await admin.query(
+        `INSERT INTO document_evidence_decisions(
+           run_id,course_id,organization_id,selected_resolution,rationale,resolved_by,answer_source,
+           selected_recommendation_value,subject_kind,subject_key,document_id
+         )
+         SELECT items.run_id,items.course_id,items.organization_id,'retry','Bounded transient retry',
+           'system','system','retry','degraded_evidence',
+           public.document_evidence_subject_key(items.run_id,'degraded_evidence',NULL,items.document_id),
+           items.document_id
+         FROM document_evidence_items items WHERE items.run_id=$1`,
+        [id.run]
+      );
+      const firstPending = await asRole(admin, 'service_role', id.orgA, () =>
+        admin.query('SELECT public.get_document_evidence_retry_directives($1,2) AS result', [
+          id.courseA,
+        ])
+      );
+      const replayedPending = await asRole(admin, 'service_role', id.orgA, () =>
+        admin.query('SELECT public.get_document_evidence_retry_directives($1,2) AS result', [
+          id.courseA,
+        ])
+      );
+      expect(firstPending.rows[0].result).toHaveLength(count);
+      expect(replayedPending.rows[0].result).toEqual(firstPending.rows[0].result);
+      await admin.query(
+        `INSERT INTO document_evidence_runs(
+           id,course_id,organization_id,input_fingerprint,evidence_version,status,source_manifest
+         ) SELECT $1,course_id,organization_id,'fp-large-target',evidence_version,'processing',source_manifest
+           FROM document_evidence_runs WHERE id=$2`,
+        [id.retryTarget, id.run]
+      );
+      await admin.query(
+        `INSERT INTO document_evidence_items(
+           run_id,course_id,organization_id,document_id,source_version_hash,document_name,
+           priority,authority_scope,content_quality,course_relevance,processing_mode,summary,claims,
+           coverage_status,coverage_reason,original_tokens,summary_tokens,allocated_tokens
+         ) SELECT $1,course_id,organization_id,document_id,source_version_hash,document_name,
+           priority,authority_scope,content_quality,course_relevance,processing_mode,summary,claims,
+           coverage_status,coverage_reason,original_tokens,summary_tokens,allocated_tokens
+         FROM document_evidence_items WHERE run_id=$2`,
+        [id.retryTarget, id.run]
+      );
+      await admin.query(
+        `UPDATE document_evidence_runs SET status='accepted',degraded_count=$2,completed_at=now()
+         WHERE id=$1`,
+        [id.retryTarget, count]
+      );
+      const decisionIds = firstPending.rows[0].result.map(
+        (value: { decision_id: string }) => value.decision_id
+      );
+      const consumed = await asRole(admin, 'service_role', id.orgA, () =>
+        admin.query(
+          'SELECT public.consume_document_evidence_retry_directives($1,$2,$3,$4::jsonb) AS result',
+          [id.courseA, id.orgA, id.retryTarget, JSON.stringify(decisionIds)]
+        )
+      );
+      expect(consumed.rows[0].result).toMatchObject({ reused: false });
+      expect(consumed.rows[0].result.decision_ids).toHaveLength(count);
+      const replay = await asRole(admin, 'service_role', id.orgA, () =>
+        admin.query(
+          'SELECT public.consume_document_evidence_retry_directives($1,$2,$3,$4::jsonb) AS result',
+          [id.courseA, id.orgA, id.retryTarget, JSON.stringify(decisionIds)]
+        )
+      );
+      expect(replay.rows[0].result).toMatchObject({ reused: true });
+      expect(
+        (await admin.query('SELECT count(*) FROM document_evidence_retry_applications')).rows[0]
+          .count
+      ).toBe(String(count));
+    },
+    30_000
+  );
 
   it('recovers the exact pending multi-document retry set and counts only an applied target run', async () => {
     await resetDatabase(false, true, true);

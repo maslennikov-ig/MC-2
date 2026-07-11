@@ -61,7 +61,7 @@ status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
 cleanup_status: cleaned
-cleanup_notes: Disposable PostgreSQL 15.18 containers, the temporary Vitest config, copied SQL harness files, and worktree node_modules symlinks were removed after fresh verification. Parent owns post-integration branch/worktree cleanup.
+cleanup_notes: The review-closeout PostgreSQL 15.18 container and worktree dependency symlinks were removed after the final post-review verification pass. Parent owns post-integration branch/worktree cleanup.
 risk_level: high
 docs_impact: behavior-and-migration
 docs_reviewed: no-change-needed
@@ -69,9 +69,9 @@ docs_review_notes: The approved document-evidence design and E3 execution plan a
 graph_reviewed: used
 graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran a focused Graphify query before broad source reads. The shared graph is stale for E3; refresh is deferred to the parent after integration because this isolated worker does not safely own graphify-out.
 verification:
-  - Focused course-gen-platform unit matrix passed 130/130 across detector, decision service, live wiring, repository, preflight, router, LLM client, actor-specific idempotency, and SQLSTATE mapping.
+  - Focused course-gen-platform unit matrix passed 136/136 across detector, decision service, manual boundary, live wiring, repository, preflight, router, LLM client, actor-specific idempotency, and SQLSTATE mapping.
   - Shared document-evidence contracts passed 13/13.
-  - Static and applied migration matrix passed 31/31, including 21/21 on disposable PostgreSQL 15.18.
+  - Static and applied migration matrix passed 36/36, including 26/26 on disposable PostgreSQL 15.18.
   - packages/course-gen-platform type-check passed after all review remediations.
   - scripts/orchestration/run_process_verification.sh passed, including git diff --check.
 changed_files:
@@ -95,6 +95,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/server/routers/clarifying.router.test.ts
   - packages/course-gen-platform/tests/unit/shared/llm/client.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/conflict-detector.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/clarifying-boundary.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/decision-service.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/preflight.test.ts
@@ -124,12 +125,13 @@ Material Qdrant verification samples an exact deterministic representative plan,
 - Recovery review found single-latest retry loss, counting unexecuted decisions, and final-attempt replay collision. The fix introduced the full pending set, append-only target-run linkage, exact atomic consume, replay-safe idempotency, and crash/resume tests for two documents.
 - Capacity/Qdrant review found operation-count planning instead of actual attempt accounting and unbounded material-side verification. The fix charges actual attempts at every boundary, persists capacity checkpoints, and records a deterministic capped verification plan. Large-side coverage proves 129 representative documents/refs in nine grouped calls with at most 16 documents per call.
 - Final addenda bound user idempotency to actor/course/question/subject, made cross-user reuse fail closed, canonically upgraded E1 decision chains, revoked direct helper execution, mapped `40001` to conflict, replaced a malformed collision fixture with a valid semantic collision, and corrected RU/EN product wording and detector-capacity choices.
+- Independent post-push review found five missed supported-scale boundaries. Count-only conflict map batches could throw before a durable capacity subject; disabled/skipped ordinary clarification could interrupt without persisting `stage_4_clarifying`; manual and informational-only gates could omit the accepted snapshot; the atomic gate capped valid 1,000-source runs at 256 questions; and retry consume capped the exact pending set at 50. RED reproduced every boundary. GREEN uses exact cl100k token-aware map partitioning, durable EN/RU impossible-claim capacity checkpoints, a fail-closed reusable status/progress transition, unconditional empty/full atomic gate refresh, a DB-derived accepted source/material-conflict/capacity-subject limit with a 16 MiB payload envelope, and exact retry linkage up to the 1,000-source target-run limit. Applied tests prove 1,000 questions create no partial rows, 51/1,000 pending retries survive restart and link atomically, and the real analyzing→manual pause→guarded approval path succeeds only after decisions.
 
 # Verification
 
-- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=[test] pnpm exec vitest run --config vitest.config.unit.ts ...` -> 130/130.
+- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=[test] pnpm exec vitest run --config vitest.config.unit.ts ...` -> 136/136.
 - `pnpm exec vitest run tests/document-evidence.test.ts` in shared-types -> 13/13.
-- `DOCUMENT_EVIDENCE_DATABASE_URL=postgresql://postgres:[redacted]@127.0.0.1:55433/document_evidence_e3_test pnpm exec vitest run --config ../../vitest.shared.ts --root . tests/integration/document-conflict-auto-decisions.test.ts tests/integration/document-conflict-auto-decisions-applied.test.ts` -> 31/31 (10 static, 21 applied).
+- `DOCUMENT_EVIDENCE_DATABASE_URL=postgresql://postgres:[redacted]@127.0.0.1:55433/document_evidence_e3_test pnpm exec vitest run --config ../../vitest.shared.ts --root . tests/integration/document-conflict-auto-decisions.test.ts tests/integration/document-conflict-auto-decisions-applied.test.ts` -> 36/36 (10 static, 26 applied).
 - Applied database: PostgreSQL 15.18, image `postgres:15.18-alpine`, digest `sha256:3d0f7584ed7d04e27fa050d6683a74746608faf21f202be78460d679cc56461f`.
 - `pnpm type-check` in course-gen-platform -> passed.
 - `scripts/orchestration/run_process_verification.sh` -> passed.

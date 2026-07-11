@@ -483,6 +483,35 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
  * Run Phase 0.5 clarifying questions
  * Phase 0.5: Clarifying Questions (25-28%)
  */
+async function transitionToClarifyingStatus(context: AnalysisContext): Promise<void> {
+  const { courseId, supabase, orchestrationLogger } = context;
+  const { data: currentCourse } = await supabase
+    .from('courses')
+    .select('generation_progress')
+    .eq('id', courseId)
+    .single();
+  const currentProgress = (currentCourse?.generation_progress ?? {}) as Record<string, unknown>;
+  const { error: statusError } = await supabase
+    .from('courses')
+    .update({
+      generation_status: 'stage_4_clarifying',
+      generation_progress: {
+        ...currentProgress,
+        message: PROGRESS_MESSAGES.step_0_5_waiting,
+      },
+      last_progress_update: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', courseId);
+  if (statusError) {
+    orchestrationLogger.error(
+      { error: statusError.message },
+      'Failed to transition to stage_4_clarifying'
+    );
+    throw new Error('Failed to persist the clarifying question boundary');
+  }
+}
+
 export async function runClarifyingPhase(context: AnalysisContext): Promise<void> {
   const {
     courseId,
@@ -560,37 +589,10 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         supabase
       );
     } else {
-      // Transition to clarifying status + update progress message directly
-      // Cannot use updateCourseProgress RPC here because:
-      // - RPC rejects non-standard statuses like 'stage_4_clarifying'
-      // - Using 'in_progress' would overwrite generation_status to 'stage_4_analyzing'
-      const { data: currentCourse } = await supabase
-        .from('courses')
-        .select('generation_progress')
-        .eq('id', courseId)
-        .single();
-
-      const currentProgress = (currentCourse?.generation_progress ?? {}) as Record<string, unknown>;
-
-      const { error: statusError } = await supabase
-        .from('courses')
-        .update({
-          generation_status: 'stage_4_clarifying',
-          generation_progress: {
-            ...currentProgress,
-            message: PROGRESS_MESSAGES.step_0_5_waiting,
-          },
-          last_progress_update: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', courseId);
-
-      if (statusError) {
-        orchestrationLogger.error(
-          { error: statusError.message },
-          'Failed to transition to stage_4_clarifying'
-        );
-      }
+      // The status/progress write is the durable resume boundary. It must also be
+      // used when ordinary clarifying generation is disabled but evidence added
+      // required questions.
+      await transitionToClarifyingStatus(context);
 
       const generatedQuestions = await getPendingQuestions(courseId);
       const criticalCount = generatedQuestions.filter(
@@ -609,6 +611,7 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         const answeredCount = await autoAnswerAllQuestions(courseId);
         orchestrationLogger.info({ answeredCount }, 'Automatic mode: auto-answered remaining');
       } else {
+        await transitionToClarifyingStatus(context);
         throw new ClarifyingQuestionsInterrupt(
           criticalPending.length,
           pendingQuestions.length,

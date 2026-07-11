@@ -962,7 +962,49 @@ export async function detectDocumentConflicts(
       throw error;
     }
   };
-  const mapCallCount = Math.ceil(claims.length / input.maxClaimsPerMapBatch);
+  const mapRequestFits = (batch: ConflictMapClaim[]): boolean =>
+    exactRequestTokens(
+      CONFLICT_MAP_SYSTEM_PROMPT,
+      buildMapPayload({
+        language: input.language,
+        claims: batch,
+        max_input_tokens: input.maxInputTokens,
+        max_output_tokens: input.maxOutputTokens,
+        max_model_calls: input.maxModelCalls,
+      })
+    ) <= input.maxInputTokens;
+  const mapBatches: ConflictMapClaim[][] = [];
+  for (let offset = 0; offset < claims.length; offset += input.maxClaimsPerMapBatch) {
+    let remaining = claims.slice(offset, offset + input.maxClaimsPerMapBatch);
+    while (remaining.length > 0) {
+      if (mapRequestFits(remaining)) {
+        mapBatches.push(remaining);
+        break;
+      }
+      let low = 1;
+      let high = remaining.length - 1;
+      let fittingPrefix = 0;
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        if (mapRequestFits(remaining.slice(0, middle))) {
+          fittingPrefix = middle;
+          low = middle + 1;
+        } else {
+          high = middle - 1;
+        }
+      }
+      if (fittingPrefix === 0) {
+        const issue = await persistCapacityIssue({
+          boundary: `map-input:${sha256(remaining[0].claim_id).slice(0, 16)}`,
+          clusterCount: claims.length,
+        });
+        return { conflicts: [], issues: [issue], batchCount: 1, usage, verification };
+      }
+      mapBatches.push(remaining.slice(0, fittingPrefix));
+      remaining = remaining.slice(fittingPrefix);
+    }
+  }
+  const mapCallCount = mapBatches.length;
   if (mapCallCount > input.maxModelCalls) {
     const issue = DetectorCapacityIssueSchema.parse({
       kind: 'detector_capacity',
@@ -986,24 +1028,6 @@ export async function detectDocumentConflicts(
     });
     return { conflicts: [], issues: [issue], batchCount: 1, usage, verification };
   }
-  const mapBatches: ConflictMapClaim[][] = [];
-  for (let offset = 0; offset < claims.length; offset += input.maxClaimsPerMapBatch) {
-    const batch = claims.slice(offset, offset + input.maxClaimsPerMapBatch);
-    const request = {
-      language: input.language,
-      claims: batch,
-      max_input_tokens: input.maxInputTokens,
-      max_output_tokens: input.maxOutputTokens,
-      max_model_calls: input.maxModelCalls,
-    };
-    assertBoundedRequest(
-      CONFLICT_MAP_SYSTEM_PROMPT,
-      buildMapPayload(request),
-      input.maxInputTokens
-    );
-    mapBatches.push(batch);
-  }
-
   const checkpointRows = await dependencies.repository.listConflictCheckpoints(input.runId);
   const checkpoints = checkpointIndex(checkpointRows);
   const propositions: Proposition[] = [];

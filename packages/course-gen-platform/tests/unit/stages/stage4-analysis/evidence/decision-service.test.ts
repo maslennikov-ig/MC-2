@@ -163,6 +163,24 @@ describe('document evidence decision service', () => {
     expect(result.unresolvedInformationalConflictIds).toEqual([id.info]);
   });
 
+  it('still materializes an empty atomic gate for an informational-only snapshot', async () => {
+    const db = repository();
+    const informational = conflict('informational');
+    vi.mocked(db.listConflicts).mockResolvedValueOnce([informational]);
+    vi.mocked(db.listItems).mockResolvedValueOnce([card('assessed')]);
+    vi.mocked(db.materializeDecisionGateAtomic).mockResolvedValueOnce({
+      question_ids: [],
+      decision_ids: [],
+      reused: false,
+    });
+    const result = await resolveDocumentEvidenceDecisions(input, { repository: db });
+    expect(db.materializeDecisionGateAtomic).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'manual', questions: [] })
+    );
+    expect(result.pauseRequired).toBe(false);
+    expect(result.unresolvedInformationalConflictIds).toEqual([informational.conflict_id]);
+  });
+
   it('automatic mode sends the sole explicit recommendation and receives atomic decision IDs', async () => {
     const db = repository();
     const result = await resolveDocumentEvidenceDecisions(

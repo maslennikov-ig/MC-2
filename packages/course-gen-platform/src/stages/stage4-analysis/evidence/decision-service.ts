@@ -443,19 +443,16 @@ export async function resolveDocumentEvidenceDecisions(
       maxDocumentsInMetadata: input.maxDocumentsInMetadata,
     })
   );
-  const materialized =
-    questions.length === 0
-      ? { question_ids: [] as string[], decision_ids: [] as string[], reused: true }
-      : await dependencies.repository.materializeDecisionGateAtomic({
-          runId: input.runId,
-          courseId: input.courseId,
-          organizationId: input.organizationId,
-          mode: input.mode,
-          questions,
-          gateIdempotencyKey: stableUuidV8(
-            `document-decision-gate-v1:${input.runId}:${sha256(JSON.stringify(questions))}`
-          ),
-        });
+  const materialized = await dependencies.repository.materializeDecisionGateAtomic({
+    runId: input.runId,
+    courseId: input.courseId,
+    organizationId: input.organizationId,
+    mode: input.mode,
+    questions,
+    gateIdempotencyKey: stableUuidV8(
+      `document-decision-gate-v1:${input.runId}:${sha256(JSON.stringify(questions))}`
+    ),
+  });
   const decisionIds = [...new Set([...current.map(value => value.id), ...materialized.decision_ids])].sort();
   dependencies.log?.info(
     {
