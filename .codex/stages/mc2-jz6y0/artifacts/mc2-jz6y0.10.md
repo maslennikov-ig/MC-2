@@ -55,7 +55,7 @@ status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
 cleanup_status: pending
-cleanup_notes: All disposable Qdrant/Prometheus/Grafana/Alertmanager/node_exporter containers, private networks, secret volumes, temporary files, and smoke data were removed. The dedicated review worktree/branch remains for orchestrator acceptance.
+cleanup_notes: All disposable Qdrant/Prometheus/Grafana/Alertmanager/node_exporter containers, private networks, secret volumes, temporary files, and smoke data were removed. Implementation commit 8d5d39c7 is pushed; the dedicated review worktree/branch remains for orchestrator acceptance.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
@@ -77,6 +77,7 @@ verification:
   - Security/public-binding/secret scans and git diff --check: passed
   - Artifact validator: passed
   - Process verification with artifact: passed
+  - Pull/rebase against unchanged remote base and push of implementation commit 8d5d39c7: passed
 changed_files:
   - .env.production.example
   - docker-compose.app.yml
@@ -156,7 +157,7 @@ The final write zone is the validated Q9 monitoring zone plus the orchestrator-a
 
 ## Rollback state
 
-No remote activation, external receiver call, deploy, service installation, secret mutation, staging operation, Q12 action, or non-loopback host publication occurred. Disposable containers/networks/volumes/temp files are gone. No rollback was needed; the branch is an isolated local change set until commit/push and orchestrator review. Runtime rollback is documented as stopping monitoring services without deleting named volumes or touching Qdrant/its stable alias.
+No remote activation, external receiver call, deploy, service installation, secret mutation, staging operation, Q12 action, or non-loopback host publication occurred. Disposable containers/networks/volumes/temp files are gone. No rollback was needed. Implementation commit `8d5d39c7f2794d98c2a2e568cf116013faf75d67` is pushed on `origin/codex/qdrant-q9-observability`; the branch/worktree remain isolated for orchestrator review. Runtime rollback is documented as stopping monitoring services without deleting named volumes or touching Qdrant/its stable alias.
 
 # Risks / Follow-ups / Explicit Defers
 
