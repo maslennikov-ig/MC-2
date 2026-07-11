@@ -6,7 +6,10 @@ import { runDocumentEvidencePhase } from '@/stages/stage4-analysis/orchestrator-
 import {
   attachDocumentEvidenceSnapshot,
   type AnalysisContext,
+  validateLegacyBudgetForEvidencePreflight,
 } from '@/stages/stage4-analysis/orchestrator-helpers';
+import { allocateStage4Budget } from '@/stages/stage4-analysis/phases/stage4-budget-allocator';
+import { validateJobInput } from '@/stages/stage4-analysis/utils/validators';
 
 const summary = {
   document_id: '40000000-0000-4000-8000-000000000001',
@@ -66,6 +69,29 @@ const skippedResult = {
 };
 
 describe('Stage 4 document evidence live wiring', () => {
+  it('lets an enabled 1,000-document evidence corpus reach bounded preflight', () => {
+    const documents = Array.from({ length: 1_000 }, (_, index) => ({
+      file_id: `40000000-0000-4000-8000-${(index + 1).toString().padStart(12, '0')}`,
+      priority: index === 0 ? ('CORE' as const) : ('SUPPLEMENTARY' as const),
+      original_tokens: index === 0 ? 900_000 : 10_000,
+      summary_tokens: 1_000,
+    }));
+    const allocation = allocateStage4Budget(documents, 'en', {
+      standard: { modelId: 'standard', fallbackModelId: 'fallback', maxContext: 260_000 },
+      extended: {
+        modelId: 'extended',
+        fallbackModelId: 'fallback',
+        maxContext: 1_000_000,
+        cacheReadEnabled: false,
+      },
+    });
+
+    expect(validateLegacyBudgetForEvidencePreflight(allocation, true)).toBe(false);
+    expect(() => validateLegacyBudgetForEvidencePreflight(allocation, false)).toThrow(
+      /effective context/i
+    );
+  });
+
   it('is called strictly after classification and before the existing Phase 0.5 boundary', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator.ts'),
@@ -124,6 +150,37 @@ describe('Stage 4 document evidence live wiring', () => {
     expect(analysisContext.documentEvidencePreflight).toEqual(skippedResult);
     expect(analysisContext.resolvedDocumentSummaries).toEqual(summariesBefore);
     expect(analysisContext.clarifyingAnswers).toEqual(answersBefore);
+  });
+
+  it('allows evidence preflight to own an enumerated missing-content outcome', async () => {
+    const missing = {
+      ...summary,
+      processed_content: '',
+      summary_metadata: { ...summary.summary_metadata, original_tokens: 0, summary_tokens: 0 },
+    };
+    expect(() =>
+      validateJobInput(
+        {
+          topic: 'Policy',
+          language: 'en',
+          lesson_duration_minutes: 15,
+          document_summaries: [missing],
+        },
+        { allowMissingDocumentContent: true }
+      )
+    ).not.toThrow();
+    const analysisContext = context([missing]);
+    const runPreflight = vi.fn(async input => {
+      expect(input.sources[0].stage3Summary).toBeUndefined();
+      return skippedResult;
+    });
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      runPreflight,
+      preflightDependencies: {} as never,
+    });
+    expect(runPreflight).toHaveBeenCalledTimes(1);
   });
 
   it('adds only the compact accepted audit snapshot to final output, including shadow runs', () => {

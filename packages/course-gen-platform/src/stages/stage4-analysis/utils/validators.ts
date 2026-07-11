@@ -230,12 +230,19 @@ export function formatErrorMessage(error: Error | string): string {
  * validateJobInput(job.input);
  * // Throws if input is invalid
  */
-export function validateJobInput(input: {
-  topic: string;
-  language: string;
-  lesson_duration_minutes: number;
-  document_summaries?: Array<{ document_id: string; file_name: string; processed_content: string }>;
-}): void {
+export function validateJobInput(
+  input: {
+    topic: string;
+    language: string;
+    lesson_duration_minutes: number;
+    document_summaries?: Array<{
+      document_id: string;
+      file_name: string;
+      processed_content: string;
+    }>;
+  },
+  options: { allowMissingDocumentContent?: boolean } = {}
+): void {
   if (input.topic.length < 3 || input.topic.length > 200) {
     throw new Error('Topic must be between 3 and 200 characters');
   }
@@ -250,7 +257,12 @@ export function validateJobInput(input: {
 
   if (input.document_summaries) {
     for (const doc of input.document_summaries) {
-      if (!doc.document_id || !doc.file_name || !doc.processed_content) {
+      if (
+        !doc.document_id ||
+        !doc.file_name ||
+        typeof doc.processed_content !== 'string' ||
+        (!options.allowMissingDocumentContent && !doc.processed_content)
+      ) {
         throw new Error('Invalid document summary format');
       }
     }

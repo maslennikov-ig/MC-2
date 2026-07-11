@@ -27,6 +27,60 @@ const documentId = (value: number) =>
 describe('Stage 4 document source enumeration', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('enumerates processed and missing-content sources regardless of Qdrant vector status', async () => {
+    const rows = ['indexed', 'pending', 'failed'].map((vectorStatus, index) => ({
+      id: documentId(index + 1),
+      original_name: `${vectorStatus}.pdf`,
+      filename: `${vectorStatus}.pdf`,
+      hash: `sha256:${vectorStatus}`,
+      summary_metadata: {},
+      priority: index === 0 ? 'CORE' : 'SUPPLEMENTARY',
+      vector_status: vectorStatus,
+    }));
+    const filters: Array<[string, string]> = [];
+    const from = vi.fn(() => {
+      let selected = '';
+      const builder = {
+        select(columns: string) {
+          selected = columns;
+          return builder;
+        },
+        eq(column: string, value: string) {
+          filters.push([column, value]);
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        gt() {
+          return builder;
+        },
+        async range() {
+          return { data: rows, error: null, count: rows.length };
+        },
+        async in(_column: string, ids: string[]) {
+          expect(selected).toContain('processed_content');
+          return {
+            data: ids
+              .filter(id => id !== documentId(3))
+              .map(id => ({ id, processed_content: `Summary ${id}` })),
+            error: null,
+          };
+        },
+      };
+      return builder;
+    });
+    mocks.getSupabaseAdmin.mockReturnValue({ from });
+    mocks.getCachedFileProcessedContentBatch.mockResolvedValue(new Map());
+
+    const result = await fetchDocumentSummaries('20000000-0000-4000-8000-000000000001');
+
+    expect(result.map(item => item.document_id)).toEqual(rows.map(row => row.id));
+    expect(new Set(result.map(item => item.document_id)).size).toBe(3);
+    expect(filters.some(([column]) => column === 'vector_status')).toBe(false);
+    expect(result.at(-1)?.processed_content).toBe('');
+  });
+
   it('propagates version hashes and deterministically pages beyond the Supabase 1,000 row default', async () => {
     const rows = Array.from({ length: 1_205 }, (_, index) => ({
       id: documentId(index + 1),

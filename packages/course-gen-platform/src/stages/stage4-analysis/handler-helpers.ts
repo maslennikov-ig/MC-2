@@ -344,9 +344,9 @@ const DOCUMENT_CONTENT_BATCH_SIZE = 200;
 export async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
   const supabase = getSupabaseAdmin();
 
-  // Step 1: Light metadata query (no processed_content — save Supabase egress).
-  // processed_content is intentionally excluded from SELECT to save egress;
-  // the NOT NULL filter still applies at the DB level (WHERE is independent of SELECT).
+  // Step 1: Enumerate the authoritative course source set without content or
+  // Qdrant-status filters. Content and retrieval readiness are assessed later
+  // and must never remove a source from the durable coverage ledger.
   type DocumentMetadataRow = {
     id: string;
     original_name: string | null;
@@ -367,7 +367,6 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
           count: 'exact',
         })
         .eq('course_id', courseId)
-        .eq('vector_status', 'indexed')
         .order('id', { ascending: true });
       if (lastId) query = query.gt('id', lastId);
       const { data, error, count } = await query.range(0, DOCUMENT_METADATA_PAGE_SIZE - 1);

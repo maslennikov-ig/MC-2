@@ -88,6 +88,30 @@ export function attachDocumentEvidenceSnapshot(
 }
 
 /**
+ * The legacy single-prompt budget remains strict unless the complete evidence
+ * preflight is enabled. In evidence mode an overflow is handed to the bounded
+ * map/reduce ledger instead of aborting before that ledger can run.
+ */
+export function validateLegacyBudgetForEvidencePreflight(
+  allocation: Stage4BudgetAllocation,
+  evidenceEnabled: boolean
+): boolean {
+  try {
+    validateStage4Budget(allocation);
+    return true;
+  } catch (error) {
+    if (
+      !evidenceEnabled ||
+      !(error instanceof Error) ||
+      !/effective context/iu.test(error.message)
+    ) {
+      throw error;
+    }
+    return false;
+  }
+}
+
+/**
  * Initialize analysis context and validate prerequisites
  * Phase 0: Pre-flight validation (0-10%)
  */
@@ -183,7 +207,16 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
         validateLocale(input.language),
         tierConfig
       );
-      validateStage4Budget(budgetAllocation);
+      const legacyBudgetFits = validateLegacyBudgetForEvidencePreflight(
+        budgetAllocation,
+        process.env.DOCUMENT_EVIDENCE_ENABLED === 'true'
+      );
+      if (!legacyBudgetFits) {
+        orchestrationLogger.warn(
+          { totalTokens: budgetAllocation.totalTokens },
+          'Legacy Stage 4 context exceeds its single-prompt budget; document evidence preflight owns bounded full-corpus processing'
+        );
+      }
     } catch (budgetError) {
       orchestrationLogger.error(
         {

@@ -172,6 +172,36 @@ function manifest(
   }));
 }
 
+function objectValue(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function semanticClassificationProjection(value: unknown): Record<string, unknown> | null {
+  const classification = objectValue(value);
+  if (!classification) return null;
+  const category = objectValue(classification.course_category);
+  const topic = objectValue(classification.topic_analysis);
+  const projection = {
+    course_category: category
+      ? {
+          primary: typeof category.primary === 'string' ? category.primary : null,
+          secondary: typeof category.secondary === 'string' ? category.secondary : null,
+        }
+      : null,
+    topic_analysis: topic
+      ? {
+          determined_topic:
+            typeof topic.determined_topic === 'string' ? topic.determined_topic : null,
+          complexity: typeof topic.complexity === 'string' ? topic.complexity : null,
+          target_audience: typeof topic.target_audience === 'string' ? topic.target_audience : null,
+        }
+      : null,
+  };
+  return projection.course_category || projection.topic_analysis ? projection : null;
+}
+
 function inputFingerprint(
   input: DocumentEvidencePreflightInput,
   sources: DocumentEvidencePreflightSource[],
@@ -181,7 +211,7 @@ function inputFingerprint(
     JSON.stringify({
       topic: input.topic,
       language: input.language,
-      classification: input.classificationContext ?? null,
+      classification: semanticClassificationProjection(input.classificationContext),
       source_manifest: sourceManifest,
       evidence_shape: sources.map(source => ({
         document_id: source.documentId,
@@ -299,34 +329,39 @@ function latestStructuredCheckpoints(rows: Array<Record<string, unknown>>) {
   return byDocument;
 }
 
-function attachVerifiedRefs(
+function attachVerifiedRefsToClaim(
   card: DocumentEvidenceCard,
+  claimId: string,
   sourceVersionHash: string,
   refs: Array<{ documentId: string; chunkId?: string }>
 ): DocumentEvidenceCard {
   if (refs.length === 0 || card.key_claims.length === 0) return card;
   return {
     ...card,
-    key_claims: card.key_claims.map(claim => ({
-      ...claim,
-      source_refs: [
-        ...claim.source_refs,
-        ...refs
-          .map(ref => ({
-            document_id: ref.documentId,
-            version_hash: sourceVersionHash,
-            ...(ref.chunkId ? { chunk_id: ref.chunkId } : {}),
-          }))
-          .filter(
-            candidate =>
-              !claim.source_refs.some(
-                existing =>
-                  existing.document_id === candidate.document_id &&
-                  existing.chunk_id === candidate.chunk_id
-              )
-          ),
-      ],
-    })),
+    key_claims: card.key_claims.map(claim =>
+      claim.claim_id !== claimId
+        ? claim
+        : {
+            ...claim,
+            source_refs: [
+              ...claim.source_refs,
+              ...refs
+                .map(ref => ({
+                  document_id: ref.documentId,
+                  version_hash: sourceVersionHash,
+                  ...(ref.chunkId ? { chunk_id: ref.chunkId } : {}),
+                }))
+                .filter(
+                  candidate =>
+                    !claim.source_refs.some(
+                      existing =>
+                        existing.document_id === candidate.document_id &&
+                        existing.chunk_id === candidate.chunk_id
+                    )
+                ),
+            ],
+          }
+    ),
   };
 }
 
@@ -596,52 +631,72 @@ export async function runDocumentEvidencePreflight(
     for (let offset = 0; offset < verificationCards.length; offset += verificationBatchSize) {
       const cards = verificationCards.slice(offset, offset + verificationBatchSize);
       const documentIds = cards.map(card => card.document_id).sort();
-      const query = cards
-        .flatMap(card => card.key_claims.map(claim => claim.statement))
-        .sort()
-        .join('\n');
-      let failed = new Set<string>();
-      let refs: Array<{ documentId: string; chunkId?: string }> = [];
+      const claimQueries = cards
+        .flatMap(card =>
+          card.key_claims.map(claim => ({
+            documentId: card.document_id,
+            claimId: claim.claim_id,
+            statement: claim.statement,
+          }))
+        )
+        .sort((left, right) =>
+          `${left.documentId}\n${left.claimId}`.localeCompare(
+            `${right.documentId}\n${right.claimId}`
+          )
+        );
+      const verificationHash = sha256(JSON.stringify(claimQueries));
+      const verificationBatchKey = `verification:${verificationHash}`;
       if (dependencies.verifyTargetedSources) {
-        try {
-          const result = await dependencies.verifyTargetedSources({
-            query,
-            organizationId: input.organizationId,
-            courseId: input.courseId,
-            documentIds,
-            groupByDocument: true,
-          });
-          const requested = new Set(documentIds);
-          if (
-            result.verifiedDocumentIds.some(documentId => !requested.has(documentId)) ||
-            (result.sourceRefs ?? []).some(ref => !requested.has(ref.documentId))
-          ) {
-            throw new EvidenceExtractionScopeError(
-              'Targeted verification returned an out-of-scope document or source ref'
+        if (existingBatchKeys.has(verificationBatchKey)) continue;
+        const failed = new Set<string>();
+        for (const claimQuery of claimQueries) {
+          try {
+            const result = await dependencies.verifyTargetedSources({
+              query: claimQuery.statement,
+              organizationId: input.organizationId,
+              courseId: input.courseId,
+              documentIds: [claimQuery.documentId],
+              groupByDocument: true,
+            });
+            if (
+              result.verifiedDocumentIds.some(id => id !== claimQuery.documentId) ||
+              (result.sourceRefs ?? []).some(ref => ref.documentId !== claimQuery.documentId)
+            ) {
+              throw new EvidenceExtractionScopeError(
+                'Targeted verification returned an out-of-scope document or source ref'
+              );
+            }
+            if (!result.verifiedDocumentIds.includes(claimQuery.documentId)) {
+              failed.add(claimQuery.documentId);
+              continue;
+            }
+            const card = cardById.get(claimQuery.documentId)!;
+            const source = sourceById.get(claimQuery.documentId)!;
+            cardById.set(
+              claimQuery.documentId,
+              attachVerifiedRefsToClaim(
+                card,
+                claimQuery.claimId,
+                source.sourceVersionHash,
+                result.sourceRefs ?? []
+              )
             );
+          } catch (error) {
+            if (error instanceof EvidenceExtractionScopeError) throw error;
+            failed.add(claimQuery.documentId);
           }
-          failed = new Set(documentIds.filter(id => !result.verifiedDocumentIds.includes(id)));
-          refs = result.sourceRefs ?? [];
-        } catch (error) {
-          if (error instanceof EvidenceExtractionScopeError) throw error;
-          failed = new Set(documentIds);
         }
-        for (const card of cards) {
-          const source = sourceById.get(card.document_id)!;
-          const scopedRefs = refs.filter(ref => ref.documentId === card.document_id);
-          const withRefs = attachVerifiedRefs(card, source.sourceVersionHash, scopedRefs);
-          cardById.set(
-            card.document_id,
-            failed.has(card.document_id) ? degradeVerification(withRefs) : withRefs
-          );
+        for (const documentId of failed) {
+          cardById.set(documentId, degradeVerification(cardById.get(documentId)!));
         }
         await commit({
-          batchKey: `verification:${sha256(JSON.stringify({ documentIds, query }))}`,
-          inputHash: sha256(JSON.stringify({ documentIds, query })),
+          batchKey: verificationBatchKey,
+          inputHash: verificationHash,
           structuredCheckpoint: {
             kind: 'targeted_verification',
             document_ids: documentIds,
             verified_document_ids: documentIds.filter(id => !failed.has(id)),
+            claim_ids: claimQueries.map(claim => claim.claimId),
           },
           cursor: { verification_offset: offset, document_ids: documentIds },
         });

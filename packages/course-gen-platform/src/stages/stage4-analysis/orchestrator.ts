@@ -107,7 +107,9 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
   const startTime = Date.now();
 
   // Input validation
-  validateJobInput(input);
+  validateJobInput(input, {
+    allowMissingDocumentContent: process.env.DOCUMENT_EVIDENCE_ENABLED === 'true',
+  });
 
   try {
     // Initialize analysis context

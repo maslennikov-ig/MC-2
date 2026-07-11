@@ -130,6 +130,21 @@ describe('validateJobInput', () => {
     expect(() => validateJobInput(input)).toThrow('Invalid document summary format');
   });
 
+  it('allows empty document content only when evidence preflight owns the durable outcome', () => {
+    const input = validInput({
+      document_summaries: [{ document_id: 'doc-1', file_name: 'file.pdf', processed_content: '' }],
+    });
+    expect(() => validateJobInput(input, { allowMissingDocumentContent: true })).not.toThrow();
+    expect(() =>
+      validateJobInput(
+        validInput({
+          document_summaries: [{ document_id: '', file_name: 'file.pdf', processed_content: '' }],
+        }),
+        { allowMissingDocumentContent: true }
+      )
+    ).toThrow('Invalid document summary format');
+  });
+
   it('accepts valid document_summaries', () => {
     const input = validInput({
       document_summaries: [

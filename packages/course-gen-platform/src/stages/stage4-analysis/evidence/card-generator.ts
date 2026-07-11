@@ -573,6 +573,11 @@ export async function hierarchicalSummarizeEvidence(input: {
     summaries.length > 1 ||
     estimate(summaries[0].summary, input.language) > input.targetTokens
   ) {
+    const previousSummaryCount = summaries.length;
+    const previousTokenCount = summaries.reduce(
+      (total, item) => total + estimate(item.summary, input.language),
+      0
+    );
     level += 1;
     if (level > 8) throw new Error('Evidence hierarchical reduce did not converge');
     const groups = groupsForReduction(summaries, input.maxBatchTokens, input.language);
@@ -646,10 +651,20 @@ export async function hierarchicalSummarizeEvidence(input: {
         throw new EvidenceCheckpointError(error);
       }
     }
-    if (reduced.length >= summaries.length && groups.every(group => group.length === 1)) {
+    summaries = reduced;
+    const nextTokenCount = summaries.reduce(
+      (total, item) => total + estimate(item.summary, input.language),
+      0
+    );
+    const requiresFurtherReduction =
+      summaries.length > 1 || estimate(summaries[0].summary, input.language) > input.targetTokens;
+    if (
+      requiresFurtherReduction &&
+      summaries.length >= previousSummaryCount &&
+      nextTokenCount >= previousTokenCount
+    ) {
       throw new Error('Evidence hierarchical reduce made no progress');
     }
-    summaries = reduced;
   }
   metrics.reduceLevels = level;
   const checkpoint = {
@@ -810,11 +825,12 @@ function requireModelId(input: GenerateEvidenceCardInput): string {
 
 function createCard(
   source: DocumentEvidencePreflightSource,
-  input: Pick<GenerateEvidenceCardInput, 'allocatedTokens' | 'processingMode'>,
+  input: Pick<GenerateEvidenceCardInput, 'allocatedTokens' | 'processingMode' | 'language'>,
   summary: string,
   status: 'assessed' | 'degraded',
   reason: string,
-  extraction: ReturnType<typeof validatedCardExtraction>
+  extraction: ReturnType<typeof validatedCardExtraction>,
+  executedMode: DocumentEvidenceCard['processing_mode'] = input.processingMode
 ): DocumentEvidenceCard {
   return {
     document_id: source.documentId,
@@ -823,7 +839,7 @@ function createCard(
     authority_scope: source.authorityScope,
     content_quality: source.contentQuality,
     course_relevance: extraction.courseRelevance,
-    processing_mode: input.processingMode,
+    processing_mode: executedMode,
     summary,
     key_claims: extraction.keyClaims,
     terminology: extraction.terminology,
@@ -833,7 +849,7 @@ function createCard(
     coverage_reason: reason,
     token_counts: {
       original: source.originalTokens,
-      summary: source.summaryTokens,
+      summary: estimate(summary, input.language ?? 'en'),
       allocated: input.allocatedTokens,
     },
   };
@@ -867,7 +883,8 @@ export async function generateDocumentEvidenceCard(
           result.summary,
           'assessed',
           'stage3_summary_hierarchically_reduced',
-          validatedCardExtraction(input.source, result.extraction)
+          validatedCardExtraction(input.source, result.extraction),
+          'hierarchical_summary'
         ),
         metrics: result.metrics,
         structuredCheckpoint: result.checkpoint,
@@ -881,7 +898,8 @@ export async function generateDocumentEvidenceCard(
         input.reusableSummary,
         'assessed',
         'stage3_summary_version_verified',
-        extracted.extraction
+        extracted.extraction,
+        'summary'
       ),
       metrics: extracted.metrics,
     };
@@ -914,7 +932,8 @@ export async function generateDocumentEvidenceCard(
         result.summary,
         'assessed',
         'hierarchical_structured_evidence_complete',
-        validatedCardExtraction(input.source, result.extraction)
+        validatedCardExtraction(input.source, result.extraction),
+        'hierarchical_summary'
       ),
       metrics: result.metrics,
       structuredCheckpoint: result.checkpoint,

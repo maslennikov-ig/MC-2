@@ -19,6 +19,7 @@ write_zone:
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-phase-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/utils/validators.ts
   - packages/course-gen-platform/supabase/migrations/20260711120000_document_evidence.sql
   - packages/course-gen-platform/supabase/migrations/rollback/20260711120000_document_evidence_rollback.sql
   - packages/course-gen-platform/tests/integration/document-evidence-rls.test.ts
@@ -67,8 +68,8 @@ graph_reviewed: used
 graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran `graphify query "Stage 4 document evidence preflight budget allocator Qdrant verification" --limit 10`; the graph was useful only for orientation and was stale for E2. Refresh is deferred to the parent after integration because the shared graph is not safely owned by this isolated worker.
 verification:
   - Allocator RED failed 1 missing-module suite; GREEN passed 11/11 initial cases and 13/13 after the legacy oversized-CORE and reserve bridge was added.
-  - Preflight adversarial GREEN passed 20/20, including structured full-source map/reduce, port-owned retries, UUIDv8 provenance, checkpoint resume without replay, fatal checkpoint persistence failures, runtime schema fail-closed, exact Stage 3 hash reuse, bounded oversized summaries, foreign-ref rejection, fingerprint invalidation, and a deterministic 1,000-source exact-ledger resume.
-  - Focused Stage 4 suite passed 68/68 across budget, preflight, live wiring, repository, source enumeration, and document preparation.
+  - Preflight adversarial GREEN passed 24/24, including structured full-source map/reduce, port-owned retries, UUIDv8 provenance, durable verification resume without replay, claim-scoped refs, actual-token reduction progress, semantic-only fingerprints, truthful executed mode/tokens, runtime schema fail-closed, exact Stage 3 hash reuse, bounded oversized summaries, foreign-ref rejection, and a deterministic 1,000-source exact-ledger resume.
+  - Focused Stage 4 suite passed 101/101 across budget, preflight, live wiring, repository, authoritative source enumeration, document preparation, and validators.
   - Shared document-evidence contracts passed 11/11.
   - Migration static gate passed 8 with the applied case skipped; applied PostgreSQL 15.18 gate passed 9/9.
   - Both shared-types and course-gen-platform type-checks passed.
@@ -81,6 +82,7 @@ changed_files:
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/repository.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/phases/stage4-budget-allocator.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/utils/validators.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-phase-helpers.ts
@@ -93,6 +95,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/preflight.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/repository.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/utils/validators.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.19.md
 explicit_defers:
   - E3 owns conflict detection and automatic/manual decision workflow; this stream emits candidate conflicts only as an empty bounded placeholder.
@@ -116,10 +119,12 @@ Checkpoint callbacks atomically persist the complete ledger, structured map/redu
 - Review RED/GREEN: added structured unit map/reduce, port-owned retries, runtime Zod validation, application-owned provenance, UUIDv8 IDs, durable checkpoints, atomic full-ledger commits, exact Stage 3 summary hashes, bounded content loading, classification-aware fingerprints, and fatal checkpoint errors.
 - Database attack-surface review removed authenticated execution of standalone item/metric writers and retained `commit_document_evidence_batch` as the only E2 batch-progress write path.
 - Legacy allocator RED/GREEN proves an oversized CORE document is not injected as full text before preflight and that the system-prompt reserve is enforced by validation.
+- Final independent review P1/P2 RED exposed eight defects: replayed verification could diverge from durable cards; combined queries contaminated claim provenance; singleton reduction rejected real token progress; runtime Phase 1 metadata invalidated reuse; `vector_status` hid authoritative sources; legacy all-summary validation aborted before preflight; empty content was rejected before durable coverage; and regenerated hierarchy reported planned rather than executed audit values.
+- Final review GREEN closes all eight: committed verification keys restore the stored ledger without a second Qdrant call; each material claim gets its own bounded tenant/course/document-grouped query and refs; reduction compares actual token progress; fingerprints use a minimal semantic classification projection; source enumeration ignores Qdrant state; enabled evidence mode owns legacy overflow and missing-content outcomes while disabled mode stays strict; and generated cards record executed hierarchy plus actual summary tokens.
 
 # Verification
 
-- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-key pnpm exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/budget.test.ts tests/unit/stages/stage4-analysis/evidence/preflight.test.ts tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts tests/unit/stage4-prepare-document-infos.test.ts` -> 68/68.
+- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-key pnpm exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/budget.test.ts tests/unit/stages/stage4-analysis/evidence/preflight.test.ts tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts tests/unit/stage4-prepare-document-infos.test.ts tests/unit/stages/stage4-analysis/utils/validators.test.ts` -> 101/101.
 - `pnpm --filter @megacampus/shared-types exec vitest run tests/document-evidence.test.ts` -> 11/11.
 - `pnpm exec vitest run --config ../../vitest.shared.ts --root . tests/integration/document-evidence-rls.test.ts` -> 8 passed, 1 applied test skipped.
 - `DOCUMENT_EVIDENCE_DATABASE_URL=postgresql://postgres:[redacted]@127.0.0.1:15434/document_evidence_test pnpm exec vitest run --config ../../vitest.shared.ts --root . tests/integration/document-evidence-rls.test.ts` -> 9/9 on PostgreSQL 15.18.

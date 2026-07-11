@@ -285,7 +285,7 @@ describe('runDocumentEvidencePreflight', () => {
     expect(new Set(resumed.cards.map(card => card.document_id)).size).toBe(3);
   });
 
-  it('invalidates reuse when a source fingerprint or evidence version changes', async () => {
+  it('fingerprints semantic classification but ignores runtime Phase 1 metadata and prose', async () => {
     const repository = new MemoryRepository();
     const deps = {
       repository,
@@ -293,33 +293,63 @@ describe('runDocumentEvidencePreflight', () => {
     };
 
     const first = await runDocumentEvidencePreflight(
-      { ...baseOptions, sources: [source(1)] },
-      deps
-    );
-    const changedSource = await runDocumentEvidencePreflight(
       {
         ...baseOptions,
-        sources: [source(1, { sourceVersionHash: 'sha256:changed' })],
+        classificationContext: {
+          course_category: {
+            primary: 'professional',
+            confidence: 0.8,
+            reasoning: 'first runtime explanation',
+          },
+          topic_analysis: {
+            determined_topic: 'Procurement policy',
+            complexity: 'medium',
+            target_audience: 'advanced',
+          },
+          phase_metadata: { duration_ms: 10, model_used: 'model-a', tokens: { total: 100 } },
+        },
+        sources: [source(1)],
       },
       deps
     );
-    const changedVersion = await runDocumentEvidencePreflight(
-      { ...baseOptions, evidenceVersion: 'evidence-v2', sources: [source(1)] },
-      deps
-    );
-    const changedClassification = await runDocumentEvidencePreflight(
+    const runtimeOnlyChange = await runDocumentEvidencePreflight(
       {
         ...baseOptions,
-        classificationContext: { category: 'regulated-policy', confidence: 0.9 },
+        classificationContext: {
+          course_category: {
+            primary: 'professional',
+            confidence: 0.99,
+            reasoning: 'different model prose',
+          },
+          topic_analysis: {
+            determined_topic: 'Procurement policy',
+            complexity: 'medium',
+            target_audience: 'advanced',
+          },
+          phase_metadata: { duration_ms: 999, model_used: 'model-b', tokens: { total: 9999 } },
+        },
+        sources: [source(1)],
+      },
+      deps
+    );
+    const semanticChange = await runDocumentEvidencePreflight(
+      {
+        ...baseOptions,
+        classificationContext: {
+          course_category: { primary: 'academic' },
+          topic_analysis: {
+            determined_topic: 'Procurement policy',
+            complexity: 'medium',
+            target_audience: 'advanced',
+          },
+        },
         sources: [source(1)],
       },
       deps
     );
 
-    expect(
-      new Set([first.runId, changedSource.runId, changedVersion.runId, changedClassification.runId])
-        .size
-    ).toBe(4);
+    expect(runtimeOnlyChange.runId).toBe(first.runId);
+    expect(semanticChange.runId).not.toBe(first.runId);
   });
 
   it('records disappeared or unrecoverable content as an explicit failed outcome', async () => {
@@ -385,13 +415,103 @@ describe('runDocumentEvidencePreflight', () => {
       { repository, generateCard: async input => assessedCard(input), verifyTargetedSources }
     );
 
-    expect(verifyTargetedSources).toHaveBeenCalledWith({
-      query: 'Claim for Document 1.pdf\nClaim for Document 2.pdf',
-      organizationId: ids.organization,
-      courseId: ids.course,
-      documentIds: [documentId(1), documentId(2)],
-      groupByDocument: true,
+    expect(verifyTargetedSources).toHaveBeenCalledTimes(2);
+    expect(verifyTargetedSources.mock.calls.map(([input]) => input)).toEqual([
+      {
+        query: 'Claim for Document 1.pdf',
+        organizationId: ids.organization,
+        courseId: ids.course,
+        documentIds: [documentId(1)],
+        groupByDocument: true,
+      },
+      {
+        query: 'Claim for Document 2.pdf',
+        organizationId: ids.organization,
+        courseId: ids.course,
+        documentIds: [documentId(2)],
+        groupByDocument: true,
+      },
+    ]);
+  });
+
+  it('attaches targeted source refs only to the claim that produced the query', async () => {
+    const evidenceSource = source(1);
+    const result = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [evidenceSource] },
+      {
+        repository: new MemoryRepository(),
+        generateCard: async input => {
+          const card = assessedCard(input);
+          return {
+            ...card,
+            key_claims: [
+              { ...card.key_claims[0], claim_id: runId(91), statement: 'Claim alpha' },
+              { ...card.key_claims[0], claim_id: runId(92), statement: 'Claim beta' },
+            ],
+          };
+        },
+        verifyTargetedSources: async input => ({
+          verifiedDocumentIds: input.documentIds,
+          sourceRefs: [
+            {
+              documentId: evidenceSource.documentId,
+              chunkId: input.query === 'Claim alpha' ? 'chunk-alpha' : 'chunk-beta',
+            },
+          ],
+        }),
+      }
+    );
+
+    expect(
+      result.cards[0].key_claims[0].source_refs.map(ref => ref.chunk_id).filter(Boolean)
+    ).toEqual(['chunk-alpha']);
+    expect(
+      result.cards[0].key_claims[1].source_refs.map(ref => ref.chunk_id).filter(Boolean)
+    ).toEqual(['chunk-beta']);
+  });
+
+  it('restores a committed verification ledger without a second Qdrant call after restart', async () => {
+    const repository = new MemoryRepository();
+    const firstVerifier = vi.fn(async input => ({
+      verifiedDocumentIds: input.documentIds,
+      sourceRefs: [{ documentId: input.documentIds[0], chunkId: 'durable-chunk' }],
+    }));
+    let stopped = false;
+    await expect(
+      runDocumentEvidencePreflight(
+        { ...baseOptions, sources: [source(1)] },
+        {
+          repository,
+          generateCard: async input => assessedCard(input),
+          verifyTargetedSources: firstVerifier,
+          afterCheckpoint: async () => {
+            if (!stopped) {
+              stopped = true;
+              throw new Error('stop after durable verification');
+            }
+          },
+        }
+      )
+    ).rejects.toThrow('stop after durable verification');
+    const persisted = await repository.listItems(runId(1));
+    expect(persisted[0].key_claims[0].source_refs).toEqual(
+      expect.arrayContaining([expect.objectContaining({ chunk_id: 'durable-chunk' })])
+    );
+
+    const outageVerifier = vi.fn(async () => {
+      throw new Error('qdrant unavailable after restart');
     });
+    const resumed = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [source(1)] },
+      {
+        repository,
+        generateCard: async input => assessedCard(input),
+        verifyTargetedSources: outageVerifier,
+      }
+    );
+
+    expect(outageVerifier).not.toHaveBeenCalled();
+    expect(resumed.cards).toEqual(persisted);
   });
 
   it('rejects cross-source IDs returned by targeted verification', async () => {
@@ -570,6 +690,50 @@ describe('runDocumentEvidencePreflight', () => {
     expect(replayPort.reduceSummary).not.toHaveBeenCalled();
     expect(resumed.summary).toBe(first.summary);
     expect(resumed.metrics.modelCalls).toBe(0);
+  });
+
+  it('accepts an actual token decrease when reducing one oversized summary below target', async () => {
+    const evidenceSource = source(1, {
+      originalTokens: 500,
+      summaryTokens: 0,
+      stage3Summary: undefined,
+      stage3SummaryVersionHash: undefined,
+      fullText: 'source '.repeat(200),
+    });
+    const reduceSummary = vi.fn(async input => ({
+      value: { unitIds: input.units.map(unit => unit.unitId), summary: 'short result' },
+      usage: { inputTokens: 100, outputTokens: 3, costUsd: 0 },
+    }));
+    const result = await hierarchicalSummarizeEvidence({
+      source: evidenceSource,
+      topic: 'Policy',
+      language: 'en',
+      maxBatchTokens: 1_000,
+      targetTokens: 10,
+      maxRetries: 0,
+      modelId: 'test/model',
+      port: {
+        async extractMap(input) {
+          return {
+            value: {
+              unitId: input.unit.unitId,
+              inputHash: input.unit.inputHash,
+              summary: 'oversized '.repeat(100),
+              claims: [],
+              terminology: [],
+              constraints: [],
+              limitations: [],
+              courseRelevance: 0.5,
+            },
+            usage: { inputTokens: 300, outputTokens: 100, costUsd: 0 },
+          };
+        },
+        reduceSummary,
+      },
+    });
+
+    expect(reduceSummary).toHaveBeenCalledTimes(1);
+    expect(result.summary).toBe('short result');
   });
 
   it('treats checkpoint persistence failure as fatal infrastructure, not excerpt degradation', async () => {
@@ -778,6 +942,55 @@ describe('runDocumentEvidencePreflight', () => {
     expect(mapTexts.join('')).toBe(largeSummary);
     expect(extractor.extract).not.toHaveBeenCalled();
     expect(result.cards[0].coverage_reason).toBe('stage3_summary_hierarchically_reduced');
+  });
+
+  it('records the executed hierarchical mode and regenerated summary token count', async () => {
+    const result = await runDocumentEvidencePreflight(
+      {
+        ...baseOptions,
+        sources: [
+          source(2, {
+            stage3Summary: 'unversioned summary',
+            stage3SummaryVersionHash: undefined,
+            fullText: 'authoritative full text',
+            summaryTokens: 400,
+          }),
+        ],
+      },
+      {
+        repository: new MemoryRepository(),
+        structuredPort: {
+          async extractMap(input) {
+            return {
+              value: {
+                unitId: input.unit.unitId,
+                inputHash: input.unit.inputHash,
+                summary: 'regenerated evidence',
+                claims: [],
+                terminology: [],
+                constraints: [],
+                limitations: [],
+                courseRelevance: 0.8,
+              },
+              usage: { inputTokens: 10, outputTokens: 2, costUsd: 0 },
+            };
+          },
+          async reduceSummary() {
+            throw new Error('single map result should fit');
+          },
+        },
+      }
+    );
+
+    expect(result.cards[0]).toEqual(
+      expect.objectContaining({
+        processing_mode: 'hierarchical_summary',
+        summary: 'regenerated evidence',
+        token_counts: expect.objectContaining({ summary: expect.any(Number) }),
+      })
+    );
+    expect(result.cards[0].token_counts.summary).toBeGreaterThan(0);
+    expect(result.cards[0].token_counts.summary).toBeLessThan(400);
   });
 
   it('rejects an out-of-scope extraction reference instead of accepting a poisoned card', async () => {
