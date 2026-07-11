@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const QDRANT_IMAGE =
   'qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c';
+const QDRANT_LINUX_AMD64_DIGEST =
+  'sha256:da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071';
 const COMPOSE_FILES = [
   'docker-compose.dev.yml',
   'docker-compose.infra.yml',
@@ -51,6 +53,7 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
 
     for (const block of [dev, infra, production]) {
       expect(block).toContain(`image: ${QDRANT_IMAGE}`);
+      expect(block).toContain('platform: linux/amd64');
       expect(block).toContain('/qdrant/storage');
       expect(block).toContain('QDRANT__TELEMETRY_DISABLED=true');
       expect(block).toContain('QDRANT__SERVICE__METRICS_PREFIX=qdrant_');
@@ -67,6 +70,17 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
     const all = COMPOSE_FILES.map(source).join('\n');
     expect(all).not.toContain('qdrant/qdrant:latest');
     expect(all).not.toMatch(/['"]?0\.0\.0\.0:633[35]:6333/);
+
+    const imageLock = JSON.parse(source('deploy/qdrant/image-lock.json')) as {
+      image: string;
+      tag: string;
+      index_digest: string;
+      platform: string;
+      child_digest: string;
+    };
+    expect(`${imageLock.image}:${imageLock.tag}@${imageLock.index_digest}`).toBe(QDRANT_IMAGE);
+    expect(imageLock.platform).toBe('linux/amd64');
+    expect(imageLock.child_digest).toBe(QDRANT_LINUX_AMD64_DIGEST);
   });
 
   it('uses a curl-less unauthenticated readyz healthcheck and file-only secrets', () => {
@@ -239,15 +253,64 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
   });
 
   it('keeps all four Compose models syntactically renderable', () => {
-    expect(() =>
-      execFileSync(
+    const directory = mkdtempSync('/tmp/mc2-qdrant-compose-test-');
+    temporaryDirectories.push(directory);
+    const secretNames = [
+      'qdrant_api_key',
+      'qdrant_read_only_api_key',
+      'qdrant_s3_access_key',
+      'qdrant_s3_secret_key',
+    ] as const;
+    const secretValues = secretNames.map(name => `synthetic-${name}-value`);
+    for (const [index, name] of secretNames.entries()) {
+      writeFileSync(join(directory, name), `${secretValues[index]}\n`, { mode: 0o400 });
+    }
+    const envFile = join(directory, 'compose.env');
+    writeFileSync(
+      envFile,
+      [
+        `DEV_ENV_FILE=${envFile}`,
+        `PRODUCTION_ENV_FILE=${envFile}`,
+        `QDRANT_API_KEY_FILE=${join(directory, 'qdrant_api_key')}`,
+        `QDRANT_READ_ONLY_API_KEY_FILE=${join(directory, 'qdrant_read_only_api_key')}`,
+        `QDRANT_S3_ACCESS_KEY_FILE=${join(directory, 'qdrant_s3_access_key')}`,
+        `QDRANT_S3_SECRET_KEY_FILE=${join(directory, 'qdrant_s3_secret_key')}`,
+        'QDRANT_S3_BUCKET=synthetic-qdrant-snapshots',
+        'QDRANT_S3_REGION=eu-test-1',
+        'QDRANT_S3_ENDPOINT_URL=https://s3.example.invalid',
+        'COLOR=blue',
+        'WEB_PORT=3001',
+        'API_PORT=4001',
+        '',
+      ].join('\n'),
+      { mode: 0o600 }
+    );
+
+    for (const composeFile of COMPOSE_FILES) {
+      const rendered = execFileSync(
         'docker',
-        ['compose', '-f', 'docker-compose.dev.yml', 'config', '--no-env-resolution', '--quiet'],
-        {
-          cwd: REPO_ROOT,
-          stdio: 'pipe',
-        }
-      )
-    ).not.toThrow();
+        ['compose', '-f', composeFile, '--env-file', envFile, 'config'],
+        { cwd: REPO_ROOT, encoding: 'utf8' }
+      );
+      for (const secretValue of secretValues) {
+        expect(rendered).not.toContain(secretValue);
+      }
+      expect(() =>
+        execFileSync(
+          'docker',
+          [
+            'compose',
+            '-f',
+            composeFile,
+            '--env-file',
+            envFile,
+            'config',
+            '--no-env-resolution',
+            '--quiet',
+          ],
+          { cwd: REPO_ROOT, stdio: 'pipe' }
+        )
+      ).not.toThrow();
+    }
   });
 });

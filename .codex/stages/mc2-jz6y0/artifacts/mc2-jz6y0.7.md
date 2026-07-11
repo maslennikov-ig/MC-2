@@ -22,10 +22,11 @@ write_zone:
   - .env.production.example
   - packages/course-gen-platform/.env.example
   - deploy/qdrant/secret-entrypoint.sh
+  - deploy/qdrant/image-lock.json
   - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.7.md
 success_criteria:
-  - Every local runtime Qdrant is exactly Qdrant 1.18.2 pinned by the approved multi-architecture index digest, with loopback host access, persistent storage, fixed resource limits, disabled telemetry, and prefixed metrics.
+  - Every local runtime Qdrant is exactly Qdrant 1.18.2 pinned by the approved multi-architecture index digest and constrained to linux/amd64 whose approved child digest is registry-verified, with loopback host access, persistent storage, fixed resource limits, disabled telemetry, and prefixed metrics.
   - Qdrant reads admin, read-only, and S3 credentials only from locked-down mounted files through a fail-closed wrapper; health is unauthenticated /readyz over Bash /dev/tcp without curl or added image packages.
   - Dev and staging API, main worker, and Stage 6 use explicit private Qdrant URLs; same-model consumers wait for health; Stage 7 has no Qdrant URL, secret, or dependency.
   - Deploy scripts run readiness, authenticated read-only collections, and full schema/alias verification before recreating any RAG-capable application container, without printing keys.
@@ -62,8 +63,10 @@ docs_review_notes: Both tracked environment examples now make self-hosted privat
 graph_reviewed: blocked
 graph_review_notes: graphify-out/GRAPH_REPORT.md was not present in this isolated child worktree. The accepted .14 runtime packet supplied focused architecture evidence; no broad architecture search or child refresh was performed. Parent integration owns the required local-only graph refresh.
 verification:
-  - TDD RED/GREEN qdrant-runtime-contract.test.ts: initial 8/8 expected failures, then 8/8 pass; retained-Docker-Cmd and custom secret-path RED cycles each failed 1/8; final GREEN passed 8/8.
-  - Four full synthetic Compose renders plus four config --no-env-resolution validations: 8/8 passed; rendered models contained no mounted secret values.
+  - TDD RED/GREEN qdrant-runtime-contract.test.ts: initial 8/8 expected failures, then 8/8 pass; retained-Docker-Cmd, custom secret-path, and reviewer platform/registry-contract RED cycles each failed 1/8; final GREEN passed 8/8.
+  - The committed focused test creates mode-0400 synthetic secrets and one synthetic env fixture, then iterates all four COMPOSE_FILES through full render and config --no-env-resolution; 8/8 Compose validations passed and no mounted secret value appeared in a render.
+  - The deterministic focused contract ties all three Compose image/platform declarations to deploy/qdrant/image-lock.json and its linux/amd64 child sha256:da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071: passed.
+  - Separate docker buildx imagetools inspect --raw plus jq selection on the approved tag@index pin returned the exact locked linux/amd64 child digest: passed.
   - bash -n scripts/deploy_dev.sh scripts/deploy_blue_green.sh deploy/qdrant/secret-entrypoint.sh: passed.
   - Disposable pinned Qdrant smoke: healthy; /readyz 200 unauthenticated; /collections 401 unauthenticated and 200 read-only; read-only mutation 403; admin create/delete 200/200; no keys in logs or inspect; cleanup rc 0.
   - pnpm --filter @megacampus/course-gen-platform type-check: passed.
@@ -81,6 +84,7 @@ changed_files:
   - .env.production.example
   - packages/course-gen-platform/.env.example
   - deploy/qdrant/secret-entrypoint.sh
+  - deploy/qdrant/image-lock.json
   - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.7.md
 explicit_defers:
@@ -91,7 +95,7 @@ explicit_defers:
 
 # Summary
 
-Q6 replaces every runtime `qdrant/qdrant:latest` occurrence with the owner-approved `v1.18.2@sha256:75eab8c4...` index pin. Dev publishes only `127.0.0.1:6333`, persists `megacampus_qdrant-dev`, and enforces 1 CPU/1 GiB. Staging/full-production publish only `127.0.0.1:6335`, persist `megacampus_qdrant`, and enforce 2 CPU/2 GiB. All three models disable anonymous telemetry, set `qdrant_` metrics prefix, and deliberately do not enable the unverified hardware-reporting suggestion.
+Q6 replaces every runtime `qdrant/qdrant:latest` occurrence with the owner-approved `v1.18.2@sha256:75eab8c4...` index pin and declares `platform: linux/amd64`. A tracked deterministic image lock binds that platform to approved child manifest `sha256:da65a06b...`; a separate registry inspection proved the lock without making ordinary unit tests depend on Docker Hub/buildx availability. Dev publishes only `127.0.0.1:6333`, persists `megacampus_qdrant-dev`, and enforces 1 CPU/1 GiB. Staging/full-production publish only `127.0.0.1:6335`, persist `megacampus_qdrant`, and enforce 2 CPU/2 GiB. All three models disable anonymous telemetry, set `qdrant_` metrics prefix, and deliberately do not enable the unverified hardware-reporting suggestion.
 
 The tracked wrapper reads admin/read-only key files and, for staging, S3 access/secret files. It refuses missing, empty, multiline, group/world-readable, or otherwise unreadable inputs without printing values, exports only Qdrant's documented nested variables inside PID 1's process environment, then executes the stock `/qdrant/entrypoint.sh`. Because Docker retains the image `Cmd` when Compose replaces `Entrypoint`, the wrapper explicitly removes the default `./entrypoint.sh` token rather than forwarding it to the Qdrant binary. Its health mode performs a Bash-builtin HTTP request over `/dev/tcp` to unauthenticated `/readyz` and requires status 200; the pinned image contains no curl/wget/nc dependency.
 
@@ -110,6 +114,7 @@ Both deployment scripts now gate application recreation in this order: unauthent
 - The first pinned smoke exposed Qdrant's actual unauthenticated `/collections` status as 401 rather than the provisional 403 expectation; authorization remained fail-closed and no production change was needed.
 - Inspection of the pinned image then exposed retained Docker `Cmd=./entrypoint.sh`. A new RED failed one of eight tests; GREEN strips only that exact default token and keeps operator-supplied Qdrant arguments intact.
 - Final self-review found that Compose honored custom secret-file paths from `--env-file` while the Bash gate only saw exported/default paths. A third RED failed one of eight tests; GREEN resolves both consumers from the same file-path contract without sourcing or executing the environment file.
+- Reviewer follow-up proved the committed Compose test exercised only dev despite its four-model name and did not bind the runtime architecture to the approved child manifest. RED kept the new real four-model synthetic render green but failed 1/8 on missing `platform`; GREEN added linux/amd64 to all three services. A reliability follow-up removed the registry network call from the ordinary unit test: RED failed 1/8 on the missing tracked lock, then GREEN bound Compose to `deploy/qdrant/image-lock.json`; the exact child mapping was verified separately against the registry.
 - Final focused result is 8/8. Synthetic Compose validation is 8/8 across full render and `--no-env-resolution`. The pinned server reached Docker `healthy`; read-only and admin capabilities were proven separately, and all disposable resources were removed.
 
 # Risks / Follow-ups / Explicit Defers
