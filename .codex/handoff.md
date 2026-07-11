@@ -31,12 +31,12 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 ## Accepted and Open Work
 
-- Accepted/pushed: Q1-Q7 and strict Formula index fix `.15`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
+- Accepted/pushed: Q1-Q7, strict Formula index fix `.15`, and evidence E1 `.18`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11`, Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
 - Decision `.14` remains open: confirm supported observability pins and explicit exporter/notification transport before Q6/Q9.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
-- Expansion E1-E7 are `.18` through `.24`; their exact dependency graph is in Beads and the stage summary.
+- E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned. E2-E7 remain `.19` through `.24`.
 
 ## Completed Recovery Gate
 
@@ -46,7 +46,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: finish/review E1, then start E2; proceed with Q6 only after owner decision `.14` is recorded.
+Recommended action: implement/review E2 from integration commit `528fdfc2`; proceed with Q6 only after owner decision `.14` is recorded.
 
 ## Starter prompt for next orchestrator
 
@@ -56,8 +56,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 ## Parallel Execution After Q7
 
-- E1 can run alongside local Q6 decision resolution/runtime work.
-- E2 waits for E1 and accepted Q7.
+- E1 and Q7 are accepted; E2 is dependency-ready.
 - E3 waits for E1/E2.
 - After E3, launch E4, E5, and E6 in parallel isolated worktrees.
 - Q8/Q9 may proceed when their parent-plan dependencies and decision `.14` permit.

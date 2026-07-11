@@ -49,8 +49,8 @@ parallel_decision: parallel with the orchestrator's disjoint Q6 stream; E1 itsel
 status: accepted
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: independently approved; dedicated branch and worktree retained until integration verification succeeds
+cleanup_status: cleaned
+cleanup_notes: Integration merge 528fdfc2 passed focused, applied PostgreSQL, type-check, artifact, and process gates; the disposable database container, dedicated worktree, and local branch were removed. The remote evidence branch remains.
 risk_level: high
 docs_impact: migration
 docs_reviewed: no-change-needed
@@ -58,6 +58,7 @@ docs_review_notes: The approved design and E1 plan already document the durable 
 graph_reviewed: used
 graph_review_notes: Read /home/me/code/mc2/graphify-out/GRAPH_REPORT.md and ran a focused query for clarifying schemas, analysis contracts, RLS, immutability, and Stage 4 repositories; no graph refresh per assigned worker contract.
 verification:
+  - Orchestrator integration merge 528fdfc2: shared contracts 11/11, repository 11/11, applied PostgreSQL 15.18 9/9, both package type-checks, artifact validation, and scripts/orchestration/run_process_verification.sh passed; remote integration SHA matched local HEAD.
   - Final independent review on bc439c63: findings none; Spec PASS; Quality APPROVED. The reviewer confirmed all five prior findings are closed and identified only the bounded residual that full automatic conflict workflow belongs to E3.
   - shared contracts RED type-check: failed with 8 expected missing-schema/union/analysis-field diagnostics
   - original plan-path test discovery: blocked because package Vitest includes tests/**/*.test.ts while the plan named src/__tests__; orchestrator authorized one canonical test under packages/shared-types/tests
@@ -118,7 +119,7 @@ TDD evidence includes the initial implementation cycles and both independent-rev
 
 # Delivery / Cleanup
 
-Delivery is accepted for integration after fresh root gates and independent Spec PASS / Quality APPROVED. The dedicated branch/worktree remains retained with cleanup pending until merge and post-integration verification succeed.
+Delivery was integrated as merge `528fdfc2` after fresh root gates and independent Spec PASS / Quality APPROVED. Post-integration verification passed; the disposable PostgreSQL container, dedicated worktree, and local branch were removed, while the remote evidence branch remains as review evidence.
 
 # Risks / Follow-ups / Explicit Defers
 
