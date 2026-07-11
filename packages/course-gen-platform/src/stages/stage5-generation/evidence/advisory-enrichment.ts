@@ -358,8 +358,10 @@ function buildAdditions(
         returnedRefs.some(
           returnedRef =>
             claimRef.document_id === returnedRef.document_id &&
-            (!claimRef.chunk_id || claimRef.chunk_id === returnedRef.chunk_id) &&
-            (!claimRef.version_hash || claimRef.version_hash === returnedRef.version_hash)
+            typeof claimRef.chunk_id === 'string' &&
+            claimRef.chunk_id === returnedRef.chunk_id &&
+            typeof claimRef.version_hash === 'string' &&
+            claimRef.version_hash === returnedRef.version_hash
         )
       )
     )

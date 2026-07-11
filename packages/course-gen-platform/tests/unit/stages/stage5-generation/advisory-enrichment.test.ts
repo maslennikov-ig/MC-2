@@ -524,6 +524,37 @@ describe('Stage 5 advisory evidence enrichment', () => {
     expect(topics).not.toContain('UNREFERENCED CONSTRAINT');
   });
 
+  it('does not let a document-only claim ref authorize an unrelated returned chunk', async () => {
+    const original = baseline();
+    const docA = card(id.docA, id.claimA, 'DOCUMENT LEVEL CLAIM MUST NOT ENRICH');
+    docA.key_claims[0].source_refs = [{ document_id: id.docA, version_hash: `hash-${id.docA}` }];
+
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: original,
+        snapshot: {
+          ...snapshot([]),
+          coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+        },
+      },
+      {
+        repository: repository({
+          listItems: vi.fn(async () => [docA]),
+          listConflicts: vi.fn(async () => []),
+          getLatestDecisions: vi.fn(async () => []),
+        }),
+        search: vi.fn(async () => searchResult(id.docA)),
+      }
+    );
+
+    expect(result.enrichment.status).toBe('no_relevant_evidence');
+    expect(result.enrichment.section_evidence).toEqual([]);
+    expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
+  });
+
   it('rejects a destructive patch, retries once with violations, and accepts a valid retry', async () => {
     const original = baseline();
     const patcher = vi
