@@ -17,6 +17,8 @@ write_zone:
   - packages/course-gen-platform/Dockerfile
   - minimal Stage 4/5/6 evidence metrics integration and focused tests
   - packages/course-gen-platform/supabase/migrations/20260711150000_document_evidence_observability_index.sql and rollback
+  - packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts
+  - packages/course-gen-platform/package.json migration runner commands
   - ops/qdrant/prometheus/{alerts,alert-tests}.yml
   - evidence-only panels in ops/qdrant/grafana/dashboards/qdrant.json
   - this delegated artifact
@@ -33,6 +35,8 @@ selected_docs:
   - docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md Task E7
   - accepted E1-E6 and Q9 artifacts/runbook/rules/textfile implementation
   - fresh parent graphify-out/GRAPH_REPORT.md at 7b542c8d
+  - https://github.com/supabase/cli/blob/v2.106.0/apps/cli-go/pkg/migration/file.go
+  - https://github.com/supabase/cli/blob/v2.106.0/apps/cli-go/pkg/migration/history.go
 selected_skills:
   - superpowers:test-driven-development
   - senior-devops
@@ -66,6 +70,7 @@ verification:
   - full pnpm test across workspace unit suites: passed
   - Stage 5 exact-attempt and sanitized post-search failure gate: 33/33 passed
   - Disposable PostgreSQL 16 applied migration gate: 6/6 passed
+  - Fixed migration runner applied gate: 10/10 on PostgreSQL 16, including invalid-index residue recovery and exact Supabase history handoff
   - Cross-process publisher proof uses 12 real child processes, inherited-fd kernel-lock contention, and killed-owner recovery
   - Privacy remediation contract: initial identity RED 4/4 failed, final GREEN 4/4 passed; outcome naming RED 2/4 failed before GREEN
   - Prometheus 3.13.1 promtool check config/check rules/test rules: passed, 14 rules
@@ -81,6 +86,8 @@ changed_files:
   - ops/qdrant/prometheus/alert-tests.yml
   - ops/qdrant/prometheus/alerts.yml
   - packages/course-gen-platform/src/shared/metrics/document-evidence-textfile.ts
+  - packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts
+  - packages/course-gen-platform/package.json
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/conflict-detector.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/preflight.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/decision-service.ts
@@ -120,7 +127,7 @@ E7-O adds one privacy-safe textfile publisher for document-evidence observabilit
 
 Stage 4 metrics consume durable invocation deltas from preflight and newly committed checkpoint/usage/conflict deltas from conflict detection. Accepted-run replay adds zero run/work/cost/conflict counters; a later user or degraded-automatic decision advances exactly once. Cumulative counters are not reconstructed from a bounded identity cache. Decision reconciliation reads a trigger-maintained singleton table while append-only decision rows remain canonical. Coverage and unresolved-critical values remain latest-state gauges. No identity sidecar, run/document/decision identifiers, hashes, or gauges named `_total` are emitted.
 
-The pending-critical partial index is created and dropped with `CONCURRENTLY`. The applied proof uses a statement-by-statement autocommit runner; a transaction-wrapped runner correctly fails with PostgreSQL `25001`. Real concurrent inserts and an answer update complete under a one-second statement timeout while create and drop wait on another writer. This proves the tested PostgreSQL/autocommit path, not universal zero downtime. The singleton migration is transactional and temporarily fences decision inserts while installing its trigger and reconciling history; runtime appends then update counters in O(1).
+The pending-critical partial index is created and dropped with `CONCURRENTLY`. The repo-owned runner is `packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts`; its package commands are `migration:document-evidence-index:apply` and `migration:document-evidence-index:rollback`, with the connection supplied only through `SUPABASE_DB_URL`. It exact-checks the fixed SQL files, runs each statement in autocommit, validates the live catalog object, and hands version `20260711150000`, name `document_evidence_observability_index`, and the Supabase-compatible statement array to the pre-existing `supabase_migrations.schema_migrations` table. The implementation follows the official Supabase CLI v2.106.0 `ExecBatch` and history sources linked in frontmatter: canonical batches are implicitly transactional, so a transaction-wrapped concurrent index correctly fails with PostgreSQL `25001`. Default remote use is rejected; Q12 requires both `--allow-remote` and the exact direction-specific confirmation. Real concurrent inserts and an answer update complete under a one-second statement timeout while create and drop wait on another writer. A cancelled build's invalid same-name residue is removed only after fixed schema/table identity plus invalid/not-ready/non-live catalog state is confirmed. The singleton migration remains transactional and temporarily fences decision inserts while installing its trigger and reconciling history; runtime appends then update counters in O(1).
 
 Stage 5 reports exact `retrievalAttempts`, incremented immediately before each actual search call and propagated to the terminal metric. Context rejection and no eligible documents report zero; no-result/outage calls report one; partial and full multi-section passes report actual calls. Unexpected patcher/validator failures become a sanitized typed failure carrying only the completed count, so a post-search failure reports one while a pre-search injected failure remains zero. The shared durable Stage 5 audit schema is unchanged. Stage 6 remains unchanged by `.24.5`; Stage 7 is untouched.
 
@@ -140,7 +147,7 @@ Alerts are `DocumentEvidenceRunFailed`, `DocumentEvidenceCoverageIncomplete`, `D
 - Privacy re-review `mc2-jz6y0.24.4`: the first static contract failed all four identifier groups, then passed 4/4 after Stage 4 completion, all three Stage 5 advisory/fail-open, the Stage 5 completion trace, and the Stage 6 accepted-evidence-empty log were reduced to allowlisted modes/outcomes/statuses/counts. The follow-up `category`→`outcome` naming contract failed 2/4 before the bounded rename and final GREEN. The expanded joined gate passed 123/123 across 14 files.
 - Replay/locking remediation `mc2-jz6y0.24.5`: the two-pass publisher/live RED exposed replayed cumulative inputs and absent durable reconciliation. The lock follow-up RED proved the directory-lock TOCTOU, killed-owner timeout, and rejected-queue poisoning. GREEN passes 12 real child writers, inherited-fd kernel contention, killed-owner recovery, and later same-path publication after a rejection. Durable Stage 4 reconciliation remains under correction before final acceptance.
 - Stage 5 exactness RED/GREEN: 5 failures first proved missing counts and section-derived terminal retrievals. The post-search follow-up proved a patcher throw lost one completed call. Final focused Stage 5 gate passed 33/33 with sanitized count propagation.
-- Concurrent migration RED/GREEN: static RED failed on non-concurrent index DDL and missing singleton state. Disposable PostgreSQL 16 then passed 6/6 applied checks for autocommit, transaction rejection, concurrent insert/answer, rollback/reapply, trigger increments, and exact recount.
+- Concurrent migration runner RED/GREEN: the runner import first failed because the repo-owned module did not exist. The first applied run then failed six paths because `pg` returned the inferred catalog array as text; `to_json` made the verifier type-stable. Final PostgreSQL 16 passed 10/10 for exact apply/query-plan/history handoff, idempotent apply/rollback, forward and rollback recovery, deterministic invalid concurrent-build residue repair, history/index mismatch rejection, canonical `25001`, concurrent insert/answer availability, singleton seed, trigger increments, and exact recount. The actual package apply and rollback commands also passed.
 - Index migration RED/GREEN: static 1 failed before files existed, then passed. First applied run failed 2/3 because PostgreSQL truncated a 70-character identifier; the bounded name fix passed 3/3 with definition, EXPLAIN use, rollback, reapply, and idempotent repeat.
 - Fresh final gates are recorded in frontmatter. Privacy scans inspect labels/log additions, dashboard/rules, changed diff, and secret-shaped content. No remote runtime or receiver was contacted.
 

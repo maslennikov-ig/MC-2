@@ -3,6 +3,12 @@ import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION,
+  runDocumentEvidenceObservabilityIndexMigration,
+  validateDocumentEvidenceMigrationTarget,
+} from '../../scripts/migrations/document-evidence-observability-index';
+
 const forwardPath = resolve(
   process.cwd(),
   'supabase/migrations/20260711150000_document_evidence_observability_index.sql'
@@ -44,8 +50,28 @@ describe('document evidence observability index migration', () => {
     expect(totalsForward).toMatch(/resolved_by = 'system'/u);
     expect(totalsForward).toMatch(/subject_kind = 'degraded_evidence'/u);
     expect(totalsForward).toContain('ENABLE ROW LEVEL SECURITY');
-    expect(totalsForward).toContain('GRANT SELECT ON public.document_evidence_observability_totals TO service_role');
-    expect(totalsRollback).toContain('DROP TABLE IF EXISTS public.document_evidence_observability_totals');
+    expect(totalsForward).toContain(
+      'GRANT SELECT ON public.document_evidence_observability_totals TO service_role'
+    );
+    expect(totalsRollback).toContain(
+      'DROP TABLE IF EXISTS public.document_evidence_observability_totals'
+    );
+  });
+
+  it('rejects remote targets unless both explicit gates are present', () => {
+    const remote = 'postgresql://postgres:secret@db.example.com:5432/postgres';
+    expect(() => validateDocumentEvidenceMigrationTarget(remote, 'apply', {})).toThrow(
+      /remote.*disabled/iu
+    );
+    expect(() =>
+      validateDocumentEvidenceMigrationTarget(remote, 'apply', { allowRemote: true })
+    ).toThrow(/confirmation/iu);
+    expect(() =>
+      validateDocumentEvidenceMigrationTarget(remote, 'apply', {
+        allowRemote: true,
+        confirmation: DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION.apply,
+      })
+    ).not.toThrow();
   });
 });
 
@@ -67,7 +93,14 @@ function disposableUrl(value: string): string {
 async function resetSchema(): Promise<void> {
   await client.query(`
     DROP SCHEMA IF EXISTS public CASCADE;
+    DROP SCHEMA IF EXISTS supabase_migrations CASCADE;
     CREATE SCHEMA public;
+    CREATE SCHEMA supabase_migrations;
+    CREATE TABLE supabase_migrations.schema_migrations (
+      version text NOT NULL PRIMARY KEY,
+      statements text[],
+      name text
+    );
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
@@ -90,14 +123,6 @@ async function resetSchema(): Promise<void> {
       subject_kind text NOT NULL
     );
   `);
-}
-
-async function runAutocommitSql(connection: Client, source: string): Promise<void> {
-  const statements = source
-    .split(';')
-    .map(value => value.trim())
-    .filter(Boolean);
-  for (const statement of statements) await connection.query(statement);
 }
 
 async function indexDefinition(): Promise<string | undefined> {
@@ -124,7 +149,10 @@ appliedDescribe('document evidence observability index applied', () => {
   });
 
   it('applies the exact partial index and supports the production oldest query', async () => {
-    await runAutocommitSql(client, forward);
+    await runDocumentEvidenceObservabilityIndexMigration({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'apply',
+    });
     const definition = await indexDefinition();
     expect(definition).toContain(`CREATE INDEX ${indexName}`);
     expect(definition).toContain('USING btree (created_at)');
@@ -151,15 +179,111 @@ appliedDescribe('document evidence observability index applied', () => {
       LIMIT 1
     `);
     expect(plan.rows.map(row => row['QUERY PLAN']).join('\n')).toContain(indexName);
+    const history = await client.query<{
+      version: string;
+      name: string;
+      statements: string[];
+    }>(`
+      SELECT version,name,statements
+      FROM supabase_migrations.schema_migrations
+      WHERE version='20260711150000'
+    `);
+    expect(history.rows).toHaveLength(1);
+    expect(history.rows[0].name).toBe('document_evidence_observability_index');
+    expect(history.rows[0].statements).toHaveLength(2);
   });
 
   it('rolls back cleanly and reapplies idempotently', async () => {
-    await runAutocommitSql(client, forward);
-    await runAutocommitSql(client, rollback);
+    const options = { databaseUrl: disposableUrl(databaseUrl!), direction: 'apply' as const };
+    await runDocumentEvidenceObservabilityIndexMigration(options);
+    await runDocumentEvidenceObservabilityIndexMigration(options);
+    await runDocumentEvidenceObservabilityIndexMigration({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'rollback',
+    });
     expect(await indexDefinition()).toBeUndefined();
-    await runAutocommitSql(client, forward);
-    await runAutocommitSql(client, forward);
+    expect(
+      (
+        await client.query(
+          "SELECT version FROM supabase_migrations.schema_migrations WHERE version='20260711150000'"
+        )
+      ).rows
+    ).toHaveLength(0);
+    await runDocumentEvidenceObservabilityIndexMigration(options);
+    await runDocumentEvidenceObservabilityIndexMigration(options);
     expect(await indexDefinition()).toContain(indexName);
+  });
+
+  it('recovers an exact index created before migration history was recorded', async () => {
+    await client.query(forward.split(';')[0]);
+    await runDocumentEvidenceObservabilityIndexMigration({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'apply',
+    });
+    expect(await indexDefinition()).toContain(indexName);
+    expect(
+      (
+        await client.query(
+          "SELECT version FROM supabase_migrations.schema_migrations WHERE version='20260711150000'"
+        )
+      ).rows
+    ).toHaveLength(1);
+  });
+
+  it('removes an invalid concurrent-build residue before recreating the index', async () => {
+    const blocker = new Client({ connectionString: disposableUrl(databaseUrl!) });
+    const failedBuilder = new Client({ connectionString: disposableUrl(databaseUrl!) });
+    await Promise.all([blocker.connect(), failedBuilder.connect()]);
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query(`
+        INSERT INTO public.clarifying_questions
+          (id, question_category, question_priority, status)
+        VALUES ('10000000-0000-4000-8000-000000000020','document_conflicts','critical','pending')
+      `);
+      const pid = (await failedBuilder.query<{ pid: number }>('SELECT pg_backend_pid() AS pid'))
+        .rows[0].pid;
+      const creating = failedBuilder.query(forward.split(';')[0]);
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (await indexDefinition()) break;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      await client.query('SELECT pg_cancel_backend($1)', [pid]);
+      await expect(creating).rejects.toMatchObject({ code: '57014' });
+      await blocker.query('ROLLBACK');
+      const residue = await client.query<{ indisvalid: boolean }>(
+        `SELECT indisvalid FROM pg_index WHERE indexrelid=$1::regclass`,
+        [`public.${indexName}`]
+      );
+      expect(residue.rows[0]?.indisvalid).toBe(false);
+
+      await runDocumentEvidenceObservabilityIndexMigration({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      });
+      const recovered = await client.query<{ indisvalid: boolean }>(
+        `SELECT indisvalid FROM pg_index WHERE indexrelid=$1::regclass`,
+        [`public.${indexName}`]
+      );
+      expect(recovered.rows[0]?.indisvalid).toBe(true);
+    } finally {
+      await blocker.query('ROLLBACK').catch(() => undefined);
+      await Promise.all([blocker.end(), failedBuilder.end()]);
+    }
+  });
+
+  it('rejects matching history when the live index is missing', async () => {
+    await runDocumentEvidenceObservabilityIndexMigration({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'apply',
+    });
+    await client.query(`DROP INDEX CONCURRENTLY public.${indexName}`);
+    await expect(
+      runDocumentEvidenceObservabilityIndexMigration({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      })
+    ).rejects.toThrow(/history.*index/iu);
   });
 
   it('rejects a transaction-wrapped runner and allows writes during concurrent create/drop', async () => {
@@ -167,10 +291,9 @@ appliedDescribe('document evidence observability index applied', () => {
     await expect(client.query(forward)).rejects.toMatchObject({ code: '25001' });
     await client.query('ROLLBACK');
 
-    const migrator = new Client({ connectionString: disposableUrl(databaseUrl!) });
     const blocker = new Client({ connectionString: disposableUrl(databaseUrl!) });
     const writer = new Client({ connectionString: disposableUrl(databaseUrl!) });
-    await Promise.all([migrator.connect(), blocker.connect(), writer.connect()]);
+    await Promise.all([blocker.connect(), writer.connect()]);
     try {
       await client.query(`
         INSERT INTO public.clarifying_questions
@@ -183,7 +306,10 @@ appliedDescribe('document evidence observability index applied', () => {
           (id, question_category, question_priority, status)
         VALUES ('10000000-0000-4000-8000-000000000011','document_conflicts','critical','pending')
       `);
-      const creating = runAutocommitSql(migrator, forward);
+      const creating = runDocumentEvidenceObservabilityIndexMigration({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      });
       await new Promise(resolve => setTimeout(resolve, 100));
 
       await writer.query("SET statement_timeout = '1s'");
@@ -206,7 +332,10 @@ appliedDescribe('document evidence observability index applied', () => {
           (id, question_category, question_priority, status)
         VALUES ('10000000-0000-4000-8000-000000000013','document_conflicts','critical','pending')
       `);
-      const dropping = runAutocommitSql(migrator, rollback);
+      const dropping = runDocumentEvidenceObservabilityIndexMigration({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'rollback',
+      });
       await new Promise(resolve => setTimeout(resolve, 100));
       await writer.query(`
         INSERT INTO public.clarifying_questions
@@ -218,7 +347,7 @@ appliedDescribe('document evidence observability index applied', () => {
       expect(await indexDefinition()).toBeUndefined();
     } finally {
       await blocker.query('ROLLBACK').catch(() => undefined);
-      await Promise.all([migrator.end(), blocker.end(), writer.end()]);
+      await Promise.all([blocker.end(), writer.end()]);
     }
   });
 
