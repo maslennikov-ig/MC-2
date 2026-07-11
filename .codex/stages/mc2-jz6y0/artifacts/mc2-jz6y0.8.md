@@ -63,7 +63,7 @@ status: returned
 delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: pending
-cleanup_notes: Dedicated worktree and branch remain intact for independent review; no cleanup is permitted before acceptance.
+cleanup_notes: The recovery Qdrant container and all fixture collections, aliases, snapshots, and points were removed; the dedicated worktree and branch remain intact pending independent review and orchestrator acceptance.
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -71,6 +71,9 @@ docs_review_notes: This changes the shared job/data-workflow contract, but the a
 graph_reviewed: blocked
 graph_review_notes: The isolated worktree has no graphify-out. The primary-checkout report was read and focused upload/Stage 2/schema queries were used, but refreshing the shared primary graph is unsafe during concurrent Q5/stage work and remains parent closeout work.
 verification:
+  - Recovery compatibility RED: the pinned integration gate executed all 19 tests and failed only the broad persisted-point retrieval because the merged test still called removed `generateNumericId(chunk_id)`; result was 18 passed and 1 failed, while the already-corrected native smoke suite passed 9 of 9.
+  - Recovery compatibility GREEN exact command: `env -u REDIS_URL -u UPSTASH_REDIS_URL -u SUPABASE_URL -u SUPABASE_SERVICE_KEY -u SUPABASE_SERVICE_ROLE_KEY -u SUPABASE_ANON_KEY QDRANT_URL=http://127.0.0.1:16333 QDRANT_API_KEY=test-qdrant-key pnpm --filter @megacampus/course-gen-platform test:integration:ci`; passed 19 of 19 across 3 files (broad 6/6, native smoke 9/9, schema 4/4).
+  - Recovery runtime: `qdrant/qdrant:v1.18.2`, image `sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c`, server `1.18.2` commit `44ad62f8cd69642be5afa6441612525e24a0d063`; pre/post collection lists were empty and `mc2-q7-recovery-qdrant` was removed.
   - Baseline shared-types build, current Stage 2 tests (5), and course-gen-platform type-check before edits: passed.
   - Q2 physical-only verifier RED: 2 failed because the dedicated function was absent; GREEN: collection-manager suite passed 19 tests.
   - Shared job schema RED: valid target/run fields were stripped and invalid values accepted; GREEN: 3 contract tests passed.
@@ -104,6 +107,8 @@ verification:
   - Delegated artifact validator: passed.
   - `scripts/orchestration/run_process_verification.sh`: passed, including orchestration contract and `git diff --check`.
 changed_files:
+  - packages/course-gen-platform/tests/integration/ci-qdrant-smoke.test.ts
+  - packages/course-gen-platform/tests/integration/qdrant.test.ts
   - packages/shared-types/src/bullmq-jobs.ts
   - packages/course-gen-platform/src/shared/qdrant/collection-manager.ts
   - packages/course-gen-platform/src/shared/qdrant/index.ts
@@ -124,7 +129,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/tools/qdrant/fixtures/reindex-dry-fixture.json
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.8.md
 explicit_defers:
-  - Q5 pinned runtime integration is independently accepted; this Q7 review-fix pass intentionally used only injected mocks and dry fixtures before the explicitly authorized compatibility merge/gate.
+  - Independent review and orchestrator integration remain required even though the explicitly authorized pinned Qdrant compatibility gate now passes 19 of 19.
   - Q10 owns durable operator documentation after acceptance; Q12 owns any live reindex, alias cutover, deploy, or staging mutation with explicit authorization.
 ---
 
@@ -140,16 +145,16 @@ Execute refuses the logical alias and invalid run UUIDs before source or service
 
 The original Q7 write zone was followed. During source inspection, Q2's verifier was proven to combine exact physical schema with alias state, which cannot verify a pre-cutover `vN` target. The parent explicitly authorized the narrow Q2 extension: `verifyPhysicalCourseEmbeddingsCollection` retains the awaited pinned-version and exact schema checks, performs no mutation or alias read, and leaves existing verify/bootstrap behavior unchanged.
 
-No Q5 CI files, Compose/ops/backup files, handoff, stage summary, live endpoint, secret, or remote runtime was changed. Source truth comes from generated database types, migrations, canonical storage helpers, Stage 2 code, shared Zod jobs, and pinned local dependency types. Catalog discovery was unnecessary.
+The recovery pass changed only the two Q5 integration retrieval assertions needed to follow Q7's document-scoped point identity; it did not change expectations, skips, strict-mode assertions, RU/EN relevance, isolation, workflow, Compose/ops/backup files, handoff, stage summary, live endpoint, secret, or remote runtime. Source truth comes from generated database types, migrations, canonical storage helpers, Stage 2 code, shared Zod jobs, and pinned local dependency types. Catalog discovery was unnecessary.
 
 # Verification
 
-RED/GREEN evidence, dry-mode counts, and the final local gates are recorded in frontmatter. Commit/push identity is carried by the completion event because the artifact cannot self-record the SHA of the commit that contains it.
+RED/GREEN evidence, dry-mode counts, and the final local gates are recorded in frontmatter. The recovery gate first reproduced the stale point lookup as the sole failure (18/19), then passed 19/19 after both integration retrievals used `generatePointId(document_id, chunk_id)`. Commit/push identity is carried by the completion event because the artifact cannot self-record the SHA of the commit that contains it.
 
 # Delivery / Cleanup
 
-Status is `returned`, not accepted. The dedicated branch/worktree remains for independent correctness review and parent integration. Cleanup is pending and intentionally not performed.
+Status is `returned`, not accepted. Runtime cleanup is complete: the isolated Qdrant container was removed after empty pre/post collection checks, and no fixture aliases, snapshots, or points remain. Branch/worktree cleanup stays pending because the dedicated branch/worktree must remain for independent correctness review and parent integration.
 
 # Risks / Follow-ups / Explicit Defers
 
-No live reindex, queue enqueue, database write, Qdrant mutation, alias change, or relevance request was performed. Runtime relevance and strict behavior against pinned Qdrant remain Q5's integration evidence; live recovery/cutover remains Q12's explicit authorization gate. Q10 owns durable data-workflow/operator documentation after this contract is independently accepted.
+No live reindex, queue enqueue, database write, persistent Qdrant mutation, deploy, or remote runtime action was performed. The ephemeral local pinned gate exercised and cleaned fixture collections while preserving every Q5 expectation; live recovery/cutover remains Q12's explicit authorization gate. Q10 owns durable data-workflow/operator documentation after this contract is independently accepted.

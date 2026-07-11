@@ -10,7 +10,7 @@ import {
 } from '../../src/shared/qdrant/collection-manager';
 import { PAYLOAD_INDEXES } from '../../src/shared/qdrant/collection-schema';
 import { createBm25Document } from '../../src/shared/qdrant/config';
-import { compactPayload, generateNumericId } from '../../src/shared/qdrant/upload-helpers';
+import { compactPayload, generatePointId } from '../../src/shared/qdrant/upload-helpers';
 import { uploadChunksToQdrant } from '../../src/shared/qdrant/upload';
 import {
   buildHybridPrefetch,
@@ -317,7 +317,7 @@ describe('CI Qdrant native retrieval gate', () => {
   it('persists the complete production payload including priority', async () => {
     const source = FIXTURE_EMBEDDINGS[0].chunk;
     const points = await client.retrieve(aliasName, {
-      ids: [generateNumericId(source.chunk_id)],
+      ids: [generatePointId(source.document_id, source.chunk_id)],
       with_payload: true,
       with_vector: true,
     });
