@@ -156,8 +156,8 @@
       },
       "targets": [
         {
-          "expr": "qdrant_collection_points{collection=~\"$collection\"}",
-          "legendFormat": "Points {{collection}}",
+          "expr": "qdrant_collection_points{id=~\"$collection\"}",
+          "legendFormat": "Points {{id}}",
           "refId": "A"
         }
       ],
@@ -374,8 +374,8 @@
       },
       "targets": [
         {
-          "expr": "qdrant_collection_running_optimizations{collection=~\"$collection\"}",
-          "legendFormat": "Optimizations {{collection}}",
+          "expr": "qdrant_collection_running_optimizations{id=~\"$collection\"}",
+          "legendFormat": "Optimizations {{id}}",
           "refId": "A"
         }
       ],
@@ -420,18 +420,18 @@
           "refId": "B"
         },
         {
-          "expr": "qdrant_snapshot_created_total{collection=~\"$collection\"}",
-          "legendFormat": "Snapshots created {{collection}}",
+          "expr": "qdrant_snapshot_created_total{id=~\"$collection\"}",
+          "legendFormat": "Snapshots created {{id}}",
           "refId": "C"
         },
         {
-          "expr": "qdrant_snapshot_creation_running{collection=~\"$collection\"}",
-          "legendFormat": "Snapshot creation running {{collection}}",
+          "expr": "qdrant_snapshot_creation_running{id=~\"$collection\"}",
+          "legendFormat": "Snapshot creation running {{id}}",
           "refId": "D"
         },
         {
-          "expr": "qdrant_snapshot_recovery_running{collection=~\"$collection\"}",
-          "legendFormat": "Snapshot recovery running {{collection}}",
+          "expr": "qdrant_snapshot_recovery_running{id=~\"$collection\"}",
+          "legendFormat": "Snapshot recovery running {{id}}",
           "refId": "E"
         }
       ],
@@ -508,7 +508,7 @@
       {
         "current": { "selected": true, "text": "All", "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "definition": "label_values(qdrant_collection_points, collection)",
+        "definition": "label_values(qdrant_collection_points, id)",
         "hide": 0,
         "includeAll": true,
         "label": "Physical collection",
@@ -516,7 +516,7 @@
         "name": "collection",
         "options": [],
         "query": {
-          "query": "label_values(qdrant_collection_points, collection)",
+          "query": "label_values(qdrant_collection_points, id)",
           "refId": "PrometheusVariableQueryEditor-Collection"
         },
         "refresh": 1,

@@ -99,7 +99,7 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
   it('defines the exact eight alert sources, severities and durations', () => {
     const alerts = source('ops/qdrant/prometheus/alerts.yml');
     const contracts = [
-      ['QdrantDown', '2m', 'critical', 'up{job="qdrant"} == 0'],
+      ['QdrantDown', '2m', 'critical', 'absent(up{job="qdrant"})'],
       ['QdrantRecoveryMode', '5m', 'critical', 'qdrant_app_status_recovery_mode == 1'],
       [
         'QdrantRestErrorRateHigh',
@@ -137,6 +137,7 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     }
 
     expect(alerts).toContain('record: megacampus:qdrant_rest_error_ratio:10m');
+    expect(alerts).not.toContain('qdrant_collection_points > 0');
     expect(alerts).toMatch(/status=~"4\.\.\|5\.\."/);
     expect(alerts).toContain('clamp_min(');
     expect(alerts).toContain('record: megacampus:qdrant_rest_latency_p95_seconds:5m');
@@ -158,7 +159,9 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     expect(config).toContain('chat_id_file: /run/secrets/alertmanager_telegram_chat_id');
     expect(config).toContain('send_resolved: true');
     expect(compose).toContain('--cluster.listen-address=');
-    expect(compose).toContain('/var/lib/alertmanager');
+    expect(compose).toContain('--storage.path=/alertmanager');
+    expect(compose).toContain('alertmanager-data:/alertmanager');
+    expect(compose).not.toContain('/var/lib/alertmanager');
     expect(compose).not.toMatch(/bot_token:|chat_id:|telegram\.org/);
   });
 
@@ -184,19 +187,38 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
 
     for (const [file, service, metricService, instance] of expectedConsumers) {
       const block = serviceBlock(source(file), service);
+      expect(block).toContain("user: '1001:1001'");
+      expect(block).toContain('group_add:');
+      expect(block).toContain(
+        '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
+      );
       expect(block).toContain('QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics');
       expect(block).toContain(`QDRANT_METRICS_SERVICE=${metricService}`);
       expect(block).toContain(`QDRANT_METRICS_INSTANCE=${instance}`);
       expect(block).toContain(
-        '${QDRANT_METRICS_TEXTFILE_HOST_DIR:-./data/qdrant-metrics}:/var/lib/megacampus/qdrant-metrics'
+        '${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics'
       );
     }
 
     for (const file of ['docker-compose.infra.yml', 'docker-compose.production.yml']) {
       expect(serviceBlock(source(file), 'worker-stage7')).not.toMatch(
-        /QDRANT_METRICS|qdrant-metrics/
+        /QDRANT_METRICS|qdrant-metrics|group_add:/
       );
     }
+
+    const infra = source('docker-compose.infra.yml');
+    const exporter = serviceBlock(infra, 'node_exporter');
+    expect(exporter).toContain("user: '65534:65534'");
+    expect(exporter).not.toContain('group_add:');
+    expect(exporter).toContain(
+      '${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/node_exporter/textfile_collector:ro'
+    );
+
+    const productionExample = source('.env.production.example');
+    expect(productionExample).toContain(
+      'QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics'
+    );
+    expect(productionExample).toMatch(/^QDRANT_METRICS_GID=[0-9]+$/m);
   });
 
   it('provisions a secret-free dashboard and secure operator runbook', () => {
@@ -206,7 +228,7 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     const dashboard = JSON.parse(dashboardSource) as {
       links: Array<{ url: string }>;
       panels: Array<{ title: string; targets?: Array<{ expr?: string }> }>;
-      templating: { list: Array<{ name: string }> };
+      templating: { list: Array<{ name: string; definition?: string }> };
     };
     const runbook = source('docs/operations/qdrant-self-hosted.md');
 
@@ -219,6 +241,9 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
       'environment',
       'collection',
     ]);
+    expect(
+      dashboard.templating.list.find(variable => variable.name === 'collection')?.definition
+    ).toBe('label_values(qdrant_collection_points, id)');
     const dashboardText = dashboard.panels
       .flatMap(panel => [panel.title, ...(panel.targets ?? []).map(target => target.expr ?? '')])
       .join('\n');
@@ -237,6 +262,18 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     ]) {
       expect(dashboardText).toContain(required);
     }
+    for (const metric of [
+      'qdrant_collection_points',
+      'qdrant_collection_running_optimizations',
+      'qdrant_snapshot_created_total',
+      'qdrant_snapshot_creation_running',
+      'qdrant_snapshot_recovery_running',
+    ]) {
+      expect(dashboardText).toContain(`${metric}{id=~"$collection"}`);
+      expect(dashboardText).not.toContain(`${metric}{collection=~"$collection"}`);
+    }
+    expect(dashboardText).toContain('qdrant_collection_vectors{collection=~"$collection"}');
+    expect(dashboardText).not.toContain('qdrant_collection_vectors{id=~"$collection"}');
     expect(dashboard.links.map(link => link.url)).toEqual([
       'http://127.0.0.1:6335/dashboard',
       '/docs/operations/qdrant-self-hosted.md',
@@ -250,5 +287,10 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     expect(runbook).toContain('http://127.0.0.1:6335/dashboard');
     expect(runbook).toMatch(/read-only|только для чтения/i);
     expect(runbook).toMatch(/never\s+publish[\s\S]{0,100}public|никогда[\s\S]{0,100}публич/i);
+    expect(runbook).toContain('megacampus-metrics');
+    expect(runbook).toContain('megacampus:megacampus-metrics');
+    expect(runbook).toContain('2775');
+    expect(runbook).toContain('QDRANT_METRICS_GID');
+    expect(runbook).toMatch(/\[\[.*QDRANT_METRICS_GID.*\^\[0-9\]\+\$/s);
   });
 });

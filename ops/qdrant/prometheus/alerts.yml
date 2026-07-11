@@ -19,7 +19,7 @@ groups:
   - name: qdrant-alerts
     rules:
       - alert: QdrantDown
-        expr: up{job="qdrant"} == 0
+        expr: (up{job="qdrant"} == 0) or absent(up{job="qdrant"})
         for: 2m
         labels:
           severity: critical
@@ -56,8 +56,6 @@ groups:
 
       - alert: QdrantPointCountUnexpectedDrop
         expr: |
-          qdrant_collection_points > 0
-          and
           qdrant_collection_points < 0.9 * (qdrant_collection_points offset 5m)
         for: 0m
         labels:

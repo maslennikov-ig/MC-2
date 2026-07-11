@@ -250,6 +250,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-api
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     ports:
       - '127.0.0.1:4000:4000'
     env_file:
@@ -273,7 +276,7 @@ services:
       - ENRICHMENTS_PUBLIC_BASE_URL=${NEXT_PUBLIC_SITE_URL:-https://ai.megacampus.ru}
     volumes:
       - ./data/uploads:/app/uploads
-      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:-./data/qdrant-metrics}:/var/lib/megacampus/qdrant-metrics
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
     healthcheck:
       test:
         [
@@ -313,6 +316,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     # Worker doesn't expose HTTP - disable healthcheck inherited from api image
     healthcheck:
@@ -335,7 +341,7 @@ services:
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
       - ./data/uploads:/app/uploads
-      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:-./data/qdrant-metrics}:/var/lib/megacampus/qdrant-metrics
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       # Shared JSON cache from docling-mcp
       - docling-json-cache:/app/docling-cache
       # LKG config persistence
@@ -369,6 +375,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker-stage6
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     healthcheck:
       disable: true
@@ -391,7 +400,7 @@ services:
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
       - ./data/uploads:/app/uploads
-      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:-./data/qdrant-metrics}:/var/lib/megacampus/qdrant-metrics
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       - docling-json-cache:/app/docling-cache
       - worker-data:/app/data
     networks:

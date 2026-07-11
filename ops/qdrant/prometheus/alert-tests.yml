@@ -24,8 +24,8 @@ tests:
         values: '0+100x20'
       - series: 'qdrant_memory_resident_bytes{environment="staging"}'
         values: '1900000000x20'
-      - series: 'qdrant_collection_points{collection="course_embeddings_v1"}'
-        values: '100x6 80x14'
+      - series: 'qdrant_collection_points{id="course_embeddings_v1"}'
+        values: '100x6 0x14'
       - series: 'megacampus_qdrant_hybrid_requests_total{service="worker",instance="worker"}'
         values: '0+100x20'
       - series: 'megacampus_qdrant_hybrid_fallback_total{service="worker",instance="worker"}'
@@ -54,7 +54,7 @@ tests:
         alertname: QdrantPointCountUnexpectedDrop
         exp_alerts:
           - exp_labels:
-              collection: course_embeddings_v1
+              id: course_embeddings_v1
               severity: critical
             exp_annotations:
               summary: Qdrant collection point count dropped unexpectedly
@@ -122,6 +122,15 @@ tests:
 
   - interval: 1m
     alert_rule_test:
+      - eval_time: 3m
+        alertname: QdrantDown
+        exp_alerts:
+          - exp_labels:
+              job: qdrant
+              severity: critical
+            exp_annotations:
+              summary: Qdrant metrics target is unavailable
+              description: The authenticated Qdrant main-listener scrape has failed for two minutes.
       - eval_time: 1m
         alertname: QdrantSnapshotStale
         exp_alerts:

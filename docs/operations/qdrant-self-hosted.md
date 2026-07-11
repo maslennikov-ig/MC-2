@@ -52,11 +52,47 @@ of its consuming image and mode `0400`; do not make the Qdrant server credential
 more broadly readable to accommodate Prometheus. The Prometheus copy must carry
 the same read-only value but has an independent path and ownership.
 
-Create `QDRANT_METRICS_TEXTFILE_HOST_DIR` as a non-secret, exporter-readable
-directory. Application containers write one persistent file per service and
-instance by atomic rename. Snapshot and restore jobs publish their gauges the
-same way. Only `*.prom` final files belong there; temporary files must never be
-observed after a successful write.
+The shared textfile directory has one supported production path and a dedicated
+supplementary group. Run this preflight before Compose activation. It creates
+the group/directory when safe and exits nonzero for a missing, nonnumeric, or
+conflicting GID, or a wrong path, owner, or mode:
+
+```bash
+: "${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be set}"
+: "${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}"
+
+[[ $QDRANT_METRICS_GID =~ ^[0-9]+$ ]] || {
+  echo "QDRANT_METRICS_GID must be numeric" >&2
+  exit 1
+}
+[[ $QDRANT_METRICS_TEXTFILE_HOST_DIR == /var/lib/megacampus/qdrant-metrics ]] || {
+  echo "unsupported Qdrant metrics directory" >&2
+  exit 1
+}
+if ! getent group megacampus-metrics >/dev/null; then
+  sudo groupadd --system --gid "$QDRANT_METRICS_GID" megacampus-metrics
+fi
+[[ $(getent group megacampus-metrics | cut -d: -f3) == "$QDRANT_METRICS_GID" ]] || {
+  echo "megacampus-metrics GID conflicts with QDRANT_METRICS_GID" >&2
+  exit 1
+}
+
+sudo install -d -o megacampus -g megacampus-metrics -m 2775 \
+  "$QDRANT_METRICS_TEXTFILE_HOST_DIR"
+[[ $(stat -c '%U:%G' "$QDRANT_METRICS_TEXTFILE_HOST_DIR") == \
+  megacampus:megacampus-metrics ]]
+[[ $(stat -c '%a' "$QDRANT_METRICS_TEXTFILE_HOST_DIR") == 2775 ]]
+```
+
+Do not start Compose unless the entire block exits zero. Compose runs only API,
+main worker, and Stage 6 as UID/GID `1001:1001` with
+`QDRANT_METRICS_GID` as a supplementary group. Stage 7 receives neither the
+group nor the mount. node_exporter stays UID `65534`, mounts the exact same host
+path read-only, and relies only on directory traversal plus final file mode
+`0644`; it never runs as root or joins the writer group. Application containers
+write one persistent file per service and instance by atomic rename. Snapshot
+and restore jobs publish their gauges the same way. Only `*.prom` final files
+belong there; temporary files must never be observed after a successful write.
 
 ## Safe local validation before activation
 

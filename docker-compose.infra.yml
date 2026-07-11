@@ -143,7 +143,7 @@ services:
       - --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
       - --web.listen-address=:9100
     volumes:
-      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:-./data/qdrant-metrics}:/var/lib/node_exporter/textfile_collector:ro
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/node_exporter/textfile_collector:ro
     networks:
       - megacampus
     logging:
@@ -167,11 +167,11 @@ services:
       - '127.0.0.1:9093:9093'
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
-      - --storage.path=/var/lib/alertmanager
+      - --storage.path=/alertmanager
       - --cluster.listen-address=
     volumes:
       - ./ops/qdrant/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - alertmanager-data:/var/lib/alertmanager
+      - alertmanager-data:/alertmanager
     secrets:
       - alertmanager_telegram_bot_token
       - alertmanager_telegram_chat_id
@@ -343,6 +343,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     # Worker doesn't expose HTTP - disable healthcheck inherited from api image
     healthcheck:
@@ -363,7 +366,7 @@ services:
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
     volumes:
       - ./data/uploads:/app/uploads
-      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:-./data/qdrant-metrics}:/var/lib/megacampus/qdrant-metrics
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       # Shared JSON cache from docling-mcp
       - docling-json-cache:/app/docling-cache
       # LKG config persistence
