@@ -274,7 +274,7 @@ The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 Database rollout is deliberately split. The partial unresolved-critical index
 uses live-write-safe `CREATE INDEX CONCURRENTLY` and its rollback uses
 `DROP INDEX CONCURRENTLY`; execute each statement in autocommit mode, never
-inside a transaction. Final code SHA `036a642d` provides one fixed-purpose
+inside a transaction. Final code SHA `59dc6cad` provides one fixed-purpose
 unified repo runner at
 `packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts`;
 it accepts no arbitrary SQL or migration path and uses one `SUPABASE_DB_URL` for
