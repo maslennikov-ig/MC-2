@@ -90,4 +90,4 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — approved evidence design and companion execution plan now define durable Stage 4/5/6 behavior and operator acceptance.
-graph-reviewed: updated — after E6 integration, local-only `graphify update .` plus `graphify cluster-only . --no-viz` rebuilt the final code graph (50,053 nodes, 74,224 edges, 3,153 communities), with zero external model/API tokens and no Git hooks.
+graph-reviewed: updated — after E6 integration, local-only `graphify update .` plus `graphify cluster-only . --no-viz` rebuilt the final code graph (50,053 nodes, 74,224 edges), with zero external model/API tokens and no Git hooks; unstable community repartition totals are intentionally omitted.
