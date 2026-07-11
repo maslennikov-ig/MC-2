@@ -61,6 +61,7 @@ graph_reviewed: blocked
 graph_review_notes: Read and queried the fresh parent graph at base 7b542c8d. The isolated child does not own the parent's ignored graphify-out state; parent refresh is required after integration.
 verification:
   - mc2-jz6y0.24.5 focused Stage 4/5/metrics/privacy gate: 124/124 passed across 9 files
+  - post-hook restoration rerun: focused 124/124 and pnpm type-check passed
   - full pnpm test across workspace unit suites: passed
   - Stage 5 exact-attempt and sanitized post-search failure gate: 33/33 passed
   - Disposable PostgreSQL 16 applied migration gate: 6/6 passed
@@ -70,6 +71,7 @@ verification:
   - pnpm type-check: passed across all workspace packages
   - scoped changed-source lint: passed with 0 errors and 13 existing warnings
   - full pnpm lint remains red on 4 pre-existing errors in untouched src/server/routers/clarifying-helpers.ts and src/server/routers/clarifying.router.ts; both are byte-unchanged from task base f40330c4
+  - pre-commit lint-staged is tracked as mc2-zsoih (P2); HUSKY=0 was used only after its test-file ESLint mismatch was reproduced and canonical changed-source lint, Prettier, tests, and type-check had passed
   - pnpm build with synthetic loopback web environment: passed; first run failed only required build-time env validation
   - artifact validation and process verification: passed after final cleanup metadata
 changed_files:
@@ -105,6 +107,7 @@ changed_files:
   - packages/course-gen-platform/vitest.config.integration-ci.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-observability.md
 explicit_defers:
+  - mc2-zsoih (P2) tracks the repo pre-commit lint-staged configuration applying type-aware source rules to staged test mocks; parent created and Dolt-pushed the Bead before the documented HUSKY=0 commit workaround.
   - Parent E7 integration owns stable documentation reconciliation, Graphify refresh, Beads state, acceptance totals, summary/handoff, and independent review.
   - Q12 retains all remote activation, deployment, live receiver, secret, and staging/production authority.
 ---

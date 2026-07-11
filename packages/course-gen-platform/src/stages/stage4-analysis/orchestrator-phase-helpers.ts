@@ -990,7 +990,7 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
     'stage_4_scope',
     'scope_analysis',
     context,
-    phase2Output,
+    phase2Output!,
     {
       total_lessons: phase2Output!.recommended_structure.total_lessons,
       total_sections: phase2Output!.recommended_structure.total_sections,

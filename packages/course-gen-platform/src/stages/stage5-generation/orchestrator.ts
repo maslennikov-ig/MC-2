@@ -230,7 +230,7 @@ export class GenerationOrchestrator {
       finalState.sections,
       input,
       this.logger,
-      finalState.metadata
+      finalState.metadata as NonNullable<typeof finalState.metadata>
     );
 
     this.logQualityGateResults(input, qualityGateResults);
@@ -250,7 +250,7 @@ export class GenerationOrchestrator {
     const finalStructuralResult = validateStructuralQuality({
       input,
       metadata: reconcileCourseMetadata(
-        finalState.metadata,
+        finalState.metadata as NonNullable<typeof finalState.metadata>,
         stateForAssembly.sections,
         input
       ),
@@ -563,7 +563,7 @@ export class GenerationOrchestrator {
     totalDuration: number
   ): Promise<GenerationResult> {
     const { courseStructure, generationMetadata } = assembleGenerationResult(
-      finalState.metadata,
+      finalState.metadata as NonNullable<typeof finalState.metadata>,
       finalState.sections,
       finalState.tokenUsage,
       finalState.modelUsed,
@@ -591,7 +591,7 @@ export class GenerationOrchestrator {
             const result = validateStructuralQuality({
               input,
               metadata: reconcileCourseMetadata(
-                finalState.metadata,
+                finalState.metadata as NonNullable<typeof finalState.metadata>,
                 candidate.sections,
                 input
               ),
@@ -608,7 +608,7 @@ export class GenerationOrchestrator {
         const enrichedStructuralResult = validateStructuralQuality({
           input,
           metadata: reconcileCourseMetadata(
-            finalState.metadata,
+            finalState.metadata as NonNullable<typeof finalState.metadata>,
             finalCourseStructure.sections,
             input
           ),

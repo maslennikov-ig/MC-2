@@ -810,7 +810,7 @@ export async function runDocumentEvidencePreflight(
           }
         }
         for (const documentId of failed) {
-          cardById.set(documentId, degradeVerification(cardById.get(documentId)));
+          cardById.set(documentId, degradeVerification(cardById.get(documentId)!));
         }
         await commit({
           batchKey: verificationBatchKey,
