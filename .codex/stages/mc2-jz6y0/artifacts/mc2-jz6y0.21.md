@@ -54,11 +54,11 @@ parallel_group: E4-conflict-ui
 depends_on_streams:
   - mc2-jz6y0.20
 parallel_decision: isolated UI stream running in parallel with E5 and E6; implementation stayed sequential because metadata parsing, grouping, decision controls, and browser fixtures share one UI contract
-status: returned
+status: accepted
 delivery_method: n/a
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Worker branch is pushed for independent review and parent integration; parent owns final worktree/branch cleanup after acceptance.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Integrated through final reviewed commit c27b9eb; the dedicated worktree and local worker branch were removed. The pushed remote evidence branch and hosted Lazyweb report remain as audit evidence.
 risk_level: medium
 docs_impact: behavior
 docs_reviewed: no-change-needed
