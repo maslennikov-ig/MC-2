@@ -44,17 +44,17 @@ depends_on_streams:
   - mc2-jz6y0.18
   - mc2-jz6y0.20
 parallel_decision: E6 ran in its isolated worktree alongside independent E4 and E5; loader, decision projection, live caller, and retriever changes were sequential because they share one cache and failure contract.
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Worker dependency symlinks are removed before handoff; parent owns independent review, integration rerun, worktree/branch cleanup, and final acceptance.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Integrated as merge 1e681027 after independent approval and a fresh integration rerun. The dedicated worktree, generated dependency links, disposable PostgreSQL containers, and local worker branch were removed; the pushed remote evidence branch remains as audit evidence.
 risk_level: high
 docs_impact: behavior-and-migration
 docs_reviewed: no-change-needed
 docs_review_notes: The approved evidence design and E6 plan already describe decision-aware targeted Stage 6 retrieval, grouping, provenance, no-document behavior, and rollback boundaries. Stable cross-epic operator/product documentation remains E7/parent-owned after integration.
-graph_reviewed: used
-graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran a focused Graphify query before broad source reads. The shared graph was stale and this isolated worker was explicitly read-only; parent refreshes it after safe integration.
+graph_reviewed: updated
+graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran a focused Graphify query before broad source reads. After safe integration, the parent ran local-only `graphify update .` and `graphify cluster-only . --no-viz`; the report is built from merge `1e681027` with 50,053 nodes, 74,224 edges and 3,154 communities, zero model/API tokens and no Git hooks.
 verification:
   - TDD RED/GREEN proved durable side handles from conflict ID plus sorted claim IDs, exact system/manual option persistence, legacy fail-closed behavior, accepted-side selection, degraded remove/continue behavior, stable decision/ref cache identity, stale and foreign ref rejection, and bounded provenance.
   - Shared document-evidence contracts passed 14/14; the full Stage 4 analysis unit directory passed 267/267 after deleting three tests for the removed dead writer; E3 static plus durable-side static migrations passed 14/14.
@@ -93,7 +93,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/side-handle.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.23.md
 explicit_defers:
-  - Independent correctness re-review of the remediation commit, parent integration rerun, E7 observability/join coverage, stable docs review, and Graphify refresh remain parent-stage responsibilities.
+  - E7 observability/join coverage, stable docs review, and the parent Graphify refresh remain parent-stage responsibilities.
   - Q12, deployment, live reindex, service/secret changes, cloud recovery, and every staging/production mutation remain blocked without explicit current-task authorization and were not performed.
 ---
 

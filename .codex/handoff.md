@@ -31,7 +31,7 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 ## Accepted and Open Work
 
-- Accepted and pushed before the current bookkeeping commit: Q1-Q7, strict Formula index fix `.15`, evidence E1 `.18`, and E2 `.19`. Reviewed E3 `.20` is integrated through `89a7948e` and ready for push. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
+- Accepted and pushed before the current bookkeeping commit: Q1-Q7, strict Formula index fix `.15`, and evidence E1-E5. E6 `.23` is independently approved and integrated as merge `1e681027`; its acceptance bookkeeping is ready for push. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11`, Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
 - Decision `.14` remains open: confirm supported observability pins and explicit exporter/notification transport before Q6/Q9.
@@ -39,8 +39,9 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
 - E2 `.19` is reviewed and integrated through `14277d8a`: focused Stage 4 117/117, shared 11/11, applied PostgreSQL 15.18 9/9, both type-checks and process verification pass. Exact full-ledger resume, per-card/cross-card hierarchy, claim-scoped verification and exact cl100k safety bounds are accepted. Its disposable DB/container and dedicated local worktree/branch are cleaned.
 - E3 `.20` is reviewed and integrated through `89a7948e`: focused 136/136, shared 13/13, PostgreSQL 15.18 static/applied 36/36, both type-checks and process verification pass. Material conflicts, degraded/capacity decisions, manual/system atomicity, full snapshots, approval guards and plural retry recovery are accepted. Its disposable containers/symlinks and dedicated local worktree/branch are cleaned.
-- E5 `.22` is reviewed and integrated through `cf438826`: focused 52/52, shared 20/20, full Stage5/Qdrant 532/532, workspace type-check/build and process verification pass. Baseline-first live enrichment, exact chunk grounding, fallback audit and CAS persistence are accepted. Its worktree/local branch are cleaned. E4 `.21`, E6 `.23` and E7 `.24` remain.
-- E4 `.21` is reviewed and integrated through rebased equivalent `2538bb5c`: web 20/20, shared 2/2, real-panel Chromium/mobile/dark E2E 4 pass/2 expected skips, type-check/build/process pass. Distinct conflict UI, CAS edit semantics, localized system audit, fail-closed metadata and accessibility are accepted. Its worktree/local branch are cleaned. E6 `.23` and E7 `.24` remain.
+- E5 `.22` is reviewed and integrated through `cf438826`: focused 52/52, shared 20/20, full Stage5/Qdrant 532/532, workspace type-check/build and process verification pass. Baseline-first live enrichment, exact chunk grounding, fallback audit and CAS persistence are accepted. Its worktree/local branch are cleaned.
+- E4 `.21` is reviewed and integrated through rebased equivalent `2538bb5c`: web 20/20, shared 2/2, real-panel Chromium/mobile/dark E2E 4 pass/2 expected skips, type-check/build/process pass. Distinct conflict UI, CAS edit semantics, localized system audit, fail-closed metadata and accessibility are accepted. Its worktree/local branch are cleaned.
+- E6 `.23` is reviewed and integrated as merge `1e681027` from final recovery commit `a6c39e7a`. Fresh integration evidence: shared 21/21, joined E5/E6 111/111, Stage4 267/267, migrations 14/14, PostgreSQL 15.18 E3 26/26 and side identity 8/8; independent merged-tree review additionally passed E4 20/20, E5 35/35, Qdrant 14/14, E6 76/76, Stage4 evidence 49/49 and type-check. Its disposable containers and dedicated worktree/local branch are cleaned. E7 `.24` remains blocked by Q8/Q9.
 
 ## Completed Recovery Gate
 
@@ -50,7 +51,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: finish independent E4/E6 remediation and integration, then run joined E7; proceed with Q6 only after owner decision `.14` is recorded.
+Recommended action: record owner decision `.14`, then execute Q6, Q8 and Q9 in dependency order; E7 joins accepted E4-E6 with Q8/Q9 before Q10/Q11.
 
 ## Starter prompt for next orchestrator
 
@@ -60,7 +61,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 ## Parallel Execution After Q7
 
-- E1, E2, E3, E5 and Q7 are accepted; E4/E6 remain in independent remediation.
+- E1-E6 and Q7 are accepted and integrated.
 - Q8/Q9 may proceed when their parent-plan dependencies and decision `.14` permit.
 - E7 is the shared evidence/observability/docs gate and blocks Q10/Q11 close.
 
@@ -89,4 +90,4 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — approved evidence design and companion execution plan now define durable Stage 4/5/6 behavior and operator acceptance.
-graph-reviewed: used — existing report and focused Qdrant Stage 2/5/6 query informed the design; refresh is due after implementation changes during stage closeout.
+graph-reviewed: updated — after E6 integration, local-only `graphify update .` plus `graphify cluster-only . --no-viz` rebuilt the report from `1e681027` (50,053 nodes, 74,224 edges, 3,154 communities), with zero external model/API tokens and no Git hooks.
