@@ -1013,6 +1013,17 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
     invalid[999].metadata.subject_key = 'sha256:foreign';
     await expect(materialize('manual', invalid)).rejects.toMatchObject({ code: '23514' });
     expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe('0');
+    const oversized = questions.map((question, index) =>
+      index === 0 ? { ...question, questionText: 'x'.repeat(16_777_216) } : question
+    );
+    await expect(
+      materialize(
+        'manual',
+        oversized,
+        '90000000-0000-4000-8000-000000000095'
+      )
+    ).rejects.toMatchObject({ code: '22023' });
+    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe('0');
     const result = await materialize('manual', questions);
     expect(result.rows[0].result.question_ids).toHaveLength(1000);
     expect(result.rows[0].result.decision_ids).toEqual([]);
