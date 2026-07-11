@@ -31,29 +31,22 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 ## Accepted and Open Work
 
-- Accepted/pushed: Q1-Q5 and strict Formula index fix `.15`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
-- Q7 `.8` is nearly complete in `/home/me/code/mc2/.worktrees/qdrant-q7-reindex`, branch `codex/qdrant-q7-reindex`, HEAD `616e8b83`.
+- Accepted/pushed: Q1-Q7 and strict Formula index fix `.15`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
+- Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11`, Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
 - Decision `.14` remains open: confirm supported observability pins and explicit exporter/notification transport before Q6/Q9.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - Expansion E1-E7 are `.18` through `.24`; their exact dependency graph is in Beads and the stage summary.
 
-## First Recovery Action
+## Completed Recovery Gate
 
-Q7 has one uncommitted compatibility patch in `tests/integration/ci-qdrant-smoke.test.ts`. The full pinned Q5 gate still fails 18/19 because `packages/course-gen-platform/tests/integration/qdrant.test.ts` uses the old numeric point ID.
-
-1. Replace only `generateNumericId(source.chunk_id)` and its import with `generatePointId(source.document_id, source.chunk_id)`.
-2. Rerun the pinned Qdrant `1.18.2` gate and require 19/19.
-3. Update `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.8.md` with exact output.
-4. Commit/push the Q7 branch, run independent correctness review, integrate into the integration branch, rerun the gate, clean the Q7 worktree, and close `.8`.
-
-Do not discard or overwrite this dirty Q7 worktree.
+Q7 recovery is complete. Both pinned integration retrievals use `generatePointId(document_id, chunk_id)`; independent review passed; the integration rerun passed 19/19 and the dedicated worktree/local branch were safely cleaned after push.
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: start the continuation orchestrator, recover and accept Q7 first, then execute the Beads dependency graph with E1 parallel to safe Q6 work.
+Recommended action: finish/review E1, then start E2; proceed with Q6 only after owner decision `.14` is recorded.
 
 ## Starter prompt for next orchestrator
 

@@ -62,8 +62,8 @@ parallel_decision: parallel because Q5 owns only disjoint CI/integration files
 status: accepted
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: The recovery Qdrant container and all fixture collections, aliases, snapshots, and points were removed; the dedicated worktree and branch remain intact pending independent review and orchestrator acceptance.
+cleanup_status: cleaned
+cleanup_notes: The recovery and integration Qdrant containers plus all fixture collections, aliases, snapshots, and points were removed. The dedicated worktree and local branch were safely removed after reviewed integration commit 841812be was pushed; the remote evidence branch remains.
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed

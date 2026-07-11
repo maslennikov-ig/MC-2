@@ -65,9 +65,8 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 
 ## Current Recovery Point
 
-- Integration branch is pushed at `a3f24157`; this planning update will create a later handoff commit.
-- Q7 branch/worktree: `codex/qdrant-q7-reindex` at `616e8b83`, ahead of remote, with one intentional uncommitted compatibility fix in `ci-qdrant-smoke.test.ts`.
-- Full pinned Q5 gate is 18/19 because `tests/integration/qdrant.test.ts` still calls stale `generateNumericId(source.chunk_id)`. Replace it narrowly with `generatePointId(source.document_id, source.chunk_id)`, rerun 19/19, update the Q7 artifact, review, commit/push, integrate, and close Q7.
+- Integration branch is pushed at `841812be` after reviewed Q7 integration.
+- Q7 / `mc2-jz6y0.8` is accepted: both integration lookups use document-scoped point IDs, the pinned Qdrant `1.18.2` gate passes 19/19, focused Q7 tests pass 85/85, and the dedicated worktree/local branch are cleaned. The remote evidence branch remains.
 - Q6/Q9 remain gated by decision `mc2-jz6y0.14` on observability pins and metric transport/notification path.
 
 ## Routing Evidence
@@ -92,6 +91,7 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 - Q3 / `mc2-jz6y0.4`: accepted and integrated from commit `bc0ceacf` (`origin/codex/qdrant-q3-native-ingestion`) as merge `b3954e83`. Native Qdrant BM25 documents, complete compacted priority payloads and fail-before-upsert weight validation are in place; process-local BM25 runtime state is removed. Independent re-review approved with no findings. Fresh branch and integrated reruns both passed 21 focused tests, package type-check, strict typed ESLint with zero errors, and the zero-legacy-reference gate.
 - Q4 / `mc2-jz6y0.5`: accepted and integrated from review-fix commit `4159c2f4` (`origin/codex/qdrant-q4-hybrid-formula`) as merge `7a5f40df`. Native BM25+dense prefetch, server-side RRF→Formula ranking, optional document grouping, exact cache identity and observable safe dense fallback are implemented; client-side RRF/priority score mutation is removed. Independent re-review passed with no findings. Integrated rerun passed 34 focused tests, package type-check and native-only static gates. Production grouping remains disabled until Q5's pinned RU/EN fixture passes.
 - Q5 / `mc2-jz6y0.6`: accepted and integrated from review-fix commit `3c36a6a1` (`origin/codex/qdrant-q5-pinned-integration`) by the required pull-rebase integration. The blocking CI gate pins Qdrant `1.18.2` and proves native multilingual BM25, dense+sparse RRF, strict Formula weighting, document grouping, tenant/course isolation, snapshots and cleanup. Independent re-review passed with no findings. Root acceptance rerun passed 17 workflow/config tests, 19 pinned integration tests, package type-check and build; pre/post collection state was empty and the verification container was removed.
+- Q7 / `mc2-jz6y0.8`: accepted and integrated from reviewed recovery commit `49e5e8d7` as merge `841812be`. Source-driven reindex plan/execute/verify is deterministic, resumable and document-scoped; the recovery reviewer found no issues (`PASS`/`APPROVED`). Fresh post-commit evidence: seven focused files 85/85 and pinned Qdrant `1.18.2` integration 19/19. Integration and recovery containers were removed; the dedicated worktree/local branch were cleaned.
 - D / authoritative docs: accepted read-only research with 40 first-party references and exact Qdrant 1.18.2/client 1.18.0 shapes. Confirmed core architecture; recorded required corrections for Formula input normalization, S3 restore transport, alias recreation, external backup/fallback metrics, notification delivery, image health probing, and version freshness.
 
 ## Decision Gates From Authoritative Docs
