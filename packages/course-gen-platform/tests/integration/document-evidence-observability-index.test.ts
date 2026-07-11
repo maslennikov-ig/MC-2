@@ -174,7 +174,8 @@ async function resetSchema(): Promise<void> {
     CREATE TABLE public.document_evidence_items (
       id uuid PRIMARY KEY,
       run_id uuid NOT NULL,
-      processing_mode text NOT NULL
+      processing_mode text NOT NULL,
+      coverage_status text NOT NULL CHECK (coverage_status IN ('assessed','degraded','failed'))
     );
     CREATE TABLE public.document_evidence_conflict_checkpoints (
       id uuid PRIMARY KEY,
@@ -659,9 +660,9 @@ appliedDescribe('document evidence observability index applied', () => {
         '20000000-0000-4000-8000-000000000001','accepted',2,1,1,0,
         2,3,100,30,0.5,'2026-01-01T00:00:00Z','2026-01-01T00:00:10Z'
       );
-      INSERT INTO public.document_evidence_items(id,run_id,processing_mode) VALUES
-        ('30000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','summary'),
-        ('30000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','metadata_only');
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode,coverage_status) VALUES
+        ('30000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','summary','assessed'),
+        ('30000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','metadata_only','degraded');
       INSERT INTO public.document_evidence_conflict_checkpoints(id,structured_checkpoint) VALUES (
         '40000000-0000-4000-8000-000000000001',
         '{"kind":"conflict_map","usage":{"model_calls":2,"input_tokens":20,"output_tokens":5,"total_cost_usd":0.1}}'
@@ -681,8 +682,8 @@ appliedDescribe('document evidence observability index applied', () => {
         '20000000-0000-4000-8000-000000000002','processing',1,1,1,1,10,2,0.05,
         '2026-01-01T00:01:00Z'
       );
-      INSERT INTO public.document_evidence_items(id,run_id,processing_mode) VALUES
-        ('30000000-0000-4000-8000-000000000003','20000000-0000-4000-8000-000000000002','full_text');
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode,coverage_status) VALUES
+        ('30000000-0000-4000-8000-000000000003','20000000-0000-4000-8000-000000000002','full_text','assessed');
       UPDATE public.document_evidence_runs
       SET status='accepted',completed_at='2026-01-01T00:01:05Z'
       WHERE id='20000000-0000-4000-8000-000000000002';
@@ -766,31 +767,32 @@ appliedDescribe('document evidence observability index applied', () => {
     await client.query(totalsForward);
     await client.query(`
       INSERT INTO public.document_evidence_runs(
-        id,status,source_count,assessed_count,batch_count,model_calls,input_tokens,
+        id,status,source_count,assessed_count,degraded_count,failed_count,batch_count,model_calls,input_tokens,
         output_tokens,total_cost_usd,started_at,completed_at
       ) VALUES (
-        '20000000-0000-4000-8000-000000000020','accepted',1,1,1,1,10,2,0.05,
+        '20000000-0000-4000-8000-000000000020','accepted',3,1,1,1,1,1,10,2,0.05,
         '2026-01-01T00:00:00Z','2026-01-01T00:00:05Z'
       );
-      INSERT INTO public.document_evidence_items(id,run_id,processing_mode) VALUES (
-        '30000000-0000-4000-8000-000000000020',
-        '20000000-0000-4000-8000-000000000020',
-        'summary'
-      );
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode,coverage_status) VALUES
+        ('30000000-0000-4000-8000-000000000020','20000000-0000-4000-8000-000000000020','summary','assessed'),
+        ('30000000-0000-4000-8000-000000000022','20000000-0000-4000-8000-000000000020','metadata_only','degraded'),
+        ('30000000-0000-4000-8000-000000000023','20000000-0000-4000-8000-000000000020','full_text','failed');
       COMMIT;
     `);
     expect(
       (
         await client.query(`
-          SELECT accepted_runs,source_documents,assessed_documents,batches,model_calls,
+          SELECT accepted_runs,source_documents,assessed_documents,degraded_documents,failed_documents,batches,model_calls,
                  input_tokens,output_tokens,total_cost_usd,duration_seconds,summary_documents
           FROM public.document_evidence_observability_totals
         `)
       ).rows[0]
     ).toMatchObject({
       accepted_runs: '1',
-      source_documents: '1',
+      source_documents: '3',
       assessed_documents: '1',
+      degraded_documents: '1',
+      failed_documents: '1',
       batches: '1',
       model_calls: '1',
       input_tokens: '10',
@@ -828,5 +830,45 @@ appliedDescribe('document evidence observability index applied', () => {
         )
       ).rows[0]
     ).toEqual({ accepted_runs: '0', source_documents: '0' });
+  });
+
+  it('rejects accepted terminal counts that disagree with durable item coverage statuses', async () => {
+    await client.query(totalsForward);
+    await client.query('BEGIN');
+    await client.query(`
+      INSERT INTO public.document_evidence_runs(
+        id,status,source_count,assessed_count,degraded_count,failed_count,started_at,completed_at
+      ) VALUES (
+        '20000000-0000-4000-8000-000000000024','accepted',1,1,0,0,
+        '2026-01-01T00:00:00Z','2026-01-01T00:00:05Z'
+      );
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode,coverage_status) VALUES (
+        '30000000-0000-4000-8000-000000000024',
+        '20000000-0000-4000-8000-000000000024',
+        'summary',
+        'degraded'
+      );
+    `);
+    await expect(client.query('COMMIT')).rejects.toThrow(/requires exact durable items/iu);
+    await client.query('ROLLBACK').catch(() => undefined);
+    expect(
+      (
+        await client.query(
+          "SELECT count(*)::text AS count FROM public.document_evidence_runs WHERE id='20000000-0000-4000-8000-000000000024'"
+        )
+      ).rows[0].count
+    ).toBe('0');
+    expect(
+      (
+        await client.query(
+          'SELECT accepted_runs,source_documents,assessed_documents,degraded_documents FROM public.document_evidence_observability_totals'
+        )
+      ).rows[0]
+    ).toEqual({
+      accepted_runs: '0',
+      source_documents: '0',
+      assessed_documents: '0',
+      degraded_documents: '0',
+    });
   });
 });

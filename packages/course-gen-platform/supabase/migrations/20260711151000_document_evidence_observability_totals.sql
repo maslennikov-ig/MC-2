@@ -85,6 +85,9 @@ DECLARE
   v_targeted BIGINT;
   v_metadata BIGINT;
   v_item_count BIGINT;
+  v_assessed BIGINT;
+  v_degraded BIGINT;
+  v_failed BIGINT;
 BEGIN
   SELECT
     count(*) FILTER (WHERE processing_mode = 'full_text'),
@@ -92,14 +95,22 @@ BEGIN
     count(*) FILTER (WHERE processing_mode = 'summary'),
     count(*) FILTER (WHERE processing_mode = 'targeted_retrieval'),
     count(*) FILTER (WHERE processing_mode = 'metadata_only'),
-    count(*)
-  INTO v_full_text, v_hierarchical, v_summary, v_targeted, v_metadata, v_item_count
+    count(*),
+    count(*) FILTER (WHERE coverage_status = 'assessed'),
+    count(*) FILTER (WHERE coverage_status = 'degraded'),
+    count(*) FILTER (WHERE coverage_status = 'failed')
+  INTO
+    v_full_text, v_hierarchical, v_summary, v_targeted, v_metadata, v_item_count,
+    v_assessed, v_degraded, v_failed
   FROM public.document_evidence_items
   WHERE run_id = NEW.id;
 
   IF TG_OP = 'INSERT' AND NEW.status = 'accepted' AND (
     v_item_count <> NEW.source_count OR
-    v_full_text + v_hierarchical + v_summary + v_targeted + v_metadata <> NEW.source_count
+    v_full_text + v_hierarchical + v_summary + v_targeted + v_metadata <> NEW.source_count OR
+    v_assessed <> NEW.assessed_count OR
+    v_degraded <> NEW.degraded_count OR
+    v_failed <> NEW.failed_count
   ) THEN
     RAISE EXCEPTION 'accepted terminal evidence insert requires exact durable items';
   END IF;
