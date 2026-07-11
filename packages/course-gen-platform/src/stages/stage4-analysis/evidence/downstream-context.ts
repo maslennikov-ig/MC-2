@@ -7,8 +7,22 @@ import { tokenEstimator } from '@/shared/llm/token-estimator';
 import type { EvidenceGenerationMetrics, StructuredEvidencePort } from './card-generator';
 import { emptyGenerationMetrics, EvidenceCheckpointError } from './card-generator';
 import type { DocumentSummaryResult } from '../handler-helpers';
+import {
+  CROSS_DOCUMENT_REDUCE_TOPIC,
+  estimateDownstreamReduceInputTokens,
+  groupDownstreamUnits,
+  splitDownstreamUnit,
+  type DownstreamSummaryUnit,
+} from './downstream-hierarchy';
+import {
+  reduceDownstreamGroup,
+  reduceOversizedCard,
+  restoreDownstreamState,
+} from './downstream-reducer';
 
-const DOWNSTREAM_CONTEXT_SCHEMA_VERSION = 'document-evidence-downstream-v1';
+export { estimateDownstreamReduceInputTokens } from './downstream-hierarchy';
+
+const DOWNSTREAM_CONTEXT_SCHEMA_VERSION = 'document-evidence-downstream-v2';
 
 export interface DownstreamEvidenceRepresentation {
   kind: 'synthetic_advisory';
@@ -23,6 +37,12 @@ export interface DownstreamEvidenceRepresentation {
     documentId: string;
     coverageStatus: DocumentEvidenceCard['coverage_status'];
     coverageReason: string;
+  }>;
+  sourceMaterials: Array<{
+    documentId: string;
+    keyClaims: DocumentEvidenceCard['key_claims'];
+    constraints: string[];
+    limitations: string[];
   }>;
   coverage: DocumentEvidenceCoverageSummary;
   materialSourceRefs: DocumentEvidenceCard['key_claims'][number]['source_refs'];
@@ -80,17 +100,7 @@ export function resolveDownstreamDocumentSummaries(
   ];
 }
 
-interface SummaryUnit {
-  unitId: string;
-  summary: string;
-}
-
-interface StoredReduction {
-  batchKey: string;
-  inputHash: string;
-  unitIds: string[];
-  summary: string;
-}
+type SummaryUnit = DownstreamSummaryUnit;
 
 function sha256(value: string): string {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -101,7 +111,7 @@ function estimate(value: string, language: 'ru' | 'en'): number {
 }
 
 function sortedUnique(values: string[]): string[] {
-  return [...new Set(values.map(value => value.trim()).filter(Boolean))].sort();
+  return [...new Set(values.filter(value => value.trim().length > 0))].sort();
 }
 
 function materialRefs(cards: DocumentEvidenceCard[]) {
@@ -144,60 +154,6 @@ function renderPrompt(
   ].join('\n');
 }
 
-function groupUnits(
-  units: SummaryUnit[],
-  maxBatchTokens: number,
-  language: 'ru' | 'en'
-): SummaryUnit[][] {
-  const groups: SummaryUnit[][] = [];
-  let group: SummaryUnit[] = [];
-  let tokens = 0;
-  for (const unit of units) {
-    const unitTokens = estimate(unit.summary, language);
-    if (unitTokens > maxBatchTokens) {
-      throw new Error(`Downstream evidence unit ${unit.unitId} exceeds the bounded reduce input`);
-    }
-    if (group.length > 0 && tokens + unitTokens > maxBatchTokens) {
-      groups.push(group);
-      group = [];
-      tokens = 0;
-    }
-    group.push(unit);
-    tokens += unitTokens;
-  }
-  if (group.length > 0) groups.push(group);
-  return groups;
-}
-
-function restoredState(rows: Array<Record<string, unknown>> | undefined, identityHash: string) {
-  const reductions = new Map<string, StoredReduction>();
-  let complete: DownstreamEvidenceRepresentation | undefined;
-  for (const row of rows ?? []) {
-    const checkpoint = row.structured_checkpoint;
-    if (!checkpoint || typeof checkpoint !== 'object' || Array.isArray(checkpoint)) continue;
-    const value = checkpoint as Record<string, unknown>;
-    if (value.identity_hash !== identityHash) continue;
-    if (value.kind === 'downstream_context_complete') {
-      complete = value.representation as DownstreamEvidenceRepresentation;
-    }
-    if (
-      value.kind === 'downstream_context_reduction' &&
-      typeof row.batch_key === 'string' &&
-      typeof row.input_hash === 'string' &&
-      Array.isArray(value.unit_ids) &&
-      typeof value.summary === 'string'
-    ) {
-      reductions.set(`${row.batch_key}\n${row.input_hash}`, {
-        batchKey: row.batch_key,
-        inputHash: row.input_hash,
-        unitIds: value.unit_ids as string[],
-        summary: value.summary,
-      });
-    }
-  }
-  return { reductions, complete };
-}
-
 function validateCompleteRepresentation(
   representation: DownstreamEvidenceRepresentation,
   identityHash: string,
@@ -206,12 +162,14 @@ function validateCompleteRepresentation(
   targetTokens: number
 ): DownstreamEvidenceRepresentation {
   const outcomeIds = representation.sourceOutcomes.map(outcome => outcome.documentId);
+  const materialIds = representation.sourceMaterials.map(material => material.documentId);
   if (
     representation.kind !== 'synthetic_advisory' ||
     representation.representationHash !== identityHash ||
     representation.sourceCount !== sourceDocumentIds.length ||
     JSON.stringify(representation.sourceDocumentIds) !== JSON.stringify(sourceDocumentIds) ||
     JSON.stringify(outcomeIds) !== JSON.stringify(sourceDocumentIds) ||
+    JSON.stringify(materialIds) !== JSON.stringify(sourceDocumentIds) ||
     representation.targetTokens !== targetTokens ||
     representation.tokenCount !== estimate(representation.promptContent, language) ||
     representation.tokenCount > targetTokens
@@ -219,46 +177,6 @@ function validateCompleteRepresentation(
     throw new Error('Stored downstream representation failed identity, coverage, or token checks');
   }
   return representation;
-}
-
-async function reduceWithRetry(
-  input: BuildDownstreamEvidenceRepresentationInput,
-  units: SummaryUnit[],
-  level: number
-) {
-  const attempts = input.port.retryOwner === 'port' ? 1 : input.maxRetries + 1;
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      const result = await input.port.reduceSummary({
-        units,
-        topic: 'Cross-document advisory evidence digest',
-        language: input.language,
-        level,
-        maxOutputTokens: Math.max(64, Math.floor(input.maxBatchTokens / 2)),
-      });
-      return { result, attempts: attempt };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError;
-}
-
-function metrics(
-  usage: { inputTokens: number; outputTokens: number; costUsd: number },
-  attempts: number,
-  level: number
-): EvidenceGenerationMetrics {
-  return {
-    ...emptyGenerationMetrics(),
-    modelCalls: attempts,
-    retryCount: attempts - 1,
-    inputTokens: usage.inputTokens,
-    outputTokens: usage.outputTokens,
-    totalCostUsd: usage.costUsd,
-    reduceLevels: level,
-  };
 }
 
 export async function buildDownstreamEvidenceRepresentation(
@@ -290,7 +208,7 @@ export async function buildDownstreamEvidenceRepresentation(
       maxBatchTokens: input.maxBatchTokens,
     })
   );
-  const restored = restoredState(input.checkpointRows, identityHash);
+  const restored = restoreDownstreamState(input.checkpointRows, identityHash);
   if (restored.complete) {
     return validateCompleteRepresentation(
       restored.complete,
@@ -304,7 +222,30 @@ export async function buildDownstreamEvidenceRepresentation(
     throw new Error('Accepted evidence run is missing its durable downstream representation');
   }
 
-  let units = cards.map(card => ({ unitId: card.document_id, summary: unitText(card) }));
+  const units: SummaryUnit[] = [];
+  for (const card of cards) {
+    const cardUnit = { unitId: card.document_id, summary: unitText(card) };
+    if (
+      estimateDownstreamReduceInputTokens(
+        [cardUnit],
+        CROSS_DOCUMENT_REDUCE_TOPIC,
+        input.language
+      ) <= input.maxBatchTokens
+    ) {
+      units.push(cardUnit);
+    } else {
+      units.push(
+        await reduceOversizedCard(
+          input,
+          identityHash,
+          DOWNSTREAM_CONTEXT_SCHEMA_VERSION,
+          restored,
+          card,
+          cards.length
+        )
+      );
+    }
+  }
   let promptContent = renderPrompt(input, identityHash, units);
   let level = 0;
   while (estimate(promptContent, input.language) > input.targetTokens) {
@@ -314,53 +255,40 @@ export async function buildDownstreamEvidenceRepresentation(
       (total, unit) => total + estimate(unit.summary, input.language),
       0
     );
-    const groups = groupUnits(units, input.maxBatchTokens, input.language);
+    const groups = groupDownstreamUnits(
+      units,
+      CROSS_DOCUMENT_REDUCE_TOPIC,
+      input.maxBatchTokens,
+      input.language
+    );
     const reduced: SummaryUnit[] = [];
     for (let index = 0; index < groups.length; index += 1) {
-      const group = groups[index];
-      const unitIds = group.map(unit => unit.unitId).sort();
-      const inputHash = sha256(JSON.stringify(group));
-      const batchKey = `downstream:${identityHash}:reduce:${level}:${index}`;
-      const prior = restored.reductions.get(`${batchKey}\n${inputHash}`);
-      let summary: string;
-      if (prior) {
-        if (JSON.stringify(prior.unitIds) !== JSON.stringify(unitIds)) {
-          throw new Error('Stored downstream reduction changed the allowlisted unit set');
-        }
-        summary = prior.summary;
-      } else {
-        const called = await reduceWithRetry(input, group, level);
-        const returnedIds = [...called.result.value.unitIds].sort();
-        if (JSON.stringify(returnedIds) !== JSON.stringify(unitIds)) {
-          throw new Error('Downstream reduction changed the allowlisted unit set');
-        }
-        summary = called.result.value.summary;
-        try {
-          await input.onCheckpoint?.({
-            batchKey,
-            inputHash,
-            structuredCheckpoint: {
-              kind: 'downstream_context_reduction',
-              identity_hash: identityHash,
-              level,
-              index,
-              unit_ids: unitIds,
-              summary,
-            },
-            cursor: { kind: 'downstream_context', level, index, source_count: cards.length },
-            usageDelta: metrics(called.result.usage, called.attempts, level),
-          });
-        } catch (error) {
-          throw new EvidenceCheckpointError(error);
-        }
-      }
-      reduced.push({ unitId: sha256(`${level}\n${unitIds.join('\n')}`), summary });
+      const result = await reduceDownstreamGroup(
+        input,
+        identityHash,
+        DOWNSTREAM_CONTEXT_SCHEMA_VERSION,
+        restored,
+        'cross',
+        undefined,
+        groups[index],
+        level,
+        index,
+        cards.length
+      );
+      reduced.push(
+        ...splitDownstreamUnit(
+          result,
+          CROSS_DOCUMENT_REDUCE_TOPIC,
+          input.maxBatchTokens,
+          input.language
+        )
+      );
     }
     const nextTokens = reduced.reduce(
       (total, unit) => total + estimate(unit.summary, input.language),
       0
     );
-    units = reduced;
+    units.splice(0, units.length, ...reduced);
     promptContent = renderPrompt(input, identityHash, units);
     if (
       estimate(promptContent, input.language) > input.targetTokens &&
@@ -384,6 +312,12 @@ export async function buildDownstreamEvidenceRepresentation(
       coverageStatus: card.coverage_status,
       coverageReason: card.coverage_reason,
     })),
+    sourceMaterials: cards.map(card => ({
+      documentId: card.document_id,
+      keyClaims: card.key_claims,
+      constraints: card.constraints,
+      limitations: card.limitations,
+    })),
     coverage: input.coverage,
     materialSourceRefs: materialRefs(cards),
     claims: sortedUnique(cards.flatMap(card => card.key_claims.map(claim => claim.statement))),
@@ -397,6 +331,11 @@ export async function buildDownstreamEvidenceRepresentation(
       structuredCheckpoint: {
         kind: 'downstream_context_complete',
         identity_hash: identityHash,
+        schema_version: DOWNSTREAM_CONTEXT_SCHEMA_VERSION,
+        model_id: input.modelId,
+        language: input.language,
+        target_tokens: input.targetTokens,
+        max_batch_tokens: input.maxBatchTokens,
         source_document_ids: sourceDocumentIds,
         representation,
       },
