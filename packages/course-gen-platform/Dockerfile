@@ -91,7 +91,7 @@ LABEL org.opencontainers.image.description="Express + tRPC API server for MegaCa
 
 # Install tsx for ESM module resolution and runtime tools
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends dumb-init curl ca-certificates && \
+    apt-get install -y --no-install-recommends dumb-init curl ca-certificates util-linux && \
     rm -rf /var/lib/apt/lists/* && \
     npm install -g tsx
 

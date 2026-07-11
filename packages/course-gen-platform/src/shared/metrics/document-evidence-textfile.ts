@@ -1,18 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import {
-  chmod,
-  mkdir,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  rmdir,
-  stat,
-  utimes,
-  writeFile,
-} from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { chmod, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 
 export interface DocumentEvidenceTextfileOptions {
   directory: string;
@@ -362,7 +351,6 @@ async function update(
 ): Promise<void> {
   const lock = await acquireOwnedLock(`${path}.lock`);
   try {
-    await lock.heartbeat();
     const state = await readState(path, options);
     applyEvent(state, event);
     await lock.write(path, render(state, options.service, options.instance), 0o644);
@@ -371,107 +359,48 @@ async function update(
   }
 }
 
-interface OwnedLockOptions {
-  staleAfterMilliseconds?: number;
-  maxAttempts?: number;
-}
-
 interface OwnedLock {
-  ownerPath: string;
-  assertOwned(): Promise<void>;
-  heartbeat(): Promise<void>;
   write(path: string, content: string, mode: number): Promise<void>;
   release(): Promise<void>;
 }
 
-async function acquireOwnedLock(
-  path: string,
-  options: OwnedLockOptions = {}
-): Promise<OwnedLock> {
-  const staleAfterMilliseconds = options.staleAfterMilliseconds ?? 30_000;
-  const maxAttempts = options.maxAttempts ?? 400;
-  const token = randomUUID();
-  const ownerName = `owner-${token}`;
-  const ownerPath = join(path, ownerName);
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const acquirePath = `${path}.acquire-${token}`;
-    try {
-      await mkdir(acquirePath, { mode: 0o700 });
-      await writeFile(join(acquirePath, ownerName), token, { mode: 0o600, flag: 'wx' });
-      await rename(acquirePath, path);
-      const assertOwned = async (): Promise<void> => {
-        try {
-          await stat(ownerPath);
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            throw new Error('Evidence metrics lock ownership was fenced');
-          }
-          throw error;
-        }
-      };
-      return {
-        ownerPath,
-        assertOwned,
-        async heartbeat() {
-          await assertOwned();
-          const now = new Date();
-          await utimes(ownerPath, now, now);
-        },
-        async write(targetPath, content, mode) {
-          const temporaryPath = join(
-            dirname(targetPath),
-            `.${randomUUID()}.evidence.prom.tmp`
-          );
-          try {
-            await writeFile(temporaryPath, content, { encoding: 'utf8', mode, flag: 'wx' });
-            await chmod(temporaryPath, mode);
-            await assertOwned();
-            await rename(temporaryPath, targetPath);
-          } finally {
-            await rm(temporaryPath, { force: true });
-          }
-        },
-        async release() {
-          try {
-            await rm(ownerPath);
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-            throw error;
-          }
-          try {
-            await rmdir(path);
-          } catch (error) {
-            if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes((error as NodeJS.ErrnoException).code ?? '')) {
-              throw error;
-            }
-          }
-        },
-      };
-    } catch (error) {
-      await rm(acquirePath, { recursive: true, force: true });
-      if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) {
-        throw error;
-      }
-      try {
-        const owners = (await readdir(path)).filter(name => name.startsWith('owner-'));
-        if (owners.length === 0) {
-          await delay(10);
-          continue;
-        }
-        if (owners.length !== 1) throw new Error('Evidence metrics lock has invalid ownership');
-        const details = await stat(join(path, owners[0]));
-        if (Date.now() - details.mtimeMs > staleAfterMilliseconds) {
-          const stalePath = `${path}.stale-${randomUUID()}`;
-          await rename(path, stalePath);
-          await rm(stalePath, { recursive: true, force: true });
-        }
-      } catch (statError) {
-        if ((statError as NodeJS.ErrnoException).code !== 'ENOENT') throw statError;
-      }
-      await delay(10);
-    }
+async function acquireOwnedLock(path: string): Promise<OwnedLock> {
+  const handle = await open(path, 'a', 0o600);
+  try {
+    await handle.chmod(0o600);
+    const child = spawn('flock', ['--exclusive', '--timeout', '5', '3'], {
+      stdio: ['ignore', 'ignore', 'ignore', handle.fd],
+    });
+    await new Promise<void>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', code => {
+        if (code === 0) resolve();
+        else reject(new Error('Evidence metrics kernel lock is unavailable'));
+      });
+    });
+  } catch (error) {
+    await handle.close();
+    throw error;
   }
-  throw new Error('Evidence metrics owned lock is unavailable');
+
+  let released = false;
+  return {
+    async write(targetPath, content, mode) {
+      const temporaryPath = join(dirname(targetPath), `.${randomUUID()}.evidence.prom.tmp`);
+      try {
+        await writeFile(temporaryPath, content, { encoding: 'utf8', mode, flag: 'wx' });
+        await chmod(temporaryPath, mode);
+        await rename(temporaryPath, targetPath);
+      } finally {
+        await rm(temporaryPath, { force: true });
+      }
+    },
+    async release() {
+      if (released) return;
+      released = true;
+      await handle.close();
+    },
+  };
 }
 
 async function updateStage4Aggregate(
@@ -483,7 +412,6 @@ async function updateStage4Aggregate(
   const lockPath = join(options.directory, '.evidence-stage4-state.lock');
   const lock = await acquireOwnedLock(lockPath);
   try {
-    await lock.heartbeat();
     const state = await readState(path, aggregateOptions);
     const coverageObservedAt = requireNumber(
       event.observedAtUnixMilliseconds,
@@ -572,7 +500,7 @@ export async function publishDocumentEvidenceMetrics(
   const normalized = { ...options, service, instance };
   const path = join(options.directory, `evidence-${service}-${instance}.prom`);
   const previous = updateQueues.get(path) ?? Promise.resolve();
-  const current = previous.then(() => update(path, normalized, event));
+  const current = previous.catch(() => undefined).then(() => update(path, normalized, event));
   updateQueues.set(path, current);
   try {
     await current;

@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { utimes } from 'node:fs/promises';
+import { once } from 'node:events';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -93,29 +93,90 @@ describe('document evidence textfile metrics', () => {
     expect(exposition).toContain(
       'megacampus_document_evidence_retrieval_total{service="worker",instance="shared",stage="stage6",outcome="request"} 12'
     );
-    expect(readdirSync(path).filter(name => /lock|tmp|acquire|stale/u.test(name))).toEqual([]);
+    const leftovers = readdirSync(path).filter(name => /tmp|acquire|stale/u.test(name));
+    expect(leftovers).toEqual([]);
+    expect(statSync(join(path, 'evidence-worker-shared.prom.lock')).isFile()).toBe(true);
   });
 
-  it('fences a stale owner before rename and its release cannot unlink the successor', async () => {
+  it('holds a kernel lock on the inherited file descriptor until the parent closes it', async () => {
     const path = directory();
     const lockPath = join(path, '.owned.lock');
     const targetPath = join(path, 'owned.prom');
-    const stale = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath, {
-      staleAfterMilliseconds: 5,
-    });
-    await utimes(stale.ownerPath, new Date(0), new Date(0));
-    const successor = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath, {
-      staleAfterMilliseconds: 5,
-    });
+    const owner = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath);
 
-    await expect(stale.write(targetPath, 'stale\n', 0o644)).rejects.toThrow(/ownership|fenced/iu);
-    await successor.write(targetPath, 'successor\n', 0o644);
-    await stale.release();
-    await expect(successor.assertOwned()).resolves.toBeUndefined();
-    expect(readFileSync(targetPath, 'utf8')).toBe('successor\n');
-    await successor.release();
+    expect(statSync(lockPath).isFile()).toBe(true);
+    await expect(execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])).rejects.toMatchObject({
+      code: 1,
+    });
+    await owner.write(targetPath, 'owner\n', 0o644);
+    await expect(execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])).rejects.toMatchObject({
+      code: 1,
+    });
+    await owner.release();
 
-    expect(readdirSync(path).filter(name => /lock|tmp|acquire|stale/u.test(name))).toEqual([]);
+    await expect(
+      execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])
+    ).resolves.toBeDefined();
+    expect(readFileSync(targetPath, 'utf8')).toBe('owner\n');
+    expect(readdirSync(path).filter(name => /tmp|acquire|stale/u.test(name))).toEqual([]);
+  });
+
+  it('recovers immediately when the process holding the kernel lock is killed', async () => {
+    const path = directory();
+    const lockPath = join(path, '.killed-owner.lock');
+    const targetPath = join(path, 'recovered.prom');
+    const moduleUrl = pathToFileURL(
+      resolve(process.cwd(), 'src/shared/metrics/document-evidence-textfile.ts')
+    ).href;
+    const child = spawn(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        '--input-type=module',
+        '-e',
+        `
+          import { documentEvidenceTextfileTesting } from ${JSON.stringify(moduleUrl)};
+          await documentEvidenceTextfileTesting.acquireOwnedLock(process.env.LOCK_PATH);
+          process.stdout.write('LOCKED\\n');
+          setInterval(() => {}, 1_000);
+        `,
+      ],
+      { cwd: process.cwd(), env: { ...process.env, LOCK_PATH: lockPath }, stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+    let output = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', chunk => {
+      output += chunk;
+    });
+    while (!output.includes('LOCKED')) await new Promise(resolve => setTimeout(resolve, 5));
+
+    child.kill('SIGKILL');
+    await once(child, 'exit');
+    const recovered = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath);
+    await recovered.write(targetPath, 'recovered\n', 0o644);
+    await recovered.release();
+
+    expect(readFileSync(targetPath, 'utf8')).toBe('recovered\n');
+    expect(readdirSync(path).filter(name => /tmp|acquire|stale/u.test(name))).toEqual([]);
+  });
+
+  it('continues a same-path publication after the preceding queued update rejects', async () => {
+    const path = directory();
+    const invalid = publishDocumentEvidenceMetrics(
+      { stage: 'stage6', status: 'not-allowlisted' } as never,
+      options(path)
+    );
+    const valid = publishDocumentEvidenceMetrics(
+      { stage: 'stage6', status: 'success', retrievals: 1, fallbacks: 0 },
+      options(path)
+    );
+
+    await expect(invalid).rejects.toThrow(/status/iu);
+    await expect(valid).resolves.toBeUndefined();
+    expect(readFileSync(join(path, 'evidence-worker-primary.prom'), 'utf8')).toContain(
+      'megacampus_document_evidence_stage6_outcomes_total{service="worker",instance="primary",status="success"} 1'
+    );
   });
 
   it('reconciles the same accepted run twice and counts one appended user decision once', async () => {
@@ -199,8 +260,10 @@ describe('document evidence textfile metrics', () => {
     await publishDocumentEvidenceMetrics(stage4Event('failed'), options(path));
 
     expect(readdirSync(path).sort()).toEqual([
+      '.evidence-stage4-state.lock',
       'evidence-stage4-state.prom',
       'evidence-worker-primary.prom',
+      'evidence-worker-primary.prom.lock',
     ]);
     const exposition = readFileSync(join(path, 'evidence-worker-primary.prom'), 'utf8');
     const stage4Exposition = readFileSync(join(path, 'evidence-stage4-state.prom'), 'utf8');
@@ -272,7 +335,10 @@ describe('document evidence textfile metrics', () => {
 
     await Promise.all(events.map(event => publishDocumentEvidenceMetrics(event, options(path))));
 
-    expect(readdirSync(path)).toEqual(['evidence-worker-primary.prom']);
+    expect(readdirSync(path).sort()).toEqual([
+      'evidence-worker-primary.prom',
+      'evidence-worker-primary.prom.lock',
+    ]);
     const exposition = readFileSync(join(path, 'evidence-worker-primary.prom'), 'utf8');
     expect(exposition).toContain(
       'megacampus_document_evidence_stage5_outcomes_total{service="worker",instance="primary",status="degraded"} 8'
@@ -411,6 +477,7 @@ describe('document evidence textfile metrics', () => {
       { directory: path, service: 'stage6', instance: 'worker-1' }
     );
     const series = readdirSync(path)
+      .filter(file => file.endsWith('.prom'))
       .flatMap(file => readFileSync(join(path, file), 'utf8').trim().split('\n'))
       .map(line => line.slice(0, line.lastIndexOf(' ')));
     expect(new Set(series).size).toBe(series.length);
