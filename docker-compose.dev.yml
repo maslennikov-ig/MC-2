@@ -9,17 +9,37 @@ services:
 
   # Qdrant Vector Database (Dev) - local persistent vector store for RAG
   qdrant-dev:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
     container_name: megacampus-qdrant-dev
     restart: unless-stopped
+    entrypoint: ['/opt/megacampus/qdrant-secret-entrypoint.sh']
     ports:
       - '127.0.0.1:6333:6333'
     environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+      - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+      - QDRANT_READ_ONLY_API_KEY_FILE=/run/secrets/qdrant_read_only_api_key
+      - QDRANT_SNAPSHOT_STORAGE=local
+      - QDRANT__TELEMETRY_DISABLED=true
+      - QDRANT__SERVICE__METRICS_PREFIX=qdrant_
     volumes:
       - qdrant-dev-data:/qdrant/storage
+      - ./deploy/qdrant/secret-entrypoint.sh:/opt/megacampus/qdrant-secret-entrypoint.sh:ro
+    secrets:
+      - qdrant_api_key
+      - qdrant_read_only_api_key
+    healthcheck:
+      test: ['CMD', '/opt/megacampus/qdrant-secret-entrypoint.sh', 'healthcheck']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks:
       - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
     logging:
       driver: 'json-file'
       options:
@@ -34,7 +54,7 @@ services:
     ports:
       - '127.0.0.1:8010:8000'
     env_file:
-      - .env.dev
+      - ${DEV_ENV_FILE:-.env.dev}
     environment:
       # NOTEBOOKLM_AUTH_JSON passed via env_file when set (must NOT be empty string)
       - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
@@ -80,7 +100,7 @@ services:
     ports:
       - '127.0.0.1:3010:3000'
     env_file:
-      - .env.dev
+      - ${DEV_ENV_FILE:-.env.dev}
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -119,7 +139,7 @@ services:
     ports:
       - '127.0.0.1:4010:4000'
     env_file:
-      - .env.dev
+      - ${DEV_ENV_FILE:-.env.dev}
     environment:
       - NODE_ENV=production
       - PORT=4000
@@ -157,7 +177,7 @@ services:
       - megacampus
     depends_on:
       qdrant-dev:
-        condition: service_started
+        condition: service_healthy
       notebooklm-bridge-dev:
         condition: service_healthy
     deploy:
@@ -180,7 +200,7 @@ services:
     healthcheck:
       disable: true
     env_file:
-      - .env.dev
+      - ${DEV_ENV_FILE:-.env.dev}
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
@@ -206,7 +226,7 @@ services:
       - megacampus
     depends_on:
       qdrant-dev:
-        condition: service_started
+        condition: service_healthy
       api-dev:
         condition: service_healthy
     deploy:
@@ -229,7 +249,7 @@ services:
     healthcheck:
       disable: true
     env_file:
-      - .env.dev
+      - ${DEV_ENV_FILE:-.env.dev}
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
@@ -251,7 +271,7 @@ services:
       - megacampus
     depends_on:
       qdrant-dev:
-        condition: service_started
+        condition: service_healthy
       api-dev:
         condition: service_healthy
     deploy:
@@ -274,7 +294,7 @@ services:
     healthcheck:
       disable: true
     env_file:
-      - .env.dev
+      - ${DEV_ENV_FILE:-.env.dev}
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
@@ -325,3 +345,9 @@ networks:
   megacampus:
     external: true
     name: megacampus-network
+
+secrets:
+  qdrant_api_key:
+    file: ${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  qdrant_read_only_api_key:
+    file: ${QDRANT_READ_ONLY_API_KEY_FILE:-./secrets/qdrant_read_only_api_key}

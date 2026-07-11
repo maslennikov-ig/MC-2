@@ -15,7 +15,7 @@ services:
     ports:
       - '127.0.0.1:${WEB_PORT:-3000}:3000'
     env_file:
-      - .env.production
+      - ${PRODUCTION_ENV_FILE:-.env.production}
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -54,11 +54,12 @@ services:
     ports:
       - '127.0.0.1:${API_PORT:-4000}:4000'
     env_file:
-      - .env.production
+      - ${PRODUCTION_ENV_FILE:-.env.production}
     environment:
       - NODE_ENV=production
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
+      - QDRANT_URL=http://qdrant:6333
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       - NOTEBOOKLM_BRIDGE_URL=http://megacampus-notebooklm-bridge:8000
       - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}

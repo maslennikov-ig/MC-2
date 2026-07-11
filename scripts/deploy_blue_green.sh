@@ -18,6 +18,79 @@ DEPLOY_BRIDGE_CHANGED=${DEPLOY_BRIDGE_CHANGED:-true}
 DEPLOY_CONFIG_CHANGED=${DEPLOY_CONFIG_CHANGED:-true}
 APP_DEPLOY_NEEDED=false
 
+read_secret_file() {
+    local path="$1"
+    local label="$2"
+    local mode
+    local value
+
+    if [[ "$path" != /* ]]; then
+        path="$BASE_PATH/${path#./}"
+    fi
+    [ -f "$path" ] && [ -r "$path" ] || { echo "ERROR: $label file is missing or unreadable" >&2; return 1; }
+    mode="$(stat -c '%a' "$path")"
+    (( (8#$mode & 077) == 0 )) || { echo "ERROR: $label file permissions are unsafe" >&2; return 1; }
+    value="$(cat -- "$path"; printf x)"
+    value="${value%x}"
+    if [[ "$value" == *$'\r\n' ]]; then
+        value="${value%$'\r\n'}"
+    elif [[ "$value" == *$'\n' ]]; then
+        value="${value%$'\n'}"
+    fi
+    [ -n "$value" ] && [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || {
+        echo "ERROR: $label file must contain exactly one non-empty line" >&2
+        return 1
+    }
+    REPLY="$value"
+}
+
+configured_path() {
+    local env_file="$1"
+    local key="$2"
+    local fallback="$3"
+    local value=''
+
+    if [ -r "$env_file" ]; then
+        value="$(awk -v key="$key" 'index($0, key "=") == 1 { print substr($0, length(key) + 2) }' "$env_file" | tail -n 1)"
+    fi
+    printf '%s' "${value:-$fallback}"
+}
+
+qdrant_staging_gate() {
+    local read_only_key admin_key read_only_path admin_path
+
+    echo "   Qdrant readiness endpoint..."
+    for i in {1..12}; do
+        if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:6335/readyz > /dev/null 2>&1; then
+            break
+        fi
+        [ "$i" -lt 12 ] || { echo "ERROR: Qdrant readiness failed" >&2; return 1; }
+        sleep 5
+    done
+
+    read_only_path="${QDRANT_READ_ONLY_API_KEY_FILE:-$(configured_path "$BASE_PATH/.env.$ENV" QDRANT_READ_ONLY_API_KEY_FILE "$BASE_PATH/secrets/qdrant_read_only_api_key")}"
+    read_secret_file "$read_only_path" 'Qdrant read-only API key'
+    read_only_key="$REPLY"
+    unset REPLY
+    echo "   Qdrant authenticated collections endpoint..."
+    curl --fail --silent --show-error --max-time 5 \
+        -H "api-key: $read_only_key" http://127.0.0.1:6335/collections > /dev/null
+    unset read_only_key
+
+    admin_path="${QDRANT_API_KEY_FILE:-$(configured_path "$BASE_PATH/.env.$ENV" QDRANT_API_KEY_FILE "$BASE_PATH/secrets/qdrant_api_key")}"
+    read_secret_file "$admin_path" 'Qdrant admin API key'
+    admin_key="$REPLY"
+    unset REPLY
+    echo "   Running qdrant:verify..."
+    QDRANT_URL=http://qdrant:6333 QDRANT_API_KEY="$admin_key" \
+        docker compose -f "$BASE_PATH/docker-compose.app.yml" \
+        --env-file "$BASE_PATH/.env.$NEW_COLOR" run --rm --no-deps -T \
+        -e QDRANT_URL -e QDRANT_API_KEY \
+        --entrypoint node api \
+        dist/shared/qdrant/create-collection.js --verify-only
+    unset admin_key
+}
+
 if [ "$DEPLOY_WEB_CHANGED" = "true" ] || [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
     APP_DEPLOY_NEEDED=true
 fi
@@ -80,7 +153,8 @@ echo ""
 
 # 4. Ensure Infrastructure is Running (shared by all colors)
 echo "Ensuring infrastructure is running..."
-docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
+docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.$ENV" \
+    up -d redis qdrant docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
 echo "   Infrastructure ready."
 echo ""
 
@@ -120,6 +194,8 @@ if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     else
         echo "No app image changes; using locally cached app images."
     fi
+
+    qdrant_staging_gate
 
     echo "Starting $NEW_COLOR containers..."
     # NOTE: do NOT use --remove-orphans, it kills shared infra containers (Redis, workers, etc.)
@@ -210,10 +286,10 @@ INFRA_COMPOSE="$BASE_PATH/docker-compose.infra.yml"
 
 if [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
     echo "Updating API-backed workers..."
-    docker compose -f "$WORKER_COMPOSE" pull worker worker-stage6 2>/dev/null || true
+    docker compose -f "$WORKER_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" pull worker worker-stage6 2>/dev/null || true
     for SVC in worker worker-stage6; do
         echo "   Restarting $SVC..."
-        docker compose -f "$WORKER_COMPOSE" up -d --force-recreate --no-deps "$SVC"
+        docker compose -f "$WORKER_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" up -d --force-recreate --no-deps "$SVC"
     done
     echo "   Updating worker-stage7..."
     docker compose -f "$INFRA_COMPOSE" pull worker-stage7 2>/dev/null || true

@@ -35,6 +35,52 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  # Private self-hosted vector database for staging RAG consumers.
+  qdrant:
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
+    container_name: megacampus-qdrant
+    restart: unless-stopped
+    entrypoint: ['/opt/megacampus/qdrant-secret-entrypoint.sh']
+    ports:
+      - '127.0.0.1:6335:6333'
+    environment:
+      - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+      - QDRANT_READ_ONLY_API_KEY_FILE=/run/secrets/qdrant_read_only_api_key
+      - QDRANT_SNAPSHOT_STORAGE=s3
+      - QDRANT_S3_BUCKET=${QDRANT_S3_BUCKET}
+      - QDRANT_S3_REGION=${QDRANT_S3_REGION}
+      - QDRANT_S3_ENDPOINT_URL=${QDRANT_S3_ENDPOINT_URL:-}
+      - QDRANT_S3_ACCESS_KEY_FILE=/run/secrets/qdrant_s3_access_key
+      - QDRANT_S3_SECRET_KEY_FILE=/run/secrets/qdrant_s3_secret_key
+      - QDRANT__TELEMETRY_DISABLED=true
+      - QDRANT__SERVICE__METRICS_PREFIX=qdrant_
+    volumes:
+      - qdrant-data:/qdrant/storage
+      - ./deploy/qdrant/secret-entrypoint.sh:/opt/megacampus/qdrant-secret-entrypoint.sh:ro
+    secrets:
+      - qdrant_api_key
+      - qdrant_read_only_api_key
+      - qdrant_s3_access_key
+      - qdrant_s3_secret_key
+    healthcheck:
+      test: ['CMD', '/opt/megacampus/qdrant-secret-entrypoint.sh', 'healthcheck']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
   # Docling MCP Server for document processing (internal - behind nginx proxy)
   # NOTE: Image built manually on server (too large for GitHub Actions)
   docling-mcp-internal:
@@ -111,7 +157,7 @@ services:
     container_name: megacampus-notebooklm-bridge
     restart: unless-stopped
     env_file:
-      - .env.production
+      - ${PRODUCTION_ENV_FILE:-.env.production}
     environment:
       # NOTEBOOKLM_AUTH_JSON passed via env_file when set (must NOT be empty string)
       - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
@@ -159,10 +205,11 @@ services:
     healthcheck:
       disable: true
     env_file:
-      - .env.production
+      - ${PRODUCTION_ENV_FILE:-.env.production}
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
+      - QDRANT_URL=http://qdrant:6333
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
@@ -177,6 +224,8 @@ services:
     networks:
       - megacampus
     depends_on:
+      qdrant:
+        condition: service_healthy
       redis:
         condition: service_healthy
       docling-mcp-internal:
@@ -201,7 +250,7 @@ services:
     healthcheck:
       disable: true
     env_file:
-      - .env.production
+      - ${PRODUCTION_ENV_FILE:-.env.production}
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
@@ -238,6 +287,8 @@ networks:
     name: megacampus-network
 
 volumes:
+  qdrant-data:
+    name: megacampus_qdrant
   redis-data:
     driver: local
   docling-models:
@@ -250,3 +301,13 @@ volumes:
   # Worker data persistence for LKG config
   worker-data:
     driver: local
+
+secrets:
+  qdrant_api_key:
+    file: ${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  qdrant_read_only_api_key:
+    file: ${QDRANT_READ_ONLY_API_KEY_FILE:-./secrets/qdrant_read_only_api_key}
+  qdrant_s3_access_key:
+    file: ${QDRANT_S3_ACCESS_KEY_FILE:-./secrets/qdrant_s3_access_key}
+  qdrant_s3_secret_key:
+    file: ${QDRANT_S3_SECRET_KEY_FILE:-./secrets/qdrant_s3_secret_key}
