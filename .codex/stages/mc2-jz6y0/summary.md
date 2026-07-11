@@ -78,7 +78,7 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 - Selected installed skills: `orchestrator-stage`, `task-router`, `senior-architect`, `senior-devops`, `subagent-driven-development`, `test-driven-development`, `test-pass`, `verification-before-completion`, `orchestration-closeout`, and `prompt-authoring`.
 - Selected installed agents: `docs_researcher`, `backend_developer`/worker, `deploy_specialist`, `db_migration_specialist`, `correctness_reviewer`, and `docs_reviewer`.
 - Catalog candidates: none — installed assets cover the stage.
-- Graphify used and refreshed locally after E6 integration: focused query `Qdrant course embeddings upload search Stage 2 Stage 5 Stage 6`, then `graphify update .` and `graphify cluster-only . --no-viz`. The code graph has 50,053 nodes, 74,224 edges and 3,154 communities; zero external model/API tokens and no Git hooks. A final local refresh records the post-rebase integration head.
+- Graphify used and refreshed locally after E6 integration: focused query `Qdrant course embeddings upload search Stage 2 Stage 5 Stage 6`, then `graphify update .` and `graphify cluster-only . --no-viz`. The final code graph has 50,053 nodes, 74,224 edges and 3,153 communities; zero external model/API tokens and no Git hooks.
 - Authoritative docs: Qdrant, Prometheus, Grafana, and systemd first-party sources; consulted versions will be recorded in `artifacts/authoritative-docs.md`.
 
 ## Baseline Evidence

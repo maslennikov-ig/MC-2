@@ -54,7 +54,7 @@ docs_impact: behavior-and-migration
 docs_reviewed: no-change-needed
 docs_review_notes: The approved evidence design and E6 plan already describe decision-aware targeted Stage 6 retrieval, grouping, provenance, no-document behavior, and rollback boundaries. Stable cross-epic operator/product documentation remains E7/parent-owned after integration.
 graph_reviewed: updated
-graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran a focused Graphify query before broad source reads. After safe integration, the parent ran local-only `graphify update .` and `graphify cluster-only . --no-viz`; the code graph has 50,053 nodes, 74,224 edges and 3,154 communities, zero model/API tokens and no Git hooks. A final local refresh records the post-rebase integration head.
+graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran a focused Graphify query before broad source reads. After safe integration, the parent ran local-only `graphify update .` and `graphify cluster-only . --no-viz`; the final code graph has 50,053 nodes, 74,224 edges and 3,153 communities, zero model/API tokens and no Git hooks.
 verification:
   - TDD RED/GREEN proved durable side handles from conflict ID plus sorted claim IDs, exact system/manual option persistence, legacy fail-closed behavior, accepted-side selection, degraded remove/continue behavior, stable decision/ref cache identity, stale and foreign ref rejection, and bounded provenance.
   - Shared document-evidence contracts passed 14/14; the full Stage 4 analysis unit directory passed 267/267 after deleting three tests for the removed dead writer; E3 static plus durable-side static migrations passed 14/14.
