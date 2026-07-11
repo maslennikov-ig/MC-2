@@ -6,6 +6,10 @@ REVOKE EXECUTE ON FUNCTION public.persist_document_evidence_items(UUID, UUID, UU
   FROM authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT)
   FROM authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.commit_document_evidence_batch(
+  UUID, UUID, UUID, TEXT, TEXT, JSONB, JSONB, JSONB,
+  INTEGER, INTEGER, BIGINT, BIGINT, NUMERIC
+) FROM authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT)
   FROM authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.append_document_evidence_decision(JSONB)
@@ -13,18 +17,27 @@ REVOKE EXECUTE ON FUNCTION public.append_document_evidence_decision(JSONB)
 DROP FUNCTION IF EXISTS public.append_document_evidence_decision(JSONB);
 DROP FUNCTION IF EXISTS public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.checkpoint_document_evidence_run_metrics(
+  UUID, UUID, UUID, INTEGER, INTEGER, BIGINT, BIGINT, NUMERIC
+);
+DROP FUNCTION IF EXISTS public.commit_document_evidence_batch(
+  UUID, UUID, UUID, TEXT, TEXT, JSONB, JSONB, JSONB,
+  INTEGER, INTEGER, BIGINT, BIGINT, NUMERIC
+);
 DROP FUNCTION IF EXISTS public.persist_document_evidence_items(UUID, UUID, UUID, JSONB);
 DROP FUNCTION IF EXISTS public.create_or_reuse_document_evidence_run(UUID, UUID, TEXT, TEXT, JSONB);
 
 DROP TABLE IF EXISTS public.document_evidence_decisions;
 DROP TABLE IF EXISTS public.document_evidence_conflicts;
 DROP TABLE IF EXISTS public.document_evidence_items;
+DROP TABLE IF EXISTS public.document_evidence_batch_checkpoints;
 DROP TABLE IF EXISTS public.document_evidence_runs;
 
 DROP FUNCTION IF EXISTS public.reject_document_evidence_mutation();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_decision_chain();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_conflict_scope();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_item_scope();
+DROP FUNCTION IF EXISTS public.validate_document_evidence_batch_checkpoint_scope();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_run_tenant();
 DROP FUNCTION IF EXISTS public.prevent_document_evidence_terminal_item_mutation();
 DROP FUNCTION IF EXISTS public.verify_document_evidence_terminal_coverage();

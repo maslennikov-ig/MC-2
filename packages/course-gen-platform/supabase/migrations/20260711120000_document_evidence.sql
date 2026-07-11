@@ -86,6 +86,24 @@ CREATE TABLE public.document_evidence_items (
   )
 );
 
+CREATE TABLE public.document_evidence_batch_checkpoints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id UUID NOT NULL REFERENCES public.document_evidence_runs(id) ON DELETE CASCADE,
+  course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  batch_key TEXT NOT NULL CHECK (btrim(batch_key) <> ''),
+  input_hash TEXT NOT NULL CHECK (btrim(input_hash) <> ''),
+  structured_checkpoint JSONB NOT NULL CHECK (jsonb_typeof(structured_checkpoint) = 'object'),
+  cursor JSONB NOT NULL CHECK (jsonb_typeof(cursor) = 'object'),
+  batch_count INTEGER NOT NULL CHECK (batch_count >= 0),
+  model_calls INTEGER NOT NULL CHECK (model_calls >= 0),
+  input_tokens BIGINT NOT NULL CHECK (input_tokens >= 0),
+  output_tokens BIGINT NOT NULL CHECK (output_tokens >= 0),
+  total_cost_usd NUMERIC(14, 6) NOT NULL CHECK (total_cost_usd >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT document_evidence_batch_checkpoint_unique UNIQUE (run_id, batch_key)
+);
+
 CREATE TABLE public.document_evidence_conflicts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id UUID NOT NULL REFERENCES public.document_evidence_runs(id) ON DELETE CASCADE,
@@ -487,6 +505,33 @@ CREATE TRIGGER prevent_document_evidence_decisions_mutation
   BEFORE UPDATE OR DELETE ON public.document_evidence_decisions
   FOR EACH ROW EXECUTE FUNCTION public.reject_document_evidence_mutation();
 
+CREATE OR REPLACE FUNCTION public.validate_document_evidence_batch_checkpoint_scope()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.document_evidence_runs runs
+    WHERE runs.id = NEW.run_id
+      AND runs.course_id = NEW.course_id
+      AND runs.organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'Evidence batch checkpoint scope does not match run'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER validate_document_evidence_batch_checkpoint_scope
+  BEFORE INSERT OR UPDATE ON public.document_evidence_batch_checkpoints
+  FOR EACH ROW EXECUTE FUNCTION public.validate_document_evidence_batch_checkpoint_scope();
+
+CREATE TRIGGER prevent_document_evidence_batch_checkpoint_mutation
+  BEFORE UPDATE OR DELETE ON public.document_evidence_batch_checkpoints
+  FOR EACH ROW EXECUTE FUNCTION public.reject_document_evidence_mutation();
+
 CREATE OR REPLACE FUNCTION public.create_or_reuse_document_evidence_run(
   p_course_id UUID,
   p_organization_id UUID,
@@ -738,6 +783,160 @@ BEGIN
 END;
 $$;
 
+-- Absolute cumulative progress checkpoint. Values are monotonic so a retry can
+-- safely replay the same checkpoint without double-counting completed work.
+CREATE OR REPLACE FUNCTION public.checkpoint_document_evidence_run_metrics(
+  p_run_id UUID,
+  p_course_id UUID,
+  p_organization_id UUID,
+  p_batch_count INTEGER,
+  p_model_calls INTEGER,
+  p_input_tokens BIGINT,
+  p_output_tokens BIGINT,
+  p_total_cost_usd NUMERIC
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_run public.document_evidence_runs%ROWTYPE;
+BEGIN
+  IF p_batch_count IS NULL OR p_batch_count < 0
+     OR p_model_calls IS NULL OR p_model_calls < 0
+     OR p_input_tokens IS NULL OR p_input_tokens < 0
+     OR p_output_tokens IS NULL OR p_output_tokens < 0
+     OR p_total_cost_usd IS NULL OR p_total_cost_usd < 0 THEN
+    RAISE EXCEPTION 'Evidence run metrics must be nonnegative'
+      USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO v_run
+  FROM public.document_evidence_runs
+  WHERE id = p_run_id
+    AND course_id = p_course_id
+    AND organization_id = p_organization_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Evidence run scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
+     AND p_organization_id IS DISTINCT FROM
+       NULLIF((SELECT auth.jwt())->>'organization_id', '')::UUID THEN
+    RAISE EXCEPTION 'Evidence run access denied' USING ERRCODE = '42501';
+  END IF;
+  IF v_run.status IN ('accepted', 'failed') THEN
+    RAISE EXCEPTION 'Terminal evidence run metrics are immutable' USING ERRCODE = '55000';
+  END IF;
+  IF p_batch_count < v_run.batch_count
+     OR p_model_calls < v_run.model_calls
+     OR p_input_tokens < v_run.input_tokens
+     OR p_output_tokens < v_run.output_tokens
+     OR p_total_cost_usd < v_run.total_cost_usd THEN
+    RAISE EXCEPTION 'Evidence run metrics cannot decrease' USING ERRCODE = '23514';
+  END IF;
+
+  UPDATE public.document_evidence_runs
+  SET batch_count = p_batch_count,
+      model_calls = p_model_calls,
+      input_tokens = p_input_tokens,
+      output_tokens = p_output_tokens,
+      total_cost_usd = p_total_cost_usd
+  WHERE id = p_run_id
+  RETURNING * INTO v_run;
+  RETURN to_jsonb(v_run);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.commit_document_evidence_batch(
+  p_run_id UUID,
+  p_course_id UUID,
+  p_organization_id UUID,
+  p_batch_key TEXT,
+  p_input_hash TEXT,
+  p_items JSONB,
+  p_structured_checkpoint JSONB,
+  p_cursor JSONB,
+  p_batch_count INTEGER,
+  p_model_calls INTEGER,
+  p_input_tokens BIGINT,
+  p_output_tokens BIGINT,
+  p_total_cost_usd NUMERIC
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_run public.document_evidence_runs%ROWTYPE;
+  v_existing public.document_evidence_batch_checkpoints%ROWTYPE;
+  v_checkpoint public.document_evidence_batch_checkpoints%ROWTYPE;
+  v_coverage JSONB;
+  v_metrics JSONB;
+BEGIN
+  IF NULLIF(btrim(p_batch_key), '') IS NULL OR NULLIF(btrim(p_input_hash), '') IS NULL
+     OR jsonb_typeof(p_structured_checkpoint) IS DISTINCT FROM 'object'
+     OR jsonb_typeof(p_cursor) IS DISTINCT FROM 'object' THEN
+    RAISE EXCEPTION 'Evidence batch checkpoint payload is invalid' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO v_run
+  FROM public.document_evidence_runs
+  WHERE id = p_run_id AND course_id = p_course_id AND organization_id = p_organization_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Evidence run scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
+     AND p_organization_id IS DISTINCT FROM
+       NULLIF((SELECT auth.jwt())->>'organization_id', '')::UUID THEN
+    RAISE EXCEPTION 'Evidence run access denied' USING ERRCODE = '42501';
+  END IF;
+  IF v_run.status IN ('accepted', 'failed') THEN
+    RAISE EXCEPTION 'Terminal evidence run cannot accept batch checkpoints'
+      USING ERRCODE = '55000';
+  END IF;
+
+  SELECT * INTO v_existing
+  FROM public.document_evidence_batch_checkpoints
+  WHERE run_id = p_run_id AND batch_key = p_batch_key;
+  IF FOUND THEN
+    IF v_existing.input_hash IS DISTINCT FROM p_input_hash THEN
+      RAISE EXCEPTION 'Evidence batch key already has a different input hash'
+        USING ERRCODE = '23514';
+    END IF;
+    RETURN jsonb_build_object(
+      'checkpoint', to_jsonb(v_existing),
+      'run', to_jsonb(v_run),
+      'reused', true
+    );
+  END IF;
+
+  v_coverage := public.persist_document_evidence_items(
+    p_run_id, p_course_id, p_organization_id, p_items
+  );
+  v_metrics := public.checkpoint_document_evidence_run_metrics(
+    p_run_id, p_course_id, p_organization_id,
+    p_batch_count, p_model_calls, p_input_tokens, p_output_tokens, p_total_cost_usd
+  );
+  INSERT INTO public.document_evidence_batch_checkpoints (
+    run_id, course_id, organization_id, batch_key, input_hash,
+    structured_checkpoint, cursor, batch_count, model_calls,
+    input_tokens, output_tokens, total_cost_usd
+  ) VALUES (
+    p_run_id, p_course_id, p_organization_id, p_batch_key, p_input_hash,
+    p_structured_checkpoint, p_cursor, p_batch_count, p_model_calls,
+    p_input_tokens, p_output_tokens, p_total_cost_usd
+  ) RETURNING * INTO v_checkpoint;
+  RETURN jsonb_build_object(
+    'checkpoint', to_jsonb(v_checkpoint),
+    'coverage', v_coverage,
+    'run', v_metrics,
+    'reused', false
+  );
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.upsert_document_evidence_conflict(
   p_run_id UUID,
   p_course_id UUID,
@@ -943,6 +1142,7 @@ $$;
 
 ALTER TABLE public.document_evidence_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_evidence_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_evidence_batch_checkpoints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_evidence_conflicts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_evidence_decisions ENABLE ROW LEVEL SECURITY;
 
@@ -956,6 +1156,12 @@ CREATE POLICY items_tenant_select ON public.document_evidence_items
   FOR SELECT TO authenticated USING (
     EXISTS (SELECT 1 FROM public.courses
       WHERE courses.id = document_evidence_items.course_id
+        AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
+  );
+CREATE POLICY batch_checkpoints_tenant_select ON public.document_evidence_batch_checkpoints
+  FOR SELECT TO authenticated USING (
+    EXISTS (SELECT 1 FROM public.courses
+      WHERE courses.id = document_evidence_batch_checkpoints.course_id
         AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
   );
 CREATE POLICY conflicts_tenant_select ON public.document_evidence_conflicts
@@ -972,6 +1178,7 @@ CREATE POLICY decisions_tenant_select ON public.document_evidence_decisions
   );
 GRANT SELECT ON public.document_evidence_runs TO authenticated;
 GRANT SELECT ON public.document_evidence_items TO authenticated;
+GRANT SELECT ON public.document_evidence_batch_checkpoints TO authenticated;
 GRANT SELECT ON public.document_evidence_conflicts TO authenticated;
 GRANT SELECT ON public.document_evidence_decisions TO authenticated;
 
@@ -981,6 +1188,13 @@ REVOKE ALL ON FUNCTION public.persist_document_evidence_items(UUID, UUID, UUID, 
   FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT)
   FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.checkpoint_document_evidence_run_metrics(
+  UUID, UUID, UUID, INTEGER, INTEGER, BIGINT, BIGINT, NUMERIC
+) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.commit_document_evidence_batch(
+  UUID, UUID, UUID, TEXT, TEXT, JSONB, JSONB, JSONB,
+  INTEGER, INTEGER, BIGINT, BIGINT, NUMERIC
+) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT)
   FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.append_document_evidence_decision(JSONB)
@@ -988,10 +1202,12 @@ REVOKE ALL ON FUNCTION public.append_document_evidence_decision(JSONB)
 
 GRANT EXECUTE ON FUNCTION public.create_or_reuse_document_evidence_run(UUID, UUID, TEXT, TEXT, JSONB)
   TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.persist_document_evidence_items(UUID, UUID, UUID, JSONB)
-  TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT)
   TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.commit_document_evidence_batch(
+  UUID, UUID, UUID, TEXT, TEXT, JSONB, JSONB, JSONB,
+  INTEGER, INTEGER, BIGINT, BIGINT, NUMERIC
+) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT)
   TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.append_document_evidence_decision(JSONB)
@@ -1001,6 +1217,7 @@ GRANT EXECUTE ON FUNCTION public.auto_answer_questions_atomic(UUID)
 
 GRANT ALL ON public.document_evidence_runs TO service_role;
 GRANT ALL ON public.document_evidence_items TO service_role;
+GRANT ALL ON public.document_evidence_batch_checkpoints TO service_role;
 GRANT ALL ON public.document_evidence_conflicts TO service_role;
 GRANT ALL ON public.document_evidence_decisions TO service_role;
 

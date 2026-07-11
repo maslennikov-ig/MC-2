@@ -40,6 +40,7 @@ import type {
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
 import type { DocumentSummaryResult } from './handler-helpers';
+import type { DocumentEvidencePreflightResult } from './evidence/preflight';
 
 /**
  * Analysis orchestration context
@@ -60,12 +61,30 @@ export interface AnalysisContext {
   phase2Output?: Phase2Output;
   phase3Output?: Phase3Output;
   phase4Output?: Phase4Output;
+  documentEvidencePreflight?: DocumentEvidencePreflightResult;
   clarifyingAnswers: Array<{
     question: string;
     answer: string;
     priority: string;
     category: string;
   }>;
+}
+
+export function attachDocumentEvidenceSnapshot(
+  analysisResult: AnalysisResult,
+  preflight: DocumentEvidencePreflightResult | undefined
+): AnalysisResult {
+  if (preflight?.status !== 'accepted' || !preflight.runId) return analysisResult;
+  return {
+    ...analysisResult,
+    document_evidence: {
+      accepted_run_id: preflight.runId,
+      coverage: preflight.coverage,
+      current_decision_ids: [],
+      unresolved_informational_conflict_ids: [],
+      enrichment_status: 'not_applicable',
+    },
+  };
 }
 
 /**
@@ -283,7 +302,7 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
 
   const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
 
-  const analysisResult: AnalysisResult = assembleAnalysisResult({
+  let analysisResult: AnalysisResult = assembleAnalysisResult({
     course_id: courseId,
     language: input.language,
     topic: input.topic,
@@ -298,6 +317,10 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
     total_tokens: totalTokens,
     total_cost_usd: 0,
   });
+  analysisResult = attachDocumentEvidenceSnapshot(
+    analysisResult,
+    context.documentEvidencePreflight
+  );
 
   await completePhase(5, courseId, supabase, orchestrationLogger, {
     total_duration_ms: analysisResult.metadata.total_duration_ms,
@@ -476,6 +499,7 @@ function prepareWithSizeHeuristic(
 // Re-export phase functions for orchestrator.ts
 export {
   runClassificationPhase,
+  runDocumentEvidencePhase,
   runClarifyingPhase,
   runScopePhase,
   runExpertPhase,

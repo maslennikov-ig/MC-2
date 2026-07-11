@@ -43,6 +43,119 @@ import { ClarifyingQuestionsInterrupt } from '@/shared/errors';
 import { logTrace } from '../../shared/trace-logger';
 import type { AnalysisContext } from './orchestrator-helpers';
 import { getErrorMessage } from '@/shared/workspace-utils';
+import {
+  runDocumentEvidencePreflight,
+  verifyEvidenceSourcesWithQdrant,
+  type DocumentEvidencePreflightDependencies,
+  type DocumentEvidencePreflightInput,
+  type DocumentEvidencePreflightResult,
+} from './evidence/preflight';
+import {
+  createDocumentEvidenceRepository,
+  type DocumentEvidenceDatabaseClient,
+} from './evidence/repository';
+import { fetchFullTextDocuments } from './handler-helpers';
+import {
+  createProductionEvidenceExtractor,
+  createProductionStructuredEvidencePort,
+} from './evidence/card-generator';
+
+export interface DocumentEvidencePhaseOverrides {
+  enabled?: boolean;
+  mode?: 'shadow' | 'active';
+  runPreflight?: (
+    input: DocumentEvidencePreflightInput,
+    dependencies: DocumentEvidencePreflightDependencies
+  ) => Promise<DocumentEvidencePreflightResult>;
+  preflightDependencies?: DocumentEvidencePreflightDependencies;
+}
+
+function evidenceEnabled(overrides?: DocumentEvidencePhaseOverrides): boolean {
+  return overrides?.enabled ?? process.env.DOCUMENT_EVIDENCE_ENABLED === 'true';
+}
+
+/** Runs after Phase 1 and before the existing Phase 0.5 pause/resume boundary. */
+export async function runDocumentEvidencePhase(
+  context: AnalysisContext,
+  overrides?: DocumentEvidencePhaseOverrides
+): Promise<void> {
+  if (!evidenceEnabled(overrides) || context.originalDocumentSummaries.length === 0) return;
+  if (!context.phase1Output) throw new Error('Phase 1 output required for document evidence');
+
+  const allocationById = new Map(
+    context.budgetAllocation?.documents.map(document => [document.file_id, document]) ?? []
+  );
+  const sources = context.originalDocumentSummaries.map(document => {
+    if (!document.source_version_hash) {
+      throw new Error(`Document ${document.document_id} is missing a source version hash`);
+    }
+    const allocatedPriority = allocationById.get(document.document_id)?.priority;
+    return {
+      documentId: document.document_id,
+      documentName: document.file_name,
+      sourceVersionHash: document.source_version_hash,
+      priority: document.stage3_priority ?? allocatedPriority ?? 'SUPPLEMENTARY',
+      authorityScope: 'course_source' as const,
+      contentQuality: document.summary_metadata.quality_score,
+      originalTokens: document.summary_metadata.original_tokens,
+      summaryTokens: document.summary_metadata.summary_tokens,
+      stage3Summary: document.processed_content || undefined,
+      stage3SummaryVersionHash: document.summary_source_version_hash,
+      importanceScore: document.stage3_importance_score ?? document.summary_metadata.quality_score,
+    };
+  });
+
+  const dependencies =
+    overrides?.preflightDependencies ??
+    (() => {
+      const modelId = context.budgetAllocation?.modelSelection.modelId;
+      if (!modelId) throw new Error('Configured Stage 4 model is required for document evidence');
+      return {
+        repository: createDocumentEvidenceRepository(
+          context.supabase as unknown as DocumentEvidenceDatabaseClient
+        ),
+        structuredPort: createProductionStructuredEvidencePort(modelId),
+        extractor: createProductionEvidenceExtractor(modelId),
+        verifyTargetedSources: verifyEvidenceSourcesWithQdrant,
+        loadSourceContents: async ({ documentIds }) =>
+          fetchFullTextDocuments(documentIds, context.courseId),
+      } satisfies DocumentEvidencePreflightDependencies;
+    })();
+  const mode =
+    overrides?.mode ?? (process.env.DOCUMENT_EVIDENCE_MODE === 'active' ? 'active' : 'shadow');
+  const runPreflight = overrides?.runPreflight ?? runDocumentEvidencePreflight;
+  const result = await runPreflight(
+    {
+      courseId: context.courseId,
+      organizationId: context.organizationId,
+      topic: context.input.topic,
+      language: context.input.language === 'en' ? 'en' : 'ru',
+      evidenceVersion: 'document-evidence-v1',
+      modelId: context.budgetAllocation?.modelSelection.modelId,
+      classificationContext: context.phase1Output,
+      sources,
+      modelContext: context.budgetAllocation?.modelSelection.maxContext ?? 700_000,
+      promptReserve: 10_000,
+      outputReserve: 16_000,
+      maxBatchTokens: 32_000,
+      maxRetries: 2,
+      maxVerificationDocumentIds: 100,
+    },
+    dependencies
+  );
+  context.documentEvidencePreflight = result;
+  context.orchestrationLogger.info(
+    {
+      evidenceMode: mode,
+      evidenceStatus: result.status,
+      sourceCount: result.coverage.source_count,
+      assessedCount: result.coverage.assessed_count,
+      degradedCount: result.coverage.degraded_count,
+      failedCount: result.coverage.failed_count,
+    },
+    'Document evidence preflight complete'
+  );
+}
 
 /**
  * Complete a phase and log its trace data

@@ -27,6 +27,7 @@ describe('document evidence migration isolation contract', () => {
     for (const table of [
       'document_evidence_runs',
       'document_evidence_items',
+      'document_evidence_batch_checkpoints',
       'document_evidence_conflicts',
       'document_evidence_decisions',
     ]) {
@@ -51,7 +52,7 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).toMatch(
       /courses\.organization_id\s*=\s*\(\(SELECT auth\.jwt\(\)\)->>'organization_id'\)::uuid/i
     );
-    expect(sql.match(/CREATE POLICY\s+\w+_tenant_select/gi)).toHaveLength(4);
+    expect(sql.match(/CREATE POLICY\s+\w+_tenant_select/gi)).toHaveLength(5);
     expect(sql.match(/CREATE POLICY\s+\w+_tenant_insert/gi) ?? []).toHaveLength(0);
     expect(sql).not.toMatch(/TO authenticated[\s\S]{0,120}USING\s*\(true\)/i);
   });
@@ -62,6 +63,7 @@ describe('document evidence migration isolation contract', () => {
     for (const table of [
       'document_evidence_runs',
       'document_evidence_items',
+      'document_evidence_batch_checkpoints',
       'document_evidence_conflicts',
       'document_evidence_decisions',
     ]) {
@@ -74,6 +76,7 @@ describe('document evidence migration isolation contract', () => {
     for (const table of [
       'document_evidence_runs',
       'document_evidence_items',
+      'document_evidence_batch_checkpoints',
       'document_evidence_conflicts',
       'document_evidence_decisions',
     ]) {
@@ -81,8 +84,8 @@ describe('document evidence migration isolation contract', () => {
     }
     for (const rpc of [
       'create_or_reuse_document_evidence_run',
-      'persist_document_evidence_items',
       'finalize_document_evidence_run',
+      'commit_document_evidence_batch',
       'upsert_document_evidence_conflict',
       'append_document_evidence_decision',
     ]) {
@@ -91,6 +94,9 @@ describe('document evidence migration isolation contract', () => {
         new RegExp(`REVOKE ALL ON FUNCTION public\\.${rpc}[\\s\\S]*FROM PUBLIC`, 'i')
       );
     }
+    expect(sql).not.toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.(?:persist_document_evidence_items|checkpoint_document_evidence_run_metrics)[\s\S]{0,180}TO authenticated/i
+    );
   });
 
   it('enforces immutable conflicts and append-only decision rows at the database boundary', () => {
@@ -104,6 +110,8 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).toMatch(/UNIQUE\s*\(supersedes_decision_id\)/i);
     expect(sql).toMatch(/\(resolved_by\s*=\s*'system'\)\s*=\s*\(answer_source\s*=\s*'system'\)/i);
     expect(sql).toMatch(/supersedes_decision_id IS NULL OR resolved_by = 'user'/i);
+    expect(sql).toMatch(/CREATE TRIGGER prevent_document_evidence_batch_checkpoint_mutation/i);
+    expect(sql).toMatch(/CREATE TRIGGER validate_document_evidence_batch_checkpoint_scope/i);
   });
 
   it('compares exact source and item ID sets and permits honest missing summaries', () => {
@@ -138,11 +146,16 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.persist_document_evidence_items/i);
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.create_or_reuse_document_evidence_run/i);
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.finalize_document_evidence_run/i);
+    expect(sql).toMatch(
+      /DROP FUNCTION IF EXISTS public\.checkpoint_document_evidence_run_metrics/i
+    );
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.commit_document_evidence_batch/i);
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.upsert_document_evidence_conflict/i);
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.append_document_evidence_decision/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_decisions/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_conflicts/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_items/i);
+    expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_batch_checkpoints/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_runs/i);
     expect(sql).toMatch(/answer_source\s*=\s*'suggested'/i);
     expect(sql).toMatch(/EXCEPTION\s+WHEN OTHERS[\s\S]*'success',\s*false/i);
@@ -234,6 +247,46 @@ function evidenceItem(documentId: string, status: 'assessed' | 'degraded', summa
     coverage_reason: status === 'assessed' ? 'verified' : 'summary unavailable after retries',
     token_counts: { original: 100, summary: summary ? 10 : 0, allocated: 10 },
   };
+}
+
+async function commitEvidenceBatch(
+  client: Client,
+  input: {
+    runId: string;
+    courseId: string;
+    organizationId: string;
+    batchKey: string;
+    inputHash: string;
+    items: unknown[];
+    checkpoint?: Record<string, unknown>;
+    cursor?: Record<string, unknown>;
+    batchCount?: number;
+    modelCalls?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    totalCostUsd?: number;
+  }
+) {
+  return client.query(
+    `SELECT public.commit_document_evidence_batch(
+      $1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10,$11,$12,$13
+    ) AS result`,
+    [
+      input.runId,
+      input.courseId,
+      input.organizationId,
+      input.batchKey,
+      input.inputHash,
+      JSON.stringify(input.items),
+      JSON.stringify(input.checkpoint ?? { batch_key: input.batchKey }),
+      JSON.stringify(input.cursor ?? { sequence: input.batchCount ?? 1 }),
+      input.batchCount ?? 1,
+      input.modelCalls ?? 1,
+      input.inputTokens ?? 100,
+      input.outputTokens ?? 10,
+      input.totalCostUsd ?? 0.01,
+    ]
+  );
 }
 
 async function resetAppliedDatabase(client: Client): Promise<void> {
@@ -357,26 +410,95 @@ describe('document evidence applied PostgreSQL isolation', () => {
 
         await client.query('DELETE FROM file_catalog WHERE id = $1', [appliedIds.documentA]);
         await asRole(client, 'authenticated', appliedIds.organizationA, async () => {
-          const persisted = await client.query(
-            'SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb) AS result',
-            [
+          const items = [
+            evidenceItem(appliedIds.documentA, 'degraded'),
+            evidenceItem(appliedIds.documentB, 'assessed', 'verified'),
+          ];
+          const committed = await commitEvidenceBatch(client, {
+            runId: runA,
+            courseId: appliedIds.courseA,
+            organizationId: appliedIds.organizationA,
+            batchKey: 'document-a:map:0',
+            inputHash: 'batch-hash-a',
+            items,
+            checkpoint: { mapped_units: ['document-a:0'] },
+            cursor: { document_id: appliedIds.documentA, unit_index: 0 },
+            batchCount: 2,
+            modelCalls: 4,
+            inputTokens: 1_000,
+            outputTokens: 100,
+            totalCostUsd: 0.25,
+          });
+          expect(committed.rows[0].result.coverage.source_count).toBe(2);
+          expect(committed.rows[0].result.run).toEqual(
+            expect.objectContaining({
+              batch_count: 2,
+              model_calls: 4,
+              input_tokens: 1000,
+              output_tokens: 100,
+            })
+          );
+          expect(committed.rows[0].result.reused).toBe(false);
+
+          const replayed = await commitEvidenceBatch(client, {
+            runId: runA,
+            courseId: appliedIds.courseA,
+            organizationId: appliedIds.organizationA,
+            batchKey: 'document-a:map:0',
+            inputHash: 'batch-hash-a',
+            items,
+            checkpoint: { should_not_replace: true },
+            cursor: { sequence: 999 },
+            batchCount: 999,
+            modelCalls: 999,
+            inputTokens: 999,
+            outputTokens: 999,
+            totalCostUsd: 999,
+          });
+          expect(replayed.rows[0].result.reused).toBe(true);
+          expect(replayed.rows[0].result.checkpoint).toEqual(
+            expect.objectContaining({
+              structured_checkpoint: { mapped_units: ['document-a:0'] },
+              cursor: { document_id: appliedIds.documentA, unit_index: 0 },
+              batch_count: 2,
+            })
+          );
+          expect(replayed.rows[0].result.run.batch_count).toBe(2);
+
+          await expect(
+            commitEvidenceBatch(client, {
+              runId: runA,
+              courseId: appliedIds.courseA,
+              organizationId: appliedIds.organizationA,
+              batchKey: 'document-a:map:0',
+              inputHash: 'different-hash',
+              items,
+            })
+          ).rejects.toMatchObject({ code: '23514' });
+
+          await expect(
+            client.query('SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb)', [
               runA,
               appliedIds.courseA,
               appliedIds.organizationA,
-              JSON.stringify([
-                evidenceItem(appliedIds.documentA, 'degraded'),
-                evidenceItem(appliedIds.documentB, 'assessed', 'verified'),
-              ]),
-            ]
-          );
-          expect(persisted.rows[0].result.source_count).toBe(2);
-          await expect(
-            client.query('SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb)', [
-              runB,
-              appliedIds.courseB,
-              appliedIds.organizationB,
-              JSON.stringify([evidenceItem(appliedIds.documentOtherTenant, 'degraded')]),
+              JSON.stringify(items),
             ])
+          ).rejects.toMatchObject({ code: '42501' });
+          await expect(
+            client.query(
+              'SELECT public.checkpoint_document_evidence_run_metrics($1,$2,$3,$4,$5,$6,$7,$8)',
+              [runA, appliedIds.courseA, appliedIds.organizationA, 2, 4, 1_000, 100, 0.25]
+            )
+          ).rejects.toMatchObject({ code: '42501' });
+          await expect(
+            commitEvidenceBatch(client, {
+              runId: runB,
+              courseId: appliedIds.courseB,
+              organizationId: appliedIds.organizationB,
+              batchKey: 'cross-tenant',
+              inputHash: 'cross-tenant',
+              items: [evidenceItem(appliedIds.documentOtherTenant, 'degraded')],
+            })
           ).rejects.toMatchObject({ code: '42501' });
         });
         expect(
@@ -389,12 +511,14 @@ describe('document evidence applied PostgreSQL isolation', () => {
         ).toEqual({ source_version_hash: 'hash-a', document_name: 'A' });
 
         await asRole(client, 'service_role', appliedIds.organizationB, async () => {
-          await client.query('SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb)', [
-            runB,
-            appliedIds.courseB,
-            appliedIds.organizationB,
-            JSON.stringify([evidenceItem(appliedIds.documentOtherTenant, 'degraded')]),
-          ]);
+          await commitEvidenceBatch(client, {
+            runId: runB,
+            courseId: appliedIds.courseB,
+            organizationId: appliedIds.organizationB,
+            batchKey: 'document-d:complete',
+            inputHash: 'batch-hash-d',
+            items: [evidenceItem(appliedIds.documentOtherTenant, 'degraded')],
+          });
         });
 
         const conflictPayload = (id: string, fingerprint: string) => ({
@@ -519,6 +643,12 @@ describe('document evidence applied PostgreSQL isolation', () => {
             ])
           ).rejects.toMatchObject({ code: '42501' });
           await expect(
+            client.query(
+              'SELECT public.checkpoint_document_evidence_run_metrics($1,$2,$3,$4,$5,$6,$7,$8)',
+              [runA, appliedIds.courseA, appliedIds.organizationA, 2, 4, 1_000, 100, 0.25]
+            )
+          ).rejects.toMatchObject({ code: '42501' });
+          await expect(
             client.query('SELECT public.finalize_document_evidence_run($1,$2,$3,$4)', [
               runA,
               appliedIds.courseA,
@@ -529,17 +659,17 @@ describe('document evidence applied PostgreSQL isolation', () => {
         });
 
         for (const [organizationId, expected] of [
-          [appliedIds.organizationA, [1, 2, 1, 2]],
-          [appliedIds.organizationB, [1, 1, 1, 1]],
+          [appliedIds.organizationA, [1, 2, 1, 1, 2]],
+          [appliedIds.organizationB, [1, 1, 1, 1, 1]],
         ] as const) {
           await asRole(client, 'authenticated', organizationId, async () => {
             const counts = await Promise.all(
-              ['runs', 'items', 'conflicts', 'decisions'].map(table =>
+              ['runs', 'items', 'batch_checkpoints', 'conflicts', 'decisions'].map(table =>
                 client.query(`SELECT count(*)::int AS count FROM document_evidence_${table}`)
               )
             );
             expect(counts.map(result => result.rows[0].count)).toEqual(expected);
-            for (const table of ['runs', 'items', 'conflicts', 'decisions']) {
+            for (const table of ['runs', 'items', 'batch_checkpoints', 'conflicts', 'decisions']) {
               await expect(
                 client.query(`INSERT INTO document_evidence_${table} DEFAULT VALUES`)
               ).rejects.toMatchObject({ code: '42501' });
@@ -552,12 +682,49 @@ describe('document evidence applied PostgreSQL isolation', () => {
             (await client.query('SELECT count(*)::int AS count FROM document_evidence_runs'))
               .rows[0].count
           ).toBe(2);
+          await expect(
+            client.query(
+              `INSERT INTO document_evidence_batch_checkpoints
+                (run_id,course_id,organization_id,batch_key,input_hash,structured_checkpoint,cursor,
+                 batch_count,model_calls,input_tokens,output_tokens,total_cost_usd)
+               VALUES ($1,$2,$3,'wrong-scope','wrong-scope','{}','{}',0,0,0,0,0)`,
+              [runB, appliedIds.courseA, appliedIds.organizationA]
+            )
+          ).rejects.toMatchObject({ code: '23514' });
+          await expect(
+            client.query(
+              `UPDATE document_evidence_batch_checkpoints
+               SET cursor='{"sequence":2}'::jsonb WHERE run_id=$1`,
+              [runA]
+            )
+          ).rejects.toMatchObject({ code: '55000' });
+          await expect(
+            client.query('DELETE FROM document_evidence_batch_checkpoints WHERE run_id=$1', [runA])
+          ).rejects.toMatchObject({ code: '55000' });
           await client.query('SELECT public.finalize_document_evidence_run($1,$2,$3,$4)', [
             runA,
             appliedIds.courseA,
             appliedIds.organizationA,
             'accepted',
           ]);
+          await expect(
+            commitEvidenceBatch(client, {
+              runId: runA,
+              courseId: appliedIds.courseA,
+              organizationId: appliedIds.organizationA,
+              batchKey: 'after-terminal',
+              inputHash: 'after-terminal',
+              items: [
+                evidenceItem(appliedIds.documentA, 'degraded'),
+                evidenceItem(appliedIds.documentB, 'assessed', 'verified'),
+              ],
+              batchCount: 3,
+              modelCalls: 5,
+              inputTokens: 1_100,
+              outputTokens: 110,
+              totalCostUsd: 0.3,
+            })
+          ).rejects.toMatchObject({ code: '55000' });
           await expect(
             client.query("UPDATE document_evidence_runs SET error_category='changed' WHERE id=$1", [
               runA,
@@ -589,17 +756,23 @@ describe('document evidence applied PostgreSQL isolation', () => {
           (
             await client.query(`SELECT
             to_regclass('document_evidence_runs') AS runs,
+            to_regclass('document_evidence_batch_checkpoints') AS checkpoints,
             to_regprocedure('create_or_reuse_document_evidence_run(uuid,uuid,text,text,jsonb)') AS create_rpc,
             to_regprocedure('persist_document_evidence_items(uuid,uuid,uuid,jsonb)') AS persist_rpc,
             to_regprocedure('finalize_document_evidence_run(uuid,uuid,uuid,text)') AS finalize_rpc,
+            to_regprocedure('checkpoint_document_evidence_run_metrics(uuid,uuid,uuid,integer,integer,bigint,bigint,numeric)') AS metrics_rpc,
+            to_regprocedure('commit_document_evidence_batch(uuid,uuid,uuid,text,text,jsonb,jsonb,jsonb,integer,integer,bigint,bigint,numeric)') AS commit_rpc,
             to_regprocedure('upsert_document_evidence_conflict(uuid,uuid,uuid,jsonb,text,text)') AS conflict_rpc,
             to_regprocedure('append_document_evidence_decision(jsonb)') AS decision_rpc`)
           ).rows[0]
         ).toEqual({
           runs: null,
+          checkpoints: null,
           create_rpc: null,
           persist_rpc: null,
           finalize_rpc: null,
+          metrics_rpc: null,
+          commit_rpc: null,
           conflict_rpc: null,
           decision_rpc: null,
         });

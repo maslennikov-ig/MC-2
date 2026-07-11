@@ -22,6 +22,8 @@ import {
 
 type EvidenceTableName =
   | 'document_evidence_runs'
+  | 'document_evidence_items'
+  | 'document_evidence_batch_checkpoints'
   | 'document_evidence_conflicts'
   | 'document_evidence_decisions';
 
@@ -50,6 +52,8 @@ export interface DocumentEvidenceDatabaseClient {
     name:
       | 'create_or_reuse_document_evidence_run'
       | 'persist_document_evidence_items'
+      | 'commit_document_evidence_batch'
+      | 'finalize_document_evidence_run'
       | 'upsert_document_evidence_conflict'
       | 'append_document_evidence_decision',
     args: Record<string, unknown>
@@ -69,6 +73,32 @@ export interface PersistEvidenceItemsInput {
   courseId: string;
   organizationId: string;
   cards: DocumentEvidenceCard[];
+}
+
+export interface FinalizeEvidenceRunInput {
+  runId: string;
+  courseId: string;
+  organizationId: string;
+  status: 'accepted' | 'failed';
+}
+
+export interface CheckpointEvidenceRunMetricsInput {
+  runId: string;
+  courseId: string;
+  organizationId: string;
+  batchCount: number;
+  modelCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalCostUsd: number;
+}
+
+export interface CommitEvidenceBatchInput extends CheckpointEvidenceRunMetricsInput {
+  cards: DocumentEvidenceCard[];
+  batchKey: string;
+  inputHash: string;
+  structuredCheckpoint: Record<string, unknown>;
+  cursor: Record<string, unknown>;
 }
 
 export interface UpsertEvidenceConflictInput {
@@ -195,6 +225,106 @@ export class DocumentEvidenceRepository {
 
     if (error) throwDatabaseError('persist_items', error);
     return DocumentEvidenceCoverageSummarySchema.parse(data);
+  }
+
+  async listItems(runId: string): Promise<DocumentEvidenceCard[]> {
+    const result = await this.client
+      .from('document_evidence_items')
+      .select('*')
+      .eq('run_id', runId)
+      .order('document_id', { ascending: true });
+    if (result.error) throwDatabaseError('list_items', result.error);
+    if (!Array.isArray(result.data)) {
+      throw new DocumentEvidenceRepositoryError('list_items:invalid_result');
+    }
+
+    return DocumentEvidenceCardsSchema.parse(
+      result.data.map(value => {
+        const row = assertRecord(value, 'list_items');
+        return {
+          document_id: row.document_id,
+          document_name: row.document_name,
+          priority: row.priority,
+          authority_scope: row.authority_scope,
+          content_quality: row.content_quality,
+          course_relevance: row.course_relevance,
+          processing_mode: row.processing_mode,
+          summary: row.summary,
+          key_claims: row.claims,
+          terminology: row.terminology,
+          constraints: row.constraints,
+          limitations: row.limitations,
+          coverage_status: row.coverage_status,
+          coverage_reason: row.coverage_reason,
+          token_counts: {
+            original: row.original_tokens,
+            summary: row.summary_tokens,
+            allocated: row.allocated_tokens,
+          },
+        };
+      })
+    );
+  }
+
+  async finalizeRun(input: FinalizeEvidenceRunInput): Promise<Record<string, unknown>> {
+    const { data, error } = await this.client.rpc('finalize_document_evidence_run', {
+      p_run_id: input.runId,
+      p_course_id: input.courseId,
+      p_organization_id: input.organizationId,
+      p_status: input.status,
+    });
+    if (error) throwDatabaseError('finalize_run', error);
+    return assertRecord(data, 'finalize_run');
+  }
+
+  async commitBatch(input: CommitEvidenceBatchInput): Promise<Record<string, unknown>> {
+    const cards = DocumentEvidenceCardsSchema.parse(input.cards);
+    if (!input.batchKey.trim() || !input.inputHash.trim()) {
+      throw new DocumentEvidenceRepositoryError('commit_batch:invalid_identity');
+    }
+    const integerMetrics = [
+      input.batchCount,
+      input.modelCalls,
+      input.inputTokens,
+      input.outputTokens,
+    ];
+    if (
+      integerMetrics.some(value => !Number.isSafeInteger(value) || value < 0) ||
+      !Number.isFinite(input.totalCostUsd) ||
+      input.totalCostUsd < 0
+    ) {
+      throw new DocumentEvidenceRepositoryError('commit_batch:invalid_metrics');
+    }
+    const { data, error } = await this.client.rpc('commit_document_evidence_batch', {
+      p_run_id: input.runId,
+      p_course_id: input.courseId,
+      p_organization_id: input.organizationId,
+      p_batch_key: input.batchKey,
+      p_input_hash: input.inputHash,
+      p_items: cards,
+      p_structured_checkpoint: input.structuredCheckpoint,
+      p_cursor: input.cursor,
+      p_batch_count: input.batchCount,
+      p_model_calls: input.modelCalls,
+      p_input_tokens: input.inputTokens,
+      p_output_tokens: input.outputTokens,
+      p_total_cost_usd: input.totalCostUsd,
+    });
+    if (error) throwDatabaseError('commit_batch', error);
+    return assertRecord(data, 'commit_batch');
+  }
+
+  async listBatchCheckpoints(runId: string): Promise<Array<Record<string, unknown>>> {
+    const result = await this.client
+      .from('document_evidence_batch_checkpoints')
+      .select('*')
+      .eq('run_id', runId)
+      .order('created_at', { ascending: true });
+    if (result.error) throwDatabaseError('list_batch_checkpoints', result.error);
+    if (!Array.isArray(result.data)) {
+      throw new DocumentEvidenceRepositoryError('list_batch_checkpoints:invalid_result');
+    }
+    return result.data.map(value => assertRecord(value, 'list_batch_checkpoints'));
   }
 
   async upsertConflict(input: UpsertEvidenceConflictInput): Promise<Record<string, unknown>> {

@@ -280,6 +280,8 @@ type SummaryMetadata = {
   summary_tokens?: number;
   compression_ratio?: number;
   quality_score?: number;
+  /** Present only when the stored summary explicitly records its source version. */
+  source_version_hash?: string;
   /** Stage 3 classification data (stored by tournament classifier) */
   classification?: {
     importance_score?: number;
@@ -290,6 +292,10 @@ type SummaryMetadata = {
 export type DocumentSummaryResult = {
   document_id: string;
   file_name: string;
+  /** Immutable file content hash used by evidence fingerprinting/resume. */
+  source_version_hash: string;
+  /** Never inferred from the file hash; absent metadata forces safe regeneration. */
+  summary_source_version_hash?: string;
   processed_content: string;
   processing_method: 'balanced';
   summary_metadata: {
@@ -332,20 +338,73 @@ async function fetchCourseMetadata(courseId: string): Promise<{
 }
 
 /** Fetch and transform document summaries from file_catalog */
-async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
+const DOCUMENT_METADATA_PAGE_SIZE = 1_000;
+const DOCUMENT_CONTENT_BATCH_SIZE = 200;
+
+export async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
   const supabase = getSupabaseAdmin();
 
   // Step 1: Light metadata query (no processed_content — save Supabase egress).
   // processed_content is intentionally excluded from SELECT to save egress;
   // the NOT NULL filter still applies at the DB level (WHERE is independent of SELECT).
-  const { data: documents } = await supabase
-    .from('file_catalog')
-    .select('id, original_name, filename, summary_metadata, priority')
-    .eq('course_id', courseId)
-    .eq('vector_status', 'indexed')
-    .not('processed_content', 'is', null);
+  type DocumentMetadataRow = {
+    id: string;
+    original_name: string | null;
+    filename: string;
+    hash: string;
+    summary_metadata: unknown;
+    priority: string | null;
+  };
 
-  if (!documents || documents.length === 0) return [];
+  const enumerateSnapshot = async (): Promise<DocumentMetadataRow[]> => {
+    const snapshot: DocumentMetadataRow[] = [];
+    let lastId: string | undefined;
+    let expectedCount: number | null = null;
+    for (;;) {
+      let query = supabase
+        .from('file_catalog')
+        .select('id, original_name, filename, hash, summary_metadata, priority', {
+          count: 'exact',
+        })
+        .eq('course_id', courseId)
+        .eq('vector_status', 'indexed')
+        .order('id', { ascending: true });
+      if (lastId) query = query.gt('id', lastId);
+      const { data, error, count } = await query.range(0, DOCUMENT_METADATA_PAGE_SIZE - 1);
+      if (error) {
+        throw new Error(`Failed to enumerate Stage 4 document metadata: ${error.message}`);
+      }
+      if (expectedCount === null) expectedCount = count;
+      const page = data ?? [];
+      snapshot.push(...page);
+      if (page.length < DOCUMENT_METADATA_PAGE_SIZE) break;
+      lastId = page.at(-1)?.id;
+      if (!lastId) throw new Error('Stage 4 keyset pagination did not advance');
+    }
+    if (expectedCount === null || snapshot.length !== expectedCount) {
+      throw new Error('Stage 4 document source snapshot failed exact count/set/order verification');
+    }
+    return snapshot;
+  };
+
+  const documents = await enumerateSnapshot();
+  const verificationSnapshot = await enumerateSnapshot();
+  if (JSON.stringify(documents) !== JSON.stringify(verificationSnapshot)) {
+    throw new Error('Stage 4 document source snapshot changed during keyset pagination');
+  }
+
+  const documentIds = documents.map(document => document.id);
+  const hasStrictOrder = documentIds.every(
+    (documentId, index) => index === 0 || documentIds[index - 1].localeCompare(documentId) < 0
+  );
+  if (new Set(documentIds).size !== documents.length || !hasStrictOrder) {
+    throw new Error('Stage 4 document source snapshot failed exact count/set/order verification');
+  }
+  if (documents.some(document => !document.hash)) {
+    throw new Error('Stage 4 document source is missing a version hash');
+  }
+
+  if (documents.length === 0) return [];
 
   // Step 2: Get processed_content from Redis cache (single mget round-trip)
   const docIds = documents.map(d => d.id);
@@ -365,18 +424,22 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
   );
 
   if (missedIds.length > 0) {
-    const { data: contentData, error: contentError } = await supabase
-      .from('file_catalog')
-      .select('id, processed_content')
-      .in('id', missedIds);
-    if (contentError) {
-      logger.warn(
-        { courseId, missedIds, error: contentError.message },
-        '[Stage4] Supabase fallback for processed_content failed — documents will have empty content'
-      );
-    }
-    for (const d of contentData || []) {
-      if (d.processed_content) contentMap.set(d.id, d.processed_content);
+    for (let offset = 0; offset < missedIds.length; offset += DOCUMENT_CONTENT_BATCH_SIZE) {
+      const batchIds = missedIds.slice(offset, offset + DOCUMENT_CONTENT_BATCH_SIZE);
+      const { data: contentData, error: contentError } = await supabase
+        .from('file_catalog')
+        .select('id, processed_content')
+        .eq('course_id', courseId)
+        .in('id', batchIds);
+      if (contentError) {
+        logger.warn(
+          { courseId, documentCount: batchIds.length, error: contentError.message },
+          '[Stage4] Supabase fallback for processed_content failed — affected documents will have empty content'
+        );
+      }
+      for (const d of contentData || []) {
+        if (d.processed_content) contentMap.set(d.id, d.processed_content);
+      }
     }
   }
 
@@ -389,6 +452,10 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
     return {
       document_id: doc.id,
       file_name: doc.original_name || doc.filename || 'unknown',
+      source_version_hash: doc.hash,
+      ...(metadata?.source_version_hash
+        ? { summary_source_version_hash: metadata.source_version_hash }
+        : {}),
       processed_content: contentMap.get(doc.id) || '',
       processing_method: 'balanced' as const,
       summary_metadata: {
@@ -404,7 +471,7 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
 }
 
 /** Fetch full text (markdown_content) for documents that need full text mode */
-async function fetchFullTextDocuments(
+export async function fetchFullTextDocuments(
   documentIds: string[],
   courseId: string
 ): Promise<Map<string, string>> {
@@ -417,19 +484,23 @@ async function fetchFullTextDocuments(
   const missedIds = documentIds.filter(id => !map.has(id));
   if (missedIds.length > 0) {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from('file_catalog')
-      .select('id, markdown_content')
-      .in('id', missedIds)
-      .not('markdown_content', 'is', null);
-    if (error) {
-      logger.warn(
-        { courseId, missedIds, error: error.message },
-        '[Stage4] Supabase fallback for markdown_content failed'
-      );
-    }
-    for (const doc of data || []) {
-      if (doc.markdown_content) map.set(doc.id, doc.markdown_content);
+    for (let offset = 0; offset < missedIds.length; offset += DOCUMENT_CONTENT_BATCH_SIZE) {
+      const batchIds = missedIds.slice(offset, offset + DOCUMENT_CONTENT_BATCH_SIZE);
+      const { data, error } = await supabase
+        .from('file_catalog')
+        .select('id, markdown_content')
+        .eq('course_id', courseId)
+        .in('id', batchIds)
+        .not('markdown_content', 'is', null);
+      if (error) {
+        logger.warn(
+          { courseId, documentCount: batchIds.length, error: error.message },
+          '[Stage4] Supabase fallback for markdown_content failed'
+        );
+      }
+      for (const doc of data || []) {
+        if (doc.markdown_content) map.set(doc.id, doc.markdown_content);
+      }
     }
   }
 

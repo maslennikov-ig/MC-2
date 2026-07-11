@@ -11,7 +11,10 @@
  */
 
 import type { DocumentPriorityLevel } from '@megacampus/shared-types';
-import { STAGE4_HARD_TOKEN_LIMIT, STAGE4_CONTEXT_THRESHOLD } from '../../../shared/llm/model-selector';
+import {
+  STAGE4_HARD_TOKEN_LIMIT,
+  STAGE4_CONTEXT_THRESHOLD,
+} from '../../../shared/llm/model-selector';
 import logger from '../../../shared/logger';
 
 /** Emergency universal fallback model when DB config is unavailable */
@@ -37,7 +40,12 @@ export interface Stage4ModelSelection {
  */
 export interface Stage4TierConfig {
   standard: { modelId: string; fallbackModelId: string; maxContext: number };
-  extended: { modelId: string; fallbackModelId: string; maxContext: number; cacheReadEnabled: boolean };
+  extended: {
+    modelId: string;
+    fallbackModelId: string;
+    maxContext: number;
+    cacheReadEnabled: boolean;
+  };
 }
 
 /**
@@ -67,7 +75,7 @@ export interface Stage4DocumentBudget {
   /** Uploaded document UUID */
   file_id: string;
 
-  /** Processing mode (full_text or summary) */
+  /** Processing mode used by the legacy single-prompt baseline path. */
   mode: 'full_text' | 'summary';
 
   /** Tokens that will be used */
@@ -95,7 +103,7 @@ export interface Stage4BudgetAllocation {
     core: {
       count: number;
       tokens: number;
-      mode: 'full_text';
+      mode: 'full_text' | 'summary';
     };
     important: {
       count: number;
@@ -170,12 +178,19 @@ export function allocateStage4Budget(
   const modelSelection = selectModelFromTierConfig(minimumTokens, language, tierConfig);
 
   // Step 4: Determine effective max context (respect hard limit + system prompt reserve)
-  const effectiveMaxContext = Math.min(modelSelection.maxContext, STAGE4_HARD_TOKEN_LIMIT) - SYSTEM_PROMPT_RESERVE;
+  const effectiveMaxContext =
+    Math.min(modelSelection.maxContext, STAGE4_HARD_TOKEN_LIMIT) - SYSTEM_PROMPT_RESERVE;
+
+  // Do not feed an oversized CORE document to the legacy single-prompt path.
+  // The evidence preflight independently processes its complete source through
+  // bounded hierarchical map/reduce and records the durable coverage outcome.
+  const coreMode = minimumTokens <= effectiveMaxContext ? 'full_text' : 'summary';
+  const coreTokens = coreMode === 'full_text' ? coreFullTokens : coreDoc.summary_tokens;
 
   // Step 5: Calculate upgrade budget for IMPORTANT documents
   // All IMPORTANT docs start as summaries (already reserved in minimumTokens).
   // upgradeableBudget = extra space available for full_text upgrades (delta over summaries).
-  const availableForImportant = effectiveMaxContext - coreFullTokens - supplementarySummaryTokens;
+  const availableForImportant = effectiveMaxContext - coreTokens - supplementarySummaryTokens;
   const upgradeableBudget = availableForImportant - importantSummaryTokens;
 
   // Step 6: Greedy allocation for IMPORTANT documents
@@ -221,8 +236,8 @@ export function allocateStage4Budget(
     // CORE first
     {
       file_id: coreDoc.file_id,
-      mode: 'full_text',
-      tokens: coreFullTokens,
+      mode: coreMode,
+      tokens: coreTokens,
       priority: 'CORE',
     },
     // IMPORTANT next
@@ -245,8 +260,8 @@ export function allocateStage4Budget(
     breakdown: {
       core: {
         count: 1,
-        tokens: coreFullTokens,
-        mode: 'full_text',
+        tokens: coreTokens,
+        mode: coreMode,
       },
       important: {
         count: important.length,
@@ -281,16 +296,12 @@ export function allocateStage4Budget(
  */
 export function validateStage4Budget(allocation: Stage4BudgetAllocation): boolean {
   const { modelSelection, totalTokens } = allocation;
+  const effectiveMaxContext =
+    Math.min(modelSelection.maxContext, STAGE4_HARD_TOKEN_LIMIT) - SYSTEM_PROMPT_RESERVE;
 
-  if (totalTokens > modelSelection.maxContext) {
+  if (totalTokens > effectiveMaxContext) {
     throw new Error(
-      `Budget allocation ${totalTokens} exceeds model context ${modelSelection.maxContext}`
-    );
-  }
-
-  if (totalTokens > STAGE4_HARD_TOKEN_LIMIT) {
-    throw new Error(
-      `Budget allocation ${totalTokens} exceeds hard limit ${STAGE4_HARD_TOKEN_LIMIT}`
+      `Budget allocation ${totalTokens} exceeds effective context ${effectiveMaxContext} after system prompt reserve`
     );
   }
 

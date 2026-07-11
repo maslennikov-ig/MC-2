@@ -296,6 +296,110 @@ describe('DocumentEvidenceRepository', () => {
     expect(rpcItems[0]).not.toHaveProperty('summary');
   });
 
+  it('loads durable checkpoint rows back into canonical evidence cards', async () => {
+    const row = {
+      document_id: card.document_id,
+      document_name: card.document_name,
+      priority: card.priority,
+      authority_scope: card.authority_scope,
+      content_quality: card.content_quality,
+      course_relevance: card.course_relevance,
+      processing_mode: card.processing_mode,
+      summary: card.summary,
+      claims: card.key_claims,
+      terminology: card.terminology,
+      constraints: card.constraints,
+      limitations: card.limitations,
+      coverage_status: card.coverage_status,
+      coverage_reason: card.coverage_reason,
+      original_tokens: card.token_counts.original,
+      summary_tokens: card.token_counts.summary,
+      allocated_tokens: card.token_counts.allocated,
+    };
+    const { client, calls } = createScriptedClient({
+      document_evidence_items: [{ data: [row], error: null }],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(repository.listItems(ids.run)).resolves.toEqual([card]);
+    expect(calls[0]).toEqual({
+      table: 'document_evidence_items',
+      operations: [
+        ['select', '*'],
+        ['eq', 'run_id', ids.run],
+        ['order', 'document_id', { ascending: true }],
+      ],
+    });
+  });
+
+  it('finalizes an evidence run through the guarded RPC', async () => {
+    const terminal = { id: ids.run, status: 'accepted' };
+    const { client, rpc } = createScriptedClient({
+      rpc: [{ data: terminal, error: null }],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(
+      repository.finalizeRun({
+        runId: ids.run,
+        courseId: ids.course,
+        organizationId: ids.organization,
+        status: 'accepted',
+      })
+    ).resolves.toEqual(terminal);
+    expect(rpc).toHaveBeenCalledWith('finalize_document_evidence_run', {
+      p_run_id: ids.run,
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_status: 'accepted',
+    });
+  });
+
+  it('atomically checkpoints the full ledger and absolute metrics for one batch', async () => {
+    const result = {
+      coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+      run: { id: ids.run, batch_count: 1, model_calls: 2 },
+    };
+    const { client, rpc } = createScriptedClient({ rpc: [{ data: result, error: null }] });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(
+      repository.commitBatch({
+        runId: ids.run,
+        courseId: ids.course,
+        organizationId: ids.organization,
+        cards: [card],
+        batchKey: 'document-a:map:unit-1',
+        inputHash: 'sha256:unit-1',
+        structuredCheckpoint: { document_id: ids.documentA, processed_unit_ids: ['unit-1'] },
+        cursor: { document_id: ids.documentA, sequence: 1 },
+        batchCount: 1,
+        modelCalls: 2,
+        inputTokens: 500,
+        outputTokens: 50,
+        totalCostUsd: 0.01,
+      })
+    ).resolves.toEqual(result);
+    expect(rpc).toHaveBeenCalledWith('commit_document_evidence_batch', {
+      p_run_id: ids.run,
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_items: [card],
+      p_batch_key: 'document-a:map:unit-1',
+      p_input_hash: 'sha256:unit-1',
+      p_structured_checkpoint: {
+        document_id: ids.documentA,
+        processed_unit_ids: ['unit-1'],
+      },
+      p_cursor: { document_id: ids.documentA, sequence: 1 },
+      p_batch_count: 1,
+      p_model_calls: 2,
+      p_input_tokens: 500,
+      p_output_tokens: 50,
+      p_total_cost_usd: 0.01,
+    });
+  });
+
   it('reuses an immutable conflict when its run fingerprint already exists', async () => {
     const existing = {
       id: ids.conflict,

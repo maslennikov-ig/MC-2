@@ -35,6 +35,7 @@ import {
   type AnalysisContext,
   initializeAnalysis,
   runClassificationPhase,
+  runDocumentEvidencePhase,
   runClarifyingPhase,
   runScopePhase,
   runExpertPhase,
@@ -114,6 +115,9 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
 
     // Phase 1: Basic Classification (12-25%)
     await runClassificationPhase(context);
+
+    // Durable document evidence preflight (optional; shadow mode is non-influential)
+    await runDocumentEvidencePhase(context);
 
     // Phase 0.5: Clarifying Questions (25-28%)
     await runClarifyingPhase(context);
