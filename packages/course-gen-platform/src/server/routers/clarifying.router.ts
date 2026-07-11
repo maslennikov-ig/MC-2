@@ -46,6 +46,7 @@ import {
   validateAnswerSource,
   validateSuggestionIndexes,
   persistAnswer,
+  persistDocumentEvidenceAnswersAtomic,
   checkCanProceed,
   executeAtomicApproval,
   verifyStatusTransition,
@@ -324,6 +325,7 @@ export const clarifyingRouter = router({
         selectedSuggestionIndex,
         selectedSuggestionIndexes,
         userModification,
+        expectedCurrentDecisionId,
       } = input;
       const requestId = nanoid();
       const currentUser = ctx.user;
@@ -358,18 +360,42 @@ export const clarifyingRouter = router({
         const suggestions = question.suggested_answers || [];
         validateSuggestionIndexes(suggestions, selectedSuggestionIndex, selectedSuggestionIndexes);
 
-        await persistAnswer({
-          questionId,
-          isMultiChoice,
-          answer,
-          answers,
-          effectiveAnswerSource,
-          selectedSuggestionIndex,
-          selectedSuggestionIndexes,
-          userModification,
-          questionMetadata: question.metadata,
-          requestId,
-        });
+        if (question.question_category === 'document_conflicts') {
+          if (isMultiChoice || !answer || effectiveAnswerSource === 'system') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Document conflict answers must be a user single choice',
+            });
+          }
+          await persistDocumentEvidenceAnswersAtomic({
+            courseId: course.id,
+            actorUserId: currentUser.id,
+            answers: [
+              {
+                questionId,
+                subjectKey: String(question.metadata?.subject_key ?? ''),
+                answer,
+                answerSource: effectiveAnswerSource as 'suggested' | 'modified' | 'custom',
+                selectedSuggestionIndex,
+                expectedCurrentDecisionId,
+              },
+            ],
+            requestId,
+          });
+        } else {
+          await persistAnswer({
+            questionId,
+            isMultiChoice,
+            answer,
+            answers,
+            effectiveAnswerSource,
+            selectedSuggestionIndex,
+            selectedSuggestionIndexes,
+            userModification,
+            questionMetadata: question.metadata,
+            requestId,
+          });
+        }
 
         const canProceed = await checkCanProceed(course.id, requestId);
         logger.info({ requestId, questionId, canProceed }, 'Answer submitted successfully');
@@ -418,7 +444,7 @@ export const clarifyingRouter = router({
 
         const { data: questions, error: fetchError } = await supabase
           .from('clarifying_questions')
-          .select('id, course_id, status, suggested_answers')
+          .select('id, course_id, status, suggested_answers, question_category, metadata')
           .in('id', questionIds);
 
         throwOnSupabaseError(fetchError, 'Questions', { requestId });
@@ -434,6 +460,8 @@ export const clarifyingRouter = router({
           course_id: string;
           status: string;
           suggested_answers: Array<{ text: string }> | null;
+          question_category: string | null;
+          metadata: Record<string, unknown> | null;
         }>;
 
         const foundIds = new Set(questionList.map(q => q.id));
@@ -455,6 +483,42 @@ export const clarifyingRouter = router({
 
         const courseId = questionList[0].course_id;
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
+
+        const conflictCount = questionList.filter(
+          question => question.question_category === 'document_conflicts'
+        ).length;
+        if (conflictCount > 0 && conflictCount !== questionList.length) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Mixed ordinary/document-conflict batches are not atomic; submit separately',
+          });
+        }
+        if (conflictCount === questionList.length) {
+          const conflictQuestionMap = new Map(questionList.map(question => [question.id, question]));
+          const answerResult = await persistDocumentEvidenceAnswersAtomic({
+            courseId,
+            actorUserId: currentUser.id,
+            answers: submissions.map(submission => ({
+              questionId: submission.questionId,
+              subjectKey: String(
+                conflictQuestionMap.get(submission.questionId)?.metadata?.subject_key ?? ''
+              ),
+              answer: submission.answer,
+              answerSource: submission.answerSource,
+              selectedSuggestionIndex: submission.selectedSuggestionIndex,
+              expectedCurrentDecisionId: submission.expectedCurrentDecisionId,
+            })),
+            requestId,
+          });
+          const answered = new Set(answerResult.answeredQuestionIds);
+          const conflictFailedIds = questionIds.filter(questionId => !answered.has(questionId));
+          const canProceed = await checkCanProceed(courseId, requestId);
+          return {
+            successCount: questionIds.length - conflictFailedIds.length,
+            failedIds: conflictFailedIds,
+            canProceed,
+          };
+        }
 
         const questionMap = new Map(questionList.map(q => [q.id, q]));
         const now = new Date().toISOString();

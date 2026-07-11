@@ -9,8 +9,10 @@ import { AnalysisResultSchema } from '../src/analysis-schemas';
 import {
   DocumentAuthorityScopeSchema,
   DocumentConflictSchema,
+  DocumentDecisionSubjectSchema,
   DocumentCoverageStatusSchema,
   DocumentDecisionSchema,
+  DocumentEvidenceQuestionMetadataSchema,
   DocumentEvidenceCardSchema,
   DocumentEvidenceCardsSchema,
   DocumentEvidenceModeSchema,
@@ -201,6 +203,7 @@ describe('document evidence canonical contracts', () => {
       decision_id: ids.decision,
       run_id: ids.run,
       conflict_id: ids.conflict,
+      subject: { kind: 'claim_conflict', conflict_id: ids.conflict },
       selected_resolution: 'Follow the organization-specific policy.',
       resolved_by: 'user',
       answer_source: 'modified',
@@ -237,6 +240,86 @@ describe('document evidence canonical contracts', () => {
         answer_source: 'system',
       })
     ).toThrow(/resolved_by=system.*answer_source=system/i);
+  });
+
+  it('models claim, degraded, and detector-capacity decisions without fake provenance', () => {
+    expect(
+      DocumentDecisionSubjectSchema.parse({ kind: 'claim_conflict', conflict_id: ids.conflict })
+    ).toEqual({ kind: 'claim_conflict', conflict_id: ids.conflict });
+    expect(
+      DocumentDecisionSubjectSchema.parse({
+        kind: 'degraded_evidence',
+        document_id: ids.documentA,
+        coverage_status: 'degraded',
+        coverage_reason: 'verification_unavailable',
+        attempt: 1,
+        max_attempts: 2,
+      })
+    ).not.toHaveProperty('claim_ids');
+    expect(
+      DocumentDecisionSubjectSchema.parse({
+        kind: 'detector_capacity',
+        reason: 'detector_capacity_degraded',
+        call_plan_hash: 'sha256:plan',
+        config_hash: 'sha256:config',
+      })
+    ).not.toHaveProperty('document_id');
+    expect(() =>
+      DocumentDecisionSchema.parse({
+        ...{
+          decision_id: ids.decision,
+          run_id: ids.run,
+          selected_resolution: 'continue_limited',
+          resolved_by: 'system',
+          answer_source: 'system',
+          rationale: 'Capacity policy permits bounded continuation.',
+          decided_at: '2026-07-11T10:30:00.000Z',
+        },
+        subject: {
+          kind: 'degraded_evidence',
+          document_id: ids.documentA,
+          coverage_status: 'degraded',
+          coverage_reason: 'verification_unavailable',
+          attempt: 1,
+          max_attempts: 2,
+        },
+        conflict_id: ids.conflict,
+      })
+    ).toThrow(/degraded.*conflict_id/i);
+  });
+
+  it('validates bounded shared RU/EN question metadata including same-document conflicts', () => {
+    const metadata = {
+      schema_version: 'document-conflict-question-v1',
+      subject_kind: 'claim_conflict',
+      subject_key: 'sha256:subject',
+      run_id: ids.run,
+      conflict_id: ids.conflict,
+      document_ids: [ids.documentA],
+      documents: [{ document_id: ids.documentA, document_name: 'Policy.pdf' }],
+      document_overflow_count: 0,
+      sides: [
+        { excerpt: 'Keep 30 days.', source_refs: [sourceRef], source_ref_overflow_count: 0 },
+        { excerpt: 'Keep 365 days.', source_refs: [sourceRef], source_ref_overflow_count: 0 },
+      ],
+      provenance_handle: 'sha256:provenance',
+      course_impact: 'One policy is required.',
+      recommendation: 'Keep 30 days.',
+      recommendation_rationale: 'Organization authority.',
+      alternatives: ['Keep 365 days.'],
+    } as const;
+    expect(DocumentEvidenceQuestionMetadataSchema.parse(metadata)).toEqual(metadata);
+    expect(
+      DocumentEvidenceQuestionMetadataSchema.parse({
+        schema_version: 'document-conflict-question-v1',
+        subject_kind: 'detector_capacity',
+        subject_key: 'sha256:capacity',
+        run_id: ids.run,
+        reason: 'detector_capacity_degraded',
+        call_plan_hash: 'sha256:plan',
+        config_hash: 'sha256:config',
+      })
+    ).not.toHaveProperty('document_id');
   });
 
   it('requires exact terminal coverage counts in accepted run summaries', () => {

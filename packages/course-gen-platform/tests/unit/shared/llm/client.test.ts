@@ -89,6 +89,29 @@ describe('LLMClient', () => {
   });
 
   describe('initialization', () => {
+    it('keeps three transport retries by default and permits an explicit zero-retry owner', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+      const defaultClient = new LLMClient();
+      await defaultClient.generateCompletion('hello', { model: 'test-model' });
+      expect(retryWithBackoff).toHaveBeenLastCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ maxRetries: 3 })
+      );
+
+      const noRetryClient = new LLMClient({ maxRetries: 0 });
+      await noRetryClient.generateCompletion('hello', { model: 'test-model' });
+      expect(retryWithBackoff).toHaveBeenLastCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ maxRetries: 0 })
+      );
+    });
+
+    it('rejects invalid construction retry bounds', () => {
+      expect(() => new LLMClient({ maxRetries: -1 })).toThrow(/maxRetries/i);
+      expect(() => new LLMClient({ maxRetries: 1.5 })).toThrow(/maxRetries/i);
+      expect(() => new LLMClient({ maxRetries: 11 })).toThrow(/maxRetries/i);
+    });
+
     it('should initialize immediately when env var available', () => {
       vi.mocked(getApiKeySync).mockReturnValue('test-key');
 

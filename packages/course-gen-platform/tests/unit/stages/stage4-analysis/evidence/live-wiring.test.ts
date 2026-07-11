@@ -259,6 +259,226 @@ describe('Stage 4 document evidence live wiring', () => {
     expect(analysisContext.documentEvidenceMode).toBe('active');
   });
 
+  it('runs conflict detection and the decision gate only after an active accepted preflight', async () => {
+    const analysisContext = context();
+    const accepted = {
+      ...skippedResult,
+      status: 'accepted' as const,
+      runId: '10000000-0000-4000-8000-000000000001',
+      coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+    };
+    const detectConflicts = vi.fn(async () => ({ conflicts: [], issues: [] }));
+    const resolveDecisions = vi.fn(async () => ({
+      pauseRequired: true,
+      requiredQuestionIds: ['80000000-0000-4000-8000-000000000001'],
+      currentDecisionIds: [],
+      unresolvedInformationalConflictIds: ['60000000-0000-4000-8000-000000000001'],
+    }));
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'active',
+      runPreflight: vi.fn(async () => accepted),
+      preflightDependencies: {} as never,
+      detectConflicts,
+      conflictDependencies: {} as never,
+      resolveDecisions,
+      decisionDependencies: {} as never,
+      decisionMode: 'manual',
+    });
+
+    expect(detectConflicts).toHaveBeenCalledTimes(1);
+    expect(resolveDecisions).toHaveBeenCalledTimes(1);
+    expect(analysisContext.documentEvidenceDecisions).toEqual(
+      expect.objectContaining({ pauseRequired: true })
+    );
+  });
+
+  it('does not run conflict decisions in non-influential shadow mode', async () => {
+    const analysisContext = context();
+    const detectConflicts = vi.fn();
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'shadow',
+      runPreflight: vi.fn(async () => ({
+        ...skippedResult,
+        status: 'accepted' as const,
+        runId: '10000000-0000-4000-8000-000000000001',
+      })),
+      preflightDependencies: {} as never,
+      detectConflicts,
+      conflictDependencies: {} as never,
+    });
+    expect(detectConflicts).not.toHaveBeenCalled();
+    expect(analysisContext.documentEvidenceDecisions).toBeUndefined();
+  });
+
+  it('records bounded automatic retries and runs the gate only on the final immutable run', async () => {
+    const analysisContext = context();
+    const degradedCard = {
+      document_id: summary.document_id,
+      coverage_status: 'degraded',
+    } as never;
+    const runPreflight = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...skippedResult,
+        status: 'accepted',
+        runId: '10000000-0000-4000-8000-000000000001',
+        cards: [degradedCard],
+      })
+      .mockResolvedValueOnce({
+        ...skippedResult,
+        status: 'accepted',
+        runId: '10000000-0000-4000-8000-000000000002',
+        cards: [degradedCard],
+      })
+      .mockResolvedValueOnce({
+        ...skippedResult,
+        status: 'accepted',
+        runId: '10000000-0000-4000-8000-000000000003',
+        cards: [degradedCard],
+      });
+    const getDegradedRetryState = vi
+      .fn()
+      .mockResolvedValueOnce({ attempt: 0, maxAttempts: 2 })
+      .mockResolvedValueOnce({ attempt: 1, maxAttempts: 2 })
+      .mockResolvedValueOnce({ attempt: 2, maxAttempts: 2 });
+    const recordAutomaticRetry = vi
+      .fn()
+      .mockResolvedValueOnce({
+        decisionId: '70000000-0000-4000-8000-000000000001',
+        documentId: summary.document_id,
+        attempt: 1,
+        maxAttempts: 2,
+      })
+      .mockResolvedValueOnce({
+        decisionId: '70000000-0000-4000-8000-000000000002',
+        documentId: summary.document_id,
+        attempt: 2,
+        maxAttempts: 2,
+      });
+    const getPendingRetryDirectives = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          decisionId: '70000000-0000-4000-8000-000000000001',
+          documentId: summary.document_id,
+          attempt: 1,
+          maxAttempts: 2,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          decisionId: '70000000-0000-4000-8000-000000000002',
+          documentId: summary.document_id,
+          attempt: 2,
+          maxAttempts: 2,
+        },
+      ]);
+    const consumeRetryDirectives = vi.fn(async () => undefined);
+    const resolveDecisions = vi.fn(async input => {
+      expect(input.runId).toBe('10000000-0000-4000-8000-000000000003');
+      return {
+        pauseRequired: false,
+        requiredQuestionIds: [],
+        currentDecisionIds: [],
+        unresolvedInformationalConflictIds: [],
+      };
+    });
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'active',
+      decisionMode: 'automatic',
+      runPreflight,
+      preflightDependencies: {} as never,
+      retryCoordinator: {
+        getDegradedRetryState,
+        recordAutomaticRetry,
+        getPendingRetryDirectives,
+        consumeRetryDirectives,
+      } as never,
+      detectConflicts: vi.fn(async () => ({ conflicts: [], issues: [] })) as never,
+      conflictDependencies: {} as never,
+      resolveDecisions,
+      decisionDependencies: {} as never,
+    });
+
+    expect(runPreflight).toHaveBeenCalledTimes(3);
+    expect(recordAutomaticRetry).toHaveBeenCalledTimes(2);
+    expect(consumeRetryDirectives).toHaveBeenCalledTimes(2);
+    expect(runPreflight.mock.calls[1][0].retryDirectives).toEqual([
+      expect.objectContaining({ attempt: 1 }),
+    ]);
+    expect(resolveDecisions).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers every durable pending retry after a crash before preflight and links the accepted run', async () => {
+    const secondSummary = {
+      ...summary,
+      document_id: documentId(2),
+      file_name: 'Appendix.pdf',
+      source_version_hash: 'sha256:source-2',
+    };
+    const analysisContext = context([summary, secondSummary]);
+    const pending = [
+      {
+        decisionId: '70000000-0000-4000-8000-000000000001',
+        documentId: summary.document_id,
+        attempt: 1,
+        maxAttempts: 2,
+      },
+      {
+        decisionId: '70000000-0000-4000-8000-000000000002',
+        documentId: secondSummary.document_id,
+        attempt: 1,
+        maxAttempts: 2,
+      },
+    ];
+    const runPreflight = vi.fn(async input => {
+      expect(input.retryDirectives).toEqual(pending);
+      return {
+        ...skippedResult,
+        status: 'accepted' as const,
+        runId: '10000000-0000-4000-8000-000000000010',
+      };
+    });
+    const consumeRetryDirectives = vi.fn(async input => {
+      expect(input).toEqual({
+        courseId: analysisContext.courseId,
+        organizationId: analysisContext.organizationId,
+        targetRunId: '10000000-0000-4000-8000-000000000010',
+        decisionIds: pending.map(value => value.decisionId),
+      });
+    });
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'active',
+      decisionMode: 'manual',
+      runPreflight,
+      preflightDependencies: {} as never,
+      retryCoordinator: {
+        getPendingRetryDirectives: vi.fn(async () => pending),
+        consumeRetryDirectives,
+      } as never,
+      detectConflicts: vi.fn(async () => ({ conflicts: [], issues: [] })) as never,
+      conflictDependencies: {} as never,
+      resolveDecisions: vi.fn(async () => ({
+        pauseRequired: false,
+        requiredQuestionIds: [],
+        currentDecisionIds: [],
+        unresolvedInformationalConflictIds: [],
+      })) as never,
+      decisionDependencies: {} as never,
+    });
+
+    expect(runPreflight).toHaveBeenCalledTimes(1);
+    expect(consumeRetryDirectives).toHaveBeenCalledTimes(1);
+  });
+
   it('allows evidence preflight to own an enumerated missing-content outcome', async () => {
     const missing = {
       ...summary,
@@ -310,5 +530,18 @@ describe('Stage 4 document evidence live wiring', () => {
         enrichment_status: 'not_applicable',
       },
     });
+  });
+
+  it('keeps ordinary-question generation category-aware and attaches accepted decision IDs', () => {
+    const phaseSource = readFileSync(
+      resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator-phase-helpers.ts'),
+      'utf8'
+    );
+    const helperSource = readFileSync(
+      resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator-helpers.ts'),
+      'utf8'
+    );
+    expect(phaseSource).toMatch(/question_category\s*!==\s*'document_conflicts'/u);
+    expect(helperSource).toMatch(/decisions\?\.currentDecisionIds/u);
   });
 });

@@ -60,6 +60,18 @@ import {
   createProductionStructuredEvidencePort,
 } from './evidence/card-generator';
 import { resolveDownstreamDocumentSummaries } from './evidence/downstream-context';
+import { createHash } from 'node:crypto';
+import {
+  createProductionConflictDetectionPort,
+  detectDocumentConflicts,
+  type DetectDocumentConflictsDependencies,
+  type DetectDocumentConflictsInput,
+} from './evidence/conflict-detector';
+import {
+  resolveDocumentEvidenceDecisions,
+  type ResolveDocumentEvidenceDecisionsDependencies,
+  type ResolveDocumentEvidenceDecisionsInput,
+} from './evidence/decision-service';
 
 export interface DocumentEvidencePhaseOverrides {
   enabled?: boolean;
@@ -69,6 +81,28 @@ export interface DocumentEvidencePhaseOverrides {
     dependencies: DocumentEvidencePreflightDependencies
   ) => Promise<DocumentEvidencePreflightResult>;
   preflightDependencies?: DocumentEvidencePreflightDependencies;
+  detectConflicts?: typeof detectDocumentConflicts;
+  conflictDependencies?: DetectDocumentConflictsDependencies;
+  resolveDecisions?: typeof resolveDocumentEvidenceDecisions;
+  decisionDependencies?: ResolveDocumentEvidenceDecisionsDependencies;
+  decisionMode?: 'manual' | 'automatic';
+  retryDirective?: DocumentEvidencePreflightInput['retryDirective'];
+  retryCoordinator?: Pick<
+    ReturnType<typeof createDocumentEvidenceRepository>,
+    | 'getDegradedRetryState'
+    | 'recordAutomaticRetry'
+    | 'getPendingRetryDirectives'
+    | 'consumeRetryDirectives'
+  >;
+}
+
+function stableUuidV8(value: string): string {
+  const chars = createHash('sha256').update(value).digest('hex').slice(0, 32).split('');
+  chars[12] = '8';
+  chars[16] = ((Number.parseInt(chars[16], 16) & 0x3) | 0x8).toString(16);
+  return `${chars.slice(0, 8).join('')}-${chars.slice(8, 12).join('')}-${chars
+    .slice(12, 16)
+    .join('')}-${chars.slice(16, 20).join('')}-${chars.slice(20).join('')}`;
 }
 
 function evidenceEnabled(overrides?: DocumentEvidencePhaseOverrides): boolean {
@@ -106,15 +140,25 @@ export async function runDocumentEvidencePhase(
     };
   });
 
+  const mode =
+    overrides?.mode ?? (process.env.DOCUMENT_EVIDENCE_MODE === 'active' ? 'active' : 'shadow');
+  const decisionMode =
+    overrides?.decisionMode ??
+    (mode === 'active' &&
+    !overrides?.preflightDependencies &&
+    (await getClarifyingConfig(context.courseId)).isAutomatic
+      ? 'automatic'
+      : 'manual');
+  const evidenceRepository = createDocumentEvidenceRepository(
+    context.supabase as unknown as DocumentEvidenceDatabaseClient
+  );
   const dependencies =
     overrides?.preflightDependencies ??
     (() => {
       const modelId = context.budgetAllocation?.modelSelection.modelId;
       if (!modelId) throw new Error('Configured Stage 4 model is required for document evidence');
       return {
-        repository: createDocumentEvidenceRepository(
-          context.supabase as unknown as DocumentEvidenceDatabaseClient
-        ),
+        repository: evidenceRepository,
         structuredPort: createProductionStructuredEvidencePort(modelId),
         extractor: createProductionEvidenceExtractor(modelId),
         verifyTargetedSources: verifyEvidenceSourcesWithQdrant,
@@ -122,11 +166,14 @@ export async function runDocumentEvidencePhase(
           fetchFullTextDocuments(documentIds, context.courseId),
       } satisfies DocumentEvidencePreflightDependencies;
     })();
-  const mode =
-    overrides?.mode ?? (process.env.DOCUMENT_EVIDENCE_MODE === 'active' ? 'active' : 'shadow');
+  const retryCoordinator = overrides?.retryCoordinator ?? evidenceRepository;
+  const pendingRetryDirectives = overrides?.retryDirective
+    ? [overrides.retryDirective]
+    : mode === 'active' && (!overrides?.preflightDependencies || overrides.retryCoordinator)
+      ? await retryCoordinator.getPendingRetryDirectives(context.courseId, 2)
+      : [];
   const runPreflight = overrides?.runPreflight ?? runDocumentEvidencePreflight;
-  const result = await runPreflight(
-    {
+  const preflightInput: DocumentEvidencePreflightInput = {
       courseId: context.courseId,
       organizationId: context.organizationId,
       topic: context.input.topic,
@@ -142,11 +189,121 @@ export async function runDocumentEvidencePhase(
       maxRetries: 2,
       maxVerificationDocumentIds: 100,
       requireBoundedDownstreamContext: mode === 'active' && context.legacyBudgetFits === false,
-    },
-    dependencies
-  );
+      ...(pendingRetryDirectives.length > 0 ? { retryDirectives: pendingRetryDirectives } : {}),
+  };
+  let result = await runPreflight(preflightInput, dependencies);
+  if (result.status === 'accepted' && result.runId && pendingRetryDirectives.length > 0) {
+    await retryCoordinator.consumeRetryDirectives({
+      courseId: context.courseId,
+      organizationId: context.organizationId,
+      targetRunId: result.runId,
+      decisionIds: pendingRetryDirectives.map(value => value.decisionId),
+    });
+  }
+  if (mode === 'active' && decisionMode === 'automatic') {
+    const maxAutomaticRetryRounds = sources.length * 2;
+    for (let round = 0; round < maxAutomaticRetryRounds; round += 1) {
+      if (result.status !== 'accepted' || !result.runId) break;
+      const directives: NonNullable<DocumentEvidencePreflightInput['retryDirectives']> = [];
+      for (const card of result.cards
+        .filter(card => card.coverage_status === 'degraded' || card.coverage_status === 'failed')
+        .sort((left, right) => left.document_id.localeCompare(right.document_id))) {
+        const state = await retryCoordinator.getDegradedRetryState({
+          runId: result.runId,
+          documentId: card.document_id,
+          configuredMaxAttempts: 2,
+        });
+        if (state.attempt >= state.maxAttempts) continue;
+        directives.push(
+          await retryCoordinator.recordAutomaticRetry({
+            runId: result.runId,
+            courseId: context.courseId,
+            organizationId: context.organizationId,
+            documentId: card.document_id,
+            configuredMaxAttempts: state.maxAttempts,
+            idempotencyKey: stableUuidV8(
+              `document-evidence-auto-retry-v1:${result.runId}:${card.document_id}:${state.attempt + 1}`
+            ),
+          })
+        );
+      }
+      if (directives.length === 0) break;
+      const durableDirectives = await retryCoordinator.getPendingRetryDirectives(
+        context.courseId,
+        2
+      );
+      if (
+        durableDirectives.length !== directives.length ||
+        durableDirectives.some(
+          (directive, index) => directive.decisionId !== directives[index]?.decisionId
+        )
+      ) {
+        throw new Error('Durable evidence retry set changed before preflight');
+      }
+      result = await runPreflight(
+        {
+          ...preflightInput,
+          retryDirective: undefined,
+          retryDirectives: durableDirectives,
+        },
+        dependencies
+      );
+      if (result.status !== 'accepted' || !result.runId) break;
+      await retryCoordinator.consumeRetryDirectives({
+        courseId: context.courseId,
+        organizationId: context.organizationId,
+        targetRunId: result.runId,
+        decisionIds: durableDirectives.map(value => value.decisionId),
+      });
+    }
+  }
   context.documentEvidencePreflight = result;
   context.documentEvidenceMode = mode;
+  if (mode === 'active' && result.status === 'accepted' && result.runId) {
+    const repository = evidenceRepository;
+    const modelId = context.budgetAllocation?.modelSelection.modelId;
+    const conflictDependencies =
+      overrides?.conflictDependencies ??
+      ({
+        repository,
+        port: createProductionConflictDetectionPort({ modelId, maxRetries: 2 }),
+        verifyMaterialSources: verifyEvidenceSourcesWithQdrant,
+        log: context.orchestrationLogger,
+      } satisfies DetectDocumentConflictsDependencies);
+    const conflictInput: DetectDocumentConflictsInput = {
+      runId: result.runId,
+      courseId: context.courseId,
+      organizationId: context.organizationId,
+      language: context.input.language === 'en' ? 'en' : 'ru',
+      detectionModel: modelId ?? 'custom-conflict-port',
+      detectionVersion: 'document-conflict-v1',
+      maxClaimsPerMapBatch: 128,
+      maxValueGroupsPerComparison: 16,
+      reductionFanIn: 8,
+      maxModelCalls: 256,
+      maxInputTokens: 32_000,
+      maxOutputTokens: 8_000,
+    };
+    await (overrides?.detectConflicts ?? detectDocumentConflicts)(
+      conflictInput,
+      conflictDependencies
+    );
+    const decisionInput: ResolveDocumentEvidenceDecisionsInput = {
+      runId: result.runId,
+      courseId: context.courseId,
+      organizationId: context.organizationId,
+      language: context.input.language === 'en' ? 'en' : 'ru',
+      mode: decisionMode,
+      maxUiExcerptChars: 600,
+      maxSourceRefsPerSide: 8,
+      maxDocumentsInMetadata: 16,
+      maxEvidenceRetryAttempts: 2,
+      automaticCapacityPolicy: 'continue_limited',
+    };
+    context.documentEvidenceDecisions = await (
+      overrides?.resolveDecisions ?? resolveDocumentEvidenceDecisions
+    )(decisionInput, overrides?.decisionDependencies ?? { repository, log: context.orchestrationLogger });
+  }
   context.orchestrationLogger.info(
     {
       evidenceMode: mode,
@@ -343,7 +500,8 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
 
   const clarifyingConfig = await getClarifyingConfig(courseId);
 
-  if (!clarifyingConfig.enabled || clarifyingConfig.skipped) {
+  const conflictPauseRequired = context.documentEvidenceDecisions?.pauseRequired === true;
+  if ((!clarifyingConfig.enabled || clarifyingConfig.skipped) && !conflictPauseRequired) {
     orchestrationLogger.info('Clarifying questions disabled or skipped');
     return;
   }
@@ -355,9 +513,16 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
 
   const pendingQuestions = await getPendingQuestions(courseId);
   const answeredQuestions = await getAnsweredQuestions(courseId);
-  const hasExistingQuestions = pendingQuestions.length > 0 || answeredQuestions.length > 0;
+  const ordinaryPendingQuestions = pendingQuestions.filter(
+    question => question.question_category !== 'document_conflicts'
+  );
+  const ordinaryAnsweredQuestions = answeredQuestions.filter(
+    question => question.question_category !== 'document_conflicts'
+  );
+  const hasExistingQuestions =
+    ordinaryPendingQuestions.length > 0 || ordinaryAnsweredQuestions.length > 0;
 
-  if (!hasExistingQuestions) {
+  if (clarifyingConfig.enabled && !clarifyingConfig.skipped && !hasExistingQuestions) {
     // Generate questions
     orchestrationLogger.info('Generating clarifying questions');
     await updateCourseProgress(

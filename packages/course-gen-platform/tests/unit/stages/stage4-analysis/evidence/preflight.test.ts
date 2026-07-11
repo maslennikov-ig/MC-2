@@ -202,6 +202,36 @@ const baseOptions = {
 };
 
 describe('runDocumentEvidencePreflight', () => {
+  it('creates a new immutable run fingerprint for a durable retry decision and reuses that retry', async () => {
+    const repository = new MemoryRepository();
+    const dependencies = {
+      repository,
+      generateCard: async (input: Parameters<typeof assessedCard>[0]) => assessedCard(input),
+    };
+    const baseline = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [source(1)] },
+      dependencies
+    );
+    const retryDirective = {
+      decisionId: '70000000-0000-4000-8000-000000000001',
+      documentId: documentId(1),
+      attempt: 1,
+      maxAttempts: 2,
+    };
+    const retry = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [source(1)], retryDirective },
+      dependencies
+    );
+    const replay = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [source(1)], retryDirective },
+      dependencies
+    );
+
+    expect(retry.runId).not.toBe(baseline.runId);
+    expect(retry.inputFingerprint).not.toBe(baseline.inputFingerprint);
+    expect(replay.runId).toBe(retry.runId);
+    expect(repository.runs.size).toBe(2);
+  });
   it('persists exact normalized source/card set equality and one durable outcome per source', async () => {
     const repository = new MemoryRepository();
     const result = await runDocumentEvidencePreflight(

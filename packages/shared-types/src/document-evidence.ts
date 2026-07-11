@@ -161,11 +161,120 @@ export const DocumentConflictSchema = z
   })
   .strict();
 
+export const DocumentDecisionSubjectSchema = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('claim_conflict'), conflict_id: z.string().uuid() })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('degraded_evidence'),
+      document_id: z.string().uuid(),
+      coverage_status: z.enum(['degraded', 'failed']),
+      coverage_reason: z.string().min(1).max(300),
+      attempt: z.number().int().nonnegative(),
+      max_attempts: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('detector_capacity'),
+      reason: z.literal('detector_capacity_degraded'),
+      call_plan_hash: z.string().min(1).max(160),
+      config_hash: z.string().min(1).max(160),
+    })
+    .strict(),
+]).superRefine((value, context) => {
+  if (value.kind === 'degraded_evidence' && value.attempt > value.max_attempts) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['attempt'],
+      message: 'degraded evidence attempt cannot exceed max_attempts',
+    });
+  }
+});
+
+const DocumentQuestionDisplayRefSchema = EvidenceSourceRefSchema.extend({
+  chunk_id: z.string().min(1).max(240).optional(),
+  heading_path: z.string().min(1).max(240).optional(),
+  version_hash: z.string().min(1).max(240).optional(),
+}).strict();
+
+const DocumentQuestionCommonSchema = z
+  .object({
+    schema_version: z.literal('document-conflict-question-v1'),
+    subject_key: z.string().min(1).max(160),
+    run_id: z.string().uuid(),
+  })
+  .strict();
+
+export const DocumentConflictQuestionMetadataSchema = DocumentQuestionCommonSchema.extend({
+  subject_kind: z.literal('claim_conflict'),
+  conflict_id: z.string().uuid(),
+  document_ids: z.array(z.string().uuid()).min(1).max(64),
+  documents: z
+    .array(
+      z
+        .object({
+          document_id: z.string().uuid(),
+          document_name: z.string().min(1).max(300),
+        })
+        .strict()
+    )
+    .min(1)
+    .max(64),
+  document_overflow_count: z.number().int().nonnegative(),
+  sides: z
+    .array(
+      z
+        .object({
+          excerpt: z.string().min(1).max(2_000),
+          source_refs: z.array(DocumentQuestionDisplayRefSchema).max(32),
+          source_ref_overflow_count: z.number().int().nonnegative(),
+        })
+        .strict()
+    )
+    .min(2)
+    .max(8),
+  provenance_handle: z.string().min(1).max(160),
+  course_impact: z.string().min(1).max(1_200),
+  recommendation: z.string().min(1).max(1_200),
+  recommendation_rationale: z.string().min(1).max(1_200),
+  alternatives: z.array(z.string().min(1).max(1_200)).min(1).max(16),
+}).strict();
+
+export const DegradedEvidenceQuestionMetadataSchema = DocumentQuestionCommonSchema.extend({
+  subject_kind: z.literal('degraded_evidence'),
+  document_id: z.string().uuid(),
+  document_name: z.string().min(1).max(300),
+  coverage_status: z.enum(['degraded', 'failed']),
+  coverage_reason: z.string().min(1).max(300),
+  attempt: z.number().int().nonnegative(),
+  max_attempts: z.number().int().positive(),
+  choices: z
+    .array(z.enum(['retry', 'continue_limited', 'remove_document']))
+    .min(2)
+    .max(3),
+}).strict();
+
+export const DetectorCapacityQuestionMetadataSchema = DocumentQuestionCommonSchema.extend({
+  subject_kind: z.literal('detector_capacity'),
+  reason: z.literal('detector_capacity_degraded'),
+  call_plan_hash: z.string().min(1).max(160),
+  config_hash: z.string().min(1).max(160),
+}).strict();
+
+export const DocumentEvidenceQuestionMetadataSchema = z.discriminatedUnion('subject_kind', [
+  DocumentConflictQuestionMetadataSchema,
+  DegradedEvidenceQuestionMetadataSchema,
+  DetectorCapacityQuestionMetadataSchema,
+]);
+
 export const DocumentDecisionSchema = z
   .object({
     decision_id: z.string().uuid(),
     run_id: z.string().uuid(),
-    conflict_id: z.string().uuid(),
+    conflict_id: z.string().uuid().optional(),
+    subject: DocumentDecisionSubjectSchema,
     selected_resolution: z.string().min(1),
     resolved_by: z.enum(['user', 'system']),
     answer_source: AnswerSourceSchema,
@@ -197,6 +306,23 @@ export const DocumentDecisionSchema = z
         code: z.ZodIssueCode.custom,
         path: ['resolved_by'],
         message: 'A superseding decision must use resolved_by=user',
+      });
+    }
+    if (
+      decision.subject.kind === 'claim_conflict' &&
+      decision.conflict_id !== decision.subject.conflict_id
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['conflict_id'],
+        message: 'claim conflict decision must match subject conflict_id',
+      });
+    }
+    if (decision.subject.kind !== 'claim_conflict' && decision.conflict_id) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['conflict_id'],
+        message: `${decision.subject.kind} decision cannot contain conflict_id`,
       });
     }
   });
@@ -301,6 +427,10 @@ export type DocumentEvidenceSourceManifest = z.infer<typeof DocumentEvidenceSour
 export type DocumentEvidenceCard = z.infer<typeof DocumentEvidenceCardSchema>;
 export type DocumentConflictSide = z.infer<typeof DocumentConflictSideSchema>;
 export type DocumentConflict = z.infer<typeof DocumentConflictSchema>;
+export type DocumentDecisionSubject = z.infer<typeof DocumentDecisionSubjectSchema>;
+export type DocumentEvidenceQuestionMetadata = z.infer<
+  typeof DocumentEvidenceQuestionMetadataSchema
+>;
 export type DocumentDecision = z.infer<typeof DocumentDecisionSchema>;
 export type DocumentEvidenceCoverageSummary = z.infer<typeof DocumentEvidenceCoverageSummarySchema>;
 export type DocumentEvidenceRunSummary = z.infer<typeof DocumentEvidenceRunSummarySchema>;

@@ -59,6 +59,19 @@ export interface DocumentEvidencePreflightInput extends EvidenceBudgetOptions {
   maxRetries: number;
   maxVerificationDocumentIds?: number;
   requireBoundedDownstreamContext?: boolean;
+  /** Immutable user retry decision that must produce a distinct, replayable run identity. */
+  retryDirective?: {
+    decisionId: string;
+    documentId: string;
+    attempt: number;
+    maxAttempts: number;
+  };
+  retryDirectives?: Array<{
+    decisionId: string;
+    documentId: string;
+    attempt: number;
+    maxAttempts: number;
+  }>;
 }
 
 interface RunRecord {
@@ -214,6 +227,10 @@ function inputFingerprint(
   sources: DocumentEvidencePreflightSource[],
   sourceManifest: DocumentEvidenceSourceManifestEntry[]
 ): string {
+  const retryDirectives = [
+    ...(input.retryDirectives ?? []),
+    ...(input.retryDirective ? [input.retryDirective] : []),
+  ].sort((left, right) => left.documentId.localeCompare(right.documentId));
   return sha256(
     JSON.stringify({
       topic: input.topic,
@@ -226,6 +243,12 @@ function inputFingerprint(
         authority_scope: source.authorityScope,
         content_quality: source.contentQuality,
         summary_artifact_version: source.stage3SummaryVersionHash ?? null,
+      })),
+      retry_directives: retryDirectives.map(directive => ({
+        decision_id: directive.decisionId,
+        document_id: directive.documentId,
+        attempt: directive.attempt,
+        max_attempts: directive.maxAttempts,
       })),
     })
   );
@@ -426,6 +449,27 @@ export async function runDocumentEvidencePreflight(
   }
   if (!Number.isInteger(input.maxRetries) || input.maxRetries < 0) {
     throw new Error('maxRetries must be a non-negative integer');
+  }
+  const retryDirectives = [
+    ...(input.retryDirectives ?? []),
+    ...(input.retryDirective ? [input.retryDirective] : []),
+  ];
+  if (
+    retryDirectives.length > sources.length ||
+    new Set(retryDirectives.map(value => value.documentId)).size !== retryDirectives.length ||
+    retryDirectives.some(
+      directive =>
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          directive.decisionId
+        ) ||
+        !sources.some(source => source.documentId === directive.documentId) ||
+        !Number.isSafeInteger(directive.attempt) ||
+        directive.attempt < 1 ||
+        !Number.isSafeInteger(directive.maxAttempts) ||
+        directive.attempt > directive.maxAttempts
+    )
+  ) {
+    throw new Error('Evidence retry directive is invalid or outside the exact source set');
   }
   if (!input.modelId && !dependencies.generateCard) {
     throw new Error('Configured Stage 4 model ID is required for production evidence preflight');

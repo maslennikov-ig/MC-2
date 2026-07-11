@@ -39,6 +39,7 @@ vi.mock('@/server/routers/clarifying-helpers', () => ({
   validateAnswerSource: vi.fn(),
   validateSuggestionIndexes: vi.fn(),
   persistAnswer: vi.fn(),
+  persistDocumentEvidenceAnswersAtomic: vi.fn(),
   checkCanProceed: vi.fn(),
   executeAtomicApproval: vi.fn(),
   verifyStatusTransition: vi.fn(),
@@ -226,6 +227,41 @@ describe('clarifyingRouter', () => {
       expect(helpers.persistAnswer).toHaveBeenCalled();
       expect(result).toEqual({ success: true, canProceed: true });
     });
+
+    it('routes a document-conflict answer through the atomic user decision RPC', async () => {
+      vi.mocked(helpers.verifyQuestionAccess).mockResolvedValueOnce({
+        question: {
+          id: mockQuestionId,
+          question_type: 'single_choice',
+          question_category: 'document_conflicts',
+          suggested_answers: [{ text: 'Continue', value: 'continue_limited' }],
+          metadata: { subject_key: 'sha256:subject', run_id: 'run' },
+        } as any,
+        course: { id: 'course-1' } as any,
+      });
+      vi.mocked(helpers.validateAnswerSource).mockReturnValue('suggested');
+      vi.mocked(helpers.checkCanProceed).mockResolvedValueOnce(true);
+      const caller = createCaller();
+      await caller.submitAnswer({
+        questionId: mockQuestionId,
+        answer: 'Continue',
+        answerSource: 'suggested',
+        selectedSuggestionIndex: 0,
+        expectedCurrentDecisionId: '70000000-0000-4000-8000-000000000001',
+      });
+      expect(helpers.persistDocumentEvidenceAnswersAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          courseId: 'course-1',
+          answers: [
+            expect.objectContaining({
+              questionId: mockQuestionId,
+              expectedCurrentDecisionId: '70000000-0000-4000-8000-000000000001',
+            }),
+          ],
+        })
+      );
+      expect(helpers.persistAnswer).not.toHaveBeenCalled();
+    });
   });
 
   describe('submitMultipleAnswers', () => {
@@ -315,6 +351,92 @@ describe('clarifyingRouter', () => {
       await expect(
         caller.submitMultipleAnswers({ submissions: invalidSubmissions })
       ).rejects.toThrow();
+    });
+
+    it('rejects a mixed ordinary/document-conflict batch before any partial write', async () => {
+      const submissions = [
+        {
+          questionId: '123e4567-e89b-12d3-a456-426614174001',
+          answer: 'A1',
+          answerSource: 'custom' as const,
+        },
+        {
+          questionId: '123e4567-e89b-12d3-a456-426614174002',
+          answer: 'A2',
+          answerSource: 'custom' as const,
+        },
+      ];
+      mockSupabase.in.mockResolvedValueOnce({
+        data: [
+          {
+            id: submissions[0].questionId,
+            course_id: 'c1',
+            status: 'pending',
+            question_category: 'document_conflicts',
+            suggested_answers: [],
+          },
+          {
+            id: submissions[1].questionId,
+            course_id: 'c1',
+            status: 'pending',
+            question_category: 'audience',
+            suggested_answers: [],
+          },
+        ],
+        error: null,
+      });
+      const caller = createCaller();
+      await expect(caller.submitMultipleAnswers({ submissions })).rejects.toThrow(/mixed/i);
+      expect(mockSupabase.update).not.toHaveBeenCalled();
+      expect(helpers.persistDocumentEvidenceAnswersAtomic).not.toHaveBeenCalled();
+    });
+
+    it('routes an all-conflict batch through one atomic user decision RPC', async () => {
+      const submissions = [
+        {
+          questionId: '123e4567-e89b-12d3-a456-426614174001',
+          answer: 'A1',
+          answerSource: 'custom' as const,
+          expectedCurrentDecisionId: '70000000-0000-4000-8000-000000000001',
+        },
+        {
+          questionId: '123e4567-e89b-12d3-a456-426614174002',
+          answer: 'A2',
+          answerSource: 'custom' as const,
+        },
+      ];
+      mockSupabase.in.mockResolvedValueOnce({
+        data: submissions.map(submission => ({
+          id: submission.questionId,
+          course_id: 'c1',
+          status: 'pending',
+          question_category: 'document_conflicts',
+          suggested_answers: [],
+          metadata: {
+            run_id: '10000000-0000-4000-8000-000000000001',
+            subject_key: `sha256:${submission.questionId}`,
+          },
+        })),
+        error: null,
+      });
+      vi.mocked(helpers.persistDocumentEvidenceAnswersAtomic).mockResolvedValueOnce({
+        answeredQuestionIds: submissions.map(value => value.questionId),
+      });
+      vi.mocked(helpers.checkCanProceed).mockResolvedValueOnce(true);
+      const caller = createCaller();
+      const result = await caller.submitMultipleAnswers({ submissions });
+      expect(helpers.persistDocumentEvidenceAnswersAtomic).toHaveBeenCalledTimes(1);
+      expect(helpers.persistDocumentEvidenceAnswersAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answers: expect.arrayContaining([
+            expect.objectContaining({
+              expectedCurrentDecisionId: '70000000-0000-4000-8000-000000000001',
+            }),
+          ]),
+        })
+      );
+      expect(mockSupabase.update).not.toHaveBeenCalled();
+      expect(result.successCount).toBe(2);
     });
   });
 

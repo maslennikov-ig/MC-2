@@ -63,6 +63,12 @@ export interface AnalysisContext {
   phase4Output?: Phase4Output;
   documentEvidencePreflight?: DocumentEvidencePreflightResult;
   documentEvidenceMode?: 'shadow' | 'active';
+  documentEvidenceDecisions?: {
+    pauseRequired: boolean;
+    requiredQuestionIds: string[];
+    currentDecisionIds: string[];
+    unresolvedInformationalConflictIds: string[];
+  };
   /** False only when the enabled evidence preflight owns legacy context overflow. */
   legacyBudgetFits?: boolean;
   clarifyingAnswers: Array<{
@@ -75,7 +81,8 @@ export interface AnalysisContext {
 
 export function attachDocumentEvidenceSnapshot(
   analysisResult: AnalysisResult,
-  preflight: DocumentEvidencePreflightResult | undefined
+  preflight: DocumentEvidencePreflightResult | undefined,
+  decisions?: AnalysisContext['documentEvidenceDecisions']
 ): AnalysisResult {
   if (preflight?.status !== 'accepted' || !preflight.runId) return analysisResult;
   return {
@@ -83,8 +90,9 @@ export function attachDocumentEvidenceSnapshot(
     document_evidence: {
       accepted_run_id: preflight.runId,
       coverage: preflight.coverage,
-      current_decision_ids: [],
-      unresolved_informational_conflict_ids: [],
+      current_decision_ids: decisions?.currentDecisionIds ?? [],
+      unresolved_informational_conflict_ids:
+        decisions?.unresolvedInformationalConflictIds ?? [],
       enrichment_status: 'not_applicable',
     },
   };
@@ -358,7 +366,8 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
   });
   analysisResult = attachDocumentEvidenceSnapshot(
     analysisResult,
-    context.documentEvidencePreflight
+    context.documentEvidencePreflight,
+    context.documentEvidenceDecisions
   );
 
   await completePhase(5, courseId, supabase, orchestrationLogger, {

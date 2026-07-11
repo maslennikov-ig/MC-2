@@ -515,18 +515,21 @@ describe('DocumentEvidenceRepository', () => {
       {
         id: ids.decisionC,
         conflict_id: ids.conflict,
+        subject_key: ids.conflict,
         supersedes_decision_id: ids.decisionB,
         decided_at: '2026-07-11T12:00:00.000Z',
       },
       {
         id: ids.decisionB,
         conflict_id: ids.conflict,
+        subject_key: ids.conflict,
         supersedes_decision_id: ids.decisionA,
         decided_at: '2026-07-11T11:00:00.000Z',
       },
       {
         id: ids.decisionA,
         conflict_id: ids.conflict,
+        subject_key: ids.conflict,
         supersedes_decision_id: null,
         decided_at: '2026-07-11T10:00:00.000Z',
       },
@@ -539,5 +542,224 @@ describe('DocumentEvidenceRepository', () => {
     const latest = await repository.getLatestDecisions(ids.run);
 
     expect(latest).toEqual([decisions[0]]);
+  });
+
+  it('loads only an accepted run and durable conflicts/checkpoints for E3', async () => {
+    const conflictRow = {
+      id: ids.conflict,
+      conflict_fingerprint: conflict.conflict_fingerprint,
+      topic: conflict.topic,
+      severity: conflict.severity,
+      sides: conflict.sides,
+      course_impact: conflict.course_impact,
+      recommended_resolution: conflict.recommended_resolution,
+      recommendation_rationale: conflict.recommendation_rationale,
+      alternatives: conflict.alternatives,
+    };
+    const checkpoint = {
+      batch_key: 'map:000001',
+      input_hash: 'sha256:input',
+      structured_checkpoint: { kind: 'conflict_map' },
+    };
+    const { client } = createScriptedClient({
+      document_evidence_runs: [{ data: { id: ids.run, status: 'accepted' }, error: null }],
+      document_evidence_conflicts: [{ data: [conflictRow], error: null }],
+      document_evidence_conflict_checkpoints: [{ data: [checkpoint], error: null }],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+    await expect(repository.getAcceptedRun(ids.run, ids.course, ids.organization)).resolves.toEqual({
+      id: ids.run,
+      status: 'accepted',
+    });
+    await expect(repository.listConflicts(ids.run)).resolves.toEqual([conflict]);
+    await expect(repository.listConflictCheckpoints(ids.run)).resolves.toEqual([checkpoint]);
+  });
+
+  it('commits a conflict checkpoint and conflicts through the single atomic RPC', async () => {
+    const result = { checkpoint: { batch_key: 'classify:1' }, reused: false };
+    const { client, rpc } = createScriptedClient({ rpc: [{ data: result, error: null }] });
+    const repository = createDocumentEvidenceRepository(client as never);
+    await expect(
+      repository.commitConflictBatch({
+        runId: ids.run,
+        courseId: ids.course,
+        organizationId: ids.organization,
+        batchKey: 'classify:1',
+        inputHash: 'sha256:classify',
+        structuredCheckpoint: { kind: 'conflict_classification' },
+        conflicts: [conflict],
+        detectionModel: 'test-model',
+        detectionVersion: 'v1',
+        verificationStatus: 'degraded',
+        conflictVerification: [
+          { conflictFingerprint: conflict.conflict_fingerprint, status: 'degraded' },
+        ],
+      })
+    ).resolves.toEqual(result);
+    expect(rpc).toHaveBeenCalledWith('commit_document_evidence_conflict_batch', {
+      p_run_id: ids.run,
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_batch_key: 'classify:1',
+      p_input_hash: 'sha256:classify',
+      p_structured_checkpoint: { kind: 'conflict_classification' },
+      p_conflicts: [conflict],
+      p_detection_model: 'test-model',
+      p_detection_version: 'v1',
+      p_verification_status: 'degraded',
+      p_conflict_verification: [
+        { conflictFingerprint: conflict.conflict_fingerprint, status: 'degraded' },
+      ],
+    });
+  });
+
+  it('materializes the whole manual/automatic gate through one service RPC', async () => {
+    const response = { question_ids: ['question'], decision_ids: [ids.decisionA], reused: false };
+    const { client, rpc } = createScriptedClient({ rpc: [{ data: response, error: null }] });
+    const repository = createDocumentEvidenceRepository(client as never);
+    const questions = [{ questionId: 'question' }] as never[];
+    await expect(
+      repository.materializeDecisionGateAtomic({
+        runId: ids.run,
+        courseId: ids.course,
+        organizationId: ids.organization,
+        mode: 'automatic',
+        questions,
+        gateIdempotencyKey: ids.decisionC,
+      })
+    ).resolves.toEqual(response);
+    expect(rpc).toHaveBeenCalledWith('materialize_document_evidence_decision_gate_atomic', {
+      p_run_id: ids.run,
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_mode: 'automatic',
+      p_questions: questions,
+      p_idempotency_key: ids.decisionC,
+    });
+  });
+
+  it('answers manual conflict questions through a forced-user atomic RPC with no origin fields', async () => {
+    const response = {
+      answered_question_ids: ['80000000-0000-4000-8000-000000000001'],
+      decision_ids: [ids.decisionB],
+      reused: false,
+    };
+    const { client, rpc } = createScriptedClient({ rpc: [{ data: response, error: null }] });
+    const repository = createDocumentEvidenceRepository(client as never);
+    const answers = [
+      {
+        questionId: '80000000-0000-4000-8000-000000000001',
+        answer: 'Continue',
+        answerSource: 'suggested' as const,
+        selectedSuggestionIndex: 0,
+        expectedCurrentDecisionId: ids.decisionA,
+        idempotencyKey: ids.decisionC,
+      },
+    ];
+    await expect(
+      repository.answerDocumentConflictAtomic({
+        courseId: ids.course,
+        actorUserId: '50000000-0000-4000-8000-000000000099',
+        answers,
+      })
+    ).resolves.toEqual(response);
+    expect(rpc).toHaveBeenCalledWith('answer_document_evidence_questions_atomic', {
+      p_course_id: ids.course,
+      p_actor_user_id: '50000000-0000-4000-8000-000000000099',
+      p_answers: [
+        {
+          question_id: answers[0].questionId,
+          answer: 'Continue',
+          answer_source: 'suggested',
+          selected_suggestion_index: 0,
+          expected_current_decision_id: ids.decisionA,
+          idempotency_key: ids.decisionC,
+        },
+      ],
+    });
+    expect(JSON.stringify(rpc.mock.calls)).not.toMatch(/resolved_by|system/iu);
+  });
+
+  it('restores detector-capacity issues and bounded retry state without source bodies', async () => {
+    const issue = {
+      kind: 'detector_capacity',
+      reason: 'detector_capacity_degraded',
+      call_plan_hash: 'sha256:plan',
+      config_hash: 'sha256:config',
+      claim_count: 1000,
+      cluster_count: 1000,
+    };
+    const { client, rpc } = createScriptedClient({
+      document_evidence_conflict_checkpoints: [
+        {
+          data: [
+            {
+              structured_checkpoint: { kind: 'conflict_capacity_degraded', issue },
+            },
+          ],
+          error: null,
+        },
+      ],
+      rpc: [{ data: { attempt: 1, max_attempts: 2 }, error: null }],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+    await expect(repository.listDetectorCapacityIssues(ids.run)).resolves.toEqual([issue]);
+    await expect(
+      repository.getDegradedRetryState({
+        runId: ids.run,
+        documentId: ids.documentA,
+        configuredMaxAttempts: 2,
+      })
+    ).resolves.toEqual({ attempt: 1, maxAttempts: 2 });
+    expect(rpc).toHaveBeenCalledWith('get_document_evidence_retry_state', {
+      p_run_id: ids.run,
+      p_document_id: ids.documentA,
+      p_configured_max_attempts: 2,
+    });
+  });
+
+  it('loads the exact durable retry set and links it to the accepted target run', async () => {
+    const directive = {
+      decision_id: ids.decisionA,
+      document_id: ids.documentA,
+      attempt: 1,
+      max_attempts: 2,
+    };
+    const { client, rpc } = createScriptedClient({
+      rpc: [
+        { data: [directive], error: null },
+        {
+          data: { target_run_id: ids.run, decision_ids: [ids.decisionA], reused: false },
+          error: null,
+        },
+      ],
+    });
+    const repository = createDocumentEvidenceRepository(client as never);
+    await expect(repository.getPendingRetryDirectives(ids.course, 2)).resolves.toEqual([
+      {
+        decisionId: ids.decisionA,
+        documentId: ids.documentA,
+        attempt: 1,
+        maxAttempts: 2,
+      },
+    ]);
+    await expect(
+      repository.consumeRetryDirectives({
+        courseId: ids.course,
+        organizationId: ids.organization,
+        targetRunId: ids.run,
+        decisionIds: [ids.decisionA],
+      })
+    ).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith('get_document_evidence_retry_directives', {
+      p_course_id: ids.course,
+      p_configured_max_attempts: 2,
+    });
+    expect(rpc).toHaveBeenCalledWith('consume_document_evidence_retry_directives', {
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_target_run_id: ids.run,
+      p_decision_ids: [ids.decisionA],
+    });
   });
 });
