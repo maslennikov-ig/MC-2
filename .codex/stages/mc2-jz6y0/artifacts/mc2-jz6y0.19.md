@@ -57,11 +57,11 @@ depends_on_streams:
   - mc2-jz6y0.18
   - mc2-jz6y0.8
 parallel_decision: isolated worker stream after E1 and Q7 integration; implementation was sequential because allocator, persistence, live wiring, and resume semantics share one checkpoint contract
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Disposable PostgreSQL is removed after final worker verification; dedicated worktree and branch remain for independent review and integration.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Integrated as merge 231ac463; disposable PostgreSQL, dedicated worktree, and local worker branch were removed after the integration rerun. The pushed remote evidence branch remains as audit evidence.
 risk_level: high
 docs_impact: behavior-and-migration
 docs_reviewed: no-change-needed
