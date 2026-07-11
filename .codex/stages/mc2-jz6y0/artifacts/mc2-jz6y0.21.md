@@ -58,7 +58,7 @@ status: accepted
 delivery_method: n/a
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: Integrated through final reviewed commit c27b9eb; the dedicated worktree and local worker branch were removed. The pushed remote evidence branch and hosted Lazyweb report remain as audit evidence.
+cleanup_notes: Integrated linearly through rebased final reviewed equivalent 2538bb5c; the dedicated worktree and local worker branch were removed. The pushed remote evidence branch and hosted Lazyweb report remain as audit evidence.
 risk_level: medium
 docs_impact: behavior
 docs_reviewed: no-change-needed
