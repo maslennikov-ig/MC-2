@@ -21,8 +21,8 @@ export interface QdrantNamedVector {
  * Point structure for Qdrant upload with named vectors
  */
 export interface QdrantUploadPoint {
-  /** Unique point ID (chunk_id hash) */
-  id: string | number;
+  /** Unique deterministic document-scoped UUID */
+  id: string;
   /** Named vectors for hybrid search */
   vector: QdrantNamedVector;
   /** Chunk metadata payload */
@@ -73,7 +73,7 @@ export interface VectorStatusUpdate {
  * Qdrant upload point with named vectors
  */
 export interface QdrantUpsertPoint {
-  id: string | number;
+  id: string;
   vector: QdrantNamedVector;
   payload: Record<string, unknown>;
 }

@@ -22,7 +22,7 @@ import {
   uploadChunksToQdrant,
   type UploadResult,
 } from '../../src/shared/qdrant/upload';
-import { compactPayload, generateNumericId } from '../../src/shared/qdrant/upload-helpers';
+import { compactPayload, generatePointId } from '../../src/shared/qdrant/upload-helpers';
 
 const TEST_ORG_1 = '81000000-0000-4000-8000-000000000001';
 const TEST_ORG_2 = '81000000-0000-4000-8000-000000000002';
@@ -244,7 +244,7 @@ qdrantDescribe('Qdrant Vector Database Integration Tests', () => {
 
     const source = EMBEDDINGS[0].chunk;
     const points = await client.retrieve(aliasName, {
-      ids: [generateNumericId(source.chunk_id)],
+      ids: [generatePointId(source.document_id, source.chunk_id)],
       with_payload: true,
       with_vector: true,
     });

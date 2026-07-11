@@ -7,6 +7,7 @@ import {
 import {
   ensureCourseEmbeddingsCollection,
   verifyCourseEmbeddingsCollection,
+  verifyPhysicalCourseEmbeddingsCollection,
 } from '../../../../src/shared/qdrant/collection-manager';
 
 const { mockLogger } = vi.hoisted(() => ({
@@ -379,6 +380,48 @@ describe('Qdrant collection manager', () => {
       expect.stringContaining(`physical collection ${PHYSICAL_NAME} is missing`),
       expect.stringContaining(`alias ${ALIAS_NAME} is missing`),
     ]);
+    expect(mutations).toEqual([]);
+  });
+
+  it('verifies an exact physical target before alias cutover without reading alias state', async () => {
+    const nextPhysicalName = 'course_embeddings_v2';
+    const { client, calls, mutations } = createClient({
+      collections: [PHYSICAL_NAME, nextPhysicalName],
+      aliases: [{ alias_name: ALIAS_NAME, collection_name: PHYSICAL_NAME }],
+    });
+
+    const result = await verifyPhysicalCourseEmbeddingsCollection({
+      client,
+      physicalName: nextPhysicalName,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      physicalName: nextPhysicalName,
+      mismatches: [],
+    });
+    expect(calls).toEqual([
+      'versionInfo:1.18.2',
+      'getCollections',
+      `getCollection:${nextPhysicalName}`,
+    ]);
+    expect(mutations).toEqual([]);
+  });
+
+  it('reports exact physical target schema drift without mutation', async () => {
+    const nextPhysicalName = 'course_embeddings_v2';
+    const { client, mutations } = createClient({
+      collections: [nextPhysicalName],
+      collectionInfo: collectionInfo({ missingIndex: 'document_id' }),
+    });
+
+    const result = await verifyPhysicalCourseEmbeddingsCollection({
+      client,
+      physicalName: nextPhysicalName,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.mismatches).toEqual([expect.stringContaining('payload_schema.document_id')]);
     expect(mutations).toEqual([]);
   });
 });

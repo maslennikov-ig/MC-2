@@ -1,0 +1,109 @@
+{
+  "runId": "50000000-0000-4000-8000-000000000005",
+  "now": "2026-07-10T12:00:00.000Z",
+  "sources": [
+    {
+      "id": "60000000-0000-4000-8000-000000000006",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/russian-source.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "vectorStatus": "indexed",
+      "chunkCount": 4,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": true
+    },
+    {
+      "id": "70000000-0000-4000-8000-000000000007",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "21000000-0000-4000-8000-000000000012",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/english-source.md",
+      "mimeType": "text/markdown",
+      "priority": "IMPORTANT",
+      "vectorStatus": "indexed",
+      "chunkCount": 3,
+      "locale": "en",
+      "alreadyEnqueued": false,
+      "sourceAvailable": true
+    },
+    {
+      "id": "80000000-0000-4000-8000-000000000008",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/missing-source.pdf",
+      "mimeType": "application/pdf",
+      "priority": "SUPPLEMENTARY",
+      "vectorStatus": "indexed",
+      "chunkCount": 2,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": false
+    },
+    {
+      "id": "90000000-0000-4000-8000-000000000009",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/unsupported.zip",
+      "mimeType": "application/zip",
+      "priority": null,
+      "vectorStatus": "pending",
+      "chunkCount": null,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": true
+    },
+    {
+      "id": "a0000000-0000-4000-8000-00000000000a",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/already-enqueued.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "vectorStatus": "indexing",
+      "chunkCount": 5,
+      "locale": "ru",
+      "alreadyEnqueued": true,
+      "sourceAvailable": true
+    }
+  ],
+  "schemaVerification": {
+    "ok": true,
+    "mismatches": []
+  },
+  "indexedDocuments": [
+    {
+      "documentId": "60000000-0000-4000-8000-000000000006",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "pointCount": 4
+    },
+    {
+      "documentId": "70000000-0000-4000-8000-000000000007",
+      "courseId": "21000000-0000-4000-8000-000000000012",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "pointCount": 3
+    },
+    {
+      "documentId": "a0000000-0000-4000-8000-00000000000a",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "pointCount": 5
+    }
+  ],
+  "relevanceChecks": [
+    { "language": "ru", "passed": true, "nativeHybrid": true },
+    { "language": "en", "passed": true, "nativeHybrid": true }
+  ]
+}

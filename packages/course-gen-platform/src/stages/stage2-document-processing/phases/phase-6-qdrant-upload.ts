@@ -119,6 +119,9 @@ export async function executeQdrantUpload(
       const uploadResult = await withTimeout(
         uploadChunksToQdrant(embeddings, {
           batch_size: 100,
+          ...(job.data.qdrantTargetCollection
+            ? { collection_name: job.data.qdrantTargetCollection }
+            : {}),
           wait: true,
           enable_sparse: true, // Enable BM25 sparse vectors for hybrid search
         }),

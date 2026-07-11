@@ -17,6 +17,17 @@ export interface SchemaVerificationResult {
   mismatches: string[];
 }
 
+export interface VerifyPhysicalCollectionOptions {
+  client?: QdrantClient;
+  physicalName?: string;
+}
+
+export interface PhysicalSchemaVerificationResult {
+  ok: boolean;
+  physicalName: string;
+  mismatches: string[];
+}
+
 interface ResolvedOptions {
   client: QdrantClient;
   aliasName: string;
@@ -307,6 +318,37 @@ export async function verifyCourseEmbeddingsCollection(
   }
 
   return result(aliasName, physicalName, mismatches);
+}
+
+/**
+ * Verify an exact physical collection before an alias cutover.
+ *
+ * Unlike verifyCourseEmbeddingsCollection(), this read-only check deliberately
+ * does not inspect alias state. Version compatibility and the complete physical
+ * schema contract remain mandatory.
+ */
+export async function verifyPhysicalCourseEmbeddingsCollection(
+  options: VerifyPhysicalCollectionOptions = {}
+): Promise<PhysicalSchemaVerificationResult> {
+  const client = options.client ?? qdrantClient;
+  const physicalName = resolveName(
+    options.physicalName,
+    QDRANT_PHYSICAL_COLLECTION,
+    'physicalName'
+  );
+
+  await assertPinnedQdrantCompatibility(client);
+  const collections = (await client.getCollections()).collections;
+  const collectionNames = new Set(collections.map(collection => collection.name));
+  const mismatches = collectionNames.has(physicalName)
+    ? schemaMismatches(await client.getCollection(physicalName))
+    : [`physical collection ${physicalName} is missing`];
+
+  return {
+    ok: mismatches.length === 0,
+    physicalName,
+    mismatches,
+  };
 }
 
 async function deleteLegacyCollection(client: QdrantClient, collectionName: string): Promise<void> {

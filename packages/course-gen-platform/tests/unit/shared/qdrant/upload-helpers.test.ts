@@ -117,6 +117,27 @@ describe('Qdrant upload conversion', () => {
     expect(secondPoint.vector.sparse).toEqual(createBm25Document(secondChunk.content));
   });
 
+  it('uses deterministic document-scoped UUID point IDs for identical chunk IDs', () => {
+    const firstPoint = toQdrantPoint(
+      createEmbedding(createChunk({ document_id: 'document-1', chunk_id: 'child_0_123' })),
+      true
+    );
+    const repeatedPoint = toQdrantPoint(
+      createEmbedding(createChunk({ document_id: 'document-1', chunk_id: 'child_0_123' })),
+      true
+    );
+    const secondDocumentPoint = toQdrantPoint(
+      createEmbedding(createChunk({ document_id: 'document-2', chunk_id: 'child_0_123' })),
+      true
+    );
+
+    expect(firstPoint.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(repeatedPoint.id).toBe(firstPoint.id);
+    expect(secondDocumentPoint.id).not.toBe(firstPoint.id);
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 0.49, 1.01, '1'])(
     'rejects invalid document_weight %s before storage',
     invalidWeight => {
