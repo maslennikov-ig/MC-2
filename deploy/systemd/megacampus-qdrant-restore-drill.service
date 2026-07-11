@@ -1,0 +1,41 @@
+[Unit]
+Description=MegaCampus Qdrant isolated authenticated restore drill
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=megacampus
+Group=megacampus
+WorkingDirectory=/opt/megacampus/packages/course-gen-platform
+UMask=0077
+LoadCredential=qdrant_api_key:/opt/megacampus/secrets/qdrant_api_key
+LoadCredential=snapshot_manifest:/var/lib/megacampus-qdrant-recovery/manifests/latest-manifest.json
+LoadCredential=recovery_probe:/opt/megacampus/recovery/probe.json
+Environment=QDRANT_URL=http://127.0.0.1:6335
+Environment=QDRANT_SNAPSHOT_TRANSPORT_URL=http://127.0.0.1:6333
+Environment=QDRANT_API_KEY_FILE=%d/qdrant_api_key
+Environment=QDRANT_SNAPSHOT_MANIFEST_FILE=%d/snapshot_manifest
+Environment=QDRANT_RECOVERY_PROBE_FILE=%d/recovery_probe
+Environment=QDRANT_COLLECTION_NAME=course_embeddings
+Environment=QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
+Environment=QDRANT_RECOVERY_LOCK_PATH=/run/megacampus-qdrant-recovery/recovery.lock
+Environment=QDRANT_RECOVERY_LOCK_HELD=1
+ExecStart=/usr/bin/flock --nonblock /run/megacampus-qdrant-recovery/recovery.lock /usr/bin/pnpm --dir /opt/megacampus/packages/course-gen-platform qdrant:restore-drill
+TimeoutStartSec=55m
+StateDirectory=megacampus-qdrant-recovery
+StateDirectoryMode=0700
+RuntimeDirectory=megacampus-qdrant-recovery
+RuntimeDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/megacampus-qdrant-recovery /run/megacampus-qdrant-recovery
