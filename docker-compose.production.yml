@@ -250,6 +250,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-api
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     ports:
       - '127.0.0.1:4000:4000'
     env_file:
@@ -259,6 +262,9 @@ services:
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_METRICS_SERVICE=api
+      - QDRANT_METRICS_INSTANCE=api
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge:8000
       - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
@@ -270,6 +276,7 @@ services:
       - ENRICHMENTS_PUBLIC_BASE_URL=${NEXT_PUBLIC_SITE_URL:-https://ai.megacampus.ru}
     volumes:
       - ./data/uploads:/app/uploads
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
     healthcheck:
       test:
         [
@@ -309,6 +316,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     # Worker doesn't expose HTTP - disable healthcheck inherited from api image
     healthcheck:
@@ -319,6 +329,9 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_METRICS_SERVICE=worker
+      - QDRANT_METRICS_INSTANCE=worker
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
@@ -328,6 +341,7 @@ services:
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
       - ./data/uploads:/app/uploads
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       # Shared JSON cache from docling-mcp
       - docling-json-cache:/app/docling-cache
       # LKG config persistence
@@ -361,6 +375,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker-stage6
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     healthcheck:
       disable: true
@@ -370,6 +387,9 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_METRICS_SERVICE=stage6
+      - QDRANT_METRICS_INSTANCE=stage6
       # Enable dedicated Stage 6 worker mode (30 concurrent)
       - STAGE6_WORKER=true
       # Path to shared docling JSON cache
@@ -380,6 +400,7 @@ services:
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
       - ./data/uploads:/app/uploads
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       - docling-json-cache:/app/docling-cache
       - worker-data:/app/data
     networks:

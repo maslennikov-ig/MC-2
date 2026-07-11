@@ -82,6 +82,148 @@ services:
         max-size: '50m'
         max-file: '3'
 
+  # Authenticated Qdrant and textfile metrics collection.
+  prometheus:
+    image: prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
+    platform: linux/amd64
+    container_name: megacampus-prometheus
+    restart: unless-stopped
+    user: '65534:65534'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - '127.0.0.1:9090:9090'
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=5GB
+    volumes:
+      - ./ops/qdrant/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/qdrant/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    secrets:
+      - source: prometheus_qdrant_read_only_api_key
+        target: qdrant_read_only_api_key
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      node_exporter:
+        condition: service_started
+      alertmanager:
+        condition: service_started
+    networks:
+      - megacampus
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '20m'
+        max-file: '3'
+
+  # Machine-scoped batch/application metrics only; no host collectors or host namespaces.
+  node_exporter:
+    image: prom/node-exporter:v1.12.0@sha256:9b0ade5e607f9dbedb0a8e11151b6011ae5bd79304c261804cfdd2cadf200a80
+    platform: linux/amd64
+    container_name: megacampus-qdrant-textfile-exporter
+    restart: unless-stopped
+    user: '65534:65534'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command:
+      - --collector.disable-defaults
+      - --collector.textfile
+      - --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+      - --web.listen-address=:9100
+    volumes:
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/node_exporter/textfile_collector:ro
+    networks:
+      - megacampus
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  alertmanager:
+    image: prom/alertmanager:v0.33.1@sha256:9e082985f56f4c8c9f724e18f2288c6708f472e56a5286b8863d080434ea065d
+    platform: linux/amd64
+    container_name: megacampus-alertmanager
+    restart: unless-stopped
+    user: '65534:65534'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - '127.0.0.1:9093:9093'
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=
+    volumes:
+      - ./ops/qdrant/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    secrets:
+      - alertmanager_telegram_bot_token
+      - alertmanager_telegram_chat_id
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - megacampus
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '20m'
+        max-file: '3'
+
+  grafana:
+    image: grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd
+    platform: linux/amd64
+    container_name: megacampus-grafana
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - '127.0.0.1:3005:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_PUBLIC_DASHBOARDS_ENABLED=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./ops/qdrant/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/qdrant/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    secrets:
+      - grafana_admin_password
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    depends_on:
+      prometheus:
+        condition: service_started
+    networks:
+      - megacampus
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '20m'
+        max-file: '3'
+
   # Docling MCP Server for document processing (internal - behind nginx proxy)
   # NOTE: Image built manually on server (too large for GitHub Actions)
   docling-mcp-internal:
@@ -201,6 +343,9 @@ services:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker
     restart: unless-stopped
+    user: '1001:1001'
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     # Worker doesn't expose HTTP - disable healthcheck inherited from api image
     healthcheck:
@@ -211,6 +356,9 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_METRICS_SERVICE=worker
+      - QDRANT_METRICS_INSTANCE=worker
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
@@ -218,6 +366,7 @@ services:
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
     volumes:
       - ./data/uploads:/app/uploads
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       # Shared JSON cache from docling-mcp
       - docling-json-cache:/app/docling-cache
       # LKG config persistence
@@ -290,6 +439,12 @@ networks:
 volumes:
   qdrant-data:
     name: megacampus_qdrant
+  prometheus-data:
+    name: megacampus_prometheus
+  grafana-data:
+    name: megacampus_grafana
+  alertmanager-data:
+    name: megacampus_alertmanager
   redis-data:
     driver: local
   docling-models:
@@ -312,3 +467,11 @@ secrets:
     file: ${QDRANT_S3_ACCESS_KEY_FILE:-./secrets/qdrant_s3_access_key}
   qdrant_s3_secret_key:
     file: ${QDRANT_S3_SECRET_KEY_FILE:-./secrets/qdrant_s3_secret_key}
+  prometheus_qdrant_read_only_api_key:
+    file: ${PROMETHEUS_QDRANT_READ_ONLY_API_KEY_FILE:-./secrets/prometheus_qdrant_read_only_api_key}
+  grafana_admin_password:
+    file: ${GRAFANA_ADMIN_PASSWORD_FILE:-./secrets/grafana_admin_password}
+  alertmanager_telegram_bot_token:
+    file: ${ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE:-./secrets/alertmanager_telegram_bot_token}
+  alertmanager_telegram_chat_id:
+    file: ${ALERTMANAGER_TELEGRAM_CHAT_ID_FILE:-./secrets/alertmanager_telegram_chat_id}

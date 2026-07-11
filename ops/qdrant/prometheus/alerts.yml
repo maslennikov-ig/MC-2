@@ -1,0 +1,101 @@
+groups:
+  - name: qdrant-recording
+    interval: 30s
+    rules:
+      - record: megacampus:qdrant_rest_error_ratio:10m
+        expr: |
+          sum(rate(qdrant_rest_responses_total{status=~"4..|5.."}[10m]))
+          /
+          clamp_min(sum(rate(qdrant_rest_responses_total[10m])), 1e-12)
+      - record: megacampus:qdrant_rest_latency_p95_seconds:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, collection) (
+              rate(qdrant_rest_responses_duration_seconds_bucket[5m])
+            )
+          )
+
+  - name: qdrant-alerts
+    rules:
+      - alert: QdrantDown
+        expr: (up{job="qdrant"} == 0) or absent(up{job="qdrant"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Qdrant metrics target is unavailable
+          description: The authenticated Qdrant main-listener scrape has failed for two minutes.
+
+      - alert: QdrantRecoveryMode
+        expr: qdrant_app_status_recovery_mode == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Qdrant remains in recovery mode
+          description: Qdrant has reported recovery mode for five minutes.
+
+      - alert: QdrantRestErrorRateHigh
+        expr: megacampus:qdrant_rest_error_ratio:10m > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Qdrant REST error ratio is high
+          description: Qdrant 4xx/5xx responses exceed two percent of REST responses.
+
+      - alert: QdrantMemoryHigh
+        expr: qdrant_memory_resident_bytes / 2147483648 > 0.85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Qdrant resident memory is high
+          description: Resident memory exceeds 85 percent of the fixed two GiB Compose limit.
+
+      - alert: QdrantPointCountUnexpectedDrop
+        expr: |
+          qdrant_collection_points < 0.9 * (qdrant_collection_points offset 5m)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Qdrant collection point count dropped unexpectedly
+          description: A physical collection lost more than ten percent of its points between scrapes.
+
+      - alert: QdrantSnapshotStale
+        expr: |
+          (time() - megacampus_qdrant_last_successful_snapshot_unixtime_seconds > 8 * 60 * 60)
+          or absent(megacampus_qdrant_last_successful_snapshot_unixtime_seconds)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Qdrant off-host snapshot is stale or missing
+          description: No successful off-host Qdrant snapshot has been recorded within eight hours.
+
+      - alert: QdrantRestoreDrillStale
+        expr: |
+          (time() - megacampus_qdrant_last_successful_restore_drill_unixtime_seconds > 35 * 24 * 60 * 60)
+          or absent(megacampus_qdrant_last_successful_restore_drill_unixtime_seconds)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Qdrant restore drill is stale or missing
+          description: No successful isolated restore drill has been recorded within 35 days.
+
+      - alert: QdrantHybridFallbackHigh
+        expr: |
+          sum(rate(megacampus_qdrant_hybrid_fallback_total[15m]))
+          /
+          clamp_min(sum(rate(megacampus_qdrant_hybrid_requests_total[15m])), 1e-12)
+          > 0.05
+          and sum(rate(megacampus_qdrant_hybrid_requests_total[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Qdrant hybrid fallback ratio is high
+          description: Dense-only fallbacks exceed five percent of hybrid requests.

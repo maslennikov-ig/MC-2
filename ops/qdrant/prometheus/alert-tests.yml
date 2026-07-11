@@ -1,0 +1,149 @@
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="qdrant",environment="staging"}'
+        values: '0x20'
+      - series: 'qdrant_app_status_recovery_mode{environment="staging"}'
+        values: '1x20'
+      - series: 'qdrant_rest_responses_total{status="200"}'
+        values: '0+100x20'
+      - series: 'qdrant_rest_responses_total{status="500"}'
+        values: '0+3x20'
+      - series: 'qdrant_rest_responses_duration_seconds_bucket{collection="course_embeddings_v1",le="0.1"}'
+        values: '0+50x20'
+      - series: 'qdrant_rest_responses_duration_seconds_bucket{collection="course_embeddings_v1",le="0.5"}'
+        values: '0+90x20'
+      - series: 'qdrant_rest_responses_duration_seconds_bucket{collection="course_embeddings_v1",le="1"}'
+        values: '0+100x20'
+      - series: 'qdrant_rest_responses_duration_seconds_bucket{collection="course_embeddings_v1",le="+Inf"}'
+        values: '0+100x20'
+      - series: 'qdrant_memory_resident_bytes{environment="staging"}'
+        values: '1900000000x20'
+      - series: 'qdrant_collection_points{id="course_embeddings_v1"}'
+        values: '100x6 0x14'
+      - series: 'megacampus_qdrant_hybrid_requests_total{service="worker",instance="worker"}'
+        values: '0+100x20'
+      - series: 'megacampus_qdrant_hybrid_fallback_total{service="worker",instance="worker"}'
+        values: '0+10x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: QdrantDown
+        exp_alerts:
+          - exp_labels:
+              environment: staging
+              job: qdrant
+              severity: critical
+            exp_annotations:
+              summary: Qdrant metrics target is unavailable
+              description: The authenticated Qdrant main-listener scrape has failed for two minutes.
+      - eval_time: 6m
+        alertname: QdrantRecoveryMode
+        exp_alerts:
+          - exp_labels:
+              environment: staging
+              severity: critical
+            exp_annotations:
+              summary: Qdrant remains in recovery mode
+              description: Qdrant has reported recovery mode for five minutes.
+      - eval_time: 7m
+        alertname: QdrantPointCountUnexpectedDrop
+        exp_alerts:
+          - exp_labels:
+              id: course_embeddings_v1
+              severity: critical
+            exp_annotations:
+              summary: Qdrant collection point count dropped unexpectedly
+              description: A physical collection lost more than ten percent of its points between scrapes.
+      - eval_time: 16m
+        alertname: QdrantMemoryHigh
+        exp_alerts:
+          - exp_labels:
+              environment: staging
+              severity: warning
+            exp_annotations:
+              summary: Qdrant resident memory is high
+              description: Resident memory exceeds 85 percent of the fixed two GiB Compose limit.
+      - eval_time: 16m
+        alertname: QdrantHybridFallbackHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Qdrant hybrid fallback ratio is high
+              description: Dense-only fallbacks exceed five percent of hybrid requests.
+      - eval_time: 20m
+        alertname: QdrantRestErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Qdrant REST error ratio is high
+              description: Qdrant 4xx/5xx responses exceed two percent of REST responses.
+    promql_expr_test:
+      - expr: 'megacampus:qdrant_rest_error_ratio:10m'
+        eval_time: 20m
+        exp_samples:
+          - labels: '{__name__="megacampus:qdrant_rest_error_ratio:10m"}'
+            value: 0.02912621359223301
+      - expr: 'megacampus:qdrant_rest_latency_p95_seconds:5m'
+        eval_time: 20m
+        exp_samples:
+          - labels: '{__name__="megacampus:qdrant_rest_latency_p95_seconds:5m",collection="course_embeddings_v1"}'
+            value: 0.7499999999999997
+
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_qdrant_last_successful_snapshot_unixtime_seconds'
+        values: '0x700'
+      - series: 'megacampus_qdrant_last_successful_restore_drill_unixtime_seconds'
+        values: '0x52000'
+    alert_rule_test:
+      - eval_time: 9h
+        alertname: QdrantSnapshotStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Qdrant off-host snapshot is stale or missing
+              description: No successful off-host Qdrant snapshot has been recorded within eight hours.
+      - eval_time: 36d
+        alertname: QdrantRestoreDrillStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Qdrant restore drill is stale or missing
+              description: No successful isolated restore drill has been recorded within 35 days.
+
+  - interval: 1m
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: QdrantDown
+        exp_alerts:
+          - exp_labels:
+              job: qdrant
+              severity: critical
+            exp_annotations:
+              summary: Qdrant metrics target is unavailable
+              description: The authenticated Qdrant main-listener scrape has failed for two minutes.
+      - eval_time: 1m
+        alertname: QdrantSnapshotStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Qdrant off-host snapshot is stale or missing
+              description: No successful off-host Qdrant snapshot has been recorded within eight hours.
+      - eval_time: 1m
+        alertname: QdrantRestoreDrillStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Qdrant restore drill is stale or missing
+              description: No successful isolated restore drill has been recorded within 35 days.
