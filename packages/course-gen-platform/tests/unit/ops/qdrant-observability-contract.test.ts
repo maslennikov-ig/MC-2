@@ -96,7 +96,7 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     expect(exporter).not.toMatch(/\/proc|\/sys|rootfs|network_mode:|pid:|privileged:|cap_add:/);
   });
 
-  it('defines the exact eight alert sources, severities and durations', () => {
+  it('preserves the exact eight Qdrant alert sources, severities and durations', () => {
     const alerts = source('ops/qdrant/prometheus/alerts.yml');
     const contracts = [
       ['QdrantDown', '2m', 'critical', 'absent(up{job="qdrant"})'],
@@ -124,9 +124,11 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
       ['QdrantHybridFallbackHigh', '15m', 'warning', 'megacampus_qdrant_hybrid_fallback_total'],
     ] as const;
 
-    expect([...alerts.matchAll(/^\s*- alert: (\S+)/gm)].map(match => match[1])).toEqual(
-      contracts.map(([name]) => name)
-    );
+    expect(
+      [...alerts.matchAll(/^\s*- alert: (\S+)/gm)]
+        .map(match => match[1])
+        .filter(name => name.startsWith('Qdrant'))
+    ).toEqual(contracts.map(([name]) => name));
     for (const [name, duration, severity, expressionFragment] of contracts) {
       const start = alerts.indexOf(`- alert: ${name}`);
       const next = alerts.indexOf('\n      - alert:', start + 1);

@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.idx_clarifying_pending_critical_evidence_created_at;

@@ -1463,7 +1463,6 @@ export async function detectDocumentConflicts(
     .sort((left, right) => left.conflict_fingerprint.localeCompare(right.conflict_fingerprint));
   dependencies.log?.info(
     {
-      runId: input.runId,
       conflictCount: conflicts.length,
       batchCount,
       verification,

@@ -487,13 +487,10 @@ export async function enrichBaselineWithDocumentEvidence(
     ) {
       throw new Error('stale_or_cross_tenant_decision_snapshot');
     }
-  } catch (error) {
+  } catch {
     dependencies.log?.warn(
       {
-        courseId: input.courseId,
-        runId,
-        category: 'evidence_context_rejected',
-        errorName: error instanceof Error ? error.name : 'unknown',
+        outcome: 'evidence_context_rejected',
       },
       'Stage 5 evidence context was rejected'
     );
@@ -609,15 +606,11 @@ export async function enrichBaselineWithDocumentEvidence(
           searchQuery: query,
         });
       }
-    } catch (error) {
+    } catch {
       failedQueries += 1;
       dependencies.log?.warn(
         {
-          courseId: input.courseId,
-          runId,
-          sectionNumber,
-          category: 'qdrant_unavailable',
-          errorName: error instanceof Error ? error.name : 'unknown',
+          outcome: 'retrieval_unavailable',
         },
         'Stage 5 advisory retrieval was unavailable'
       );
@@ -667,8 +660,6 @@ export async function enrichBaselineWithDocumentEvidence(
       });
       dependencies.log?.info(
         {
-          courseId: input.courseId,
-          runId,
           status,
           sectionCount: enrichment.section_evidence.length,
           refCount: enrichment.retrieved_ref_count,

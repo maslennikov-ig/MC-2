@@ -2,19 +2,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseRagAvailabilityReason } from '@/shared/rag/document-availability';
 import type { Stage6AcceptedEvidenceContext } from '@/stages/stage6-lesson-content/rag/evidence-context';
 
-const { mockAssertCourseRagReady, mockCacheGet, mockCacheGetOrRetrieve, mockLogger } = vi.hoisted(
-  () => ({
-    mockAssertCourseRagReady: vi.fn(),
-    mockCacheGet: vi.fn(() => Promise.resolve(null)),
-    mockCacheGetOrRetrieve: vi.fn(),
-    mockLogger: {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
-  })
-);
+const {
+  mockAssertCourseRagReady,
+  mockCacheGet,
+  mockCacheGetOrRetrieve,
+  mockLogger,
+  mockPublishMetrics,
+} = vi.hoisted(() => ({
+  mockAssertCourseRagReady: vi.fn(),
+  mockCacheGet: vi.fn(() => Promise.resolve(null)),
+  mockCacheGetOrRetrieve: vi.fn(),
+  mockLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  mockPublishMetrics: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('@/shared/metrics/document-evidence-textfile', () => ({
+  publishDocumentEvidenceMetricsSafely: mockPublishMetrics,
+}));
 
 vi.mock('@/shared/rag/document-availability', async importOriginal => {
   const original = await importOriginal<typeof import('@/shared/rag/document-availability')>();
@@ -160,12 +169,17 @@ describe('lesson-rag-retriever', () => {
       chunks: [],
       totalRetrieved: 0,
     });
+    expect(mockPublishMetrics).toHaveBeenCalledOnce();
+    expect(mockPublishMetrics).toHaveBeenCalledWith(
+      { stage: 'stage6', status: 'empty', retrievals: 1, fallbacks: 0 },
+      mockLogger
+    );
   });
 
   it('retries transient Stage 6 required-RAG outages before failing', async () => {
-    mockAssertCourseRagReady.mockImplementation(async () => {
-      throw createRequiredRagUnavailableError('qdrant_timeout');
-    });
+    mockAssertCourseRagReady.mockImplementation(() =>
+      Promise.reject(createRequiredRagUnavailableError('qdrant_timeout'))
+    );
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
 
@@ -183,6 +197,11 @@ describe('lesson-rag-retriever', () => {
 
     await expectation;
     expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(3);
+    expect(mockPublishMetrics).toHaveBeenCalledOnce();
+    expect(mockPublishMetrics).toHaveBeenCalledWith(
+      { stage: 'stage6', status: 'failed', retrievals: 1, fallbacks: 0 },
+      mockLogger
+    );
   });
 
   it('fails through the required-RAG policy when every live query fails after preflight', async () => {
@@ -210,6 +229,34 @@ describe('lesson-rag-retriever', () => {
       reason: 'qdrant_service_unavailable',
       retryable: true,
     });
+  });
+
+  it('publishes one fallback outcome when optional live retrieval degrades', async () => {
+    const { searchChunks } = await import('@/shared/qdrant/search');
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: false,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
+    vi.mocked(searchChunks).mockRejectedValue(new Error('private retrieval failure'));
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        organizationId: 'organization-1',
+        lessonSpec: lessonSpec as any,
+        useCache: false,
+      })
+    ).resolves.toMatchObject({ totalRetrieved: 0 });
+
+    expect(mockPublishMetrics).toHaveBeenCalledOnce();
+    expect(mockPublishMetrics).toHaveBeenCalledWith(
+      { stage: 'stage6', status: 'fallback', retrievals: 1, fallbacks: 1 },
+      mockLogger
+    );
   });
 
   it('uses accepted decisions and refs in grouped tenant-scoped live retrieval', async () => {
@@ -456,9 +503,9 @@ describe('lesson-rag-retriever', () => {
       searchQueriesUsed: ['query 1'],
       coverageScore: 0.8,
     });
-    mockAssertCourseRagReady.mockImplementationOnce(async () => {
-      throw createRequiredRagUnavailableError('qdrant_timeout');
-    });
+    mockAssertCourseRagReady.mockImplementationOnce(() =>
+      Promise.reject(createRequiredRagUnavailableError('qdrant_timeout'))
+    );
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
 

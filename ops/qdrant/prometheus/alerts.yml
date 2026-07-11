@@ -99,3 +99,51 @@ groups:
         annotations:
           summary: Qdrant hybrid fallback ratio is high
           description: Dense-only fallbacks exceed five percent of hybrid requests.
+
+  - name: document-evidence-alerts
+    rules:
+      - alert: DocumentEvidenceRunFailed
+        expr: sum by (stage, status) (increase(megacampus_document_evidence_runs_total{stage="stage4",status="failed"}[10m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: A document evidence run failed
+          description: At least one Stage 4 document evidence run failed in the last ten minutes.
+
+      - alert: DocumentEvidenceCoverageIncomplete
+        expr: |
+          min(megacampus_document_evidence_coverage_ratio) < 1
+          or (
+            sum(megacampus_document_evidence_runs_total{stage="stage4"}) > 0
+            and absent(megacampus_document_evidence_coverage_ratio)
+          )
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Document evidence coverage is incomplete
+          description: The latest Stage 4 evidence ledger is below exact full coverage or its coverage signal is missing.
+
+      - alert: DocumentEvidenceDegradedAutomaticDecisionsRepeated
+        expr: sum(increase(megacampus_document_evidence_degraded_automatic_decisions_total[30m])) >= 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Degraded automatic evidence decisions are repeating
+          description: At least three degraded automatic decisions occurred within thirty minutes.
+
+      - alert: DocumentEvidenceCriticalConflictStale
+        expr: |
+          max(megacampus_document_evidence_unresolved_critical_conflicts) > 0
+          and (
+            time() - min(megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds > 0) > 60 * 60
+            or absent(megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds > 0)
+          )
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: A critical document conflict remains unresolved
+          description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.

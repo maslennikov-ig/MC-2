@@ -147,3 +147,77 @@ tests:
             exp_annotations:
               summary: Qdrant restore drill is stale or missing
               description: No successful isolated restore drill has been recorded within 35 days.
+
+  # evidence-counter-reset
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_document_evidence_runs_total{stage="stage4",status="failed"}'
+        values: '0+0x2 0+1x3'
+      - series: 'megacampus_document_evidence_coverage_ratio'
+        values: '0.75x10'
+      - series: 'megacampus_document_evidence_degraded_automatic_decisions_total'
+        values: '8 9 0 1 2 3 3 3 3 3'
+      - series: 'megacampus_document_evidence_unresolved_critical_conflicts'
+        values: '1x130'
+      - series: 'megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds'
+        values: '1x130'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: DocumentEvidenceRunFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              stage: stage4
+              status: failed
+            exp_annotations:
+              summary: A document evidence run failed
+              description: At least one Stage 4 document evidence run failed in the last ten minutes.
+      - eval_time: 6m
+        alertname: DocumentEvidenceCoverageIncomplete
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Document evidence coverage is incomplete
+              description: The latest Stage 4 evidence ledger is below exact full coverage or its coverage signal is missing.
+      - eval_time: 6m
+        alertname: DocumentEvidenceDegradedAutomaticDecisionsRepeated
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Degraded automatic evidence decisions are repeating
+              description: At least three degraded automatic decisions occurred within thirty minutes.
+      - eval_time: 2h
+        alertname: DocumentEvidenceCriticalConflictStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: A critical document conflict remains unresolved
+              description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+
+  # evidence-series-absent
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_document_evidence_runs_total{stage="stage4",status="accepted"}'
+        values: '1x10'
+      - series: 'megacampus_document_evidence_unresolved_critical_conflicts'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DocumentEvidenceCoverageIncomplete
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Document evidence coverage is incomplete
+              description: The latest Stage 4 evidence ledger is below exact full coverage or its coverage signal is missing.
+      - eval_time: 6m
+        alertname: DocumentEvidenceCriticalConflictStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: A critical document conflict remains unresolved
+              description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.

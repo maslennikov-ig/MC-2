@@ -28,26 +28,28 @@ vi.mock('@/stages/stage5-generation/orchestrator-helpers', async importOriginal 
     await importOriginal<typeof import('@/stages/stage5-generation/orchestrator-helpers')>();
   return {
     ...actual,
-    performPostGenerationQualityGate: vi.fn(async () => ({
-      qualityResult: { passed: true, score: 1, failedSections: [] },
-      lessonsResult: {
-        passed: true,
-        totalLessons: 1,
-        minimumRequired: 1,
-        deficit: 0,
-        exceedsMax: false,
-      },
-      overlapResult: null,
-      structuralResult: {
-        passed: true,
-        hasCriticalIssues: false,
-        profileId: 'micro',
-        totalLessons: 1,
-        computedDurationHours: 0.5,
-        criticalIssues: [],
-        warnings: [],
-      },
-    })),
+    performPostGenerationQualityGate: vi.fn(() =>
+      Promise.resolve({
+        qualityResult: { passed: true, score: 1, failedSections: [] },
+        lessonsResult: {
+          passed: true,
+          totalLessons: 1,
+          minimumRequired: 1,
+          deficit: 0,
+          exceedsMax: false,
+        },
+        overlapResult: null,
+        structuralResult: {
+          passed: true,
+          hasCriticalIssues: false,
+          profileId: 'micro',
+          totalLessons: 1,
+          computedDurationHours: 0.5,
+          criticalIssues: [],
+          warnings: [],
+        },
+      })
+    ),
   };
 });
 
@@ -201,28 +203,34 @@ describe('live Stage 5 evidence caller', () => {
       retrieved_ref_count: 0,
       fallback_section_count: 0,
     };
-    const evidenceEnricher = vi.fn(async () => ({ courseStructure: enriched, enrichment: audit }));
+    const evidenceEnricher = vi.fn(() =>
+      Promise.resolve({ courseStructure: enriched, enrichment: audit })
+    );
+    const publishMetrics = vi.fn(() => Promise.resolve());
     const orchestrator = new GenerationOrchestrator(
       {} as never,
       {} as never,
       {} as never,
       undefined,
-      evidenceEnricher
+      evidenceEnricher,
+      publishMetrics
     );
     (orchestrator as never as { graph: { invoke: (value: unknown) => Promise<unknown> } }).graph = {
-      invoke: vi.fn(async () => ({
-        input: input(),
-        metadata: metadata(),
-        sections: [section()],
-        qualityScores: { metadata_similarity: 1, sections_similarity: [1], overall: 1 },
-        tokenUsage: { metadata: 1, sections: 1, validation: 0, total: 2 },
-        modelUsed: { metadata: 'metadata-model', sections: 'sections-model' },
-        retryCount: { metadata: 0, sections: [0] },
-        currentPhase: 'validate_quality',
-        phaseDurations: {},
-        errors: [],
-        modelOverride: null,
-      })),
+      invoke: vi.fn(() =>
+        Promise.resolve({
+          input: input(),
+          metadata: metadata(),
+          sections: [section()],
+          qualityScores: { metadata_similarity: 1, sections_similarity: [1], overall: 1 },
+          tokenUsage: { metadata: 1, sections: 1, validation: 0, total: 2 },
+          modelUsed: { metadata: 'metadata-model', sections: 'sections-model' },
+          retryCount: { metadata: 0, sections: [0] },
+          currentPhase: 'validate_quality',
+          phaseDurations: {},
+          errors: [],
+          modelOverride: null,
+        })
+      ),
     };
 
     const result = await orchestrator.execute(input());
@@ -240,9 +248,16 @@ describe('live Stage 5 evidence caller', () => {
     );
     expect(result.course_structure.sections[0].lessons[0].key_topics).toContain(privateSentinel);
     expect(result.generation_metadata.document_evidence_enrichment).toEqual(audit);
+    expect(publishMetrics).toHaveBeenCalledOnce();
+    expect(publishMetrics).toHaveBeenCalledWith(
+      { stage: 'stage5', status: 'applied', retrievals: 1, fallbacks: 0 },
+      pinoMocks.logger
+    );
     const serializedTrace = JSON.stringify(vi.mocked(logTrace).mock.calls);
     expect(serializedTrace).not.toContain(privateSentinel);
-    expect(serializedTrace).toContain('provenanceHash');
+    expect(serializedTrace).not.toContain('provenanceHash');
+    expect(serializedTrace).not.toContain('acceptedRunId');
+    expect(serializedTrace).toContain('decisionCount');
     expect(
       JSON.stringify(Object.values(pinoMocks.logger).flatMap(spy => spy.mock.calls))
     ).not.toContain(privateSentinel);
@@ -250,30 +265,32 @@ describe('live Stage 5 evidence caller', () => {
 
   it('fails open and sanitizes an unexpected evidence error before trace logging', async () => {
     const privateSentinel = 'PRIVATE_ERROR_SENTINEL source body';
-    const evidenceEnricher = vi.fn(async () => {
-      throw new Error(privateSentinel);
-    });
+    const evidenceEnricher = vi.fn(() => Promise.reject(new Error(privateSentinel)));
+    const publishMetrics = vi.fn(() => Promise.resolve());
     const orchestrator = new GenerationOrchestrator(
       {} as never,
       {} as never,
       {} as never,
       undefined,
-      evidenceEnricher
+      evidenceEnricher,
+      publishMetrics
     );
     (orchestrator as never as { graph: { invoke: (value: unknown) => Promise<unknown> } }).graph = {
-      invoke: vi.fn(async () => ({
-        input: input(),
-        metadata: metadata(),
-        sections: [section()],
-        qualityScores: { metadata_similarity: 1, sections_similarity: [1], overall: 1 },
-        tokenUsage: { metadata: 1, sections: 1, validation: 0, total: 2 },
-        modelUsed: { metadata: 'metadata-model', sections: 'sections-model' },
-        retryCount: { metadata: 0, sections: [0] },
-        currentPhase: 'validate_quality',
-        phaseDurations: {},
-        errors: [],
-        modelOverride: null,
-      })),
+      invoke: vi.fn(() =>
+        Promise.resolve({
+          input: input(),
+          metadata: metadata(),
+          sections: [section()],
+          qualityScores: { metadata_similarity: 1, sections_similarity: [1], overall: 1 },
+          tokenUsage: { metadata: 1, sections: 1, validation: 0, total: 2 },
+          modelUsed: { metadata: 'metadata-model', sections: 'sections-model' },
+          retryCount: { metadata: 0, sections: [0] },
+          currentPhase: 'validate_quality',
+          phaseDurations: {},
+          errors: [],
+          modelOverride: null,
+        })
+      ),
     };
 
     const result = await orchestrator.execute(input());
@@ -283,6 +300,11 @@ describe('live Stage 5 evidence caller', () => {
     );
     expect(result.generation_metadata.document_evidence_enrichment).toEqual(
       expect.objectContaining({ status: 'degraded', accepted_run_id: runId })
+    );
+    expect(publishMetrics).toHaveBeenCalledOnce();
+    expect(publishMetrics).toHaveBeenCalledWith(
+      { stage: 'stage5', status: 'degraded', retrievals: 1, fallbacks: 0 },
+      pinoMocks.logger
     );
     expect(JSON.stringify(vi.mocked(logTrace).mock.calls)).not.toContain(privateSentinel);
     expect(

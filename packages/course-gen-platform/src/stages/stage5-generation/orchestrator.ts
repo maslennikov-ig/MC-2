@@ -46,6 +46,7 @@ import {
 } from './validators/structural-quality-validator';
 import type { Stage5EvidenceEnricher } from './evidence/types';
 import { buildEvidenceFailureRecord } from './evidence/advisory-enrichment';
+import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -149,7 +150,8 @@ export class GenerationOrchestrator {
     sectionBatchGenerator: SectionBatchGenerator,
     qualityValidator: QualityValidator,
     qdrantClient?: QdrantClient,
-    private readonly evidenceEnricher?: Stage5EvidenceEnricher
+    private readonly evidenceEnricher?: Stage5EvidenceEnricher,
+    private readonly evidenceMetricsPublisher: typeof publishDocumentEvidenceMetricsSafely = publishDocumentEvidenceMetricsSafely
   ) {
     this.logger = pino({
       name: 'generation-orchestrator',
@@ -227,7 +229,7 @@ export class GenerationOrchestrator {
       finalState.sections,
       input,
       this.logger,
-      finalState.metadata!
+      finalState.metadata as NonNullable<typeof finalState.metadata>
     );
 
     this.logQualityGateResults(input, qualityGateResults);
@@ -246,7 +248,11 @@ export class GenerationOrchestrator {
         : finalState;
     const finalStructuralResult = validateStructuralQuality({
       input,
-      metadata: reconcileCourseMetadata(finalState.metadata!, stateForAssembly.sections, input),
+      metadata: reconcileCourseMetadata(
+        finalState.metadata as NonNullable<typeof finalState.metadata>,
+        stateForAssembly.sections,
+        input
+      ),
       sections: stateForAssembly.sections,
     });
     stateForAssembly.qualityScores = {
@@ -556,7 +562,7 @@ export class GenerationOrchestrator {
     totalDuration: number
   ): Promise<GenerationResult> {
     const { courseStructure, generationMetadata } = assembleGenerationResult(
-      finalState.metadata!,
+      finalState.metadata as NonNullable<typeof finalState.metadata>,
       finalState.sections,
       finalState.tokenUsage,
       finalState.modelUsed,
@@ -582,7 +588,11 @@ export class GenerationOrchestrator {
           validateCandidate: candidate => {
             const result = validateStructuralQuality({
               input,
-              metadata: reconcileCourseMetadata(finalState.metadata!, candidate.sections, input),
+              metadata: reconcileCourseMetadata(
+                finalState.metadata as NonNullable<typeof finalState.metadata>,
+                candidate.sections,
+                input
+              ),
               sections: candidate.sections,
             });
             return result.criticalIssues
@@ -595,7 +605,7 @@ export class GenerationOrchestrator {
         const enrichedStructuralResult = validateStructuralQuality({
           input,
           metadata: reconcileCourseMetadata(
-            finalState.metadata!,
+            finalState.metadata as NonNullable<typeof finalState.metadata>,
             finalCourseStructure.sections,
             input
           ),
@@ -612,13 +622,10 @@ export class GenerationOrchestrator {
           );
         }
         generationMetadata.quality_scores.structure = enrichedStructuralResult;
-      } catch (error) {
+      } catch {
         this.logger.warn(
           {
-            courseId: input.course_id,
-            runId: input.analysis_result?.document_evidence?.accepted_run_id,
-            category: 'evidence_enrichment_failed',
-            errorName: error instanceof Error ? error.name : 'unknown',
+            outcome: 'evidence_enrichment_failed',
           },
           'Stage 5 advisory evidence pass failed open'
         );
@@ -628,6 +635,19 @@ export class GenerationOrchestrator {
           generationMetadata.document_evidence_enrichment = buildEvidenceFailureRecord(snapshot);
         }
       }
+    }
+
+    const evidenceAudit = generationMetadata.document_evidence_enrichment;
+    if (this.evidenceEnricher && evidenceAudit) {
+      await this.evidenceMetricsPublisher(
+        {
+          stage: 'stage5',
+          status: evidenceAudit.status,
+          retrievals: evidenceAudit.accepted_run_id ? finalCourseStructure.sections.length : 0,
+          fallbacks: evidenceAudit.fallback_section_count,
+        },
+        this.logger
+      );
     }
 
     const result: GenerationResult = {
@@ -659,14 +679,12 @@ export class GenerationOrchestrator {
         documentEvidence: generationMetadata.document_evidence_enrichment
           ? {
               status: generationMetadata.document_evidence_enrichment.status,
-              acceptedRunId: generationMetadata.document_evidence_enrichment.accepted_run_id,
               decisionCount:
                 generationMetadata.document_evidence_enrichment.accepted_decision_ids.length,
               sectionCount: generationMetadata.document_evidence_enrichment.section_evidence.length,
               refCount: generationMetadata.document_evidence_enrichment.retrieved_ref_count,
               fallbackSectionCount:
                 generationMetadata.document_evidence_enrichment.fallback_section_count,
-              provenanceHash: generationMetadata.document_evidence_enrichment.provenance_hash,
             }
           : undefined,
       },

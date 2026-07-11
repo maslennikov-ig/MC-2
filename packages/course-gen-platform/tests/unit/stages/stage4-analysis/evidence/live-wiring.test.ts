@@ -294,9 +294,16 @@ describe('Stage 4 document evidence live wiring', () => {
     );
   });
 
-  it('does not run conflict decisions in non-influential shadow mode', async () => {
+  it('persists shadow conflicts and metrics without creating decisions or downstream context', async () => {
     const analysisContext = context();
-    const detectConflicts = vi.fn();
+    const detectConflicts = vi.fn(async () => ({
+      conflicts: [{ severity: 'important' }],
+      issues: [],
+      batchCount: 2,
+      usage: { model_calls: 3, input_tokens: 40, output_tokens: 5, total_cost_usd: 0.02 },
+    }));
+    const resolveDecisions = vi.fn();
+    const publishMetrics = vi.fn(async () => undefined);
     await runDocumentEvidencePhase(analysisContext, {
       enabled: true,
       mode: 'shadow',
@@ -306,11 +313,211 @@ describe('Stage 4 document evidence live wiring', () => {
         runId: '10000000-0000-4000-8000-000000000001',
       })),
       preflightDependencies: {} as never,
-      detectConflicts,
+      detectConflicts: detectConflicts as never,
       conflictDependencies: {} as never,
+      resolveDecisions: resolveDecisions as never,
+      decisionDependencies: {} as never,
+      publishMetrics,
+      loadCriticalConflictState: vi.fn(async () => ({
+        unresolved: 0,
+        oldestUnixSeconds: 0,
+        observedAtUnixMilliseconds: 1_700_000_000_000,
+      })),
     });
-    expect(detectConflicts).not.toHaveBeenCalled();
+    expect(detectConflicts).toHaveBeenCalledOnce();
+    expect(resolveDecisions).not.toHaveBeenCalled();
     expect(analysisContext.documentEvidenceDecisions).toBeUndefined();
+    expect(analysisContext.documentEvidenceMode).toBe('shadow');
+    expect(publishMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'shadow',
+        conflicts: { critical: 0, important: 1, informational: 0 },
+        batches: 2,
+        inputTokens: 40,
+        outputTokens: 5,
+        modelCalls: 3,
+        costUsd: 0.02,
+      }),
+      analysisContext.orchestrationLogger
+    );
+  });
+
+  it('publishes one bounded Stage 4 completion outcome after decisions', async () => {
+    const analysisContext = context();
+    const publishMetrics = vi.fn(async () => undefined);
+    const accepted = {
+      ...skippedResult,
+      status: 'accepted' as const,
+      runId: '10000000-0000-4000-8000-000000000001',
+      coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+      cards: [{ processing_mode: 'summary' }],
+      batchDocumentIds: [[summary.document_id]],
+      generationMetrics: {
+        ...skippedResult.generationMetrics,
+        modelCalls: 2,
+        inputTokens: 100,
+        outputTokens: 20,
+        totalCostUsd: 0.1,
+      },
+    };
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'active',
+      runPreflight: vi.fn(async () => accepted as never),
+      preflightDependencies: {} as never,
+      detectConflicts: vi.fn(async () => ({
+        conflicts: [
+          { severity: 'critical' },
+          { severity: 'important' },
+          { severity: 'informational' },
+        ],
+        issues: [],
+        batchCount: 2,
+        usage: { model_calls: 1, input_tokens: 50, output_tokens: 10, total_cost_usd: 0.05 },
+      })) as never,
+      conflictDependencies: {} as never,
+      resolveDecisions: vi.fn(async () => ({
+        pauseRequired: true,
+        requiredQuestionIds: ['80000000-0000-4000-8000-000000000001'],
+        currentDecisionIds: [],
+        unresolvedInformationalConflictIds: [],
+        decisionSummary: { user: 0, system: 0, degradedAutomatic: 0 },
+        unresolvedCriticalConflictCount: 1,
+      })) as never,
+      decisionDependencies: {} as never,
+      publishMetrics,
+      loadCriticalConflictState: vi.fn(async () => ({
+        unresolved: 1,
+        oldestUnixSeconds: 1_700_000_000,
+        observedAtUnixMilliseconds: 1_700_000_001_000,
+      })),
+    });
+
+    expect(publishMetrics).toHaveBeenCalledOnce();
+    expect(publishMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'stage4',
+        status: 'accepted',
+        coverage: { source: 1, assessed: 1, degraded: 0, failed: 0 },
+        processingModes: expect.objectContaining({ summary: 1 }),
+        batches: 3,
+        inputTokens: 150,
+        outputTokens: 30,
+        modelCalls: 3,
+        costUsd: 0.15000000000000002,
+        conflicts: { critical: 1, important: 1, informational: 1 },
+        decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+        criticalConflictState: {
+          unresolved: 1,
+          oldestUnixSeconds: 1_700_000_000,
+          observedAtUnixMilliseconds: 1_700_000_001_000,
+        },
+      }),
+      analysisContext.orchestrationLogger
+    );
+  });
+
+  it('publishes one bounded Stage 4 failure outcome and preserves the product error', async () => {
+    const analysisContext = context();
+    const publishMetrics = vi.fn(async () => undefined);
+    const failure = new Error('private failure body');
+
+    await expect(
+      runDocumentEvidencePhase(analysisContext, {
+        enabled: true,
+        mode: 'active',
+        runPreflight: vi.fn(async () => {
+          throw failure;
+        }),
+        preflightDependencies: {} as never,
+        publishMetrics,
+      })
+    ).rejects.toBe(failure);
+
+    expect(publishMetrics).toHaveBeenCalledOnce();
+    expect(publishMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'stage4', status: 'failed' }),
+      analysisContext.orchestrationLogger
+    );
+  });
+
+  it('reconciles an answered critical conflict when the resumed analysis reruns Stage 4', async () => {
+    const publishMetrics = vi.fn(async () => undefined);
+    const loadCriticalConflictState = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unresolved: 1,
+        oldestUnixSeconds: 1_700_000_000,
+        observedAtUnixMilliseconds: 1_700_000_001_000,
+      })
+      .mockResolvedValueOnce({
+        unresolved: 0,
+        oldestUnixSeconds: 0,
+        observedAtUnixMilliseconds: 1_700_000_002_000,
+      });
+    const accepted = {
+      ...skippedResult,
+      status: 'accepted' as const,
+      runId: '10000000-0000-4000-8000-000000000001',
+    };
+    const phaseOverrides = {
+      enabled: true,
+      mode: 'active' as const,
+      runPreflight: vi.fn(async () => accepted),
+      preflightDependencies: {} as never,
+      detectConflicts: vi.fn(async () => ({
+        conflicts: [],
+        issues: [],
+        batchCount: 0,
+        usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+      })) as never,
+      conflictDependencies: {} as never,
+      resolveDecisions: vi.fn(async () => ({
+        pauseRequired: false,
+        requiredQuestionIds: [],
+        currentDecisionIds: [],
+        unresolvedInformationalConflictIds: [],
+      })) as never,
+      decisionDependencies: {} as never,
+      publishMetrics,
+      loadCriticalConflictState,
+    };
+
+    await runDocumentEvidencePhase(context(), phaseOverrides);
+    await runDocumentEvidencePhase(context(), phaseOverrides);
+
+    expect(loadCriticalConflictState).toHaveBeenCalledTimes(2);
+    expect(publishMetrics.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        criticalConflictState: {
+          unresolved: 1,
+          oldestUnixSeconds: 1_700_000_000,
+          observedAtUnixMilliseconds: 1_700_000_001_000,
+        },
+      })
+    );
+    expect(publishMetrics.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        criticalConflictState: {
+          unresolved: 0,
+          oldestUnixSeconds: 0,
+          observedAtUnixMilliseconds: 1_700_000_002_000,
+        },
+      })
+    );
+
+    const approvalSource = readFileSync(
+      resolve(process.cwd(), 'src/server/routers/clarifying-approval-helpers.ts'),
+      'utf8'
+    );
+    const orchestratorSource = readFileSync(
+      resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator.ts'),
+      'utf8'
+    );
+    expect(approvalSource).toContain('JobType.STRUCTURE_ANALYSIS');
+    expect(approvalSource).toContain('createAnalysisJob');
+    expect(orchestratorSource).toContain('await runDocumentEvidencePhase(context)');
   });
 
   it('records bounded automatic retries and runs the gate only on the final immutable run', async () => {
