@@ -7,6 +7,7 @@ import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
 import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
@@ -62,7 +63,9 @@ function assertEvidenceSearchResult(input: {
  * @param params - Lesson retrieval parameters
  * @returns LessonRAGResult with chunks and metrics
  */
-export async function retrieveLessonContext(params: LessonRAGParams): Promise<LessonRAGResult> {
+async function retrieveLessonContextCore(
+  params: LessonRAGParams
+): Promise<LessonRAGResult & { fallbackUsed?: boolean }> {
   const startTime = Date.now();
   const {
     courseId,
@@ -186,9 +189,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
   if (evidenceContext && evidenceContext.allowedDocumentIds.length === 0) {
     logger.info(
       {
-        courseId,
-        lessonId: lessonSpec.lesson_id,
-        acceptedRunId: evidenceContext.acceptedRunId,
+        outcome: 'empty',
+        allowedDocumentCount: 0,
       },
       '[Lesson RAG] Accepted evidence decisions exclude all document refs'
     );
@@ -379,7 +381,10 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         // Don't fail on trace error
       }
 
-      return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+      return {
+        ...createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime),
+        fallbackUsed: queryFailureCount > 0,
+      };
     }
 
     // Compute Tier 1 max score for threshold tuning data
@@ -600,11 +605,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         lessonSpec.lesson_id,
         evidenceContext?.cacheIdentity
       );
-      await ragContextCache.getOrRetrieve(
-        courseId,
-        lessonSpec.lesson_id,
-        cacheIdentity,
-        async () => ({
+      await ragContextCache.getOrRetrieve(courseId, lessonSpec.lesson_id, cacheIdentity, () =>
+        Promise.resolve({
           sectionId: lessonSpec.lesson_id,
           chunks: sortedChunks.map(c => ({
             chunkId: c.chunk_id,
@@ -651,7 +653,33 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
     coverageScore,
     retrievalDurationMs,
     cached: false,
+    fallbackUsed: queryFailureCount > 0,
   };
+}
+
+export async function retrieveLessonContext(params: LessonRAGParams): Promise<LessonRAGResult> {
+  try {
+    const result = await retrieveLessonContextCore(params);
+    const status = result.cached
+      ? 'cached'
+      : result.fallbackUsed
+        ? 'fallback'
+        : result.totalRetrieved > 0
+          ? 'success'
+          : 'empty';
+    await publishDocumentEvidenceMetricsSafely(
+      { stage: 'stage6', status, retrievals: 1, fallbacks: status === 'fallback' ? 1 : 0 },
+      logger
+    );
+    const { fallbackUsed: _fallbackUsed, ...publicResult } = result;
+    return publicResult;
+  } catch (error) {
+    await publishDocumentEvidenceMetricsSafely(
+      { stage: 'stage6', status: 'failed', retrievals: 1, fallbacks: 0 },
+      logger
+    );
+    throw error;
+  }
 }
 
 /**

@@ -488,6 +488,14 @@ export class DocumentEvidenceRepository {
     return decisions.map(decision => ({
       id: decision.id,
       subject_key: String(decision.subject_key ?? decision.conflict_id),
+      ...(decision.resolved_by === 'user' || decision.resolved_by === 'system'
+        ? { resolved_by: decision.resolved_by }
+        : {}),
+      ...(decision.subject_kind === 'claim_conflict' ||
+      decision.subject_kind === 'degraded_evidence' ||
+      decision.subject_kind === 'detector_capacity'
+        ? { subject_kind: decision.subject_kind }
+        : {}),
     }));
   }
 

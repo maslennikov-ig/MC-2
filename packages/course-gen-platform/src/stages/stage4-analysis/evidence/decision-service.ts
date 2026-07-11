@@ -42,6 +42,8 @@ export interface DocumentEvidenceQuestion {
 export interface CurrentEvidenceDecision {
   id: string;
   subject_key: string;
+  resolved_by?: 'user' | 'system';
+  subject_kind?: 'claim_conflict' | 'degraded_evidence' | 'detector_capacity';
 }
 
 export interface DocumentDecisionRepository {
@@ -105,14 +107,12 @@ function stableUuidV8(value: string): string {
 }
 
 function sanitizePlainText(value: string, maxCharacters: number): string {
-  return Array.from(
-    value
-      .normalize('NFKC')
-      .replace(/<[^>]*>/gu, ' ')
-      .replace(/[\u0000-\u001F\u007F-\u009F]/gu, ' ')
-      .replace(/\s+/gu, ' ')
-      .trim()
-  )
+  const normalized = value.normalize('NFKC').replace(/<[^>]*>/gu, ' ');
+  const withoutControlCharacters = Array.from(normalized, character => {
+    const codePoint = character.codePointAt(0) ?? -1;
+    return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? ' ' : character;
+  }).join('');
+  return Array.from(withoutControlCharacters.replace(/\s+/gu, ' ').trim())
     .slice(0, maxCharacters)
     .join('');
 }
@@ -434,6 +434,8 @@ export async function resolveDocumentEvidenceDecisions(
   requiredQuestionIds: string[];
   currentDecisionIds: string[];
   unresolvedInformationalConflictIds: string[];
+  decisionSummary?: { user: number; system: number; degradedAutomatic: number };
+  unresolvedCriticalConflictCount?: number;
 }> {
   const run = await dependencies.repository.getAcceptedRun(
     input.runId,
@@ -455,6 +457,7 @@ export async function resolveDocumentEvidenceDecisions(
   const documentNames = new Map(cards.map(card => [card.document_id, card.document_name]));
   const subjects: DocumentEvidenceDecisionSubject[] = [];
   const unresolvedInformationalConflictIds: string[] = [];
+  let unresolvedCriticalConflictCount = 0;
 
   for (const conflict of [...conflicts].sort((a, b) =>
     a.conflict_id.localeCompare(b.conflict_id)
@@ -463,7 +466,10 @@ export async function resolveDocumentEvidenceDecisions(
     const key = subjectKey(input.runId, subject);
     if (conflict.severity === 'informational') {
       if (!currentKeys.has(key)) unresolvedInformationalConflictIds.push(conflict.conflict_id);
-    } else if (!currentKeys.has(key)) subjects.push(subject);
+    } else if (!currentKeys.has(key)) {
+      subjects.push(subject);
+      if (conflict.severity === 'critical') unresolvedCriticalConflictCount += 1;
+    }
   }
   for (const issue of capacityIssues) {
     const subject: DocumentEvidenceDecisionSubject = { kind: 'detector_capacity', issue };
@@ -520,9 +526,9 @@ export async function resolveDocumentEvidenceDecisions(
   const decisionIds = [
     ...new Set([...current.map(value => value.id), ...materialized.decision_ids]),
   ].sort();
+  const automaticQuestions = input.mode === 'automatic' ? questions : [];
   dependencies.log?.info(
     {
-      runId: input.runId,
       mode: input.mode,
       requiredQuestionCount: materialized.question_ids.length,
       currentDecisionCount: decisionIds.length,
@@ -535,5 +541,14 @@ export async function resolveDocumentEvidenceDecisions(
     requiredQuestionIds: [...materialized.question_ids].sort(),
     currentDecisionIds: decisionIds,
     unresolvedInformationalConflictIds: unresolvedInformationalConflictIds.sort(),
+    decisionSummary: {
+      user: current.filter(value => value.resolved_by === 'user').length,
+      system:
+        current.filter(value => value.resolved_by === 'system').length + automaticQuestions.length,
+      degradedAutomatic: automaticQuestions.filter(
+        question => question.subjectKind === 'degraded_evidence'
+      ).length,
+    },
+    unresolvedCriticalConflictCount,
   };
 }

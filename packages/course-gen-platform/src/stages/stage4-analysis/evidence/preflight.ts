@@ -157,6 +157,13 @@ export interface DocumentEvidencePreflightResult {
   batchAllocatedTokens: number[];
   reductionLevelWidths: number[];
   generationMetrics: EvidenceGenerationMetrics;
+  metricDeltas: {
+    acceptedRun: 0 | 1;
+    documents: { source: number; assessed: number; degraded: number; failed: number };
+    processingModes: Record<DocumentEvidenceCard['processing_mode'], number>;
+    batches: number;
+    generationMetrics: EvidenceGenerationMetrics;
+  };
   downstreamRepresentation?: DownstreamEvidenceRepresentation;
 }
 
@@ -304,6 +311,47 @@ function addMetrics(target: EvidenceGenerationMetrics, delta: EvidenceGeneration
   target.reduceLevels = Math.max(target.reduceLevels, delta.reduceLevels);
 }
 
+function emptyProcessingModeCounts(): Record<DocumentEvidenceCard['processing_mode'], number> {
+  return {
+    full_text: 0,
+    hierarchical_summary: 0,
+    summary: 0,
+    targeted_retrieval: 0,
+    metadata_only: 0,
+  };
+}
+
+function metricDeltasForAcceptedCards(
+  cards: DocumentEvidenceCard[],
+  batches: number,
+  generationMetrics: EvidenceGenerationMetrics
+): DocumentEvidencePreflightResult['metricDeltas'] {
+  const processingModes = emptyProcessingModeCounts();
+  for (const card of cards) processingModes[card.processing_mode] += 1;
+  return {
+    acceptedRun: 1,
+    documents: {
+      source: cards.length,
+      assessed: cards.filter(card => card.coverage_status === 'assessed').length,
+      degraded: cards.filter(card => card.coverage_status === 'degraded').length,
+      failed: cards.filter(card => card.coverage_status === 'failed').length,
+    },
+    processingModes,
+    batches,
+    generationMetrics,
+  };
+}
+
+function emptyMetricDeltas(): DocumentEvidencePreflightResult['metricDeltas'] {
+  return {
+    acceptedRun: 0,
+    documents: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+    processingModes: emptyProcessingModeCounts(),
+    batches: 0,
+    generationMetrics: emptyGenerationMetrics(),
+  };
+}
+
 function subtractMetrics(
   total: EvidenceGenerationMetrics,
   checkpointed: EvidenceGenerationMetrics
@@ -445,6 +493,7 @@ export async function runDocumentEvidencePreflight(
       batchAllocatedTokens: [],
       reductionLevelWidths: [],
       generationMetrics: emptyGenerationMetrics(),
+      metricDeltas: emptyMetricDeltas(),
     };
   }
   if (!Number.isInteger(input.maxRetries) || input.maxRetries < 0) {
@@ -504,6 +553,8 @@ export async function runDocumentEvidencePreflight(
   if (typeof run.id !== 'string') throw new Error('Evidence repository returned an invalid run ID');
   const runId = run.id;
   const metrics = runMetrics(run);
+  const invocationMetrics = emptyGenerationMetrics();
+  let invocationBatchCount = 0;
   let batchCount = metric(run.batch_count);
   const checkpointRows = reused ? await dependencies.repository.listBatchCheckpoints(runId) : [];
   const existingBatchKeys = new Set(
@@ -543,6 +594,7 @@ export async function runDocumentEvidencePreflight(
       batchAllocatedTokens: plan.map(batch => batch.allocatedTokens),
       reductionLevelWidths: reductionWidths(plan.length),
       generationMetrics: metrics,
+      metricDeltas: emptyMetricDeltas(),
       ...(downstreamRepresentation ? { downstreamRepresentation } : {}),
     };
   }
@@ -583,6 +635,8 @@ export async function runDocumentEvidencePreflight(
       outputTokens: metrics.outputTokens,
       totalCostUsd: metrics.totalCostUsd,
     });
+    if (event.usageDelta) addMetrics(invocationMetrics, event.usageDelta);
+    invocationBatchCount += 1;
     existingBatchKeys.add(event.batchKey);
   };
 
@@ -813,6 +867,11 @@ export async function runDocumentEvidencePreflight(
     batchAllocatedTokens: plan.map(batch => batch.allocatedTokens),
     reductionLevelWidths: reductionWidths(plan.length),
     generationMetrics: metrics,
+    metricDeltas: metricDeltasForAcceptedCards(
+      durableCards,
+      invocationBatchCount,
+      invocationMetrics
+    ),
     ...(downstreamRepresentation ? { downstreamRepresentation } : {}),
   };
 }

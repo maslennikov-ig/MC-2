@@ -11,6 +11,7 @@ import {
   type Stage5DocumentEvidenceEnrichment,
 } from '@megacampus/shared-types';
 import type { SearchResult } from '@/shared/qdrant/search-types';
+import { Stage5EvidenceEnrichmentFailure } from './types';
 import type {
   Stage5CurrentEvidenceDecision,
   Stage5EvidenceEnrichmentDependencies,
@@ -466,227 +467,238 @@ export async function enrichBaselineWithDocumentEvidence(
   input: Stage5EvidenceEnrichmentInput,
   dependencies: Stage5EvidenceEnrichmentDependencies
 ): Promise<Stage5EvidenceEnrichmentResult> {
-  if (!input.snapshot) {
-    return { courseStructure: input.baseline, enrichment: notApplicableRecord() };
-  }
-
-  const runId = input.snapshot.accepted_run_id;
-  let cards: DocumentEvidenceCard[];
-  let conflicts: DocumentConflict[];
-  let decisions: Stage5CurrentEvidenceDecision[];
+  let retrievalAttempts = 0;
   try {
-    await dependencies.repository.getAcceptedRun(runId, input.courseId, input.organizationId);
-    [cards, conflicts, decisions] = await Promise.all([
-      dependencies.repository.listItems(runId),
-      dependencies.repository.listConflicts(runId),
-      dependencies.repository.getLatestDecisions(runId),
-    ]);
-    if (
-      !exactDecisionIds(input.snapshot.current_decision_ids, decisions) ||
-      decisions.some(decision => !decisionScopeIsValid(decision, input))
-    ) {
-      throw new Error('stale_or_cross_tenant_decision_snapshot');
+    if (!input.snapshot) {
+      return {
+        courseStructure: input.baseline,
+        enrichment: notApplicableRecord(),
+        retrievalAttempts,
+      };
     }
-  } catch (error) {
-    dependencies.log?.warn(
-      {
-        courseId: input.courseId,
-        runId,
-        category: 'evidence_context_rejected',
-        errorName: error instanceof Error ? error.name : 'unknown',
-      },
-      'Stage 5 evidence context was rejected'
-    );
-    return {
-      courseStructure: input.baseline,
-      enrichment: buildRecord({
-        status: 'degraded',
-        runId,
-        decisionIds: input.snapshot.current_decision_ids,
-      }),
-    };
-  }
 
-  const actualCoverage = {
-    source_count: cards.length,
-    assessed_count: cards.filter(card => card.coverage_status === 'assessed').length,
-    degraded_count: cards.filter(card => card.coverage_status === 'degraded').length,
-    failed_count: cards.filter(card => card.coverage_status === 'failed').length,
-  };
-  if (JSON.stringify(actualCoverage) !== JSON.stringify(input.snapshot.coverage)) {
-    return {
-      courseStructure: input.baseline,
-      enrichment: buildRecord({
-        status: 'degraded',
-        runId,
-        decisionIds: decisions.map(value => value.id),
-      }),
-    };
-  }
-
-  const policy = resolveDecisionPolicy({ cards, conflicts, decisions });
-  if (!policy.complete) {
-    return {
-      courseStructure: input.baseline,
-      enrichment: buildRecord({
-        status: 'degraded',
-        runId,
-        decisionIds: decisions.map(value => value.id),
-      }),
-    };
-  }
-  const eligibleCards = cards
-    .filter(card => card.coverage_status !== 'failed')
-    .filter(card => !policy.removedDocumentIds.has(card.document_id))
-    .filter(card => !policy.blockedDocumentIds.has(card.document_id))
-    .filter(card => sourceVersion(card) !== undefined)
-    .sort(compareCardPriority)
-    .slice(0, MAX_DOCUMENTS_PER_SECTION_QUERY);
-  const cardsById = new Map(eligibleCards.map(card => [card.document_id, card]));
-  const allowedDocumentIds = eligibleCards.map(card => card.document_id);
-
-  if (allowedDocumentIds.length === 0) {
-    return {
-      courseStructure: input.baseline,
-      enrichment: buildRecord({
-        status: 'no_relevant_evidence',
-        runId,
-        decisionIds: decisions.map(value => value.id),
-      }),
-    };
-  }
-
-  const materials: Stage5EvidenceMaterial[] = [];
-  let failedQueries = 0;
-  let fallbackSectionCount = 0;
-  for (let sectionIndex = 0; sectionIndex < input.baseline.sections.length; sectionIndex++) {
-    const section = input.baseline.sections[sectionIndex];
-    const sectionNumber = section.section_number ?? sectionIndex + 1;
-    const query = buildSearchQuery(input.baseline, sectionIndex);
+    const runId = input.snapshot.accepted_run_id;
+    let cards: DocumentEvidenceCard[];
+    let conflicts: DocumentConflict[];
+    let decisions: Stage5CurrentEvidenceDecision[];
     try {
-      const response = await dependencies.search(query, {
-        limit: MAX_RESULTS_PER_SECTION,
-        score_threshold: 0.7,
-        enable_hybrid: true,
-        include_payload: true,
-        enable_priority_boost: true,
-        group_by_document: true,
-        group_size: 2,
-        filters: {
-          organization_id: input.organizationId,
-          course_id: input.courseId,
-          document_ids: allowedDocumentIds,
-        },
-      });
-      if (response.metadata.fallback_used) fallbackSectionCount += 1;
-      const refsByDocument = new Map<string, Map<string, EvidenceSourceRef>>();
-      for (const result of response.results) {
-        const card = cardsById.get(result.document_id);
-        const expectedVersion = card ? sourceVersion(card) : undefined;
-        if (!card || !expectedVersion) continue;
-        const ref = resultRef(result, input, expectedVersion, policy.blockedRefs);
-        if (!ref) continue;
-        const refs = refsByDocument.get(card.document_id) ?? new Map<string, EvidenceSourceRef>();
-        refs.set(JSON.stringify(stableValue(ref)), ref);
-        refsByDocument.set(card.document_id, refs);
+      await dependencies.repository.getAcceptedRun(runId, input.courseId, input.organizationId);
+      [cards, conflicts, decisions] = await Promise.all([
+        dependencies.repository.listItems(runId),
+        dependencies.repository.listConflicts(runId),
+        dependencies.repository.getLatestDecisions(runId),
+      ]);
+      if (
+        !exactDecisionIds(input.snapshot.current_decision_ids, decisions) ||
+        decisions.some(decision => !decisionScopeIsValid(decision, input))
+      ) {
+        throw new Error('stale_or_cross_tenant_decision_snapshot');
       }
-      for (const [documentId, refs] of [...refsByDocument.entries()].sort(([left], [right]) =>
-        left.localeCompare(right)
-      )) {
-        const card = cardsById.get(documentId);
-        if (!card) continue;
-        const evidenceRefs = [...refs.entries()]
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([, ref]) => ref)
-          .slice(0, MAX_REFS_PER_SECTION);
-        const additions = buildAdditions(card, policy, evidenceRefs);
-        if (additions.length === 0) continue;
-        materials.push({
-          sectionNumber,
-          documentId,
-          additions,
-          evidenceRefs,
-          searchQuery: query,
-        });
-      }
-    } catch (error) {
-      failedQueries += 1;
+    } catch {
       dependencies.log?.warn(
         {
-          courseId: input.courseId,
-          runId,
-          sectionNumber,
-          category: 'qdrant_unavailable',
-          errorName: error instanceof Error ? error.name : 'unknown',
+          outcome: 'evidence_context_rejected',
         },
-        'Stage 5 advisory retrieval was unavailable'
+        'Stage 5 evidence context was rejected'
       );
+      return {
+        courseStructure: input.baseline,
+        enrichment: buildRecord({
+          status: 'degraded',
+          runId,
+          decisionIds: input.snapshot.current_decision_ids,
+        }),
+        retrievalAttempts,
+      };
     }
-  }
 
-  if (materials.length === 0) {
-    const status =
-      failedQueries > 0
-        ? policy.continueLimited
-          ? 'failed_open_with_decision'
-          : 'degraded'
-        : fallbackSectionCount > 0
-          ? 'degraded'
+    const actualCoverage = {
+      source_count: cards.length,
+      assessed_count: cards.filter(card => card.coverage_status === 'assessed').length,
+      degraded_count: cards.filter(card => card.coverage_status === 'degraded').length,
+      failed_count: cards.filter(card => card.coverage_status === 'failed').length,
+    };
+    if (JSON.stringify(actualCoverage) !== JSON.stringify(input.snapshot.coverage)) {
+      return {
+        courseStructure: input.baseline,
+        enrichment: buildRecord({
+          status: 'degraded',
+          runId,
+          decisionIds: decisions.map(value => value.id),
+        }),
+        retrievalAttempts,
+      };
+    }
+
+    const policy = resolveDecisionPolicy({ cards, conflicts, decisions });
+    if (!policy.complete) {
+      return {
+        courseStructure: input.baseline,
+        enrichment: buildRecord({
+          status: 'degraded',
+          runId,
+          decisionIds: decisions.map(value => value.id),
+        }),
+        retrievalAttempts,
+      };
+    }
+    const eligibleCards = cards
+      .filter(card => card.coverage_status !== 'failed')
+      .filter(card => !policy.removedDocumentIds.has(card.document_id))
+      .filter(card => !policy.blockedDocumentIds.has(card.document_id))
+      .filter(card => sourceVersion(card) !== undefined)
+      .sort(compareCardPriority)
+      .slice(0, MAX_DOCUMENTS_PER_SECTION_QUERY);
+    const cardsById = new Map(eligibleCards.map(card => [card.document_id, card]));
+    const allowedDocumentIds = eligibleCards.map(card => card.document_id);
+
+    if (allowedDocumentIds.length === 0) {
+      return {
+        courseStructure: input.baseline,
+        enrichment: buildRecord({
+          status: 'no_relevant_evidence',
+          runId,
+          decisionIds: decisions.map(value => value.id),
+        }),
+        retrievalAttempts,
+      };
+    }
+
+    const materials: Stage5EvidenceMaterial[] = [];
+    let failedQueries = 0;
+    let fallbackSectionCount = 0;
+    for (let sectionIndex = 0; sectionIndex < input.baseline.sections.length; sectionIndex++) {
+      const section = input.baseline.sections[sectionIndex];
+      const sectionNumber = section.section_number ?? sectionIndex + 1;
+      const query = buildSearchQuery(input.baseline, sectionIndex);
+      try {
+        retrievalAttempts += 1;
+        const response = await dependencies.search(query, {
+          limit: MAX_RESULTS_PER_SECTION,
+          score_threshold: 0.7,
+          enable_hybrid: true,
+          include_payload: true,
+          enable_priority_boost: true,
+          group_by_document: true,
+          group_size: 2,
+          filters: {
+            organization_id: input.organizationId,
+            course_id: input.courseId,
+            document_ids: allowedDocumentIds,
+          },
+        });
+        if (response.metadata.fallback_used) fallbackSectionCount += 1;
+        const refsByDocument = new Map<string, Map<string, EvidenceSourceRef>>();
+        for (const result of response.results) {
+          const card = cardsById.get(result.document_id);
+          const expectedVersion = card ? sourceVersion(card) : undefined;
+          if (!card || !expectedVersion) continue;
+          const ref = resultRef(result, input, expectedVersion, policy.blockedRefs);
+          if (!ref) continue;
+          const refs = refsByDocument.get(card.document_id) ?? new Map<string, EvidenceSourceRef>();
+          refs.set(JSON.stringify(stableValue(ref)), ref);
+          refsByDocument.set(card.document_id, refs);
+        }
+        for (const [documentId, refs] of [...refsByDocument.entries()].sort(([left], [right]) =>
+          left.localeCompare(right)
+        )) {
+          const card = cardsById.get(documentId);
+          if (!card) continue;
+          const evidenceRefs = [...refs.entries()]
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([, ref]) => ref)
+            .slice(0, MAX_REFS_PER_SECTION);
+          const additions = buildAdditions(card, policy, evidenceRefs);
+          if (additions.length === 0) continue;
+          materials.push({
+            sectionNumber,
+            documentId,
+            additions,
+            evidenceRefs,
+            searchQuery: query,
+          });
+        }
+      } catch {
+        failedQueries += 1;
+        dependencies.log?.warn(
+          {
+            outcome: 'retrieval_unavailable',
+          },
+          'Stage 5 advisory retrieval was unavailable'
+        );
+      }
+    }
+
+    if (materials.length === 0) {
+      const status =
+        failedQueries > 0
+          ? policy.continueLimited
+            ? 'failed_open_with_decision'
+            : 'degraded'
+          : fallbackSectionCount > 0
+            ? 'degraded'
+            : 'no_relevant_evidence';
+      return {
+        courseStructure: input.baseline,
+        enrichment: buildRecord({
+          status,
+          runId,
+          decisionIds: decisions.map(value => value.id),
+          fallbackSectionCount,
+        }),
+        retrievalAttempts,
+      };
+    }
+
+    const patcher = dependencies.patcher ?? deterministicPatcher;
+    let violations: string[] = [];
+    for (const attempt of [1, 2] as const) {
+      const candidate = await patcher({ baseline: input.baseline, materials, attempt, violations });
+      violations = validateCandidate(input.baseline, candidate, input, dependencies);
+      if (violations.length === 0) {
+        const changed = JSON.stringify(candidate) !== JSON.stringify(input.baseline);
+        const status = changed
+          ? failedQueries > 0 || fallbackSectionCount > 0
+            ? 'degraded'
+            : 'applied'
           : 'no_relevant_evidence';
+        const persistedMaterials = changed ? materials : [];
+        const enrichment = buildRecord({
+          status,
+          runId,
+          decisionIds: decisions.map(value => value.id),
+          materials: persistedMaterials,
+          attemptedPatches: attempt,
+          fallbackSectionCount,
+        });
+        dependencies.log?.info(
+          {
+            status,
+            sectionCount: enrichment.section_evidence.length,
+            refCount: enrichment.retrieved_ref_count,
+          },
+          'Stage 5 advisory evidence pass completed'
+        );
+        return {
+          courseStructure: changed ? candidate : input.baseline,
+          enrichment,
+          retrievalAttempts,
+        };
+      }
+    }
+
     return {
       courseStructure: input.baseline,
       enrichment: buildRecord({
-        status,
+        status: policy.continueLimited ? 'failed_open_with_decision' : 'degraded',
         runId,
         decisionIds: decisions.map(value => value.id),
+        attemptedPatches: 2,
         fallbackSectionCount,
       }),
+      retrievalAttempts,
     };
+  } catch {
+    throw new Stage5EvidenceEnrichmentFailure(retrievalAttempts);
   }
-
-  const patcher = dependencies.patcher ?? deterministicPatcher;
-  let violations: string[] = [];
-  for (const attempt of [1, 2] as const) {
-    const candidate = await patcher({ baseline: input.baseline, materials, attempt, violations });
-    violations = validateCandidate(input.baseline, candidate, input, dependencies);
-    if (violations.length === 0) {
-      const changed = JSON.stringify(candidate) !== JSON.stringify(input.baseline);
-      const status = changed
-        ? failedQueries > 0 || fallbackSectionCount > 0
-          ? 'degraded'
-          : 'applied'
-        : 'no_relevant_evidence';
-      const persistedMaterials = changed ? materials : [];
-      const enrichment = buildRecord({
-        status,
-        runId,
-        decisionIds: decisions.map(value => value.id),
-        materials: persistedMaterials,
-        attemptedPatches: attempt,
-        fallbackSectionCount,
-      });
-      dependencies.log?.info(
-        {
-          courseId: input.courseId,
-          runId,
-          status,
-          sectionCount: enrichment.section_evidence.length,
-          refCount: enrichment.retrieved_ref_count,
-        },
-        'Stage 5 advisory evidence pass completed'
-      );
-      return { courseStructure: changed ? candidate : input.baseline, enrichment };
-    }
-  }
-
-  return {
-    courseStructure: input.baseline,
-    enrichment: buildRecord({
-      status: policy.continueLimited ? 'failed_open_with_decision' : 'degraded',
-      runId,
-      decisionIds: decisions.map(value => value.id),
-      attemptedPatches: 2,
-      fallbackSectionCount,
-    }),
-  };
 }

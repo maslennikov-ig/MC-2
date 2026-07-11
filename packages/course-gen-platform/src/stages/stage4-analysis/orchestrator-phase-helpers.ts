@@ -63,7 +63,9 @@ import { resolveDownstreamDocumentSummaries } from './evidence/downstream-contex
 import { createHash } from 'node:crypto';
 import {
   createProductionConflictDetectionPort,
+  ConflictDetectionExecutionError,
   detectDocumentConflicts,
+  type ConflictMetricDeltas,
   type DetectDocumentConflictsDependencies,
   type DetectDocumentConflictsInput,
 } from './evidence/conflict-detector';
@@ -72,6 +74,11 @@ import {
   type ResolveDocumentEvidenceDecisionsDependencies,
   type ResolveDocumentEvidenceDecisionsInput,
 } from './evidence/decision-service';
+import {
+  publishDocumentEvidenceMetricsSafely,
+  type DocumentEvidenceMetricEvent,
+  type Stage4DurableTotals,
+} from '@/shared/metrics/document-evidence-textfile';
 
 export interface DocumentEvidencePhaseOverrides {
   enabled?: boolean;
@@ -94,6 +101,18 @@ export interface DocumentEvidencePhaseOverrides {
     | 'getPendingRetryDirectives'
     | 'consumeRetryDirectives'
   >;
+  publishMetrics?: typeof publishDocumentEvidenceMetricsSafely;
+  loadCriticalConflictState?: () => Promise<{
+    unresolved: number;
+    oldestUnixSeconds: number;
+    observedAtUnixMilliseconds: number;
+  }>;
+  loadDecisionTotals?: () => Promise<{
+    user: number;
+    system: number;
+    degradedAutomatic: number;
+  }>;
+  loadDurableTotals?: () => Promise<Stage4DurableTotals>;
 }
 
 function stableUuidV8(value: string): string {
@@ -109,12 +128,189 @@ function evidenceEnabled(overrides?: DocumentEvidencePhaseOverrides): boolean {
   return overrides?.enabled ?? process.env.DOCUMENT_EVIDENCE_ENABLED === 'true';
 }
 
+function failedStage4Metric(
+  mode: 'shadow' | 'active',
+  durationSeconds: number,
+  sourceCount: number,
+  durableTotals?: Stage4DurableTotals,
+  failureDeltas?: ConflictMetricDeltas
+): DocumentEvidenceMetricEvent {
+  return {
+    stage: 'stage4',
+    status: 'failed',
+    mode,
+    runDelta: 1,
+    observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+    coverage: { source: sourceCount, assessed: 0, degraded: 0, failed: 0 },
+    documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+    processingModes: {
+      full_text: 0,
+      hierarchical_summary: 0,
+      summary: 0,
+      targeted_retrieval: 0,
+      metadata_only: 0,
+    },
+    batches: failureDeltas?.batches ?? 0,
+    inputTokens: failureDeltas?.usage.input_tokens ?? 0,
+    outputTokens: failureDeltas?.usage.output_tokens ?? 0,
+    modelCalls: failureDeltas?.usage.model_calls ?? 0,
+    costUsd: failureDeltas?.usage.total_cost_usd ?? 0,
+    durationSeconds,
+    conflicts: failureDeltas?.conflicts ?? {
+      critical: 0,
+      important: 0,
+      informational: 0,
+    },
+    decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+    ...(durableTotals ? { durableTotals } : {}),
+  };
+}
+
+async function loadDurableCriticalConflictState(context: AnalysisContext): Promise<{
+  unresolved: number;
+  oldestUnixSeconds: number;
+  observedAtUnixMilliseconds: number;
+}> {
+  const { data, error, count } = await context.supabase
+    .from('clarifying_questions')
+    .select('created_at', { count: 'exact' })
+    .eq('question_category', 'document_conflicts')
+    .eq('question_priority', 'critical')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (error) throw new Error('Critical conflict metrics reconciliation failed');
+  const unresolved = count ?? data?.length ?? 0;
+  const createdAt = data?.[0]?.created_at;
+  const oldestUnixSeconds =
+    unresolved > 0 && typeof createdAt === 'string'
+      ? Math.floor(new Date(createdAt).getTime() / 1000)
+      : 0;
+  if (unresolved > 0 && (!Number.isSafeInteger(oldestUnixSeconds) || oldestUnixSeconds <= 0)) {
+    throw new Error('Critical conflict metrics reconciliation returned an invalid timestamp');
+  }
+  return {
+    unresolved,
+    oldestUnixSeconds,
+    observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+  };
+}
+
+async function loadDurableStage4Totals(context: AnalysisContext): Promise<Stage4DurableTotals> {
+  type DurableTotalsClient = {
+    rpc(
+      functionName: 'get_document_evidence_observability_totals'
+    ): Promise<{ data: unknown; error: unknown }>;
+  };
+  const totalsClient = context.supabase as unknown as DurableTotalsClient;
+  const { data, error } = await totalsClient.rpc('get_document_evidence_observability_totals');
+  if (error || !data) throw new Error('Document evidence metrics reconciliation failed');
+  const row = data as Record<string, unknown>;
+  const count = (column: string): number => {
+    const value = Number(row[column]);
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error('Document evidence metrics reconciliation returned invalid totals');
+    }
+    return value;
+  };
+  const amount = (column: string): number => {
+    const value = Number(row[column]);
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error('Document evidence metrics reconciliation returned invalid totals');
+    }
+    return value;
+  };
+  return {
+    databaseStartUnixMilliseconds: count('database_start_unix_milliseconds'),
+    generation: count('generation'),
+    revision: count('revision'),
+    runs: { accepted: count('accepted_runs'), failed: count('failed_runs') },
+    documents: {
+      source: count('source_documents'),
+      assessed: count('assessed_documents'),
+      degraded: count('degraded_documents'),
+      failed: count('failed_documents'),
+    },
+    latestCoverage: {
+      source: count('latest_coverage_source'),
+      assessed: count('latest_coverage_assessed'),
+      degraded: count('latest_coverage_degraded'),
+      failed: count('latest_coverage_failed'),
+    },
+    processingModes: {
+      full_text: count('full_text_documents'),
+      hierarchical_summary: count('hierarchical_summary_documents'),
+      summary: count('summary_documents'),
+      targeted_retrieval: count('targeted_retrieval_documents'),
+      metadata_only: count('metadata_only_documents'),
+    },
+    batches: count('batches'),
+    modelCalls: count('model_calls'),
+    inputTokens: count('input_tokens'),
+    outputTokens: count('output_tokens'),
+    costUsd: amount('total_cost_usd'),
+    durationSeconds: amount('duration_seconds'),
+    conflicts: {
+      critical: count('critical_conflicts'),
+      important: count('important_conflicts'),
+      informational: count('informational_conflicts'),
+    },
+    decisions: {
+      user: count('user_decisions'),
+      system: count('system_decisions'),
+      degradedAutomatic: count('degraded_automatic_decisions'),
+    },
+  };
+}
+
+async function tryLoadDurableTotals(
+  context: AnalysisContext,
+  overrides?: DocumentEvidencePhaseOverrides
+): Promise<Stage4DurableTotals | undefined> {
+  try {
+    return await (overrides?.loadDurableTotals ?? (() => loadDurableStage4Totals(context)))();
+  } catch {
+    return undefined;
+  }
+}
+
 /** Runs after Phase 1 and before the existing Phase 0.5 pause/resume boundary. */
 export async function runDocumentEvidencePhase(
   context: AnalysisContext,
   overrides?: DocumentEvidencePhaseOverrides
 ): Promise<void> {
   if (!evidenceEnabled(overrides) || context.originalDocumentSummaries.length === 0) return;
+  const startedAt = Date.now();
+  const mode =
+    overrides?.mode ?? (process.env.DOCUMENT_EVIDENCE_MODE === 'active' ? 'active' : 'shadow');
+  const publishMetrics = overrides?.publishMetrics ?? publishDocumentEvidenceMetricsSafely;
+  try {
+    const metric = await runDocumentEvidencePhaseCore(context, overrides, mode, startedAt);
+    await publishMetrics(metric, context.orchestrationLogger);
+  } catch (error) {
+    const durableTotals = await tryLoadDurableTotals(context, overrides);
+    const failureDeltas =
+      error instanceof ConflictDetectionExecutionError ? error.metricDeltas : undefined;
+    await publishMetrics(
+      failedStage4Metric(
+        mode,
+        Math.max(0, (Date.now() - startedAt) / 1000),
+        context.originalDocumentSummaries.length,
+        durableTotals,
+        failureDeltas
+      ),
+      context.orchestrationLogger
+    );
+    throw error;
+  }
+}
+
+async function runDocumentEvidencePhaseCore(
+  context: AnalysisContext,
+  overrides: DocumentEvidencePhaseOverrides | undefined,
+  mode: 'shadow' | 'active',
+  startedAt: number
+): Promise<DocumentEvidenceMetricEvent> {
   if (!context.phase1Output) throw new Error('Phase 1 output required for document evidence');
 
   const allocationById = new Map(
@@ -140,8 +336,6 @@ export async function runDocumentEvidencePhase(
     };
   });
 
-  const mode =
-    overrides?.mode ?? (process.env.DOCUMENT_EVIDENCE_MODE === 'active' ? 'active' : 'shadow');
   const decisionMode =
     overrides?.decisionMode ??
     (mode === 'active' &&
@@ -174,22 +368,22 @@ export async function runDocumentEvidencePhase(
       : [];
   const runPreflight = overrides?.runPreflight ?? runDocumentEvidencePreflight;
   const preflightInput: DocumentEvidencePreflightInput = {
-      courseId: context.courseId,
-      organizationId: context.organizationId,
-      topic: context.input.topic,
-      language: context.input.language === 'en' ? 'en' : 'ru',
-      evidenceVersion: 'document-evidence-v1',
-      modelId: context.budgetAllocation?.modelSelection.modelId,
-      classificationContext: context.phase1Output,
-      sources,
-      modelContext: context.budgetAllocation?.modelSelection.maxContext ?? 700_000,
-      promptReserve: 10_000,
-      outputReserve: 16_000,
-      maxBatchTokens: 32_000,
-      maxRetries: 2,
-      maxVerificationDocumentIds: 100,
-      requireBoundedDownstreamContext: mode === 'active' && context.legacyBudgetFits === false,
-      ...(pendingRetryDirectives.length > 0 ? { retryDirectives: pendingRetryDirectives } : {}),
+    courseId: context.courseId,
+    organizationId: context.organizationId,
+    topic: context.input.topic,
+    language: context.input.language === 'en' ? 'en' : 'ru',
+    evidenceVersion: 'document-evidence-v1',
+    modelId: context.budgetAllocation?.modelSelection.modelId,
+    classificationContext: context.phase1Output,
+    sources,
+    modelContext: context.budgetAllocation?.modelSelection.maxContext ?? 700_000,
+    promptReserve: 10_000,
+    outputReserve: 16_000,
+    maxBatchTokens: 32_000,
+    maxRetries: 2,
+    maxVerificationDocumentIds: 100,
+    requireBoundedDownstreamContext: mode === 'active' && context.legacyBudgetFits === false,
+    ...(pendingRetryDirectives.length > 0 ? { retryDirectives: pendingRetryDirectives } : {}),
   };
   let result = await runPreflight(preflightInput, dependencies);
   if (result.status === 'accepted' && result.runId && pendingRetryDirectives.length > 0) {
@@ -259,7 +453,8 @@ export async function runDocumentEvidencePhase(
   }
   context.documentEvidencePreflight = result;
   context.documentEvidenceMode = mode;
-  if (mode === 'active' && result.status === 'accepted' && result.runId) {
+  let conflictResult: Awaited<ReturnType<typeof detectDocumentConflicts>> | undefined;
+  if (result.status === 'accepted' && result.runId) {
     const repository = evidenceRepository;
     const modelId = context.budgetAllocation?.modelSelection.modelId;
     const conflictDependencies =
@@ -284,25 +479,30 @@ export async function runDocumentEvidencePhase(
       maxInputTokens: 32_000,
       maxOutputTokens: 8_000,
     };
-    await (overrides?.detectConflicts ?? detectDocumentConflicts)(
+    conflictResult = await (overrides?.detectConflicts ?? detectDocumentConflicts)(
       conflictInput,
       conflictDependencies
     );
-    const decisionInput: ResolveDocumentEvidenceDecisionsInput = {
-      runId: result.runId,
-      courseId: context.courseId,
-      organizationId: context.organizationId,
-      language: context.input.language === 'en' ? 'en' : 'ru',
-      mode: decisionMode,
-      maxUiExcerptChars: 600,
-      maxSourceRefsPerSide: 8,
-      maxDocumentsInMetadata: 16,
-      maxEvidenceRetryAttempts: 2,
-      automaticCapacityPolicy: 'continue_limited',
-    };
-    context.documentEvidenceDecisions = await (
-      overrides?.resolveDecisions ?? resolveDocumentEvidenceDecisions
-    )(decisionInput, overrides?.decisionDependencies ?? { repository, log: context.orchestrationLogger });
+    if (mode === 'active') {
+      const decisionInput: ResolveDocumentEvidenceDecisionsInput = {
+        runId: result.runId,
+        courseId: context.courseId,
+        organizationId: context.organizationId,
+        language: context.input.language === 'en' ? 'en' : 'ru',
+        mode: decisionMode,
+        maxUiExcerptChars: 600,
+        maxSourceRefsPerSide: 8,
+        maxDocumentsInMetadata: 16,
+        maxEvidenceRetryAttempts: 2,
+        automaticCapacityPolicy: 'continue_limited',
+      };
+      context.documentEvidenceDecisions = await (
+        overrides?.resolveDecisions ?? resolveDocumentEvidenceDecisions
+      )(
+        decisionInput,
+        overrides?.decisionDependencies ?? { repository, log: context.orchestrationLogger }
+      );
+    }
   }
   context.orchestrationLogger.info(
     {
@@ -315,6 +515,90 @@ export async function runDocumentEvidencePhase(
     },
     'Document evidence preflight complete'
   );
+  const processingModes = {
+    full_text: 0,
+    hierarchical_summary: 0,
+    summary: 0,
+    targeted_retrieval: 0,
+    metadata_only: 0,
+  };
+  for (const card of result.cards) {
+    if (card.processing_mode in processingModes) {
+      processingModes[card.processing_mode] += 1;
+    }
+  }
+  const conflicts = conflictResult?.conflicts ?? [];
+  const preflightMetricDeltas = result.metricDeltas ?? {
+    acceptedRun: 1 as const,
+    documents: {
+      source: result.coverage.source_count,
+      assessed: result.coverage.assessed_count,
+      degraded: result.coverage.degraded_count,
+      failed: result.coverage.failed_count,
+    },
+    processingModes,
+    batches: result.batchDocumentIds.length,
+    generationMetrics: result.generationMetrics,
+  };
+  const conflictMetricDeltas = conflictResult?.metricDeltas ?? {
+    batches: conflictResult?.batchCount ?? 0,
+    usage: conflictResult?.usage,
+    conflicts: {
+      critical: conflicts.filter(conflict => conflict.severity === 'critical').length,
+      important: conflicts.filter(conflict => conflict.severity === 'important').length,
+      informational: conflicts.filter(conflict => conflict.severity === 'informational').length,
+    },
+  };
+  const conflictUsage = conflictMetricDeltas.usage;
+  let criticalConflictState:
+    | { unresolved: number; oldestUnixSeconds: number; observedAtUnixMilliseconds: number }
+    | undefined;
+  try {
+    criticalConflictState = await (
+      overrides?.loadCriticalConflictState ?? (() => loadDurableCriticalConflictState(context))
+    )();
+  } catch {
+    // A failed reconciliation must never clear a previously published unresolved state.
+  }
+  const durableTotals = await tryLoadDurableTotals(context, overrides);
+  let decisionTotals = durableTotals?.decisions;
+  if (!decisionTotals && overrides?.loadDecisionTotals) {
+    try {
+      decisionTotals = await overrides.loadDecisionTotals();
+    } catch {
+      // A failed totals reconciliation must not change monotonic decision counters.
+    }
+  }
+  return {
+    stage: 'stage4',
+    status: 'accepted',
+    mode,
+    runDelta: preflightMetricDeltas.acceptedRun,
+    observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+    coverage: {
+      source: result.coverage.source_count,
+      assessed: result.coverage.assessed_count,
+      degraded: result.coverage.degraded_count,
+      failed: result.coverage.failed_count,
+    },
+    documentDeltas: preflightMetricDeltas.documents,
+    processingModes: preflightMetricDeltas.processingModes,
+    batches: preflightMetricDeltas.batches + conflictMetricDeltas.batches,
+    inputTokens:
+      preflightMetricDeltas.generationMetrics.inputTokens + (conflictUsage?.input_tokens ?? 0),
+    outputTokens:
+      preflightMetricDeltas.generationMetrics.outputTokens + (conflictUsage?.output_tokens ?? 0),
+    modelCalls:
+      preflightMetricDeltas.generationMetrics.modelCalls + (conflictUsage?.model_calls ?? 0),
+    costUsd:
+      preflightMetricDeltas.generationMetrics.totalCostUsd + (conflictUsage?.total_cost_usd ?? 0),
+    durationSeconds:
+      preflightMetricDeltas.acceptedRun === 1 ? Math.max(0, (Date.now() - startedAt) / 1000) : 0,
+    conflicts: conflictMetricDeltas.conflicts,
+    ...(decisionTotals ? { decisions: decisionTotals } : {}),
+    ...(durableTotals ? { durableTotals } : {}),
+    ...(criticalConflictState ? { criticalConflictState } : {}),
+  };
 }
 
 /**

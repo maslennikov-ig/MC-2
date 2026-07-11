@@ -478,6 +478,137 @@
       ],
       "title": "Hybrid fallback and request count",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 37 },
+      "id": 13,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (status) (increase(megacampus_document_evidence_runs_total{stage=\"stage4\"}[$__range]))",
+          "legendFormat": "durable {{status}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (status, mode) (increase(megacampus_document_evidence_stage4_invocations_total[$__range]))",
+          "legendFormat": "invocation {{status}}/{{mode}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Evidence run status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "max": 1, "min": 0, "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 37 },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "min(megacampus_document_evidence_coverage_ratio)",
+          "legendFormat": "exact coverage",
+          "refId": "A"
+        }
+      ],
+      "title": "Evidence document coverage",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 37 },
+      "id": 15,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (mode) (increase(megacampus_document_evidence_processing_mode_total[$__range]))",
+          "legendFormat": "{{mode}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Evidence processing modes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 43 },
+      "id": 16,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(increase(megacampus_document_evidence_cost_usd_total[$__range]))",
+          "legendFormat": "cost USD",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(megacampus_document_evidence_duration_seconds_total[$__range]))",
+          "legendFormat": "duration seconds",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(megacampus_document_evidence_model_calls_total[$__range]))",
+          "legendFormat": "model calls",
+          "refId": "C"
+        }
+      ],
+      "title": "Evidence cost and duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 43 },
+      "id": 17,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (severity) (increase(megacampus_document_evidence_conflicts_total[$__range]))",
+          "legendFormat": "conflict {{severity}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (actor) (increase(megacampus_document_evidence_decisions_total[$__range]))",
+          "legendFormat": "decision {{actor}}",
+          "refId": "B"
+        },
+        {
+          "expr": "max(megacampus_document_evidence_unresolved_critical_conflicts)",
+          "legendFormat": "unresolved critical",
+          "refId": "C"
+        }
+      ],
+      "title": "Evidence conflicts and decisions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 43 },
+      "id": 18,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (stage, outcome) (rate(megacampus_document_evidence_retrieval_total[15m]))",
+          "legendFormat": "Stage {{stage}} {{outcome}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (status) (rate(megacampus_document_evidence_stage5_outcomes_total[15m]))",
+          "legendFormat": "Stage 5 {{status}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (status) (rate(megacampus_document_evidence_stage6_outcomes_total[15m]))",
+          "legendFormat": "Stage 6 {{status}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Evidence Stage 5 / 6 retrieval",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",

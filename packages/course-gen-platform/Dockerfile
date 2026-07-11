@@ -74,10 +74,18 @@ RUN pnpm --filter @megacampus/course-gen-platform build
 # Prune dev dependencies
 RUN pnpm --filter @megacampus/course-gen-platform --prod deploy pruned
 
-# Stage 4: Production image
-FROM node:${NODE_VERSION}-bookworm-slim AS runner
+# Stage 4: Auditable production runtime tools
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime-tools
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init curl ca-certificates util-linux && \
+    flock --version && \
+    rm -rf /var/lib/apt/lists/*
+
+# Stage 5: Production image
+FROM runtime-tools AS runner
 
 # Metadata labels
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
@@ -89,11 +97,8 @@ LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.title="MegaCampus API Server"
 LABEL org.opencontainers.image.description="Express + tRPC API server for MegaCampusAI platform"
 
-# Install tsx for ESM module resolution and runtime tools
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends dumb-init curl ca-certificates && \
-    rm -rf /var/lib/apt/lists/* && \
-    npm install -g tsx
+# Install tsx for ESM module resolution
+RUN npm install -g tsx
 
 # Create non-root user
 RUN groupadd --system --gid 1001 nodejs && \

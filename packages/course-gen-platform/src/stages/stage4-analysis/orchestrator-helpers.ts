@@ -68,6 +68,8 @@ export interface AnalysisContext {
     requiredQuestionIds: string[];
     currentDecisionIds: string[];
     unresolvedInformationalConflictIds: string[];
+    decisionSummary?: { user: number; system: number; degradedAutomatic: number };
+    unresolvedCriticalConflictCount?: number;
   };
   /** False only when the enabled evidence preflight owns legacy context overflow. */
   legacyBudgetFits?: boolean;
@@ -91,8 +93,7 @@ export function attachDocumentEvidenceSnapshot(
       accepted_run_id: preflight.runId,
       coverage: preflight.coverage,
       current_decision_ids: decisions?.currentDecisionIds ?? [],
-      unresolved_informational_conflict_ids:
-        decisions?.unresolvedInformationalConflictIds ?? [],
+      unresolved_informational_conflict_ids: decisions?.unresolvedInformationalConflictIds ?? [],
       enrichment_status: 'not_applicable',
     },
   };

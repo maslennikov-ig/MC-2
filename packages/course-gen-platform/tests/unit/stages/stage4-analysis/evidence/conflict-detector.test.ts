@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
 import {
   buildConflictFingerprint,
+  ConflictDetectionExecutionError,
   createProductionConflictDetectionPort,
   detectDocumentConflicts,
+  documentConflictDetectorTesting,
   type ConflictDetectionPort,
   type ConflictDetectionRepository,
 } from '@/stages/stage4-analysis/evidence/conflict-detector';
@@ -129,6 +131,12 @@ const baseInput = {
   maxOutputTokens: 1_000,
 };
 
+async function expectExecutionCause(promise: Promise<unknown>, pattern: RegExp): Promise<void> {
+  await expect(promise).rejects.toMatchObject({
+    cause: expect.objectContaining({ message: expect.stringMatching(pattern) }),
+  });
+}
+
 describe('document conflict detector', () => {
   it('loads only an accepted persisted run and keeps authority independent from quality', async () => {
     const db = repository([...cards].reverse());
@@ -207,9 +215,10 @@ describe('document conflict detector', () => {
       ],
       usage: { model_calls: 1, input_tokens: 1, output_tokens: 1, total_cost_usd: 0 },
     });
-    await expect(
-      detectDocumentConflicts(baseInput, { repository: repository(), port: invented })
-    ).rejects.toThrow(/allowlist/i);
+    await expectExecutionCause(
+      detectDocumentConflicts(baseInput, { repository: repository(), port: invented }),
+      /allowlist/i
+    );
 
     const unknown = port();
     vi.mocked(unknown.classifyProposition).mockResolvedValueOnce({
@@ -217,11 +226,12 @@ describe('document conflict detector', () => {
       usage: { model_calls: 1, input_tokens: 1, output_tokens: 1, total_cost_usd: 0 },
       secret_extra: 'forbidden',
     } as never);
-    await expect(
-      detectDocumentConflicts(baseInput, { repository: repository(), port: unknown })
-    ).rejects.toThrow(/unrecognized|unknown/i);
+    await expectExecutionCause(
+      detectDocumentConflicts(baseInput, { repository: repository(), port: unknown }),
+      /unrecognized|unknown/i
+    );
 
-    await expect(
+    await expectExecutionCause(
       detectDocumentConflicts(baseInput, {
         repository: repository(),
         port: port(),
@@ -229,8 +239,9 @@ describe('document conflict detector', () => {
           verifiedDocumentIds: [UUID.docA],
           sourceRefs: [{ documentId: '40000000-0000-4000-8000-999999999999', chunkId: 'foreign' }],
         }),
-      })
-    ).rejects.toThrow(/foreign.*ref/i);
+      }),
+      /foreign.*ref/i
+    );
   });
 
   it('skips the port for zero/one claim and never creates a compatible false positive', async () => {
@@ -359,12 +370,13 @@ describe('document conflict detector', () => {
           usage: { model_calls: 1, input_tokens: 1, output_tokens: 1, total_cost_usd: 0 },
         };
       });
-      await expect(
+      await expectExecutionCause(
         detectDocumentConflicts(baseInput, {
           repository: repository(many),
           port: classifier,
-        })
-      ).rejects.toThrow(/partition.*allowlist|exact.*cluster/i);
+        }),
+        /partition.*allowlist|exact.*cluster/i
+      );
     }
   });
 
@@ -416,6 +428,99 @@ describe('document conflict detector', () => {
     );
   });
 
+  it('reports retry-exhausted production usage once and replays the capacity checkpoint without calls', async () => {
+    const db = repository();
+    const invoke = vi.fn(async () => ({
+      content: JSON.stringify({ propositions: [], unexpected: true }),
+      usage: { input_tokens: 7, output_tokens: 3, total_cost_usd: 0.02 },
+    }));
+    const production = createProductionConflictDetectionPort({ invoke, maxRetries: 1 });
+    const first = await detectDocumentConflicts(
+      { ...baseInput, maxModelCalls: 2 },
+      { repository: db, port: production }
+    );
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(first.metricDeltas).toEqual({
+      batches: 1,
+      usage: { model_calls: 2, input_tokens: 14, output_tokens: 6, total_cost_usd: 0.04 },
+      conflicts: { critical: 0, important: 0, informational: 0 },
+    });
+    expect(db.commitConflictBatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        structuredCheckpoint: expect.objectContaining({
+          kind: 'conflict_capacity_degraded',
+          usage: {
+            model_calls: 2,
+            input_tokens: 14,
+            output_tokens: 6,
+            total_cost_usd: 0.04,
+          },
+        }),
+      })
+    );
+
+    const replayInvoke = vi.fn();
+    const replay = await detectDocumentConflicts(
+      { ...baseInput, maxModelCalls: 2 },
+      {
+        repository: db,
+        port: createProductionConflictDetectionPort({ invoke: replayInvoke, maxRetries: 1 }),
+      }
+    );
+    expect(replayInvoke).not.toHaveBeenCalled();
+    expect(replay.metricDeltas).toEqual({
+      batches: 0,
+      usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+      conflicts: { critical: 0, important: 0, informational: 0 },
+    });
+  });
+
+  it('reports all usage when a port returns attempts above the remaining budget', async () => {
+    const classifier = port();
+    vi.mocked(classifier.mapBatch).mockResolvedValueOnce({
+      propositions: cards.map((card, index) => ({
+        claim_id: card.key_claims[0].claim_id,
+        proposition_key: 'audit_log_retention',
+        value_key: index === 0 ? '30_days' : '365_days',
+      })),
+      usage: { model_calls: 3, input_tokens: 30, output_tokens: 9, total_cost_usd: 0.12 },
+    });
+    const result = await detectDocumentConflicts(
+      { ...baseInput, maxModelCalls: 2 },
+      { repository: repository(), port: classifier }
+    );
+    expect(result.metricDeltas.usage).toEqual({
+      model_calls: 3,
+      input_tokens: 30,
+      output_tokens: 9,
+      total_cost_usd: 0.12,
+    });
+    expect(result.usage).toEqual(result.metricDeltas.usage);
+  });
+
+  it('throws a typed bounded execution error with usage below the capacity ceiling', async () => {
+    const invoke = vi.fn(async () => ({
+      content: JSON.stringify({ propositions: [], unexpected: true }),
+      usage: { input_tokens: 11, output_tokens: 4, total_cost_usd: 0.03 },
+    }));
+    const execution = detectDocumentConflicts(
+      { ...baseInput, maxModelCalls: 3 },
+      {
+        repository: repository(),
+        port: createProductionConflictDetectionPort({ invoke, maxRetries: 0 }),
+      }
+    );
+    await expect(execution).rejects.toBeInstanceOf(ConflictDetectionExecutionError);
+    await expect(execution).rejects.toMatchObject({
+      metricDeltas: {
+        batches: 0,
+        usage: { model_calls: 1, input_tokens: 11, output_tokens: 4, total_cost_usd: 0.03 },
+        conflicts: { critical: 0, important: 0, informational: 0 },
+      },
+    });
+  });
+
   it.each([
     ['en', 'Extremely long audited statement. '.repeat(20_000)],
     ['ru', 'Очень длинное проверяемое утверждение. '.repeat(20_000)],
@@ -438,6 +543,11 @@ describe('document conflict detector', () => {
       expect(db.commitConflictBatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ verificationStatus: 'degraded' })
       );
+      expect(result.metricDeltas).toEqual({
+        batches: 1,
+        usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+        conflicts: { critical: 0, important: 0, informational: 0 },
+      });
     }
   );
 
@@ -480,9 +590,10 @@ describe('document conflict detector', () => {
       if (committed === 2) throw new Error('crash after durable boundary');
       return row;
     });
-    await expect(
-      detectDocumentConflicts(baseInput, { repository: db, port: firstPort })
-    ).rejects.toThrow(/crash/);
+    await expectExecutionCause(
+      detectDocumentConflicts(baseInput, { repository: db, port: firstPort }),
+      /crash/
+    );
 
     vi.mocked(db.commitConflictBatch).mockImplementation(async input => {
       const prior = db.checkpoints.find((row: any) => row.batch_key === input.batchKey) as any;
@@ -505,9 +616,58 @@ describe('document conflict detector', () => {
       input_hash: 'different',
       structured_checkpoint: {},
     });
-    await expect(
-      detectDocumentConflicts(baseInput, { repository: db, port: port() })
-    ).rejects.toThrow(/collision/i);
+    await expectExecutionCause(
+      detectDocumentConflicts(baseInput, { repository: db, port: port() }),
+      /collision/i
+    );
+  });
+
+  it('reports only newly committed conflict work and fingerprints on accepted replay', async () => {
+    const db = repository();
+    const first = await detectDocumentConflicts(baseInput, { repository: db, port: port() });
+    const replay = await detectDocumentConflicts(baseInput, { repository: db, port: port() });
+
+    expect(first.metricDeltas.batches).toBeGreaterThan(0);
+    expect(first.metricDeltas.usage.model_calls).toBeGreaterThan(0);
+    expect(Object.values(first.metricDeltas.conflicts).reduce((sum, value) => sum + value, 0)).toBe(
+      1
+    );
+    expect(replay.metricDeltas).toEqual({
+      batches: 0,
+      usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+      conflicts: { critical: 0, important: 0, informational: 0 },
+    });
+  });
+
+  it('does not recount an old fingerprint repeated by a newly committed checkpoint', async () => {
+    const db = repository();
+    const detected = await detectDocumentConflicts(baseInput, { repository: db, port: port() });
+    const persisted = detected.conflicts[0];
+    const checkpoints = new Map<string, { inputHash: string; checkpoint: unknown }>([
+      [
+        'classify:old',
+        { inputHash: 'old', checkpoint: { conflicts: [persisted], usage: detected.usage } },
+      ],
+      [
+        'classify:new',
+        {
+          inputHash: 'new',
+          checkpoint: {
+            conflicts: [persisted],
+            usage: { model_calls: 1, input_tokens: 2, output_tokens: 3, total_cost_usd: 0.01 },
+          },
+        },
+      ],
+    ]);
+
+    const deltas = documentConflictDetectorTesting.collectMetricDeltas(
+      checkpoints,
+      new Set(['classify:old']),
+      { model_calls: 1, input_tokens: 2, output_tokens: 3, total_cost_usd: 0.01 }
+    );
+    expect(deltas.batches).toBe(1);
+    expect(deltas.usage.model_calls).toBe(1);
+    expect(deltas.conflicts).toEqual({ critical: 0, important: 0, informational: 0 });
   });
 
   it('verifies each material side with tenant/course/document grouping and persists degraded outage truth', async () => {
@@ -627,12 +787,13 @@ describe('document conflict detector', () => {
   it('binds checkpoint identity to model, language, schema, tokenizer and bounds', async () => {
     const db = repository();
     await detectDocumentConflicts(baseInput, { repository: db, port: port() });
-    await expect(
+    await expectExecutionCause(
       detectDocumentConflicts(
         { ...baseInput, language: 'en', detectionModel: 'different-model', maxInputTokens: 3_999 },
         { repository: db, port: port() }
-      )
-    ).rejects.toThrow(/collision/i);
+      ),
+      /collision/i
+    );
   });
 
   it('does not log claim, conflict, question, or answer bodies on success or failure', async () => {
