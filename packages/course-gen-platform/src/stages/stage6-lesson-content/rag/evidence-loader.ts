@@ -16,6 +16,7 @@ import {
   type Stage6AcceptedEvidenceContext,
   type Stage6EvidenceDecisionRow,
 } from './evidence-context';
+import { isDocumentEvidenceActive } from '@/shared/document-evidence/rollout';
 
 export interface LoadStage6EvidenceForCourseInput {
   courseId: string;
@@ -146,6 +147,9 @@ export async function loadStage6EvidenceForCourse(
     throw new Stage6EvidenceScopeError(
       'Stage 6 requested organization scope does not own the course'
     );
+  }
+  if (!isDocumentEvidenceActive()) {
+    return { organizationId: course.organizationId, evidenceContext: undefined };
   }
   const snapshot = evidenceSnapshot(course.analysisResult);
   if (!snapshot) {

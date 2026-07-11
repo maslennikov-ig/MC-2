@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadStage6EvidenceForCourse } from '@/stages/stage6-lesson-content/rag/evidence-loader';
 
 const id = {
@@ -17,8 +17,29 @@ const snapshot = {
   enrichment_status: 'applied',
 } as const;
 
+const originalRolloutEnvironment = {
+  DOCUMENT_EVIDENCE_ENABLED: process.env.DOCUMENT_EVIDENCE_ENABLED,
+  DOCUMENT_EVIDENCE_MODE: process.env.DOCUMENT_EVIDENCE_MODE,
+  DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT: process.env.DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT,
+};
+
+function restoreEnvironment(name: keyof typeof originalRolloutEnvironment): void {
+  const value = originalRolloutEnvironment[name];
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 describe('loadStage6EvidenceForCourse', () => {
+  afterEach(() => {
+    restoreEnvironment('DOCUMENT_EVIDENCE_ENABLED');
+    restoreEnvironment('DOCUMENT_EVIDENCE_MODE');
+    restoreEnvironment('DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT');
+  });
+
   it('loads the current database snapshot and builds its accepted-run projection', async () => {
+    process.env.DOCUMENT_EVIDENCE_ENABLED = 'true';
+    process.env.DOCUMENT_EVIDENCE_MODE = 'active';
+    process.env.DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT = '0';
     const loadAcceptedEvidence = vi.fn(async () => ({
       sourceManifest: [
         {
@@ -93,7 +114,38 @@ describe('loadStage6EvidenceForCourse', () => {
     expect(result.evidenceContext?.allowedDocumentIds).toEqual([id.document]);
   });
 
+  it.each([
+    ['default configuration', undefined, undefined],
+    ['globally disabled', 'false', 'active'],
+    ['shadow mode', 'true', 'shadow'],
+  ])(
+    'validates course scope but does not load accepted evidence for %s',
+    async (_label, enabled, mode) => {
+      if (enabled === undefined) delete process.env.DOCUMENT_EVIDENCE_ENABLED;
+      else process.env.DOCUMENT_EVIDENCE_ENABLED = enabled;
+      if (mode === undefined) delete process.env.DOCUMENT_EVIDENCE_MODE;
+      else process.env.DOCUMENT_EVIDENCE_MODE = mode;
+      const loadCourseScope = vi.fn(async () => ({
+        organizationId: id.organization,
+        analysisResult: { document_evidence: snapshot },
+      }));
+      const loadAcceptedEvidence = vi.fn();
+
+      await expect(
+        loadStage6EvidenceForCourse(
+          { courseId: id.course, requestedOrganizationId: id.organization },
+          { loadCourseScope, loadAcceptedEvidence }
+        )
+      ).resolves.toEqual({ organizationId: id.organization, evidenceContext: undefined });
+
+      expect(loadCourseScope).toHaveBeenCalledWith(id.course);
+      expect(loadAcceptedEvidence).not.toHaveBeenCalled();
+    }
+  );
+
   it('keeps no-document courses optional without loading evidence tables', async () => {
+    process.env.DOCUMENT_EVIDENCE_ENABLED = 'true';
+    process.env.DOCUMENT_EVIDENCE_MODE = 'active';
     const loadAcceptedEvidence = vi.fn();
     const result = await loadStage6EvidenceForCourse(
       { courseId: id.course },
@@ -108,6 +160,8 @@ describe('loadStage6EvidenceForCourse', () => {
   });
 
   it('rejects a requested organization that does not own the course', async () => {
+    process.env.DOCUMENT_EVIDENCE_ENABLED = 'true';
+    process.env.DOCUMENT_EVIDENCE_MODE = 'shadow';
     await expect(
       loadStage6EvidenceForCourse(
         { courseId: id.course, requestedOrganizationId: '30000000-0000-4000-8000-000000000099' },

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AnalysisResult,
   CourseStructure,
@@ -24,7 +24,7 @@ vi.mock('@/stages/stage5-generation/evidence/production', () => ({
 }));
 vi.mock('@/stages/stage5-generation/orchestrator', () => ({
   GenerationOrchestrator: class {
-    readonly evidenceEnricher: typeof mocks.productionEnricher;
+    readonly evidenceEnricher?: typeof mocks.productionEnricher;
 
     constructor(...args: unknown[]) {
       mocks.orchestratorConstructor(...args);
@@ -32,7 +32,7 @@ vi.mock('@/stages/stage5-generation/orchestrator', () => ({
     }
 
     async execute() {
-      await this.evidenceEnricher({ marker: 'handler-production-path' });
+      await this.evidenceEnricher?.({ marker: 'handler-production-path' });
       return generationResult();
     }
   },
@@ -61,6 +61,17 @@ import { Stage5GenerationHandler } from '@/stages/stage5-generation/handler';
 const runId = '10000000-0000-4000-8000-000000000001';
 const courseId = '20000000-0000-4000-8000-000000000001';
 const organizationId = '30000000-0000-4000-8000-000000000001';
+const originalRolloutEnvironment = {
+  DOCUMENT_EVIDENCE_ENABLED: process.env.DOCUMENT_EVIDENCE_ENABLED,
+  DOCUMENT_EVIDENCE_MODE: process.env.DOCUMENT_EVIDENCE_MODE,
+  DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT: process.env.DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT,
+};
+
+function restoreEnvironment(name: keyof typeof originalRolloutEnvironment): void {
+  const value = originalRolloutEnvironment[name];
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
 
 function structure(): CourseStructure {
   return {
@@ -150,7 +161,16 @@ describe('Stage 5 handler evidence wiring and atomic persistence', () => {
     mocks.updateStatusForGenerationStart.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    restoreEnvironment('DOCUMENT_EVIDENCE_ENABLED');
+    restoreEnvironment('DOCUMENT_EVIDENCE_MODE');
+    restoreEnvironment('DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT');
+  });
+
   it('constructs and reaches the production evidence adapter from the real handler pipeline', async () => {
+    process.env.DOCUMENT_EVIDENCE_ENABLED = 'true';
+    process.env.DOCUMENT_EVIDENCE_MODE = 'active';
+    process.env.DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT = '100';
     const handler = new Stage5GenerationHandler();
     const input = {
       course_id: courseId,
@@ -172,6 +192,36 @@ describe('Stage 5 handler evidence wiring and atomic persistence', () => {
       mocks.productionEnricher
     );
     expect(mocks.productionEnricher).toHaveBeenCalledWith({ marker: 'handler-production-path' });
+  });
+
+  it('runs the ordinary generation pipeline without constructing the adapter outside the cohort', async () => {
+    process.env.DOCUMENT_EVIDENCE_ENABLED = 'true';
+    process.env.DOCUMENT_EVIDENCE_MODE = 'active';
+    process.env.DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT = '0';
+    const handler = new Stage5GenerationHandler();
+    const input = {
+      course_id: courseId,
+      organization_id: organizationId,
+      vectorized_documents: true,
+    } as GenerationJobInput;
+
+    await expect(
+      (handler as unknown as { executeGenerationPipeline: Function }).executeGenerationPipeline(
+        input,
+        jobLogger
+      )
+    ).resolves.toEqual(generationResult());
+
+    expect(mocks.createProductionEnricher).not.toHaveBeenCalled();
+    expect(mocks.orchestratorConstructor).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined
+    );
+    expect(mocks.processWithFallback).toHaveBeenCalledTimes(1);
+    expect(mocks.productionEnricher).not.toHaveBeenCalled();
   });
 
   it('aborts every Stage 5 write when the evidence CAS update matches zero rows', async () => {
