@@ -57,11 +57,11 @@ depends_on_streams:
   - mc2-jz6y0.18
   - mc2-jz6y0.19
 parallel_decision: isolated worker stream after E1 and E2; detector, decisions, retry lineage, and live Stage 4 wiring were sequential because they share one accepted-run audit contract
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: The review-closeout PostgreSQL 15.18 container and worktree dependency symlinks were removed after the final post-review verification pass. Parent owns post-integration branch/worktree cleanup.
+cleanup_notes: Integrated through final reviewed commit 89a7948e; all PostgreSQL containers, dependency symlinks, the dedicated worktree, and the local worker branch were removed. The pushed remote evidence branch remains as audit evidence.
 risk_level: high
 docs_impact: behavior-and-migration
 docs_reviewed: no-change-needed
