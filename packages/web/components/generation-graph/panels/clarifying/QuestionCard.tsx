@@ -7,6 +7,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   AlertCircle,
   AlertTriangle,
@@ -21,8 +23,13 @@ import {
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CategoryBadge } from '@/components/ui/category-badge'
+import { DocumentEvidenceDetails } from './DocumentEvidenceDetails'
 // MEDIUM-003: Import types from Single Source of Truth
-import type { QuestionPriority, QuestionType } from '@megacampus/shared-types'
+import type {
+  DocumentEvidenceQuestionMetadata,
+  QuestionPriority,
+  QuestionType,
+} from '@megacampus/shared-types'
 
 type CardMode = 'unanswered' | 'answered' | 'editing'
 
@@ -41,6 +48,8 @@ interface Question {
   currentAnswer?: string
   currentAnswers?: string[] // For multi_choice
   category?: string
+  evidenceMetadata?: DocumentEvidenceQuestionMetadata
+  answerSource?: 'suggested' | 'modified' | 'custom' | 'system'
 }
 
 interface QuestionCardProps {
@@ -117,10 +126,15 @@ export function QuestionCard({
   readOnly = false,
 }: QuestionCardProps) {
   const t = useTranslations('generation.clarifying')
+  const isDocumentEvidence = question.category === 'document_conflicts'
+  const isSystemDecision = isDocumentEvidence && question.answerSource === 'system'
+  const effectiveReadOnly = readOnly || isSystemDecision
 
   // Determine initial mode based on isAnswered prop (or readOnly)
   // In readOnly mode, always show answered state
-  const [mode, setMode] = useState<CardMode>(isAnswered || readOnly ? 'answered' : 'unanswered')
+  const [mode, setMode] = useState<CardMode>(
+    isAnswered || effectiveReadOnly ? 'answered' : 'unanswered'
+  )
 
   // BUG FIX: Sync mode with isAnswered prop changes
   // Track previous isAnswered value to detect when answer was just saved
@@ -367,9 +381,18 @@ export function QuestionCard({
           <div className="mb-2 flex items-center gap-2">
             <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              {t('yourAnswer')}
+              {isSystemDecision ? t('documentEvidence.systemDecision') : t('yourAnswer')}
             </span>
           </div>
+
+          {isSystemDecision && (
+            <p
+              data-testid="system-decision-description"
+              className="mb-3 text-xs text-slate-600 dark:text-slate-400"
+            >
+              {t('documentEvidence.systemDecisionDescription')}
+            </p>
+          )}
 
           {question.type === 'multi_choice' && question.currentAnswers ? (
             <ul className="space-y-2">
@@ -386,7 +409,7 @@ export function QuestionCard({
         </div>
 
         {/* Hide edit button in read-only mode */}
-        {!readOnly && (
+        {!effectiveReadOnly && (
           <Button
             size="sm"
             variant="outline"
@@ -481,6 +504,70 @@ export function QuestionCard({
 
   // === RENDER SINGLE CHOICE QUESTION (Unanswered/Editing) ===
   const renderSingleChoiceQuestion = () => {
+    if (isDocumentEvidence) {
+      return (
+        <RadioGroup
+          value={selectedSuggestionIndex === null ? '' : String(selectedSuggestionIndex)}
+          onValueChange={(value) => handleSingleChoiceSelect(Number(value))}
+          onKeyDown={(event) => {
+            if (!['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'].includes(event.key)) return
+            const currentValue = Number((event.target as HTMLButtonElement).value)
+            if (!Number.isInteger(currentValue)) return
+            const direction = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1
+            const nextIndex =
+              (currentValue + direction + question.suggestedAnswers.length) %
+              question.suggestedAnswers.length
+            event.preventDefault()
+            handleSingleChoiceSelect(nextIndex)
+            document.getElementById(`document-conflict-${question.id}-${nextIndex}`)?.focus()
+          }}
+          className="space-y-2"
+          aria-label={question.text}
+          required={question.priority !== 'nice_to_have'}
+          disabled={isProcessing}
+        >
+          {question.suggestedAnswers.map((suggestion, index) => {
+            const isSelected = selectedSuggestionIndex === index
+            const optionId = `document-conflict-${question.id}-${index}`
+
+            return (
+              <div
+                key={optionId}
+                className={cn(
+                  'flex min-h-[56px] items-start gap-3 rounded-lg border-2 p-4 transition-colors',
+                  isSelected
+                    ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/25'
+                    : 'border-slate-200 bg-white hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900'
+                )}
+              >
+                <RadioGroupItem value={String(index)} id={optionId} className="mt-0.5" />
+                <Label htmlFor={optionId} className="min-w-0 flex-1 cursor-pointer">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {suggestion.text}
+                    </span>
+                    {suggestion.is_recommended && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200"
+                      >
+                        {t('recommended')}
+                      </Badge>
+                    )}
+                  </span>
+                  {suggestion.rationale && (
+                    <span className="mt-1 block text-xs text-slate-600 dark:text-slate-400">
+                      {suggestion.rationale}
+                    </span>
+                  )}
+                </Label>
+              </div>
+            )
+          })}
+        </RadioGroup>
+      )
+    }
+
     return (
       <div className="space-y-2">
         {question.suggestedAnswers.map((suggestion, index) => {
@@ -763,6 +850,8 @@ export function QuestionCard({
 
   return (
     <motion.div
+      id={`clarifying-question-${question.id}`}
+      tabIndex={-1}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -795,12 +884,25 @@ export function QuestionCard({
               </>
             )}
             {isAnswered && mode === 'answered' && (
-              <span className="ml-auto flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+              <span className="ml-auto flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
                 <Check className="h-3 w-3" />
                 {t('answeredBadge')}
               </span>
             )}
+            {isDocumentEvidence && (
+              <Badge variant="outline" className="ml-auto" data-testid="document-decision-badge">
+                {isSystemDecision
+                  ? t('documentEvidence.systemDecision')
+                  : question.priority === 'nice_to_have'
+                    ? t('documentEvidence.informationalDecision')
+                    : t('documentEvidence.requiredDecision')}
+              </Badge>
+            )}
           </div>
+
+          {question.evidenceMetadata && (
+            <DocumentEvidenceDetails metadata={question.evidenceMetadata} />
+          )}
 
           {/* Question Text */}
           <div className="mb-4">

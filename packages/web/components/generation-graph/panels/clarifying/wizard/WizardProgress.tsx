@@ -13,6 +13,7 @@ interface WizardProgressProps {
     important: { total: number; answered: number }
     nice_to_have: { total: number; answered: number }
   }
+  conflictCounts?: { total: number; answered: number }
 }
 
 const priorityDots = {
@@ -32,6 +33,7 @@ export function WizardProgress({
   totalQuestions,
   answeredCount,
   priorityCounts,
+  conflictCounts,
 }: WizardProgressProps) {
   const t = useTranslations('generation.clarifying')
   const progress = (answeredCount / totalQuestions) * 100
@@ -53,6 +55,17 @@ export function WizardProgress({
 
       {/* Priority counters with dots */}
       <div className="flex items-center gap-3 text-xs">
+        {conflictCounts && conflictCounts.total > 0 && (
+          <div
+            className="flex items-center gap-1.5 border-r border-slate-200 pr-3 dark:border-slate-700"
+            aria-label={t('documentEvidence.sectionTitle')}
+          >
+            <div className="h-2 w-2 rounded-full bg-orange-500" />
+            <span className="font-semibold text-orange-700 tabular-nums dark:text-orange-300">
+              {conflictCounts.answered}/{conflictCounts.total}
+            </span>
+          </div>
+        )}
         {(Object.keys(priorityCounts) as Array<keyof typeof priorityCounts>).map((priority) => {
           const { total, answered } = priorityCounts[priority]
           const { color } = priorityDots[priority]
