@@ -72,7 +72,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Shared document-evidence contracts: `packages/shared-types/src/document-evidence.ts`; compact Stage 5 audit contract: `packages/shared-types/src/generation-result.ts`.
 - Stage 4 evidence ownership: `packages/course-gen-platform/src/stages/stage4-analysis/evidence/`, with production ordering in `orchestrator.ts` / `orchestrator-phase-helpers.ts` and durable behavior in `stage4-analysis/README.md`.
 - Document-conflict question UI: `packages/web/components/generation-graph/panels/clarifying/`; canonical question and answer-source contracts: `packages/shared-types/src/clarifying-questions.ts`.
-- Stage 5 advisory evidence ownership: `packages/course-gen-platform/src/stages/stage5-generation/evidence/`, with the live handler/orchestrator entrypoint and durable behavior in `stage5-generation/README.md`; shared active gating lives in `packages/course-gen-platform/src/shared/document-evidence/rollout.ts` and deterministic Stage 5 cohort selection in `evidence/rollout.ts`.
+- Stage 5 advisory evidence ownership: `packages/course-gen-platform/src/stages/stage5-generation/evidence/`, with the live handler/orchestrator entrypoint and durable behavior in `stage5-generation/README.md`; shared active gating lives in `packages/course-gen-platform/src/shared/document-evidence/rollout.ts` and deterministic Stage 5 cohort selection in `packages/course-gen-platform/src/stages/stage5-generation/evidence/rollout.ts`.
 - Stage 6 decision-aware retrieval ownership: `packages/course-gen-platform/src/stages/stage6-lesson-content/rag/`, with the live caller in `services/job-processor.ts` and durable behavior in `stage6-lesson-content/README.md`.
 
 ## Integrations And Sources Of Truth

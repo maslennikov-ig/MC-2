@@ -27,14 +27,16 @@ selected_docs:
   - docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md
   - docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md
   - accepted artifacts mc2-jz6y0.18 through mc2-jz6y0.23 plus mc2-jz6y0.9 and mc2-jz6y0.10
-  - pushed rollout control commit 0aad2c20
+  - rollout control task mc2-jz6y0.24.1 production commit 0aad2c20 and delivery artifact commit b7359f32
   - Stage 4/5/6 READMEs, docs/operations/qdrant-self-hosted.md, and .codex/project-index.md
 selected_skills:
   - /home/me/code/mc2/.agents/skills/code-review/SKILL.md
+  - /mnt/c/Users/masle/.codex/superpowers/skills/receiving-code-review/SKILL.md
+  - /mnt/c/Users/masle/.codex/superpowers/skills/test-driven-development/SKILL.md
   - /mnt/c/Users/masle/.codex/superpowers/skills/verification-before-completion/SKILL.md
   - /mnt/c/Users/masle/.codex/superpowers/skills/systematic-debugging/SKILL.md
 selected_agents:
-  - docs_reviewer / senior technical writer
+  - docs_reviewer / senior technical writer; independent correctness-review feedback incorporated
 catalog_candidates:
   - none - approved repository docs, artifacts, and current implementation provide the required truth
 parallel_group: E7-D-docs
@@ -47,7 +49,9 @@ depends_on_streams:
   - mc2-jz6y0.23
   - mc2-jz6y0.9
   - mc2-jz6y0.10
-  - mc2-jz6y0.24.2
+  - mc2-jz6y0.24.1 - exact active gate and Stage 5 cohort, commits 0aad2c20 and b7359f32
+  - mc2-jz6y0.24.2 - owner rollout decision for cohort and promotion thresholds
+  - mc2-jz6y0.24.3 - shadow conflict detection/persistence without decisions or downstream influence; integration dependency, not branch-local behavior
 parallel_decision: parallel with the disjoint E7 observability stream; documentation is sequentially truth-reviewed because the cross-stage contract and rollout procedure share one durable narrative
 status: returned
 delivery_method: merge
@@ -57,12 +61,17 @@ cleanup_notes: Dedicated worktree remains for parent review and integration.
 risk_level: medium
 docs_impact: docs-only
 docs_reviewed: updated
-docs_review_notes: Durable Stage 4/5/6 and operator docs now describe the accepted evidence behavior; project index adds stable navigation only.
+docs_review_notes: Durable Stage 4/5/6 and operator docs describe accepted evidence behavior, quiesce-first rollback choices, post-gate Stage 6 protections, and strict telemetry/log privacy; project index adds stable navigation only.
 graph_reviewed: used
 graph_review_notes: Read and queried the integration worktree's parent Graphify report read-only at base 7b542c8d (50,252 nodes, 74,520 edges, zero model/API tokens). The report oriented the evidence design and Stage 5 enrichment community; accepted artifacts and focused current-source reads supplied exact runtime names. No graph files or hooks were changed; root owns the post-integration refresh.
 verification:
+  - docs-review RED scan: failed on missing quiesce/in-flight sequencing, mutually exclusive rollback modes, post-gate Stage 6 truth, privacy boundaries, rollout dependencies, integration-order wording, and the full Stage 5 rollout path
+  - focused rollback/Stage 6/shadow, dependency/path, and privacy GREEN scans: passed
+  - combined reviewed-docs invariant GREEN scan: passed
+  - git cat-file integration-order gate for both rollout paths at 0aad2c20: passed; rollout task must merge before docs
   - /home/me/code/mc2/node_modules/.bin/prettier --check over all six changed Markdown files: passed
-  - local Markdown-link and stable-path existence gate: passed
+  - local Markdown-link and branch-local path existence gate: passed
+  - rollout stable-path integration-order gate: rollout task mc2-jz6y0.24.1 must merge before this docs branch; exact shared/stage5 rollout paths were verified in commit 0aad2c20, not claimed as branch-local files
   - stale evidence terminology, project-index navigation-only, and strict write-zone scans: passed
   - git diff --check: passed
   - python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-docs.md: passed
@@ -77,6 +86,7 @@ changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-docs.md
 explicit_defers:
   - Owner rollout decisions remain unresolved for Stage 5 cohort size/definition, cost, latency, false-conflict, degradation, enrichment quality, observation windows, and rollback ownership; no numeric threshold is claimed.
+  - mc2-jz6y0.24.3 must integrate before docs may claim shadow conflict comparison; it detects/persists conflicts without questions, decisions, or downstream influence.
   - Q12 deployment, live reindex, secret/service changes, staging activation, and every production mutation remain authorization-gated.
 ---
 
@@ -90,7 +100,7 @@ Work stayed inside the dedicated E7-D worktree and strict docs write zone. The p
 
 # Verification
 
-Prettier check, local Markdown links, stable path targets, stale evidence terminology, project-index navigation-only content, strict write-zone ownership, `git diff --check`, artifact validation, and process verification all pass on the stable docs diff. The isolated worktree has no dependency links, so the first `pnpm exec prettier` attempt failed with `EACCES`; root-cause inspection confirmed the absent worktree shim, and the repository's executable Prettier 3.6.2 shim at `/home/me/code/mc2/node_modules/.bin/prettier` completed the same scoped check. No code, dependency, schema, runtime, or deployment file changed, so type-check/build are not applicable to this docs-only stream.
+The review correction started with a failing docs-invariant scan for rollback sequencing, Stage 6 post-gate truth, integration dependencies/paths, and privacy. Focused GREEN scans and the combined invariant scan now pass. Prettier check, local Markdown links, branch-local path targets, stale evidence terminology, project-index navigation-only content, strict write-zone ownership, `git diff --check`, artifact validation, and process verification pass on the stable docs diff. Rollout-specific paths are an integration-order gate: `mc2-jz6y0.24.1` must merge first, and the exact paths are verified against `0aad2c20` rather than claimed to exist on this branch. The isolated worktree has no dependency links, so the first `pnpm exec prettier` attempt failed with `EACCES`; root-cause inspection confirmed the absent worktree shim, and the repository's executable Prettier 3.6.2 shim at `/home/me/code/mc2/node_modules/.bin/prettier` completed the same scoped check. No code, dependency, schema, runtime, or deployment file changed, so type-check/build are not applicable to this docs-only stream.
 
 # Delivery / Cleanup
 

@@ -72,6 +72,13 @@ The shared downstream gate is active only when both strings are exact:
 and Stage 6 do not consume a shadow snapshot. Stage 6 still resolves and
 validates course/organization ownership before returning without evidence.
 
+The shadow conflict contract additionally depends on integration task
+`mc2-jz6y0.24.3`. After its GREEN change is integrated, shadow mode detects and
+persists conflicts for comparison, but it creates no questions or decisions and
+cannot influence Phase 2-4, Stage 5, or Stage 6. Before that dependency is in the
+integration tree, shadow mode does not provide conflict-comparison evidence and
+must not be used to approve the manual-conflict rollout step.
+
 The preflight runs after Phase 1 and before Phase 0.5. Large corpora use
 deterministic token-bounded batches, per-document hierarchy, cross-document
 reduction, durable checkpoints, and exact resume. An oversized or unavailable
@@ -158,13 +165,21 @@ unavailable or incomplete required retrieval, or an evidence scope violation,
 fails closed through the existing required-RAG error contract. Do not bypass
 that error to generate purportedly source-backed content from partial evidence.
 
+When the shared active gate becomes false, Stage 6 stops loading the evidence
+snapshot. Its evidence decision/ref allowlist and evidence-aware cache identity
+are therefore disabled. The baseline retriever still enforces its normal
+`organization_id` and `course_id` scope plus required-RAG availability, retry,
+and fail-closed protections. Disabling evidence consumption does not disable
+baseline tenant/course isolation or make required RAG optional.
+
 ## Large-corpus and resume checks
 
 For a stalled or restarted Stage 4 run:
 
-1. Identify the course, organization, accepted/pending run ID, input fingerprint,
-   evidence version, and source-manifest count. Do not copy document text into
-   incident notes.
+1. In an access-controlled database session, resolve the affected course,
+   organization, accepted/pending run, input fingerprint, evidence version, and
+   source-manifest count. Keep product identifiers and hashes inside that session;
+   use a separate incident case reference in notes and telemetry.
 2. Confirm `source_count = assessed_count + degraded_count + failed_count` for an
    accepted run and that the coverage ratio is exactly one.
 3. Inspect batch/conflict checkpoint counts, cursor/progress identity, retry
@@ -191,7 +206,8 @@ requires:
 
 1. verify the stable alias and physical collection before any source check;
 2. query with the affected organization and course filters plus the expected
-   document/version identity;
+   document/version identity, keeping those product identifiers in the
+   access-controlled operator session;
 3. validate dense, RU BM25, EN BM25, Formula ordering, document grouping, and
    negative organization/course isolation against known fixtures;
 4. if the index is missing or corrupt, rebuild it from authoritative source data
@@ -208,7 +224,8 @@ retention.
 
 Rollout is ordered and must not skip a step:
 
-1. disabled, then shadow evidence collection;
+1. disabled, then shadow evidence and conflict collection after
+   `mc2-jz6y0.24.3` is integrated;
 2. active conflict questions for internal/manual courses;
 3. automatic system decisions only after manual conflict evidence is reviewed;
 4. Stage 5 advisory enrichment for an explicitly bounded deterministic course
@@ -246,26 +263,52 @@ neither belongs in the table as a negotiable threshold.
 
 ## Rollback
 
-Rollback must stop new document influence without deleting audit history:
+Choose one rollback objective before changing configuration:
 
-1. set `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=0` before starting new Stage 5
-   work;
-2. move Stage 4 from active to shadow if evidence observation should continue, or
-   disable `DOCUMENT_EVIDENCE_ENABLED` to stop new preflights. Either action also
-   makes the exact shared active gate false, so Stage 5 and Stage 6 stop consuming
-   evidence snapshots;
-3. stop/pause affected queued work according to the normal worker procedure so
-   jobs do not straddle incompatible runtime configuration;
-4. verify new Stage 5 results preserve the baseline and no new active decisions
-   are being applied;
-5. retain `document_evidence_runs`, items, conflicts, decisions, checkpoints,
-   retry applications, clarifying questions, and compact course/generation audit
-   snapshots. Do not roll back migrations or delete rows as an incident shortcut.
+- **Audit-only rollback:** make the shared active gate false. New Stage 5/6 jobs
+  do not consume evidence snapshots. Stage 6 keeps baseline tenant/course and
+  required-RAG protections, but its evidence decision/ref allowlist and
+  evidence-aware cache identity are off. After `mc2-jz6y0.24.3` is integrated,
+  shadow may continue collecting cards/conflicts without decisions or downstream
+  influence.
+- **Evidence-aware containment:** keep the shared gate exactly active so Stage 6
+  continues honoring current decisions/refs, but set the Stage 5 cohort to zero.
+  This is not audit-only: admitted Stage 4 jobs remain active and can create
+  decisions/downstream evidence. Keep Stage 4 intake paused unless that behavior
+  is explicitly intended.
 
-Existing accepted snapshots remain auditable. Stage 6 continues to enforce its
-decision/ref scope and required-RAG safety; rollback is not permission to bypass
-that fail-closed contract. Any change to Stage 6 evidence consumption requires a
-separate reviewed release.
+Do not promise audit-only behavior and evidence-aware Stage 6 behavior in the
+same configuration; the shared active gate makes them mutually exclusive.
+
+Use this order for either rollback objective:
+
+1. **Quiesce first.** Pause new course-generation intake and the affected Stage
+   4, Stage 5, and Stage 6 worker queues before changing flags. Inventory in-flight
+   jobs and choose one handling policy per job: let it drain completely under the
+   old configuration, or stop it at its durable boundary and requeue it only
+   after restart under the new configuration. Never flip evidence flags while a
+   job continues across the boundary.
+2. Record pre-change aggregate audit counts and the intended rollback objective.
+   Do not delete or rewrite evidence state.
+3. Set `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=0`. For audit-only rollback,
+   additionally set `DOCUMENT_EVIDENCE_MODE=shadow` or disable
+   `DOCUMENT_EVIDENCE_ENABLED`. For evidence-aware containment, keep both global
+   active-gate values exact.
+4. Restart the main Stage 4/5 worker and the dedicated Stage 6 worker so every
+   process reads one coherent environment. Confirm no old-configuration job is
+   still running before verification.
+5. Verify the selected behavior with a no-document course and an authorized
+   document-backed fixture. Audit-only must show no Stage 5 evidence adapter and
+   no Stage 6 evidence context while baseline tenant/course and required-RAG
+   checks remain active. Evidence-aware containment must show Stage 5 cohort
+   exclusion while Stage 6 still uses current decisions/refs. In both cases,
+   confirm durable audit counts are unchanged.
+6. Resume worker queues and intake gradually. Watch aggregate failure, fallback,
+   latency, and coverage signals; re-quiesce before any further flag change.
+
+Retain `document_evidence_runs`, items, conflicts, decisions, checkpoints, retry
+applications, clarifying questions, and compact course/generation audit
+snapshots. Do not roll back migrations or delete rows as an incident shortcut.
 
 ## Local verification before an authorized rollout
 
@@ -290,8 +333,26 @@ isolation. A local pass does not authorize staging activation.
 
 ## Privacy and incident evidence
 
-Metrics, logs, dashboards, alerts, Beads, and orchestration artifacts may include
-IDs, counts, modes, durations, error categories, hashes, and aggregate cost. They
-must not include document text, claim bodies, user/system answers, source
-excerpts, credentials, or credential-bearing URLs. Preserve durable database
-provenance and bounded redacted recovery evidence instead.
+Metrics, dashboards, and alerts contain aggregate counters, gauges, histograms,
+and allowlisted stage/service/mode/status/severity labels only. They never contain
+product IDs (course, organization, document, run, decision, conflict, question,
+chunk, lesson, or user), runtime hashes/fingerprints, document or answer content,
+source names/excerpts, raw errors or error names/categories, model names,
+credentials, or credential-bearing URLs. Failure conditions are represented by
+aggregate status/count signals, not error values.
+
+The same boundary applies to every ordinary new evidence-specific log event: it
+may contain aggregate counts, durations, mode/status, and an allowlisted outcome,
+but no product IDs, content, source names/excerpts, runtime hashes, raw errors, or
+model names. This requirement is specific to new evidence logging and does not
+claim that unrelated legacy pipeline logs have already been remediated.
+
+Repository, stage, Beads, and commit IDs identify engineering work, not product
+records. They may appear in Beads and `.codex` orchestration artifacts, but must
+never be repurposed as runtime product identifiers or telemetry labels. Product
+IDs and durable provenance hashes may exist in approved access-controlled runtime
+stores: tenant-scoped PostgreSQL, tenant/course-filtered Qdrant payloads, bounded
+caches, compact runtime audit, and access-controlled operator queries. Do not copy
+them from those stores into telemetry, Beads, orchestration artifacts, dashboards,
+alerts, or ordinary evidence logs. Preserve bounded redacted recovery evidence
+instead.

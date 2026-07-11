@@ -72,6 +72,11 @@ Phase 0.5 boundary.
   conflict decisions or replace Phase 2-4 document inputs with the bounded
   advisory representation. Active mode can supply that representation and the
   decision ledger to later phases.
+- Shadow conflict detection is an integration dependency on tracked task
+  `mc2-jz6y0.24.3`. After its GREEN change is integrated, shadow detects and
+  persists conflicts but still creates no questions/decisions and has no
+  downstream influence. Do not claim shadow conflict evidence from this docs
+  branch alone.
 - Downstream evidence consumption uses the same exact active gate: both
   `DOCUMENT_EVIDENCE_ENABLED=true` and `DOCUMENT_EVIDENCE_MODE=active` are
   required. A shadow snapshot is not consumed by the Stage 5 evidence pass or
@@ -120,8 +125,10 @@ Durable rows live in `document_evidence_runs`, `document_evidence_items`,
 conflict, and retry checkpoints beside them. `AnalysisResult.document_evidence`
 contains only the accepted run ID, coverage totals, current decision IDs,
 unresolved informational conflicts, and Stage 5 enrichment status. Source and
-answer bodies do not belong in ordinary logs, metrics, or orchestration
-artifacts.
+answer bodies remain in durable storage. Metrics/dashboards/alerts and ordinary
+new evidence-specific logs contain no product IDs, runtime hashes, content, raw
+errors, or model names; engineering task/commit IDs in Beads and orchestration
+artifacts are not product data.
 
 Operational rollout, recovery, and rollback are documented in
 [`docs/operations/document-evidence.md`](../../../../../docs/operations/document-evidence.md).
