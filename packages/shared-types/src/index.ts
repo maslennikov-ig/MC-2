@@ -24,6 +24,7 @@ export * from './transactional-outbox';
 
 // Stage 4-6 Pipeline Types (v0.20.0+)
 export * from './document-prioritization';
+export * from './document-evidence';
 export * from './lesson-specification-v2';
 export * from './lesson-content';
 export * from './lesson-identifiers';

@@ -11,6 +11,7 @@
  * - Migration: 20260127_question_types.sql
  */
 
+import { z } from 'zod';
 import type { Database } from './database.types';
 
 /**
@@ -31,7 +32,27 @@ export type QuestionStatus = 'pending' | 'answered' | 'skipped';
 /**
  * Answer source tracking
  */
-export type AnswerSource = 'suggested' | 'modified' | 'custom';
+export const AnswerSourceSchema = z.enum(['suggested', 'modified', 'custom', 'system']);
+export type AnswerSource = z.infer<typeof AnswerSourceSchema>;
+
+/**
+ * Canonical Stage 4 clarifying-question categories.
+ *
+ * `document_conflicts` is kept separate so clients can render material evidence
+ * conflicts in their own required-question block.
+ */
+export const ClarifyingQuestionCategorySchema = z.enum([
+  'company_context',
+  'audience',
+  'expected_outcomes',
+  'content_structure',
+  'focus_priorities',
+  'business_goals',
+  'practical_application',
+  'constraints',
+  'document_conflicts',
+]);
+export type ClarifyingQuestionCategory = z.infer<typeof ClarifyingQuestionCategorySchema>;
 
 /**
  * User answer stored in JSONB format (user_answer column)
