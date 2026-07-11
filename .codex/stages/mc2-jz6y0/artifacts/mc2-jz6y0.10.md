@@ -55,7 +55,7 @@ status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
 cleanup_status: pending
-cleanup_notes: All disposable Qdrant/Prometheus/Grafana/Alertmanager/node_exporter containers, private networks, secret volumes, temporary files, and smoke data were removed. Implementation commit 8d5d39c7 is pushed; the dedicated review worktree/branch remains for orchestrator acceptance.
+cleanup_notes: All disposable Qdrant/Prometheus/Grafana/Alertmanager/node_exporter containers, private networks, secret volumes, temporary files, and smoke data were removed. Implementation commit 8d5d39c7 and independent-review remediation commit 151e4e1a are pushed; the dedicated review worktree/branch remains for orchestrator acceptance.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
@@ -64,6 +64,11 @@ graph_reviewed: used
 graph_review_notes: Read fresh parent Graphify report at integration 26fcf065 and ran a focused query for the production fallback location. Per orchestrator instruction, the ignored graph was not copied or refreshed in this child worktree.
 verification:
   - TDD/static contract final focused suite: 33/33 passed
+  - Independent-review TDD: 4/7 Q9 static tests failed before remediation; 7/7 Q9 and 33/33 joined focused tests passed after remediation and after the commit hook
+  - Point-count 100-to-0 and absent Qdrant target promtool fixtures: passed
+  - Alertmanager pinned UID-65534 persistence smoke on /alertmanager: silence survived restart; state files were UID/GID 65534 and mode 0644
+  - Shared textfile directory smoke: UID-1001 writer with supplementary GID 2001 published mode-0644 data; pinned UID-65534 node_exporter read it without the writer group
+  - Exact pinned Qdrant 1.18.2 label assertion: points/optimizations/snapshot metrics use id; vectors uses collection
   - Prometheus 3.13.1 promtool check config/check rules/test rules: passed; 10 rules
   - Alertmanager 0.33.1 amtool production/test config and route selection: passed
   - Four Compose config validations with synthetic paths: passed
@@ -78,6 +83,7 @@ verification:
   - Artifact validator: passed
   - Process verification with artifact: passed
   - Pull/rebase against unchanged remote base and push of implementation commit 8d5d39c7: passed
+  - Pull/rebase and push of independent-review remediation commit 151e4e1aaa278b85f411197885dc34cb2d53381d: passed
 changed_files:
   - .env.production.example
   - docker-compose.app.yml
@@ -101,11 +107,12 @@ changed_files:
   - packages/course-gen-platform/src/shared/qdrant/metrics-textfile.ts
   - packages/course-gen-platform/src/shared/qdrant/search-operations.ts
   - packages/course-gen-platform/tests/unit/ops/qdrant-observability-contract.test.ts
+  - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
   - packages/course-gen-platform/tests/unit/shared/qdrant/metrics-textfile.test.ts
   - packages/course-gen-platform/tests/unit/shared/qdrant/search-operations.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.10.md
 explicit_defers:
-  - Q8 owns the production snapshot/restore tools and systemd jobs that advance recovery gauges; Q9 provides and validates their atomic textfile transport and alerts.
+  - Q8 owns independent-review item 5, the production snapshot/restore tools and systemd jobs that advance recovery gauges; Q9 provides and validates their atomic textfile transport and alerts.
   - Q10 owns broad deployment-guide, project-index, and retired Cloud documentation reconciliation.
   - Q12 retains all remote activation, real receiver test, secret creation/change, deployment, staging mutation, and live observation authority.
 ---
@@ -124,12 +131,26 @@ The final write zone is the validated Q9 monitoring zone plus the orchestrator-a
 
 # Verification
 
+## Independent-review remediation
+
+The follow-up closed every Q9-owned review item: zero-point drops now alert;
+missing targets now alert through `absent`; Alertmanager persists on its pinned
+image's writable `/alertmanager` path; the host textfile bind is required and
+preflighted with a dedicated numeric GID; only API/main/Stage6 writers receive
+the mount and supplemental group while Stage 7 and node_exporter do not; and
+Grafana selectors match the mixed labels observed from pinned Qdrant 1.18.2.
+The related Compose-render fixture was updated so the shared Q6/Q9 runtime
+contract continues to validate all four models. Independent-review item 5
+remains in Q8's snapshot/restore write zone and was not modified here.
+
 ## TDD chronology and command totals
 
 - Monitoring RED: the initial static contract failed 6/6 because all Q9 assets were absent. The first GREEN passed 23/23 joined tests; the final focused acceptance is 33/33 across four files.
 - Application metrics RED: the new module import was absent and three decision-point assertions saw zero recorder calls. GREEN passed 17/17. A later dense-fallback failure RED observed two counter calls; the refactored decision boundary made it one and the joined suite passed 24/24.
 - Command-shape RED: pinned Prometheus rejected `--web.enable-lifecycle=false` with `unexpected false`; a 1/7 static guard failed, the invalid non-default flag was removed, exact Compose args parsed, and 7/7 passed.
 - Rule fixture diagnostic: REST ratio and p95 values were correct, while expected samples omitted the recording `__name__` and rounded the IEEE quantile. Corrected fixture then passed.
+- Independent-review RED/GREEN: four of seven Q9 static tests failed before the requested hardening. The corrected contracts passed 7/7 Q9 tests and the joined focused suite passed 33/33, including a second 33/33 run after the commit hook.
+- Independent-review runtime evidence: promtool fired on a 100-to-0 point drop and on a completely absent target; a pinned UID-65534 Alertmanager retained a silence across restart on `/alertmanager`; a UID-1001 writer plus supplemental GID published a mode-0644 textfile that an ungrouped pinned UID-65534 node_exporter read; pinned Qdrant 1.18.2 exposed `id` on points/optimizations/snapshot metrics and `collection` on vectors.
 - Final command totals: 33 focused tests; 3 promtool commands; 2 production amtool checks plus 1 local test-config check; 4 Compose models; 4 registry index/child checks; 4 service/signal smokes; 2 workspace gates; 1 security/public/secret scan group; artifact/process/diff checks recorded below.
 
 # Exact approved image locks
@@ -157,7 +178,7 @@ The final write zone is the validated Q9 monitoring zone plus the orchestrator-a
 
 ## Rollback state
 
-No remote activation, external receiver call, deploy, service installation, secret mutation, staging operation, Q12 action, or non-loopback host publication occurred. Disposable containers/networks/volumes/temp files are gone. No rollback was needed. Implementation commit `8d5d39c7f2794d98c2a2e568cf116013faf75d67` is pushed on `origin/codex/qdrant-q9-observability`; the branch/worktree remain isolated for orchestrator review. Runtime rollback is documented as stopping monitoring services without deleting named volumes or touching Qdrant/its stable alias.
+No remote activation, external receiver call, deploy, service installation, secret mutation, staging operation, Q12 action, or non-loopback host publication occurred. Disposable containers/networks/volumes/temp files are gone. No rollback was needed. Implementation commit `8d5d39c7f2794d98c2a2e568cf116013faf75d67` and independent-review remediation commit `151e4e1aaa278b85f411197885dc34cb2d53381d` are pushed on `origin/codex/qdrant-q9-observability`; the branch/worktree remain isolated for orchestrator review. Runtime rollback is documented as stopping monitoring services without deleting named volumes or touching Qdrant/its stable alias.
 
 # Risks / Follow-ups / Explicit Defers
 
