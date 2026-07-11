@@ -24,6 +24,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - `docs/superpowers/prompts/` - validated manual start prompts for fresh orchestrator tasks.
 - Self-hosted Qdrant platform design/plan: `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md` and `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`.
 - Advisory document evidence design/plan: `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md` and `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`.
+- Document-evidence operator runbook: `docs/operations/document-evidence.md`; self-hosted Qdrant runtime/recovery runbook: `docs/operations/qdrant-self-hosted.md`.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
 - `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.
@@ -68,6 +69,11 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.
 - Backend Supabase migrations: `packages/course-gen-platform/supabase/migrations/`.
 - Shared Career Playbook contracts: `packages/shared-types/src/career-playbook.ts`.
+- Shared document-evidence contracts: `packages/shared-types/src/document-evidence.ts`; compact Stage 5 audit contract: `packages/shared-types/src/generation-result.ts`.
+- Stage 4 evidence ownership: `packages/course-gen-platform/src/stages/stage4-analysis/evidence/`, with production ordering in `orchestrator.ts` / `orchestrator-phase-helpers.ts` and durable behavior in `stage4-analysis/README.md`.
+- Document-conflict question UI: `packages/web/components/generation-graph/panels/clarifying/`; canonical question and answer-source contracts: `packages/shared-types/src/clarifying-questions.ts`.
+- Stage 5 advisory evidence ownership: `packages/course-gen-platform/src/stages/stage5-generation/evidence/`, with the live handler/orchestrator entrypoint and durable behavior in `stage5-generation/README.md`; shared active gating lives in `packages/course-gen-platform/src/shared/document-evidence/rollout.ts` and deterministic Stage 5 cohort selection in `evidence/rollout.ts`.
+- Stage 6 decision-aware retrieval ownership: `packages/course-gen-platform/src/stages/stage6-lesson-content/rag/`, with the live caller in `services/job-processor.ts` and durable behavior in `stage6-lesson-content/README.md`.
 
 ## Integrations And Sources Of Truth
 

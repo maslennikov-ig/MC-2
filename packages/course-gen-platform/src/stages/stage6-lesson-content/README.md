@@ -1,6 +1,6 @@
 # Stage 6: Lesson Content Generation
 
-**Purpose**: Generate full lesson content in parallel using BullMQ workers and LangGraph state machine.
+**Purpose**: Generate full lesson content in parallel using BullMQ workers and a LangGraph state machine, with optional decision-aware document retrieval.
 
 ## Architecture
 
@@ -37,7 +37,11 @@ stage6-lesson-content/
 ├── utils/
 │   ├── prompt-templates.ts    # Context-First XML prompts
 │   ├── markdown-parser.ts     # Output parsing
-│   └── lesson-rag-retriever.ts # Lesson-level RAG (5-10 chunks)
+│   └── lesson-rag-retriever.ts # Compatibility re-export for lesson RAG
+├── rag/
+│   ├── evidence-loader.ts     # Current accepted run/decision loader
+│   ├── evidence-context.ts    # Fail-closed accepted evidence projection
+│   └── retriever.ts           # Grouped, tenant/course-scoped live retrieval
 ├── validators/
 │   ├── content-validator.ts   # Quality score calculation
 │   └── xss-sanitizer.ts       # DOMPurify integration
@@ -57,7 +61,7 @@ stage6-lesson-content/
 - **Parallel Execution**: 30 concurrent BullMQ workers
 - **Model Fallback**: Primary → fallback model on failure (configured via database)
 - **Partial Success**: Save successful, mark failed for review
-- **RAG Context**: Lesson-level retrieval (5-10 chunks per lesson)
+- **RAG Context**: Optional lesson-level retrieval, scoped to the current accepted evidence run and decisions when documents exist
 - **Quality Gates**: 0.75 threshold with CLEV voting
 - **XSS Protection**: DOMPurify sanitization (FR-024)
 - **Generation Locks**: Redis-backed atomic locks prevent concurrent course generation (FR-037)
@@ -136,10 +140,63 @@ const jobHandlers = {
 
 - `LessonSpecificationV2[]` from Stage 5
 - `language` (ISO 639-1 code) from `courses.language`
+- current accepted document-evidence state loaded from the database when the
+  course has an evidence snapshot; queued snapshots are not trusted for cache
+  identity
 
 ## Output
 
 - `LessonContent[]` with full markdown content, citations, quality scores (in specified language)
+
+## Decision-aware document retrieval
+
+The production path is `services/job-processor.ts` ->
+`rag/evidence-loader.ts` -> `rag/retriever.ts`. Before retrieval, Stage 6 reloads
+the course organization, exact accepted evidence run, source manifest, coverage
+cards, immutable conflicts, and current append-only decisions. It rejects a
+queued or caller-supplied scope that disagrees with current database truth.
+
+The loader always validates the requested course/organization relationship
+first. It loads durable evidence only when the shared gate is exactly
+`DOCUMENT_EVIDENCE_ENABLED=true` plus `DOCUMENT_EVIDENCE_MODE=active`;
+disabled/default/shadow configurations return no evidence context. The Stage 5
+cohort percentage does not apply to Stage 6.
+
+The accepted projection controls both planning and cache identity:
+
+- only the selected material-conflict side is eligible; rejected sides remain
+  excluded even when they share a document with an accepted side;
+- `remove_document` excludes degraded/failed evidence, while
+  `continue_limited` retains it under the recorded limitation;
+- stale versions, unknown chunks, cross-tenant refs, non-terminal runs,
+  incomplete degraded decisions, ambiguous legacy decisions, and custom
+  conflict answers without a durable side handle fail closed;
+- the cache key includes accepted run identity, sorted current decision IDs, and
+  accepted source refs/version hashes, so a decision or source change cannot
+  reuse stale context.
+
+Every live Qdrant query filters both `organization_id` and `course_id`,
+intersects lesson primary documents with the accepted allowlist, uses native
+hybrid BM25/RRF plus Formula priority weighting, and sets
+`group_by_document: true` with `group_size: 2`. Returned payloads are validated
+again for tenant, course, document, version, and exact accepted chunk/ref scope
+before prompt conversion.
+
+Courses with no uploaded documents remain a first-class optional path and
+return the existing empty RAG result. When uploaded documents make RAG required,
+the existing bounded availability retry is used. An unavailable/incomplete
+required retrieval, or any evidence scope violation, fails the course through
+the existing required-RAG error path instead of silently generating
+source-backed content from partial or fabricated context. A non-evidence
+optional retrieval error may still continue without context.
+
+Lesson chunks carry bounded structured provenance: accepted run ID, relevant
+decision IDs and exact/document-level source refs, plus total/overflow/hash
+handles. Raw decision answers and unrelated evidence cards are not added to
+queries, prompts, ordinary logs, or cache identity text.
+
+Operational triage, rollout, and rollback are documented in
+[`docs/operations/document-evidence.md`](../../../../../docs/operations/document-evidence.md).
 
 ## Mermaid Fix Pipeline (3-Layer Defense)
 
@@ -230,18 +287,24 @@ This keeps refinement latency low while maintaining quality.
 
 ## Test Coverage
 
-Stage 6 has comprehensive test coverage:
+Current Stage 6 unit coverage lives in `tests/unit/stages/stage6/`, with the
+production job-processor cases under
+`tests/unit/stages/stage6-lesson-content/services/`. Evidence-specific suites
+cover the current-run loader/projection, live and cached chunk scope, grouped
+retrieval, required-RAG failures, and job-processor wiring.
 
-| Test Suite                              | Tests | Description                    |
-| --------------------------------------- | ----- | ------------------------------ |
-| `mermaid-sanitizer.test.ts`             | 20    | Mermaid sanitizer unit tests   |
-| `mermaid-fix-pipeline.e2e.test.ts`      | 27    | E2E pipeline with real DB data |
-| `targeted-refinement-cycle.e2e.test.ts` | 23    | Full refinement cycle E2E      |
-| Total Stage 6                           | 262+  | All passing                    |
+```bash
+pnpm --filter @megacampus/course-gen-platform exec vitest run \
+  --config vitest.config.unit.ts \
+  tests/unit/stages/stage6 \
+  tests/unit/stages/stage6-lesson-content/services/job-processor.test.ts
+```
 
 ## Related
 
 - [Architecture](../../../../../docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md)
+- [Document evidence operations](../../../../../docs/operations/document-evidence.md)
+- [Self-hosted Qdrant operations](../../../../../docs/operations/qdrant-self-hosted.md)
 - [LLM Judge Research](../../../../../docs/research/010-stage6-generation-strategy/)
 - [Targeted Refinement Spec](../../../../../specs/018-judge-targeted-refinement/spec.md)
 - [Technical Spec](../../../../../docs/specs/features/stage6-targeted-refinement-spec.md)
