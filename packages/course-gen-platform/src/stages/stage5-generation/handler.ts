@@ -53,6 +53,7 @@ import { notifyCourseError } from '@/shared/notifications';
 import { z } from 'zod';
 import { createProductionStage5EvidenceEnricher } from './evidence/production';
 import { buildEvidencePersistencePlan } from './evidence/persistence';
+import { isDocumentEvidenceStage5EnrichmentEnabled } from './evidence/rollout';
 
 // Import helpers extracted from this file
 import {
@@ -282,13 +283,16 @@ export class Stage5GenerationHandler {
 
     // Initialize services with optional RAG context
     const qdrantClientInstance = input.vectorized_documents ? qdrantClient : undefined;
+    const evidenceEnricher = isDocumentEvidenceStage5EnrichmentEnabled(input.course_id)
+      ? createProductionStage5EvidenceEnricher()
+      : undefined;
 
     const orchestrator = new GenerationOrchestrator(
       new MetadataGenerator(),
       new SectionBatchGenerator(),
       new QualityValidator(),
       qdrantClientInstance,
-      createProductionStage5EvidenceEnricher()
+      evidenceEnricher
     );
 
     // Update status transitions
