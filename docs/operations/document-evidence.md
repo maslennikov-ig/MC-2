@@ -224,24 +224,43 @@ retention.
 
 The semantics in this section belong to tracked remediation `mc2-jz6y0.24.5`;
 they are not a claim about the current integration tree. Treat them as rollout
-guarantees only after `.24.5` receives an independent PASS and is integrated.
-Until both conditions hold, evidence observability remains a rollout blocker.
+guarantees only after `.24.5` code independent PASS and integration. Until both
+conditions hold, evidence observability remains a rollout blocker.
 
 The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 `12.4.5`, node_exporter `1.12.0`, and Alertmanager `0.33.1`.
 
-- Stage 4 work and conflict counters use durable execution deltas from the
-  current invocation. Reused or replayed checkpoints do not increment work;
-  conflict deltas count only newly durable conflicts after existing fingerprints
-  are excluded. Do not publish returned lifetime totals as new work.
-- Decision totals come from a trigger-maintained O(1) singleton derived from the
-  append-only decision ledger. The ledger remains canonical; the singleton is
-  bounded export state maintained on each insert, not permission to rewrite or
-  replace decision history.
-- Textfile read-modify-write uses a cross-process ownership-safe lock with a
-  unique owner marker, heartbeat, and stale-owner fencing. A fenced writer cannot
-  publish or unlink a successor's lock; publication remains temp-file plus atomic
-  rename while ownership is valid. A process-local mutex is not sufficient.
+- Stage 4 durable work, conflict, and decision metrics are absolute cumulative
+  values read in O(1) from one RLS-protected, `service_role`-readable singleton
+  with a monotonic reconciliation revision. Trigger-maintained totals cover
+  accepted/failed terminal runs, source/outcome documents, all five processing
+  modes, batches, model calls, input/output tokens, cost, duration, conflict
+  severities, and append-only user/system/degraded-automatic decisions. The
+  transactional seed scans canonical tables once while trigger DDL locks the
+  affected writers; runtime publication does not rescan history.
+- Latest-terminal coverage is separate from lifetime cumulative totals and is
+  ordered by completion time plus run ID. Coverage ratio must use only that
+  latest coverage snapshot. The aggregate publisher writes the established
+  durable metric names only to `service="stage4",instance="aggregate"`, applies
+  only a higher revision, treats the same revision as idempotent, and ignores an
+  older revision. Replica files remove durable aggregate names and expose only
+  distinct best-effort Stage 4 invocation/failure signals.
+- A failed or crashed fail-open sink is not exactly-once. The next Stage 4
+  invocation reconciles the absolute singleton and catches up missed durable
+  publication; if no later invocation occurs, the textfile remains stale and
+  operators must not claim convergence. Durable capacity checkpoints retain
+  usage, while terminal detector errors expose typed bounded usage only through
+  failure signals.
+- The append-only decision ledger and canonical Stage 4 tables remain the source
+  of truth. The singleton is derived bounded export state, not permission to
+  rewrite or replace history.
+- Textfile read-modify-write uses the pending `.24.5` Linux kernel `flock` on a
+  persistent regular `0600` lock file. The parent keeps the inherited FileHandle
+  open while `flock --exclusive --timeout 5 3` is held across read, apply,
+  temp-file write, and atomic rename; close or process death releases the kernel
+  lock. The runtime Dockerfile explicitly supplies `util-linux`, which provides
+  `flock`. A process-local mutex or user-space heartbeat/stale-owner protocol is
+  not the accepted cross-process guarantee.
 - Stage 5 publishes actual Stage 5 retrieval attempts: increment immediately
   before each live search and preserve the count through success, no-material,
   fallback, fail-open, and unexpected completion paths. Do not infer attempts
@@ -250,11 +269,60 @@ The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 Database rollout is deliberately split. The partial unresolved-critical index
 uses live-write-safe `CREATE INDEX CONCURRENTLY` and its rollback uses
 `DROP INDEX CONCURRENTLY`; execute each statement in autocommit mode, never
-inside a transaction. Apply the separate transactional totals migration to
-create and reconcile the singleton plus its decision-insert trigger atomically.
-Do not combine the concurrent index statements with that transaction. Local
-verification still does not authorize applying either migration to staging or
-production.
+inside a transaction. Supabase CLI `2.106.0` runs ordinary migrations in an
+implicit transaction, so canonical `supabase migration up` must not apply the
+concurrent `20260711150000` file directly. Use only the fixed-purpose repo runner
+at
+`packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts`;
+it accepts no arbitrary SQL or migration path. Its apply path exact-checks the
+allowlisted SQL bytes, executes the statements in autocommit mode, verifies the
+live index definition/comment, and records the exact
+`(version, name, statements)` row for `20260711150000` in Supabase migration
+history. A repeat is a no-op only when both history and the live definition
+match; mismatches fail closed.
+
+The separate transactional `20260711151000` totals migration acquires
+write-conflicting locks on its canonical source tables, including the decision
+ledger, before it creates/seeds the singleton, installs the run/checkpoint,
+conflict, and decision triggers, and reconciles history. The nonblocking index
+proof does not apply to these locks.
+
+Use this forward order:
+
+1. quiesce decision writers and answer submission;
+2. run
+   `SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-index:apply`;
+3. run canonical `pnpm supabase migration up`; it must see the exact `150000`
+   history row, skip that file, and apply transactional `151000`, including the
+   trigger installation and reconciliation;
+4. deploy the matching consumer code;
+5. resume answer submission and decision writers.
+
+Use this reverse order:
+
+1. quiesce decision writers and answer submission, then disable or rollback the
+   consumer code;
+2. run the transactional `151000` totals rollback with its matching canonical
+   migration-history update;
+3. run
+   `SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-index:rollback`;
+   the fixed runner verifies exact history/live state, uses
+   `DROP INDEX CONCURRENTLY`, and deletes only the matching `150000` history row;
+4. resume answer submission and decision writers.
+
+Plan a bounded expected insert/answer pause around the totals transaction and
+consumer cutover. The nonblocking index proof does not apply to the totals
+migration: its write-conflicting ledger lock intentionally blocks concurrent
+decision inserts/answers until commit. Do not combine the concurrent index
+statements with that transaction. Local verification still does not authorize
+applying either migration or consumer change to staging or production.
+
+The fixed runner accepts loopback targets by default and rejects remote targets.
+Only a separately authorized future Q12 may append
+`-- --allow-remote --confirm 'APPLY REMOTE DOCUMENT EVIDENCE INDEX 20260711150000'`;
+rollback uses the exact confirmation
+`ROLL BACK REMOTE DOCUMENT EVIDENCE INDEX 20260711150000`. Neither remote form,
+nor any Q12 migration execution, was invoked while preparing this runbook.
 
 ## Rollout sequence
 
@@ -369,8 +437,11 @@ isolation. A local pass does not authorize staging activation.
 
 ## Privacy and incident evidence
 
-Metrics, dashboards, and alerts contain aggregate counters, gauges, histograms,
-and allowlisted stage/service/mode/status/severity labels only. They never contain
+Metrics, dashboards, and alerts contain aggregate counters and gauges only. The
+complete evidence-metric label allowlist is `service`, `instance`, `stage`,
+`mode`, `status`, `severity`, `actor`, `direction`, and `outcome`; no other label
+key is permitted. `service` and `instance` are fixed operational identifiers,
+never product IDs and never derived from product IDs. Metrics never contain
 product IDs (course, organization, document, run, decision, conflict, question,
 chunk, lesson, or user), runtime hashes/fingerprints, document or answer content,
 source names/excerpts, raw errors or error names/categories, model names,
