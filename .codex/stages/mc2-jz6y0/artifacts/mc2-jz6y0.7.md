@@ -54,8 +54,8 @@ parallel_decision: Q6 ran in its isolated worktree while independent orchestrati
 status: returned
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: Disposable containers, volumes, temporary secret files, and rendered Compose fixtures were removed. Final independent review passed with no findings; integration merge f7930913 and the integration 8/8/process rerun passed. Dedicated worktree/local-branch cleanup follows the pushed bookkeeping commit.
+cleanup_status: cleaned
+cleanup_notes: Disposable containers, volumes, temporary secret files, and rendered Compose fixtures were removed. Final independent review passed with no findings; integration merge f7930913 and the integration 8/8/process rerun passed. The dedicated worktree and local branch were removed after the pushed integration bookkeeping commit; the remote evidence branch is retained.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
