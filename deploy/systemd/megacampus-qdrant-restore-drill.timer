@@ -1,0 +1,12 @@
+[Unit]
+Description=Run monthly MegaCampus Qdrant restore verification
+
+[Timer]
+OnCalendar=monthly
+RandomizedDelaySec=1h
+AccuracySec=1m
+Persistent=true
+Unit=megacampus-qdrant-restore-drill.service
+
+[Install]
+WantedBy=timers.target
