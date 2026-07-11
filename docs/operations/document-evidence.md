@@ -347,6 +347,14 @@ but no product IDs, content, source names/excerpts, runtime hashes, raw errors, 
 model names. This requirement is specific to new evidence logging and does not
 claim that unrelated legacy pipeline logs have already been remediated.
 
+This privacy guarantee becomes true for the evidence rollout only after tracked
+remediation `mc2-jz6y0.24.4` is GREEN and integrated. Until then, privacy is a
+rollout blocker. The targeted remediation scope is limited to Stage 4
+decision/detector completion logs, Stage 5 advisory/fail-open/completion logs,
+and Stage 6 evidence-exclusion logs. Unrelated legacy/general logs are excluded
+from `.24.4`; that exclusion does not weaken this boundary or permit evidence
+rollout through a log path that emits restricted data.
+
 Repository, stage, Beads, and commit IDs identify engineering work, not product
 records. They may appear in Beads and `.codex` orchestration artifacts, but must
 never be repurposed as runtime product identifiers or telemetry labels. Product

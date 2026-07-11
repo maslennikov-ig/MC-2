@@ -52,6 +52,7 @@ depends_on_streams:
   - mc2-jz6y0.24.1 - exact active gate and Stage 5 cohort, commits 0aad2c20 and b7359f32
   - mc2-jz6y0.24.2 - owner rollout decision for cohort and promotion thresholds
   - mc2-jz6y0.24.3 - shadow conflict detection/persistence without decisions or downstream influence; integration dependency, not branch-local behavior
+  - mc2-jz6y0.24.4 - targeted Stage 4/5/6 evidence-log privacy remediation; rollout blocker until GREEN and integrated
 parallel_decision: parallel with the disjoint E7 observability stream; documentation is sequentially truth-reviewed because the cross-stage contract and rollout procedure share one durable narrative
 status: returned
 delivery_method: merge
@@ -66,7 +67,9 @@ graph_reviewed: used
 graph_review_notes: Read and queried the integration worktree's parent Graphify report read-only at base 7b542c8d (50,252 nodes, 74,520 edges, zero model/API tokens). The report oriented the evidence design and Stage 5 enrichment community; accepted artifacts and focused current-source reads supplied exact runtime names. No graph files or hooks were changed; root owns the post-integration refresh.
 verification:
   - docs-review RED scan: failed on missing quiesce/in-flight sequencing, mutually exclusive rollback modes, post-gate Stage 6 truth, privacy boundaries, rollout dependencies, integration-order wording, and the full Stage 5 rollout path
+  - mc2-jz6y0.24.4 dependency RED scan: failed on the missing integration gate and targeted privacy-remediation scope
   - focused rollback/Stage 6/shadow, dependency/path, and privacy GREEN scans: passed
+  - mc2-jz6y0.24.4 privacy gate/scope GREEN scan: passed
   - combined reviewed-docs invariant GREEN scan: passed
   - git cat-file integration-order gate for both rollout paths at 0aad2c20: passed; rollout task must merge before docs
   - /home/me/code/mc2/node_modules/.bin/prettier --check over all six changed Markdown files: passed
@@ -87,6 +90,7 @@ changed_files:
 explicit_defers:
   - Owner rollout decisions remain unresolved for Stage 5 cohort size/definition, cost, latency, false-conflict, degradation, enrichment quality, observation windows, and rollback ownership; no numeric threshold is claimed.
   - mc2-jz6y0.24.3 must integrate before docs may claim shadow conflict comparison; it detects/persists conflicts without questions, decisions, or downstream influence.
+  - mc2-jz6y0.24.4 must be GREEN and integrated before the evidence-log privacy guarantee is considered true or rollout may proceed. Its targeted scope is Stage 4 decision/detector completion, Stage 5 advisory/fail-open/completion, and Stage 6 evidence-exclusion logs; unrelated legacy/general logs are excluded without weakening the boundary.
   - Q12 deployment, live reindex, secret/service changes, staging activation, and every production mutation remain authorization-gated.
 ---
 
