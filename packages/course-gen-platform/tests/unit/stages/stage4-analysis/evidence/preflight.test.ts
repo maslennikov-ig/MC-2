@@ -1113,12 +1113,28 @@ describe('runDocumentEvidencePreflight', () => {
       })
     );
     let stopped = false;
+    const structuredPort = {
+      extractMap: vi.fn(),
+      reduceSummary: vi.fn(async input => ({
+        value: {
+          unitIds: input.units.map(unit => unit.unitId),
+          summary: `Bounded advisory level ${input.level} for ${input.units.length} inputs`,
+        },
+        usage: { inputTokens: 100, outputTokens: 10, costUsd: 0 },
+      })),
+    };
     await expect(
       runDocumentEvidencePreflight(
-        { ...baseOptions, sources, maxBatchTokens: 10_000 },
+        {
+          ...baseOptions,
+          sources,
+          maxBatchTokens: 10_000,
+          requireBoundedDownstreamContext: true,
+        },
         {
           repository,
           generateCard,
+          structuredPort,
           afterCheckpoint: async ({ batchIndex }) => {
             if (batchIndex === 2 && !stopped) {
               stopped = true;
@@ -1130,8 +1146,13 @@ describe('runDocumentEvidencePreflight', () => {
     ).rejects.toThrow('simulated large-corpus stop');
 
     const resumed = await runDocumentEvidencePreflight(
-      { ...baseOptions, sources: [...sources].reverse(), maxBatchTokens: 10_000 },
-      { repository, generateCard }
+      {
+        ...baseOptions,
+        sources: [...sources].reverse(),
+        maxBatchTokens: 10_000,
+        requireBoundedDownstreamContext: true,
+      },
+      { repository, generateCard, structuredPort }
     );
 
     expect(generateCard).toHaveBeenCalledTimes(1_000);
@@ -1140,5 +1161,26 @@ describe('runDocumentEvidencePreflight', () => {
     expect(
       repository.persistHistory.every(idsForCheckpoint => idsForCheckpoint.length === 1_000)
     ).toBe(true);
+    expect(resumed.downstreamRepresentation).toEqual(
+      expect.objectContaining({
+        kind: 'synthetic_advisory',
+        sourceCount: 1_000,
+        sourceDocumentIds: sources.map(item => item.documentId).sort(),
+      })
+    );
+    expect(resumed.downstreamRepresentation!.tokenCount).toBeLessThanOrEqual(24_000);
+
+    const replayPort = { extractMap: vi.fn(), reduceSummary: vi.fn() };
+    const acceptedRestart = await runDocumentEvidencePreflight(
+      {
+        ...baseOptions,
+        sources,
+        maxBatchTokens: 10_000,
+        requireBoundedDownstreamContext: true,
+      },
+      { repository, generateCard, structuredPort: replayPort }
+    );
+    expect(replayPort.reduceSummary).not.toHaveBeenCalled();
+    expect(acceptedRestart.downstreamRepresentation).toEqual(resumed.downstreamRepresentation);
   });
 });

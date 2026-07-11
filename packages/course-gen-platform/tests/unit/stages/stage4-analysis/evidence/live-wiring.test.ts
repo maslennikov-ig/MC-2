@@ -8,6 +8,7 @@ import {
   type AnalysisContext,
   validateLegacyBudgetForEvidencePreflight,
 } from '@/stages/stage4-analysis/orchestrator-helpers';
+import { resolveDownstreamDocumentSummaries } from '@/stages/stage4-analysis/evidence/downstream-context';
 import { allocateStage4Budget } from '@/stages/stage4-analysis/phases/stage4-budget-allocator';
 import { validateJobInput } from '@/stages/stage4-analysis/utils/validators';
 
@@ -26,6 +27,9 @@ const summary = {
   stage3_priority: 'CORE' as const,
   stage3_importance_score: 0.9,
 };
+
+const documentId = (value: number) =>
+  `40000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
 
 function context(documents = [summary]): AnalysisContext {
   return {
@@ -92,6 +96,93 @@ describe('Stage 4 document evidence live wiring', () => {
     );
   });
 
+  it('uses one immutable synthetic advisory digest only for an overflowed accepted run', () => {
+    const analysisContext = context();
+    const original = analysisContext.resolvedDocumentSummaries;
+    expect(resolveDownstreamDocumentSummaries(original, undefined)).toBe(original);
+
+    analysisContext.documentEvidencePreflight = {
+      ...skippedResult,
+      status: 'accepted',
+      runId: '10000000-0000-4000-8000-000000000001',
+      downstreamRepresentation: {
+        kind: 'synthetic_advisory',
+        runId: '10000000-0000-4000-8000-000000000001',
+        representationHash: 'sha256:representation',
+        promptContent: 'SYNTHETIC ADVISORY DOCUMENT EVIDENCE\nBounded digest',
+        tokenCount: 12,
+        targetTokens: 24_000,
+        sourceCount: 1_000,
+        sourceDocumentIds: Array.from({ length: 1_000 }, (_, index) => documentId(index + 1)),
+        sourceOutcomes: [],
+        coverage: {
+          source_count: 1_000,
+          assessed_count: 1_000,
+          degraded_count: 0,
+          failed_count: 0,
+        },
+        materialSourceRefs: [],
+        claims: [],
+        constraints: [],
+        limitations: [],
+      },
+    } as never;
+
+    const downstream = resolveDownstreamDocumentSummaries(
+      original,
+      analysisContext.documentEvidencePreflight.downstreamRepresentation
+    );
+    expect(downstream).toHaveLength(1);
+    expect(downstream[0]).toEqual(
+      expect.objectContaining({
+        file_name: 'Synthetic advisory evidence digest (not an uploaded document)',
+        processed_content: 'SYNTHETIC ADVISORY DOCUMENT EVIDENCE\nBounded digest',
+      })
+    );
+  });
+
+  it('keeps a shadow representation out of semantic downstream inputs', () => {
+    const analysisContext = context();
+    analysisContext.documentEvidenceMode = 'shadow';
+    analysisContext.documentEvidencePreflight = {
+      ...skippedResult,
+      status: 'accepted',
+      runId: '10000000-0000-4000-8000-000000000001',
+      downstreamRepresentation: {
+        kind: 'synthetic_advisory',
+        runId: '10000000-0000-4000-8000-000000000001',
+        representationHash: 'sha256:shadow',
+        promptContent: 'shadow digest',
+        tokenCount: 2,
+        targetTokens: 24_000,
+        sourceCount: 1,
+        sourceDocumentIds: [summary.document_id],
+        sourceOutcomes: [],
+        coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+        materialSourceRefs: [],
+        claims: [],
+        constraints: [],
+        limitations: [],
+      },
+    } as never;
+
+    const selected = resolveDownstreamDocumentSummaries(
+      analysisContext.resolvedDocumentSummaries,
+      analysisContext.documentEvidenceMode === 'active'
+        ? analysisContext.documentEvidencePreflight.downstreamRepresentation
+        : undefined
+    );
+    expect(selected).toBe(analysisContext.resolvedDocumentSummaries);
+  });
+
+  it('routes the same bounded representation into Phase 2, Phase 3, and Phase 4 callers', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator-phase-helpers.ts'),
+      'utf8'
+    );
+    expect(source.match(/resolveDownstreamDocumentSummaries\(/gu)).toHaveLength(3);
+  });
+
   it('is called strictly after classification and before the existing Phase 0.5 boundary', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator.ts'),
@@ -150,6 +241,22 @@ describe('Stage 4 document evidence live wiring', () => {
     expect(analysisContext.documentEvidencePreflight).toEqual(skippedResult);
     expect(analysisContext.resolvedDocumentSummaries).toEqual(summariesBefore);
     expect(analysisContext.clarifyingAnswers).toEqual(answersBefore);
+  });
+
+  it('requests a durable bounded digest only for active legacy overflow', async () => {
+    const analysisContext = context();
+    analysisContext.legacyBudgetFits = false;
+    const runPreflight = vi.fn(async () => skippedResult);
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'active',
+      runPreflight,
+      preflightDependencies: {} as never,
+    });
+
+    expect(runPreflight.mock.calls[0][0].requireBoundedDownstreamContext).toBe(true);
+    expect(analysisContext.documentEvidenceMode).toBe('active');
   });
 
   it('allows evidence preflight to own an enumerated missing-content outcome', async () => {

@@ -62,6 +62,9 @@ export interface AnalysisContext {
   phase3Output?: Phase3Output;
   phase4Output?: Phase4Output;
   documentEvidencePreflight?: DocumentEvidencePreflightResult;
+  documentEvidenceMode?: 'shadow' | 'active';
+  /** False only when the enabled evidence preflight owns legacy context overflow. */
+  legacyBudgetFits?: boolean;
   clarifyingAnswers: Array<{
     question: string;
     answer: string;
@@ -175,6 +178,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
 
   // Budget allocation
   let budgetAllocation: Stage4BudgetAllocation | null = null;
+  let legacyBudgetFits = true;
   let tierConfig: Stage4TierConfig | undefined;
 
   // Extract DocumentSummaryResult[] early — has stage3_priority from fetchDocumentSummaries
@@ -207,9 +211,10 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
         validateLocale(input.language),
         tierConfig
       );
-      const legacyBudgetFits = validateLegacyBudgetForEvidencePreflight(
+      legacyBudgetFits = validateLegacyBudgetForEvidencePreflight(
         budgetAllocation,
-        process.env.DOCUMENT_EVIDENCE_ENABLED === 'true'
+        process.env.DOCUMENT_EVIDENCE_ENABLED === 'true' &&
+          process.env.DOCUMENT_EVIDENCE_MODE === 'active'
       );
       if (!legacyBudgetFits) {
         orchestrationLogger.warn(
@@ -290,6 +295,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
     budgetAllocation,
     originalDocumentSummaries,
     resolvedDocumentSummaries,
+    legacyBudgetFits,
     clarifyingAnswers: [],
   };
 }

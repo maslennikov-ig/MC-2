@@ -14,6 +14,7 @@ base_commit: 06c90b131d70fcce051cd77de5922222f50b1859
 worktree: /home/me/code/mc2/.worktrees/document-evidence-e2
 write_zone:
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/
+  - packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-2-scope.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/phases/stage4-budget-allocator.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
@@ -69,7 +70,7 @@ graph_review_notes: Read graphify-out/GRAPH_REPORT.md and ran `graphify query "S
 verification:
   - Allocator RED failed 1 missing-module suite; GREEN passed 11/11 initial cases and 13/13 after the legacy oversized-CORE and reserve bridge was added.
   - Preflight adversarial GREEN passed 24/24, including structured full-source map/reduce, port-owned retries, UUIDv8 provenance, durable verification resume without replay, claim-scoped refs, actual-token reduction progress, semantic-only fingerprints, truthful executed mode/tokens, runtime schema fail-closed, exact Stage 3 hash reuse, bounded oversized summaries, foreign-ref rejection, and a deterministic 1,000-source exact-ledger resume.
-  - Focused Stage 4 suite passed 101/101 across budget, preflight, live wiring, repository, authoritative source enumeration, document preparation, and validators.
+  - Focused Stage 4 suite passed 110/110 across budget, preflight, durable downstream hierarchy, real Phase 2/3/4 callers, live wiring, repository, authoritative source enumeration, document preparation, and validators.
   - Shared document-evidence contracts passed 11/11.
   - Migration static gate passed 8 with the applied case skipped; applied PostgreSQL 15.18 gate passed 9/9.
   - Both shared-types and course-gen-platform type-checks passed.
@@ -78,9 +79,11 @@ changed_files:
   - packages/shared-types/src/analysis-result.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/budget.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/card-generator.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/evidence/downstream-context.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/preflight.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/repository.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/phases/stage4-budget-allocator.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-2-scope.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/utils/validators.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts
@@ -92,6 +95,8 @@ changed_files:
   - packages/course-gen-platform/tests/unit/stage4-prepare-document-infos.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/budget.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/downstream-context.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/downstream-phase-callers.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/preflight.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/repository.test.ts
@@ -121,10 +126,11 @@ Checkpoint callbacks atomically persist the complete ledger, structured map/redu
 - Legacy allocator RED/GREEN proves an oversized CORE document is not injected as full text before preflight and that the system-prompt reserve is enforced by validation.
 - Final independent review P1/P2 RED exposed eight defects: replayed verification could diverge from durable cards; combined queries contaminated claim provenance; singleton reduction rejected real token progress; runtime Phase 1 metadata invalidated reuse; `vector_status` hid authoritative sources; legacy all-summary validation aborted before preflight; empty content was rejected before durable coverage; and regenerated hierarchy reported planned rather than executed audit values.
 - Final review GREEN closes all eight: committed verification keys restore the stored ledger without a second Qdrant call; each material claim gets its own bounded tenant/course/document-grouped query and refs; reduction compares actual token progress; fingerprints use a minimal semantic classification projection; source enumeration ignores Qdrant state; enabled evidence mode owns legacy overflow and missing-content outcomes while disabled mode stays strict; and generated cards record executed hierarchy plus actual summary tokens.
+- Re-review found that merely suppressing legacy overflow still passed every summary into Phase 2/3/4. The final P1 cycle now builds one explicitly synthetic/advisory representation from every accepted card exactly once, reduces only through the validated structured port, atomically checkpoints each reduction and the immutable complete digest, and restores it without replay. Exact source IDs/statuses, coverage, claims, constraints, limitations and material refs remain in durable checkpoint metadata; the prompt receives only count, accepted run ID, provenance handle and the bounded digest. Active overflow sends the same representation to Phase 2/3/4 at `min(effective budget, 24000)` tokens; shadow, disabled, no-document and small-fit paths retain their prior document inputs.
 
 # Verification
 
-- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-key pnpm exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/budget.test.ts tests/unit/stages/stage4-analysis/evidence/preflight.test.ts tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts tests/unit/stage4-prepare-document-infos.test.ts tests/unit/stages/stage4-analysis/utils/validators.test.ts` -> 101/101.
+- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-key pnpm exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/budget.test.ts tests/unit/stages/stage4-analysis/evidence/preflight.test.ts tests/unit/stages/stage4-analysis/evidence/downstream-context.test.ts tests/unit/stages/stage4-analysis/evidence/downstream-phase-callers.test.ts tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts tests/unit/stage4-prepare-document-infos.test.ts tests/unit/stages/stage4-analysis/utils/validators.test.ts` -> 110/110.
 - `pnpm --filter @megacampus/shared-types exec vitest run tests/document-evidence.test.ts` -> 11/11.
 - `pnpm exec vitest run --config ../../vitest.shared.ts --root . tests/integration/document-evidence-rls.test.ts` -> 8 passed, 1 applied test skipped.
 - `DOCUMENT_EVIDENCE_DATABASE_URL=postgresql://postgres:[redacted]@127.0.0.1:15434/document_evidence_test pnpm exec vitest run --config ../../vitest.shared.ts --root . tests/integration/document-evidence-rls.test.ts` -> 9/9 on PostgreSQL 15.18.

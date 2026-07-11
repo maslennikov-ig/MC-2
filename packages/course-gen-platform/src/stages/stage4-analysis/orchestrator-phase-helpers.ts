@@ -59,6 +59,7 @@ import {
   createProductionEvidenceExtractor,
   createProductionStructuredEvidencePort,
 } from './evidence/card-generator';
+import { resolveDownstreamDocumentSummaries } from './evidence/downstream-context';
 
 export interface DocumentEvidencePhaseOverrides {
   enabled?: boolean;
@@ -140,10 +141,12 @@ export async function runDocumentEvidencePhase(
       maxBatchTokens: 32_000,
       maxRetries: 2,
       maxVerificationDocumentIds: 100,
+      requireBoundedDownstreamContext: mode === 'active' && context.legacyBudgetFits === false,
     },
     dependencies
   );
   context.documentEvidencePreflight = result;
+  context.documentEvidenceMode = mode;
   context.orchestrationLogger.info(
     {
       evidenceMode: mode,
@@ -493,6 +496,12 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
   if (!phase1Output) {
     throw new Error('Phase 1 output required for scope phase');
   }
+  const downstreamDocumentSummaries = resolveDownstreamDocumentSummaries(
+    resolvedDocumentSummaries,
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined
+  );
 
   await startPhase(2, courseId, supabase, orchestrationLogger);
 
@@ -508,7 +517,7 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
           course_id: courseId,
           language: input.language,
           topic: input.topic,
-          document_summaries: resolvedDocumentSummaries?.map(ds => ds.processed_content) || null,
+          document_summaries: downstreamDocumentSummaries.map(ds => ds.processed_content),
           phase1_output: phase1Output,
           course_size: input.course_size,
           target_lessons: input.target_lessons,
@@ -623,7 +632,17 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
 
   await startPhase(3, courseId, supabase, orchestrationLogger);
 
-  const documentSummariesText = resolvedDocumentSummaries?.map(ds => ds.processed_content) || null;
+  const downstreamDocumentSummaries = resolveDownstreamDocumentSummaries(
+    resolvedDocumentSummaries,
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined
+  );
+  const documentSummariesText = downstreamDocumentSummaries.map(ds => ds.processed_content);
+  const boundedRepresentation =
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined;
 
   const phase3Output: Phase3Output = await executePhaseWithRetry(
     'phase3_expert',
@@ -636,28 +655,40 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         clarifying_answers: clarifyingAnswers,
-        budget_context: context.budgetAllocation
+        budget_context: boundedRepresentation
           ? {
-              documents: context.budgetAllocation.documents.map(d => {
-                const docSummary = resolvedDocumentSummaries?.find(
-                  ds => ds.document_id === d.file_id
-                );
-                if (!docSummary) {
-                  orchestrationLogger.warn(
-                    { file_id: d.file_id, priority: d.priority },
-                    'Budget document not found in resolvedDocumentSummaries, using file_id as name'
-                  );
-                }
-                return {
-                  file_name: docSummary?.file_name || d.file_id,
-                  mode: d.mode,
-                  priority: d.priority,
-                  tokens: d.tokens,
-                };
-              }),
-              totalTokens: context.budgetAllocation.totalTokens,
+              documents: [
+                {
+                  file_name: 'Synthetic advisory evidence digest (not an uploaded document)',
+                  mode: 'summary',
+                  priority: 'SUPPLEMENTARY',
+                  tokens: boundedRepresentation.tokenCount,
+                },
+              ],
+              totalTokens: boundedRepresentation.tokenCount,
             }
-          : undefined,
+          : context.budgetAllocation
+            ? {
+                documents: context.budgetAllocation.documents.map(d => {
+                  const docSummary = downstreamDocumentSummaries.find(
+                    ds => ds.document_id === d.file_id
+                  );
+                  if (!docSummary) {
+                    orchestrationLogger.warn(
+                      { file_id: d.file_id, priority: d.priority },
+                      'Budget document not found in resolvedDocumentSummaries, using file_id as name'
+                    );
+                  }
+                  return {
+                    file_name: docSummary?.file_name || d.file_id,
+                    mode: d.mode,
+                    priority: d.priority,
+                    tokens: d.tokens,
+                  };
+                }),
+                totalTokens: context.budgetAllocation.totalTokens,
+              }
+            : undefined,
       }),
     orchestrationLogger
   );
@@ -699,6 +730,12 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
   if (!phase1Output || !phase2Output || !phase3Output) {
     throw new Error('Phase 1, 2, and 3 outputs required for synthesis phase');
   }
+  const downstreamDocumentSummaries = resolveDownstreamDocumentSummaries(
+    resolvedDocumentSummaries,
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined
+  );
 
   await startPhase(4, courseId, supabase, orchestrationLogger);
 
@@ -709,7 +746,7 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
         course_id: courseId,
         language: input.language,
         topic: input.topic,
-        document_summaries: resolvedDocumentSummaries || null,
+        document_summaries: downstreamDocumentSummaries,
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         phase3_output: phase3Output,

@@ -27,6 +27,10 @@ import {
   type StructuredEvidenceCheckpoint,
   type StructuredEvidencePort,
 } from './card-generator';
+import {
+  buildDownstreamEvidenceRepresentation,
+  type DownstreamEvidenceRepresentation,
+} from './downstream-context';
 
 export interface DocumentEvidencePreflightSource {
   documentId: string;
@@ -54,6 +58,7 @@ export interface DocumentEvidencePreflightInput extends EvidenceBudgetOptions {
   sources: DocumentEvidencePreflightSource[];
   maxRetries: number;
   maxVerificationDocumentIds?: number;
+  requireBoundedDownstreamContext?: boolean;
 }
 
 interface RunRecord {
@@ -139,9 +144,11 @@ export interface DocumentEvidencePreflightResult {
   batchAllocatedTokens: number[];
   reductionLevelWidths: number[];
   generationMetrics: EvidenceGenerationMetrics;
+  downstreamRepresentation?: DownstreamEvidenceRepresentation;
 }
 
 const DEFAULT_VERIFICATION_BATCH_SIZE = 100;
+const DOWNSTREAM_PHASE_DOCUMENT_TOKEN_LIMIT = 24_000;
 
 function sha256(value: string): string {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -464,17 +471,35 @@ export async function runDocumentEvidencePreflight(
 
   if (reused && run.status === 'accepted') {
     const cards = exactCards(await dependencies.repository.listItems(runId), sources);
+    const acceptedCoverage = coverage(cards);
+    const downstreamRepresentation = input.requireBoundedDownstreamContext
+      ? await buildDownstreamEvidenceRepresentation({
+          runId,
+          cards,
+          coverage: acceptedCoverage,
+          language: input.language ?? 'en',
+          modelId: input.modelId ?? 'custom-generator',
+          evidenceVersion: input.evidenceVersion,
+          targetTokens: Math.min(budget.effectiveBudget, DOWNSTREAM_PHASE_DOCUMENT_TOKEN_LIMIT),
+          maxBatchTokens: input.maxBatchTokens,
+          maxRetries: input.maxRetries,
+          port: dependencies.structuredPort!,
+          checkpointRows,
+          requireRestoredComplete: true,
+        })
+      : undefined;
     return {
       status: 'accepted',
       runId,
       inputFingerprint: fingerprint,
-      coverage: coverage(cards),
+      coverage: acceptedCoverage,
       cards,
       candidateConflicts: [],
       batchDocumentIds: plan.map(batch => batch.documentIds),
       batchAllocatedTokens: plan.map(batch => batch.allocatedTokens),
       reductionLevelWidths: reductionWidths(plan.length),
       generationMetrics: metrics,
+      ...(downstreamRepresentation ? { downstreamRepresentation } : {}),
     };
   }
 
@@ -706,6 +731,27 @@ export async function runDocumentEvidencePreflight(
   }
 
   durableCards = exactCards([...cardById.values()], sources);
+  const durableCoverage = coverage(durableCards);
+  let downstreamRepresentation: DownstreamEvidenceRepresentation | undefined;
+  if (input.requireBoundedDownstreamContext) {
+    if (!dependencies.structuredPort) {
+      throw new Error('Structured evidence port is required for bounded downstream context');
+    }
+    downstreamRepresentation = await buildDownstreamEvidenceRepresentation({
+      runId,
+      cards: durableCards,
+      coverage: durableCoverage,
+      language: input.language ?? 'en',
+      modelId: input.modelId ?? 'custom-generator',
+      evidenceVersion: input.evidenceVersion,
+      targetTokens: Math.min(budget.effectiveBudget, DOWNSTREAM_PHASE_DOCUMENT_TOKEN_LIMIT),
+      maxBatchTokens: input.maxBatchTokens,
+      maxRetries: input.maxRetries,
+      port: dependencies.structuredPort,
+      checkpointRows,
+      onCheckpoint: async event => commit(event),
+    });
+  }
   await dependencies.repository.finalizeRun({
     runId,
     courseId: input.courseId,
@@ -716,12 +762,13 @@ export async function runDocumentEvidencePreflight(
     status: 'accepted',
     runId,
     inputFingerprint: fingerprint,
-    coverage: coverage(durableCards),
+    coverage: durableCoverage,
     cards: durableCards,
     candidateConflicts: [],
     batchDocumentIds: plan.map(batch => batch.documentIds),
     batchAllocatedTokens: plan.map(batch => batch.allocatedTokens),
     reductionLevelWidths: reductionWidths(plan.length),
     generationMetrics: metrics,
+    ...(downstreamRepresentation ? { downstreamRepresentation } : {}),
   };
 }
