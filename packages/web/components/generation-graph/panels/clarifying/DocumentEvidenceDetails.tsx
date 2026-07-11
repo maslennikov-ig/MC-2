@@ -8,12 +8,17 @@ import {
   type EvidenceSourceRef,
 } from '@megacampus/shared-types'
 import { Badge } from '@/components/ui/badge'
+import { z } from 'zod'
 
 interface DocumentEvidenceDetailsProps {
   metadata: DocumentEvidenceQuestionMetadata
 }
 
 const COLLAPSED_EXCERPT_LENGTH = 240
+
+export type ParsedDocumentEvidenceQuestionMetadata = DocumentEvidenceQuestionMetadata & {
+  current_decision_id?: string
+}
 
 function sanitizeText(value: string): string {
   // React renders this value as a text node and escapes markup. Keeping the
@@ -27,15 +32,20 @@ function sanitizeText(value: string): string {
  */
 export function parseDocumentEvidenceQuestionMetadata(
   raw: unknown
-): DocumentEvidenceQuestionMetadata | null {
+): ParsedDocumentEvidenceQuestionMetadata | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
 
-  const { current_decision_id: _currentDecisionId, ...canonicalMetadata } = raw as Record<
+  const { current_decision_id: currentDecisionId, ...canonicalMetadata } = raw as Record<
     string,
     unknown
   >
+  const parsedDecisionId = z.string().uuid().optional().safeParse(currentDecisionId)
+  if (!parsedDecisionId.success) return null
   const parsed = DocumentEvidenceQuestionMetadataSchema.safeParse(canonicalMetadata)
-  return parsed.success ? parsed.data : null
+  if (!parsed.success) return null
+  return parsedDecisionId.data
+    ? { ...parsed.data, current_decision_id: parsedDecisionId.data }
+    : parsed.data
 }
 
 function sourceLabel(
@@ -144,7 +154,10 @@ export function DocumentEvidenceDetails({ metadata }: DocumentEvidenceDetailsPro
                 </p>
                 {hasLongExcerpt && (
                   <details className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-                    <summary className="cursor-pointer font-medium text-orange-800 underline underline-offset-2 dark:text-orange-200">
+                    <summary
+                      data-testid={`conflict-disclosure-${sideIndex}`}
+                      className="cursor-pointer font-medium text-orange-800 underline underline-offset-2 dark:text-orange-200"
+                    >
                       {t('showFullStatement')}
                     </summary>
                     <p className="mt-2 break-words">“{sanitizeText(side.excerpt)}”</p>
@@ -157,7 +170,9 @@ export function DocumentEvidenceDetails({ metadata }: DocumentEvidenceDetailsPro
                       className="flex gap-2"
                     >
                       <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <span>{sourceLabel(ref, documents, (page) => t('page', { page }))}</span>
+                      <span data-testid={`conflict-source-${sideIndex}-${refIndex}`}>
+                        {sourceLabel(ref, documents, (page) => t('page', { page }))}
+                      </span>
                     </li>
                   ))}
                 </ul>

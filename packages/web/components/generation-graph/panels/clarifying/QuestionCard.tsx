@@ -35,6 +35,7 @@ type CardMode = 'unanswered' | 'answered' | 'editing'
 
 interface SuggestedAnswer {
   text: string
+  value?: string
   rationale?: string
   is_recommended?: boolean
 }
@@ -49,6 +50,7 @@ interface Question {
   currentAnswers?: string[] // For multi_choice
   category?: string
   evidenceMetadata?: DocumentEvidenceQuestionMetadata
+  evidenceMetadataInvalid?: boolean
   answerSource?: 'suggested' | 'modified' | 'custom' | 'system'
 }
 
@@ -60,7 +62,7 @@ interface QuestionCardProps {
     source: 'suggested' | 'modified' | 'custom',
     selectedSuggestionIndex?: number,
     selectedSuggestionIndexes?: number[] // For multi_choice
-  ) => void
+  ) => Promise<boolean> | boolean | void
   onSkip?: (questionId: string) => void
   isAnswered: boolean
   isProcessing?: boolean
@@ -139,35 +141,12 @@ export function QuestionCard({
   // BUG FIX: Sync mode with isAnswered prop changes
   // Track previous isAnswered value to detect when answer was just saved
   const prevIsAnswered = usePrevious(isAnswered)
-  // Track previous answer to detect when answer was updated (for edit mode)
-  const prevAnswer = usePrevious(question.currentAnswer)
-  const prevAnswers = usePrevious(question.currentAnswers)
-
   useEffect(() => {
     // Case 1: If isAnswered just changed from false to true (new answer saved)
     if (isAnswered && prevIsAnswered === false) {
       setMode('answered')
     }
-
-    // Case 2: If we're in editing mode and currentAnswer/currentAnswers changed (edit saved)
-    // This happens when user edits an existing answer and data is refetched
-    if (mode === 'editing') {
-      const answerChanged = question.currentAnswer !== prevAnswer
-      const answersChanged = JSON.stringify(question.currentAnswers) !== JSON.stringify(prevAnswers)
-
-      if (answerChanged || answersChanged) {
-        setMode('answered')
-      }
-    }
-  }, [
-    isAnswered,
-    prevIsAnswered,
-    question.currentAnswer,
-    prevAnswer,
-    question.currentAnswers,
-    prevAnswers,
-    mode,
-  ])
+  }, [isAnswered, prevIsAnswered])
 
   // Selection state (Phase 1: not saved yet)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null)
@@ -271,31 +250,37 @@ export function QuestionCard({
   }
 
   // === CONFIRM ANSWER (Phase 2: Save to backend) ===
-  const handleConfirmAnswer = () => {
+  const handleConfirmAnswer = async () => {
     if (!hasSelection || isProcessing) return
 
-    // Optimistically switch to answered mode
-    // If save fails, ClarifyingPanel will show error toast
-    setMode('answered')
+    let saved = false
 
     if (question.type === 'open') {
       if (hasCustomInput && customText.trim()) {
         // Custom or modified answer
         const source = selectedSuggestionIndex !== null ? 'modified' : 'custom'
-        onAnswer(question.id, customText.trim(), source, selectedSuggestionIndex ?? undefined)
+        saved =
+          (await onAnswer(
+            question.id,
+            customText.trim(),
+            source,
+            selectedSuggestionIndex ?? undefined
+          )) !== false
       } else if (selectedSuggestionIndex !== null) {
         // Accepted suggested answer
         const answer = question.suggestedAnswers[selectedSuggestionIndex].text
-        onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)
+        saved =
+          (await onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)) !== false
       }
     } else if (question.type === 'single_choice') {
       if (isCustomSelected && customText.trim()) {
         // User typed custom answer
-        onAnswer(question.id, customText.trim(), 'custom')
+        saved = (await onAnswer(question.id, customText.trim(), 'custom')) !== false
       } else if (selectedSuggestionIndex !== null) {
         // User selected from suggestions
         const answer = question.suggestedAnswers[selectedSuggestionIndex].text
-        onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)
+        saved =
+          (await onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)) !== false
       }
     } else if (question.type === 'multi_choice') {
       const answers = selectedSuggestionIndexes.map((idx) => question.suggestedAnswers[idx].text)
@@ -314,9 +299,13 @@ export function QuestionCard({
         } else if (hasCustom && selectedSuggestionIndexes.length > 0) {
           source = 'modified'
         }
-        onAnswer(question.id, answers, source, undefined, selectedSuggestionIndexes)
+        saved =
+          (await onAnswer(question.id, answers, source, undefined, selectedSuggestionIndexes)) !==
+          false
       }
     }
+
+    if (saved) setMode('answered')
   }
 
   // === EDIT MODE ===
@@ -543,7 +532,10 @@ export function QuestionCard({
                 <RadioGroupItem value={String(index)} id={optionId} className="mt-0.5" />
                 <Label htmlFor={optionId} className="min-w-0 flex-1 cursor-pointer">
                   <span className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    <span
+                      data-testid={`document-option-${index}`}
+                      className="text-sm font-medium text-slate-900 dark:text-slate-100"
+                    >
                       {suggestion.text}
                     </span>
                     {suggestion.is_recommended && (
@@ -906,41 +898,55 @@ export function QuestionCard({
 
           {/* Question Text */}
           <div className="mb-4">
-            <p className="text-base font-medium text-slate-800 dark:text-slate-100">
+            <p
+              data-testid="clarifying-question-text"
+              className="text-base font-medium text-slate-800 dark:text-slate-100"
+            >
               {question.text}
             </p>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{typeHelperText}</p>
           </div>
 
           {/* Main Content (Conditional based on mode) */}
-          <AnimatePresence mode="wait">
-            {mode === 'answered' ? (
-              <motion.div
-                key="answered"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                {renderAnsweredState()}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="selection"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                {/* Question Type Specific UI */}
-                {question.type === 'open' && renderOpenQuestion()}
-                {question.type === 'single_choice' && renderSingleChoiceQuestion()}
-                {question.type === 'multi_choice' && renderMultiChoiceQuestion()}
+          {question.evidenceMetadataInvalid ? (
+            <div
+              role="alert"
+              data-testid="invalid-document-decision"
+              className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-950 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100"
+            >
+              <p className="font-semibold">{t('documentEvidence.invalidTitle')}</p>
+              <p className="mt-1 text-sm">{t('documentEvidence.invalidDescription')}</p>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              {mode === 'answered' ? (
+                <motion.div
+                  key="answered"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {renderAnsweredState()}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="selection"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-4"
+                >
+                  {/* Question Type Specific UI */}
+                  {question.type === 'open' && renderOpenQuestion()}
+                  {question.type === 'single_choice' && renderSingleChoiceQuestion()}
+                  {question.type === 'multi_choice' && renderMultiChoiceQuestion()}
 
-                {/* Action Buttons */}
-                {renderActionButtons()}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  {/* Action Buttons */}
+                  {renderActionButtons()}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </CardContent>
       </Card>
     </motion.div>

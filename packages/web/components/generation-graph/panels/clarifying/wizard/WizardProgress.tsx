@@ -51,7 +51,11 @@ export function WizardProgress({
       </div>
 
       {/* Progress bar */}
-      <Progress value={progress} className="mb-2 h-2" />
+      <Progress
+        value={progress}
+        aria-label={t('progressLabel', { answered: answeredCount, total: totalQuestions })}
+        className="mb-2 h-2"
+      />
 
       {/* Priority counters with dots */}
       <div className="flex items-center gap-3 text-xs">

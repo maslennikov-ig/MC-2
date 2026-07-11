@@ -101,6 +101,7 @@
     "titleReadOnly": "Question Answers",
     "questionOf": "Question {current} of {total}",
     "answered": "Answered: {count}",
+    "progressLabel": "Clarifying question progress: {answered} of {total} answered",
     "priority": {
       "critical": "Required",
       "important": "Important",
@@ -160,6 +161,9 @@
       "informationalDecision": "Informational · does not block generation",
       "systemDecision": "System decision",
       "systemDecisionDescription": "Selected automatically from the audited recommendation. This record is read-only.",
+      "decisionLabelUnavailable": "Stored decision label unavailable",
+      "invalidTitle": "Document decision data is invalid",
+      "invalidDescription": "Refresh the page or contact support. This decision cannot be submitted until its evidence metadata is valid.",
       "conflictingStatements": "Conflicting statements and source references",
       "showFullStatement": "Show full statement",
       "courseImpact": "Course impact",

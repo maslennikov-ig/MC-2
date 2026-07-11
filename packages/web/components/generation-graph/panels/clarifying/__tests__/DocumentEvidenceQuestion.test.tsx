@@ -57,12 +57,22 @@ function renderWithMessages(node: React.ReactNode, locale: 'en' | 'ru' = 'en') {
 
 describe('document evidence metadata boundary', () => {
   it('accepts the E3 allowlisted payload and ignores only the audited current decision id', () => {
+    const currentDecisionId = '10000000-0000-4000-8000-000000000005'
     expect(
       parseDocumentEvidenceQuestionMetadata({
         ...conflictMetadata,
-        current_decision_id: '10000000-0000-4000-8000-000000000005',
+        current_decision_id: currentDecisionId,
       })
-    ).toEqual(conflictMetadata)
+    ).toEqual({ ...conflictMetadata, current_decision_id: currentDecisionId })
+  })
+
+  it('rejects an invalid current decision CAS token', () => {
+    expect(
+      parseDocumentEvidenceQuestionMetadata({
+        ...conflictMetadata,
+        current_decision_id: 'not-a-uuid',
+      })
+    ).toBeNull()
   })
 
   it('rejects source-body and unknown metadata instead of forwarding it to the UI', () => {

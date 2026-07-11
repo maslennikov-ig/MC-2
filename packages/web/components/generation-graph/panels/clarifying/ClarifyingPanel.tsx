@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import DOMPurify from 'isomorphic-dompurify'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
@@ -22,6 +21,7 @@ type QuestionType = 'open' | 'single_choice' | 'multi_choice'
 
 interface SuggestedAnswer {
   text: string
+  value?: string
   rationale?: string
   is_recommended?: boolean
 }
@@ -37,6 +37,7 @@ interface Question {
   category?: string
   isAnswered: boolean
   evidenceMetadata?: NonNullable<ReturnType<typeof parseDocumentEvidenceQuestionMetadata>>
+  evidenceMetadataInvalid?: boolean
   answerSource?: 'suggested' | 'modified' | 'custom' | 'system'
 }
 
@@ -47,12 +48,14 @@ type AnswerPayload =
       answerSource: 'suggested' | 'modified' | 'custom'
       answer: string
       selectedSuggestionIndex?: number
+      expectedCurrentDecisionId?: string
     }
   | {
       questionId: string
       answerSource: 'suggested' | 'modified' | 'custom'
       answers: string[]
       selectedSuggestionIndexes?: number[]
+      expectedCurrentDecisionId?: string
     }
 
 interface ClarifyingPanelProps {
@@ -69,6 +72,17 @@ const UserAnswerSchema = z.union([
   z.string(), // Legacy format
 ])
 
+const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/g
+
+/**
+ * Keep this client boundary browser-free. Every returned value is rendered by
+ * React as a text node (never raw HTML), so markup is escaped while unsafe
+ * control characters are removed without pulling server-only jsdom into SSR.
+ */
+function sanitizeTextNode(value: string): string {
+  return value.replace(CONTROL_CHARACTERS, '')
+}
+
 /**
  * Safely parse user_answer from JSONB with Zod validation
  */
@@ -79,13 +93,13 @@ function parseUserAnswer(raw: unknown): { currentAnswer?: string; currentAnswers
     const validated = UserAnswerSchema.parse(raw)
 
     if (typeof validated === 'string') {
-      return { currentAnswer: DOMPurify.sanitize(validated) }
+      return { currentAnswer: sanitizeTextNode(validated) }
     }
     if ('value' in validated) {
-      return { currentAnswer: DOMPurify.sanitize(validated.value) }
+      return { currentAnswer: sanitizeTextNode(validated.value) }
     }
     if ('values' in validated) {
-      const sanitizedValues = validated.values.map((v) => DOMPurify.sanitize(v))
+      const sanitizedValues = validated.values.map(sanitizeTextNode)
       return {
         currentAnswers: sanitizedValues,
         currentAnswer: sanitizedValues.join(', '),
@@ -208,35 +222,47 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
   // tRPC infers ClarifyingQuestionRow from backend (shared-types) — no manual cast needed
   const questions: Question[] = (questionsData?.questions || []).map((rawQ) => {
     // HIGH-004 fix: Use Zod-validated parser instead of inline logic
-    const { currentAnswer, currentAnswers } = parseUserAnswer(rawQ.user_answer)
+    const parsedAnswer = parseUserAnswer(rawQ.user_answer)
+    const suggestedAnswers = Array.isArray(rawQ.suggested_answers)
+      ? rawQ.suggested_answers.map((item) => ({
+          text: sanitizeTextNode(item.text),
+          value: typeof item.value === 'string' ? item.value : undefined,
+          rationale: item.rationale,
+          is_recommended: item.is_recommended,
+        }))
+      : []
+    const answerSource =
+      rawQ.answer_source === 'suggested' ||
+      rawQ.answer_source === 'modified' ||
+      rawQ.answer_source === 'custom' ||
+      rawQ.answer_source === 'system'
+        ? rawQ.answer_source
+        : undefined
+    const evidenceMetadata =
+      rawQ.question_category === 'document_conflicts'
+        ? (parseDocumentEvidenceQuestionMetadata(rawQ.metadata) ?? undefined)
+        : undefined
+    const mappedSystemAnswer =
+      rawQ.question_category === 'document_conflicts' &&
+      answerSource === 'system' &&
+      parsedAnswer.currentAnswer
+        ? (suggestedAnswers.find((answer) => answer.value === parsedAnswer.currentAnswer)?.text ??
+          t('documentEvidence.decisionLabelUnavailable'))
+        : parsedAnswer.currentAnswer
 
     return {
       id: rawQ.id,
-      text: DOMPurify.sanitize(rawQ.question_text),
+      text: sanitizeTextNode(rawQ.question_text),
       type: rawQ.question_type || 'open',
       priority: rawQ.question_priority as QuestionPriority,
-      suggestedAnswers: Array.isArray(rawQ.suggested_answers)
-        ? rawQ.suggested_answers.map((item) => ({
-            text: DOMPurify.sanitize(item.text),
-            rationale: item.rationale,
-            is_recommended: item.is_recommended,
-          }))
-        : [],
-      currentAnswer,
-      currentAnswers,
+      suggestedAnswers,
+      currentAnswer: mappedSystemAnswer,
+      currentAnswers: parsedAnswer.currentAnswers,
       category: rawQ.question_category || undefined,
       isAnswered: rawQ.status === 'answered',
-      evidenceMetadata:
-        rawQ.question_category === 'document_conflicts'
-          ? (parseDocumentEvidenceQuestionMetadata(rawQ.metadata) ?? undefined)
-          : undefined,
-      answerSource:
-        rawQ.answer_source === 'suggested' ||
-        rawQ.answer_source === 'modified' ||
-        rawQ.answer_source === 'custom' ||
-        rawQ.answer_source === 'system'
-          ? rawQ.answer_source
-          : undefined,
+      evidenceMetadata,
+      evidenceMetadataInvalid: rawQ.question_category === 'document_conflicts' && !evidenceMetadata,
+      answerSource,
     }
   })
 
@@ -330,13 +356,14 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
   const isAllAnswered = answeredCount === totalQuestions
   const canProceed = sortedQuestions.every(
     (question) =>
-      question.isAnswered ||
-      answeredQuestions.has(question.id) ||
-      (question.category === 'document_conflicts' && question.priority === 'nice_to_have')
+      !question.evidenceMetadataInvalid &&
+      (question.isAnswered ||
+        answeredQuestions.has(question.id) ||
+        (question.category === 'document_conflicts' && question.priority === 'nice_to_have'))
   )
   const pendingRequiredConflicts = conflictQuestions.filter(
     (question) =>
-      question.priority !== 'nice_to_have' &&
+      (question.priority !== 'nice_to_have' || question.evidenceMetadataInvalid) &&
       !question.isAnswered &&
       !answeredQuestions.has(question.id)
   )
@@ -390,58 +417,62 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     }
   }
 
-  const handleAnswer = (
+  const handleAnswer = async (
     questionId: string,
     answer: string | string[],
     source: 'suggested' | 'modified' | 'custom',
     selectedSuggestionIndex?: number,
     selectedSuggestionIndexes?: number[]
-  ) => {
+  ): Promise<boolean> => {
     // Determine if this is a multi_choice answer
     const isMultiChoice = Array.isArray(answer)
 
     // Build mutation payload based on answer type
+    const question = sortedQuestions.find((candidate) => candidate.id === questionId)
+    const expectedCurrentDecisionId = question?.evidenceMetadata?.current_decision_id
     const payload: AnswerPayload = isMultiChoice
       ? {
           questionId,
           answerSource: source,
           answers: answer,
           selectedSuggestionIndexes,
+          expectedCurrentDecisionId,
         }
       : {
           questionId,
           answerSource: source,
           answer: answer,
           selectedSuggestionIndex,
+          expectedCurrentDecisionId,
         }
 
     // Track which question is being processed for per-card loading state
     setProcessingQuestionId(questionId)
 
-    void submitAnswerMutation
-      .mutateAsync(payload)
-      .then(async () => {
-        setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+    try {
+      await submitAnswerMutation.mutateAsync(payload)
+      setAnsweredQuestions((prev) => new Set(prev).add(questionId))
 
-        // Auto-advance to next unanswered question
-        const nextUnanswered = sortedQuestions.findIndex(
-          (q, idx) => idx > currentIndex && !answeredQuestions.has(q.id)
-        )
-        if (nextUnanswered >= 0) {
-          setCurrentIndex(nextUnanswered)
-        }
+      // Auto-advance to next unanswered question
+      const nextUnanswered = sortedQuestions.findIndex(
+        (q, idx) => idx > currentIndex && !answeredQuestions.has(q.id)
+      )
+      if (nextUnanswered >= 0) {
+        setCurrentIndex(nextUnanswered)
+      }
 
-        // Invalidate cache to force refetch with updated currentAnswer
-        await invalidateAndRefetch()
+      // Invalidate cache to force refetch with updated currentAnswer
+      await invalidateAndRefetch()
+      return true
+    } catch (error) {
+      const submissionError = error as Error
+      toast.error(t('saveError'), {
+        description: submissionError.message || t('tryAgain'),
       })
-      .catch((error: Error) => {
-        toast.error(t('saveError'), {
-          description: error.message || t('tryAgain'),
-        })
-      })
-      .finally(() => {
-        setProcessingQuestionId(null)
-      })
+      return false
+    } finally {
+      setProcessingQuestionId(null)
+    }
   }
 
   const handleSkip = (questionId: string) => {

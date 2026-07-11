@@ -70,6 +70,7 @@ export function WizardNavigation({
             variant="outline"
             onClick={onPrev}
             disabled={isFirstQuestion}
+            aria-label={t('back')}
             className="min-h-[44px] min-w-[44px]"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
@@ -111,6 +112,7 @@ export function WizardNavigation({
               variant="outline"
               onClick={onNext}
               disabled={isLastQuestion}
+              aria-label={t('next')}
               className="min-h-[44px] min-w-[44px]"
             >
               <span className="hidden sm:inline">{t('next')}</span>

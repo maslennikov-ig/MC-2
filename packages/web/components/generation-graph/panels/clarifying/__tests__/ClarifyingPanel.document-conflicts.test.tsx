@@ -53,6 +53,9 @@ const runId = '20000000-0000-4000-8000-000000000001'
 const conflictId = '20000000-0000-4000-8000-000000000002'
 const documentA = '20000000-0000-4000-8000-000000000003'
 const documentB = '20000000-0000-4000-8000-000000000004'
+const currentDecisionId = '20000000-0000-4000-8000-000000000005'
+const recommendationValue = `recommendation:${conflictId}`
+const alternativeValue = `alternative:${conflictId}:1`
 
 function ordinaryQuestion() {
   return {
@@ -78,7 +81,10 @@ function conflictQuestion(overrides: Record<string, unknown> = {}) {
     question_type: 'single_choice',
     question_priority: 'critical',
     question_category: 'document_conflicts',
-    suggested_answers: [{ text: '24 hours', is_recommended: true }, { text: '48 hours' }],
+    suggested_answers: [
+      { text: '24 hours', value: recommendationValue, is_recommended: true },
+      { text: '48 hours', value: alternativeValue },
+    ],
     user_answer: null,
     answer_source: null,
     status: 'pending',
@@ -127,6 +133,7 @@ function renderPanel() {
 describe('ClarifyingPanel document conflict grouping', () => {
   beforeEach(() => {
     mocks.questions = []
+    mocks.submitAnswer.mockResolvedValue({ success: true })
     localStorage.clear()
     vi.clearAllMocks()
   })
@@ -161,7 +168,7 @@ describe('ClarifyingPanel document conflict grouping', () => {
   it('shows an answered system decision in the conflict section without making it editable', () => {
     mocks.questions = [
       conflictQuestion({
-        user_answer: { value: '24 hours' },
+        user_answer: { value: recommendationValue },
         answer_source: 'system',
         status: 'answered',
       }),
@@ -172,6 +179,114 @@ describe('ClarifyingPanel document conflict grouping', () => {
     expect(screen.getAllByText('System decision').length).toBeGreaterThan(0)
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit answer' })).not.toBeInTheDocument()
+    expect(screen.getByText('24 hours')).toBeInTheDocument()
+    expect(screen.queryByText(recommendationValue)).not.toBeInTheDocument()
+  })
+
+  it('maps a stored continue_limited machine value to its localized option text', () => {
+    mocks.questions = [
+      conflictQuestion({
+        suggested_answers: [
+          {
+            text: 'Continue with limited evidence',
+            value: 'continue_limited',
+            is_recommended: true,
+          },
+          { text: 'Remove the document', value: 'remove_document' },
+        ],
+        user_answer: { value: 'continue_limited' },
+        answer_source: 'system',
+        status: 'answered',
+      }),
+    ]
+    renderPanel()
+
+    expect(screen.getByText('Continue with limited evidence')).toBeInTheDocument()
+    expect(screen.queryByText('continue_limited')).not.toBeInTheDocument()
+  })
+
+  it('renders hostile API strings only as inert React text', () => {
+    mocks.questions = [
+      ordinaryQuestion(),
+      conflictQuestion({ question_text: '<img src=x onerror=alert(1)>Policy deadline?' }),
+    ]
+    const { container } = renderPanel()
+
+    expect(container.querySelector('img[src="x"]')).not.toBeInTheDocument()
+    expect(screen.getByText(/Policy deadline/)).toBeInTheDocument()
+  })
+
+  it('submits the current decision token when editing an existing manual decision', async () => {
+    const user = userEvent.setup()
+    mocks.questions = [
+      conflictQuestion({
+        user_answer: { value: recommendationValue },
+        answer_source: 'suggested',
+        status: 'answered',
+        metadata: {
+          ...(conflictQuestion().metadata as Record<string, unknown>),
+          current_decision_id: currentDecisionId,
+        },
+      }),
+    ]
+    renderPanel()
+
+    await user.click(screen.getByRole('button', { name: 'Edit answer' }))
+    await user.click(await screen.findByRole('radio', { name: /48 hours/ }))
+    await user.click(screen.getByRole('button', { name: 'Confirm changes' }))
+
+    expect(mocks.submitAnswer).toHaveBeenCalledWith({
+      questionId: 'conflict-question',
+      answer: '48 hours',
+      answerSource: 'suggested',
+      selectedSuggestionIndex: 1,
+      expectedCurrentDecisionId: currentDecisionId,
+    })
+  })
+
+  it('keeps an edited conflict actionable when stale CAS is rejected', async () => {
+    const user = userEvent.setup()
+    mocks.submitAnswer.mockRejectedValueOnce(new Error('Decision changed; refresh and retry'))
+    mocks.questions = [
+      conflictQuestion({
+        user_answer: { value: recommendationValue },
+        answer_source: 'suggested',
+        status: 'answered',
+        metadata: {
+          ...(conflictQuestion().metadata as Record<string, unknown>),
+          current_decision_id: currentDecisionId,
+        },
+      }),
+    ]
+    renderPanel()
+
+    await user.click(screen.getByRole('button', { name: 'Edit answer' }))
+    await user.click(await screen.findByRole('radio', { name: /48 hours/ }))
+    await user.click(screen.getByRole('button', { name: 'Confirm changes' }))
+
+    expect(await screen.findByRole('button', { name: 'Confirm changes' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /48 hours/ })).toBeChecked()
+    expect(mocks.approve).not.toHaveBeenCalled()
+  })
+
+  it('renders invalid E3 metadata as a blocking non-actionable error', () => {
+    mocks.questions = [
+      conflictQuestion({
+        metadata: {
+          ...(conflictQuestion().metadata as Record<string, unknown>),
+          current_decision_id: 'not-a-uuid',
+        },
+      }),
+    ]
+    renderPanel()
+
+    expect(screen.getByTestId('invalid-document-decision')).toHaveTextContent(
+      'Document decision data is invalid'
+    )
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm answer' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue generation' })).not.toBeInTheDocument()
+    expect(mocks.submitAnswer).not.toHaveBeenCalled()
   })
 
   it('allows continuation when only an informational document difference remains', () => {

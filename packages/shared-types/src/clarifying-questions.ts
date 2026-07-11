@@ -83,6 +83,8 @@ export interface UserAnswerValue {
 export interface SuggestedAnswer {
   /** The suggested answer text */
   text: string;
+  /** Stable machine value persisted by document-evidence decisions */
+  value?: string;
   /** Rationale explaining why this is suggested */
   rationale?: string;
   /** Flag indicating if this is the AI-recommended answer */
@@ -98,6 +100,8 @@ export interface SuggestedAnswer {
 export interface QuestionMetadata {
   /** Selected suggestion indexes for multi_choice questions */
   selected_suggestion_indexes?: number[];
+  /** Current append-only decision used as the optimistic concurrency token */
+  current_decision_id?: string;
   /** Additional metadata fields can be added here */
   [key: string]: unknown;
 }
