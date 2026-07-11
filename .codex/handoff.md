@@ -38,7 +38,8 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
 - E2 `.19` is reviewed and integrated through `14277d8a`: focused Stage 4 117/117, shared 11/11, applied PostgreSQL 15.18 9/9, both type-checks and process verification pass. Exact full-ledger resume, per-card/cross-card hierarchy, claim-scoped verification and exact cl100k safety bounds are accepted. Its disposable DB/container and dedicated local worktree/branch are cleaned.
-- E3 `.20` is reviewed and integrated through `89a7948e`: focused 136/136, shared 13/13, PostgreSQL 15.18 static/applied 36/36, both type-checks and process verification pass. Material conflicts, degraded/capacity decisions, manual/system atomicity, full snapshots, approval guards and plural retry recovery are accepted. Its disposable containers/symlinks and dedicated local worktree/branch are cleaned. E4-E7 remain `.21` through `.24`.
+- E3 `.20` is reviewed and integrated through `89a7948e`: focused 136/136, shared 13/13, PostgreSQL 15.18 static/applied 36/36, both type-checks and process verification pass. Material conflicts, degraded/capacity decisions, manual/system atomicity, full snapshots, approval guards and plural retry recovery are accepted. Its disposable containers/symlinks and dedicated local worktree/branch are cleaned.
+- E5 `.22` is reviewed and integrated through `cf438826`: focused 52/52, shared 20/20, full Stage5/Qdrant 532/532, workspace type-check/build and process verification pass. Baseline-first live enrichment, exact chunk grounding, fallback audit and CAS persistence are accepted. Its worktree/local branch are cleaned. E4 `.21`, E6 `.23` and E7 `.24` remain.
 
 ## Completed Recovery Gate
 
@@ -48,7 +49,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: launch E4, E5 and E6 in parallel isolated worktrees from the pushed integration HEAD containing `89a7948e`; proceed with Q6 only after owner decision `.14` is recorded.
+Recommended action: finish independent E4/E6 remediation and integration, then run joined E7; proceed with Q6 only after owner decision `.14` is recorded.
 
 ## Starter prompt for next orchestrator
 
@@ -58,7 +59,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 ## Parallel Execution After Q7
 
-- E1, E2, E3 and Q7 are accepted; launch E4, E5 and E6 in parallel isolated worktrees.
+- E1, E2, E3, E5 and Q7 are accepted; E4/E6 remain in independent remediation.
 - Q8/Q9 may proceed when their parent-plan dependencies and decision `.14` permit.
 - E7 is the shared evidence/observability/docs gate and blocks Q10/Q11 close.
 

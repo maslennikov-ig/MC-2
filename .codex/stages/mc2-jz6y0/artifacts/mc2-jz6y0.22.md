@@ -47,11 +47,11 @@ depends_on_streams:
   - mc2-jz6y0.20
   - accepted Q5/Q7 retrieval
 parallel_decision: parallel isolated E5 worker beside disjoint E4 UI and E6 lesson-retrieval streams
-status: returned
+status: accepted
 delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Dedicated worktree remains for parent correctness review and integration; dependency symlinks used for verification were removed.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Integrated through final reviewed commit cf438826; dependency symlinks, the dedicated worktree, and the local worker branch were removed. The pushed remote evidence branch remains as audit evidence.
 risk_level: high
 docs_impact: behavior-and-api-contract
 docs_reviewed: no-change-needed
