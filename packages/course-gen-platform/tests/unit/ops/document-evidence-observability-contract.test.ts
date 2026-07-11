@@ -19,6 +19,8 @@ describe('E7 document evidence observability contract', () => {
       expect(alerts).toContain(`- alert: ${alert}`);
     }
     expect(alerts).toContain('megacampus_document_evidence_runs_total');
+    expect(alerts).toContain('megacampus_document_evidence_stage4_invocations_total');
+    expect(alerts).toContain('status="failed"');
     expect(alerts).toContain('min(megacampus_document_evidence_coverage_ratio) < 1');
     expect(alerts).toContain('increase(');
     expect(alerts).toContain('megacampus_document_evidence_degraded_automatic_decisions_total');
@@ -26,7 +28,7 @@ describe('E7 document evidence observability contract', () => {
       'megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds'
     );
     expect(alerts).toContain('absent(');
-    expect(alerts).toContain('sum by (stage, status)');
+    expect(alerts).toContain('sum(increase(megacampus_document_evidence_runs_total');
     expect(alerts).toContain('max(megacampus_document_evidence_unresolved_critical_conflicts)');
     expect(alerts).not.toMatch(/document_id|course_id|organization_id|tenant_id|answer|claim/iu);
   });
@@ -43,6 +45,7 @@ describe('E7 document evidence observability contract', () => {
     }
     expect(tests).toContain('# evidence-counter-reset');
     expect(tests).toContain('# evidence-series-absent');
+    expect(tests).toContain('# evidence-invocation-only-failure');
   });
 
   it('adds evidence run, coverage, mode, cost, conflict, decision and retrieval panels', () => {
@@ -66,5 +69,20 @@ describe('E7 document evidence observability contract', () => {
     expect(dashboardSource).not.toMatch(
       /document_id|course_id|organization_id|tenant_id|answer|claim|api.?key|password|secret/iu
     );
+    const runPanel = dashboard.panels.find(panel => panel.title === 'Evidence run status');
+    expect(runPanel?.targets?.map(target => target.expr).join('\n')).toContain(
+      'megacampus_document_evidence_stage4_invocations_total'
+    );
+  });
+
+  it('ships flock in the runner image used by the kernel-backed textfile publisher', () => {
+    const dockerfile = source('packages/course-gen-platform/Dockerfile');
+    const publisher = source(
+      'packages/course-gen-platform/src/shared/metrics/document-evidence-textfile.ts'
+    );
+    expect(dockerfile).toMatch(/FROM node:.* AS runtime-tools[\s\S]*util-linux/u);
+    expect(dockerfile).toContain('flock --version');
+    expect(dockerfile).toContain('FROM runtime-tools AS runner');
+    expect(publisher).toContain("spawn('flock', ['--exclusive', '--timeout', '5', '3']");
   });
 });

@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { once } from 'node:events';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -25,6 +25,28 @@ function directory(): string {
 }
 
 const options = (path: string) => ({ directory: path, service: 'worker', instance: 'primary' });
+
+const durableTotals = (revision = 1) => ({
+  revision,
+  runs: { accepted: 1, failed: 0 },
+  documents: { source: 4, assessed: 2, degraded: 1, failed: 1 },
+  latestCoverage: { source: 4, assessed: 2, degraded: 1, failed: 1 },
+  processingModes: {
+    full_text: 1,
+    hierarchical_summary: 1,
+    summary: 1,
+    targeted_retrieval: 0,
+    metadata_only: 1,
+  },
+  batches: 3,
+  inputTokens: 100,
+  outputTokens: 25,
+  modelCalls: 4,
+  costUsd: 0.125,
+  durationSeconds: 2.5,
+  conflicts: { critical: 1, important: 2, informational: 3 },
+  decisions: { user: 2, system: 1, degradedAutomatic: 1 },
+});
 
 const stage4Event = (status: 'accepted' | 'failed' = 'accepted'): DocumentEvidenceMetricEvent => ({
   stage: 'stage4',
@@ -54,6 +76,7 @@ const stage4Event = (status: 'accepted' | 'failed' = 'accepted'): DocumentEviden
     oldestUnixSeconds: 1_700_000_000,
     observedAtUnixMilliseconds: 1_700_000_001_000,
   },
+  durableTotals: durableTotals(),
 });
 
 afterEach(() => {
@@ -105,11 +128,15 @@ describe('document evidence textfile metrics', () => {
     const owner = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath);
 
     expect(statSync(lockPath).isFile()).toBe(true);
-    await expect(execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])).rejects.toMatchObject({
+    await expect(
+      execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])
+    ).rejects.toMatchObject({
       code: 1,
     });
     await owner.write(targetPath, 'owner\n', 0o644);
-    await expect(execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])).rejects.toMatchObject({
+    await expect(
+      execFileAsync('flock', ['--exclusive', '--nonblock', lockPath, 'true'])
+    ).rejects.toMatchObject({
       code: 1,
     });
     await owner.release();
@@ -142,7 +169,11 @@ describe('document evidence textfile metrics', () => {
           setInterval(() => {}, 1_000);
         `,
       ],
-      { cwd: process.cwd(), env: { ...process.env, LOCK_PATH: lockPath }, stdio: ['ignore', 'pipe', 'pipe'] }
+      {
+        cwd: process.cwd(),
+        env: { ...process.env, LOCK_PATH: lockPath },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
     );
     let output = '';
     child.stdout.setEncoding('utf8');
@@ -179,11 +210,61 @@ describe('document evidence textfile metrics', () => {
     );
   });
 
+  it('reconciles absolute durable totals by revision after a sink failure without replica duplicates', async () => {
+    const root = directory();
+    const path = join(root, 'late-sink');
+    const warn = vi.fn();
+    await publishDocumentEvidenceMetricsSafely(stage4Event(), { warn }, options(path));
+    expect(warn).toHaveBeenCalledOnce();
+    mkdirSync(path);
+
+    await publishDocumentEvidenceMetrics(stage4Event(), options(path));
+    await publishDocumentEvidenceMetrics(
+      { ...stage4Event(), runDelta: 0, durableTotals: durableTotals() },
+      { directory: path, service: 'worker', instance: 'secondary' }
+    );
+    await publishDocumentEvidenceMetrics(
+      {
+        ...stage4Event(),
+        durableTotals: {
+          ...durableTotals(0),
+          runs: { accepted: 0, failed: 0 },
+          documents: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+          latestCoverage: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+        },
+      },
+      { directory: path, service: 'worker', instance: 'secondary' }
+    );
+
+    const aggregate = readFileSync(join(path, 'evidence-stage4-state.prom'), 'utf8');
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_reconciliation_revision{service="stage4",instance="aggregate"} 1'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_runs_total{service="stage4",instance="aggregate",stage="stage4",status="accepted"} 1'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_documents_total{service="stage4",instance="aggregate",outcome="source"} 4'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_batches_total{service="stage4",instance="aggregate"} 3'
+    );
+    for (const file of ['evidence-worker-primary.prom', 'evidence-worker-secondary.prom']) {
+      const replica = readFileSync(join(path, file), 'utf8');
+      expect(replica).not.toContain('megacampus_document_evidence_runs_total');
+      expect(replica).toContain('megacampus_document_evidence_stage4_invocations_total');
+    }
+  });
+
   it('reconciles the same accepted run twice and counts one appended user decision once', async () => {
     const path = directory();
     const first = {
       ...stage4Event(),
       decisions: { user: 0, system: 1, degradedAutomatic: 1 },
+      durableTotals: {
+        ...durableTotals(),
+        decisions: { user: 0, system: 1, degradedAutomatic: 1 },
+      },
     } as DocumentEvidenceMetricEvent;
     const replay = {
       ...stage4Event(),
@@ -204,20 +285,25 @@ describe('document evidence textfile metrics', () => {
       durationSeconds: 0,
       conflicts: { critical: 0, important: 0, informational: 0 },
       decisions: { user: 0, system: 1, degradedAutomatic: 1 },
+      durableTotals: {
+        ...durableTotals(),
+        decisions: { user: 0, system: 1, degradedAutomatic: 1 },
+      },
     } as DocumentEvidenceMetricEvent;
     const resumed = {
       ...replay,
       decisions: { user: 1, system: 1, degradedAutomatic: 1 },
+      durableTotals: {
+        ...durableTotals(2),
+        decisions: { user: 1, system: 1, degradedAutomatic: 1 },
+      },
       observedAtUnixMilliseconds: 1_700_000_002_000,
     } as DocumentEvidenceMetricEvent;
 
     await publishDocumentEvidenceMetrics(first, options(path));
     await publishDocumentEvidenceMetrics(replay, options(path));
     for (let index = 0; index < 300; index += 1) {
-      await publishDocumentEvidenceMetrics(
-        { ...first, decisions: { user: 0, system: 1, degradedAutomatic: 1 } },
-        options(path)
-      );
+      await publishDocumentEvidenceMetrics(first, options(path));
     }
     await publishDocumentEvidenceMetrics(resumed, options(path));
     await publishDocumentEvidenceMetrics(resumed, options(path));
@@ -225,19 +311,22 @@ describe('document evidence textfile metrics', () => {
     const exposition = readFileSync(join(path, 'evidence-worker-primary.prom'), 'utf8');
     const aggregate = readFileSync(join(path, 'evidence-stage4-state.prom'), 'utf8');
     expect(exposition).toContain(
-      'megacampus_document_evidence_runs_total{service="worker",instance="primary",stage="stage4",status="accepted"} 301'
+      'megacampus_document_evidence_stage4_invocations_total{service="worker",instance="primary",status="accepted",mode="active"} 304'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="source"} 1204'
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_runs_total{service="stage4",instance="aggregate",stage="stage4",status="accepted"} 1'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_batches_total{service="worker",instance="primary"} 903'
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_documents_total{service="stage4",instance="aggregate",outcome="source"} 4'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_cost_usd_total{service="worker",instance="primary"} 37.625'
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_batches_total{service="stage4",instance="aggregate"} 3'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_conflicts_total{service="worker",instance="primary",severity="critical"} 301'
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_cost_usd_total{service="stage4",instance="aggregate"} 0.125'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_conflicts_total{service="stage4",instance="aggregate",severity="critical"} 1'
     );
     expect(aggregate).toContain(
       'megacampus_document_evidence_decisions_total{service="stage4",instance="aggregate",actor="user"} 1'
@@ -257,7 +346,32 @@ describe('document evidence textfile metrics', () => {
     const path = directory();
 
     await publishDocumentEvidenceMetrics(stage4Event(), options(path));
-    await publishDocumentEvidenceMetrics(stage4Event('failed'), options(path));
+    await publishDocumentEvidenceMetrics(
+      {
+        ...stage4Event('failed'),
+        durableTotals: {
+          ...durableTotals(2),
+          runs: { accepted: 1, failed: 1 },
+          documents: { source: 8, assessed: 4, degraded: 2, failed: 2 },
+          latestCoverage: { source: 4, assessed: 2, degraded: 1, failed: 1 },
+          processingModes: {
+            full_text: 2,
+            hierarchical_summary: 2,
+            summary: 2,
+            targeted_retrieval: 0,
+            metadata_only: 2,
+          },
+          batches: 6,
+          inputTokens: 200,
+          outputTokens: 50,
+          modelCalls: 8,
+          costUsd: 0.25,
+          durationSeconds: 5,
+          conflicts: { critical: 2, important: 4, informational: 6 },
+        },
+      },
+      options(path)
+    );
 
     expect(readdirSync(path).sort()).toEqual([
       '.evidence-stage4-state.lock',
@@ -268,37 +382,37 @@ describe('document evidence textfile metrics', () => {
     const exposition = readFileSync(join(path, 'evidence-worker-primary.prom'), 'utf8');
     const stage4Exposition = readFileSync(join(path, 'evidence-stage4-state.prom'), 'utf8');
     expect(exposition).toContain(
-      'megacampus_document_evidence_runs_total{service="worker",instance="primary",stage="stage4",status="accepted"} 1'
+      'megacampus_document_evidence_stage4_invocations_total{service="worker",instance="primary",status="accepted",mode="active"} 1'
     );
     expect(exposition).toContain(
-      'megacampus_document_evidence_runs_total{service="worker",instance="primary",stage="stage4",status="failed"} 1'
+      'megacampus_document_evidence_stage4_invocations_total{service="worker",instance="primary",status="failed",mode="active"} 1'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="assessed"} 4'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_documents_total{service="stage4",instance="aggregate",outcome="assessed"} 4'
     );
     expect(stage4Exposition).toContain(
       'megacampus_document_evidence_coverage_ratio{service="stage4",instance="aggregate"} 1'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_processing_mode_total{service="worker",instance="primary",mode="metadata_only"} 2'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_processing_mode_total{service="stage4",instance="aggregate",mode="metadata_only"} 2'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_batches_total{service="worker",instance="primary"} 6'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_batches_total{service="stage4",instance="aggregate"} 6'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_tokens_total{service="worker",instance="primary",direction="input"} 200'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_tokens_total{service="stage4",instance="aggregate",direction="input"} 200'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_model_calls_total{service="worker",instance="primary"} 8'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_model_calls_total{service="stage4",instance="aggregate"} 8'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_cost_usd_total{service="worker",instance="primary"} 0.25'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_cost_usd_total{service="stage4",instance="aggregate"} 0.25'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_duration_seconds_total{service="worker",instance="primary"} 5'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_duration_seconds_total{service="stage4",instance="aggregate"} 5'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_conflicts_total{service="worker",instance="primary",severity="critical"} 2'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_conflicts_total{service="stage4",instance="aggregate",severity="critical"} 2'
     );
     expect(stage4Exposition).toContain(
       'megacampus_document_evidence_decisions_total{service="stage4",instance="aggregate",actor="system"} 1'
@@ -403,6 +517,27 @@ describe('document evidence textfile metrics', () => {
         coverage: { source: 4, assessed: 0, degraded: 0, failed: 0 },
         documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
         criticalConflictState: undefined,
+        durableTotals: {
+          ...durableTotals(),
+          runs: { accepted: 0, failed: 1 },
+          documents: { source: 4, assessed: 0, degraded: 0, failed: 0 },
+          latestCoverage: { source: 4, assessed: 0, degraded: 0, failed: 0 },
+          processingModes: {
+            full_text: 0,
+            hierarchical_summary: 0,
+            summary: 0,
+            targeted_retrieval: 0,
+            metadata_only: 0,
+          },
+          batches: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          modelCalls: 0,
+          costUsd: 0,
+          durationSeconds: 0,
+          conflicts: { critical: 0, important: 0, informational: 0 },
+          decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+        },
       },
       options(path)
     );
@@ -411,12 +546,13 @@ describe('document evidence textfile metrics', () => {
     expect(stage4Exposition).toContain(
       'megacampus_document_evidence_coverage_ratio{service="stage4",instance="aggregate"} 0'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="source"} 0'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_documents_total{service="stage4",instance="aggregate",outcome="source"} 4'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="failed"} 0'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_documents_total{service="stage4",instance="aggregate",outcome="failed"} 0'
     );
+    expect(exposition).not.toContain('megacampus_document_evidence_documents_total');
   });
 
   it('does not clear another run until durable reconciliation explicitly resolves it', async () => {

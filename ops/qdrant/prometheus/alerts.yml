@@ -103,13 +103,16 @@ groups:
   - name: document-evidence-alerts
     rules:
       - alert: DocumentEvidenceRunFailed
-        expr: sum by (stage, status) (increase(megacampus_document_evidence_runs_total{stage="stage4",status="failed"}[10m])) > 0
+        expr: |
+          sum(increase(megacampus_document_evidence_runs_total{stage="stage4",status="failed"}[10m])) > 0
+          or
+          sum(increase(megacampus_document_evidence_stage4_invocations_total{status="failed"}[10m])) > 0
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: A document evidence run failed
-          description: At least one Stage 4 document evidence run failed in the last ten minutes.
+          summary: A document evidence run or invocation failed
+          description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes.
 
       - alert: DocumentEvidenceCoverageIncomplete
         expr: |

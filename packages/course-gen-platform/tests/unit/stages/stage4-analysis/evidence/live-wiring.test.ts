@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { runDocumentEvidencePhase } from '@/stages/stage4-analysis/orchestrator-phase-helpers';
+import { ConflictDetectionExecutionError } from '@/stages/stage4-analysis/evidence/conflict-detector';
 import {
   attachDocumentEvidenceSnapshot,
   type AnalysisContext,
@@ -71,6 +72,28 @@ const skippedResult = {
     reduceLevels: 0,
   },
 };
+
+const durableTotals = (revision: number, userDecisions = 0) => ({
+  revision,
+  runs: { accepted: 1, failed: 0 },
+  documents: { source: 1, assessed: 1, degraded: 0, failed: 0 },
+  latestCoverage: { source: 1, assessed: 1, degraded: 0, failed: 0 },
+  processingModes: {
+    full_text: 0,
+    hierarchical_summary: 0,
+    summary: 1,
+    targeted_retrieval: 0,
+    metadata_only: 0,
+  },
+  batches: 3,
+  inputTokens: 150,
+  outputTokens: 30,
+  modelCalls: 3,
+  costUsd: 0.15,
+  durationSeconds: 1,
+  conflicts: { critical: 1, important: 1, informational: 1 },
+  decisions: { user: userDecisions, system: 0, degradedAutomatic: 0 },
+});
 
 describe('Stage 4 document evidence live wiring', () => {
   it('lets an enabled 1,000-document evidence corpus reach bounded preflight', () => {
@@ -392,11 +415,7 @@ describe('Stage 4 document evidence live wiring', () => {
         oldestUnixSeconds: 1_700_000_000,
         observedAtUnixMilliseconds: 1_700_000_001_000,
       })),
-      loadDecisionTotals: vi.fn(async () => ({
-        user: 0,
-        system: 0,
-        degradedAutomatic: 0,
-      })),
+      loadDurableTotals: vi.fn(async () => durableTotals(1)),
     });
 
     expect(publishMetrics).toHaveBeenCalledOnce();
@@ -413,6 +432,7 @@ describe('Stage 4 document evidence live wiring', () => {
         costUsd: 0.15000000000000002,
         conflicts: { critical: 1, important: 1, informational: 1 },
         decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+        durableTotals: durableTotals(1),
         criticalConflictState: {
           unresolved: 1,
           oldestUnixSeconds: 1_700_000_000,
@@ -521,10 +541,10 @@ describe('Stage 4 document evidence live wiring', () => {
         oldestUnixSeconds: 0,
         observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
       })),
-      loadDecisionTotals: vi
+      loadDurableTotals: vi
         .fn()
-        .mockResolvedValueOnce({ user: 0, system: 0, degradedAutomatic: 0 })
-        .mockResolvedValueOnce({ user: 1, system: 0, degradedAutomatic: 0 }),
+        .mockResolvedValueOnce(durableTotals(1))
+        .mockResolvedValueOnce(durableTotals(2, 1)),
     };
 
     await runDocumentEvidencePhase(analysisContext, overrides);
@@ -532,20 +552,26 @@ describe('Stage 4 document evidence live wiring', () => {
 
     const first = publishMetrics.mock.calls[0][0] as Record<string, unknown>;
     const resumed = publishMetrics.mock.calls[1][0] as Record<string, unknown>;
-    expect(first).toEqual(expect.objectContaining({
-      runDelta: 1,
-      documentDeltas: { source: 1, assessed: 1, degraded: 0, failed: 0 },
-      batches: 1,
-      inputTokens: 100,
-      decisions: { user: 0, system: 0, degradedAutomatic: 0 },
-    }));
-    expect(resumed).toEqual(expect.objectContaining({
-      runDelta: 0,
-      documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
-      batches: 0,
-      inputTokens: 0,
-      decisions: { user: 1, system: 0, degradedAutomatic: 0 },
-    }));
+    expect(first).toEqual(
+      expect.objectContaining({
+        runDelta: 1,
+        documentDeltas: { source: 1, assessed: 1, degraded: 0, failed: 0 },
+        batches: 1,
+        inputTokens: 100,
+        decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+        durableTotals: durableTotals(1),
+      })
+    );
+    expect(resumed).toEqual(
+      expect.objectContaining({
+        runDelta: 0,
+        documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+        batches: 0,
+        inputTokens: 0,
+        decisions: { user: 1, system: 0, degradedAutomatic: 0 },
+        durableTotals: durableTotals(2, 1),
+      })
+    );
   });
 
   it('publishes one bounded Stage 4 failure outcome and preserves the product error', async () => {
@@ -568,6 +594,47 @@ describe('Stage 4 document evidence live wiring', () => {
     expect(publishMetrics).toHaveBeenCalledOnce();
     expect(publishMetrics).toHaveBeenCalledWith(
       expect.objectContaining({ stage: 'stage4', status: 'failed' }),
+      analysisContext.orchestrationLogger
+    );
+  });
+
+  it('publishes typed conflict execution usage in the bounded Stage 4 failure outcome', async () => {
+    const analysisContext = context();
+    const publishMetrics = vi.fn(async () => undefined);
+    const failure = new ConflictDetectionExecutionError({
+      batches: 1,
+      usage: { model_calls: 2, input_tokens: 11, output_tokens: 4, total_cost_usd: 0.03 },
+      conflicts: { critical: 0, important: 0, informational: 0 },
+    });
+
+    await expect(
+      runDocumentEvidencePhase(analysisContext, {
+        enabled: true,
+        mode: 'active',
+        runPreflight: vi.fn(async () => ({
+          ...skippedResult,
+          status: 'accepted' as const,
+          runId: '10000000-0000-4000-8000-000000000001',
+        })),
+        preflightDependencies: {} as never,
+        detectConflicts: vi.fn(async () => {
+          throw failure;
+        }) as never,
+        conflictDependencies: {} as never,
+        publishMetrics,
+      })
+    ).rejects.toBe(failure);
+
+    expect(publishMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'stage4',
+        status: 'failed',
+        batches: 1,
+        modelCalls: 2,
+        inputTokens: 11,
+        outputTokens: 4,
+        costUsd: 0.03,
+      }),
       analysisContext.orchestrationLogger
     );
   });

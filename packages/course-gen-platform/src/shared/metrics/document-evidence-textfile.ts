@@ -16,6 +16,22 @@ type ProcessingMode =
   | 'targeted_retrieval'
   | 'metadata_only';
 
+export type Stage4DurableTotals = {
+  revision: number;
+  runs: { accepted: number; failed: number };
+  documents: { source: number; assessed: number; degraded: number; failed: number };
+  latestCoverage: { source: number; assessed: number; degraded: number; failed: number };
+  processingModes: Record<ProcessingMode, number>;
+  batches: number;
+  inputTokens: number;
+  outputTokens: number;
+  modelCalls: number;
+  costUsd: number;
+  durationSeconds: number;
+  conflicts: { critical: number; important: number; informational: number };
+  decisions: { user: number; system: number; degradedAutomatic: number };
+};
+
 type Stage4Event = {
   stage: 'stage4';
   status: 'accepted' | 'failed';
@@ -33,6 +49,7 @@ type Stage4Event = {
   durationSeconds: number;
   conflicts: { critical: number; important: number; informational: number };
   decisions?: { user: number; system: number; degradedAutomatic: number };
+  durableTotals?: Stage4DurableTotals;
   criticalConflictState?: {
     unresolved: number;
     oldestUnixSeconds: number;
@@ -195,78 +212,145 @@ function applyStage4(state: MetricState, event: Stage4Event): void {
 
   const runDelta = requireCount(event.runDelta, 'run delta');
   if (runDelta > 1) throw new Error('Evidence metrics run delta must be zero or one');
-  increment(
-    state,
-    key('megacampus_document_evidence_runs_total', {
-      stage: 'stage4',
-      status: event.status,
-    }),
-    runDelta
-  );
-  increment(
-    state,
-    key('megacampus_document_evidence_run_mode_total', { mode: event.mode }),
-    runDelta
-  );
-  for (const [outcome, value] of [
-    ['source', event.documentDeltas.source],
-    ['assessed', event.documentDeltas.assessed],
-    ['degraded', event.documentDeltas.degraded],
-    ['failed', event.documentDeltas.failed],
-  ] as const) {
-    increment(
-      state,
-      key('megacampus_document_evidence_documents_total', { outcome }),
-      requireCount(value, `${outcome} document delta`)
-    );
+  for (const status of ['accepted', 'failed'] as const) {
+    state.delete(key('megacampus_document_evidence_runs_total', { stage: 'stage4', status }));
+  }
+  for (const mode of ['shadow', 'active'] as const) {
+    state.delete(key('megacampus_document_evidence_run_mode_total', { mode }));
+  }
+  for (const outcome of ['source', 'assessed', 'degraded', 'failed'] as const) {
+    state.delete(key('megacampus_document_evidence_documents_total', { outcome }));
   }
   for (const mode of PROCESSING_MODES) {
-    increment(
-      state,
-      key('megacampus_document_evidence_processing_mode_total', { mode }),
-      requireCount(event.processingModes[mode], `${mode} count`)
-    );
+    state.delete(key('megacampus_document_evidence_processing_mode_total', { mode }));
+  }
+  state.delete('megacampus_document_evidence_batches_total');
+  state.delete(key('megacampus_document_evidence_tokens_total', { direction: 'input' }));
+  state.delete(key('megacampus_document_evidence_tokens_total', { direction: 'output' }));
+  state.delete('megacampus_document_evidence_model_calls_total');
+  state.delete('megacampus_document_evidence_cost_usd_total');
+  state.delete('megacampus_document_evidence_duration_seconds_total');
+  for (const severity of ['critical', 'important', 'informational'] as const) {
+    state.delete(key('megacampus_document_evidence_conflicts_total', { severity }));
   }
   increment(
     state,
-    'megacampus_document_evidence_batches_total',
-    requireCount(event.batches, 'batches')
+    key('megacampus_document_evidence_stage4_invocations_total', {
+      status: event.status,
+      mode: event.mode,
+    }),
+    1
   );
   increment(
     state,
-    key('megacampus_document_evidence_tokens_total', { direction: 'input' }),
-    requireCount(event.inputTokens, 'input tokens')
-  );
-  increment(
-    state,
-    key('megacampus_document_evidence_tokens_total', { direction: 'output' }),
-    requireCount(event.outputTokens, 'output tokens')
-  );
-  increment(
-    state,
-    'megacampus_document_evidence_model_calls_total',
-    requireCount(event.modelCalls, 'model calls')
-  );
-  increment(
-    state,
-    'megacampus_document_evidence_cost_usd_total',
-    requireNumber(event.costUsd, 'cost')
-  );
-  increment(
-    state,
-    'megacampus_document_evidence_duration_seconds_total',
+    key('megacampus_document_evidence_stage4_invocation_duration_seconds_total', {
+      status: event.status,
+      mode: event.mode,
+    }),
     requireNumber(event.durationSeconds, 'duration')
   );
-  for (const severity of ['critical', 'important', 'informational'] as const) {
+  if (event.status === 'failed') {
     increment(
       state,
-      key('megacampus_document_evidence_conflicts_total', { severity }),
-      requireCount(event.conflicts[severity], `${severity} conflicts`)
+      key('megacampus_document_evidence_stage4_failure_tokens_total', { direction: 'input' }),
+      requireCount(event.inputTokens, 'failed input tokens')
+    );
+    increment(
+      state,
+      key('megacampus_document_evidence_stage4_failure_tokens_total', { direction: 'output' }),
+      requireCount(event.outputTokens, 'failed output tokens')
+    );
+    increment(
+      state,
+      'megacampus_document_evidence_stage4_failure_model_calls_total',
+      requireCount(event.modelCalls, 'failed model calls')
+    );
+    increment(
+      state,
+      'megacampus_document_evidence_stage4_failure_cost_usd_total',
+      requireNumber(event.costUsd, 'failed cost')
     );
   }
-  state.delete(key('megacampus_document_evidence_decisions_total', { actor: 'user' }));
-  state.delete(key('megacampus_document_evidence_decisions_total', { actor: 'system' }));
-  state.delete('megacampus_document_evidence_degraded_automatic_decisions_total');
+}
+
+function applyDurableStage4Totals(state: MetricState, totals: Stage4DurableTotals): void {
+  const revision = requireCount(totals.revision, 'durable reconciliation revision');
+  const revisionMetric = 'megacampus_document_evidence_reconciliation_revision';
+  if (revision <= (state.get(revisionMetric) ?? -1)) return;
+  const documents = {
+    source: requireCount(totals.documents.source, 'durable source documents'),
+    assessed: requireCount(totals.documents.assessed, 'durable assessed documents'),
+    degraded: requireCount(totals.documents.degraded, 'durable degraded documents'),
+    failed: requireCount(totals.documents.failed, 'durable failed documents'),
+  };
+  const latestCoverage = {
+    source: requireCount(totals.latestCoverage.source, 'latest coverage source'),
+    assessed: requireCount(totals.latestCoverage.assessed, 'latest coverage assessed'),
+    degraded: requireCount(totals.latestCoverage.degraded, 'latest coverage degraded'),
+    failed: requireCount(totals.latestCoverage.failed, 'latest coverage failed'),
+  };
+  const latestCovered = latestCoverage.assessed + latestCoverage.degraded + latestCoverage.failed;
+  if (latestCovered > latestCoverage.source) {
+    throw new Error('Evidence metrics durable coverage is inconsistent');
+  }
+  state.set(revisionMetric, revision);
+  for (const status of ['accepted', 'failed'] as const) {
+    state.set(
+      key('megacampus_document_evidence_runs_total', { stage: 'stage4', status }),
+      requireCount(totals.runs[status], `${status} durable runs`)
+    );
+  }
+  for (const outcome of ['source', 'assessed', 'degraded', 'failed'] as const) {
+    state.set(key('megacampus_document_evidence_documents_total', { outcome }), documents[outcome]);
+  }
+  for (const mode of PROCESSING_MODES) {
+    state.set(
+      key('megacampus_document_evidence_processing_mode_total', { mode }),
+      requireCount(totals.processingModes[mode], `${mode} durable documents`)
+    );
+  }
+  state.set('megacampus_document_evidence_batches_total', requireCount(totals.batches, 'batches'));
+  state.set(
+    key('megacampus_document_evidence_tokens_total', { direction: 'input' }),
+    requireCount(totals.inputTokens, 'durable input tokens')
+  );
+  state.set(
+    key('megacampus_document_evidence_tokens_total', { direction: 'output' }),
+    requireCount(totals.outputTokens, 'durable output tokens')
+  );
+  state.set(
+    'megacampus_document_evidence_model_calls_total',
+    requireCount(totals.modelCalls, 'durable model calls')
+  );
+  state.set(
+    'megacampus_document_evidence_cost_usd_total',
+    requireNumber(totals.costUsd, 'durable cost')
+  );
+  state.set(
+    'megacampus_document_evidence_duration_seconds_total',
+    requireNumber(totals.durationSeconds, 'durable duration')
+  );
+  for (const severity of ['critical', 'important', 'informational'] as const) {
+    state.set(
+      key('megacampus_document_evidence_conflicts_total', { severity }),
+      requireCount(totals.conflicts[severity], `${severity} durable conflicts`)
+    );
+  }
+  for (const actor of ['user', 'system'] as const) {
+    state.set(
+      key('megacampus_document_evidence_decisions_total', { actor }),
+      requireCount(totals.decisions[actor], `${actor} durable decisions`)
+    );
+  }
+  state.set(
+    'megacampus_document_evidence_degraded_automatic_decisions_total',
+    requireCount(totals.decisions.degradedAutomatic, 'durable degraded automatic decisions')
+  );
+  state.set(
+    'megacampus_document_evidence_coverage_ratio',
+    latestCoverage.source === 0 ? 1 : latestCovered / latestCoverage.source
+  );
+  state.delete('megacampus_document_evidence_coverage_reconciliation_unixtime_milliseconds');
 }
 
 function applyStage5(state: MetricState, event: Stage5Event): void {
@@ -413,46 +497,7 @@ async function updateStage4Aggregate(
   const lock = await acquireOwnedLock(lockPath);
   try {
     const state = await readState(path, aggregateOptions);
-    const coverageObservedAt = requireNumber(
-      event.observedAtUnixMilliseconds,
-      'Stage 4 coverage reconciliation time'
-    );
-    const priorCoverageObservedAt =
-      state.get('megacampus_document_evidence_coverage_reconciliation_unixtime_milliseconds') ?? 0;
-    if (coverageObservedAt > priorCoverageObservedAt) {
-      const covered = event.coverage.assessed + event.coverage.degraded + event.coverage.failed;
-      state.set(
-        'megacampus_document_evidence_coverage_ratio',
-        event.coverage.source === 0 ? 1 : covered / event.coverage.source
-      );
-      state.set(
-        'megacampus_document_evidence_coverage_reconciliation_unixtime_milliseconds',
-        coverageObservedAt
-      );
-    }
-    if (event.decisions) {
-      for (const actor of ['user', 'system'] as const) {
-        const metric = key('megacampus_document_evidence_decisions_total', { actor });
-        state.set(
-          metric,
-          Math.max(
-            state.get(metric) ?? 0,
-            requireCount(event.decisions[actor], `${actor} durable decision total`)
-          )
-        );
-      }
-      const degradedMetric = 'megacampus_document_evidence_degraded_automatic_decisions_total';
-      state.set(
-        degradedMetric,
-        Math.max(
-          state.get(degradedMetric) ?? 0,
-          requireCount(
-            event.decisions.degradedAutomatic,
-            'degraded automatic durable decision total'
-          )
-        )
-      );
-    }
+    if (event.durableTotals) applyDurableStage4Totals(state, event.durableTotals);
     const reconciliation = event.criticalConflictState;
     if (reconciliation) {
       const observedAt = requireNumber(
@@ -482,7 +527,11 @@ async function updateStage4Aggregate(
         );
       }
     }
-    await lock.write(path, render(state, aggregateOptions.service, aggregateOptions.instance), 0o644);
+    await lock.write(
+      path,
+      render(state, aggregateOptions.service, aggregateOptions.instance),
+      0o644
+    );
   } finally {
     await lock.release();
   }

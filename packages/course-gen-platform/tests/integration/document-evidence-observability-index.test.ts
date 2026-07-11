@@ -117,6 +117,34 @@ async function resetSchema(): Promise<void> {
       answered_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    CREATE TABLE public.document_evidence_runs (
+      id uuid PRIMARY KEY,
+      status text NOT NULL,
+      source_count integer NOT NULL DEFAULT 0,
+      assessed_count integer NOT NULL DEFAULT 0,
+      degraded_count integer NOT NULL DEFAULT 0,
+      failed_count integer NOT NULL DEFAULT 0,
+      batch_count integer NOT NULL DEFAULT 0,
+      model_calls integer NOT NULL DEFAULT 0,
+      input_tokens bigint NOT NULL DEFAULT 0,
+      output_tokens bigint NOT NULL DEFAULT 0,
+      total_cost_usd numeric(14,6) NOT NULL DEFAULT 0,
+      started_at timestamptz NOT NULL DEFAULT now(),
+      completed_at timestamptz
+    );
+    CREATE TABLE public.document_evidence_items (
+      id uuid PRIMARY KEY,
+      run_id uuid NOT NULL,
+      processing_mode text NOT NULL
+    );
+    CREATE TABLE public.document_evidence_conflict_checkpoints (
+      id uuid PRIMARY KEY,
+      structured_checkpoint jsonb NOT NULL
+    );
+    CREATE TABLE public.document_evidence_conflicts (
+      id uuid PRIMARY KEY,
+      severity text NOT NULL
+    );
     CREATE TABLE public.document_evidence_decisions (
       id bigserial PRIMARY KEY,
       resolved_by text NOT NULL,
@@ -402,5 +430,118 @@ appliedDescribe('document evidence observability index applied', () => {
       system_decisions: '3',
       degraded_automatic_decisions: '2',
     });
+  });
+
+  it('reconciles terminal work and conflict checkpoints exactly once in one O(1) row', async () => {
+    await client.query(`
+      INSERT INTO public.document_evidence_runs(
+        id,status,source_count,assessed_count,degraded_count,failed_count,
+        batch_count,model_calls,input_tokens,output_tokens,total_cost_usd,
+        started_at,completed_at
+      ) VALUES (
+        '20000000-0000-4000-8000-000000000001','accepted',2,1,1,0,
+        2,3,100,30,0.5,'2026-01-01T00:00:00Z','2026-01-01T00:00:10Z'
+      );
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode) VALUES
+        ('30000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','summary'),
+        ('30000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','metadata_only');
+      INSERT INTO public.document_evidence_conflict_checkpoints(id,structured_checkpoint) VALUES (
+        '40000000-0000-4000-8000-000000000001',
+        '{"kind":"conflict_map","usage":{"model_calls":2,"input_tokens":20,"output_tokens":5,"total_cost_usd":0.1}}'
+      );
+      INSERT INTO public.document_evidence_conflicts(id,severity) VALUES
+        ('50000000-0000-4000-8000-000000000001','critical');
+      INSERT INTO public.document_evidence_decisions(resolved_by,subject_kind) VALUES
+        ('system','degraded_evidence');
+    `);
+    await client.query(totalsForward);
+
+    await client.query(`
+      INSERT INTO public.document_evidence_runs(
+        id,status,source_count,assessed_count,batch_count,model_calls,input_tokens,
+        output_tokens,total_cost_usd,started_at
+      ) VALUES (
+        '20000000-0000-4000-8000-000000000002','processing',1,1,1,1,10,2,0.05,
+        '2026-01-01T00:01:00Z'
+      );
+      INSERT INTO public.document_evidence_items(id,run_id,processing_mode) VALUES
+        ('30000000-0000-4000-8000-000000000003','20000000-0000-4000-8000-000000000002','full_text');
+      UPDATE public.document_evidence_runs
+      SET status='accepted',completed_at='2026-01-01T00:01:05Z'
+      WHERE id='20000000-0000-4000-8000-000000000002';
+      UPDATE public.document_evidence_runs SET status='accepted'
+      WHERE id='20000000-0000-4000-8000-000000000002';
+      INSERT INTO public.document_evidence_conflict_checkpoints(id,structured_checkpoint) VALUES (
+        '40000000-0000-4000-8000-000000000002',
+        '{"kind":"conflict_capacity_degraded","issue":{"kind":"detector_capacity"},"usage":{"model_calls":2,"input_tokens":20,"output_tokens":5,"total_cost_usd":0.1}}'
+      );
+      INSERT INTO public.document_evidence_conflicts(id,severity) VALUES
+        ('50000000-0000-4000-8000-000000000002','important');
+      INSERT INTO public.document_evidence_decisions(resolved_by,subject_kind) VALUES
+        ('user','claim_conflict');
+    `);
+
+    const totals = (
+      await client.query(`SELECT * FROM public.document_evidence_observability_totals`)
+    ).rows[0];
+    expect(totals).toMatchObject({
+      revision: '5',
+      accepted_runs: '2',
+      failed_runs: '0',
+      source_documents: '3',
+      assessed_documents: '2',
+      degraded_documents: '1',
+      failed_documents: '0',
+      full_text_documents: '1',
+      summary_documents: '1',
+      metadata_only_documents: '1',
+      batches: '5',
+      model_calls: '8',
+      input_tokens: '150',
+      output_tokens: '42',
+      total_cost_usd: '0.750000',
+      duration_seconds: '15.000000',
+      critical_conflicts: '1',
+      important_conflicts: '1',
+      informational_conflicts: '0',
+      user_decisions: '1',
+      system_decisions: '1',
+      degraded_automatic_decisions: '1',
+    });
+  });
+
+  it('keeps latest coverage ordered by terminal completion instead of trigger arrival', async () => {
+    await client.query(totalsForward);
+    await client.query(`
+      INSERT INTO public.document_evidence_runs(
+        id,status,source_count,assessed_count,degraded_count,failed_count,started_at
+      ) VALUES
+        ('20000000-0000-4000-8000-000000000010','processing',10,10,0,0,'2026-01-01T00:00:00Z'),
+        ('20000000-0000-4000-8000-000000000011','processing',4,1,1,2,'2026-01-01T00:00:00Z');
+      UPDATE public.document_evidence_runs
+      SET status='accepted',completed_at='2026-01-01T00:02:00Z'
+      WHERE id='20000000-0000-4000-8000-000000000010';
+      UPDATE public.document_evidence_runs
+      SET status='failed',completed_at='2026-01-01T00:01:00Z'
+      WHERE id='20000000-0000-4000-8000-000000000011';
+    `);
+    const latest = (
+      await client.query(`
+        SELECT latest_coverage_source,latest_coverage_assessed,
+               latest_coverage_degraded,latest_coverage_failed,
+               latest_coverage_completed_at,latest_coverage_run_id
+        FROM public.document_evidence_observability_totals
+      `)
+    ).rows[0];
+    expect(latest).toMatchObject({
+      latest_coverage_source: '10',
+      latest_coverage_assessed: '10',
+      latest_coverage_degraded: '0',
+      latest_coverage_failed: '0',
+      latest_coverage_run_id: '20000000-0000-4000-8000-000000000010',
+    });
+    expect(new Date(latest.latest_coverage_completed_at).toISOString()).toBe(
+      '2026-01-01T00:02:00.000Z'
+    );
   });
 });

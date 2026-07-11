@@ -127,7 +127,16 @@ export const DetectorCapacityIssueSchema = z
   .strict();
 
 const CapacityCheckpointSchema = z
-  .object({ kind: z.literal('conflict_capacity_degraded'), issue: DetectorCapacityIssueSchema })
+  .object({
+    kind: z.literal('conflict_capacity_degraded'),
+    issue: DetectorCapacityIssueSchema,
+    usage: UsageSchema.default({
+      model_calls: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      total_cost_usd: 0,
+    }),
+  })
   .strict();
 
 type Usage = z.infer<typeof UsageSchema>;
@@ -193,11 +202,15 @@ export interface ProductionConflictPortOptions {
 class ConflictModelCallError extends Error {
   constructor(
     message: string,
-    readonly modelCalls: number,
+    readonly usage: Usage,
     options?: { cause?: unknown }
   ) {
     super(message, options);
     this.name = 'ConflictModelCallError';
+  }
+
+  get modelCalls(): number {
+    return this.usage.model_calls;
   }
 }
 
@@ -438,7 +451,7 @@ function sumUsage(target: Usage, value: Usage): void {
   target.total_cost_usd += value.total_cost_usd;
 }
 
-type ConflictMetricDeltas = {
+export type ConflictMetricDeltas = {
   batches: number;
   usage: Usage;
   conflicts: { critical: number; important: number; informational: number };
@@ -454,9 +467,11 @@ function emptyConflictMetricDeltas(): ConflictMetricDeltas {
 
 function collectConflictMetricDeltas(
   checkpoints: Map<string, { inputHash: string; checkpoint: unknown }>,
-  initialKeys: Set<string>
+  initialKeys: Set<string>,
+  invocationUsage: Usage = emptyUsage()
 ): ConflictMetricDeltas {
   const deltas = emptyConflictMetricDeltas();
+  sumUsage(deltas.usage, invocationUsage);
   const fingerprints = new Set<string>();
   for (const [batchKey, value] of checkpoints) {
     if (!initialKeys.has(batchKey) || !value.checkpoint || typeof value.checkpoint !== 'object') {
@@ -473,8 +488,6 @@ function collectConflictMetricDeltas(
     deltas.batches += 1;
     if (!value.checkpoint || typeof value.checkpoint !== 'object') continue;
     const record = value.checkpoint as Record<string, unknown>;
-    const usage = UsageSchema.safeParse(record.usage);
-    if (usage.success) sumUsage(deltas.usage, usage.data);
     const conflicts = DocumentConflictSchema.array().safeParse(record.conflicts);
     if (!conflicts.success) continue;
     for (const conflict of conflicts.data) {
@@ -904,7 +917,7 @@ export function createProductionConflictDetectionPort(
     }
     throw new ConflictModelCallError(
       'Conflict detection model request failed within the bounded retry policy',
-      attempts,
+      UsageSchema.parse({ ...accumulated, model_calls: attempts }),
       { cause: lastError }
     );
   }
@@ -954,17 +967,45 @@ export function createProductionConflictDetectionPort(
   };
 }
 
-export async function detectDocumentConflicts(
-  input: DetectDocumentConflictsInput,
-  dependencies: DetectDocumentConflictsDependencies
-): Promise<{
+type ConflictDetectionResult = {
   conflicts: DocumentConflict[];
   issues: DetectorCapacityIssue[];
   batchCount: number;
   usage: Usage;
   verification: { verified: number; degraded: number; not_required: number };
   metricDeltas: ConflictMetricDeltas;
-}> {
+};
+
+export class ConflictDetectionExecutionError extends Error {
+  constructor(
+    readonly metricDeltas: ConflictMetricDeltas,
+    options?: { cause?: unknown }
+  ) {
+    super('Conflict detection failed within the bounded execution policy', options);
+    this.name = 'ConflictDetectionExecutionError';
+  }
+}
+
+type ConflictExecutionTracker = { metricDeltas: () => ConflictMetricDeltas };
+
+export async function detectDocumentConflicts(
+  input: DetectDocumentConflictsInput,
+  dependencies: DetectDocumentConflictsDependencies
+): Promise<ConflictDetectionResult> {
+  const tracker: ConflictExecutionTracker = { metricDeltas: emptyConflictMetricDeltas };
+  try {
+    return await detectDocumentConflictsCore(input, dependencies, tracker);
+  } catch (error) {
+    if (error instanceof ConflictDetectionExecutionError) throw error;
+    throw new ConflictDetectionExecutionError(tracker.metricDeltas(), { cause: error });
+  }
+}
+
+async function detectDocumentConflictsCore(
+  input: DetectDocumentConflictsInput,
+  dependencies: DetectDocumentConflictsDependencies,
+  tracker: ConflictExecutionTracker
+): Promise<ConflictDetectionResult> {
   validateConfig(input);
   if (dependencies.port.retryOwner !== 'port') throw new Error('Conflict port must own retries');
   const run = await dependencies.repository.getAcceptedRun(
@@ -996,13 +1037,79 @@ export async function detectDocumentConflicts(
   const checkpointRows = await dependencies.repository.listConflictCheckpoints(input.runId);
   const checkpoints = checkpointIndex(checkpointRows);
   const initialCheckpointKeys = new Set(checkpoints.keys());
-  const metricDeltas = () => collectConflictMetricDeltas(checkpoints, initialCheckpointKeys);
+  const invocationUsage = emptyUsage();
+  const metricDeltas = () =>
+    collectConflictMetricDeltas(checkpoints, initialCheckpointKeys, invocationUsage);
+  tracker.metricDeltas = metricDeltas;
+  const recordOutputUsage = (value: unknown): Usage | undefined => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const parsed = UsageSchema.safeParse((value as Record<string, unknown>).usage);
+    if (!parsed.success) return undefined;
+    sumUsage(invocationUsage, parsed.data);
+    return parsed.data;
+  };
   const identity = detectorIdentity(input);
-  const persistCapacityIssue = async (details: {
-    boundary: string;
-    clusterCount: number;
-    propositionKey?: string;
-  }): Promise<DetectorCapacityIssue> => {
+  const identityHash = hashInput(identity);
+  const restoredCapacityIssues: DetectorCapacityIssue[] = [];
+  for (const value of checkpoints.values()) {
+    const capacity = CapacityCheckpointSchema.safeParse(value.checkpoint);
+    if (capacity.success && capacity.data.issue.config_hash === identityHash) {
+      restoredCapacityIssues.push(capacity.data.issue);
+    }
+  }
+  if (restoredCapacityIssues.length > 0) {
+    const restoredConflicts = new Map<string, DocumentConflict>();
+    let restoredBatchCount = 0;
+    for (const value of checkpoints.values()) {
+      if (!value.checkpoint || typeof value.checkpoint !== 'object') continue;
+      const record = value.checkpoint as Record<string, unknown>;
+      if (
+        [
+          'conflict_map',
+          'conflict_reduction',
+          'conflict_classification',
+          'conflict_capacity_degraded',
+        ].includes(String(record.kind))
+      ) {
+        restoredBatchCount += 1;
+      }
+      const checkpointUsage = UsageSchema.safeParse(record.usage);
+      if (checkpointUsage.success) sumUsage(usage, checkpointUsage.data);
+      const checkpointConflicts = DocumentConflictSchema.array().safeParse(record.conflicts);
+      if (checkpointConflicts.success) {
+        for (const conflict of checkpointConflicts.data) {
+          restoredConflicts.set(conflict.conflict_fingerprint, conflict);
+        }
+      }
+      if (Array.isArray(record.verification)) {
+        for (const entry of record.verification) {
+          if (!entry || typeof entry !== 'object') continue;
+          const status = (entry as Record<string, unknown>).status;
+          if (status === 'verified' || status === 'degraded' || status === 'not_required') {
+            verification[status] += 1;
+          }
+        }
+      }
+    }
+    return {
+      conflicts: [...restoredConflicts.values()].sort((left, right) =>
+        left.conflict_fingerprint.localeCompare(right.conflict_fingerprint)
+      ),
+      issues: restoredCapacityIssues,
+      batchCount: restoredBatchCount,
+      usage,
+      verification,
+      metricDeltas: metricDeltas(),
+    };
+  }
+  const persistCapacityIssue = async (
+    details: {
+      boundary: string;
+      clusterCount: number;
+      propositionKey?: string;
+    },
+    capacityUsage: Usage = emptyUsage()
+  ): Promise<DetectorCapacityIssue> => {
     const issue = DetectorCapacityIssueSchema.parse({
       kind: 'detector_capacity',
       reason: 'detector_capacity_degraded',
@@ -1013,7 +1120,7 @@ export async function detectDocumentConflicts(
         claimCount: claims.length,
         clusterCount: details.clusterCount,
       }),
-      config_hash: hashInput(identity),
+      config_hash: identityHash,
       ...(details.propositionKey
         ? { proposition_key_hash: `sha256:${sha256(details.propositionKey)}` }
         : {}),
@@ -1021,7 +1128,7 @@ export async function detectDocumentConflicts(
       cluster_count: details.clusterCount,
     });
     const batchKey = `capacity:${sha256(issue.call_plan_hash).slice(0, 24)}`;
-    const checkpoint = { kind: 'conflict_capacity_degraded', issue };
+    const checkpoint = { kind: 'conflict_capacity_degraded', issue, usage: capacityUsage };
     await dependencies.repository.commitConflictBatch({
       runId: input.runId,
       courseId: input.courseId,
@@ -1050,13 +1157,17 @@ export async function detectDocumentConflicts(
       return { output: await details.invoke() };
     } catch (error) {
       if (error instanceof ConflictModelCallError) {
-        usage.model_calls += error.modelCalls;
+        sumUsage(usage, error.usage);
+        sumUsage(invocationUsage, error.usage);
         if (usage.model_calls >= input.maxModelCalls) {
           return {
-            issue: await persistCapacityIssue({
-              ...details,
-              boundary: `${details.boundary}:retry-exhausted`,
-            }),
+            issue: await persistCapacityIssue(
+              {
+                ...details,
+                boundary: `${details.boundary}:retry-exhausted`,
+              },
+              error.usage
+            ),
           };
         }
       }
@@ -1128,7 +1239,7 @@ export async function detectDocumentConflicts(
       organizationId: input.organizationId,
       batchKey: 'capacity:pre-map',
       inputHash: issue.call_plan_hash,
-      structuredCheckpoint: { kind: 'conflict_capacity_degraded', issue },
+      structuredCheckpoint: { kind: 'conflict_capacity_degraded', issue, usage: emptyUsage() },
       conflicts: [],
       detectionModel: input.detectionModel,
       detectionVersion: input.detectionVersion,
@@ -1136,7 +1247,7 @@ export async function detectDocumentConflicts(
     });
     checkpoints.set('capacity:pre-map', {
       inputHash: issue.call_plan_hash,
-      checkpoint: { kind: 'conflict_capacity_degraded', issue },
+      checkpoint: { kind: 'conflict_capacity_degraded', issue, usage: emptyUsage() },
     });
     return {
       conflicts: [],
@@ -1180,12 +1291,16 @@ export async function detectDocumentConflicts(
         rawOutput = await dependencies.port.mapBatch(portInput);
       } catch (error) {
         if (error instanceof ConflictModelCallError) {
-          usage.model_calls += error.modelCalls;
+          sumUsage(usage, error.usage);
+          sumUsage(invocationUsage, error.usage);
           if (usage.model_calls >= input.maxModelCalls) {
-            const issue = await persistCapacityIssue({
-              boundary: `${batchKey}:retry-exhausted`,
-              clusterCount: claims.length,
-            });
+            const issue = await persistCapacityIssue(
+              {
+                boundary: `${batchKey}:retry-exhausted`,
+                clusterCount: claims.length,
+              },
+              error.usage
+            );
             return {
               conflicts: [],
               issues: [issue],
@@ -1198,13 +1313,17 @@ export async function detectDocumentConflicts(
         }
         throw error;
       }
+      recordOutputUsage(rawOutput);
       const output = MapOutputSchema.parse(rawOutput);
       if (output.usage.model_calls > input.maxModelCalls - usage.model_calls) {
-        usage.model_calls += output.usage.model_calls;
-        const issue = await persistCapacityIssue({
-          boundary: `${batchKey}:reported-attempts`,
-          clusterCount: claims.length,
-        });
+        sumUsage(usage, output.usage);
+        const issue = await persistCapacityIssue(
+          {
+            boundary: `${batchKey}:reported-attempts`,
+            clusterCount: claims.length,
+          },
+          output.usage
+        );
         return {
           conflicts: [],
           issues: [issue],
@@ -1329,15 +1448,19 @@ export async function detectDocumentConflicts(
             capacityDegraded = true;
             break;
           }
+          recordOutputUsage(call.output);
           const output = ReductionOutputSchema.parse(call.output);
           if (output.usage.model_calls > input.maxModelCalls - usage.model_calls) {
-            usage.model_calls += output.usage.model_calls;
+            sumUsage(usage, output.usage);
             issues.push(
-              await persistCapacityIssue({
-                boundary: `${batchKey}:reported-attempts`,
-                clusterCount: clusters.length,
-                propositionKey,
-              })
+              await persistCapacityIssue(
+                {
+                  boundary: `${batchKey}:reported-attempts`,
+                  clusterCount: clusters.length,
+                  propositionKey,
+                },
+                output.usage
+              )
             );
             capacityDegraded = true;
             break;
@@ -1412,11 +1535,19 @@ export async function detectDocumentConflicts(
             organizationId: input.organizationId,
             batchKey: issueKey,
             inputHash: issueHash,
-            structuredCheckpoint: { kind: 'conflict_capacity_degraded', issue },
+            structuredCheckpoint: {
+              kind: 'conflict_capacity_degraded',
+              issue,
+              usage: emptyUsage(),
+            },
             conflicts: [],
             detectionModel: input.detectionModel,
             detectionVersion: input.detectionVersion,
             verificationStatus: 'degraded',
+          });
+          checkpoints.set(issueKey, {
+            inputHash: issueHash,
+            checkpoint: { kind: 'conflict_capacity_degraded', issue, usage: emptyUsage() },
           });
         }
         issues.push(issue);
@@ -1470,15 +1601,19 @@ export async function detectDocumentConflicts(
         batchCount += 1;
         break;
       }
+      recordOutputUsage(call.output);
       const output = ClassificationOutputSchema.parse(call.output);
       if (output.usage.model_calls > input.maxModelCalls - usage.model_calls) {
-        usage.model_calls += output.usage.model_calls;
+        sumUsage(usage, output.usage);
         issues.push(
-          await persistCapacityIssue({
-            boundary: `${batchKey}:reported-attempts`,
-            clusterCount: clusters.length,
-            propositionKey,
-          })
+          await persistCapacityIssue(
+            {
+              boundary: `${batchKey}:reported-attempts`,
+              clusterCount: clusters.length,
+              propositionKey,
+            },
+            output.usage
+          )
         );
         batchCount += 1;
         break;

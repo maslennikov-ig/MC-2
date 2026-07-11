@@ -487,8 +487,13 @@
       "targets": [
         {
           "expr": "sum by (status) (increase(megacampus_document_evidence_runs_total{stage=\"stage4\"}[$__range]))",
-          "legendFormat": "{{status}}",
+          "legendFormat": "durable {{status}}",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (status, mode) (increase(megacampus_document_evidence_stage4_invocations_total[$__range]))",
+          "legendFormat": "invocation {{status}}/{{mode}}",
+          "refId": "B"
         }
       ],
       "title": "Evidence run status",

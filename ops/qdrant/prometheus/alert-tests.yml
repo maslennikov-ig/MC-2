@@ -167,11 +167,9 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              stage: stage4
-              status: failed
             exp_annotations:
-              summary: A document evidence run failed
-              description: At least one Stage 4 document evidence run failed in the last ten minutes.
+              summary: A document evidence run or invocation failed
+              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes.
       - eval_time: 6m
         alertname: DocumentEvidenceCoverageIncomplete
         exp_alerts:
@@ -196,6 +194,21 @@ tests:
             exp_annotations:
               summary: A critical document conflict remains unresolved
               description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+
+  # evidence-invocation-only-failure
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_document_evidence_stage4_invocations_total{service="worker",instance="worker-1",status="failed",mode="active"}'
+        values: '0+0x2 0+1x3'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: DocumentEvidenceRunFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: A document evidence run or invocation failed
+              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes.
 
   # evidence-series-absent
   - interval: 1m

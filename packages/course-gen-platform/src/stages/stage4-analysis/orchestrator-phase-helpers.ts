@@ -63,7 +63,9 @@ import { resolveDownstreamDocumentSummaries } from './evidence/downstream-contex
 import { createHash } from 'node:crypto';
 import {
   createProductionConflictDetectionPort,
+  ConflictDetectionExecutionError,
   detectDocumentConflicts,
+  type ConflictMetricDeltas,
   type DetectDocumentConflictsDependencies,
   type DetectDocumentConflictsInput,
 } from './evidence/conflict-detector';
@@ -75,6 +77,7 @@ import {
 import {
   publishDocumentEvidenceMetricsSafely,
   type DocumentEvidenceMetricEvent,
+  type Stage4DurableTotals,
 } from '@/shared/metrics/document-evidence-textfile';
 
 export interface DocumentEvidencePhaseOverrides {
@@ -109,6 +112,7 @@ export interface DocumentEvidencePhaseOverrides {
     system: number;
     degradedAutomatic: number;
   }>;
+  loadDurableTotals?: () => Promise<Stage4DurableTotals>;
 }
 
 function stableUuidV8(value: string): string {
@@ -127,7 +131,9 @@ function evidenceEnabled(overrides?: DocumentEvidencePhaseOverrides): boolean {
 function failedStage4Metric(
   mode: 'shadow' | 'active',
   durationSeconds: number,
-  sourceCount: number
+  sourceCount: number,
+  durableTotals?: Stage4DurableTotals,
+  failureDeltas?: ConflictMetricDeltas
 ): DocumentEvidenceMetricEvent {
   return {
     stage: 'stage4',
@@ -144,14 +150,19 @@ function failedStage4Metric(
       targeted_retrieval: 0,
       metadata_only: 0,
     },
-    batches: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    modelCalls: 0,
-    costUsd: 0,
+    batches: failureDeltas?.batches ?? 0,
+    inputTokens: failureDeltas?.usage.input_tokens ?? 0,
+    outputTokens: failureDeltas?.usage.output_tokens ?? 0,
+    modelCalls: failureDeltas?.usage.model_calls ?? 0,
+    costUsd: failureDeltas?.usage.total_cost_usd ?? 0,
     durationSeconds,
-    conflicts: { critical: 0, important: 0, informational: 0 },
+    conflicts: failureDeltas?.conflicts ?? {
+      critical: 0,
+      important: 0,
+      informational: 0,
+    },
     decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+    ...(durableTotals ? { durableTotals } : {}),
   };
 }
 
@@ -185,41 +196,93 @@ async function loadDurableCriticalConflictState(context: AnalysisContext): Promi
   };
 }
 
-async function loadDurableDecisionTotals(context: AnalysisContext): Promise<{
-  user: number;
-  system: number;
-  degradedAutomatic: number;
-}> {
-  type DecisionTotalsClient = {
+async function loadDurableStage4Totals(context: AnalysisContext): Promise<Stage4DurableTotals> {
+  type DurableTotalsClient = {
     from(relation: 'document_evidence_observability_totals'): {
-      select(columns: 'user_decisions,system_decisions,degraded_automatic_decisions'): {
-        eq(column: 'singleton', value: true): {
+      select(columns: string): {
+        eq(
+          column: 'singleton',
+          value: true
+        ): {
           single(): Promise<{ data: unknown; error: unknown }>;
         };
       };
     };
   };
-  const totalsClient = context.supabase as unknown as DecisionTotalsClient;
+  const totalsClient = context.supabase as unknown as DurableTotalsClient;
   const { data, error } = await totalsClient
     .from('document_evidence_observability_totals')
-    .select('user_decisions,system_decisions,degraded_automatic_decisions')
+    .select(
+      'revision,accepted_runs,failed_runs,source_documents,assessed_documents,degraded_documents,failed_documents,latest_coverage_source,latest_coverage_assessed,latest_coverage_degraded,latest_coverage_failed,full_text_documents,hierarchical_summary_documents,summary_documents,targeted_retrieval_documents,metadata_only_documents,batches,model_calls,input_tokens,output_tokens,total_cost_usd,duration_seconds,critical_conflicts,important_conflicts,informational_conflicts,user_decisions,system_decisions,degraded_automatic_decisions'
+    )
     .eq('singleton', true)
     .single();
-  if (error || !data) throw new Error('Document decision metrics reconciliation failed');
+  if (error || !data) throw new Error('Document evidence metrics reconciliation failed');
   const row = data as Record<string, unknown>;
-  const values = [
-    row.user_decisions,
-    row.system_decisions,
-    row.degraded_automatic_decisions,
-  ];
-  if (values.some(value => !Number.isSafeInteger(value) || (value as number) < 0)) {
-    throw new Error('Document decision metrics reconciliation returned invalid totals');
-  }
-  return {
-    user: row.user_decisions as number,
-    system: row.system_decisions as number,
-    degradedAutomatic: row.degraded_automatic_decisions as number,
+  const count = (column: string): number => {
+    const value = Number(row[column]);
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error('Document evidence metrics reconciliation returned invalid totals');
+    }
+    return value;
   };
+  const amount = (column: string): number => {
+    const value = Number(row[column]);
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error('Document evidence metrics reconciliation returned invalid totals');
+    }
+    return value;
+  };
+  return {
+    revision: count('revision'),
+    runs: { accepted: count('accepted_runs'), failed: count('failed_runs') },
+    documents: {
+      source: count('source_documents'),
+      assessed: count('assessed_documents'),
+      degraded: count('degraded_documents'),
+      failed: count('failed_documents'),
+    },
+    latestCoverage: {
+      source: count('latest_coverage_source'),
+      assessed: count('latest_coverage_assessed'),
+      degraded: count('latest_coverage_degraded'),
+      failed: count('latest_coverage_failed'),
+    },
+    processingModes: {
+      full_text: count('full_text_documents'),
+      hierarchical_summary: count('hierarchical_summary_documents'),
+      summary: count('summary_documents'),
+      targeted_retrieval: count('targeted_retrieval_documents'),
+      metadata_only: count('metadata_only_documents'),
+    },
+    batches: count('batches'),
+    modelCalls: count('model_calls'),
+    inputTokens: count('input_tokens'),
+    outputTokens: count('output_tokens'),
+    costUsd: amount('total_cost_usd'),
+    durationSeconds: amount('duration_seconds'),
+    conflicts: {
+      critical: count('critical_conflicts'),
+      important: count('important_conflicts'),
+      informational: count('informational_conflicts'),
+    },
+    decisions: {
+      user: count('user_decisions'),
+      system: count('system_decisions'),
+      degradedAutomatic: count('degraded_automatic_decisions'),
+    },
+  };
+}
+
+async function tryLoadDurableTotals(
+  context: AnalysisContext,
+  overrides?: DocumentEvidencePhaseOverrides
+): Promise<Stage4DurableTotals | undefined> {
+  try {
+    return await (overrides?.loadDurableTotals ?? (() => loadDurableStage4Totals(context)))();
+  } catch {
+    return undefined;
+  }
 }
 
 /** Runs after Phase 1 and before the existing Phase 0.5 pause/resume boundary. */
@@ -236,11 +299,16 @@ export async function runDocumentEvidencePhase(
     const metric = await runDocumentEvidencePhaseCore(context, overrides, mode, startedAt);
     await publishMetrics(metric, context.orchestrationLogger);
   } catch (error) {
+    const durableTotals = await tryLoadDurableTotals(context, overrides);
+    const failureDeltas =
+      error instanceof ConflictDetectionExecutionError ? error.metricDeltas : undefined;
     await publishMetrics(
       failedStage4Metric(
         mode,
         Math.max(0, (Date.now() - startedAt) / 1000),
-        context.originalDocumentSummaries.length
+        context.originalDocumentSummaries.length,
+        durableTotals,
+        failureDeltas
       ),
       context.orchestrationLogger
     );
@@ -503,13 +571,14 @@ async function runDocumentEvidencePhaseCore(
   } catch {
     // A failed reconciliation must never clear a previously published unresolved state.
   }
-  let decisionTotals: { user: number; system: number; degradedAutomatic: number } | undefined;
-  try {
-    decisionTotals = await (
-      overrides?.loadDecisionTotals ?? (() => loadDurableDecisionTotals(context))
-    )();
-  } catch {
-    // A failed totals reconciliation must not change monotonic decision counters.
+  const durableTotals = await tryLoadDurableTotals(context, overrides);
+  let decisionTotals = durableTotals?.decisions;
+  if (!decisionTotals && overrides?.loadDecisionTotals) {
+    try {
+      decisionTotals = await overrides.loadDecisionTotals();
+    } catch {
+      // A failed totals reconciliation must not change monotonic decision counters.
+    }
   }
   return {
     stage: 'stage4',
@@ -533,12 +602,12 @@ async function runDocumentEvidencePhaseCore(
     modelCalls:
       preflightMetricDeltas.generationMetrics.modelCalls + (conflictUsage?.model_calls ?? 0),
     costUsd:
-      preflightMetricDeltas.generationMetrics.totalCostUsd +
-      (conflictUsage?.total_cost_usd ?? 0),
+      preflightMetricDeltas.generationMetrics.totalCostUsd + (conflictUsage?.total_cost_usd ?? 0),
     durationSeconds:
       preflightMetricDeltas.acceptedRun === 1 ? Math.max(0, (Date.now() - startedAt) / 1000) : 0,
     conflicts: conflictMetricDeltas.conflicts,
     ...(decisionTotals ? { decisions: decisionTotals } : {}),
+    ...(durableTotals ? { durableTotals } : {}),
     ...(criticalConflictState ? { criticalConflictState } : {}),
   };
 }
