@@ -31,12 +31,24 @@ describe('Qdrant recovery systemd contract', () => {
       expect(unit).toContain('ProtectHome=true');
       expect(unit).toContain('PrivateTmp=true');
       expect(unit).toContain('StateDirectory=megacampus-qdrant-recovery');
+      expect(unit).not.toContain('StateDirectory=megacampus-qdrant-metrics');
       expect(unit).toContain('QDRANT_RECOVERY_LOCK_HELD=1');
+      expect(unit).toContain(
+        'Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics'
+      );
+      expect(unit).toContain(
+        'ReadWritePaths=/var/lib/megacampus-qdrant-recovery /var/lib/megacampus/qdrant-metrics /run/megacampus-qdrant-recovery'
+      );
+      const metricsPreflight =
+        'ExecStartPre=/usr/bin/bash -eu -c \'test -d "$1" && test ! -L "$1" && test -w "$1" && test "$(/usr/bin/stat -c %%a -- "$1")" = 2775\' -- /var/lib/megacampus/qdrant-metrics';
+      expect(unit).toContain(metricsPreflight);
+      expect(unit.indexOf(metricsPreflight)).toBeLessThan(unit.indexOf('ExecStart='));
       expect(unit).toMatch(
         /ExecStart=\/usr\/bin\/flock --nonblock \/run\/megacampus-qdrant-recovery\/recovery\.lock \/usr\/bin\/pnpm --dir \/opt\/megacampus\/packages\/course-gen-platform qdrant:/u
       );
       expect(unit).not.toContain('EnvironmentFile=');
       expect(unit).not.toMatch(/access[_-]?key|secret[_-]?key|api[_-]?key=/iu);
+      expect(unit).not.toMatch(/(?:mkdir|chmod).*qdrant-metrics/iu);
     }
 
     expect(snapshot.match(/^LoadCredential=/gmu)).toHaveLength(1);

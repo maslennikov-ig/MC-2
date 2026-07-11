@@ -67,7 +67,8 @@ verification:
   - TDD self-review streaming and latest-manifest RED 2 failed and 11 passed then GREEN 13/13 passed.
   - Independent-review cleanup RED failed 4/7 then GREEN passed 7/7 for boolean results and cleanup postconditions.
   - Independent-review identity RED failed 2/8 then GREEN passed 8/8 for exact ranks and dual isolation.
-  - Final focused unit command passed 21/21 across 3 files.
+  - Cross-stream shared-metrics RED failed 4/12: atomic metrics remained 0600 under UMask 0077 and missing/wrong-mode directories reached the snapshot client. Symmetric GREEN passed 26/26 across snapshot, restore, and systemd tests.
+  - Final focused unit command passed 26/26 across 3 files.
   - Package type-check passed.
   - Package build passed.
   - systemd-analyze verify passed for 4 units in a rootless mount namespace with a writable isolated /run.
@@ -93,7 +94,7 @@ changed_files:
   - deploy/systemd/megacampus-qdrant-restore-drill.timer
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.9.md
 explicit_defers:
-  - Q9 owns scraping and alerting for the atomic textfile metrics; Q8 only emits the durable files.
+  - Q9 owns the host directory, metrics GID, same-path node_exporter mount, scraping, and alerting for the atomic 0644 textfile metrics; Q8 only validates the precreated 2775 contract and emits the durable file.
   - Q10 owns durable install and enable documentation plus validation of the target-host absolute /usr/bin/pnpm path.
   - Q12 remains the explicit authority gate for real S3, staging, service installation, timer enabling, and any live recovery action.
   - Persistent timers catch up after restart but cannot guarantee the recovery objective during a host outage; Q9 must alert when snapshot age exceeds eight hours.
@@ -101,11 +102,11 @@ explicit_defers:
 
 # Summary
 
-Q8 now resolves the stable alias to one physical collection, creates and re-lists a native snapshot, streams an authenticated download through SHA-256 without whole-file buffering, checks size and server checksum, and atomically writes both immutable and latest redacted manifests before applying deterministic 30-day retention. Retention filters by physical collection and owned object prefix, preserves the newest successful snapshot, and never deletes an unlisted or foreign object. Atomic Prometheus textfile metrics retain success ages across failures and expose snapshot failures, restore failures, lock contention, and latest operation status.
+Q8 now resolves the stable alias to one physical collection, creates and re-lists a native snapshot, streams an authenticated download through SHA-256 without whole-file buffering, checks size and server checksum, and atomically writes both immutable and latest redacted manifests before applying deterministic 30-day retention. Retention filters by physical collection and owned object prefix, preserves the newest successful snapshot, and never deletes an unlisted or foreign object. Atomic Prometheus textfile metrics retain success ages across failures and expose snapshot failures, restore failures, lock contention, and latest operation status. Metrics are written to the precreated shared `/var/lib/megacampus/qdrant-metrics` contract as 0644 before atomic visibility despite `UMask=0077`; recovery state, manifests, and evidence remain owner-only 0600 under the separate 0700 recovery directory.
 
 The restore drill uses Qdrant 1.18.2's supported authenticated self-HTTP transport with `priority=snapshot` and the manifest checksum. It creates a unique owned physical collection and drill alias, verifies the complete physical schema and strict indexes, exact point count, exact top point/document/chunk/content for dense, RU BM25, and EN BM25, exact ordered Formula identities, and separate negative organization and course isolation through that drill alias. The stable alias is asserted unchanged before and after success or failure. Every create/delete boolean is checked; `finally` re-reads aliases and collections, proves the owned resources are absent, and records any false result or postcondition mismatch in redacted cleanup evidence.
 
-Snapshot and restore commands share one real nonblocking `flock`. Hardened systemd services use narrow `LoadCredential` inputs, no broad environment file, owner-only state, an absolute command path, filesystem and privilege protections, and one shared runtime lock. The snapshot timer runs every four hours with at most ten minutes jitter and one minute accuracy, so the proven bound is 4h11m, below six hours. The separate monthly restore timer is persistent and uses the same lock.
+Snapshot and restore commands share one real nonblocking `flock`. Hardened systemd services use narrow `LoadCredential` inputs, no broad environment file, owner-only state, an absolute command path, filesystem and privilege protections, and one shared runtime lock. Both services set `QDRANT_METRICS_TEXTFILE_DIR`, permit only the precreated shared path, and fail in `ExecStartPre` unless it is a real, writable mode-2775 directory. The TypeScript entrypoints repeat that fail-fast check before state, lock, snapshot, or restore activity and never create or chmod the shared directory. The snapshot timer runs every four hours with at most ten minutes jitter and one minute accuracy, so the proven bound is 4h11m, below six hours. The separate monthly restore timer is persistent and uses the same lock.
 
 # Scope / Routing
 
@@ -126,10 +127,11 @@ The implementation consumed the already recorded Qdrant 1.18.2 OpenAPI/client sh
 - Self-review RED: 2 failures plus 11 passes proved whole-file buffering and a missing durable latest manifest. GREEN streams the response body and atomically updates `latest-manifest.json`; 13/13 passed.
 - Independent cleanup review RED: 4/7 failed because false create/delete alias and delete-collection results plus residual owned resources were accepted. GREEN checks every boolean, performs post-cleanup alias/collection reads, preserves the stable alias, records cleanup failures, increments the failure metric, and exits nonzero; 7/7 passed.
 - Independent relevance review first exposed the old scalar-only probe validator, then produced the behavioral RED: one test observed only five queries instead of separate negative organization and course checks, while an intentional top-identity mismatch reached a later Formula failure. GREEN requires exact expected dense/RU/EN identities and content, ordered Formula identities, and both isolation fixtures. Mismatch errors expose only field names, not expected or recovered content; restore unit tests passed 8/8.
+- Cross-stream Q9 review RED: snapshot tests passed 8/12 and failed 4/12. Two failures proved metric temp/final files stayed 0600 under `UMask=0077`; missing and wrong-mode 0700 shared directories reached Qdrant client handling instead of stopping first. GREEN extends the atomic writer with an explicit mode applied to the temporary inode before rename, keeps the default at 0600, requires a precreated real/writable 2775 shared directory without creating or chmodding it, and mirrors the fail-fast contract in snapshot, restore, and systemd. The joined suite passed 26/26.
 
 ## Final evidence
 
-- Focused unit: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=[synthetic] pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/tools/qdrant/snapshot.test.ts tests/unit/tools/qdrant/restore-drill.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts` -> 21/21.
+- Focused unit: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=[synthetic] pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/tools/qdrant/snapshot.test.ts tests/unit/tools/qdrant/restore-drill.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts` -> 26/26. This includes metric 0644 under `UMask=0077`, owner-only state/manifests/evidence, symmetric pre-client rejection for missing/0700 shared directories, and service preflight ordering.
 - Type-check: `pnpm --filter @megacampus/course-gen-platform type-check` -> exit 0.
 - Build: `pnpm --filter @megacampus/course-gen-platform build` -> exit 0.
 - Units: rootless mount namespace with isolated writable `/run`, then `systemd-analyze verify` over all four Q8 units -> exit 0 and no diagnostics. Direct host verification is impossible in this WSL profile because `/run/systemd` is root-owned and absent.
@@ -144,6 +146,6 @@ The branch is returned for orchestrator review and merge; it is not accepted or 
 
 # Risks / Follow-ups / Explicit Defers
 
-Q9 must scrape the emitted textfile and enforce the accepted stale-snapshot and stale-restore alerts. Q10 must document installation/enabling, recovery-probe ownership, and confirm the packaged target host exposes pnpm at the absolute unit path. Q12 alone may configure real bucket credentials, install or enable units, create an off-host snapshot, or exercise staging recovery. `Persistent=true` improves restart catch-up but cannot overcome a host outage, so the eight-hour stale alert remains mandatory.
+Q9 must provision the host directory and metrics GID, mount the same `/var/lib/megacampus/qdrant-metrics` path into node_exporter, scrape the emitted 0644 textfile, and enforce the accepted stale-snapshot and stale-restore alerts. Q8 deliberately does not create the shared directory, guess its group, or chmod recovery state directories. Q10 must document installation/enabling, recovery-probe ownership, and confirm the packaged target host exposes pnpm at the absolute unit path. Q12 alone may configure real bucket credentials, install or enable units, create an off-host snapshot, or exercise staging recovery. `Persistent=true` improves restart catch-up but cannot overcome a host outage, so the eight-hour stale alert remains mandatory.
 
 Rollback is a normal revert of the eventual Q8 merge commit plus removal of uninstalled unit files. No alias rollback, restored data rollback, secret rollback, remote branch deletion, deployment rollback, or service rollback is currently necessary.

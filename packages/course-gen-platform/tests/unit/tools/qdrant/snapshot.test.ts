@@ -1,4 +1,14 @@
-import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  access,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
@@ -13,6 +23,13 @@ import {
   type SnapshotManifest,
 } from '../../../../tools/qdrant/snapshot-recovery.js';
 import { runSnapshotOperation } from '../../../../tools/qdrant/snapshot.js';
+
+async function createSharedMetricsDirectory(root: string): Promise<string> {
+  const directory = join(root, 'qdrant-metrics');
+  await mkdir(directory, { mode: 0o700 });
+  await chmod(directory, 0o2775);
+  return directory;
+}
 
 describe('Qdrant snapshot recovery contract', () => {
   it('provides a dedicated recovery helper module', async () => {
@@ -174,6 +191,26 @@ describe('Qdrant snapshot recovery contract', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
+  it('makes a metric node_exporter-readable before atomic visibility under umask 0077', async () => {
+    const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-metric-atomic-'));
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
+    const target = join(metricsDirectory, 'megacampus_qdrant_recovery.prom');
+    const previousUmask = process.umask(0o077);
+    try {
+      await writeAtomicText(target, 'megacampus_qdrant_snapshot_failures_total 0\n', {
+        mode: 0o644,
+        createParent: false,
+      });
+    } finally {
+      process.umask(previousUmask);
+    }
+
+    expect((await stat(target)).mode & 0o777).toBe(0o644);
+    expect(await readFile(target, 'utf8')).toContain('snapshot_failures_total 0');
+    expect(await readdir(metricsDirectory)).toEqual(['megacampus_qdrant_recovery.prom']);
+    await rm(directory, { recursive: true, force: true });
+  });
+
   it('holds one nonblocking recovery lock and rejects a duplicate run', async () => {
     const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-lock-'));
     const lockPath = join(directory, 'recovery.lock');
@@ -189,6 +226,7 @@ describe('Qdrant snapshot recovery contract', () => {
   it('creates, re-lists, downloads, checksums, persists, then applies owned retention', async () => {
     const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-snapshot-run-'));
     const manifestDir = join(directory, 'manifests');
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
     const snapshot = {
       name: 'course_embeddings_v7-2026-07-11.snapshot',
       creation_time: '2026-07-11T12:00:00Z',
@@ -264,7 +302,7 @@ describe('Qdrant snapshot recovery contract', () => {
       remotePrefix: 'owned',
       manifestDirectory: manifestDir,
       metricStatePath: join(directory, 'metrics-state.json'),
-      metricsPath: join(directory, 'metrics.prom'),
+      metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
       failureDirectory: join(directory, 'failures'),
       lockPath: join(directory, 'recovery.lock'),
       now: new Date('2026-07-11T12:00:00.000Z'),
@@ -280,22 +318,29 @@ describe('Qdrant snapshot recovery contract', () => {
     expect(await readFile(join(manifestDir, 'latest-manifest.json'), 'utf8')).toBe(
       await readFile(result.manifestPath, 'utf8')
     );
-    expect(await readFile(join(directory, 'metrics.prom'), 'utf8')).toContain(
-      'megacampus_qdrant_last_successful_snapshot_unixtime_seconds 1783771200'
-    );
+    expect(
+      await readFile(join(metricsDirectory, 'megacampus_qdrant_recovery.prom'), 'utf8')
+    ).toContain('megacampus_qdrant_last_successful_snapshot_unixtime_seconds 1783771200');
     expect(client.deleteSnapshot).toHaveBeenCalledWith(
       'course_embeddings_v7',
       'owned-old.snapshot',
       { wait: true }
     );
     expect(
-      `${await readFile(result.manifestPath, 'utf8')} ${await readFile(join(directory, 'metrics.prom'), 'utf8')}`
+      `${await readFile(result.manifestPath, 'utf8')} ${await readFile(join(metricsDirectory, 'megacampus_qdrant_recovery.prom'), 'utf8')}`
     ).not.toContain('local-test-key');
+    expect(
+      (await stat(join(metricsDirectory, 'megacampus_qdrant_recovery.prom'))).mode & 0o777
+    ).toBe(0o644);
+    expect((await stat(join(directory, 'metrics-state.json'))).mode & 0o777).toBe(0o600);
+    expect((await stat(result.manifestPath)).mode & 0o777).toBe(0o600);
+    expect((await stat(join(manifestDir, 'latest-manifest.json'))).mode & 0o777).toBe(0o600);
     await rm(directory, { recursive: true, force: true });
   });
 
   it('records a redacted failure metric and leaves success age unchanged', async () => {
     const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-snapshot-failure-'));
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
     const client = {
       getAliases: vi.fn(() =>
         Promise.resolve({
@@ -328,14 +373,17 @@ describe('Qdrant snapshot recovery contract', () => {
         remotePrefix: 'owned',
         manifestDirectory: join(directory, 'manifests'),
         metricStatePath,
-        metricsPath: join(directory, 'metrics.prom'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
         failureDirectory: join(directory, 'failures'),
         lockPath: join(directory, 'recovery.lock'),
         now: new Date('2026-07-11T12:00:00.000Z'),
       })
     ).rejects.toThrow(/snapshot operation failed/iu);
 
-    const metrics = await readFile(join(directory, 'metrics.prom'), 'utf8');
+    const metrics = await readFile(
+      join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
+      'utf8'
+    );
     expect(metrics).toContain('megacampus_qdrant_snapshot_failures_total 5');
     expect(metrics).toContain('megacampus_qdrant_last_successful_snapshot_unixtime_seconds 100');
     expect(metrics).not.toContain('secret-value');
@@ -346,4 +394,48 @@ describe('Qdrant snapshot recovery contract', () => {
     );
     await rm(directory, { recursive: true, force: true });
   });
+
+  it.each(['missing', 'wrong-mode'] as const)(
+    'fails before Qdrant mutation when the shared metrics directory is %s',
+    async condition => {
+      const directory = await mkdtemp(join('/tmp', `mc2-qdrant-metrics-${condition}-`));
+      const metricsDirectory = join(directory, 'qdrant-metrics');
+      if (condition === 'wrong-mode') {
+        await mkdir(metricsDirectory, { mode: 0o700 });
+      }
+      const client = {
+        getAliases: vi.fn(() => Promise.resolve({ aliases: [] })),
+        getCollection: vi.fn(),
+        versionInfo: vi.fn(),
+        createSnapshot: vi.fn(),
+        listSnapshots: vi.fn(),
+        deleteSnapshot: vi.fn(),
+      };
+
+      await expect(
+        runSnapshotOperation({
+          client: client as never,
+          logicalAlias: 'course_embeddings',
+          qdrantUrl: 'http://127.0.0.1:6333',
+          apiKey: 'local-test-key',
+          storageMode: 'local',
+          remotePrefix: 'owned',
+          manifestDirectory: join(directory, 'manifests'),
+          metricStatePath: join(directory, 'metrics-state.json'),
+          metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
+          failureDirectory: join(directory, 'failures'),
+          lockPath: join(directory, 'recovery.lock'),
+        })
+      ).rejects.toThrow(/metrics.*directory|directory.*metrics/iu);
+
+      expect(client.getAliases).not.toHaveBeenCalled();
+      expect(client.createSnapshot).not.toHaveBeenCalled();
+      if (condition === 'missing') {
+        await expect(access(metricsDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
+      } else {
+        expect((await stat(metricsDirectory)).mode & 0o7777).toBe(0o700);
+      }
+      await rm(directory, { recursive: true, force: true });
+    }
+  );
 });

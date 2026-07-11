@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { verifyPhysicalCourseEmbeddingsCollection } from '../../src/shared/qdrant/collection-manager.js';
@@ -13,6 +13,7 @@ import {
 import type { ResolvedSearchOptions } from '../../src/shared/qdrant/search-types.js';
 import {
   acquireRecoveryLock,
+  assertSharedMetricsDirectory,
   renderRecoveryMetrics,
   resolvePhysicalCollection,
   SNAPSHOT_MANIFEST_SCHEMA,
@@ -325,7 +326,10 @@ async function persistMetrics(
   state: RecoveryMetricState
 ): Promise<void> {
   await writeAtomicText(statePath, `${JSON.stringify(state, null, 2)}\n`);
-  await writeAtomicText(metricsPath, renderRecoveryMetrics(state));
+  await writeAtomicText(metricsPath, renderRecoveryMetrics(state), {
+    mode: 0o644,
+    createParent: false,
+  });
 }
 
 function redact(error: unknown, secrets: readonly string[]): string {
@@ -393,6 +397,7 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
   const targetCollection = options.targetCollection ?? `qdrant_restore_drill_${stamp}_${nonce}`;
   const drillAlias = options.drillAlias ?? `qdrant_restore_drill_alias_${stamp}_${nonce}`;
   validateOwnedNames(targetCollection, drillAlias);
+  await assertSharedMetricsDirectory(dirname(options.metricsPath));
 
   let state = await readMetricState(options.metricStatePath);
   let lock: Awaited<ReturnType<typeof acquireRecoveryLock>> | undefined;
@@ -603,6 +608,7 @@ async function runCli(): Promise<void> {
   ) as RecoveryProbe;
   const root =
     process.env.QDRANT_RECOVERY_STATE_DIR?.trim() || '/var/lib/megacampus-qdrant-recovery';
+  const metricsDirectory = requiredEnv('QDRANT_METRICS_TEXTFILE_DIR');
   const client = new QdrantClient({
     url: qdrantUrl,
     apiKey,
@@ -618,7 +624,7 @@ async function runCli(): Promise<void> {
     stableAlias: process.env.QDRANT_COLLECTION_NAME?.trim() || 'course_embeddings',
     evidenceDirectory: join(root, 'restore-evidence'),
     metricStatePath: join(root, 'metrics-state.json'),
-    metricsPath: join(root, 'textfile', 'megacampus_qdrant_recovery.prom'),
+    metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
     lockPath:
       process.env.QDRANT_RECOVERY_LOCK_PATH?.trim() || '/run/lock/megacampus-qdrant-recovery.lock',
     lockAlreadyHeld: process.env.QDRANT_RECOVERY_LOCK_HELD === '1',

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { QdrantClient } from '@qdrant/js-client-rest';
@@ -99,12 +99,16 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
   let apiKey: string;
   let qdrantUrl: string;
   let directory: string;
+  let metricsDirectory: string;
   let snapshotResult: SnapshotOperationResult;
 
   beforeAll(async () => {
     apiKey = requireEnv('QDRANT_API_KEY');
     qdrantUrl = requireEnv('QDRANT_URL');
     directory = await mkdtemp(join('/tmp', 'mc2-qdrant-recovery-integration-'));
+    metricsDirectory = join(directory, 'qdrant-metrics');
+    await mkdir(metricsDirectory, { mode: 0o700 });
+    await chmod(metricsDirectory, 0o2775);
     client = new QdrantClient({
       url: qdrantUrl,
       apiKey,
@@ -223,7 +227,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
       remotePrefix: `integration/${physical}`,
       manifestDirectory: join(directory, 'manifests'),
       metricStatePath: join(directory, 'metrics-state.json'),
-      metricsPath: join(directory, 'metrics.prom'),
+      metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
       failureDirectory: join(directory, 'failures'),
       lockPath: join(directory, 'recovery.lock'),
     });
@@ -266,7 +270,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
         drillAlias,
         evidenceDirectory: join(directory, 'restore-evidence'),
         metricStatePath: join(directory, 'metrics-state.json'),
-        metricsPath: join(directory, 'metrics.prom'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
         lockPath: join(directory, 'recovery.lock'),
       });
     } catch (error) {
@@ -325,7 +329,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
         drillAlias,
         evidenceDirectory,
         metricStatePath: join(directory, 'metrics-state.json'),
-        metricsPath: join(directory, 'metrics.prom'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
         lockPath: join(directory, 'recovery.lock'),
       })
     ).rejects.toThrow(/restore drill failed/iu);
@@ -398,7 +402,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
         drillAlias,
         evidenceDirectory: join(directory, 'duplicate-evidence'),
         metricStatePath: join(directory, 'metrics-state.json'),
-        metricsPath: join(directory, 'metrics.prom'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
         lockPath: join(directory, 'recovery.lock'),
       })
     ).rejects.toThrow(/restore drill failed/iu);

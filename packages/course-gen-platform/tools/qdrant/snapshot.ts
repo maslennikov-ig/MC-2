@@ -1,11 +1,12 @@
 import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import {
   acquireRecoveryLock,
+  assertSharedMetricsDirectory,
   buildSnapshotManifest,
   renderRecoveryMetrics,
   resolvePhysicalCollection,
@@ -78,7 +79,10 @@ async function persistMetrics(
   state: RecoveryMetricState
 ): Promise<void> {
   await writeAtomicText(statePath, `${JSON.stringify(state, null, 2)}\n`);
-  await writeAtomicText(metricsPath, renderRecoveryMetrics(state));
+  await writeAtomicText(metricsPath, renderRecoveryMetrics(state), {
+    mode: 0o644,
+    createParent: false,
+  });
 }
 
 function redactMessage(error: unknown, secrets: readonly string[]): string {
@@ -158,6 +162,7 @@ function artifactName(now: Date, snapshotName: string): string {
 export async function runSnapshotOperation(
   options: SnapshotOperationOptions
 ): Promise<SnapshotOperationResult> {
+  await assertSharedMetricsDirectory(dirname(options.metricsPath));
   const now = options.now ?? new Date();
   let state = await readMetricState(options.metricStatePath);
   let lock: Awaited<ReturnType<typeof acquireRecoveryLock>> | undefined;
@@ -292,6 +297,7 @@ async function runCli(): Promise<void> {
   const apiKey = await readCredential(requiredEnv('QDRANT_API_KEY_FILE'));
   const root =
     process.env.QDRANT_RECOVERY_STATE_DIR?.trim() || '/var/lib/megacampus-qdrant-recovery';
+  const metricsDirectory = requiredEnv('QDRANT_METRICS_TEXTFILE_DIR');
   const client = new QdrantClient({
     url: qdrantUrl,
     apiKey,
@@ -307,7 +313,7 @@ async function runCli(): Promise<void> {
     remotePrefix: process.env.QDRANT_SNAPSHOT_OBJECT_PREFIX?.trim() || 'megacampus/qdrant',
     manifestDirectory: join(root, 'manifests'),
     metricStatePath: join(root, 'metrics-state.json'),
-    metricsPath: join(root, 'textfile', 'megacampus_qdrant_recovery.prom'),
+    metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
     failureDirectory: join(root, 'failures'),
     lockPath:
       process.env.QDRANT_RECOVERY_LOCK_PATH?.trim() || '/run/lock/megacampus-qdrant-recovery.lock',

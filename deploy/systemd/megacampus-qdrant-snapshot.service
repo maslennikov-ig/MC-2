@@ -16,8 +16,10 @@ Environment=QDRANT_COLLECTION_NAME=course_embeddings
 Environment=QDRANT_SNAPSHOT_STORAGE_MODE=s3
 Environment=QDRANT_SNAPSHOT_OBJECT_PREFIX=megacampus/qdrant
 Environment=QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
+Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
 Environment=QDRANT_RECOVERY_LOCK_PATH=/run/megacampus-qdrant-recovery/recovery.lock
 Environment=QDRANT_RECOVERY_LOCK_HELD=1
+ExecStartPre=/usr/bin/bash -eu -c 'test -d "$1" && test ! -L "$1" && test -w "$1" && test "$(/usr/bin/stat -c %%a -- "$1")" = 2775' -- /var/lib/megacampus/qdrant-metrics
 ExecStart=/usr/bin/flock --nonblock /run/megacampus-qdrant-recovery/recovery.lock /usr/bin/pnpm --dir /opt/megacampus/packages/course-gen-platform qdrant:snapshot
 TimeoutStartSec=55m
 StateDirectory=megacampus-qdrant-recovery
@@ -35,4 +37,4 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
-ReadWritePaths=/var/lib/megacampus-qdrant-recovery /run/megacampus-qdrant-recovery
+ReadWritePaths=/var/lib/megacampus-qdrant-recovery /var/lib/megacampus/qdrant-metrics /run/megacampus-qdrant-recovery

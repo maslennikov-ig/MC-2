@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { chmod, mkdir, open, rename } from 'node:fs/promises';
+import { lstat, mkdir, open, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export const SNAPSHOT_MANIFEST_SCHEMA = 'megacampus.qdrant.snapshot-manifest/v1' as const;
@@ -203,19 +203,68 @@ export function renderRecoveryMetrics(state: RecoveryMetricState): string {
   ].join('\n');
 }
 
-export async function writeAtomicText(targetPath: string, content: string): Promise<void> {
+export interface AtomicTextOptions {
+  mode?: number;
+  createParent?: boolean;
+}
+
+export async function writeAtomicText(
+  targetPath: string,
+  content: string,
+  options: AtomicTextOptions = {}
+): Promise<void> {
   const directory = dirname(targetPath);
-  await mkdir(directory, { recursive: true, mode: 0o700 });
+  if (options.createParent !== false) {
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+  }
+  const mode = options.mode ?? 0o600;
   const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
-  const handle = await open(temporaryPath, 'wx', 0o600);
+  const handle = await open(temporaryPath, 'wx', mode);
   try {
     await handle.writeFile(content, 'utf8');
+    // Apply the final mode before rename so the atomically visible file is never
+    // temporarily owner-only when node_exporter needs group/other read access.
+    await handle.chmod(mode);
     await handle.sync();
-  } finally {
     await handle.close();
+    await rename(temporaryPath, targetPath);
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    await unlink(temporaryPath).catch(() => undefined);
+    throw error;
   }
-  await rename(temporaryPath, targetPath);
-  await chmod(targetPath, 0o600);
+}
+
+export async function assertSharedMetricsDirectory(directory: string): Promise<void> {
+  try {
+    const metadata = await lstat(directory);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new Error('must be a real directory');
+    }
+    if ((metadata.mode & 0o7777) !== 0o2775) {
+      throw new Error('must have mode 2775');
+    }
+
+    const probePath = `${directory}/.megacampus-qdrant-metrics.${process.pid}.${randomUUID()}.tmp`;
+    let probe: Awaited<ReturnType<typeof open>> | undefined;
+    try {
+      probe = await open(probePath, 'wx', 0o644);
+      await probe.chmod(0o644);
+      await probe.sync();
+      await probe.close();
+      probe = undefined;
+      await unlink(probePath);
+    } catch (error) {
+      await probe?.close().catch(() => undefined);
+      await unlink(probePath).catch(() => undefined);
+      throw error;
+    }
+  } catch (error) {
+    throw new Error(
+      `Shared metrics directory ${directory} must be precreated, writable, and mode 2775`,
+      { cause: error }
+    );
+  }
 }
 
 export interface RecoveryLock {

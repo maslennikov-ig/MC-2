@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -70,6 +70,13 @@ const PROBE: RecoveryProbe = {
     },
   ],
 };
+
+async function createSharedMetricsDirectory(root: string): Promise<string> {
+  const directory = join(root, 'qdrant-metrics');
+  await mkdir(directory, { mode: 0o700 });
+  await chmod(directory, 0o2775);
+  return directory;
+}
 
 function recoveryPoint(
   id: string,
@@ -222,6 +229,7 @@ describe('Qdrant restore drill', () => {
 
   it('recovers by authenticated supported transport, recreates drill alias, and preserves stable alias', async () => {
     const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-restore-'));
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
     const aliases = new Map([['course_embeddings', 'course_embeddings_v7']]);
     const collections = new Set(['course_embeddings_v7']);
     const client = {
@@ -278,7 +286,7 @@ describe('Qdrant restore drill', () => {
       drillAlias: 'qdrant_restore_drill_alias_20260711_nonce',
       evidenceDirectory: join(directory, 'evidence'),
       metricStatePath: join(directory, 'metrics-state.json'),
-      metricsPath: join(directory, 'metrics.prom'),
+      metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
       lockPath: join(directory, 'recovery.lock'),
       now: new Date('2026-07-11T12:00:00.000Z'),
       verifyRecovered,
@@ -307,14 +315,19 @@ describe('Qdrant restore drill', () => {
       stable_alias_after: 'course_embeddings_v7',
       cleanup: { alias: 'deleted', collection: 'deleted' },
     });
-    expect(await readFile(join(directory, 'metrics.prom'), 'utf8')).toContain(
+    const metricsPath = join(metricsDirectory, 'megacampus_qdrant_recovery.prom');
+    expect(await readFile(metricsPath, 'utf8')).toContain(
       'megacampus_qdrant_last_successful_restore_drill_unixtime_seconds 1783771200'
     );
+    expect((await stat(metricsPath)).mode & 0o777).toBe(0o644);
+    expect((await stat(join(directory, 'metrics-state.json'))).mode & 0o777).toBe(0o600);
+    expect((await stat(result.evidencePath)).mode & 0o777).toBe(0o600);
     await rm(directory, { recursive: true, force: true });
   });
 
   it('retains redacted failure and cleanup evidence while deleting only owned resources', async () => {
     const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-restore-failure-'));
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
     const collections = new Set(['course_embeddings_v7']);
     const client = {
       getAliases: vi.fn(() =>
@@ -345,7 +358,7 @@ describe('Qdrant restore drill', () => {
         drillAlias: 'qdrant_restore_drill_alias_owned',
         evidenceDirectory: join(directory, 'evidence'),
         metricStatePath: join(directory, 'metrics-state.json'),
-        metricsPath: join(directory, 'metrics.prom'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
         lockPath: join(directory, 'recovery.lock'),
         now: new Date('2026-07-11T12:00:00.000Z'),
         verifyRecovered: vi.fn(() => Promise.reject(new Error('verification failed secret-value'))),
@@ -360,9 +373,9 @@ describe('Qdrant restore drill', () => {
     expect(evidence).toContain('cleanup failed [REDACTED]');
     expect(evidence).toContain('verification failed [REDACTED]');
     expect(evidence).not.toContain('secret-value');
-    expect(await readFile(join(directory, 'metrics.prom'), 'utf8')).toContain(
-      'megacampus_qdrant_restore_drill_failures_total 1'
-    );
+    expect(
+      await readFile(join(metricsDirectory, 'megacampus_qdrant_recovery.prom'), 'utf8')
+    ).toContain('megacampus_qdrant_restore_drill_failures_total 1');
     await rm(directory, { recursive: true, force: true });
   });
 
@@ -370,6 +383,7 @@ describe('Qdrant restore drill', () => {
     'fails closed when %s returns false',
     async falseOperation => {
       const directory = await mkdtemp(join('/tmp', `mc2-qdrant-${falseOperation}-`));
+      const metricsDirectory = await createSharedMetricsDirectory(directory);
       const stableAlias = 'course_embeddings';
       const stablePhysical = 'course_embeddings_v7';
       const target = `qdrant_restore_drill_${falseOperation.replaceAll('-', '_')}`;
@@ -425,7 +439,7 @@ describe('Qdrant restore drill', () => {
           drillAlias,
           evidenceDirectory: join(directory, 'evidence'),
           metricStatePath: join(directory, 'metrics-state.json'),
-          metricsPath: join(directory, 'metrics.prom'),
+          metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
           lockPath: join(directory, 'recovery.lock'),
           verifyRecovered: vi.fn(() =>
             Promise.resolve({
@@ -454,15 +468,16 @@ describe('Qdrant restore drill', () => {
       expect(evidence.stable_alias_before).toBe(stablePhysical);
       expect(evidence.stable_alias_after).toBe(stablePhysical);
       expect(evidence.cleanup_failures.join(' ')).toMatch(/false|still exists/iu);
-      expect(await readFile(join(directory, 'metrics.prom'), 'utf8')).toContain(
-        'megacampus_qdrant_restore_drill_failures_total 1'
-      );
+      expect(
+        await readFile(join(metricsDirectory, 'megacampus_qdrant_recovery.prom'), 'utf8')
+      ).toContain('megacampus_qdrant_restore_drill_failures_total 1');
       await rm(directory, { recursive: true, force: true });
     }
   );
 
   it('fails when cleanup reports success but owned resources still exist', async () => {
     const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-cleanup-postcondition-'));
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
     const aliases = new Map([['course_embeddings', 'course_embeddings_v7']]);
     const collections = new Set(['course_embeddings_v7']);
     const target = 'qdrant_restore_drill_postcondition';
@@ -507,7 +522,7 @@ describe('Qdrant restore drill', () => {
         drillAlias,
         evidenceDirectory: join(directory, 'evidence'),
         metricStatePath: join(directory, 'metrics-state.json'),
-        metricsPath: join(directory, 'metrics.prom'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
         lockPath: join(directory, 'recovery.lock'),
         verifyRecovered: vi.fn(() =>
           Promise.resolve({
@@ -530,4 +545,49 @@ describe('Qdrant restore drill', () => {
     expect(aliases.get('course_embeddings')).toBe('course_embeddings_v7');
     await rm(directory, { recursive: true, force: true });
   });
+
+  it.each(['missing', 'wrong-mode'] as const)(
+    'fails before restore client mutation when the shared metrics directory is %s',
+    async directoryState => {
+      const directory = await mkdtemp(join('/tmp', `mc2-qdrant-restore-${directoryState}-`));
+      const metricsDirectory = join(directory, 'qdrant-metrics');
+      if (directoryState === 'wrong-mode') {
+        await mkdir(metricsDirectory, { mode: 0o700 });
+      }
+      const client = {
+        getAliases: vi.fn(),
+        getCollections: vi.fn(),
+        recoverSnapshot: vi.fn(),
+        updateCollectionAliases: vi.fn(),
+        deleteCollection: vi.fn(),
+      };
+
+      await expect(
+        runRestoreDrill({
+          client: client as never,
+          manifest: MANIFEST,
+          probe: PROBE,
+          apiKey: 'local-test-key',
+          transportBaseUrl: 'http://127.0.0.1:6333',
+          stableAlias: 'course_embeddings',
+          targetCollection: 'qdrant_restore_drill_shared_dir',
+          drillAlias: 'qdrant_restore_drill_alias_shared_dir',
+          evidenceDirectory: join(directory, 'evidence'),
+          metricStatePath: join(directory, 'metrics-state.json'),
+          metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
+          lockPath: join(directory, 'recovery.lock'),
+        })
+      ).rejects.toThrow(/shared metrics directory/iu);
+
+      expect(client.getAliases).not.toHaveBeenCalled();
+      expect(client.getCollections).not.toHaveBeenCalled();
+      expect(client.recoverSnapshot).not.toHaveBeenCalled();
+      if (directoryState === 'missing') {
+        await expect(stat(metricsDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
+      } else {
+        expect((await stat(metricsDirectory)).mode & 0o7777).toBe(0o700);
+      }
+      await rm(directory, { recursive: true, force: true });
+    }
+  );
 });
