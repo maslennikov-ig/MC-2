@@ -7,13 +7,11 @@
  */
 
 import {
-  AnswerSourceSchema,
   DocumentConflictSchema,
   DocumentEvidenceCardsSchema,
   DocumentEvidenceCoverageSummarySchema,
   DocumentEvidenceSourceManifestEntrySchema,
   DocumentEvidenceSourceManifestSchema,
-  type AnswerSource,
   type DocumentConflict,
   type DocumentEvidenceCard,
   type DocumentEvidenceCoverageSummary,
@@ -63,7 +61,6 @@ export interface DocumentEvidenceDatabaseClient {
       | 'commit_document_evidence_batch'
       | 'finalize_document_evidence_run'
       | 'upsert_document_evidence_conflict'
-      | 'append_document_evidence_decision'
       | 'commit_document_evidence_conflict_batch'
       | 'materialize_document_evidence_decision_gate_atomic'
       | 'answer_document_evidence_questions_atomic'
@@ -123,21 +120,6 @@ export interface UpsertEvidenceConflictInput {
   conflict: DocumentConflict;
   detectionModel: string;
   detectionVersion: string;
-}
-
-export interface AppendEvidenceDecisionInput {
-  runId: string;
-  conflictId: string;
-  selectedResolution: string;
-  resolvedBy: 'user' | 'system';
-  answerSource: AnswerSource;
-  rationale: string;
-  decidedAt: string;
-  clarifyingQuestionId?: string;
-  selectedRecommendationIndex?: number;
-  selectedRecommendationValue?: string;
-  selectedSideHandle?: string;
-  supersedesDecisionId?: string;
 }
 
 export interface EvidenceDecisionRow {
@@ -656,41 +638,6 @@ export class DocumentEvidenceRepository {
     });
     if (error) throwDatabaseError('upsert_conflict', error);
     return assertRecord(data, 'upsert_conflict');
-  }
-
-  async appendDecision(input: AppendEvidenceDecisionInput): Promise<Record<string, unknown>> {
-    const answerSource = AnswerSourceSchema.parse(input.answerSource);
-    if ((input.resolvedBy === 'system') !== (answerSource === 'system')) {
-      throw new DocumentEvidenceRepositoryError('append_decision:invalid_system_answer_source');
-    }
-    if (input.supersedesDecisionId && input.resolvedBy !== 'user') {
-      throw new DocumentEvidenceRepositoryError(
-        'append_decision:superseding_decision_must_be_user'
-      );
-    }
-    const decision = {
-      run_id: input.runId,
-      conflict_id: input.conflictId,
-      selected_resolution: input.selectedResolution,
-      resolved_by: input.resolvedBy,
-      answer_source: answerSource,
-      rationale: input.rationale,
-      decided_at: input.decidedAt,
-      ...(input.clarifyingQuestionId ? { clarifying_question_id: input.clarifyingQuestionId } : {}),
-      ...(input.selectedRecommendationIndex !== undefined
-        ? { selected_recommendation_index: input.selectedRecommendationIndex }
-        : {}),
-      ...(input.selectedRecommendationValue
-        ? { selected_recommendation_value: input.selectedRecommendationValue }
-        : {}),
-      ...(input.selectedSideHandle ? { selected_side_handle: input.selectedSideHandle } : {}),
-      ...(input.supersedesDecisionId ? { supersedes_decision_id: input.supersedesDecisionId } : {}),
-    };
-    const { data, error } = await this.client.rpc('append_document_evidence_decision', {
-      p_decision: decision,
-    });
-    if (error) throwDatabaseError('append_decision', error);
-    return assertRecord(data, 'append_decision');
   }
 
   async getLatestDecisions(runId: string): Promise<EvidenceDecisionRow[]> {

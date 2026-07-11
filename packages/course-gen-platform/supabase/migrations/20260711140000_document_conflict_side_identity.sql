@@ -139,6 +139,186 @@ END $$;
 ALTER TABLE public.document_evidence_conflicts
   ENABLE TRIGGER prevent_document_evidence_conflicts_mutation;
 
+-- Pending legacy questions have stable IDs and immutable payload identity in the
+-- E3 gate. Upgrade the complete question payload atomically when conflict roles
+-- are unambiguous; otherwise leave the old values intact and mark the question
+-- as explicitly blocked for operator remediation.
+DO $$
+DECLARE
+  v_question public.clarifying_questions%ROWTYPE;
+  v_conflict public.document_evidence_conflicts%ROWTYPE;
+  v_recommended_count INTEGER;
+  v_alternative_count INTEGER;
+  v_recommended_handle TEXT;
+  v_alternative_handles JSONB;
+  v_metadata_sides JSONB;
+  v_suggested_answers JSONB;
+  v_option RECORD;
+  v_option_value TEXT;
+  v_mapped_value TEXT;
+  v_alternative_index INTEGER;
+  v_mapped_count INTEGER;
+  v_recommended_flag_count INTEGER;
+  v_mapped_recommended_flag_count INTEGER;
+BEGIN
+  FOR v_question IN
+    SELECT questions.*
+    FROM public.clarifying_questions questions
+    WHERE questions.question_category = 'document_conflicts'
+      AND questions.metadata->>'subject_kind' = 'claim_conflict'
+      AND questions.status = 'pending'
+      AND questions.user_answer IS NULL
+      AND questions.answered_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.document_evidence_decisions decisions
+        WHERE decisions.clarifying_question_id = questions.id
+      )
+    ORDER BY questions.id
+  LOOP
+    SELECT * INTO v_conflict
+    FROM public.document_evidence_conflicts conflicts
+    WHERE conflicts.id::text = v_question.metadata->>'conflict_id'
+      AND conflicts.run_id::text = v_question.metadata->>'run_id';
+
+    IF NOT FOUND THEN
+      UPDATE public.clarifying_questions
+      SET metadata = metadata || jsonb_build_object(
+        'side_identity_migration', 'blocked_ambiguous',
+        'side_identity_migration_reason', 'conflict_scope_unavailable'
+      )
+      WHERE id = v_question.id;
+      CONTINUE;
+    END IF;
+
+    SELECT
+      count(*) FILTER (WHERE side->>'side_role' = 'recommended'),
+      count(*) FILTER (WHERE side->>'side_role' = 'alternative'),
+      min(side->>'side_handle') FILTER (WHERE side->>'side_role' = 'recommended'),
+      COALESCE(
+        jsonb_agg(
+          side->>'side_handle' ORDER BY NULLIF(side->>'alternative_index','')::integer
+        ) FILTER (WHERE side->>'side_role' = 'alternative'),
+        '[]'::jsonb
+      )
+    INTO v_recommended_count, v_alternative_count, v_recommended_handle,
+         v_alternative_handles
+    FROM jsonb_array_elements(v_conflict.sides) side;
+
+    IF v_recommended_count <> 1
+       OR v_alternative_count <> jsonb_array_length(v_conflict.alternatives)
+       OR EXISTS (
+         SELECT 1
+         FROM generate_series(0, jsonb_array_length(v_conflict.alternatives) - 1) expected(index)
+         WHERE NOT EXISTS (
+           SELECT 1 FROM jsonb_array_elements(v_conflict.sides) side
+           WHERE side->>'side_role' = 'alternative'
+             AND NULLIF(side->>'alternative_index','')::integer = expected.index
+         )
+       )
+       OR jsonb_typeof(v_question.metadata->'sides') IS DISTINCT FROM 'array'
+       OR jsonb_array_length(v_question.metadata->'sides') <>
+          LEAST(jsonb_array_length(v_conflict.sides), 8)
+       OR jsonb_typeof(v_question.suggested_answers) IS DISTINCT FROM 'array'
+       OR jsonb_array_length(v_question.suggested_answers) < 1 THEN
+      UPDATE public.clarifying_questions
+      SET metadata = metadata || jsonb_build_object(
+        'side_identity_migration', 'blocked_ambiguous',
+        'side_identity_migration_reason', 'conflict_role_projection_unavailable'
+      )
+      WHERE id = v_question.id;
+      CONTINUE;
+    END IF;
+
+    SELECT jsonb_agg(
+      entry.side || jsonb_build_object(
+        'side_handle',
+        (v_conflict.sides -> ((entry.ordinality - 1)::integer))->>'side_handle'
+      ) ORDER BY entry.ordinality
+    )
+    INTO v_metadata_sides
+    FROM jsonb_array_elements(v_question.metadata->'sides')
+      WITH ORDINALITY entry(side, ordinality);
+
+    v_suggested_answers := '[]'::jsonb;
+    v_mapped_count := 0;
+    v_recommended_flag_count := 0;
+    v_mapped_recommended_flag_count := 0;
+    FOR v_option IN
+      SELECT answer, ordinality
+      FROM jsonb_array_elements(v_question.suggested_answers)
+        WITH ORDINALITY options(answer, ordinality)
+      ORDER BY ordinality
+    LOOP
+      v_option_value := v_option.answer->>'value';
+      v_mapped_value := NULL;
+      IF v_option_value = 'recommendation:' || v_conflict.id::text
+         OR v_option_value = v_recommended_handle THEN
+        v_mapped_value := v_recommended_handle;
+      ELSIF jsonb_array_length(v_alternative_handles) > 0 THEN
+        FOR v_alternative_index IN 0..jsonb_array_length(v_alternative_handles) - 1 LOOP
+          IF v_option_value =
+               'alternative:' || v_conflict.id::text || ':' || v_alternative_index::text
+             OR v_option_value = v_alternative_handles->>v_alternative_index THEN
+            v_mapped_value := v_alternative_handles->>v_alternative_index;
+            EXIT;
+          END IF;
+        END LOOP;
+      END IF;
+      IF v_mapped_value IS NOT NULL THEN
+        v_mapped_count := v_mapped_count + 1;
+        v_suggested_answers := v_suggested_answers || jsonb_build_array(
+          jsonb_set(v_option.answer, '{value}', to_jsonb(v_mapped_value), true)
+        );
+      ELSE
+        v_suggested_answers := v_suggested_answers || jsonb_build_array(v_option.answer);
+      END IF;
+      IF COALESCE((v_option.answer->>'is_recommended')::boolean, false) THEN
+        v_recommended_flag_count := v_recommended_flag_count + 1;
+        IF v_mapped_value = v_recommended_handle THEN
+          v_mapped_recommended_flag_count := v_mapped_recommended_flag_count + 1;
+        END IF;
+      END IF;
+    END LOOP;
+
+    IF v_mapped_count <> jsonb_array_length(v_question.suggested_answers)
+       OR jsonb_array_length(v_question.suggested_answers) <>
+          1 + jsonb_array_length(v_alternative_handles)
+       OR (
+         SELECT count(DISTINCT answer->>'value')
+         FROM jsonb_array_elements(v_suggested_answers) answer
+       ) <> jsonb_array_length(v_suggested_answers)
+       OR v_recommended_flag_count <> 1
+       OR v_mapped_recommended_flag_count <> 1 THEN
+      UPDATE public.clarifying_questions
+      SET metadata = metadata || jsonb_build_object(
+        'side_identity_migration', 'blocked_ambiguous',
+        'side_identity_migration_reason', 'question_option_projection_unavailable'
+      )
+      WHERE id = v_question.id;
+      CONTINUE;
+    END IF;
+
+    UPDATE public.clarifying_questions
+    SET suggested_answers = v_suggested_answers,
+        metadata = jsonb_set(
+          (metadata - 'side_identity_migration' - 'side_identity_migration_reason') ||
+            jsonb_build_object(
+              'recommended_side_handle', v_recommended_handle,
+              'alternative_side_handles', v_alternative_handles
+            ),
+          '{sides}', v_metadata_sides, true
+        )
+    WHERE id = v_question.id
+      AND status = 'pending'
+      AND user_answer IS NULL
+      AND answered_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.document_evidence_decisions decisions
+        WHERE decisions.clarifying_question_id = v_question.id
+      );
+  END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.validate_document_evidence_conflict_side_identity()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
@@ -281,6 +461,12 @@ BEGIN
   END IF;
   v_subject_kind := v_question.metadata->>'subject_kind';
   v_subject_key := v_question.metadata->>'subject_key';
+  IF v_subject_kind = 'claim_conflict'
+     AND v_question.metadata->>'side_identity_migration' = 'blocked_ambiguous' THEN
+    RAISE EXCEPTION 'Legacy conflict question side identity migration is blocked: %',
+      COALESCE(v_question.metadata->>'side_identity_migration_reason', 'ambiguous_projection')
+      USING ERRCODE = '23514';
+  END IF;
   IF v_subject_kind = 'claim_conflict' THEN
     v_selected_side_handle := v_recommended_value;
     IF v_selected_side_handle !~ '^side:v1:[0-9a-f]{64}$'
@@ -399,6 +585,12 @@ BEGIN
       RAISE EXCEPTION 'Selected answer is outside the question options'
         USING ERRCODE = '23514';
     END IF;
+  END IF;
+  IF v_question.metadata->>'subject_kind' = 'claim_conflict'
+     AND v_question.metadata->>'side_identity_migration' = 'blocked_ambiguous' THEN
+    RAISE EXCEPTION 'Legacy conflict question side identity migration is blocked: %',
+      COALESCE(v_question.metadata->>'side_identity_migration_reason', 'ambiguous_projection')
+      USING ERRCODE = '23514';
   END IF;
   IF v_question.metadata->>'subject_kind' = 'claim_conflict'
      AND p_answer_source IN ('suggested','modified') THEN

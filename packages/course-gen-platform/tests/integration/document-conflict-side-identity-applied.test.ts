@@ -240,6 +240,77 @@ async function insertLegacyRecommendationDecision(
   );
 }
 
+function conflictQuestionInput(input: {
+  recommendation: string;
+  alternative: string;
+  sideHandles?: [string, string];
+}) {
+  const [recommendedHandle, alternativeHandle] = input.sideHandles ?? [];
+  return {
+    questionId: id.question,
+    questionText: 'Which retention rule should the course use?',
+    priority: 'important',
+    suggestedAnswers: [
+      {
+        value: alternativeHandle ?? `alternative:${id.conflict}:0`,
+        text: input.alternative,
+        rationale: 'Authority wins',
+        is_recommended: false,
+      },
+      {
+        value: recommendedHandle ?? `recommendation:${id.conflict}`,
+        text: input.recommendation,
+        rationale: 'Authority wins',
+        is_recommended: true,
+      },
+    ],
+    metadata: {
+      schema_version: 'document-conflict-question-v1',
+      subject_kind: 'claim_conflict',
+      subject_key: subjectKey(),
+      run_id: id.run,
+      conflict_id: id.conflict,
+      sides: [
+        {
+          ...(recommendedHandle ? { side_handle: recommendedHandle } : {}),
+          excerpt: input.recommendation,
+          source_refs: [],
+          source_ref_overflow_count: 0,
+        },
+        {
+          ...(alternativeHandle ? { side_handle: alternativeHandle } : {}),
+          excerpt: input.alternative,
+          source_refs: [],
+          source_ref_overflow_count: 0,
+        },
+      ],
+      recommendation: input.recommendation,
+      ...(recommendedHandle ? { recommended_side_handle: recommendedHandle } : {}),
+      recommendation_rationale: 'Authority wins',
+      alternatives: [input.alternative],
+      ...(alternativeHandle ? { alternative_side_handles: [alternativeHandle] } : {}),
+    },
+  };
+}
+
+async function insertLegacyConflictQuestion(recommendation: string, alternative: string) {
+  const question = conflictQuestionInput({ recommendation, alternative });
+  await admin.query(
+    `INSERT INTO clarifying_questions(
+       id,course_id,question_text,question_type,question_priority,question_category,
+       suggested_answers,iteration_round,status,order_index,metadata
+     ) VALUES ($1,$2,$3,'single_choice',$4,'document_conflicts',$5::jsonb,1,'pending',10000,$6::jsonb)`,
+    [
+      question.questionId,
+      id.course,
+      question.questionText,
+      question.priority,
+      JSON.stringify(question.suggestedAnswers),
+      JSON.stringify(question.metadata),
+    ]
+  );
+}
+
 function rawSides(withIdentity: boolean): unknown[] {
   const handles = [sideHandle(id.conflict, [id.claimA]), sideHandle(id.conflict, [id.claimB])];
   return [id.claimA, id.claimB].map((claimId, index) => ({
@@ -331,7 +402,12 @@ appliedDescribe('document conflict side identity applied PostgreSQL 15 matrix', 
       recommendation: `${common}30 days.`.slice(0, 600),
       alternatives: [`${common}indefinitely.`.slice(0, 600)],
     });
+    await insertLegacyConflictQuestion(
+      `${common}30 days.`.slice(0, 600),
+      `${common}indefinitely.`.slice(0, 600)
+    );
     await insertLegacyRecommendationDecision(`${common}30 days.`.slice(0, 600));
+    await admin.query(sideMigration);
     await admin.query(sideMigration);
     const ambiguous = (
       await admin.query(`SELECT sides FROM document_evidence_conflicts WHERE id=$1`, [id.conflict])
@@ -346,6 +422,139 @@ appliedDescribe('document conflict side identity applied PostgreSQL 15 matrix', 
         )
       ).rows[0].selected_side_handle
     ).toBeNull();
+    const blockedQuestion = (
+      await admin.query(`SELECT suggested_answers,metadata FROM clarifying_questions WHERE id=$1`, [
+        id.question,
+      ])
+    ).rows[0];
+    expect(blockedQuestion.metadata.side_identity_migration).toBe('blocked_ambiguous');
+    expect(blockedQuestion.suggested_answers.map((answer: { value: string }) => answer.value)).toEqual(
+      [`alternative:${id.conflict}:0`, `recommendation:${id.conflict}`]
+    );
+    await expect(
+      asRole('authenticated', () =>
+        admin.query(
+          `SELECT public.answer_document_evidence_questions_atomic($1,$2::jsonb) AS result`,
+          [
+            id.course,
+            JSON.stringify([
+              {
+                question_id: id.question,
+                answer: `${common}30 days.`.slice(0, 600),
+                answer_source: 'suggested',
+                selected_suggestion_index: 1,
+                idempotency_key: '90000000-0000-4000-8000-000000000020',
+                expected_current_decision_id: id.decision,
+              },
+            ]),
+          ]
+        )
+      )
+    ).rejects.toMatchObject({
+      code: '23514',
+      message: expect.stringMatching(/side identity migration is blocked/i),
+    });
+  });
+
+  it('atomically upgrades a pending legacy question and reuses its stable payload', async () => {
+    await resetBase();
+    await seedAcceptedRun(['Retain data 30 days.', 'Retain data indefinitely.']);
+    await insertConflict({
+      sides: rawSides(false),
+      recommendation: 'Retain data 30 days.',
+      alternatives: ['Retain data indefinitely.'],
+    });
+    await insertLegacyConflictQuestion('Retain data 30 days.', 'Retain data indefinitely.');
+    await admin.query(sideMigration);
+    await admin.query(sideMigration);
+
+    const handleA = sideHandle(id.conflict, [id.claimA]);
+    const handleB = sideHandle(id.conflict, [id.claimB]);
+    const question = (
+      await admin.query(`SELECT suggested_answers,metadata FROM clarifying_questions WHERE id=$1`, [
+        id.question,
+      ])
+    ).rows[0];
+    expect(question.suggested_answers.map((answer: { value: string }) => answer.value)).toEqual([
+      handleB,
+      handleA,
+    ]);
+    expect(question.metadata).toMatchObject({
+      recommended_side_handle: handleA,
+      alternative_side_handles: [handleB],
+      sides: [{ side_handle: handleA }, { side_handle: handleB }],
+    });
+
+    await expect(
+      asRole('service_role', () =>
+        admin.query(
+          `SELECT public.materialize_document_evidence_decision_gate_atomic(
+             $1,$2,$3,'manual',$4::jsonb,$5
+           ) AS result`,
+          [
+            id.run,
+            id.course,
+            id.org,
+            JSON.stringify([
+              conflictQuestionInput({
+                recommendation: 'Retain data 30 days.',
+                alternative: 'Retain data indefinitely.',
+                sideHandles: [handleA, handleB],
+              }),
+            ]),
+            '90000000-0000-4000-8000-000000000021',
+          ]
+        )
+      )
+    ).resolves.toBeDefined();
+    expect(
+      (await admin.query(`SELECT count(*) FROM clarifying_questions WHERE id=$1`, [id.question]))
+        .rows[0].count
+    ).toBe('1');
+  });
+
+  it('blocks pending legacy questions whose conflict scope or complete side projection is missing', async () => {
+    await resetBase();
+    await seedAcceptedRun(['Retain data 30 days.', 'Retain data indefinitely.']);
+    await insertLegacyConflictQuestion('Retain data 30 days.', 'Retain data indefinitely.');
+    await admin.query(sideMigration);
+    expect(
+      (
+        await admin.query(`SELECT metadata FROM clarifying_questions WHERE id=$1`, [id.question])
+      ).rows[0].metadata
+    ).toMatchObject({
+      side_identity_migration: 'blocked_ambiguous',
+      side_identity_migration_reason: 'conflict_scope_unavailable',
+    });
+
+    await resetBase();
+    await seedAcceptedRun(['Retain data 30 days.', 'Retain data indefinitely.']);
+    await insertConflict({
+      sides: rawSides(false),
+      recommendation: 'Retain data 30 days.',
+      alternatives: ['Retain data indefinitely.'],
+    });
+    await insertLegacyConflictQuestion('Retain data 30 days.', 'Retain data indefinitely.');
+    await admin.query(
+      `UPDATE clarifying_questions
+       SET metadata = jsonb_set(metadata, '{sides}', jsonb_build_array(metadata->'sides'->0))
+       WHERE id=$1`,
+      [id.question]
+    );
+    await admin.query(sideMigration);
+    const incomplete = (
+      await admin.query(`SELECT suggested_answers,metadata FROM clarifying_questions WHERE id=$1`, [
+        id.question,
+      ])
+    ).rows[0];
+    expect(incomplete.metadata).toMatchObject({
+      side_identity_migration: 'blocked_ambiguous',
+      side_identity_migration_reason: 'conflict_role_projection_unavailable',
+    });
+    expect(incomplete.suggested_answers.map((answer: { value: string }) => answer.value)).toEqual([
+      `alternative:${id.conflict}:0`,
+      `recommendation:${id.conflict}`,
+    ]);
   });
 
   it('persists exact system and modified side handles while custom remains null', async () => {
@@ -478,5 +687,96 @@ appliedDescribe('document conflict side identity applied PostgreSQL 15 matrix', 
         )
       ).rows[0].count
     ).toBe('1');
+  });
+
+  it('refuses rollback for a pending side-aware question without decisions', async () => {
+    await resetBase();
+    await seedAcceptedRun(['Retain data 30 days.', 'Retain data indefinitely.']);
+    await insertConflict({
+      sides: rawSides(false),
+      recommendation: 'Retain data 30 days.',
+      alternatives: ['Retain data indefinitely.'],
+    });
+    await insertLegacyConflictQuestion('Retain data 30 days.', 'Retain data indefinitely.');
+    await admin.query(sideMigration);
+    await expect(admin.query(sideRollback)).rejects.toThrow(/side-aware question/i);
+  });
+
+  it('refuses rollback when the only decision is custom-null on a side-aware question', async () => {
+    await resetBase();
+    await admin.query(sideMigration);
+    await seedAcceptedRun(['Retain data 30 days.', 'Retain data indefinitely.']);
+    await insertConflict({
+      sides: rawSides(true),
+      recommendation: 'Retain data 30 days.',
+      alternatives: ['Retain data indefinitely.'],
+    });
+    const handleA = sideHandle(id.conflict, [id.claimA]);
+    const handleB = sideHandle(id.conflict, [id.claimB]);
+    await asRole('service_role', () =>
+      admin.query(
+        `SELECT public.materialize_document_evidence_decision_gate_atomic(
+           $1,$2,$3,'manual',$4::jsonb,$5
+         )`,
+        [
+          id.run,
+          id.course,
+          id.org,
+          JSON.stringify([
+            conflictQuestionInput({
+              recommendation: 'Retain data 30 days.',
+              alternative: 'Retain data indefinitely.',
+              sideHandles: [handleA, handleB],
+            }),
+          ]),
+          '90000000-0000-4000-8000-000000000022',
+        ]
+      )
+    );
+    await asRole('authenticated', () =>
+      admin.query(`SELECT public.answer_document_evidence_questions_atomic($1,$2::jsonb)`, [
+        id.course,
+        JSON.stringify([
+          {
+            question_id: id.question,
+            answer: 'Use a new compromise',
+            answer_source: 'custom',
+            selected_suggestion_index: null,
+            idempotency_key: '90000000-0000-4000-8000-000000000023',
+            expected_current_decision_id: null,
+          },
+        ]),
+      ])
+    );
+    expect(
+      (
+        await admin.query(
+          `SELECT selected_side_handle FROM document_evidence_decisions WHERE conflict_id=$1`,
+          [id.conflict]
+        )
+      ).rows[0].selected_side_handle
+    ).toBeNull();
+    await expect(admin.query(sideRollback)).rejects.toThrow(/side-aware question/i);
+  });
+
+  it('refuses rollback for side handles anywhere in legacy question metadata or user answers', async () => {
+    const handle = sideHandle(id.conflict, [id.claimA]);
+    await resetBase();
+    await admin.query(sideMigration);
+    await admin.query(
+      `INSERT INTO clarifying_questions(
+         id,course_id,question_category,suggested_answers,status,user_answer,answered_at,metadata
+       ) VALUES ($1,$2,'document_conflicts','{}'::jsonb,'answered',$3::jsonb,now(),$4::jsonb)`,
+      [
+        id.question,
+        id.course,
+        JSON.stringify({ value: handle }),
+        JSON.stringify({
+          subject_kind: 'claim_conflict',
+          legacy_projection: { selected: handle },
+        }),
+      ]
+    );
+    await expect(admin.query(sideRollback)).rejects.toThrow(/side-aware question/i);
   });
 });

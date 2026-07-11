@@ -1,4 +1,4 @@
--- Refuse to erase durable side-aware audit decisions.
+-- Refuse to erase durable side-aware audit decisions or question payloads.
 DO $$ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.document_evidence_decisions
@@ -6,7 +6,21 @@ DO $$ BEGIN
   ) THEN
     RAISE EXCEPTION 'Cannot roll back durable conflict side identity with side-aware decisions';
   END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public.clarifying_questions questions
+    WHERE questions.question_category = 'document_conflicts'
+      AND questions.metadata->>'subject_kind' = 'claim_conflict'
+      AND to_jsonb(questions)::text ~ 'side:v1:[0-9a-f]{64}'
+  ) THEN
+    RAISE EXCEPTION 'Cannot roll back durable conflict side identity with a side-aware question payload';
+  END IF;
 END $$;
+
+UPDATE public.clarifying_questions
+SET metadata = metadata - 'side_identity_migration' - 'side_identity_migration_reason'
+WHERE question_category = 'document_conflicts'
+  AND metadata->>'side_identity_migration' = 'blocked_ambiguous';
 
 CREATE OR REPLACE FUNCTION public.resolve_document_evidence_question_atomic(
   p_course_id UUID,

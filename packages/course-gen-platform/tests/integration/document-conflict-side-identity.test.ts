@@ -10,6 +10,10 @@ const rollbackPath = resolve(
   process.cwd(),
   'supabase/migrations/rollback/20260711140000_document_conflict_side_identity_rollback.sql'
 );
+const repositoryPath = resolve(
+  process.cwd(),
+  'src/stages/stage4-analysis/evidence/repository.ts'
+);
 
 describe('document conflict durable side identity migration', () => {
   it('adds versioned side identity without rewriting the accepted E3 migration', () => {
@@ -49,5 +53,11 @@ describe('document conflict durable side identity migration', () => {
     expect(rollback).toMatch(
       /CREATE OR REPLACE FUNCTION public\.answer_document_evidence_question_atomic/is
     );
+  });
+
+  it('removes the unaudited legacy decision writer from the repository surface', () => {
+    const repository = readFileSync(repositoryPath, 'utf8');
+    expect(repository).not.toMatch(/appendDecision|AppendEvidenceDecisionInput/);
+    expect(repository).not.toMatch(/append_document_evidence_decision/);
   });
 });
