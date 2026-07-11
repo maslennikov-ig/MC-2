@@ -242,8 +242,13 @@ The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
   ordered by completion time plus run ID. Coverage ratio must use only that
   latest coverage snapshot. The aggregate publisher writes the established
   durable metric names only to `service="stage4",instance="aggregate"`, applies
-  only a higher revision, treats the same revision as idempotent, and ignores an
-  older revision. Replica files remove durable aggregate names and expose only
+  the lexicographic epoch `(databaseStart, generation, revision)`, treats the
+  same epoch as idempotent, and ignores an older epoch. `databaseStart` comes
+  from the database postmaster start time; `generation` changes when the
+  singleton is recreated. A newer database start or generation replaces all
+  durable aggregate series even at a lower revision, so rollback/PITR can catch
+  up on the next Stage 4 invocation without allowing delayed pre-restore state to
+  overwrite it. Replica files remove durable aggregate names and expose only
   distinct best-effort Stage 4 invocation/failure signals.
 - A failed or crashed fail-open sink is not exactly-once. The next Stage 4
   invocation reconciles the absolute singleton and catches up missed durable
@@ -269,46 +274,37 @@ The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 Database rollout is deliberately split. The partial unresolved-critical index
 uses live-write-safe `CREATE INDEX CONCURRENTLY` and its rollback uses
 `DROP INDEX CONCURRENTLY`; execute each statement in autocommit mode, never
-inside a transaction. Supabase CLI `2.106.0` runs ordinary migrations in an
-implicit transaction, so canonical `supabase migration up` must not apply the
-concurrent `20260711150000` file directly. Use only the fixed-purpose repo runner
-at
+inside a transaction. Final code SHA `036a642d` provides one fixed-purpose
+unified repo runner at
 `packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts`;
-it accepts no arbitrary SQL or migration path. Its apply path exact-checks the
-allowlisted SQL bytes, executes the statements in autocommit mode, verifies the
-live index definition/comment, and records the exact
-`(version, name, statements)` row for `20260711150000` in Supabase migration
-history. A repeat is a no-op only when both history and the live definition
-match; mismatches fail closed.
+it accepts no arbitrary SQL or migration path and uses one `SUPABASE_DB_URL` for
+both versions. Apply exact-checks both allowlisted files, installs
+`20260711150000` plus its exact history row statement-by-statement in autocommit
+mode, then installs `20260711151000` plus its exact history row in one
+transaction. Rollback reverses that order: transactional totals SQL/history
+first, then concurrent index SQL/history. Mismatched history or live definitions
+fail closed; exact repeats and bounded partial recovery are idempotent.
 
-The separate transactional `20260711151000` totals migration acquires
-write-conflicting locks on its canonical source tables, including the decision
-ledger, before it creates/seeds the singleton, installs the run/checkpoint,
-conflict, and decision triggers, and reconciles history. The nonblocking index
-proof does not apply to these locks.
+The transactional totals step acquires write-conflicting locks on its canonical
+source tables, including the decision ledger, before it creates/seeds the
+singleton, installs the run/checkpoint, conflict, and decision triggers, and
+reconciles history. The nonblocking index proof does not apply to these locks.
 
 Use this forward order:
 
 1. quiesce decision writers and answer submission;
 2. run
-   `SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-index:apply`;
-3. run canonical `pnpm supabase migration up`; it must see the exact `150000`
-   history row, skip that file, and apply transactional `151000`, including the
-   trigger installation and reconciliation;
-4. deploy the matching consumer code;
-5. resume answer submission and decision writers.
+   `TMPDIR=${TMPDIR:-/tmp} SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-observability:apply`;
+3. deploy the matching consumer code;
+4. resume answer submission and decision writers.
 
 Use this reverse order:
 
 1. quiesce decision writers and answer submission, then disable or rollback the
    consumer code;
-2. run the transactional `151000` totals rollback with its matching canonical
-   migration-history update;
-3. run
-   `SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-index:rollback`;
-   the fixed runner verifies exact history/live state, uses
-   `DROP INDEX CONCURRENTLY`, and deletes only the matching `150000` history row;
-4. resume answer submission and decision writers.
+2. run
+   `TMPDIR=${TMPDIR:-/tmp} SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-observability:rollback`;
+3. resume answer submission and decision writers.
 
 Plan a bounded expected insert/answer pause around the totals transaction and
 consumer cutover. The nonblocking index proof does not apply to the totals
@@ -317,12 +313,33 @@ decision inserts/answers until commit. Do not combine the concurrent index
 statements with that transaction. Local verification still does not authorize
 applying either migration or consumer change to staging or production.
 
-The fixed runner accepts loopback targets by default and rejects remote targets.
-Only a separately authorized future Q12 may append
-`-- --allow-remote --confirm 'APPLY REMOTE DOCUMENT EVIDENCE INDEX 20260711150000'`;
-rollback uses the exact confirmation
-`ROLL BACK REMOTE DOCUMENT EVIDENCE INDEX 20260711150000`. Neither remote form,
-nor any Q12 migration execution, was invoked while preparing this runbook.
+The unified runner accepts loopback targets by default and rejects remote
+targets. Only a separately authorized future Q12 may use a DSN with
+`sslmode=verify-full` and append
+`-- --allow-remote --confirm 'APPLY REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711150000 20260711151000'`.
+Rollback requires the exact confirmation
+`ROLL BACK REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711151000 20260711150000`.
+Neither remote form, nor any Q12 migration execution, was invoked while preparing
+this runbook.
+
+### Alerts and dashboard panels
+
+The document-evidence alert set is exactly:
+
+- `DocumentEvidenceRunFailed` — fires for either a durable failed run or a
+  best-effort invocation-only failure;
+- `DocumentEvidenceCoverageIncomplete`;
+- `DocumentEvidenceDegradedAutomaticDecisionsRepeated`;
+- `DocumentEvidenceCriticalConflictStale`.
+
+The dashboard evidence section contains exactly these six panels:
+
+- Evidence run status;
+- Evidence document coverage;
+- Evidence processing modes;
+- Evidence cost and duration;
+- Evidence conflicts and decisions;
+- Evidence Stage 5/6 retrieval.
 
 ## Rollout sequence
 

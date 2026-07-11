@@ -28,7 +28,7 @@ selected_docs:
   - docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md
   - accepted artifacts mc2-jz6y0.18 through mc2-jz6y0.23 plus mc2-jz6y0.9 and mc2-jz6y0.10
   - rollout control task mc2-jz6y0.24.1 production commit 0aad2c20 and delivery artifact commit b7359f32
-  - final mc2-jz6y0.24.5 independent-review findings and local planned-code contracts for kernel locking, the fixed migration runner, and durable absolute reconciliation
+  - final mc2-jz6y0.24.5 code SHA 036a642d and independent-review contract for kernel locking, unified migrations, runtime epochs, alerts/panels, and durable absolute reconciliation
   - Stage 4/5/6 READMEs, docs/operations/qdrant-self-hosted.md, and .codex/project-index.md
 selected_skills:
   - /home/me/code/mc2/.agents/skills/code-review/SKILL.md
@@ -54,7 +54,7 @@ depends_on_streams:
   - mc2-jz6y0.24.2 - owner rollout decision for cohort and promotion thresholds
   - mc2-jz6y0.24.3 - shadow conflict detection/persistence without decisions or downstream influence; integration dependency, not branch-local behavior
   - mc2-jz6y0.24.4 - targeted Stage 4/5/6 evidence-log privacy remediation; rollout blocker until GREEN and integrated
-  - mc2-jz6y0.24.5 - trigger-maintained absolute Stage 4 reconciliation, kernel flock/util-linux runtime, actual retrieval attempts, privacy-safe label allowlist, and fixed-runner ordered migrations; rollout guarantee only after code independent PASS and integration
+  - mc2-jz6y0.24.5 - final code SHA 036a642d: trigger-maintained absolute Stage 4 reconciliation, epoch-safe rollback/PITR catch-up, kernel flock/util-linux runtime, actual retrieval attempts, privacy-safe labels, unified ordered migrations, four alerts, and six panels; rollout guarantee only after code independent PASS and integration
 parallel_decision: parallel with the disjoint E7 observability stream; documentation is sequentially truth-reviewed because the cross-stage contract and rollout procedure share one durable narrative
 status: returned
 delivery_method: merge
@@ -64,7 +64,7 @@ cleanup_notes: Dedicated worktree remains for parent review and integration.
 risk_level: medium
 docs_impact: docs-only
 docs_reviewed: updated
-docs_review_notes: Durable Stage 4/5/6 and operator docs describe accepted evidence behavior, quiesce-first rollback choices, post-gate Stage 6 protections, strict telemetry/log privacy, and dependency-gated observability semantics including absolute reconciliation, kernel locking, fixed-runner migration ordering, and the complete metric-label allowlist; project index adds stable navigation only.
+docs_review_notes: Durable Stage 4/5/6 and operator docs describe accepted evidence behavior, quiesce-first rollback choices, post-gate Stage 6 protections, strict telemetry/log privacy, and dependency-gated observability semantics including absolute epoch reconciliation, kernel locking, unified migration ordering, the complete metric-label allowlist, four alerts, and six panels; project index adds stable navigation only.
 graph_reviewed: used
 graph_review_notes: Read and queried the integration worktree's parent Graphify report read-only at base 7b542c8d (50,252 nodes, 74,520 edges, zero model/API tokens). The report oriented the evidence design and Stage 5 enrichment community; accepted artifacts and focused current-source reads supplied exact runtime names. No graph files or hooks were changed; root owns the post-integration refresh.
 verification:
@@ -75,7 +75,9 @@ verification:
   - mc2-jz6y0.24.4 privacy gate/scope GREEN scan: passed
   - initial mc2-jz6y0.24.5 observability-docs invariant GREEN scan: passed, then superseded by final independent-review findings; this is not the remediation stream's independent PASS
   - final mc2-jz6y0.24.5 docs-review RED scan: failed on the obsolete owned-directory lock, incomplete migration ordering/lock impact, and incomplete metric-label privacy contract
-  - final mc2-jz6y0.24.5 aggregate/lock/migration/label docs-invariant GREEN scan: passed; this is not the remediation stream's code independent PASS
+  - pre-unification mc2-jz6y0.24.5 aggregate/lock/migration/label docs-invariant GREEN scan: passed, then superseded by final code SHA 036a642d; this is not the remediation stream's code independent PASS
+  - final 036a642d unified-contract docs RED scan: failed on obsolete index-only commands and missing runtime epoch, four-alert, and six-panel contracts
+  - final 036a642d unified-runner/epoch/alerts/panels docs-invariant GREEN scan: passed; this is not the remediation stream's code independent PASS
   - combined reviewed-docs invariant GREEN scan: passed
   - git cat-file integration-order gate for both rollout paths at 0aad2c20: passed; rollout task must merge before docs
   - /home/me/code/mc2/node_modules/.bin/prettier --check over all six changed Markdown files: passed
@@ -97,7 +99,7 @@ explicit_defers:
   - Owner rollout decisions remain unresolved for Stage 5 cohort size/definition, cost, latency, false-conflict, degradation, enrichment quality, observation windows, and rollback ownership; no numeric threshold is claimed.
   - mc2-jz6y0.24.3 must integrate before docs may claim shadow conflict comparison; it detects/persists conflicts without questions, decisions, or downstream influence.
   - mc2-jz6y0.24.4 must be GREEN and integrated before the evidence-log privacy guarantee is considered true or rollout may proceed. Its targeted scope is Stage 4 decision/detector completion, Stage 5 advisory/fail-open/completion, and Stage 6 evidence-exclusion logs; unrelated legacy/general logs are excluded without weakening the boundary.
-  - mc2-jz6y0.24.5 is not yet accepted or integrated. Observability remains a rollout blocker until code independent PASS and integration establish trigger-maintained absolute Stage 4 aggregates with monotonic reconciliation revision and explicit fail-open staleness, Linux kernel flock across read/apply/temp/atomic rename with util-linux in the runtime, actual Stage 5 retrieval attempts, the complete privacy-safe metric label allowlist, and fixed-runner forward/reverse migration order with write-conflicting source-table locks plus bounded insert/answer pause. No remote runner or Q12 migration command was executed by this docs stream.
+  - mc2-jz6y0.24.5 final code SHA 036a642d is not yet independently accepted or integrated. Observability remains a rollout blocker until code independent PASS and integration establish trigger-maintained absolute Stage 4 aggregates ordered by (database start, generation, revision) with explicit fail-open staleness and rollback/PITR catch-up, Linux kernel flock across read/apply/temp/atomic rename with util-linux in the runtime, actual Stage 5 retrieval attempts, the complete privacy-safe metric label allowlist, unified forward/reverse migration ordering with write-conflicting source-table locks plus bounded insert/answer pause, exactly four alerts, and exactly six panels. No remote runner or Q12 migration command was executed by this docs stream.
   - Q12 deployment, live reindex, secret/service changes, staging activation, and every production mutation remain authorization-gated.
 ---
 
