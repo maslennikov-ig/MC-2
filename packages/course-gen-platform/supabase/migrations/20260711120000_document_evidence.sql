@@ -10,7 +10,7 @@ CREATE TABLE public.document_evidence_runs (
   evidence_version TEXT NOT NULL CHECK (btrim(evidence_version) <> ''),
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'processing', 'accepted', 'failed')),
-  source_document_ids UUID[] NOT NULL,
+  source_manifest JSONB NOT NULL CHECK (jsonb_typeof(source_manifest) = 'array'),
   source_count INTEGER NOT NULL DEFAULT 0 CHECK (source_count >= 0),
   assessed_count INTEGER NOT NULL DEFAULT 0 CHECK (assessed_count >= 0),
   degraded_count INTEGER NOT NULL DEFAULT 0 CHECK (degraded_count >= 0),
@@ -30,8 +30,7 @@ CREATE TABLE public.document_evidence_runs (
   CONSTRAINT document_evidence_runs_identity_unique
     UNIQUE (course_id, input_fingerprint, evidence_version),
   CONSTRAINT document_evidence_runs_source_set_count CHECK (
-    source_count = cardinality(source_document_ids)
-    AND array_position(source_document_ids, NULL) IS NULL
+    source_count = jsonb_array_length(source_manifest)
   ),
   CONSTRAINT document_evidence_runs_coverage_bounds CHECK (
     assessed_count + degraded_count + failed_count <= source_count
@@ -133,6 +132,9 @@ CREATE TABLE public.document_evidence_decisions (
     CHECK (supersedes_decision_id IS NULL OR supersedes_decision_id <> id),
   CONSTRAINT document_evidence_decisions_system_source CHECK (
     (resolved_by = 'system') = (answer_source = 'system')
+  ),
+  CONSTRAINT document_evidence_decisions_user_override CHECK (
+    supersedes_decision_id IS NULL OR resolved_by = 'user'
   )
 );
 
@@ -170,41 +172,87 @@ CREATE TRIGGER set_document_evidence_items_updated_at
   BEFORE UPDATE ON public.document_evidence_items
   FOR EACH ROW EXECUTE FUNCTION public.set_document_evidence_updated_at();
 
-CREATE OR REPLACE FUNCTION public.enforce_document_evidence_run_source_set()
+CREATE OR REPLACE FUNCTION public.normalize_document_evidence_source_manifest(p_manifest JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_normalized JSONB;
+  v_input_count INTEGER;
+  v_distinct_count INTEGER;
+BEGIN
+  IF jsonb_typeof(p_manifest) IS DISTINCT FROM 'array'
+     OR jsonb_array_length(p_manifest) = 0 THEN
+    RAISE EXCEPTION 'Evidence source manifest must be a non-empty JSON array'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(p_manifest) source
+    WHERE jsonb_typeof(source) IS DISTINCT FROM 'object'
+      OR NOT (source ? 'document_id' AND source ? 'source_version_hash' AND source ? 'document_name')
+      OR NULLIF(btrim(source->>'source_version_hash'), '') IS NULL
+      OR NULLIF(btrim(source->>'document_name'), '') IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Evidence source manifest entries are invalid' USING ERRCODE = '23514';
+  END IF;
+
+  BEGIN
+    SELECT count(*), count(DISTINCT (source->>'document_id')::UUID)
+      INTO v_input_count, v_distinct_count
+    FROM jsonb_array_elements(p_manifest) source;
+  EXCEPTION WHEN invalid_text_representation THEN
+    RAISE EXCEPTION 'Evidence source manifest document_id must be UUID'
+      USING ERRCODE = '23514';
+  END;
+
+  IF v_input_count <> v_distinct_count THEN
+    RAISE EXCEPTION 'Evidence source manifest document_id values must be unique'
+      USING ERRCODE = '23514';
+  END IF;
+
+  SELECT jsonb_agg(
+    jsonb_build_object(
+      'document_id', (source->>'document_id')::UUID,
+      'source_version_hash', source->>'source_version_hash',
+      'document_name', source->>'document_name'
+    ) ORDER BY (source->>'document_id')::UUID
+  ) INTO v_normalized
+  FROM jsonb_array_elements(p_manifest) source;
+
+  RETURN v_normalized;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.enforce_document_evidence_run_source_manifest()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = public
 AS $$
 DECLARE
-  v_normalized_source_ids UUID[];
+  v_normalized JSONB;
 BEGIN
   IF TG_OP = 'UPDATE'
      AND (
-       NEW.source_document_ids IS DISTINCT FROM OLD.source_document_ids
+       NEW.source_manifest IS DISTINCT FROM OLD.source_manifest
        OR NEW.source_count IS DISTINCT FROM OLD.source_count
      ) THEN
-    RAISE EXCEPTION 'Evidence run source document set is immutable' USING ERRCODE = '55000';
+    RAISE EXCEPTION 'Evidence run source manifest is immutable' USING ERRCODE = '55000';
   END IF;
 
-  SELECT COALESCE(array_agg(source_id ORDER BY source_id), '{}'::uuid[])
-    INTO v_normalized_source_ids
-  FROM (
-    SELECT DISTINCT unnest(NEW.source_document_ids) AS source_id
-  ) normalized;
-
-  IF cardinality(v_normalized_source_ids) = 0 THEN
-    RAISE EXCEPTION 'Evidence run source document set cannot be empty' USING ERRCODE = '23514';
-  END IF;
-
-  NEW.source_document_ids := v_normalized_source_ids;
-  NEW.source_count := cardinality(v_normalized_source_ids);
+  v_normalized := public.normalize_document_evidence_source_manifest(NEW.source_manifest);
+  NEW.source_manifest := v_normalized;
+  NEW.source_count := jsonb_array_length(v_normalized);
   RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER enforce_document_evidence_run_source_set
+CREATE TRIGGER enforce_document_evidence_run_source_manifest
   BEFORE INSERT OR UPDATE ON public.document_evidence_runs
-  FOR EACH ROW EXECUTE FUNCTION public.enforce_document_evidence_run_source_set();
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_document_evidence_run_source_manifest();
 
 CREATE OR REPLACE FUNCTION public.validate_document_evidence_run_tenant()
 RETURNS trigger
@@ -228,6 +276,72 @@ CREATE TRIGGER validate_document_evidence_run_tenant
   BEFORE INSERT OR UPDATE ON public.document_evidence_runs
   FOR EACH ROW EXECUTE FUNCTION public.validate_document_evidence_run_tenant();
 
+CREATE OR REPLACE FUNCTION public.prevent_document_evidence_terminal_run_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND pg_trigger_depth() > 1 THEN
+    RETURN OLD;
+  END IF;
+  IF OLD.status IN ('accepted', 'failed') THEN
+    RAISE EXCEPTION 'Terminal evidence runs are immutable' USING ERRCODE = '55000';
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$;
+
+CREATE TRIGGER prevent_document_evidence_terminal_run_mutation
+  BEFORE UPDATE OR DELETE ON public.document_evidence_runs
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_document_evidence_terminal_run_mutation();
+
+CREATE OR REPLACE FUNCTION public.verify_document_evidence_terminal_coverage()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_source_document_ids UUID[];
+  v_item_document_ids UUID[];
+  v_assessed_count INTEGER;
+  v_degraded_count INTEGER;
+  v_failed_count INTEGER;
+BEGIN
+  IF NEW.status NOT IN ('accepted', 'failed')
+     OR OLD.status IN ('accepted', 'failed') THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT COALESCE(array_agg((source->>'document_id')::UUID ORDER BY (source->>'document_id')::UUID), '{}'::UUID[])
+    INTO v_source_document_ids
+  FROM jsonb_array_elements(NEW.source_manifest) source;
+
+  SELECT
+    COALESCE(array_agg(document_id ORDER BY document_id), '{}'::UUID[]),
+    count(*) FILTER (WHERE coverage_status = 'assessed'),
+    count(*) FILTER (WHERE coverage_status = 'degraded'),
+    count(*) FILTER (WHERE coverage_status = 'failed')
+  INTO v_item_document_ids, v_assessed_count, v_degraded_count, v_failed_count
+  FROM public.document_evidence_items
+  WHERE run_id = NEW.id;
+
+  IF v_item_document_ids IS DISTINCT FROM v_source_document_ids
+     OR NEW.source_count <> cardinality(v_item_document_ids)
+     OR NEW.assessed_count <> v_assessed_count
+     OR NEW.degraded_count <> v_degraded_count
+     OR NEW.failed_count <> v_failed_count THEN
+    RAISE EXCEPTION 'Terminal evidence run requires exact durable coverage'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER verify_document_evidence_terminal_coverage
+  BEFORE UPDATE ON public.document_evidence_runs
+  FOR EACH ROW EXECUTE FUNCTION public.verify_document_evidence_terminal_coverage();
+
 CREATE OR REPLACE FUNCTION public.validate_document_evidence_item_scope()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -237,12 +351,16 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM public.document_evidence_runs runs
-    JOIN public.file_catalog files ON files.id = NEW.document_id
     WHERE runs.id = NEW.run_id
       AND runs.course_id = NEW.course_id
       AND runs.organization_id = NEW.organization_id
-      AND files.course_id = NEW.course_id
-      AND files.organization_id = NEW.organization_id
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(runs.source_manifest) source
+        WHERE (source->>'document_id')::UUID = NEW.document_id
+          AND source->>'source_version_hash' = NEW.source_version_hash
+          AND source->>'document_name' = NEW.document_name
+      )
   ) THEN
     RAISE EXCEPTION 'Document evidence item scope mismatch' USING ERRCODE = '23514';
   END IF;
@@ -253,6 +371,31 @@ $$;
 CREATE TRIGGER validate_document_evidence_item_scope
   BEFORE INSERT OR UPDATE ON public.document_evidence_items
   FOR EACH ROW EXECUTE FUNCTION public.validate_document_evidence_item_scope();
+
+CREATE OR REPLACE FUNCTION public.prevent_document_evidence_terminal_item_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_run_status TEXT;
+BEGIN
+  IF TG_OP = 'DELETE' AND pg_trigger_depth() > 1 THEN
+    RETURN OLD;
+  END IF;
+  SELECT status INTO v_run_status
+  FROM public.document_evidence_runs
+  WHERE id = COALESCE(NEW.run_id, OLD.run_id);
+  IF v_run_status IN ('accepted', 'failed') THEN
+    RAISE EXCEPTION 'Terminal evidence items are immutable' USING ERRCODE = '55000';
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$;
+
+CREATE TRIGGER prevent_document_evidence_terminal_item_mutation
+  BEFORE INSERT OR UPDATE OR DELETE ON public.document_evidence_items
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_document_evidence_terminal_item_mutation();
 
 CREATE OR REPLACE FUNCTION public.validate_document_evidence_conflict_scope()
 RETURNS trigger
@@ -344,6 +487,70 @@ CREATE TRIGGER prevent_document_evidence_decisions_mutation
   BEFORE UPDATE OR DELETE ON public.document_evidence_decisions
   FOR EACH ROW EXECUTE FUNCTION public.reject_document_evidence_mutation();
 
+CREATE OR REPLACE FUNCTION public.create_or_reuse_document_evidence_run(
+  p_course_id UUID,
+  p_organization_id UUID,
+  p_input_fingerprint TEXT,
+  p_evidence_version TEXT,
+  p_source_manifest JSONB
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_manifest JSONB;
+  v_run public.document_evidence_runs%ROWTYPE;
+  v_reused BOOLEAN;
+BEGIN
+  IF NULLIF(btrim(p_input_fingerprint), '') IS NULL
+     OR NULLIF(btrim(p_evidence_version), '') IS NULL THEN
+    RAISE EXCEPTION 'Evidence run identity is invalid' USING ERRCODE = '23514';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.courses
+    WHERE courses.id = p_course_id
+      AND courses.organization_id = p_organization_id
+  ) THEN
+    RAISE EXCEPTION 'Evidence run tenant does not match course' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
+     AND p_organization_id IS DISTINCT FROM
+       NULLIF((SELECT auth.jwt())->>'organization_id', '')::UUID THEN
+    RAISE EXCEPTION 'Evidence run access denied' USING ERRCODE = '42501';
+  END IF;
+
+  v_manifest := public.normalize_document_evidence_source_manifest(p_source_manifest);
+  INSERT INTO public.document_evidence_runs (
+    course_id, organization_id, input_fingerprint, evidence_version, status, source_manifest
+  ) VALUES (
+    p_course_id, p_organization_id, p_input_fingerprint, p_evidence_version, 'processing', v_manifest
+  )
+  ON CONFLICT (course_id, input_fingerprint, evidence_version) DO NOTHING
+  RETURNING * INTO v_run;
+  v_reused := NOT FOUND;
+
+  IF v_reused THEN
+    SELECT * INTO v_run
+    FROM public.document_evidence_runs
+    WHERE course_id = p_course_id
+      AND organization_id = p_organization_id
+      AND input_fingerprint = p_input_fingerprint
+      AND evidence_version = p_evidence_version
+    FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Evidence run identity belongs to another tenant'
+        USING ERRCODE = '23514';
+    END IF;
+    IF v_run.source_manifest IS DISTINCT FROM v_manifest THEN
+      RAISE EXCEPTION 'Evidence run source manifest mismatch' USING ERRCODE = '23514';
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object('run', to_jsonb(v_run), 'reused', v_reused);
+END;
+$$;
+
 -- Atomic replacement/checkpoint of the complete coverage ledger. PostgreSQL
 -- functions execute in the caller transaction, so item rows and run counts
 -- cannot diverge.
@@ -358,6 +565,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+  v_source_manifest JSONB;
   v_source_document_ids UUID[];
   v_item_document_ids UUID[];
   v_source_count INTEGER;
@@ -370,8 +578,8 @@ BEGIN
     RAISE EXCEPTION 'Evidence items must be a JSON array' USING ERRCODE = '22023';
   END IF;
 
-  SELECT runs.source_document_ids, runs.source_count
-    INTO v_source_document_ids, v_source_count
+  SELECT runs.source_manifest, runs.source_count
+    INTO v_source_manifest, v_source_count
   FROM public.document_evidence_runs runs
   WHERE runs.id = p_run_id
     AND runs.course_id = p_course_id
@@ -382,7 +590,14 @@ BEGIN
     RAISE EXCEPTION 'Evidence run scope mismatch' USING ERRCODE = '23514';
   END IF;
 
-  IF (SELECT auth.role()) <> 'service_role'
+  IF EXISTS (
+    SELECT 1 FROM public.document_evidence_runs
+    WHERE id = p_run_id AND status IN ('accepted', 'failed')
+  ) THEN
+    RAISE EXCEPTION 'Terminal evidence run cannot replace items' USING ERRCODE = '55000';
+  END IF;
+
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
      AND NOT EXISTS (
        SELECT 1 FROM public.courses
        WHERE courses.id = p_course_id
@@ -390,6 +605,12 @@ BEGIN
      ) THEN
     RAISE EXCEPTION 'Evidence run access denied' USING ERRCODE = '42501';
   END IF;
+
+  SELECT COALESCE(
+    array_agg((source->>'document_id')::UUID ORDER BY (source->>'document_id')::UUID),
+    '{}'::UUID[]
+  ) INTO v_source_document_ids
+  FROM jsonb_array_elements(v_source_manifest) source;
 
   SELECT count(*) INTO v_item_count
   FROM jsonb_array_elements(p_items) item;
@@ -420,8 +641,8 @@ BEGIN
     p_course_id,
     p_organization_id,
     (item->>'document_id')::uuid,
-    files.hash,
-    item->>'document_name',
+    source->>'source_version_hash',
+    source->>'document_name',
     item->>'priority',
     item->>'authority_scope',
     (item->>'content_quality')::double precision,
@@ -438,10 +659,8 @@ BEGIN
     (item->'token_counts'->>'summary')::integer,
     (item->'token_counts'->>'allocated')::integer
   FROM jsonb_array_elements(p_items) item
-  JOIN public.file_catalog files
-    ON files.id = (item->>'document_id')::uuid
-   AND files.course_id = p_course_id
-   AND files.organization_id = p_organization_id;
+  JOIN jsonb_array_elements(v_source_manifest) source
+    ON (source->>'document_id')::UUID = (item->>'document_id')::UUID;
 
   IF (SELECT count(*) FROM public.document_evidence_items WHERE run_id = p_run_id)
      <> v_source_count THEN
@@ -471,6 +690,181 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.finalize_document_evidence_run(
+  p_run_id UUID,
+  p_course_id UUID,
+  p_organization_id UUID,
+  p_status TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_run public.document_evidence_runs%ROWTYPE;
+BEGIN
+  IF p_status NOT IN ('accepted', 'failed') THEN
+    RAISE EXCEPTION 'Evidence terminal status must be accepted or failed'
+      USING ERRCODE = '23514';
+  END IF;
+  SELECT * INTO v_run
+  FROM public.document_evidence_runs
+  WHERE id = p_run_id
+    AND course_id = p_course_id
+    AND organization_id = p_organization_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Evidence run scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
+     AND p_organization_id IS DISTINCT FROM
+       NULLIF((SELECT auth.jwt())->>'organization_id', '')::UUID THEN
+    RAISE EXCEPTION 'Evidence run access denied' USING ERRCODE = '42501';
+  END IF;
+  IF v_run.status IN ('accepted', 'failed') THEN
+    IF v_run.status IS DISTINCT FROM p_status THEN
+      RAISE EXCEPTION 'Evidence run already has a different terminal status'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN to_jsonb(v_run);
+  END IF;
+
+  UPDATE public.document_evidence_runs
+  SET status = p_status,
+      completed_at = now()
+  WHERE id = p_run_id
+  RETURNING * INTO v_run;
+  RETURN to_jsonb(v_run);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.upsert_document_evidence_conflict(
+  p_run_id UUID,
+  p_course_id UUID,
+  p_organization_id UUID,
+  p_conflict JSONB,
+  p_detection_model TEXT,
+  p_detection_version TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_conflict public.document_evidence_conflicts%ROWTYPE;
+  v_claim_ids JSONB;
+  v_source_refs JSONB;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.document_evidence_runs
+    WHERE id = p_run_id
+      AND course_id = p_course_id
+      AND organization_id = p_organization_id
+  ) THEN
+    RAISE EXCEPTION 'Evidence conflict scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
+     AND p_organization_id IS DISTINCT FROM
+       NULLIF((SELECT auth.jwt())->>'organization_id', '')::UUID THEN
+    RAISE EXCEPTION 'Evidence conflict access denied' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(DISTINCT claim_id), '[]'::JSONB)
+    INTO v_claim_ids
+  FROM jsonb_array_elements(COALESCE(p_conflict->'sides', '[]'::JSONB)) side
+  CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(side->'claim_ids', '[]'::JSONB)) claim_id;
+
+  SELECT COALESCE(jsonb_agg(DISTINCT source_ref), '[]'::JSONB)
+    INTO v_source_refs
+  FROM jsonb_array_elements(COALESCE(p_conflict->'sides', '[]'::JSONB)) side
+  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(side->'source_refs', '[]'::JSONB)) source_ref;
+
+  INSERT INTO public.document_evidence_conflicts (
+    id, run_id, course_id, organization_id, conflict_fingerprint, topic, severity,
+    sides, claim_ids, source_refs, course_impact, recommended_resolution,
+    recommendation_rationale, alternatives, detection_model, detection_version
+  ) VALUES (
+    (p_conflict->>'conflict_id')::UUID,
+    p_run_id,
+    p_course_id,
+    p_organization_id,
+    p_conflict->>'conflict_fingerprint',
+    p_conflict->>'topic',
+    p_conflict->>'severity',
+    p_conflict->'sides',
+    v_claim_ids,
+    v_source_refs,
+    p_conflict->>'course_impact',
+    p_conflict->>'recommended_resolution',
+    p_conflict->>'recommendation_rationale',
+    p_conflict->'alternatives',
+    p_detection_model,
+    p_detection_version
+  )
+  ON CONFLICT (run_id, conflict_fingerprint) DO NOTHING
+  RETURNING * INTO v_conflict;
+
+  IF NOT FOUND THEN
+    SELECT * INTO v_conflict
+    FROM public.document_evidence_conflicts
+    WHERE run_id = p_run_id
+      AND conflict_fingerprint = p_conflict->>'conflict_fingerprint';
+  END IF;
+  RETURN to_jsonb(v_conflict);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.append_document_evidence_decision(p_decision JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_course_id UUID;
+  v_organization_id UUID;
+  v_decision public.document_evidence_decisions%ROWTYPE;
+BEGIN
+  SELECT conflicts.course_id, conflicts.organization_id
+    INTO v_course_id, v_organization_id
+  FROM public.document_evidence_conflicts conflicts
+  WHERE conflicts.id = (p_decision->>'conflict_id')::UUID
+    AND conflicts.run_id = (p_decision->>'run_id')::UUID;
+  IF v_course_id IS NULL THEN
+    RAISE EXCEPTION 'Decision conflict does not belong to run' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
+     AND v_organization_id IS DISTINCT FROM
+       NULLIF((SELECT auth.jwt())->>'organization_id', '')::UUID THEN
+    RAISE EXCEPTION 'Evidence decision access denied' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.document_evidence_decisions (
+    id, run_id, conflict_id, course_id, organization_id, clarifying_question_id,
+    selected_resolution, rationale, resolved_by, answer_source,
+    selected_recommendation_index, selected_recommendation_value,
+    supersedes_decision_id, decided_at
+  ) VALUES (
+    COALESCE(NULLIF(p_decision->>'decision_id', '')::UUID, gen_random_uuid()),
+    (p_decision->>'run_id')::UUID,
+    (p_decision->>'conflict_id')::UUID,
+    v_course_id,
+    v_organization_id,
+    NULLIF(p_decision->>'clarifying_question_id', '')::UUID,
+    p_decision->>'selected_resolution',
+    p_decision->>'rationale',
+    p_decision->>'resolved_by',
+    p_decision->>'answer_source',
+    NULLIF(p_decision->>'selected_recommendation_index', '')::INTEGER,
+    NULLIF(p_decision->>'selected_recommendation_value', ''),
+    NULLIF(p_decision->>'supersedes_decision_id', '')::UUID,
+    COALESCE(NULLIF(p_decision->>'decided_at', '')::TIMESTAMPTZ, now())
+  )
+  RETURNING * INTO v_decision;
+  RETURN to_jsonb(v_decision);
+END;
+$$;
+
 -- Keep automatic clarifying answers distinguishable from user selections.
 CREATE OR REPLACE FUNCTION public.auto_answer_questions_atomic(p_course_id UUID)
 RETURNS JSONB
@@ -487,7 +881,7 @@ DECLARE
   v_user_answer JSONB;
   v_answered_at TIMESTAMPTZ := now();
 BEGIN
-  IF (SELECT auth.role()) <> 'service_role'
+  IF (SELECT auth.role()) IS DISTINCT FROM 'service_role'
      AND NOT EXISTS (
        SELECT 1 FROM public.courses
        WHERE courses.id = p_course_id
@@ -558,69 +952,49 @@ CREATE POLICY runs_tenant_select ON public.document_evidence_runs
       WHERE courses.id = document_evidence_runs.course_id
         AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
   );
-CREATE POLICY runs_tenant_insert ON public.document_evidence_runs
-  FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.courses
-      WHERE courses.id = document_evidence_runs.course_id
-        AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid
-        AND document_evidence_runs.organization_id = courses.organization_id)
-  );
-CREATE POLICY runs_tenant_update ON public.document_evidence_runs
-  FOR UPDATE TO authenticated
-  USING (organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
-  WITH CHECK (organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid);
-
 CREATE POLICY items_tenant_select ON public.document_evidence_items
   FOR SELECT TO authenticated USING (
     EXISTS (SELECT 1 FROM public.courses
       WHERE courses.id = document_evidence_items.course_id
         AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
   );
-CREATE POLICY items_tenant_insert ON public.document_evidence_items
-  FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.courses
-      WHERE courses.id = document_evidence_items.course_id
-        AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid
-        AND document_evidence_items.organization_id = courses.organization_id)
-  );
-CREATE POLICY items_tenant_update ON public.document_evidence_items
-  FOR UPDATE TO authenticated
-  USING (organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
-  WITH CHECK (organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid);
-
 CREATE POLICY conflicts_tenant_select ON public.document_evidence_conflicts
   FOR SELECT TO authenticated USING (
     EXISTS (SELECT 1 FROM public.courses
       WHERE courses.id = document_evidence_conflicts.course_id
         AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
   );
-CREATE POLICY conflicts_tenant_insert ON public.document_evidence_conflicts
-  FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.courses
-      WHERE courses.id = document_evidence_conflicts.course_id
-        AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid
-        AND document_evidence_conflicts.organization_id = courses.organization_id)
-  );
-
 CREATE POLICY decisions_tenant_select ON public.document_evidence_decisions
   FOR SELECT TO authenticated USING (
     EXISTS (SELECT 1 FROM public.courses
       WHERE courses.id = document_evidence_decisions.course_id
         AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid)
   );
-CREATE POLICY decisions_tenant_insert ON public.document_evidence_decisions
-  FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.courses
-      WHERE courses.id = document_evidence_decisions.course_id
-        AND courses.organization_id = ((SELECT auth.jwt())->>'organization_id')::uuid
-        AND document_evidence_decisions.organization_id = courses.organization_id)
-  );
+GRANT SELECT ON public.document_evidence_runs TO authenticated;
+GRANT SELECT ON public.document_evidence_items TO authenticated;
+GRANT SELECT ON public.document_evidence_conflicts TO authenticated;
+GRANT SELECT ON public.document_evidence_decisions TO authenticated;
 
-GRANT SELECT, INSERT, UPDATE ON public.document_evidence_runs TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.document_evidence_items TO authenticated;
-GRANT SELECT, INSERT ON public.document_evidence_conflicts TO authenticated;
-GRANT SELECT, INSERT ON public.document_evidence_decisions TO authenticated;
+REVOKE ALL ON FUNCTION public.create_or_reuse_document_evidence_run(UUID, UUID, TEXT, TEXT, JSONB)
+  FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.persist_document_evidence_items(UUID, UUID, UUID, JSONB)
+  FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT)
+  FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT)
+  FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.append_document_evidence_decision(JSONB)
+  FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.create_or_reuse_document_evidence_run(UUID, UUID, TEXT, TEXT, JSONB)
+  TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.persist_document_evidence_items(UUID, UUID, UUID, JSONB)
+  TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT)
+  TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT)
+  TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.append_document_evidence_decision(JSONB)
   TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.auto_answer_questions_atomic(UUID)
   TO authenticated, service_role;

@@ -74,6 +74,14 @@ verification:
   - pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage4-analysis/evidence/repository.test.ts: passed 10 of 10 tests after loading the existing local unit-test env without printing values
   - migration/RLS suite without DOCUMENT_EVIDENCE_DATABASE_URL: passed 7 static tests with the applied test explicitly skipped
   - migration/RLS suite with DOCUMENT_EVIDENCE_DATABASE_URL against disposable PostgreSQL 15.18: passed 8 of 8 tests including real apply, RLS/service access, exact-set RPC, immutability, chain constraints, source deletion survival, and rollback
+  - second independent review verdict on 8a48c7ed: Spec FAIL and Quality CHANGES_REQUIRED because authenticated direct writes could corrupt coverage, source deletion before first persistence was unhandled, the applied URL lacked a destructive-test guard, the tenant matrix was incomplete, and system decisions could supersede user decisions
+  - second review RED shared contracts: failed 3 of 11 tests on the absent source manifest and invalid system supersede semantics
+  - second review RED repository: failed 6 of 11 tests on old source IDs/direct table writes, missing guarded conflict/decision RPCs, and invalid system supersede acceptance
+  - second review RED migration/safety: failed 6 of 9 tests on absent manifest/guarded RPC/terminal/rollback invariants, authenticated write grants, and the missing URL guard; the applied block was intentionally skipped during RED
+  - second review GREEN shared contracts: passed 11 of 11 tests
+  - second review GREEN repository: passed 11 of 11 tests
+  - second review GREEN migration/safety without URL: passed 8 static/safety tests with the applied block explicitly skipped
+  - second review GREEN applied PostgreSQL 15.18 on loopback document_evidence_test: passed 9 of 9 tests, including snapshot-before-delete persistence, authenticated A/B read isolation and direct-write denial, own/cross-tenant RPC checks, service access, terminal immutability, decision override direction, and rollback
   - pnpm exec supabase --version: passed and reported 2.106.0; no Supabase stack was needed or started because the applied harness uses direct pg against a disposable PostgreSQL database
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
   - targeted Prettier check: passed
@@ -97,7 +105,7 @@ explicit_defers:
 
 # Summary
 
-Added canonical evidence schemas and the compact optional `analysis_result.document_evidence` snapshot, while keeping full cards/conflicts/decision history in durable tables. Runs now persist an immutable normalized source-ID set with a derived exact count; item persistence compares source/item sets bidirectionally, source deletion preserves the evidence audit ledger, degraded/failed cards may honestly omit summaries, and decision audit fields are equivalent in both directions. The migration provides tenant consistency checks, authenticated RLS, service access, immutable conflicts, linear append-only decisions, and a verified rollback.
+Added canonical evidence schemas and the compact optional `analysis_result.document_evidence` snapshot, while keeping full cards/conflicts/decision history in durable tables. Runs now persist an immutable normalized source manifest containing document ID, version hash, and display name; item persistence compares source/item sets bidirectionally and no longer depends on a live `file_catalog` row. Authenticated callers have tenant-scoped reads plus guarded RPCs instead of direct table writes, terminal runs/items are immutable, degraded/failed cards may honestly omit summaries, and only user events may supersede an existing decision. The migration and rollback are exercised on a loopback `_test` database behind a destructive-test URL guard.
 
 # Scope / Routing
 
@@ -105,7 +113,7 @@ The worker stayed in the assigned isolated branch/worktree and strict E1 write z
 
 # Verification
 
-TDD evidence includes the initial implementation RED/GREEN cycles plus the review fix RED counts above. Review GREEN totals are 10 shared contract tests, 10 repository tests, and 8 migration/RLS tests. With the explicit disposable database URL, the integration file creates minimal PostgreSQL prerequisites and auth helpers, applies the real migration, executes RLS and integrity behavior, applies rollback, verifies evidence objects are gone and prior automatic-answer semantics are restored, then resets the disposable database. Without the explicit URL, the same file passes seven static checks and clearly skips the applied block.
+TDD evidence includes the initial implementation cycles and both independent-review fix cycles above. Current focused GREEN totals are 11 shared contract tests, 11 repository tests, and 9 migration/RLS/safety tests. The applied harness refuses non-loopback or non-`_test` URLs before connecting or resetting schemas, then creates minimal PostgreSQL prerequisites and auth helpers, applies the real migration, executes the two-tenant and terminal-integrity matrix, applies rollback, verifies evidence objects are gone and prior automatic-answer semantics are restored, and resets only the disposable test database.
 
 # Delivery / Cleanup
 
@@ -115,5 +123,7 @@ Delivery is not accepted yet. The dedicated worker branch/worktree remains retai
 
 - Material finding: the plan's original shared test path was excluded by package Vitest configuration; the orchestrator authorized the canonical `packages/shared-types/tests/document-evidence.test.ts` path. Promote to: none (captured in this artifact and corrected locally).
 - Material finding: the first implementation incorrectly reported the CLI as absent; `pnpm exec supabase --version` resolves 2.106.0. The actual missing component was a running local stack. The review fix uses direct `pg` with an explicit disposable PostgreSQL URL and now provides applied behavior evidence. Promote to: none (artifact truth corrected and applied gate added).
+- Material finding: the first applied harness accepted an arbitrary database URL and reset shared schemas. It now rejects non-loopback hosts and database names not ending in `_test` before connection/reset. Promote to: none (guard and negative tests are in scope).
+- Material finding: the second worker turn produced the RED tests/contracts/repository changes but stalled before production SQL. The orchestrator stopped the worker and completed the narrow migration/rollback GREEN patch in the same isolated worktree. Promote to: none (ownership remained isolated and all edits are independently reviewed before acceptance).
 - No source JSON bodies are logged by the repository or migration. Repository errors expose only operation and database code.
 - No Graphify refresh, generated database type update, live database action, deployment, Beads closure, or integration was performed.

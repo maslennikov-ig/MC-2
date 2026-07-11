@@ -1,8 +1,20 @@
 -- Roll back durable advisory document evidence.
 
+REVOKE EXECUTE ON FUNCTION public.create_or_reuse_document_evidence_run(UUID, UUID, TEXT, TEXT, JSONB)
+  FROM authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.persist_document_evidence_items(UUID, UUID, UUID, JSONB)
   FROM authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT)
+  FROM authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT)
+  FROM authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.append_document_evidence_decision(JSONB)
+  FROM authenticated, service_role;
+DROP FUNCTION IF EXISTS public.append_document_evidence_decision(JSONB);
+DROP FUNCTION IF EXISTS public.upsert_document_evidence_conflict(UUID, UUID, UUID, JSONB, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.finalize_document_evidence_run(UUID, UUID, UUID, TEXT);
 DROP FUNCTION IF EXISTS public.persist_document_evidence_items(UUID, UUID, UUID, JSONB);
+DROP FUNCTION IF EXISTS public.create_or_reuse_document_evidence_run(UUID, UUID, TEXT, TEXT, JSONB);
 
 DROP TABLE IF EXISTS public.document_evidence_decisions;
 DROP TABLE IF EXISTS public.document_evidence_conflicts;
@@ -14,7 +26,11 @@ DROP FUNCTION IF EXISTS public.validate_document_evidence_decision_chain();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_conflict_scope();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_item_scope();
 DROP FUNCTION IF EXISTS public.validate_document_evidence_run_tenant();
-DROP FUNCTION IF EXISTS public.enforce_document_evidence_run_source_set();
+DROP FUNCTION IF EXISTS public.prevent_document_evidence_terminal_item_mutation();
+DROP FUNCTION IF EXISTS public.verify_document_evidence_terminal_coverage();
+DROP FUNCTION IF EXISTS public.prevent_document_evidence_terminal_run_mutation();
+DROP FUNCTION IF EXISTS public.enforce_document_evidence_run_source_manifest();
+DROP FUNCTION IF EXISTS public.normalize_document_evidence_source_manifest(JSONB);
 DROP FUNCTION IF EXISTS public.set_document_evidence_updated_at();
 
 -- Restore the previous automatic-answer semantics.

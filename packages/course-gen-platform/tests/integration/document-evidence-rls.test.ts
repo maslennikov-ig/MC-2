@@ -39,7 +39,7 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).toMatch(/UNIQUE\s*\(run_id,\s*document_id\)/i);
     expect(sql).toMatch(/UNIQUE\s*\(run_id,\s*conflict_fingerprint\)/i);
     expect(sql).toMatch(/UNIQUE\s*\(course_id,\s*input_fingerprint,\s*evidence_version\)/i);
-    expect(sql).toMatch(/source_document_ids UUID\[\] NOT NULL/i);
+    expect(sql).toMatch(/source_manifest JSONB NOT NULL/i);
     expect(sql).not.toMatch(/document_id UUID NOT NULL REFERENCES public\.file_catalog/i);
   });
 
@@ -52,7 +52,7 @@ describe('document evidence migration isolation contract', () => {
       /courses\.organization_id\s*=\s*\(\(SELECT auth\.jwt\(\)\)->>'organization_id'\)::uuid/i
     );
     expect(sql.match(/CREATE POLICY\s+\w+_tenant_select/gi)).toHaveLength(4);
-    expect(sql.match(/CREATE POLICY\s+\w+_tenant_insert/gi)).toHaveLength(4);
+    expect(sql.match(/CREATE POLICY\s+\w+_tenant_insert/gi) ?? []).toHaveLength(0);
     expect(sql).not.toMatch(/TO authenticated[\s\S]{0,120}USING\s*\(true\)/i);
   });
 
@@ -70,6 +70,27 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).not.toMatch(
       /RAISE\s+(NOTICE|LOG|WARNING)[^;]*(claims|sides|summary|rationale|selected_resolution)/i
     );
+    expect(sql).not.toMatch(/GRANT\s+[^;]*(INSERT|UPDATE|DELETE)[^;]*TO authenticated/i);
+    for (const table of [
+      'document_evidence_runs',
+      'document_evidence_items',
+      'document_evidence_conflicts',
+      'document_evidence_decisions',
+    ]) {
+      expect(sql).toMatch(new RegExp(`GRANT SELECT ON public\\.${table} TO authenticated`, 'i'));
+    }
+    for (const rpc of [
+      'create_or_reuse_document_evidence_run',
+      'persist_document_evidence_items',
+      'finalize_document_evidence_run',
+      'upsert_document_evidence_conflict',
+      'append_document_evidence_decision',
+    ]) {
+      expect(sql).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${rpc}`, 'i'));
+      expect(sql).toMatch(
+        new RegExp(`REVOKE ALL ON FUNCTION public\\.${rpc}[\\s\\S]*FROM PUBLIC`, 'i')
+      );
+    }
   });
 
   it('enforces immutable conflicts and append-only decision rows at the database boundary', () => {
@@ -82,6 +103,7 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).toMatch(/supersedes_decision_id UUID/i);
     expect(sql).toMatch(/UNIQUE\s*\(supersedes_decision_id\)/i);
     expect(sql).toMatch(/\(resolved_by\s*=\s*'system'\)\s*=\s*\(answer_source\s*=\s*'system'\)/i);
+    expect(sql).toMatch(/supersedes_decision_id IS NULL OR resolved_by = 'user'/i);
   });
 
   it('compares exact source and item ID sets and permits honest missing summaries', () => {
@@ -90,6 +112,16 @@ describe('document evidence migration isolation contract', () => {
     expect(sql).toMatch(/v_item_document_ids\s+IS DISTINCT FROM\s+v_source_document_ids/i);
     expect(sql).toMatch(/coverage_status = 'assessed'[\s\S]*summary IS NOT NULL/i);
     expect(sql).toMatch(/coverage_status IN \('degraded', 'failed'\)[\s\S]*summary IS NULL/i);
+    expect(sql).toMatch(/prevent_document_evidence_terminal_run_mutation/i);
+    expect(sql).toMatch(/prevent_document_evidence_terminal_item_mutation/i);
+    expect(sql).toMatch(/verify_document_evidence_terminal_coverage/i);
+    const persistStart = sql.indexOf(
+      'CREATE OR REPLACE FUNCTION public.persist_document_evidence_items'
+    );
+    const persistEnd = sql.indexOf('-- Keep automatic clarifying answers');
+    const persistSql = sql.slice(persistStart, persistEnd);
+    expect(persistSql).toMatch(/source_manifest/i);
+    expect(persistSql).not.toMatch(/file_catalog/i);
   });
 
   it('persists automatic clarifying answers as system answers', () => {
@@ -104,6 +136,10 @@ describe('document evidence migration isolation contract', () => {
     const sql = rollbackSql();
 
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.persist_document_evidence_items/i);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.create_or_reuse_document_evidence_run/i);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.finalize_document_evidence_run/i);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.upsert_document_evidence_conflict/i);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.append_document_evidence_decision/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_decisions/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_conflicts/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS public\.document_evidence_items/i);
@@ -115,6 +151,33 @@ describe('document evidence migration isolation contract', () => {
 
 const appliedDatabaseUrl = process.env.DOCUMENT_EVIDENCE_DATABASE_URL;
 const appliedIt = appliedDatabaseUrl ? it : it.skip;
+
+function assertDisposableDatabaseUrl(databaseUrl: string): string {
+  const parsed = new URL(databaseUrl);
+  const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
+  if (!loopbackHosts.has(parsed.hostname)) {
+    throw new Error('Applied evidence database must use a loopback host');
+  }
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  if (!databaseName.endsWith('_test')) {
+    throw new Error('Applied evidence database name must end with _test');
+  }
+  return databaseUrl;
+}
+
+describe('document evidence applied database safety guard', () => {
+  it('rejects non-loopback and non-test database URLs before reset', () => {
+    expect(() =>
+      assertDisposableDatabaseUrl('postgresql://postgres@db.internal/document_evidence_test')
+    ).toThrow(/loopback/i);
+    expect(() => assertDisposableDatabaseUrl('postgresql://postgres@127.0.0.1/production')).toThrow(
+      /_test/i
+    );
+    expect(
+      assertDisposableDatabaseUrl('postgresql://postgres@127.0.0.1/document_evidence_test')
+    ).toBe('postgresql://postgres@127.0.0.1/document_evidence_test');
+  });
+});
 
 const appliedIds = {
   organizationA: '81000000-0000-4000-8000-000000000001',
@@ -229,246 +292,323 @@ async function resetAppliedDatabase(client: Client): Promise<void> {
 
 describe('document evidence applied PostgreSQL isolation', () => {
   appliedIt(
-    'applies migration and proves tenant, coverage, immutability, chain, audit, and rollback behavior',
+    'proves guarded writes, tenant reads, terminal integrity, and rollback',
     async () => {
-      const client = new Client({ connectionString: appliedDatabaseUrl });
+      const databaseUrl = assertDisposableDatabaseUrl(appliedDatabaseUrl!);
+      const client = new Client({ connectionString: databaseUrl });
       await client.connect();
       try {
         await resetAppliedDatabase(client);
         await client.query(`
-          INSERT INTO public.organizations(id) VALUES
-            ('${appliedIds.organizationA}'), ('${appliedIds.organizationB}');
-          INSERT INTO public.courses(id, organization_id) VALUES
-            ('${appliedIds.courseA}', '${appliedIds.organizationA}'),
-            ('${appliedIds.courseB}', '${appliedIds.organizationB}');
-          INSERT INTO public.file_catalog(id, organization_id, course_id, hash) VALUES
-            ('${appliedIds.documentA}', '${appliedIds.organizationA}', '${appliedIds.courseA}', 'hash-a'),
-            ('${appliedIds.documentB}', '${appliedIds.organizationA}', '${appliedIds.courseA}', 'hash-b'),
-            ('${appliedIds.substitute}', '${appliedIds.organizationA}', '${appliedIds.courseA}', 'hash-c'),
-            ('${appliedIds.documentOtherTenant}', '${appliedIds.organizationB}', '${appliedIds.courseB}', 'hash-d');
-        `);
+        INSERT INTO public.organizations(id) VALUES
+          ('${appliedIds.organizationA}'), ('${appliedIds.organizationB}');
+        INSERT INTO public.courses(id, organization_id) VALUES
+          ('${appliedIds.courseA}', '${appliedIds.organizationA}'),
+          ('${appliedIds.courseB}', '${appliedIds.organizationB}');
+        INSERT INTO public.file_catalog(id, organization_id, course_id, hash) VALUES
+          ('${appliedIds.documentA}', '${appliedIds.organizationA}', '${appliedIds.courseA}', 'hash-a'),
+          ('${appliedIds.documentB}', '${appliedIds.organizationA}', '${appliedIds.courseA}', 'hash-b'),
+          ('${appliedIds.substitute}', '${appliedIds.organizationA}', '${appliedIds.courseA}', 'hash-c'),
+          ('${appliedIds.documentOtherTenant}', '${appliedIds.organizationB}', '${appliedIds.courseB}', 'hash-d');
+      `);
         await client.query(migrationSql());
-
+        const manifestA = [
+          { document_id: appliedIds.documentB, source_version_hash: 'hash-b', document_name: 'B' },
+          { document_id: appliedIds.documentA, source_version_hash: 'hash-a', document_name: 'A' },
+        ];
+        const manifestB = [
+          {
+            document_id: appliedIds.documentOtherTenant,
+            source_version_hash: 'hash-d',
+            document_name: 'D',
+          },
+        ];
+        let runA = '';
+        let runB = '';
         await asRole(client, 'authenticated', appliedIds.organizationA, async () => {
-          await client.query(
-            `INSERT INTO public.document_evidence_runs
-              (id, course_id, organization_id, input_fingerprint, evidence_version, status,
-               source_document_ids)
-             VALUES ($1, $2, $3, 'fingerprint-a', '1.0.0', 'processing', $4::uuid[])`,
-            [
-              appliedIds.runA,
-              appliedIds.courseA,
-              appliedIds.organizationA,
-              [appliedIds.documentB, appliedIds.documentA, appliedIds.documentA],
-            ]
+          const created = await client.query(
+            'SELECT public.create_or_reuse_document_evidence_run($1,$2,$3,$4,$5::jsonb) AS result',
+            [appliedIds.courseA, appliedIds.organizationA, 'fp-a', '1', JSON.stringify(manifestA)]
           );
-          const own = await client.query(
-            'SELECT source_document_ids, source_count FROM public.document_evidence_runs WHERE id = $1',
-            [appliedIds.runA]
+          runA = created.rows[0].result.run.id;
+          await expect(
+            client.query('INSERT INTO document_evidence_runs DEFAULT VALUES')
+          ).rejects.toMatchObject({ code: '42501' });
+        });
+        await asRole(client, 'authenticated', appliedIds.organizationB, async () => {
+          const created = await client.query(
+            'SELECT public.create_or_reuse_document_evidence_run($1,$2,$3,$4,$5::jsonb) AS result',
+            [appliedIds.courseB, appliedIds.organizationB, 'fp-b', '1', JSON.stringify(manifestB)]
           );
-          expect(own.rows[0]).toEqual({
-            source_document_ids: [appliedIds.documentA, appliedIds.documentB],
-            source_count: 2,
-          });
+          runB = created.rows[0].result.run.id;
           await expect(
             client.query(
-              'UPDATE public.document_evidence_runs SET source_document_ids = $1 WHERE id = $2',
-              [[appliedIds.documentA], appliedIds.runA]
-            )
-          ).rejects.toMatchObject({ code: '55000' });
-          await expect(
-            client.query(
-              `INSERT INTO public.document_evidence_runs
-                (id, course_id, organization_id, input_fingerprint, evidence_version, status,
-                 source_document_ids)
-               VALUES ($1, $2, $3, 'denied', '1.0.0', 'processing', $4::uuid[])`,
+              'SELECT public.create_or_reuse_document_evidence_run($1,$2,$3,$4,$5::jsonb)',
               [
-                appliedIds.deniedRun,
-                appliedIds.courseB,
-                appliedIds.organizationB,
-                [appliedIds.documentOtherTenant],
+                appliedIds.courseA,
+                appliedIds.organizationA,
+                'cross-tenant-create',
+                '1',
+                JSON.stringify(manifestA),
               ]
             )
           ).rejects.toMatchObject({ code: '42501' });
         });
 
-        await asRole(client, 'service_role', appliedIds.organizationB, async () => {
-          await client.query(
-            `INSERT INTO public.document_evidence_runs
-              (id, course_id, organization_id, input_fingerprint, evidence_version, status,
-               source_document_ids)
-             VALUES ($1, $2, $3, 'fingerprint-b', '1.0.0', 'processing', $4::uuid[])`,
+        await client.query('DELETE FROM file_catalog WHERE id = $1', [appliedIds.documentA]);
+        await asRole(client, 'authenticated', appliedIds.organizationA, async () => {
+          const persisted = await client.query(
+            'SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb) AS result',
             [
-              appliedIds.runB,
+              runA,
+              appliedIds.courseA,
+              appliedIds.organizationA,
+              JSON.stringify([
+                evidenceItem(appliedIds.documentA, 'degraded'),
+                evidenceItem(appliedIds.documentB, 'assessed', 'verified'),
+              ]),
+            ]
+          );
+          expect(persisted.rows[0].result.source_count).toBe(2);
+          await expect(
+            client.query('SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb)', [
+              runB,
               appliedIds.courseB,
               appliedIds.organizationB,
-              [appliedIds.documentOtherTenant],
-            ]
-          );
-          expect(
-            (await client.query('SELECT count(*)::int AS count FROM document_evidence_runs'))
-              .rows[0]
-          ).toEqual({ count: 2 });
-        });
-
-        await asRole(client, 'authenticated', appliedIds.organizationA, async () => {
-          const visible = await client.query('SELECT id FROM public.document_evidence_runs');
-          expect(visible.rows.map(row => row.id)).toEqual([appliedIds.runA]);
-          await expect(
-            client.query('SELECT public.persist_document_evidence_items($1, $2, $3, $4::jsonb)', [
-              appliedIds.runA,
-              appliedIds.courseA,
-              appliedIds.organizationA,
-              JSON.stringify([
-                evidenceItem(appliedIds.documentA, 'assessed', 'verified summary'),
-                evidenceItem(appliedIds.substitute, 'degraded'),
-              ]),
+              JSON.stringify([evidenceItem(appliedIds.documentOtherTenant, 'degraded')]),
             ])
-          ).rejects.toMatchObject({ code: '23514' });
-          const persisted = await client.query(
-            'SELECT public.persist_document_evidence_items($1, $2, $3, $4::jsonb) AS coverage',
-            [
-              appliedIds.runA,
-              appliedIds.courseA,
-              appliedIds.organizationA,
-              JSON.stringify([
-                evidenceItem(appliedIds.documentA, 'assessed', 'verified summary'),
-                evidenceItem(appliedIds.documentB, 'degraded'),
-              ]),
-            ]
-          );
-          expect(persisted.rows[0].coverage).toEqual({
-            source_count: 2,
-            assessed_count: 1,
-            degraded_count: 1,
-            failed_count: 0,
-          });
+          ).rejects.toMatchObject({ code: '42501' });
         });
-
-        await client.query('DELETE FROM public.file_catalog WHERE id = $1', [appliedIds.documentA]);
         expect(
           (
             await client.query(
-              'SELECT document_id, source_version_hash FROM document_evidence_items WHERE document_id = $1',
+              'SELECT source_version_hash, document_name FROM document_evidence_items WHERE document_id=$1',
               [appliedIds.documentA]
             )
           ).rows[0]
-        ).toEqual({ document_id: appliedIds.documentA, source_version_hash: 'hash-a' });
+        ).toEqual({ source_version_hash: 'hash-a', document_name: 'A' });
+
+        await asRole(client, 'service_role', appliedIds.organizationB, async () => {
+          await client.query('SELECT public.persist_document_evidence_items($1,$2,$3,$4::jsonb)', [
+            runB,
+            appliedIds.courseB,
+            appliedIds.organizationB,
+            JSON.stringify([evidenceItem(appliedIds.documentOtherTenant, 'degraded')]),
+          ]);
+        });
+
+        const conflictPayload = (id: string, fingerprint: string) => ({
+          conflict_id: id,
+          conflict_fingerprint: fingerprint,
+          topic: 'scope',
+          severity: 'important',
+          sides: [{}, {}],
+          course_impact: 'impact',
+          recommended_resolution: 'resolution',
+          recommendation_rationale: 'rationale',
+          alternatives: ['alternative'],
+        });
+        await asRole(client, 'authenticated', appliedIds.organizationA, async () => {
+          await client.query(
+            'SELECT public.upsert_document_evidence_conflict($1,$2,$3,$4::jsonb,$5,$6)',
+            [
+              runA,
+              appliedIds.courseA,
+              appliedIds.organizationA,
+              JSON.stringify(conflictPayload(appliedIds.conflict, 'fp-conflict-a')),
+              'model',
+              '1',
+            ]
+          );
+        });
+        const conflictB = '85000000-0000-4000-8000-000000000002';
+        await asRole(client, 'authenticated', appliedIds.organizationB, async () => {
+          await client.query(
+            'SELECT public.upsert_document_evidence_conflict($1,$2,$3,$4::jsonb,$5,$6)',
+            [
+              runB,
+              appliedIds.courseB,
+              appliedIds.organizationB,
+              JSON.stringify(conflictPayload(conflictB, 'fp-conflict-b')),
+              'model',
+              '1',
+            ]
+          );
+          await expect(
+            client.query(
+              'SELECT public.upsert_document_evidence_conflict($1,$2,$3,$4::jsonb,$5,$6)',
+              [
+                runA,
+                appliedIds.courseA,
+                appliedIds.organizationA,
+                JSON.stringify(
+                  conflictPayload('85000000-0000-4000-8000-000000000003', 'cross-tenant')
+                ),
+                'model',
+                '1',
+              ]
+            )
+          ).rejects.toMatchObject({ code: '42501' });
+        });
+
+        let systemDecision = '';
+        await asRole(client, 'authenticated', appliedIds.organizationA, async () => {
+          const root = await client.query(
+            'SELECT public.append_document_evidence_decision($1::jsonb) AS result',
+            [
+              JSON.stringify({
+                run_id: runA,
+                conflict_id: appliedIds.conflict,
+                selected_resolution: 'system root',
+                rationale: 'system root',
+                resolved_by: 'system',
+                answer_source: 'system',
+              }),
+            ]
+          );
+          systemDecision = root.rows[0].result.id;
+          const userOverride = await client.query(
+            'SELECT public.append_document_evidence_decision($1::jsonb) AS result',
+            [
+              JSON.stringify({
+                run_id: runA,
+                conflict_id: appliedIds.conflict,
+                selected_resolution: 'user override',
+                rationale: 'user override',
+                resolved_by: 'user',
+                answer_source: 'modified',
+                supersedes_decision_id: systemDecision,
+              }),
+            ]
+          );
+          await expect(
+            client.query('SELECT public.append_document_evidence_decision($1::jsonb)', [
+              JSON.stringify({
+                run_id: runA,
+                conflict_id: appliedIds.conflict,
+                selected_resolution: 'invalid system override',
+                rationale: 'invalid',
+                resolved_by: 'system',
+                answer_source: 'system',
+                supersedes_decision_id: userOverride.rows[0].result.id,
+              }),
+            ])
+          ).rejects.toMatchObject({ code: '23514' });
+        });
+        await asRole(client, 'authenticated', appliedIds.organizationB, async () => {
+          await client.query('SELECT public.append_document_evidence_decision($1::jsonb)', [
+            JSON.stringify({
+              run_id: runB,
+              conflict_id: conflictB,
+              selected_resolution: 'manual root',
+              rationale: 'manual root',
+              resolved_by: 'user',
+              answer_source: 'custom',
+            }),
+          ]);
+          await expect(
+            client.query('SELECT public.append_document_evidence_decision($1::jsonb)', [
+              JSON.stringify({
+                run_id: runA,
+                conflict_id: appliedIds.conflict,
+                selected_resolution: 'cross tenant',
+                rationale: 'cross tenant',
+                resolved_by: 'user',
+                answer_source: 'custom',
+              }),
+            ])
+          ).rejects.toMatchObject({ code: '42501' });
+          await expect(
+            client.query('SELECT public.finalize_document_evidence_run($1,$2,$3,$4)', [
+              runA,
+              appliedIds.courseA,
+              appliedIds.organizationA,
+              'accepted',
+            ])
+          ).rejects.toMatchObject({ code: '42501' });
+        });
+
+        for (const [organizationId, expected] of [
+          [appliedIds.organizationA, [1, 2, 1, 2]],
+          [appliedIds.organizationB, [1, 1, 1, 1]],
+        ] as const) {
+          await asRole(client, 'authenticated', organizationId, async () => {
+            const counts = await Promise.all(
+              ['runs', 'items', 'conflicts', 'decisions'].map(table =>
+                client.query(`SELECT count(*)::int AS count FROM document_evidence_${table}`)
+              )
+            );
+            expect(counts.map(result => result.rows[0].count)).toEqual(expected);
+            for (const table of ['runs', 'items', 'conflicts', 'decisions']) {
+              await expect(
+                client.query(`INSERT INTO document_evidence_${table} DEFAULT VALUES`)
+              ).rejects.toMatchObject({ code: '42501' });
+            }
+          });
+        }
+
+        await asRole(client, 'service_role', appliedIds.organizationA, async () => {
+          expect(
+            (await client.query('SELECT count(*)::int AS count FROM document_evidence_runs'))
+              .rows[0].count
+          ).toBe(2);
+          await client.query('SELECT public.finalize_document_evidence_run($1,$2,$3,$4)', [
+            runA,
+            appliedIds.courseA,
+            appliedIds.organizationA,
+            'accepted',
+          ]);
+          await expect(
+            client.query("UPDATE document_evidence_runs SET error_category='changed' WHERE id=$1", [
+              runA,
+            ])
+          ).rejects.toMatchObject({ code: '55000' });
+          await expect(
+            client.query('DELETE FROM document_evidence_items WHERE run_id=$1', [runA])
+          ).rejects.toMatchObject({ code: '55000' });
+          await expect(
+            client.query(
+              `INSERT INTO document_evidence_items
+              (run_id,course_id,organization_id,document_id,source_version_hash,document_name,
+               priority,authority_scope,content_quality,course_relevance,processing_mode,
+               coverage_status,coverage_reason,original_tokens,summary_tokens,allocated_tokens)
+             VALUES ($1,$2,$3,$4,'wrong','wrong','CORE','course_source',0,0,'metadata_only',
+               'failed','invalid membership',0,0,0)`,
+              [runB, appliedIds.courseB, appliedIds.organizationB, appliedIds.substitute]
+            )
+          ).rejects.toMatchObject({ code: '23514' });
+        });
 
         await client.query(
-          `INSERT INTO public.document_evidence_conflicts
-            (id, run_id, course_id, organization_id, conflict_fingerprint, topic, severity, sides,
-             course_impact, recommended_resolution, recommendation_rationale, alternatives,
-             detection_model, detection_version)
-           VALUES ($1, $2, $3, $4, 'conflict-fp', 'scope', 'important', '[{},{}]'::jsonb,
-             'impact', 'resolution', 'rationale', '["alternative"]'::jsonb, 'model', '1')`,
-          [appliedIds.conflict, appliedIds.runA, appliedIds.courseA, appliedIds.organizationA]
-        );
-        await expect(
-          client.query('UPDATE document_evidence_conflicts SET topic = topic WHERE id = $1', [
-            appliedIds.conflict,
-          ])
-        ).rejects.toMatchObject({ code: '55000' });
-        await expect(
-          client.query('DELETE FROM document_evidence_conflicts WHERE id = $1', [
-            appliedIds.conflict,
-          ])
-        ).rejects.toMatchObject({ code: '55000' });
-
-        await expect(
-          client.query(
-            `INSERT INTO document_evidence_decisions
-              (run_id, conflict_id, selected_resolution, rationale, resolved_by, answer_source)
-             VALUES ($1, $2, 'invalid', 'invalid', 'user', 'system')`,
-            [appliedIds.runA, appliedIds.conflict]
-          )
-        ).rejects.toMatchObject({ code: '23514' });
-        await expect(
-          client.query(
-            `INSERT INTO document_evidence_decisions
-              (run_id, conflict_id, selected_resolution, rationale, resolved_by, answer_source)
-             VALUES ($1, $2, 'invalid', 'invalid', 'system', 'modified')`,
-            [appliedIds.runA, appliedIds.conflict]
-          )
-        ).rejects.toMatchObject({ code: '23514' });
-        await client.query(
-          `INSERT INTO document_evidence_decisions
-            (id, run_id, conflict_id, selected_resolution, rationale, resolved_by, answer_source)
-           VALUES ($1, $2, $3, 'manual', 'manual audit', 'user', 'modified')`,
-          [appliedIds.decisionA, appliedIds.runA, appliedIds.conflict]
-        );
-        await client.query(
-          `INSERT INTO document_evidence_decisions
-            (id, run_id, conflict_id, selected_resolution, rationale, resolved_by, answer_source,
-             supersedes_decision_id)
-           VALUES ($1, $2, $3, 'automatic', 'system audit', 'system', 'system', $4)`,
-          [appliedIds.decisionB, appliedIds.runA, appliedIds.conflict, appliedIds.decisionA]
-        );
-        await expect(
-          client.query(
-            `INSERT INTO document_evidence_decisions
-              (run_id, conflict_id, selected_resolution, rationale, resolved_by, answer_source,
-               supersedes_decision_id)
-             VALUES ($1, $2, 'fork', 'fork', 'system', 'system', $3)`,
-            [appliedIds.runA, appliedIds.conflict, appliedIds.decisionA]
-          )
-        ).rejects.toMatchObject({ code: '23505' });
-        await expect(
-          client.query(
-            `INSERT INTO document_evidence_decisions
-              (run_id, conflict_id, selected_resolution, rationale, resolved_by, answer_source)
-             VALUES ($1, $2, 'second root', 'second root', 'user', 'custom')`,
-            [appliedIds.runA, appliedIds.conflict]
-          )
-        ).rejects.toMatchObject({ code: '23505' });
-        await expect(
-          client.query(
-            'UPDATE document_evidence_decisions SET rationale = rationale WHERE id = $1',
-            [appliedIds.decisionB]
-          )
-        ).rejects.toMatchObject({ code: '55000' });
-        await expect(
-          client.query('DELETE FROM document_evidence_decisions WHERE id = $1', [
-            appliedIds.decisionB,
-          ])
-        ).rejects.toMatchObject({ code: '55000' });
-
-        await client.query(
-          `INSERT INTO public.clarifying_questions
-            (id, course_id, suggested_answers, question_type, status)
-           VALUES ($1, $2, '[{"text":"recommended"}]'::jsonb, 'open', 'pending')`,
+          `INSERT INTO clarifying_questions(id,course_id,suggested_answers)
+         VALUES ($1,$2,'[{"text":"recommended"}]')`,
           [appliedIds.question, appliedIds.courseA]
         );
         await client.query(rollbackSql());
         expect(
           (
             await client.query(`SELECT
-              to_regclass('public.document_evidence_runs') AS runs_table,
-              to_regclass('public.document_evidence_items') AS items_table,
-              to_regclass('public.document_evidence_conflicts') AS conflicts_table,
-              to_regclass('public.document_evidence_decisions') AS decisions_table,
-              to_regprocedure(
-                'public.persist_document_evidence_items(uuid,uuid,uuid,jsonb)'
-              ) AS persist_function,
-              to_regprocedure(
-                'public.enforce_document_evidence_run_source_set()'
-              ) AS source_set_function`)
+            to_regclass('document_evidence_runs') AS runs,
+            to_regprocedure('create_or_reuse_document_evidence_run(uuid,uuid,text,text,jsonb)') AS create_rpc,
+            to_regprocedure('persist_document_evidence_items(uuid,uuid,uuid,jsonb)') AS persist_rpc,
+            to_regprocedure('finalize_document_evidence_run(uuid,uuid,uuid,text)') AS finalize_rpc,
+            to_regprocedure('upsert_document_evidence_conflict(uuid,uuid,uuid,jsonb,text,text)') AS conflict_rpc,
+            to_regprocedure('append_document_evidence_decision(jsonb)') AS decision_rpc`)
           ).rows[0]
         ).toEqual({
-          runs_table: null,
-          items_table: null,
-          conflicts_table: null,
-          decisions_table: null,
-          persist_function: null,
-          source_set_function: null,
+          runs: null,
+          create_rpc: null,
+          persist_rpc: null,
+          finalize_rpc: null,
+          conflict_rpc: null,
+          decision_rpc: null,
         });
-        await client.query('SELECT public.auto_answer_questions_atomic($1)', [appliedIds.courseA]);
+        await client.query('SELECT auto_answer_questions_atomic($1)', [appliedIds.courseA]);
         expect(
           (
-            await client.query(
-              'SELECT answer_source FROM public.clarifying_questions WHERE id = $1',
-              [appliedIds.question]
-            )
+            await client.query('SELECT answer_source FROM clarifying_questions WHERE id=$1', [
+              appliedIds.question,
+            ])
           ).rows[0]
         ).toEqual({ answer_source: 'suggested' });
       } finally {

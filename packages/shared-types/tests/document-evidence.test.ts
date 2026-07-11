@@ -15,6 +15,7 @@ import {
   DocumentEvidenceCardsSchema,
   DocumentEvidenceModeSchema,
   DocumentEvidenceRunSummarySchema,
+  DocumentEvidenceSourceManifestSchema,
   DocumentEvidenceSnapshotSchema,
   EvidenceClaimSchema,
   EvidenceSourceRefSchema,
@@ -42,6 +43,24 @@ const sourceRef = {
   heading_path: 'Policy / Exceptions',
   version_hash: 'sha256:source-v1',
 };
+
+const sourceManifest = [
+  {
+    document_id: ids.documentA,
+    source_version_hash: 'sha256:source-a',
+    document_name: 'Policy A.pdf',
+  },
+  {
+    document_id: ids.documentB,
+    source_version_hash: 'sha256:source-b',
+    document_name: 'Policy B.pdf',
+  },
+  {
+    document_id: ids.documentC,
+    source_version_hash: 'sha256:source-c',
+    document_name: 'Policy C.pdf',
+  },
+] as const;
 
 const card = {
   document_id: ids.documentA,
@@ -135,6 +154,19 @@ describe('document evidence canonical contracts', () => {
     );
   });
 
+  it('pins a sorted unique source manifest snapshot with version identity', () => {
+    expect(DocumentEvidenceSourceManifestSchema.parse(sourceManifest)).toEqual(sourceManifest);
+    expect(() =>
+      DocumentEvidenceSourceManifestSchema.parse([
+        sourceManifest[0],
+        { ...sourceManifest[0], source_version_hash: 'sha256:different' },
+      ])
+    ).toThrow(/source_manifest.*unique/i);
+    expect(() =>
+      DocumentEvidenceSourceManifestSchema.parse([sourceManifest[1], sourceManifest[0]])
+    ).toThrow(/source_manifest.*sorted/i);
+  });
+
   it('pins the stable conflict shape and source provenance', () => {
     const conflict = {
       conflict_id: ids.conflict,
@@ -193,6 +225,14 @@ describe('document evidence canonical contracts', () => {
     expect(() =>
       DocumentDecisionSchema.parse({
         ...decision,
+        resolved_by: 'system',
+        answer_source: 'system',
+        supersedes_decision_id: ids.priorDecision,
+      })
+    ).toThrow(/superseding.*resolved_by=user/i);
+    expect(() =>
+      DocumentDecisionSchema.parse({
+        ...decision,
         resolved_by: 'user',
         answer_source: 'system',
       })
@@ -207,7 +247,7 @@ describe('document evidence canonical contracts', () => {
       input_fingerprint: 'sha256:run-input-v1',
       evidence_version: '1.0.0',
       status: 'accepted',
-      source_document_ids: [ids.documentA, ids.documentB, ids.documentC],
+      source_manifest: sourceManifest,
       source_count: 3,
       assessed_count: 1,
       degraded_count: 1,
@@ -230,15 +270,15 @@ describe('document evidence canonical contracts', () => {
     expect(() =>
       DocumentEvidenceRunSummarySchema.parse({
         ...summary,
-        source_document_ids: [ids.documentA, ids.documentA, ids.documentC],
+        source_manifest: [sourceManifest[0], sourceManifest[0], sourceManifest[2]],
       })
-    ).toThrow(/source_document_ids.*unique/i);
+    ).toThrow(/source_manifest.*unique/i);
     expect(() =>
       DocumentEvidenceRunSummarySchema.parse({
         ...summary,
-        source_document_ids: [ids.documentB, ids.documentA, ids.documentC],
+        source_manifest: [sourceManifest[1], sourceManifest[0], sourceManifest[2]],
       })
-    ).toThrow(/source_document_ids.*sorted/i);
+    ).toThrow(/source_manifest.*sorted/i);
   });
 });
 

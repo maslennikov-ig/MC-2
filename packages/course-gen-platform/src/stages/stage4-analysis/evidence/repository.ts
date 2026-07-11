@@ -11,11 +11,13 @@ import {
   DocumentConflictSchema,
   DocumentEvidenceCardsSchema,
   DocumentEvidenceCoverageSummarySchema,
-  DocumentEvidenceSourceIdSetSchema,
+  DocumentEvidenceSourceManifestEntrySchema,
+  DocumentEvidenceSourceManifestSchema,
   type AnswerSource,
   type DocumentConflict,
   type DocumentEvidenceCard,
   type DocumentEvidenceCoverageSummary,
+  type DocumentEvidenceSourceManifestEntry,
 } from '@megacampus/shared-types';
 
 type EvidenceTableName =
@@ -45,7 +47,11 @@ interface EvidenceQueryBuilder extends PromiseLike<DatabaseResult> {
 export interface DocumentEvidenceDatabaseClient {
   from(table: EvidenceTableName): EvidenceQueryBuilder;
   rpc(
-    name: 'persist_document_evidence_items',
+    name:
+      | 'create_or_reuse_document_evidence_run'
+      | 'persist_document_evidence_items'
+      | 'upsert_document_evidence_conflict'
+      | 'append_document_evidence_decision',
     args: Record<string, unknown>
   ): Promise<DatabaseResult>;
 }
@@ -55,7 +61,7 @@ export interface GetOrCreateEvidenceRunInput {
   organizationId: string;
   inputFingerprint: string;
   evidenceVersion: string;
-  sourceDocumentIds: string[];
+  sourceManifest: DocumentEvidenceSourceManifestEntry[];
 }
 
 export interface PersistEvidenceItemsInput {
@@ -117,21 +123,36 @@ function throwDatabaseError(operation: string, error: DatabaseError): never {
   throw new DocumentEvidenceRepositoryError(operation, error.code);
 }
 
-function assertRunSourceSet(
+function normalizeSourceManifest(
+  input: DocumentEvidenceSourceManifestEntry[]
+): DocumentEvidenceSourceManifestEntry[] {
+  const byDocumentId = new Map<string, DocumentEvidenceSourceManifestEntry>();
+  for (const rawEntry of input) {
+    const entry = DocumentEvidenceSourceManifestEntrySchema.parse(rawEntry);
+    const existing = byDocumentId.get(entry.document_id);
+    if (existing && JSON.stringify(existing) !== JSON.stringify(entry)) {
+      throw new DocumentEvidenceRepositoryError('normalize_manifest:conflicting_document_snapshot');
+    }
+    byDocumentId.set(entry.document_id, entry);
+  }
+  return DocumentEvidenceSourceManifestSchema.parse(
+    [...byDocumentId.values()].sort((left, right) =>
+      left.document_id.localeCompare(right.document_id)
+    )
+  );
+}
+
+function assertRunSourceManifest(
   value: unknown,
-  expectedSourceDocumentIds: string[],
+  expectedManifest: DocumentEvidenceSourceManifestEntry[],
   operation: string
 ): Record<string, unknown> {
   const run = assertRecord(value, operation);
-  const actualSourceDocumentIds = run.source_document_ids;
+  const parsedManifest = DocumentEvidenceSourceManifestSchema.safeParse(run.source_manifest);
   if (
-    !Array.isArray(actualSourceDocumentIds) ||
-    actualSourceDocumentIds.some(documentId => typeof documentId !== 'string') ||
-    actualSourceDocumentIds.length !== expectedSourceDocumentIds.length ||
-    actualSourceDocumentIds.some(
-      (documentId, index) => documentId !== expectedSourceDocumentIds[index]
-    ) ||
-    run.source_count !== expectedSourceDocumentIds.length
+    !parsedManifest.success ||
+    JSON.stringify(parsedManifest.data) !== JSON.stringify(expectedManifest) ||
+    run.source_count !== expectedManifest.length
   ) {
     throw new DocumentEvidenceRepositoryError(`${operation}:source_set_mismatch`);
   }
@@ -144,66 +165,23 @@ export class DocumentEvidenceRepository {
   async getOrCreateRun(
     input: GetOrCreateEvidenceRunInput
   ): Promise<{ run: Record<string, unknown>; reused: boolean }> {
-    const sourceDocumentIds = DocumentEvidenceSourceIdSetSchema.parse(
-      [...new Set(input.sourceDocumentIds)].sort()
-    );
-    const findExisting = async (): Promise<DatabaseResult> =>
-      this.client
-        .from('document_evidence_runs')
-        .select('*')
-        .eq('course_id', input.courseId)
-        .eq('organization_id', input.organizationId)
-        .eq('input_fingerprint', input.inputFingerprint)
-        .eq('evidence_version', input.evidenceVersion)
-        .maybeSingle();
-
-    const existing = await findExisting();
-    if (existing.error) {
-      throwDatabaseError('find_run', existing.error);
+    const sourceManifest = normalizeSourceManifest(input.sourceManifest);
+    const { data, error } = await this.client.rpc('create_or_reuse_document_evidence_run', {
+      p_course_id: input.courseId,
+      p_organization_id: input.organizationId,
+      p_input_fingerprint: input.inputFingerprint,
+      p_evidence_version: input.evidenceVersion,
+      p_source_manifest: sourceManifest,
+    });
+    if (error) throwDatabaseError('create_or_reuse_run', error);
+    const result = assertRecord(data, 'create_or_reuse_run');
+    if (typeof result.reused !== 'boolean') {
+      throw new DocumentEvidenceRepositoryError('create_or_reuse_run:invalid_result');
     }
-    if (existing.data) {
-      return {
-        run: assertRunSourceSet(existing.data, sourceDocumentIds, 'find_run'),
-        reused: true,
-      };
-    }
-
-    const created = await this.client
-      .from('document_evidence_runs')
-      .insert({
-        course_id: input.courseId,
-        organization_id: input.organizationId,
-        input_fingerprint: input.inputFingerprint,
-        evidence_version: input.evidenceVersion,
-        status: 'processing',
-        source_document_ids: sourceDocumentIds,
-        source_count: sourceDocumentIds.length,
-      })
-      .select('*')
-      .single();
-
-    if (!created.error && created.data) {
-      return {
-        run: assertRunSourceSet(created.data, sourceDocumentIds, 'create_run'),
-        reused: false,
-      };
-    }
-
-    // A concurrent retry may win the uniqueness race. Re-read instead of
-    // changing the already-created run.
-    if (created.error?.code === '23505') {
-      const concurrent = await findExisting();
-      if (!concurrent.error && concurrent.data) {
-        return {
-          run: assertRunSourceSet(concurrent.data, sourceDocumentIds, 'find_concurrent_run'),
-          reused: true,
-        };
-      }
-      if (concurrent.error) throwDatabaseError('find_concurrent_run', concurrent.error);
-    }
-
-    if (created.error) throwDatabaseError('create_run', created.error);
-    throw new DocumentEvidenceRepositoryError('create_run:missing_result');
+    return {
+      run: assertRunSourceManifest(result.run, sourceManifest, 'create_or_reuse_run'),
+      reused: result.reused,
+    };
   }
 
   async persistItems(input: PersistEvidenceItemsInput): Promise<DocumentEvidenceCoverageSummary> {
@@ -221,54 +199,16 @@ export class DocumentEvidenceRepository {
 
   async upsertConflict(input: UpsertEvidenceConflictInput): Promise<Record<string, unknown>> {
     const conflict = DocumentConflictSchema.parse(input.conflict);
-    const claimIds = [...new Set(conflict.sides.flatMap(side => side.claim_ids))];
-    const sourceRefs = [
-      ...new Map(
-        conflict.sides
-          .flatMap(side => side.source_refs)
-          .map(sourceRef => [JSON.stringify(sourceRef), sourceRef])
-      ).values(),
-    ];
-    const inserted = await this.client
-      .from('document_evidence_conflicts')
-      .insert({
-        id: conflict.conflict_id,
-        run_id: input.runId,
-        course_id: input.courseId,
-        organization_id: input.organizationId,
-        conflict_fingerprint: conflict.conflict_fingerprint,
-        topic: conflict.topic,
-        severity: conflict.severity,
-        sides: conflict.sides,
-        claim_ids: claimIds,
-        source_refs: sourceRefs,
-        course_impact: conflict.course_impact,
-        recommended_resolution: conflict.recommended_resolution,
-        recommendation_rationale: conflict.recommendation_rationale,
-        alternatives: conflict.alternatives,
-        detection_model: input.detectionModel,
-        detection_version: input.detectionVersion,
-      })
-      .select('*')
-      .single();
-
-    if (!inserted.error && inserted.data) {
-      return assertRecord(inserted.data, 'insert_conflict');
-    }
-    if (inserted.error?.code !== '23505') {
-      if (inserted.error) throwDatabaseError('insert_conflict', inserted.error);
-      throw new DocumentEvidenceRepositoryError('insert_conflict:missing_result');
-    }
-
-    const existing = await this.client
-      .from('document_evidence_conflicts')
-      .select('*')
-      .eq('run_id', input.runId)
-      .eq('conflict_fingerprint', conflict.conflict_fingerprint)
-      .single();
-
-    if (existing.error) throwDatabaseError('find_conflict', existing.error);
-    return assertRecord(existing.data, 'find_conflict');
+    const { data, error } = await this.client.rpc('upsert_document_evidence_conflict', {
+      p_run_id: input.runId,
+      p_course_id: input.courseId,
+      p_organization_id: input.organizationId,
+      p_conflict: conflict,
+      p_detection_model: input.detectionModel,
+      p_detection_version: input.detectionVersion,
+    });
+    if (error) throwDatabaseError('upsert_conflict', error);
+    return assertRecord(data, 'upsert_conflict');
   }
 
   async appendDecision(input: AppendEvidenceDecisionInput): Promise<Record<string, unknown>> {
@@ -276,27 +216,33 @@ export class DocumentEvidenceRepository {
     if ((input.resolvedBy === 'system') !== (answerSource === 'system')) {
       throw new DocumentEvidenceRepositoryError('append_decision:invalid_system_answer_source');
     }
-
-    const inserted = await this.client
-      .from('document_evidence_decisions')
-      .insert({
-        run_id: input.runId,
-        conflict_id: input.conflictId,
-        clarifying_question_id: input.clarifyingQuestionId,
-        selected_resolution: input.selectedResolution,
-        rationale: input.rationale,
-        resolved_by: input.resolvedBy,
-        answer_source: answerSource,
-        selected_recommendation_index: input.selectedRecommendationIndex,
-        selected_recommendation_value: input.selectedRecommendationValue,
-        supersedes_decision_id: input.supersedesDecisionId,
-        decided_at: input.decidedAt,
-      })
-      .select('*')
-      .single();
-
-    if (inserted.error) throwDatabaseError('append_decision', inserted.error);
-    return assertRecord(inserted.data, 'append_decision');
+    if (input.supersedesDecisionId && input.resolvedBy !== 'user') {
+      throw new DocumentEvidenceRepositoryError(
+        'append_decision:superseding_decision_must_be_user'
+      );
+    }
+    const decision = {
+      run_id: input.runId,
+      conflict_id: input.conflictId,
+      selected_resolution: input.selectedResolution,
+      resolved_by: input.resolvedBy,
+      answer_source: answerSource,
+      rationale: input.rationale,
+      decided_at: input.decidedAt,
+      ...(input.clarifyingQuestionId ? { clarifying_question_id: input.clarifyingQuestionId } : {}),
+      ...(input.selectedRecommendationIndex !== undefined
+        ? { selected_recommendation_index: input.selectedRecommendationIndex }
+        : {}),
+      ...(input.selectedRecommendationValue
+        ? { selected_recommendation_value: input.selectedRecommendationValue }
+        : {}),
+      ...(input.supersedesDecisionId ? { supersedes_decision_id: input.supersedesDecisionId } : {}),
+    };
+    const { data, error } = await this.client.rpc('append_document_evidence_decision', {
+      p_decision: decision,
+    });
+    if (error) throwDatabaseError('append_decision', error);
+    return assertRecord(data, 'append_decision');
   }
 
   async getLatestDecisions(runId: string): Promise<EvidenceDecisionRow[]> {

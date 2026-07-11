@@ -41,6 +41,19 @@ const card: DocumentEvidenceCard = {
   token_counts: { original: 2000, summary: 200, allocated: 250 },
 };
 
+const sourceManifest = [
+  {
+    document_id: ids.documentA,
+    source_version_hash: 'hash-a',
+    document_name: 'Policy A.pdf',
+  },
+  {
+    document_id: ids.documentB,
+    source_version_hash: 'hash-b',
+    document_name: 'Policy B.pdf',
+  },
+];
+
 const conflict: DocumentConflict = {
   conflict_id: ids.conflict,
   conflict_fingerprint: 'sha256:approval-conflict',
@@ -126,11 +139,11 @@ describe('DocumentEvidenceRepository', () => {
       input_fingerprint: 'sha256:input-v1',
       evidence_version: '1.0.0',
       status: 'accepted',
-      source_document_ids: [ids.documentA, ids.documentB],
+      source_manifest: sourceManifest,
       source_count: 2,
     };
-    const { client, calls } = createScriptedClient({
-      document_evidence_runs: [{ data: existingRun, error: null }],
+    const { client, calls, rpc } = createScriptedClient({
+      rpc: [{ data: { run: existingRun, reused: true }, error: null }],
     });
     const repository = createDocumentEvidenceRepository(client as never);
 
@@ -139,25 +152,28 @@ describe('DocumentEvidenceRepository', () => {
       organizationId: ids.organization,
       inputFingerprint: 'sha256:input-v1',
       evidenceVersion: '1.0.0',
-      sourceDocumentIds: [ids.documentB, ids.documentA, ids.documentA],
+      sourceManifest: [sourceManifest[1], sourceManifest[0]],
     });
 
     expect(result).toEqual({ run: existingRun, reused: true });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.operations.some(([operation]) => operation === 'insert')).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(rpc).toHaveBeenCalledWith('create_or_reuse_document_evidence_run', {
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_input_fingerprint: 'sha256:input-v1',
+      p_evidence_version: '1.0.0',
+      p_source_manifest: sourceManifest,
+    });
   });
 
   it('creates runs with deterministic unique source IDs and a derived exact count', async () => {
     const createdRun = {
       id: ids.run,
-      source_document_ids: [ids.documentA, ids.documentB],
+      source_manifest: sourceManifest,
       source_count: 2,
     };
-    const { client, calls } = createScriptedClient({
-      document_evidence_runs: [
-        { data: null, error: null },
-        { data: createdRun, error: null },
-      ],
+    const { client, rpc } = createScriptedClient({
+      rpc: [{ data: { run: createdRun, reused: false }, error: null }],
     });
     const repository = createDocumentEvidenceRepository(client as never);
 
@@ -167,24 +183,27 @@ describe('DocumentEvidenceRepository', () => {
         organizationId: ids.organization,
         inputFingerprint: 'sha256:new-input',
         evidenceVersion: '1.0.0',
-        sourceDocumentIds: [ids.documentB, ids.documentA, ids.documentB],
+        sourceManifest: [sourceManifest[1], sourceManifest[0], sourceManifest[1]],
       })
     ).resolves.toEqual({ run: createdRun, reused: false });
 
-    const insertedRun = calls[1]?.operations.find(([operation]) => operation === 'insert')?.[1];
-    expect(insertedRun).toMatchObject({
-      source_document_ids: [ids.documentA, ids.documentB],
-      source_count: 2,
+    expect(rpc).toHaveBeenCalledWith('create_or_reuse_document_evidence_run', {
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_input_fingerprint: 'sha256:new-input',
+      p_evidence_version: '1.0.0',
+      p_source_manifest: sourceManifest,
     });
   });
 
   it('rejects a uniqueness-race run whose immutable source set differs', async () => {
     const { client } = createScriptedClient({
-      document_evidence_runs: [
-        { data: null, error: null },
-        { data: null, error: { code: '23505', message: 'duplicate key' } },
+      rpc: [
         {
-          data: { id: ids.run, source_document_ids: [ids.documentA], source_count: 1 },
+          data: {
+            run: { id: ids.run, source_manifest: [sourceManifest[0]], source_count: 1 },
+            reused: true,
+          },
           error: null,
         },
       ],
@@ -197,7 +216,7 @@ describe('DocumentEvidenceRepository', () => {
         organizationId: ids.organization,
         inputFingerprint: 'sha256:race',
         evidenceVersion: '1.0.0',
-        sourceDocumentIds: [ids.documentA, ids.documentB],
+        sourceManifest,
       })
     ).rejects.toThrow(/source_set_mismatch/i);
   });
@@ -283,11 +302,8 @@ describe('DocumentEvidenceRepository', () => {
       run_id: ids.run,
       conflict_fingerprint: conflict.conflict_fingerprint,
     };
-    const { client, calls } = createScriptedClient({
-      document_evidence_conflicts: [
-        { data: null, error: { code: '23505', message: 'duplicate key' } },
-        { data: existing, error: null },
-      ],
+    const { client, calls, rpc } = createScriptedClient({
+      rpc: [{ data: existing, error: null }],
     });
     const repository = createDocumentEvidenceRepository(client as never);
 
@@ -301,24 +317,18 @@ describe('DocumentEvidenceRepository', () => {
     });
 
     expect(result).toEqual(existing);
-    expect(calls[0]?.operations.map(([operation]) => operation)).toContain('insert');
-    const insertedConflict = calls[0]?.operations.find(
-      ([operation]) => operation === 'insert'
-    )?.[1] as Record<string, unknown>;
-    expect(insertedConflict.claim_ids).toEqual([ids.claimA, ids.claimB]);
-    expect(insertedConflict.source_refs).toEqual([
-      { document_id: ids.documentA, page_number: 2 },
-      { document_id: ids.documentB, page_number: 5 },
-    ]);
-    expect(calls[1]?.operations).toEqual(
-      expect.arrayContaining([
-        ['eq', 'run_id', ids.run],
-        ['eq', 'conflict_fingerprint', conflict.conflict_fingerprint],
-      ])
-    );
+    expect(calls).toHaveLength(0);
+    expect(rpc).toHaveBeenCalledWith('upsert_document_evidence_conflict', {
+      p_run_id: ids.run,
+      p_course_id: ids.course,
+      p_organization_id: ids.organization,
+      p_conflict: conflict,
+      p_detection_model: 'test-model',
+      p_detection_version: '1.0.0',
+    });
   });
 
-  it('appends decisions using insert only', async () => {
+  it('appends decisions through the guarded RPC only', async () => {
     const decision = {
       id: ids.decisionA,
       run_id: ids.run,
@@ -329,8 +339,8 @@ describe('DocumentEvidenceRepository', () => {
       rationale: 'The automatic course selected the recommended answer.',
       decided_at: '2026-07-11T10:00:00.000Z',
     };
-    const { client, calls } = createScriptedClient({
-      document_evidence_decisions: [{ data: decision, error: null }],
+    const { client, calls, rpc } = createScriptedClient({
+      rpc: [{ data: decision, error: null }],
     });
     const repository = createDocumentEvidenceRepository(client as never);
 
@@ -346,11 +356,18 @@ describe('DocumentEvidenceRepository', () => {
       })
     ).resolves.toEqual(decision);
 
-    expect(calls[0]?.operations.map(([operation]) => operation)).toEqual([
-      'insert',
-      'select',
-      'single',
-    ]);
+    expect(calls).toHaveLength(0);
+    expect(rpc).toHaveBeenCalledWith('append_document_evidence_decision', {
+      p_decision: {
+        run_id: ids.run,
+        conflict_id: ids.conflict,
+        selected_resolution: decision.selected_resolution,
+        resolved_by: 'system',
+        answer_source: 'system',
+        rationale: decision.rationale,
+        decided_at: decision.decided_at,
+      },
+    });
   });
 
   it('rejects system answer sources for user decisions', async () => {
@@ -368,6 +385,25 @@ describe('DocumentEvidenceRepository', () => {
         decidedAt: '2026-07-11T10:00:00.000Z',
       })
     ).rejects.toThrow(/invalid_system_answer_source/i);
+  });
+
+  it('rejects a system decision that tries to supersede an existing event', async () => {
+    const { client, rpc } = createScriptedClient({});
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await expect(
+      repository.appendDecision({
+        runId: ids.run,
+        conflictId: ids.conflict,
+        selectedResolution: 'System override is forbidden.',
+        resolvedBy: 'system',
+        answerSource: 'system',
+        rationale: 'Invalid override.',
+        supersedesDecisionId: ids.decisionA,
+        decidedAt: '2026-07-11T10:00:00.000Z',
+      })
+    ).rejects.toThrow(/superseding_decision_must_be_user/i);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('resolves the latest unsuperseded decision in each append-only chain', async () => {

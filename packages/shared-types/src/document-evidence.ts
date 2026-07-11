@@ -65,21 +65,30 @@ export const DocumentEvidenceTokenCountsSchema = z
   })
   .strict();
 
-export const DocumentEvidenceSourceIdSetSchema = z
-  .array(z.string().uuid())
+export const DocumentEvidenceSourceManifestEntrySchema = z
+  .object({
+    document_id: z.string().uuid(),
+    source_version_hash: z.string().min(1),
+    document_name: z.string().min(1),
+  })
+  .strict();
+
+export const DocumentEvidenceSourceManifestSchema = z
+  .array(DocumentEvidenceSourceManifestEntrySchema)
   .min(1)
-  .superRefine((documentIds, context) => {
-    if (new Set(documentIds).size !== documentIds.length) {
+  .superRefine((manifest, context) => {
+    const documentIds = manifest.map(source => source.document_id);
+    if (new Set(documentIds).size !== manifest.length) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'source_document_ids must be unique',
+        message: 'source_manifest document_id values must be unique',
       });
     }
     const sorted = [...documentIds].sort();
     if (sorted.some((documentId, index) => documentId !== documentIds[index])) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'source_document_ids must be sorted',
+        message: 'source_manifest must be sorted by document_id',
       });
     }
   });
@@ -183,6 +192,13 @@ export const DocumentDecisionSchema = z
         message: 'resolved_by=system iff answer_source=system',
       });
     }
+    if (decision.supersedes_decision_id && decision.resolved_by !== 'user') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['resolved_by'],
+        message: 'A superseding decision must use resolved_by=user',
+      });
+    }
   });
 
 const CountSchema = z.number().int().nonnegative();
@@ -213,7 +229,7 @@ export const DocumentEvidenceRunSummarySchema = z
     input_fingerprint: z.string().min(1),
     evidence_version: z.string().min(1),
     status: DocumentEvidenceRunStatusSchema,
-    source_document_ids: DocumentEvidenceSourceIdSetSchema,
+    source_manifest: DocumentEvidenceSourceManifestSchema,
     source_count: CountSchema,
     assessed_count: CountSchema,
     degraded_count: CountSchema,
@@ -239,11 +255,11 @@ export const DocumentEvidenceRunSummarySchema = z
   })
   .strict()
   .superRefine((summary, context) => {
-    if (summary.source_document_ids.length !== summary.source_count) {
+    if (summary.source_manifest.length !== summary.source_count) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['source_document_ids'],
-        message: 'source_document_ids length must equal source_count',
+        path: ['source_manifest'],
+        message: 'source_manifest length must equal source_count',
       });
     }
     if (
@@ -278,7 +294,10 @@ export type DocumentEvidenceEnrichmentStatus = z.infer<
 export type EvidenceSourceRef = z.infer<typeof EvidenceSourceRefSchema>;
 export type EvidenceClaim = z.infer<typeof EvidenceClaimSchema>;
 export type DocumentEvidenceTokenCounts = z.infer<typeof DocumentEvidenceTokenCountsSchema>;
-export type DocumentEvidenceSourceIdSet = z.infer<typeof DocumentEvidenceSourceIdSetSchema>;
+export type DocumentEvidenceSourceManifestEntry = z.infer<
+  typeof DocumentEvidenceSourceManifestEntrySchema
+>;
+export type DocumentEvidenceSourceManifest = z.infer<typeof DocumentEvidenceSourceManifestSchema>;
 export type DocumentEvidenceCard = z.infer<typeof DocumentEvidenceCardSchema>;
 export type DocumentConflictSide = z.infer<typeof DocumentConflictSideSchema>;
 export type DocumentConflict = z.infer<typeof DocumentConflictSchema>;
