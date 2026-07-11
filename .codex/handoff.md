@@ -91,4 +91,4 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — approved evidence design and companion execution plan now define durable Stage 4/5/6 behavior and operator acceptance.
-graph-reviewed: updated — after E6 integration, local-only `graphify update .` plus `graphify cluster-only . --no-viz` rebuilt the final code graph (50,053 nodes, 74,224 edges), with zero external model/API tokens and no Git hooks; unstable community repartition totals are intentionally omitted.
+graph-reviewed: updated — after Q6 integration and workspace cleanup, local-only Graphify `0.8.45` ran `graphify update .` plus `graphify cluster-only . --no-viz`; the graph has 50,114 nodes and 74,284 edges, zero external model/API tokens, no excluded runtime/noise source paths, and no Git hooks. Focused Qdrant runtime/recovery queries completed; shell assets are not direct graph nodes, so Q8/Q9 should use their tracked paths plus focused TypeScript/config neighbors.

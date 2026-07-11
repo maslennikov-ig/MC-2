@@ -60,8 +60,8 @@ risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: Both tracked environment examples now make self-hosted private URLs, logical/physical names, secret-file paths, S3 identifiers, and the external-URL prohibition explicit. The full operator runbook remains Q9/Q10-owned.
-graph_reviewed: blocked
-graph_review_notes: graphify-out/GRAPH_REPORT.md was not present in this isolated child worktree. The accepted .14 runtime packet supplied focused architecture evidence; no broad architecture search or child refresh was performed. Parent integration owns the required local-only graph refresh.
+graph_reviewed: updated
+graph_review_notes: The isolated child had no graph report, so parent integration ran local-only graphify update and cluster-only after Q6 integration and cleanup. The resulting graph/report uses zero external model/API tokens and no Git hooks; final HEAD freshness is recorded in the stage handoff.
 verification:
   - TDD RED/GREEN qdrant-runtime-contract.test.ts: initial 8/8 expected failures, then 8/8 pass; retained-Docker-Cmd, custom secret-path, and reviewer platform/registry-contract RED cycles each failed 1/8; final GREEN passed 8/8.
   - The committed focused test creates mode-0400 synthetic secrets and one synthetic env fixture, then iterates all four COMPOSE_FILES through full render and config --no-env-resolution; 8/8 Compose validations passed and no mounted secret value appeared in a render.
