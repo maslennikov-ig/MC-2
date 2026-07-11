@@ -52,7 +52,7 @@ import { RequiredRagUnavailableError } from '@/shared/rag/document-availability'
 import { notifyCourseError } from '@/shared/notifications';
 import { z } from 'zod';
 import { createProductionStage5EvidenceEnricher } from './evidence/production';
-import { buildEvidenceAnalysisResultUpdate } from './evidence/persistence';
+import { buildEvidencePersistencePlan } from './evidence/persistence';
 
 // Import helpers extracted from this file
 import {
@@ -387,19 +387,21 @@ class Stage5GenerationHandler {
       // Set schema_version to 2 (plan:105) — indicates stable IDs present
       schema_version: 2 as const,
     };
-    const analysisResultUpdate = buildEvidenceAnalysisResultUpdate(
+    const evidencePersistence = buildEvidencePersistencePlan(
       analysisResult,
       result.generation_metadata.document_evidence_enrichment
     );
 
     // Save structure + sync LLM-generated title/description back to courses table
     // This ensures courses.title matches the target language even when user input was in a different language
-    const { error: structureError } = await supabaseAdmin
+    const structureUpdate = supabaseAdmin
       .from('courses')
       .update({
         course_structure: structureWithIds,
         generation_metadata: result.generation_metadata,
-        ...(analysisResultUpdate ? { analysis_result: analysisResultUpdate } : {}),
+        ...(evidencePersistence.analysisResultUpdate
+          ? { analysis_result: evidencePersistence.analysisResultUpdate }
+          : {}),
         ...(structureWithIds.course_title ? { title: structureWithIds.course_title } : {}),
         ...(structureWithIds.course_description
           ? { course_description: structureWithIds.course_description }
@@ -407,6 +409,21 @@ class Stage5GenerationHandler {
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId);
+
+    let structureError: { message: string } | null;
+    if (evidencePersistence.expectedAnalysisResultJson) {
+      const result = await structureUpdate
+        .filter('analysis_result', 'eq', evidencePersistence.expectedAnalysisResultJson)
+        .select('id')
+        .maybeSingle();
+      structureError = result.error;
+      if (!result.data && !structureError) {
+        throw new Error('Failed to save structure: document evidence snapshot changed');
+      }
+    } else {
+      const result = await structureUpdate;
+      structureError = result.error;
+    }
 
     if (structureError) {
       throw new Error(`Failed to save structure: ${structureError.message}`);

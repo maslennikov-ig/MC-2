@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalysisResult, Stage5DocumentEvidenceEnrichment } from '@megacampus/shared-types';
-import { buildEvidenceAnalysisResultUpdate } from '@/stages/stage5-generation/evidence/persistence';
+import {
+  buildEvidenceAnalysisResultUpdate,
+  buildEvidencePersistencePlan,
+} from '@/stages/stage5-generation/evidence/persistence';
 
 const runId = '10000000-0000-4000-8000-000000000001';
 const decisionId = '20000000-0000-4000-8000-000000000001';
@@ -58,6 +61,14 @@ describe('Stage 5 evidence persistence snapshot', () => {
         })
       )
     ).toBeUndefined();
+  });
+
+  it('returns the original snapshot as a compare-and-swap precondition', () => {
+    const original = analysis();
+    const plan = buildEvidencePersistencePlan(original, enrichment());
+
+    expect(plan.analysisResultUpdate?.document_evidence?.enrichment_status).toBe('applied');
+    expect(plan.expectedAnalysisResultJson).toBe(JSON.stringify(original));
   });
 
   it.each([

@@ -30,3 +30,22 @@ export function buildEvidenceAnalysisResultUpdate(
     },
   };
 }
+
+export interface EvidencePersistencePlan {
+  analysisResultUpdate?: AnalysisResult;
+  expectedAnalysisResultJson?: string;
+}
+
+/**
+ * Pair the narrow update with its exact source snapshot so the database write
+ * can use optimistic compare-and-swap and cannot erase a concurrent decision.
+ */
+export function buildEvidencePersistencePlan(
+  analysisResult: AnalysisResult | null | undefined,
+  enrichment: Stage5DocumentEvidenceEnrichment | undefined
+): EvidencePersistencePlan {
+  const analysisResultUpdate = buildEvidenceAnalysisResultUpdate(analysisResult, enrichment);
+  return analysisResultUpdate && analysisResult
+    ? { analysisResultUpdate, expectedAnalysisResultJson: JSON.stringify(analysisResult) }
+    : {};
+}

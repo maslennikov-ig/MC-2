@@ -60,8 +60,8 @@ graph_reviewed: used
 graph_review_notes: Read the shared GRAPH_REPORT and ran a focused Stage 5 live-caller query before broad reads. The graph is stale at commit 1233be56 and returned no useful Stage 5 path; repository evidence established handler -> orchestrator -> structural gate -> evidence pass. Refresh remains parent closeout work after integration.
 verification:
   - Shared Stage 5 enrichment plus canonical document evidence contracts: 19/19 passed.
-  - Focused Stage 5 enrichment/live/persistence plus Qdrant search operations: 43/43 passed after the final large-corpus bound.
-  - Full Stage 5 unit directory: 511/511 passed after the final large-corpus bound.
+  - Focused Stage 5 enrichment/live/persistence plus Qdrant search operations: 44/44 passed after the final CAS hardening.
+  - Full Stage 5 unit directory: 512/512 passed after the final CAS hardening.
   - pnpm type-check: passed across all workspace packages.
   - pnpm build with local non-secret test Supabase environment values: passed across all workspace packages.
   - scripts/orchestration/run_process_verification.sh: passed.
@@ -99,7 +99,7 @@ The deterministic production patch can only append at most two evidence-backed t
 - Initial shared RED: the unknown metadata field was stripped and non-canonical arrays passed; GREEN added the optional canonical schema.
 - Initial Stage 5 RED: the evidence module did not exist; GREEN covered no-doc/no-relevant byte equivalence, RU/EN, decision filtering, grouped query shape, patch retry, size limits, fallback status, stale/cross-tenant rejection and log privacy.
 - Live RED: `GenerationOrchestrator.execute()` ignored the injected enricher; GREEN wired the post-baseline production caller and persisted the audit record.
-- Persistence RED: no compact snapshot updater existed; GREEN updates only `analysis_result.document_evidence.enrichment_status` when accepted run and decision sets match.
+- Persistence RED: no compact snapshot updater existed; GREEN updates only `analysis_result.document_evidence.enrichment_status` when accepted run and decision sets match. A post-push self-review then found a concurrent-decision overwrite race; the final CAS plan makes the course update conditional on the exact original `analysis_result` snapshot and fails rather than erasing a newer decision.
 - Hardening RED: manual canonical values, stale coverage, unresolved degraded cards and 1,000-document query bounds failed; GREEN added exact checks and deterministic top-64 ranking.
 - Focused Graphify was consulted first but was stale and unhelpful; repository reads were then limited to the actual Stage 5 handler/orchestrator/validation chain.
 
