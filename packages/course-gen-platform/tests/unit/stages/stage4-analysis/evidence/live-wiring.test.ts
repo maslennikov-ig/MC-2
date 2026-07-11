@@ -392,6 +392,11 @@ describe('Stage 4 document evidence live wiring', () => {
         oldestUnixSeconds: 1_700_000_000,
         observedAtUnixMilliseconds: 1_700_000_001_000,
       })),
+      loadDecisionTotals: vi.fn(async () => ({
+        user: 0,
+        system: 0,
+        degradedAutomatic: 0,
+      })),
     });
 
     expect(publishMetrics).toHaveBeenCalledOnce();
@@ -416,6 +421,131 @@ describe('Stage 4 document evidence live wiring', () => {
       }),
       analysisContext.orchestrationLogger
     );
+  });
+
+  it('publishes zero work deltas on accepted replay and reconciles one appended user decision', async () => {
+    const analysisContext = context();
+    const publishMetrics = vi.fn(async () => undefined);
+    const firstAccepted = {
+      ...skippedResult,
+      status: 'accepted' as const,
+      runId: '10000000-0000-4000-8000-000000000001',
+      coverage: { source_count: 1, assessed_count: 1, degraded_count: 0, failed_count: 0 },
+      cards: [{ processing_mode: 'summary' }],
+      batchDocumentIds: [[summary.document_id]],
+      generationMetrics: {
+        ...skippedResult.generationMetrics,
+        modelCalls: 2,
+        inputTokens: 100,
+        outputTokens: 20,
+        totalCostUsd: 0.1,
+      },
+      metricDeltas: {
+        acceptedRun: 1,
+        documents: { source: 1, assessed: 1, degraded: 0, failed: 0 },
+        processingModes: {
+          full_text: 0,
+          hierarchical_summary: 0,
+          summary: 1,
+          targeted_retrieval: 0,
+          metadata_only: 0,
+        },
+        batches: 1,
+        generationMetrics: {
+          ...skippedResult.generationMetrics,
+          modelCalls: 2,
+          inputTokens: 100,
+          outputTokens: 20,
+          totalCostUsd: 0.1,
+        },
+      },
+    };
+    const replayedAccepted = {
+      ...firstAccepted,
+      metricDeltas: {
+        acceptedRun: 0,
+        documents: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+        processingModes: {
+          full_text: 0,
+          hierarchical_summary: 0,
+          summary: 0,
+          targeted_retrieval: 0,
+          metadata_only: 0,
+        },
+        batches: 0,
+        generationMetrics: skippedResult.generationMetrics,
+      },
+    };
+    const resolveDecisions = vi
+      .fn()
+      .mockResolvedValueOnce({
+        pauseRequired: true,
+        requiredQuestionIds: ['80000000-0000-4000-8000-000000000001'],
+        currentDecisionIds: [],
+        unresolvedInformationalConflictIds: [],
+        decisionSummary: { user: 0, system: 0, degradedAutomatic: 0 },
+      })
+      .mockResolvedValueOnce({
+        pauseRequired: false,
+        requiredQuestionIds: [],
+        currentDecisionIds: ['70000000-0000-4000-8000-000000000001'],
+        unresolvedInformationalConflictIds: [],
+        decisionSummary: { user: 1, system: 0, degradedAutomatic: 0 },
+      });
+    const overrides = {
+      enabled: true,
+      mode: 'active' as const,
+      runPreflight: vi
+        .fn()
+        .mockResolvedValueOnce(firstAccepted as never)
+        .mockResolvedValueOnce(replayedAccepted as never),
+      preflightDependencies: {} as never,
+      detectConflicts: vi.fn(async () => ({
+        conflicts: [],
+        issues: [],
+        batchCount: 0,
+        usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+        metricDeltas: {
+          batches: 0,
+          usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+          conflicts: { critical: 0, important: 0, informational: 0 },
+        },
+      })) as never,
+      conflictDependencies: {} as never,
+      resolveDecisions: resolveDecisions as never,
+      decisionDependencies: {} as never,
+      decisionMode: 'manual' as const,
+      publishMetrics,
+      loadCriticalConflictState: vi.fn(async () => ({
+        unresolved: 0,
+        oldestUnixSeconds: 0,
+        observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+      })),
+      loadDecisionTotals: vi
+        .fn()
+        .mockResolvedValueOnce({ user: 0, system: 0, degradedAutomatic: 0 })
+        .mockResolvedValueOnce({ user: 1, system: 0, degradedAutomatic: 0 }),
+    };
+
+    await runDocumentEvidencePhase(analysisContext, overrides);
+    await runDocumentEvidencePhase(analysisContext, overrides);
+
+    const first = publishMetrics.mock.calls[0][0] as Record<string, unknown>;
+    const resumed = publishMetrics.mock.calls[1][0] as Record<string, unknown>;
+    expect(first).toEqual(expect.objectContaining({
+      runDelta: 1,
+      documentDeltas: { source: 1, assessed: 1, degraded: 0, failed: 0 },
+      batches: 1,
+      inputTokens: 100,
+      decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+    }));
+    expect(resumed).toEqual(expect.objectContaining({
+      runDelta: 0,
+      documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+      batches: 0,
+      inputTokens: 0,
+      decisions: { user: 1, system: 0, degradedAutomatic: 0 },
+    }));
   });
 
   it('publishes one bounded Stage 4 failure outcome and preserves the product error', async () => {

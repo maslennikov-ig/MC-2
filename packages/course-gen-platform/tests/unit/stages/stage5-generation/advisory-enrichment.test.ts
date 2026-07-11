@@ -255,6 +255,7 @@ describe('Stage 5 advisory evidence enrichment', () => {
 
       expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
       expect(result.enrichment.status).toBe('not_applicable');
+      expect(result.retrievalAttempts).toBe(0);
       expect(search).not.toHaveBeenCalled();
     }
   );
@@ -275,6 +276,7 @@ describe('Stage 5 advisory evidence enrichment', () => {
 
     expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
     expect(result.enrichment.status).toBe('no_relevant_evidence');
+    expect(result.retrievalAttempts).toBe(1);
   });
 
   it('uses a grouped tenant/course-filtered live Qdrant query with bounded limits', async () => {
@@ -587,6 +589,20 @@ describe('Stage 5 advisory evidence enrichment', () => {
     expect(patcher).toHaveBeenCalledTimes(2);
   });
 
+  it('preserves completed retrieval attempts when a patcher throws unexpectedly', async () => {
+    const privateSentinel = 'PRIVATE_PATCHER_FAILURE';
+    const patcher = vi.fn(async () => {
+      throw new Error(privateSentinel);
+    });
+    const { promise, search } = run({ patcher });
+
+    await expect(promise).rejects.toMatchObject({ retrievalAttempts: 1 });
+    expect(search).toHaveBeenCalledOnce();
+    await expect(promise).rejects.not.toMatchObject({
+      message: expect.stringContaining(privateSentinel),
+    });
+  });
+
   it('revalidates schema/size constraints and rejects a key-topic overflow', async () => {
     const original = baseline();
     const patcher = vi.fn(async () => {
@@ -601,6 +617,7 @@ describe('Stage 5 advisory evidence enrichment', () => {
     const result = await promise;
 
     expect(result.enrichment.status).toBe('degraded');
+    expect(result.retrievalAttempts).toBe(1);
     expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
   });
 
@@ -648,7 +665,57 @@ describe('Stage 5 advisory evidence enrichment', () => {
     );
 
     expect(result.enrichment.status).toBe('degraded');
+    expect(result.retrievalAttempts).toBe(1);
     expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
+  });
+
+  it('counts every actual section search including a partial retrieval failure', async () => {
+    const original = baseline();
+    original.sections.push({
+      ...structuredClone(original.sections[0]),
+      section_number: 2,
+      section_title: 'Retention Operations',
+    });
+    const search = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary retrieval failure'))
+      .mockResolvedValueOnce({ ...searchResult(), results: [] });
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: original,
+        snapshot: snapshot(),
+      },
+      { repository: repository(), search }
+    );
+
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(result.retrievalAttempts).toBe(2);
+  });
+
+  it('counts one actual retrieval for every baseline section on a full pass', async () => {
+    const original = baseline();
+    original.sections.push({
+      ...structuredClone(original.sections[0]),
+      section_number: 2,
+      section_title: 'Retention Operations',
+    });
+    const search = vi.fn(async () => ({ ...searchResult(), results: [] }));
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: original,
+        snapshot: snapshot(),
+      },
+      { repository: repository(), search }
+    );
+
+    expect(search).toHaveBeenCalledTimes(original.sections.length);
+    expect(result.retrievalAttempts).toBe(original.sections.length);
   });
 
   it('records a degraded fallback section even when fallback returns a grounded hit', async () => {
@@ -793,6 +860,40 @@ describe('Stage 5 advisory evidence enrichment', () => {
     );
 
     expect(result.enrichment.status).toBe('degraded');
+    expect(result.retrievalAttempts).toBe(0);
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it('does not count retrieval when no evidence card is eligible', async () => {
+    const failedCard = {
+      ...card(id.docA, id.claimA, 'Keep records for 30 days.'),
+      coverage_status: 'failed' as const,
+      coverage_reason: 'processing failed',
+    };
+    const search = vi.fn();
+    const result = await enrichBaselineWithDocumentEvidence(
+      {
+        courseId: id.course,
+        organizationId: id.org,
+        language: 'en',
+        baseline: baseline(),
+        snapshot: {
+          ...snapshot([]),
+          coverage: { source_count: 1, assessed_count: 0, degraded_count: 0, failed_count: 1 },
+        },
+      },
+      {
+        repository: repository({
+          listItems: vi.fn(async () => [failedCard]),
+          listConflicts: vi.fn(async () => []),
+          getLatestDecisions: vi.fn(async () => []),
+        }),
+        search,
+      }
+    );
+
+    expect(result.enrichment.status).toBe('degraded');
+    expect(result.retrievalAttempts).toBe(0);
     expect(search).not.toHaveBeenCalled();
   });
 
@@ -825,6 +926,7 @@ describe('Stage 5 advisory evidence enrichment', () => {
     );
 
     expect(result.enrichment.status).toBe('degraded');
+    expect(result.retrievalAttempts).toBe(0);
     expect(search).not.toHaveBeenCalled();
   });
 

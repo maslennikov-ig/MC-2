@@ -24,6 +24,7 @@ success_criteria:
   - Stage 4/5/6 production paths publish exactly once while metrics I/O fails open with one constant content-free log.
   - Shadow mode persists bounded conflicts and usage without decisions/questions/downstream influence (mc2-jz6y0.24.3).
   - Ordinary evidence logs expose only allowlisted outcomes/statuses/counts and no evidence identity (mc2-jz6y0.24.4).
+  - Replay-safe Stage 4 deltas, ownership-token locks, concurrent migrations, O(1) decision totals, and exact Stage 5 retrieval attempts are implemented (mc2-jz6y0.24.5).
   - Four Prometheus alerts and six Grafana panels use privacy-safe aggregate signals and reset/absence fixtures.
   - Critical-conflict and coverage reconciliation remains correct across unrelated runs and multiple worker instances.
 selected_docs:
@@ -51,7 +52,7 @@ status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
 cleanup_status: cleaned
-cleanup_notes: Disposable PostgreSQL 15.18 and the worktree-local dependency install were removed; no test container, temporary metric file, or generated dependency directory remains.
+cleanup_notes: Disposable PostgreSQL 16 database/role, worktree-local dependencies, build outputs, generated service worker files, and metric lock/temp state were removed; the shared pre-existing PostgreSQL container was not changed.
 risk_level: high
 docs_impact: migration-and-ops-observability
 docs_reviewed: no-change-needed
@@ -59,37 +60,49 @@ docs_review_notes: Stable E7/Q9 prose belongs to the disjoint E7-D stream; this 
 graph_reviewed: blocked
 graph_review_notes: Read and queried the fresh parent graph at base 7b542c8d. The isolated child does not own the parent's ignored graphify-out state; parent refresh is required after integration.
 verification:
-  - Final expanded TDD joined gate: 123/123 passed across 14 files
+  - mc2-jz6y0.24.5 focused Stage 4/5/metrics/privacy gate: 124/124 passed across 9 files
+  - full pnpm test across workspace unit suites: passed
+  - Stage 5 exact-attempt and sanitized post-search failure gate: 33/33 passed
+  - Disposable PostgreSQL 16 applied migration gate: 6/6 passed
+  - Cross-process publisher proof uses 12 real child processes and deterministic stale-owner fencing
   - Privacy remediation contract: initial identity RED 4/4 failed, final GREEN 4/4 passed; outcome naming RED 2/4 failed before GREEN
-  - observability-index static gate: 1 passed, 2 applied tests expected skipped without database URL
-  - disposable PostgreSQL 15.18 observability-index applied gate: 3/3 passed
   - Prometheus 3.13.1 promtool check config/check rules/test rules: passed, 14 rules
   - pnpm type-check: passed across all workspace packages
-  - pnpm build with synthetic loopback web environment: passed
-  - artifact validation and process verification: passed; repeated after final cleanup metadata
+  - scoped changed-source lint: passed with 0 errors and 13 existing warnings
+  - full pnpm lint remains red on 4 pre-existing errors in untouched src/server/routers/clarifying-helpers.ts and src/server/routers/clarifying.router.ts; both are byte-unchanged from task base f40330c4
+  - pnpm build with synthetic loopback web environment: passed; first run failed only required build-time env validation
+  - artifact validation and process verification: passed after final cleanup metadata
 changed_files:
   - ops/qdrant/grafana/dashboards/qdrant.json
   - ops/qdrant/prometheus/alert-tests.yml
   - ops/qdrant/prometheus/alerts.yml
   - packages/course-gen-platform/src/shared/metrics/document-evidence-textfile.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/conflict-detector.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/evidence/preflight.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/decision-service.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/repository.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-phase-helpers.ts
   - packages/course-gen-platform/src/stages/stage5-generation/evidence/advisory-enrichment.ts
+  - packages/course-gen-platform/src/stages/stage5-generation/evidence/types.ts
   - packages/course-gen-platform/src/stages/stage5-generation/orchestrator.ts
   - packages/course-gen-platform/src/stages/stage6-lesson-content/rag/retriever.ts
   - packages/course-gen-platform/supabase/migrations/20260711150000_document_evidence_observability_index.sql
   - packages/course-gen-platform/supabase/migrations/rollback/20260711150000_document_evidence_observability_index_rollback.sql
+  - packages/course-gen-platform/supabase/migrations/20260711151000_document_evidence_observability_totals.sql
+  - packages/course-gen-platform/supabase/migrations/rollback/20260711151000_document_evidence_observability_totals_rollback.sql
   - packages/course-gen-platform/tests/integration/document-evidence-observability-index.test.ts
   - packages/course-gen-platform/tests/unit/ops/document-evidence-log-privacy-contract.test.ts
   - packages/course-gen-platform/tests/unit/ops/document-evidence-observability-contract.test.ts
   - packages/course-gen-platform/tests/unit/ops/qdrant-observability-contract.test.ts
   - packages/course-gen-platform/tests/unit/shared/metrics/document-evidence-textfile.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/conflict-detector.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/preflight.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment-live.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage6/rag/lesson-rag-retriever.test.ts
+  - packages/course-gen-platform/vitest.config.integration-ci.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-observability.md
 explicit_defers:
   - Parent E7 integration owns stable documentation reconciliation, Graphify refresh, Beads state, acceptance totals, summary/handoff, and independent review.
@@ -98,9 +111,13 @@ explicit_defers:
 
 # Summary
 
-E7-O adds one privacy-safe textfile publisher for document-evidence observability. Per-service/instance counters persist independently while coverage and unresolved-critical state use one locked, atomic `stage4/aggregate` file, so stale worker files cannot clear or preserve the wrong global state. Newer reconciliation timestamps win; an unrelated run without a durable snapshot cannot clear an open conflict. A partial failed run reports incomplete coverage rather than inventing failed document outcomes. Every final file is explicitly mode `0644`, and metric I/O is converted into one constant log with no error, identifier, answer, or source content.
+E7-O adds one privacy-safe textfile publisher for document-evidence observability. Per-service/instance counters persist independently while coverage, unresolved-critical state, and durable decision totals use one locked, atomic `stage4/aggregate` file. Every read-modify-write path rereads under an ownership-token directory lock. Stale takeover first atomically fences the old directory; an old owner verifies its unique token before rename and cannot unlink a successor during release. A 12-child-process test and deterministic stale-takeover test verify no lost counters or leftover lock/temp state. Metrics I/O remains fail-open for product work with one constant content-free log.
 
-Stage 4 publishes one completion or failure event. Accepted shadow and active runs both execute and persist bounded conflict detection; only active mode enters decision materialization. The active path reports exact user/system and degraded-automatic decision aggregates. A global pending-critical-question reconciliation supplies count and oldest time; approval creates a new `STRUCTURE_ANALYSIS` job, which reruns the Stage 4 evidence phase and clears resolved state. The new partial `created_at` index exactly covers that production predicate. Stage 5 publishes its final advisory status/fallback count after success or fail-open. Stage 6 wraps its live retriever once and distinguishes cached, success, empty, optional fallback, and required failure without exposing the internal marker to callers. Stage 7 is untouched.
+Stage 4 metrics consume durable invocation deltas from preflight and newly committed checkpoint/usage/conflict deltas from conflict detection. Accepted-run replay adds zero run/work/cost/conflict counters; a later user or degraded-automatic decision advances exactly once. Cumulative counters are not reconstructed from a bounded identity cache. Decision reconciliation reads a trigger-maintained singleton table while append-only decision rows remain canonical. Coverage and unresolved-critical values remain latest-state gauges. No identity sidecar, run/document/decision identifiers, hashes, or gauges named `_total` are emitted.
+
+The pending-critical partial index is created and dropped with `CONCURRENTLY`. The applied proof uses a statement-by-statement autocommit runner; a transaction-wrapped runner correctly fails with PostgreSQL `25001`. Real concurrent inserts and an answer update complete under a one-second statement timeout while create and drop wait on another writer. This proves the tested PostgreSQL/autocommit path, not universal zero downtime. The singleton migration is transactional and temporarily fences decision inserts while installing its trigger and reconciling history; runtime appends then update counters in O(1).
+
+Stage 5 reports exact `retrievalAttempts`, incremented immediately before each actual search call and propagated to the terminal metric. Context rejection and no eligible documents report zero; no-result/outage calls report one; partial and full multi-section passes report actual calls. Unexpected patcher/validator failures become a sanitized typed failure carrying only the completed count, so a post-search failure reports one while a pre-search injected failure remains zero. The shared durable Stage 5 audit schema is unchanged. Stage 6 remains unchanged by `.24.5`; Stage 7 is untouched.
 
 # Metrics, alerts, and panels
 
@@ -116,15 +133,18 @@ Alerts are `DocumentEvidenceRunFailed`, `DocumentEvidenceCoverageIncomplete`, `D
 - Reconciliation review RED/GREEN: five of six publisher tests failed before base labels and durable interleaving semantics; final publisher gate is 7/7, including multi-file uniqueness, open→unrelated→resolved→stale-writer ordering and partial failed coverage.
 - Shadow expansion `mc2-jz6y0.24.3`: RED 1/19 because detector calls were zero; GREEN 19/19 with conflict/usage metrics and no resolver call.
 - Privacy re-review `mc2-jz6y0.24.4`: the first static contract failed all four identifier groups, then passed 4/4 after Stage 4 completion, all three Stage 5 advisory/fail-open, the Stage 5 completion trace, and the Stage 6 accepted-evidence-empty log were reduced to allowlisted modes/outcomes/statuses/counts. The follow-up `category`→`outcome` naming contract failed 2/4 before the bounded rename and final GREEN. The expanded joined gate passed 123/123 across 14 files.
+- Replay/locking remediation `mc2-jz6y0.24.5`: the two-pass publisher/live RED exposed replayed cumulative inputs and absent durable reconciliation. GREEN passed the accepted-run lifecycle (first, replay, 300 distinct runs, manual resume, replay), 12 real child writers, and stale-owner fencing. The final focused Stage 4/5/metrics/privacy gate passed 124/124.
+- Stage 5 exactness RED/GREEN: 5 failures first proved missing counts and section-derived terminal retrievals. The post-search follow-up proved a patcher throw lost one completed call. Final focused Stage 5 gate passed 33/33 with sanitized count propagation.
+- Concurrent migration RED/GREEN: static RED failed on non-concurrent index DDL and missing singleton state. Disposable PostgreSQL 16 then passed 6/6 applied checks for autocommit, transaction rejection, concurrent insert/answer, rollback/reapply, trigger increments, and exact recount.
 - Index migration RED/GREEN: static 1 failed before files existed, then passed. First applied run failed 2/3 because PostgreSQL truncated a 70-character identifier; the bounded name fix passed 3/3 with definition, EXPLAIN use, rollback, reapply, and idempotent repeat.
 - Fresh final gates are recorded in frontmatter. Privacy scans inspect labels/log additions, dashboard/rules, changed diff, and secret-shaped content. No remote runtime or receiver was contacted.
 
 # Delivery / Cleanup
 
-The implementation remains isolated on `codex/e7-evidence-observability` for parent inspection and merge. The PostgreSQL container/database and test schema were removed. No Compose service, systemd unit, secret, receiver, Qdrant state, cloud resource, staging environment, or production state was changed.
+The implementation remains isolated on `codex/e7-evidence-observability` for parent inspection and merge. The disposable PostgreSQL database/schema and worktree dependencies are removed during final cleanup. No Compose service, systemd unit, secret, receiver, Qdrant state, cloud resource, staging environment, or production state was changed.
 
 # Risks / Follow-ups / Explicit Defers
 
-The reconciliation query is global by design so an unrelated course cannot clear another conflict. Its exact partial index bounds the pending-critical document-conflict count/oldest scan without changing prior evidence migrations. Cross-process aggregate publication uses a bounded lock with stale-lock recovery and observation ordering; if the optional sink or lock is unavailable, product work proceeds and the prior durable aggregate remains visible rather than being falsely cleared.
+The reconciliation query is global by design so an unrelated course cannot clear another conflict. The owner reconfirmed the Prometheus `3.13.1` LTS pin for this remediation; pinned-digest `promtool` config/rule/test checks pass with 14 rules. If the optional sink or lock is unavailable, product work proceeds and the prior durable aggregate remains visible rather than being falsely cleared.
 
 Stable E7 operator/product docs, acceptance totals, summary/handoff, Beads updates, Graphify refresh, integration review, and Q12 remain parent-owned as declared above.

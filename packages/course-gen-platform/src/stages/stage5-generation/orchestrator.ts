@@ -45,6 +45,7 @@ import {
   validateStructuralQuality,
 } from './validators/structural-quality-validator';
 import type { Stage5EvidenceEnricher } from './evidence/types';
+import { Stage5EvidenceEnrichmentFailure } from './evidence/types';
 import { buildEvidenceFailureRecord } from './evidence/advisory-enrichment';
 import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
@@ -229,7 +230,7 @@ export class GenerationOrchestrator {
       finalState.sections,
       input,
       this.logger,
-      finalState.metadata as NonNullable<typeof finalState.metadata>
+      finalState.metadata
     );
 
     this.logQualityGateResults(input, qualityGateResults);
@@ -249,7 +250,7 @@ export class GenerationOrchestrator {
     const finalStructuralResult = validateStructuralQuality({
       input,
       metadata: reconcileCourseMetadata(
-        finalState.metadata as NonNullable<typeof finalState.metadata>,
+        finalState.metadata,
         stateForAssembly.sections,
         input
       ),
@@ -562,7 +563,7 @@ export class GenerationOrchestrator {
     totalDuration: number
   ): Promise<GenerationResult> {
     const { courseStructure, generationMetadata } = assembleGenerationResult(
-      finalState.metadata as NonNullable<typeof finalState.metadata>,
+      finalState.metadata,
       finalState.sections,
       finalState.tokenUsage,
       finalState.modelUsed,
@@ -574,6 +575,7 @@ export class GenerationOrchestrator {
     );
 
     let finalCourseStructure = courseStructure;
+    let evidenceRetrievalAttempts = 0;
     if (this.evidenceEnricher) {
       const baselineCriticalCodes = new Set(
         generationMetadata.quality_scores.structure?.criticalIssues.map(issue => issue.code) ?? []
@@ -589,7 +591,7 @@ export class GenerationOrchestrator {
             const result = validateStructuralQuality({
               input,
               metadata: reconcileCourseMetadata(
-                finalState.metadata as NonNullable<typeof finalState.metadata>,
+                finalState.metadata,
                 candidate.sections,
                 input
               ),
@@ -600,12 +602,13 @@ export class GenerationOrchestrator {
               .map(issue => `structural:${issue.code}`);
           },
         });
+        evidenceRetrievalAttempts = enriched.retrievalAttempts;
         finalCourseStructure = enriched.courseStructure;
         generationMetadata.document_evidence_enrichment = enriched.enrichment;
         const enrichedStructuralResult = validateStructuralQuality({
           input,
           metadata: reconcileCourseMetadata(
-            finalState.metadata as NonNullable<typeof finalState.metadata>,
+            finalState.metadata,
             finalCourseStructure.sections,
             input
           ),
@@ -622,7 +625,10 @@ export class GenerationOrchestrator {
           );
         }
         generationMetadata.quality_scores.structure = enrichedStructuralResult;
-      } catch {
+      } catch (error) {
+        if (error instanceof Stage5EvidenceEnrichmentFailure) {
+          evidenceRetrievalAttempts = error.retrievalAttempts;
+        }
         this.logger.warn(
           {
             outcome: 'evidence_enrichment_failed',
@@ -643,7 +649,7 @@ export class GenerationOrchestrator {
         {
           stage: 'stage5',
           status: evidenceAudit.status,
-          retrievals: evidenceAudit.accepted_run_id ? finalCourseStructure.sections.length : 0,
+          retrievals: evidenceRetrievalAttempts,
           fallbacks: evidenceAudit.fallback_section_count,
         },
         this.logger

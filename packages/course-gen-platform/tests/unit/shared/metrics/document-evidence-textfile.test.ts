@@ -1,15 +1,21 @@
+import { execFile } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { utimes } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   publishDocumentEvidenceMetrics,
   publishDocumentEvidenceMetricsSafely,
+  documentEvidenceTextfileTesting,
   type DocumentEvidenceMetricEvent,
 } from '@/shared/metrics/document-evidence-textfile';
 
 const temporaryDirectories: string[] = [];
+const execFileAsync = promisify(execFile);
 
 function directory(): string {
   // Windows' WSL temp mount ignores POSIX chmod; the production contract is Linux mode 0644.
@@ -24,8 +30,10 @@ const stage4Event = (status: 'accepted' | 'failed' = 'accepted'): DocumentEviden
   stage: 'stage4',
   status,
   mode: 'active',
+  runDelta: 1,
   observedAtUnixMilliseconds: 1_700_000_001_000,
   coverage: { source: 4, assessed: 2, degraded: 1, failed: 1 },
+  documentDeltas: { source: 4, assessed: 2, degraded: 1, failed: 1 },
   processingModes: {
     full_text: 1,
     hierarchical_summary: 1,
@@ -56,6 +64,134 @@ afterEach(() => {
 });
 
 describe('document evidence textfile metrics', () => {
+  it('serializes real child processes updating the same service file without lost counters', async () => {
+    const path = directory();
+    const moduleUrl = pathToFileURL(
+      resolve(process.cwd(), 'src/shared/metrics/document-evidence-textfile.ts')
+    ).href;
+    const script = `
+      import { publishDocumentEvidenceMetrics } from ${JSON.stringify(moduleUrl)};
+      await publishDocumentEvidenceMetrics(
+        { stage: 'stage6', status: 'success', retrievals: 1, fallbacks: 0 },
+        { directory: process.env.EVIDENCE_DIR, service: 'worker', instance: 'shared' }
+      );
+    `;
+
+    await Promise.all(
+      Array.from({ length: 12 }, () =>
+        execFileAsync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
+          cwd: process.cwd(),
+          env: { ...process.env, EVIDENCE_DIR: path },
+        })
+      )
+    );
+
+    const exposition = readFileSync(join(path, 'evidence-worker-shared.prom'), 'utf8');
+    expect(exposition).toContain(
+      'megacampus_document_evidence_stage6_outcomes_total{service="worker",instance="shared",status="success"} 12'
+    );
+    expect(exposition).toContain(
+      'megacampus_document_evidence_retrieval_total{service="worker",instance="shared",stage="stage6",outcome="request"} 12'
+    );
+    expect(readdirSync(path).filter(name => /lock|tmp|acquire|stale/u.test(name))).toEqual([]);
+  });
+
+  it('fences a stale owner before rename and its release cannot unlink the successor', async () => {
+    const path = directory();
+    const lockPath = join(path, '.owned.lock');
+    const targetPath = join(path, 'owned.prom');
+    const stale = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath, {
+      staleAfterMilliseconds: 5,
+    });
+    await utimes(stale.ownerPath, new Date(0), new Date(0));
+    const successor = await documentEvidenceTextfileTesting.acquireOwnedLock(lockPath, {
+      staleAfterMilliseconds: 5,
+    });
+
+    await expect(stale.write(targetPath, 'stale\n', 0o644)).rejects.toThrow(/ownership|fenced/iu);
+    await successor.write(targetPath, 'successor\n', 0o644);
+    await stale.release();
+    await expect(successor.assertOwned()).resolves.toBeUndefined();
+    expect(readFileSync(targetPath, 'utf8')).toBe('successor\n');
+    await successor.release();
+
+    expect(readdirSync(path).filter(name => /lock|tmp|acquire|stale/u.test(name))).toEqual([]);
+  });
+
+  it('reconciles the same accepted run twice and counts one appended user decision once', async () => {
+    const path = directory();
+    const first = {
+      ...stage4Event(),
+      decisions: { user: 0, system: 1, degradedAutomatic: 1 },
+    } as DocumentEvidenceMetricEvent;
+    const replay = {
+      ...stage4Event(),
+      runDelta: 0,
+      documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+      processingModes: {
+        full_text: 0,
+        hierarchical_summary: 0,
+        summary: 0,
+        targeted_retrieval: 0,
+        metadata_only: 0,
+      },
+      batches: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      modelCalls: 0,
+      costUsd: 0,
+      durationSeconds: 0,
+      conflicts: { critical: 0, important: 0, informational: 0 },
+      decisions: { user: 0, system: 1, degradedAutomatic: 1 },
+    } as DocumentEvidenceMetricEvent;
+    const resumed = {
+      ...replay,
+      decisions: { user: 1, system: 1, degradedAutomatic: 1 },
+      observedAtUnixMilliseconds: 1_700_000_002_000,
+    } as DocumentEvidenceMetricEvent;
+
+    await publishDocumentEvidenceMetrics(first, options(path));
+    await publishDocumentEvidenceMetrics(replay, options(path));
+    for (let index = 0; index < 300; index += 1) {
+      await publishDocumentEvidenceMetrics(
+        { ...first, decisions: { user: 0, system: 1, degradedAutomatic: 1 } },
+        options(path)
+      );
+    }
+    await publishDocumentEvidenceMetrics(resumed, options(path));
+    await publishDocumentEvidenceMetrics(resumed, options(path));
+
+    const exposition = readFileSync(join(path, 'evidence-worker-primary.prom'), 'utf8');
+    const aggregate = readFileSync(join(path, 'evidence-stage4-state.prom'), 'utf8');
+    expect(exposition).toContain(
+      'megacampus_document_evidence_runs_total{service="worker",instance="primary",stage="stage4",status="accepted"} 301'
+    );
+    expect(exposition).toContain(
+      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="source"} 1204'
+    );
+    expect(exposition).toContain(
+      'megacampus_document_evidence_batches_total{service="worker",instance="primary"} 903'
+    );
+    expect(exposition).toContain(
+      'megacampus_document_evidence_cost_usd_total{service="worker",instance="primary"} 37.625'
+    );
+    expect(exposition).toContain(
+      'megacampus_document_evidence_conflicts_total{service="worker",instance="primary",severity="critical"} 301'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_decisions_total{service="stage4",instance="aggregate",actor="user"} 1'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_decisions_total{service="stage4",instance="aggregate",actor="system"} 1'
+    );
+    expect(aggregate).toContain(
+      'megacampus_document_evidence_degraded_automatic_decisions_total{service="stage4",instance="aggregate"} 1'
+    );
+    expect(`${exposition}\n${aggregate}`).not.toMatch(
+      /10000000-0000-4000-8000-000000000001|sha256:/u
+    );
+  });
+
   it('persists bounded Stage 4 counters and exact coverage across restarts', async () => {
     const path = directory();
 
@@ -101,11 +237,11 @@ describe('document evidence textfile metrics', () => {
     expect(exposition).toContain(
       'megacampus_document_evidence_conflicts_total{service="worker",instance="primary",severity="critical"} 2'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_decisions_total{service="worker",instance="primary",actor="system"} 2'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_decisions_total{service="stage4",instance="aggregate",actor="system"} 1'
     );
-    expect(exposition).toContain(
-      'megacampus_document_evidence_degraded_automatic_decisions_total{service="worker",instance="primary"} 2'
+    expect(stage4Exposition).toContain(
+      'megacampus_document_evidence_degraded_automatic_decisions_total{service="stage4",instance="aggregate"} 1'
     );
     expect(stage4Exposition).toMatch(
       /megacampus_document_evidence_unresolved_critical_conflicts\{service="stage4",instance="aggregate"\} 1\n/
@@ -199,6 +335,7 @@ describe('document evidence textfile metrics', () => {
       {
         ...stage4Event('failed'),
         coverage: { source: 4, assessed: 0, degraded: 0, failed: 0 },
+        documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
         criticalConflictState: undefined,
       },
       options(path)
@@ -209,7 +346,7 @@ describe('document evidence textfile metrics', () => {
       'megacampus_document_evidence_coverage_ratio{service="stage4",instance="aggregate"} 0'
     );
     expect(exposition).toContain(
-      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="source"} 4'
+      'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="source"} 0'
     );
     expect(exposition).toContain(
       'megacampus_document_evidence_documents_total{service="worker",instance="primary",outcome="failed"} 0'

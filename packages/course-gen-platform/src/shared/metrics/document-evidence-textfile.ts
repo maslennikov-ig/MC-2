@@ -1,6 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { chmod, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  rmdir,
+  stat,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export interface DocumentEvidenceTextfileOptions {
@@ -20,8 +31,10 @@ type Stage4Event = {
   stage: 'stage4';
   status: 'accepted' | 'failed';
   mode: 'shadow' | 'active';
+  runDelta: 0 | 1;
   observedAtUnixMilliseconds: number;
   coverage: { source: number; assessed: number; degraded: number; failed: number };
+  documentDeltas: { source: number; assessed: number; degraded: number; failed: number };
   processingModes: Record<ProcessingMode, number>;
   batches: number;
   inputTokens: number;
@@ -30,7 +43,7 @@ type Stage4Event = {
   costUsd: number;
   durationSeconds: number;
   conflicts: { critical: number; important: number; informational: number };
-  decisions: { user: number; system: number; degradedAutomatic: number };
+  decisions?: { user: number; system: number; degradedAutomatic: number };
   criticalConflictState?: {
     unresolved: number;
     oldestUnixSeconds: number;
@@ -191,22 +204,32 @@ function applyStage4(state: MetricState, event: Stage4Event): void {
     throw new Error('Evidence metrics coverage must be exact');
   }
 
+  const runDelta = requireCount(event.runDelta, 'run delta');
+  if (runDelta > 1) throw new Error('Evidence metrics run delta must be zero or one');
   increment(
     state,
     key('megacampus_document_evidence_runs_total', {
       stage: 'stage4',
       status: event.status,
     }),
-    1
+    runDelta
   );
-  increment(state, key('megacampus_document_evidence_run_mode_total', { mode: event.mode }), 1);
+  increment(
+    state,
+    key('megacampus_document_evidence_run_mode_total', { mode: event.mode }),
+    runDelta
+  );
   for (const [outcome, value] of [
-    ['source', source],
-    ['assessed', assessed],
-    ['degraded', degraded],
-    ['failed', failed],
+    ['source', event.documentDeltas.source],
+    ['assessed', event.documentDeltas.assessed],
+    ['degraded', event.documentDeltas.degraded],
+    ['failed', event.documentDeltas.failed],
   ] as const) {
-    increment(state, key('megacampus_document_evidence_documents_total', { outcome }), value);
+    increment(
+      state,
+      key('megacampus_document_evidence_documents_total', { outcome }),
+      requireCount(value, `${outcome} document delta`)
+    );
   }
   for (const mode of PROCESSING_MODES) {
     increment(
@@ -252,18 +275,9 @@ function applyStage4(state: MetricState, event: Stage4Event): void {
       requireCount(event.conflicts[severity], `${severity} conflicts`)
     );
   }
-  for (const actor of ['user', 'system'] as const) {
-    increment(
-      state,
-      key('megacampus_document_evidence_decisions_total', { actor }),
-      requireCount(event.decisions[actor], `${actor} decisions`)
-    );
-  }
-  increment(
-    state,
-    'megacampus_document_evidence_degraded_automatic_decisions_total',
-    requireCount(event.decisions.degradedAutomatic, 'degraded automatic decisions')
-  );
+  state.delete(key('megacampus_document_evidence_decisions_total', { actor: 'user' }));
+  state.delete(key('megacampus_document_evidence_decisions_total', { actor: 'system' }));
+  state.delete('megacampus_document_evidence_degraded_automatic_decisions_total');
 }
 
 function applyStage5(state: MetricState, event: Stage5Event): void {
@@ -346,42 +360,118 @@ async function update(
   options: DocumentEvidenceTextfileOptions,
   event: DocumentEvidenceMetricEvent
 ): Promise<void> {
-  const state = await readState(path, options);
-  applyEvent(state, event);
-  const temporaryPath = join(options.directory, `.${randomUUID()}.evidence.prom.tmp`);
+  const lock = await acquireOwnedLock(`${path}.lock`);
   try {
-    await writeFile(temporaryPath, render(state, options.service, options.instance), {
-      encoding: 'utf8',
-      mode: 0o644,
-      flag: 'wx',
-    });
-    await chmod(temporaryPath, 0o644);
-    await rename(temporaryPath, path);
+    await lock.heartbeat();
+    const state = await readState(path, options);
+    applyEvent(state, event);
+    await lock.write(path, render(state, options.service, options.instance), 0o644);
   } finally {
-    await rm(temporaryPath, { force: true });
+    await lock.release();
   }
 }
 
-async function acquireAggregateLock(path: string): Promise<() => Promise<void>> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+interface OwnedLockOptions {
+  staleAfterMilliseconds?: number;
+  maxAttempts?: number;
+}
+
+interface OwnedLock {
+  ownerPath: string;
+  assertOwned(): Promise<void>;
+  heartbeat(): Promise<void>;
+  write(path: string, content: string, mode: number): Promise<void>;
+  release(): Promise<void>;
+}
+
+async function acquireOwnedLock(
+  path: string,
+  options: OwnedLockOptions = {}
+): Promise<OwnedLock> {
+  const staleAfterMilliseconds = options.staleAfterMilliseconds ?? 30_000;
+  const maxAttempts = options.maxAttempts ?? 400;
+  const token = randomUUID();
+  const ownerName = `owner-${token}`;
+  const ownerPath = join(path, ownerName);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const acquirePath = `${path}.acquire-${token}`;
     try {
-      const handle = await open(path, 'wx', 0o600);
-      return async () => {
-        await handle.close();
-        await rm(path, { force: true });
+      await mkdir(acquirePath, { mode: 0o700 });
+      await writeFile(join(acquirePath, ownerName), token, { mode: 0o600, flag: 'wx' });
+      await rename(acquirePath, path);
+      const assertOwned = async (): Promise<void> => {
+        try {
+          await stat(ownerPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            throw new Error('Evidence metrics lock ownership was fenced');
+          }
+          throw error;
+        }
+      };
+      return {
+        ownerPath,
+        assertOwned,
+        async heartbeat() {
+          await assertOwned();
+          const now = new Date();
+          await utimes(ownerPath, now, now);
+        },
+        async write(targetPath, content, mode) {
+          const temporaryPath = join(
+            dirname(targetPath),
+            `.${randomUUID()}.evidence.prom.tmp`
+          );
+          try {
+            await writeFile(temporaryPath, content, { encoding: 'utf8', mode, flag: 'wx' });
+            await chmod(temporaryPath, mode);
+            await assertOwned();
+            await rename(temporaryPath, targetPath);
+          } finally {
+            await rm(temporaryPath, { force: true });
+          }
+        },
+        async release() {
+          try {
+            await rm(ownerPath);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+            throw error;
+          }
+          try {
+            await rmdir(path);
+          } catch (error) {
+            if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes((error as NodeJS.ErrnoException).code ?? '')) {
+              throw error;
+            }
+          }
+        },
       };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      await rm(acquirePath, { recursive: true, force: true });
+      if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) {
+        throw error;
+      }
       try {
-        const details = await stat(path);
-        if (Date.now() - details.mtimeMs > 30_000) await rm(path, { force: true });
+        const owners = (await readdir(path)).filter(name => name.startsWith('owner-'));
+        if (owners.length === 0) {
+          await delay(10);
+          continue;
+        }
+        if (owners.length !== 1) throw new Error('Evidence metrics lock has invalid ownership');
+        const details = await stat(join(path, owners[0]));
+        if (Date.now() - details.mtimeMs > staleAfterMilliseconds) {
+          const stalePath = `${path}.stale-${randomUUID()}`;
+          await rename(path, stalePath);
+          await rm(stalePath, { recursive: true, force: true });
+        }
       } catch (statError) {
         if ((statError as NodeJS.ErrnoException).code !== 'ENOENT') throw statError;
       }
       await delay(10);
     }
   }
-  throw new Error('Evidence metrics aggregate lock is unavailable');
+  throw new Error('Evidence metrics owned lock is unavailable');
 }
 
 async function updateStage4Aggregate(
@@ -391,8 +481,9 @@ async function updateStage4Aggregate(
   const aggregateOptions = { ...options, service: 'stage4', instance: 'aggregate' };
   const path = join(options.directory, 'evidence-stage4-state.prom');
   const lockPath = join(options.directory, '.evidence-stage4-state.lock');
-  const release = await acquireAggregateLock(lockPath);
+  const lock = await acquireOwnedLock(lockPath);
   try {
+    await lock.heartbeat();
     const state = await readState(path, aggregateOptions);
     const coverageObservedAt = requireNumber(
       event.observedAtUnixMilliseconds,
@@ -409,6 +500,29 @@ async function updateStage4Aggregate(
       state.set(
         'megacampus_document_evidence_coverage_reconciliation_unixtime_milliseconds',
         coverageObservedAt
+      );
+    }
+    if (event.decisions) {
+      for (const actor of ['user', 'system'] as const) {
+        const metric = key('megacampus_document_evidence_decisions_total', { actor });
+        state.set(
+          metric,
+          Math.max(
+            state.get(metric) ?? 0,
+            requireCount(event.decisions[actor], `${actor} durable decision total`)
+          )
+        );
+      }
+      const degradedMetric = 'megacampus_document_evidence_degraded_automatic_decisions_total';
+      state.set(
+        degradedMetric,
+        Math.max(
+          state.get(degradedMetric) ?? 0,
+          requireCount(
+            event.decisions.degradedAutomatic,
+            'degraded automatic durable decision total'
+          )
+        )
       );
     }
     const reconciliation = event.criticalConflictState;
@@ -440,20 +554,9 @@ async function updateStage4Aggregate(
         );
       }
     }
-    const temporaryPath = join(options.directory, `.${randomUUID()}.critical.prom.tmp`);
-    try {
-      await writeFile(
-        temporaryPath,
-        render(state, aggregateOptions.service, aggregateOptions.instance),
-        { encoding: 'utf8', mode: 0o644, flag: 'wx' }
-      );
-      await chmod(temporaryPath, 0o644);
-      await rename(temporaryPath, path);
-    } finally {
-      await rm(temporaryPath, { force: true });
-    }
+    await lock.write(path, render(state, aggregateOptions.service, aggregateOptions.instance), 0o644);
   } finally {
-    await release();
+    await lock.release();
   }
 }
 
@@ -493,3 +596,5 @@ export async function publishDocumentEvidenceMetricsSafely(
     logger.warn({}, 'Document evidence metrics update failed');
   }
 }
+
+export const documentEvidenceTextfileTesting = { acquireOwnedLock };

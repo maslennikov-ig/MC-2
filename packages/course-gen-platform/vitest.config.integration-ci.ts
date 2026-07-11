@@ -15,6 +15,7 @@ export default mergeConfig(
     test: {
       include: [
         'tests/integration/career-playbook-schema.test.ts',
+        'tests/integration/document-evidence-observability-index.test.ts',
         'tests/integration/ci-qdrant-smoke.test.ts',
         'tests/integration/qdrant.test.ts',
       ],

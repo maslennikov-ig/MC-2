@@ -55,6 +55,7 @@ vi.mock('@/stages/stage5-generation/orchestrator-helpers', async importOriginal 
 
 import { GenerationOrchestrator } from '@/stages/stage5-generation/orchestrator';
 import { logTrace } from '@/shared/trace-logger';
+import { Stage5EvidenceEnrichmentFailure } from '@/stages/stage5-generation/evidence/types';
 
 const runId = '10000000-0000-4000-8000-000000000001';
 const courseId = '20000000-0000-4000-8000-000000000001';
@@ -204,7 +205,7 @@ describe('live Stage 5 evidence caller', () => {
       fallback_section_count: 0,
     };
     const evidenceEnricher = vi.fn(() =>
-      Promise.resolve({ courseStructure: enriched, enrichment: audit })
+      Promise.resolve({ courseStructure: enriched, enrichment: audit, retrievalAttempts: 0 })
     );
     const publishMetrics = vi.fn(() => Promise.resolve());
     const orchestrator = new GenerationOrchestrator(
@@ -250,7 +251,7 @@ describe('live Stage 5 evidence caller', () => {
     expect(result.generation_metadata.document_evidence_enrichment).toEqual(audit);
     expect(publishMetrics).toHaveBeenCalledOnce();
     expect(publishMetrics).toHaveBeenCalledWith(
-      { stage: 'stage5', status: 'applied', retrievals: 1, fallbacks: 0 },
+      { stage: 'stage5', status: 'applied', retrievals: 0, fallbacks: 0 },
       pinoMocks.logger
     );
     const serializedTrace = JSON.stringify(vi.mocked(logTrace).mock.calls);
@@ -303,12 +304,49 @@ describe('live Stage 5 evidence caller', () => {
     );
     expect(publishMetrics).toHaveBeenCalledOnce();
     expect(publishMetrics).toHaveBeenCalledWith(
-      { stage: 'stage5', status: 'degraded', retrievals: 1, fallbacks: 0 },
+      { stage: 'stage5', status: 'degraded', retrievals: 0, fallbacks: 0 },
       pinoMocks.logger
     );
     expect(JSON.stringify(vi.mocked(logTrace).mock.calls)).not.toContain(privateSentinel);
     expect(
       JSON.stringify(Object.values(pinoMocks.logger).flatMap(spy => spy.mock.calls))
     ).not.toContain(privateSentinel);
+  });
+
+  it('publishes completed retrievals carried by a sanitized production evidence failure', async () => {
+    const evidenceEnricher = vi.fn(() => Promise.reject(new Stage5EvidenceEnrichmentFailure(1)));
+    const publishMetrics = vi.fn(() => Promise.resolve());
+    const orchestrator = new GenerationOrchestrator(
+      {} as never,
+      {} as never,
+      {} as never,
+      undefined,
+      evidenceEnricher,
+      publishMetrics
+    );
+    (orchestrator as never as { graph: { invoke: (value: unknown) => Promise<unknown> } }).graph = {
+      invoke: vi.fn(() =>
+        Promise.resolve({
+          input: input(),
+          metadata: metadata(),
+          sections: [section()],
+          qualityScores: { metadata_similarity: 1, sections_similarity: [1], overall: 1 },
+          tokenUsage: { metadata: 1, sections: 1, validation: 0, total: 2 },
+          modelUsed: { metadata: 'metadata-model', sections: 'sections-model' },
+          retryCount: { metadata: 0, sections: [0] },
+          currentPhase: 'validate_quality',
+          phaseDurations: {},
+          errors: [],
+          modelOverride: null,
+        })
+      ),
+    };
+
+    await orchestrator.execute(input());
+
+    expect(publishMetrics).toHaveBeenCalledWith(
+      { stage: 'stage5', status: 'degraded', retrievals: 1, fallbacks: 0 },
+      pinoMocks.logger
+    );
   });
 });

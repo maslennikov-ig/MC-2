@@ -79,6 +79,18 @@ export interface Stage5EvidenceEnrichmentDependencies {
 export interface Stage5EvidenceEnrichmentResult {
   courseStructure: CourseStructure;
   enrichment: Stage5DocumentEvidenceEnrichment;
+  retrievalAttempts: number;
+}
+
+/** Sanitized failure envelope that preserves only the completed retrieval count. */
+export class Stage5EvidenceEnrichmentFailure extends Error {
+  readonly retrievalAttempts: number;
+
+  constructor(retrievalAttempts: number) {
+    super('Stage 5 evidence enrichment failed');
+    this.name = 'Stage5EvidenceEnrichmentFailure';
+    this.retrievalAttempts = retrievalAttempts;
+  }
 }
 
 export type Stage5EvidenceEnricher = (

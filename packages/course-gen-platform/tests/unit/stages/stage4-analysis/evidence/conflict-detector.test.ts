@@ -4,6 +4,7 @@ import {
   buildConflictFingerprint,
   createProductionConflictDetectionPort,
   detectDocumentConflicts,
+  documentConflictDetectorTesting,
   type ConflictDetectionPort,
   type ConflictDetectionRepository,
 } from '@/stages/stage4-analysis/evidence/conflict-detector';
@@ -438,6 +439,11 @@ describe('document conflict detector', () => {
       expect(db.commitConflictBatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ verificationStatus: 'degraded' })
       );
+      expect(result.metricDeltas).toEqual({
+        batches: 1,
+        usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+        conflicts: { critical: 0, important: 0, informational: 0 },
+      });
     }
   );
 
@@ -508,6 +514,53 @@ describe('document conflict detector', () => {
     await expect(
       detectDocumentConflicts(baseInput, { repository: db, port: port() })
     ).rejects.toThrow(/collision/i);
+  });
+
+  it('reports only newly committed conflict work and fingerprints on accepted replay', async () => {
+    const db = repository();
+    const first = await detectDocumentConflicts(baseInput, { repository: db, port: port() });
+    const replay = await detectDocumentConflicts(baseInput, { repository: db, port: port() });
+
+    expect(first.metricDeltas.batches).toBeGreaterThan(0);
+    expect(first.metricDeltas.usage.model_calls).toBeGreaterThan(0);
+    expect(Object.values(first.metricDeltas.conflicts).reduce((sum, value) => sum + value, 0)).toBe(
+      1
+    );
+    expect(replay.metricDeltas).toEqual({
+      batches: 0,
+      usage: { model_calls: 0, input_tokens: 0, output_tokens: 0, total_cost_usd: 0 },
+      conflicts: { critical: 0, important: 0, informational: 0 },
+    });
+  });
+
+  it('does not recount an old fingerprint repeated by a newly committed checkpoint', async () => {
+    const db = repository();
+    const detected = await detectDocumentConflicts(baseInput, { repository: db, port: port() });
+    const persisted = detected.conflicts[0];
+    const checkpoints = new Map<string, { inputHash: string; checkpoint: unknown }>([
+      [
+        'classify:old',
+        { inputHash: 'old', checkpoint: { conflicts: [persisted], usage: detected.usage } },
+      ],
+      [
+        'classify:new',
+        {
+          inputHash: 'new',
+          checkpoint: {
+            conflicts: [persisted],
+            usage: { model_calls: 1, input_tokens: 2, output_tokens: 3, total_cost_usd: 0.01 },
+          },
+        },
+      ],
+    ]);
+
+    const deltas = documentConflictDetectorTesting.collectMetricDeltas(
+      checkpoints,
+      new Set(['classify:old'])
+    );
+    expect(deltas.batches).toBe(1);
+    expect(deltas.usage.model_calls).toBe(1);
+    expect(deltas.conflicts).toEqual({ critical: 0, important: 0, informational: 0 });
   });
 
   it('verifies each material side with tenant/course/document grouping and persists degraded outage truth', async () => {

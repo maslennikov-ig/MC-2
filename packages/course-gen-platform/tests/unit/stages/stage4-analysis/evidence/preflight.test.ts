@@ -271,6 +271,34 @@ describe('runDocumentEvidencePreflight', () => {
     );
 
     expect(second.batchDocumentIds).toEqual(first.batchDocumentIds);
+    expect(first.metricDeltas).toEqual(
+      expect.objectContaining({
+        acceptedRun: 1,
+        documents: { source: 25, assessed: 25, degraded: 0, failed: 0 },
+      })
+    );
+    expect(first.metricDeltas.batches).toBeGreaterThan(0);
+    expect(second.metricDeltas).toEqual({
+      acceptedRun: 0,
+      documents: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+      processingModes: {
+        full_text: 0,
+        hierarchical_summary: 0,
+        summary: 0,
+        targeted_retrieval: 0,
+        metadata_only: 0,
+      },
+      batches: 0,
+      generationMetrics: {
+        modelCalls: 0,
+        retryCount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalCostUsd: 0,
+        mapChunks: 0,
+        reduceLevels: 0,
+      },
+    });
     expect(first.batchAllocatedTokens.every(tokens => tokens <= baseOptions.maxBatchTokens)).toBe(
       true
     );
