@@ -65,12 +65,14 @@ verification:
   - TDD restore orchestration RED missing module then joined snapshot and restore GREEN 12/12 passed.
   - TDD systemd contract RED 4/4 failed then GREEN 4/4 passed.
   - TDD self-review streaming and latest-manifest RED 2 failed and 11 passed then GREEN 13/13 passed.
-  - Final focused unit command passed 16/16 across 3 files.
+  - Independent-review cleanup RED failed 4/7 then GREEN passed 7/7 for boolean results and cleanup postconditions.
+  - Independent-review identity RED failed 2/8 then GREEN passed 8/8 for exact ranks and dual isolation.
+  - Final focused unit command passed 21/21 across 3 files.
   - Package type-check passed.
   - Package build passed.
   - systemd-analyze verify passed for 4 units in a rootless mount namespace with a writable isolated /run.
   - systemd-analyze calendar passed 8 iterations for four-hour snapshot and monthly restore schedules.
-  - Exact Qdrant 1.18.2 integration passed 4/4 and ended with empty collection and alias lists.
+  - Exact Qdrant 1.18.2 integration passed 5/5, including intentional identity mismatch, and ended with empty collection and alias lists.
   - Exact image evidence matched index sha256 75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c and linux amd64 child sha256 da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071.
   - Owned-file secret scan passed with no matches.
   - Prettier check and git diff check passed.
@@ -101,7 +103,7 @@ explicit_defers:
 
 Q8 now resolves the stable alias to one physical collection, creates and re-lists a native snapshot, streams an authenticated download through SHA-256 without whole-file buffering, checks size and server checksum, and atomically writes both immutable and latest redacted manifests before applying deterministic 30-day retention. Retention filters by physical collection and owned object prefix, preserves the newest successful snapshot, and never deletes an unlisted or foreign object. Atomic Prometheus textfile metrics retain success ages across failures and expose snapshot failures, restore failures, lock contention, and latest operation status.
 
-The restore drill uses Qdrant 1.18.2's supported authenticated self-HTTP transport with `priority=snapshot` and the manifest checksum. It creates a unique owned physical collection and drill alias, verifies the complete physical schema and strict indexes, exact point count, dense retrieval, RU BM25, EN BM25, Formula priority order, and organization/course isolation through that drill alias. The stable alias is asserted unchanged before and after success or failure. `finally` removes only the preflight-absent generated alias and collection and atomically retains redacted operation plus cleanup failures.
+The restore drill uses Qdrant 1.18.2's supported authenticated self-HTTP transport with `priority=snapshot` and the manifest checksum. It creates a unique owned physical collection and drill alias, verifies the complete physical schema and strict indexes, exact point count, exact top point/document/chunk/content for dense, RU BM25, and EN BM25, exact ordered Formula identities, and separate negative organization and course isolation through that drill alias. The stable alias is asserted unchanged before and after success or failure. Every create/delete boolean is checked; `finally` re-reads aliases and collections, proves the owned resources are absent, and records any false result or postcondition mismatch in redacted cleanup evidence.
 
 Snapshot and restore commands share one real nonblocking `flock`. Hardened systemd services use narrow `LoadCredential` inputs, no broad environment file, owner-only state, an absolute command path, filesystem and privilege protections, and one shared runtime lock. The snapshot timer runs every four hours with at most ten minutes jitter and one minute accuracy, so the proven bound is 4h11m, below six hours. The separate monthly restore timer is persistent and uses the same lock.
 
@@ -122,17 +124,19 @@ The implementation consumed the already recorded Qdrant 1.18.2 OpenAPI/client sh
 - systemd RED: 4/4 failed on absent scripts and units; GREEN passed 4/4.
 - Pinned behavior RED: 3/4 passed and restore failed before alias creation. Redacted evidence plus Qdrant logs proved the server process could not fetch the host-published port from inside its container. A regression test failed 1/4 for the incorrect transport port; the single fix changed the self-fetch endpoint to Qdrant's internal listener on 6333. The integration then passed 4/4, including real corrupt-checksum and wrong-key failures against a reachable source.
 - Self-review RED: 2 failures plus 11 passes proved whole-file buffering and a missing durable latest manifest. GREEN streams the response body and atomically updates `latest-manifest.json`; 13/13 passed.
+- Independent cleanup review RED: 4/7 failed because false create/delete alias and delete-collection results plus residual owned resources were accepted. GREEN checks every boolean, performs post-cleanup alias/collection reads, preserves the stable alias, records cleanup failures, increments the failure metric, and exits nonzero; 7/7 passed.
+- Independent relevance review first exposed the old scalar-only probe validator, then produced the behavioral RED: one test observed only five queries instead of separate negative organization and course checks, while an intentional top-identity mismatch reached a later Formula failure. GREEN requires exact expected dense/RU/EN identities and content, ordered Formula identities, and both isolation fixtures. Mismatch errors expose only field names, not expected or recovered content; restore unit tests passed 8/8.
 
 ## Final evidence
 
-- Focused unit: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=[synthetic] pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/tools/qdrant/snapshot.test.ts tests/unit/tools/qdrant/restore-drill.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts` -> 16/16.
+- Focused unit: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=[synthetic] pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/tools/qdrant/snapshot.test.ts tests/unit/tools/qdrant/restore-drill.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts` -> 21/21.
 - Type-check: `pnpm --filter @megacampus/course-gen-platform type-check` -> exit 0.
 - Build: `pnpm --filter @megacampus/course-gen-platform build` -> exit 0.
 - Units: rootless mount namespace with isolated writable `/run`, then `systemd-analyze verify` over all four Q8 units -> exit 0 and no diagnostics. Direct host verification is impossible in this WSL profile because `/run/systemd` is root-owned and absent.
 - Calendars: `systemd-analyze calendar --iterations=8 '*-*-* 00/4:15:00'` showed consecutive 00:15, 04:15, 08:15, 12:15, 16:15, 20:15 events; `monthly` showed consecutive first-of-month events. Snapshot cadence plus jitter plus accuracy is 4h11m.
-- Pinned integration: exact `qdrant/qdrant:v1.18.2@sha256:75eab8c4...`, `platform=linux/amd64`, client 1.18.0, dedicated Vitest config -> 4/4. The locally streamed digest equalled the server checksum; manifest count was 4; restore checks were 7/7; negative corrupt-checksum, wrong-key, and duplicate-target cases failed closed; final authenticated collection and alias lists were both empty.
+- Pinned integration: exact `qdrant/qdrant:v1.18.2@sha256:75eab8c4...`, `platform=linux/amd64`, client 1.18.0, dedicated Vitest config -> 5/5. The locally streamed digest equalled the server checksum; manifest count was 4; exact deterministic dense/RU/EN/Formula identities and both isolation checks passed; an intentional expected-content mismatch failed with no content or key in evidence and no stable-alias change; corrupt-checksum, wrong-key, and duplicate-target cases failed closed; final authenticated collection and alias lists were both empty.
 
-Manifest evidence contains schema version, success status, logical alias, physical collection, snapshot name, point count, byte size, server checksum, locally verified SHA-256, UTC creation time, local/S3 mode, sanitized object identity, server version, and client version. It contains no endpoint credentials, bucket secret, access key, API key, or credential-bearing URL. Restore evidence records authenticated HTTP transport, snapshot priority, stable alias before/after, all seven checks, and owned cleanup results without secret values.
+Manifest evidence contains schema version, success status, logical alias, physical collection, snapshot name, point count, byte size, server checksum, locally verified SHA-256, UTC creation time, local/S3 mode, sanitized object identity, server version, and client version. It contains no endpoint credentials, bucket secret, access key, API key, or credential-bearing URL. Restore evidence records authenticated HTTP transport, snapshot priority, stable alias before/after, all checks, boolean cleanup outcomes, and postcondition results without secret values or recovered content.
 
 # Delivery / Cleanup
 

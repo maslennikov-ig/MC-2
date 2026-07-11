@@ -39,7 +39,19 @@ export interface RecoveryProbe {
   formula_query: string;
   organization_id: string;
   course_id: string;
+  mismatched_organization_id: string;
   mismatched_course_id: string;
+  expected_dense: RecoveryExpectedPoint;
+  expected_ru_bm25: RecoveryExpectedPoint;
+  expected_en_bm25: RecoveryExpectedPoint;
+  expected_formula_order: [RecoveryExpectedPoint, RecoveryExpectedPoint];
+}
+
+export interface RecoveryExpectedPoint {
+  point_id: string;
+  document_id: string;
+  chunk_id: string;
+  content: string;
 }
 
 export interface RecoveryChecks {
@@ -61,23 +73,82 @@ function requireProbe(probe: RecoveryProbe): void {
   ) {
     throw new Error('Recovery probe dense_vector must contain finite values');
   }
-  for (const [name, value] of Object.entries(probe)) {
-    if (name === 'dense_vector') continue;
+  for (const [name, value] of Object.entries({
+    ru_query: probe.ru_query,
+    en_query: probe.en_query,
+    formula_query: probe.formula_query,
+    organization_id: probe.organization_id,
+    course_id: probe.course_id,
+    mismatched_organization_id: probe.mismatched_organization_id,
+    mismatched_course_id: probe.mismatched_course_id,
+  })) {
     if (typeof value !== 'string' || !value.trim())
       throw new Error(`Recovery probe ${name} is required`);
+  }
+  const expectations = [
+    ['expected_dense', probe.expected_dense],
+    ['expected_ru_bm25', probe.expected_ru_bm25],
+    ['expected_en_bm25', probe.expected_en_bm25],
+    ...probe.expected_formula_order.map(
+      (expected, index) => [`expected_formula_order[${index}]`, expected] as const
+    ),
+  ] as const;
+  for (const [name, expected] of expectations) {
+    for (const [field, value] of Object.entries(expected ?? {})) {
+      if (typeof value !== 'string' || !value.trim()) {
+        throw new Error(`Recovery probe ${name}.${field} is required`);
+      }
+    }
+    if (!expected || Object.keys(expected).length !== 4) {
+      throw new Error(
+        `Recovery probe ${name} must define exact point, document, chunk, and content`
+      );
+    }
+  }
+  if (probe.expected_formula_order.length !== 2) {
+    throw new Error('Recovery probe expected_formula_order must contain exactly two points');
+  }
+  if (probe.organization_id === probe.mismatched_organization_id) {
+    throw new Error('Recovery probe mismatched_organization_id must differ from organization_id');
   }
   if (probe.course_id === probe.mismatched_course_id) {
     throw new Error('Recovery probe mismatched_course_id must differ from course_id');
   }
 }
 
-function scopedFilter(probe: RecoveryProbe, courseId = probe.course_id) {
+function scopedFilter(
+  probe: RecoveryProbe,
+  courseId = probe.course_id,
+  organizationId = probe.organization_id
+) {
   return {
     must: [
-      { key: 'organization_id', match: { value: probe.organization_id } },
+      { key: 'organization_id', match: { value: organizationId } },
       { key: 'course_id', match: { value: courseId } },
     ],
   };
+}
+
+function assertExactPoint(
+  label: string,
+  point: Awaited<ReturnType<RestoreClient['query']>>['points'][number] | undefined,
+  expected: RecoveryExpectedPoint
+): void {
+  if (!point) throw new Error(`${label} expected top identity is missing`);
+  const actual = {
+    point_id: String(point.id),
+    document_id: point.payload?.document_id,
+    chunk_id: point.payload?.chunk_id,
+    content: point.payload?.content,
+  };
+  const mismatchedFields = (Object.keys(expected) as Array<keyof RecoveryExpectedPoint>).filter(
+    field => actual[field] !== expected[field]
+  );
+  if (mismatchedFields.length > 0) {
+    throw new Error(
+      `${label} top identity/content mismatch in fields: ${mismatchedFields.join(', ')}`
+    );
+  }
 }
 
 function assertScopedPoints(
@@ -127,6 +198,7 @@ export async function verifyRecoveredCollection(options: {
     with_payload: true,
   });
   assertScopedPoints('Dense', dense.points, options.probe);
+  assertExactPoint('Dense', dense.points[0], options.probe.expected_dense);
 
   const russian = await options.client.query(options.drillAlias, {
     query: createBm25Document(options.probe.ru_query),
@@ -136,6 +208,7 @@ export async function verifyRecoveredCollection(options: {
     with_payload: true,
   });
   assertScopedPoints('RU BM25', russian.points, options.probe);
+  assertExactPoint('RU BM25', russian.points[0], options.probe.expected_ru_bm25);
 
   const english = await options.client.query(options.drillAlias, {
     query: createBm25Document(options.probe.en_query),
@@ -145,6 +218,7 @@ export async function verifyRecoveredCollection(options: {
     with_payload: true,
   });
   assertScopedPoints('EN BM25', english.points, options.probe);
+  assertExactPoint('EN BM25', english.points[0], options.probe.expected_en_bm25);
 
   const searchOptions: ResolvedSearchOptions = {
     limit: 2,
@@ -176,6 +250,9 @@ export async function verifyRecoveredCollection(options: {
     with_payload: true,
   });
   assertScopedPoints('Formula', formula.points, options.probe);
+  options.probe.expected_formula_order.forEach((expected, index) => {
+    assertExactPoint(`Formula rank ${index + 1}`, formula.points[index], expected);
+  });
   if (
     formula.points.length < 2 ||
     formula.points[0].payload?.document_priority !== 'CORE' ||
@@ -194,6 +271,20 @@ export async function verifyRecoveredCollection(options: {
   });
   if (mismatched.points.length !== 0) {
     throw new Error('Recovery probe crossed tenant/course isolation boundary');
+  }
+  const mismatchedOrganization = await options.client.query(options.drillAlias, {
+    query: createBm25Document(options.probe.ru_query),
+    using: 'sparse',
+    filter: scopedFilter(
+      options.probe,
+      options.probe.course_id,
+      options.probe.mismatched_organization_id
+    ),
+    limit: 3,
+    with_payload: true,
+  });
+  if (mismatchedOrganization.points.length !== 0) {
+    throw new Error('Recovery probe crossed organization/tenant isolation boundary');
   }
 
   return {
@@ -307,7 +398,7 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
   let lock: Awaited<ReturnType<typeof acquireRecoveryLock>> | undefined;
   let stableBefore = '';
   let stableAfter = '';
-  let aliasCreated = false;
+  let aliasOwned = false;
   let collectionOwned = false;
   let checks: RecoveryChecks | undefined;
   let operationError: unknown;
@@ -330,6 +421,7 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
     if (initialAliases.some(alias => alias.alias_name === drillAlias)) {
       throw new Error('Generated drill alias already exists');
     }
+    aliasOwned = true;
     const initialCollections = (await options.client.getCollections()).collections;
     if (initialCollections.some(collection => collection.name === targetCollection)) {
       throw new Error('Generated drill collection already exists');
@@ -344,10 +436,13 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
     });
     if (!recovered) throw new Error('Qdrant refused snapshot recovery');
 
-    await options.client.updateCollectionAliases({
+    const aliasCreated = await options.client.updateCollectionAliases({
       actions: [{ create_alias: { collection_name: targetCollection, alias_name: drillAlias } }],
     });
-    aliasCreated = true;
+    if (!aliasCreated) {
+      cleanupFailures.push('drill alias creation returned false');
+      throw new Error('Qdrant refused drill alias creation');
+    }
     checks = await (options.verifyRecovered ?? verifyRecoveredCollection)({
       client: options.client,
       physicalCollection: targetCollection,
@@ -358,12 +453,29 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
   } catch (error) {
     operationError = error;
   } finally {
-    if (aliasCreated) {
+    if (aliasOwned) {
       try {
-        await options.client.updateCollectionAliases({
-          actions: [{ delete_alias: { alias_name: drillAlias } }],
-        });
-        cleanup.alias = 'deleted';
+        const currentAlias = (await options.client.getAliases()).aliases.find(
+          alias => alias.alias_name === drillAlias
+        );
+        if (!currentAlias) {
+          cleanup.alias = 'already-absent';
+        } else if (currentAlias.collection_name !== targetCollection) {
+          cleanup.alias = 'failed';
+          cleanupFailures.push(
+            `owned drill alias points to unexpected collection ${currentAlias.collection_name}`
+          );
+        } else {
+          const aliasDeleted = await options.client.updateCollectionAliases({
+            actions: [{ delete_alias: { alias_name: drillAlias } }],
+          });
+          if (!aliasDeleted) {
+            cleanup.alias = 'failed';
+            cleanupFailures.push('drill alias cleanup returned false');
+          } else {
+            cleanup.alias = 'deleted';
+          }
+        }
       } catch (error) {
         cleanup.alias = 'failed';
         cleanupFailures.push(`drill alias cleanup: ${redact(error, [options.apiKey])}`);
@@ -371,18 +483,32 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
     }
     if (collectionOwned) {
       try {
-        await options.client.deleteCollection(targetCollection);
-        cleanup.collection = 'deleted';
+        const collectionExists = (await options.client.getCollections()).collections.some(
+          collection => collection.name === targetCollection
+        );
+        if (!collectionExists) {
+          cleanup.collection = 'already-absent';
+        } else {
+          const collectionDeleted = await options.client.deleteCollection(targetCollection);
+          if (!collectionDeleted) {
+            cleanup.collection = 'failed';
+            cleanupFailures.push('drill collection cleanup returned false');
+          } else {
+            cleanup.collection = 'deleted';
+          }
+        }
       } catch (error) {
         cleanup.collection = 'failed';
         cleanupFailures.push(`drill collection cleanup: ${redact(error, [options.apiKey])}`);
       }
     }
+    let postCleanupAliases: Awaited<ReturnType<RestoreClient['getAliases']>>['aliases'] = [];
     try {
-      stableAfter = resolvePhysicalCollection(
-        (await options.client.getAliases()).aliases,
-        options.stableAlias
-      );
+      postCleanupAliases = (await options.client.getAliases()).aliases;
+      if (aliasOwned && postCleanupAliases.some(alias => alias.alias_name === drillAlias)) {
+        cleanupFailures.push('drill alias still exists after cleanup');
+      }
+      stableAfter = resolvePhysicalCollection(postCleanupAliases, options.stableAlias);
       if (stableBefore && stableAfter !== stableBefore) {
         cleanupFailures.push(
           `stable alias changed from ${stableBefore} to ${stableAfter}; automatic mutation is forbidden`
@@ -390,6 +516,16 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
       }
     } catch (error) {
       cleanupFailures.push(`stable alias verification: ${redact(error, [options.apiKey])}`);
+    }
+    if (collectionOwned) {
+      try {
+        const postCleanupCollections = (await options.client.getCollections()).collections;
+        if (postCleanupCollections.some(collection => collection.name === targetCollection)) {
+          cleanupFailures.push('drill collection still exists after cleanup');
+        }
+      } catch (error) {
+        cleanupFailures.push(`drill collection postcondition: ${redact(error, [options.apiKey])}`);
+      }
     }
     await lock?.release();
   }

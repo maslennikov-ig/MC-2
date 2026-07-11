@@ -22,8 +22,21 @@ function unitVector(axis: number): number[] {
 }
 
 const ORG = '81000000-0000-4000-8000-000000000001';
+const FOREIGN_ORG = '81000000-0000-4000-8000-000000000002';
 const COURSE = '82000000-0000-4000-8000-000000000001';
 const FOREIGN_COURSE = '82000000-0000-4000-8000-000000000002';
+const RU_CORE_POINT = '83000000-0000-4000-8000-000000000001';
+const RU_SUPPLEMENTARY_POINT = '83000000-0000-4000-8000-000000000002';
+const EN_CORE_POINT = '83000000-0000-4000-8000-000000000003';
+const RU_CORE_DOCUMENT = '84000000-0000-4000-8000-000000000001';
+const RU_SUPPLEMENTARY_DOCUMENT = '84000000-0000-4000-8000-000000000002';
+const EN_CORE_DOCUMENT = '84000000-0000-4000-8000-000000000003';
+const RU_CORE_CHUNK = '85000000-0000-4000-8000-000000000001';
+const RU_SUPPLEMENTARY_CHUNK = '85000000-0000-4000-8000-000000000002';
+const EN_CORE_CHUNK = '85000000-0000-4000-8000-000000000003';
+const RU_CORE_CONTENT = 'ru_restore_probe_unique formula_fixture neutral evidence';
+const RU_SUPPLEMENTARY_CONTENT = 'formula_fixture formula_fixture supplementary evidence';
+const EN_CORE_CONTENT = 'en_restore_probe_unique controlled english evidence';
 const FORMULA_VECTOR = unitVector(0);
 const CONTEXT_VECTOR = unitVector(1);
 const SUPPLEMENTARY_VECTOR = (() => {
@@ -35,12 +48,45 @@ const SUPPLEMENTARY_VECTOR = (() => {
 
 const PROBE: RecoveryProbe = {
   dense_vector: FORMULA_VECTOR,
-  ru_query: 'спектроскопия',
-  en_query: 'photosynthesis',
+  ru_query: 'ru_restore_probe_unique',
+  en_query: 'en_restore_probe_unique',
   formula_query: 'formula_fixture',
   organization_id: ORG,
   course_id: COURSE,
+  mismatched_organization_id: FOREIGN_ORG,
   mismatched_course_id: FOREIGN_COURSE,
+  expected_dense: {
+    point_id: RU_CORE_POINT,
+    document_id: RU_CORE_DOCUMENT,
+    chunk_id: RU_CORE_CHUNK,
+    content: RU_CORE_CONTENT,
+  },
+  expected_ru_bm25: {
+    point_id: RU_CORE_POINT,
+    document_id: RU_CORE_DOCUMENT,
+    chunk_id: RU_CORE_CHUNK,
+    content: RU_CORE_CONTENT,
+  },
+  expected_en_bm25: {
+    point_id: EN_CORE_POINT,
+    document_id: EN_CORE_DOCUMENT,
+    chunk_id: EN_CORE_CHUNK,
+    content: EN_CORE_CONTENT,
+  },
+  expected_formula_order: [
+    {
+      point_id: RU_CORE_POINT,
+      document_id: RU_CORE_DOCUMENT,
+      chunk_id: RU_CORE_CHUNK,
+      content: RU_CORE_CONTENT,
+    },
+    {
+      point_id: RU_SUPPLEMENTARY_POINT,
+      document_id: RU_SUPPLEMENTARY_DOCUMENT,
+      chunk_id: RU_SUPPLEMENTARY_CHUNK,
+      content: RU_SUPPLEMENTARY_CONTENT,
+    },
+  ],
 };
 
 describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
@@ -78,51 +124,49 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
       wait: true,
       points: [
         {
-          id: '83000000-0000-4000-8000-000000000001',
+          id: RU_CORE_POINT,
           vector: {
             dense: FORMULA_VECTOR,
-            sparse: createBm25Document('спектроскопия formula_fixture neutral evidence'),
+            sparse: createBm25Document(RU_CORE_CONTENT),
           },
           payload: {
             organization_id: ORG,
             course_id: COURSE,
-            document_id: '84000000-0000-4000-8000-000000000001',
-            chunk_id: '85000000-0000-4000-8000-000000000001',
-            content: 'спектроскопия formula_fixture neutral evidence',
+            document_id: RU_CORE_DOCUMENT,
+            chunk_id: RU_CORE_CHUNK,
+            content: RU_CORE_CONTENT,
             document_priority: 'CORE',
             document_weight: 1,
           },
         },
         {
-          id: '83000000-0000-4000-8000-000000000002',
+          id: RU_SUPPLEMENTARY_POINT,
           vector: {
             dense: SUPPLEMENTARY_VECTOR,
-            sparse: createBm25Document(
-              'спектроскопия formula_fixture formula_fixture supplementary evidence'
-            ),
+            sparse: createBm25Document(RU_SUPPLEMENTARY_CONTENT),
           },
           payload: {
             organization_id: ORG,
             course_id: COURSE,
-            document_id: '84000000-0000-4000-8000-000000000002',
-            chunk_id: '85000000-0000-4000-8000-000000000002',
-            content: 'спектроскопия formula_fixture formula_fixture supplementary evidence',
+            document_id: RU_SUPPLEMENTARY_DOCUMENT,
+            chunk_id: RU_SUPPLEMENTARY_CHUNK,
+            content: RU_SUPPLEMENTARY_CONTENT,
             document_priority: 'SUPPLEMENTARY',
             document_weight: 0.5,
           },
         },
         {
-          id: '83000000-0000-4000-8000-000000000003',
+          id: EN_CORE_POINT,
           vector: {
             dense: CONTEXT_VECTOR,
-            sparse: createBm25Document('photosynthesis controlled english evidence'),
+            sparse: createBm25Document(EN_CORE_CONTENT),
           },
           payload: {
             organization_id: ORG,
             course_id: COURSE,
-            document_id: '84000000-0000-4000-8000-000000000003',
-            chunk_id: '85000000-0000-4000-8000-000000000003',
-            content: 'photosynthesis controlled english evidence',
+            document_id: EN_CORE_DOCUMENT,
+            chunk_id: EN_CORE_CHUNK,
+            content: EN_CORE_CONTENT,
             document_priority: 'CORE',
             document_weight: 1,
           },
@@ -251,6 +295,57 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
         ?.collection_name
     ).toBe(stableBefore);
     expect(await readFile(result.evidencePath, 'utf8')).not.toContain(apiKey);
+  }, 120_000);
+
+  it('fails an intentional identity mismatch without leaking or altering the stable alias', async () => {
+    const target = `qdrant_restore_drill_identity_mismatch_${runId}`;
+    const drillAlias = `qdrant_restore_drill_alias_identity_mismatch_${runId}`;
+    const evidenceDirectory = join(directory, 'identity-mismatch-evidence');
+    ownedCollections.add(target);
+    ownedAliases.add(drillAlias);
+    const stableBefore = (await client.getAliases()).aliases.find(
+      candidate => candidate.alias_name === alias
+    )?.collection_name;
+
+    await expect(
+      runRestoreDrill({
+        client,
+        manifest: snapshotResult.manifest,
+        probe: {
+          ...PROBE,
+          expected_dense: {
+            ...PROBE.expected_dense,
+            content: 'intentional wrong dense content',
+          },
+        },
+        apiKey,
+        transportBaseUrl: 'http://127.0.0.1:6333',
+        stableAlias: alias,
+        targetCollection: target,
+        drillAlias,
+        evidenceDirectory,
+        metricStatePath: join(directory, 'metrics-state.json'),
+        metricsPath: join(directory, 'metrics.prom'),
+        lockPath: join(directory, 'recovery.lock'),
+      })
+    ).rejects.toThrow(/restore drill failed/iu);
+
+    expect(
+      (await client.getAliases()).aliases.find(candidate => candidate.alias_name === alias)
+        ?.collection_name
+    ).toBe(stableBefore);
+    expect((await client.getCollections()).collections.map(item => item.name)).not.toContain(
+      target
+    );
+    expect((await client.getAliases()).aliases.map(item => item.alias_name)).not.toContain(
+      drillAlias
+    );
+    const evidenceFiles = await readdir(evidenceDirectory);
+    const evidence = await readFile(join(evidenceDirectory, evidenceFiles[0]), 'utf8');
+    expect(evidence).toMatch(/dense.*identity\/content mismatch/iu);
+    expect(evidence).not.toContain(apiKey);
+    expect(evidence).not.toContain(RU_CORE_CONTENT);
+    expect(evidence).not.toContain('intentional wrong dense content');
   }, 120_000);
 
   it('rejects corrupt checksum and wrong transport key without changing the stable alias', async () => {
