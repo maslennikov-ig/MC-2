@@ -49,9 +49,9 @@ depends_on_streams:
 parallel_decision: parallel with Q9 in disjoint write zones
 status: returned
 delivery_method: merge
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: Exact-digest disposable Qdrant container, all owned aliases, collections, snapshots, temporary evidence/state directories, and systemd validation root were removed; no remote service or timer was touched.
+cleanup_notes: Exact-digest disposable Qdrant container, all owned aliases, collections, snapshots, temporary evidence/state directories, and systemd validation root were removed. Final independent reviews passed with no findings; integration merge da126a8a and the combined Q6/Q8/Q9 59/59 rerun passed. The dedicated worktree/local branch were removed; the remote evidence branch remains.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed

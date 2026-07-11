@@ -53,9 +53,9 @@ depends_on_streams:
 parallel_decision: parallel
 status: returned
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: All disposable Qdrant/Prometheus/Grafana/Alertmanager/node_exporter containers, private networks, secret volumes, temporary files, and smoke data were removed. Implementation commit 8d5d39c7 and independent-review remediation commit 151e4e1a are pushed; the dedicated review worktree/branch remains for orchestrator acceptance.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: All disposable Qdrant/Prometheus/Grafana/Alertmanager/node_exporter containers, private networks, secret volumes, temporary files, and smoke data were removed. Final independent review passed with no findings; integration merge 5d4282ee and the combined Q6/Q8/Q9 59/59 plus pinned promtool/amtool rerun passed. The dedicated worktree/local branch were removed; the remote evidence branch remains.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated

@@ -33,7 +33,7 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 - Accepted and pushed: Q1-Q7, strict Formula index fix `.15`, and evidence E1-E6. E6 `.23` is independently approved and integrated linearly through rebased reviewed equivalent `5201a786`; its tree `fda761f0` is byte-identical to reviewed merge `1e681027`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
-- Q6 `.7` is reviewed and integrated as `f7930913`; Q8 `.9`, Q9 `.10`, Q10 `.11`, Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
+- Q6 `.7`, Q8 `.9` and Q9 `.10` are reviewed, integrated as `f7930913`, `da126a8a` and `5d4282ee`, and closed. Q10 `.11` and Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
@@ -43,6 +43,7 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 - E4 `.21` is reviewed and integrated through rebased equivalent `2538bb5c`: web 20/20, shared 2/2, real-panel Chromium/mobile/dark E2E 4 pass/2 expected skips, type-check/build/process pass. Distinct conflict UI, CAS edit semantics, localized system audit, fail-closed metadata and accessibility are accepted. Its worktree/local branch are cleaned.
 - E6 `.23` is reviewed and integrated linearly through `5201a786` from final recovery commit `a6c39e7a`; the rebased tree is byte-identical to reviewed merge `1e681027`. Fresh integration evidence: shared 21/21, joined E5/E6 111/111, Stage4 267/267, migrations 14/14, PostgreSQL 15.18 E3 26/26 and side identity 8/8; independent merged-tree review additionally passed E4 20/20, E5 35/35, Qdrant 14/14, E6 76/76, Stage4 evidence 49/49 and type-check. Its disposable containers and dedicated worktree/local branch are cleaned. E7 `.24` remains blocked by Q8/Q9.
 - Q6 `.7` final branch commits `bd6237b3` + `14322c8f` are independently approved and integrated as `f7930913`. Exact Qdrant index/amd64 child locks, fail-closed file secrets, loopback services, native S3 mapping, Stage 7 isolation and pre-recreate verification gates are accepted. Branch evidence: focused 8/8, Compose 8/8, pinned auth smoke `200/401/200/403/200/200`, type-check/build/process pass and disposable cleanup; integration focused 8/8 plus process verification pass. Its dedicated worktree/local branch are cleaned; the remote evidence branch remains.
+- Q8 `.9` is independently approved and integrated as `da126a8a`: recovery relevance/isolation, checksum/manifest/retention, cleanup postconditions, shared metrics and systemd schedules pass unit 26/26 plus exact Qdrant restore 5/5. Q9 `.10` is independently approved and integrated as `5d4282ee`: approved LTS/extended-support monitoring pins, authenticated scrape, alerts, persistent notification path, dashboard and shared UID/GID textfile contract pass focused 33/33 and local service smokes. Combined Q6/Q8/Q9 integration passed 59/59, type-check, pinned promtool/amtool and process verification. Both worktrees/local branches are cleaned; remote evidence branches remain.
 
 ## Completed Recovery Gate
 
@@ -52,7 +53,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: execute Q8 and Q9 in parallel from accepted Q6, then E7 joins accepted E4-E6 with Q8/Q9 before Q10/Q11.
+Recommended action: execute E7 cross-stage acceptance/observability/rollout on accepted E1-E6 + Q8/Q9, then Q10/Q11.
 
 ## Starter prompt for next orchestrator
 
@@ -63,7 +64,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 ## Parallel Execution After Q7
 
 - E1-E6 and Q7 are accepted and integrated.
-- Q8/Q9 are dependency-ready and should proceed in isolated parallel worktrees; Q9 alone owns monitoring additions to `docker-compose.infra.yml`.
+- Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
 - E7 is the shared evidence/observability/docs gate and blocks Q10/Q11 close.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
