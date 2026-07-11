@@ -33,11 +33,11 @@ parallel_group: Q-runtime-preflight
 depends_on_streams:
   - mc2-jz6y0.14 owner decision before Q6/Q9 implementation
 parallel_decision: sequential
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Read-only worktree; only this artifact was created.
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Reviewed and integrated as rebased equivalent 99e08364. The dedicated worktree and local branch were removed; the pushed remote research branch remains as audit evidence. Q6 implementation remains blocked by the owner decision.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -70,11 +70,11 @@ Do not select Prometheus, Grafana, node_exporter, or Alertmanager pins in Q6/Q9 
 
 # Dependency and decomposition boundaries
 
-| Stream | Goal | Write zone | Dependency | Verification | Decision |
-| --- | --- | --- | --- | --- | --- |
-| Q6 | Secure dev/staging runtime and pre-recreate gates | four Compose files, two deploy scripts, env examples, a narrow Qdrant secret-entrypoint helper, runtime contract tests | `.14`, Q1 | static contract tests, four Compose validations, shell syntax, pinned local health proof | blocked before edits by `.14` |
-| Q8 | Snapshot manifest, retention, isolated restore, timer | `tools/qdrant/snapshot*`, `restore-drill*`, unit/integration tests, package scripts, `deploy/systemd/*` | accepted Q2 and Q6 | unit tests, systemd verify/calendar, pinned local snapshot/restore | starts only after Q6 |
-| Q9 | Scrape/export/alerts/dashboard/notification path | `ops/qdrant/**`, infra Compose, Qdrant/app metric sink and tests, operator runbook | Q6 and `.14` | promtool/amtool, dashboard schema, Compose, local scrape/rule/delivery smoke | starts only after Q6; may run beside Q8 |
+| Stream | Goal                                                  | Write zone                                                                                                             | Dependency         | Verification                                                                             | Decision                                |
+| ------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------- |
+| Q6     | Secure dev/staging runtime and pre-recreate gates     | four Compose files, two deploy scripts, env examples, a narrow Qdrant secret-entrypoint helper, runtime contract tests | `.14`, Q1          | static contract tests, four Compose validations, shell syntax, pinned local health proof | blocked before edits by `.14`           |
+| Q8     | Snapshot manifest, retention, isolated restore, timer | `tools/qdrant/snapshot*`, `restore-drill*`, unit/integration tests, package scripts, `deploy/systemd/*`                | accepted Q2 and Q6 | unit tests, systemd verify/calendar, pinned local snapshot/restore                       | starts only after Q6                    |
+| Q9     | Scrape/export/alerts/dashboard/notification path      | `ops/qdrant/**`, infra Compose, Qdrant/app metric sink and tests, operator runbook                                     | Q6 and `.14`       | promtool/amtool, dashboard schema, Compose, local scrape/rule/delivery smoke             | starts only after Q6; may run beside Q8 |
 
 Q8 and Q9 have disjoint primary write zones after Q6 and should be separate worktrees with independent correctness review. `docker-compose.infra.yml` is shared ownership; Q8 should consume Q6's snapshot environment contract and Q9 alone should add monitoring services. Integrate Q6 before branching Q8/Q9 to avoid an unisolatable YAML conflict.
 
@@ -149,13 +149,13 @@ The approved `00/6:15` calendar plus 10-minute jitter and default one-minute acc
 
 ## Q8 RED/acceptance matrix
 
-| Test | Must prove |
-| --- | --- |
-| Pure manifest/retention | alias resolves, redaction, deterministic order, 30-day boundary, newest preserved, foreign prefix refused, failures do not publish success |
+| Test                       | Must prove                                                                                                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pure manifest/retention    | alias resolves, redaction, deterministic order, 30-day boundary, newest preserved, foreign prefix refused, failures do not publish success                           |
 | Restore orchestration unit | `priority=snapshot`, API key not logged, stable alias unchanged, drill alias recreated, `finally` deletes only owned resources, cleanup failure retained in evidence |
-| Recovery verification | exact schema/indexes/strict mode, counts, dense, RU BM25, EN BM25, Formula priority and tenant/course isolation |
-| systemd static | credentials are narrow, lock and hardening exist, calendar upper bound is documented/proved, absolute paths validate |
-| Pinned local integration | snapshot create/list/download/recover, checksum, alias recreation and negative corrupt/wrong-key/duplicate-run cases on 1.18.2 |
+| Recovery verification      | exact schema/indexes/strict mode, counts, dense, RU BM25, EN BM25, Formula priority and tenant/course isolation                                                      |
+| systemd static             | credentials are narrow, lock and hardening exist, calendar upper bound is documented/proved, absolute paths validate                                                 |
+| Pinned local integration   | snapshot create/list/download/recover, checksum, alias recreation and negative corrupt/wrong-key/duplicate-run cases on 1.18.2                                       |
 
 # Q9 observability design
 
@@ -169,20 +169,20 @@ The approved `00/6:15` calendar plus 10-minute jitter and default one-minute acc
 - Add a Qdrant hybrid-attempt/fallback metric sink at the production fallback decision point. API, main worker and Stage 6 each own a distinct persistent `.prom` file; counters survive restart and files are atomically replaced. Stage 7 emits nothing.
 - Add `docs/operations/qdrant-self-hosted.md` with SSH tunnels, read-only Web UI key, triage, backup/restore, receiver testing, exposure prohibition, and rollback.
 
-Prometheus scrapes `qdrant:6333/metrics?per_collection=true` using the read-only key file header, node_exporter textfiles, and Alertmanager. With `metrics_prefix=qdrant_`, all rules/dashboard queries use the prefixed names. Per-collection mode replaces global response series and supplies status/collection labels; rule tests must catch prefix and label drift.
+Prometheus scrapes `qdrant:6333/metrics?per_collection=true` using the read-only key file header, node*exporter textfiles, and Alertmanager. With `metrics_prefix=qdrant*`, all rules/dashboard queries use the prefixed names. Per-collection mode replaces global response series and supplies status/collection labels; rule tests must catch prefix and label drift.
 
 ## Eight required alert signal sources
 
-| Alert | Source/expression contract | Required duration |
-| --- | --- | --- |
-| `QdrantDown` | Prometheus `up{job="qdrant"} == 0` (the scrape target is gated separately by `/readyz`) | 2m, critical |
-| `QdrantRecoveryMode` | `qdrant_app_status_recovery_mode == 1` | 5m, critical |
-| `QdrantRestErrorRateHigh` | failed HTTP statuses from `rate(qdrant_rest_responses_total{status=~"4..|5.."}[10m]) / rate(qdrant_rest_responses_total[10m]) > 0.02`; protect zero denominator | 10m, warning |
-| `QdrantMemoryHigh` | `qdrant_memory_resident_bytes / 2147483648 > 0.85` for the fixed staging 2 GiB limit; if the limit becomes variable, add cAdvisor rather than guessing | 15m, warning |
-| `QdrantPointCountUnexpectedDrop` | active physical collection `qdrant_collection_points` compared with an offset/rule baseline; suppress alias-cutover maintenance only through an audited silence | critical when loss >10% between scrapes |
-| `QdrantSnapshotStale` | node_exporter textfile gauge `megacampus_qdrant_last_successful_snapshot_unixtime_seconds`; `time()-gauge > 8h` and absent gauge is failure | critical |
-| `QdrantRestoreDrillStale` | textfile gauge `megacampus_qdrant_last_successful_restore_drill_unixtime_seconds`; `time()-gauge > 35d` and absent gauge is failure | warning |
-| `QdrantHybridFallbackHigh` | rates of durable per-instance `megacampus_qdrant_hybrid_fallback_total / megacampus_qdrant_hybrid_requests_total > 0.05`; protect zero denominator and sum instances | 15m, warning |
+| Alert                            | Source/expression contract                                                                                                                                           | Required duration                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------ |
+| `QdrantDown`                     | Prometheus `up{job="qdrant"} == 0` (the scrape target is gated separately by `/readyz`)                                                                              | 2m, critical                                                                           |
+| `QdrantRecoveryMode`             | `qdrant_app_status_recovery_mode == 1`                                                                                                                               | 5m, critical                                                                           |
+| `QdrantRestErrorRateHigh`        | failed HTTP statuses from `rate(qdrant_rest_responses_total{status=~"4..                                                                                             | 5.."}[10m]) / rate(qdrant_rest_responses_total[10m]) > 0.02`; protect zero denominator | 10m, warning |
+| `QdrantMemoryHigh`               | `qdrant_memory_resident_bytes / 2147483648 > 0.85` for the fixed staging 2 GiB limit; if the limit becomes variable, add cAdvisor rather than guessing               | 15m, warning                                                                           |
+| `QdrantPointCountUnexpectedDrop` | active physical collection `qdrant_collection_points` compared with an offset/rule baseline; suppress alias-cutover maintenance only through an audited silence      | critical when loss >10% between scrapes                                                |
+| `QdrantSnapshotStale`            | node_exporter textfile gauge `megacampus_qdrant_last_successful_snapshot_unixtime_seconds`; `time()-gauge > 8h` and absent gauge is failure                          | critical                                                                               |
+| `QdrantRestoreDrillStale`        | textfile gauge `megacampus_qdrant_last_successful_restore_drill_unixtime_seconds`; `time()-gauge > 35d` and absent gauge is failure                                  | warning                                                                                |
+| `QdrantHybridFallbackHigh`       | rates of durable per-instance `megacampus_qdrant_hybrid_fallback_total / megacampus_qdrant_hybrid_requests_total > 0.05`; protect zero denominator and sum instances | 15m, warning                                                                           |
 
 Dashboard panels use those same sources plus `qdrant_app_info`, points/vectors, REST rate/error/p95 histogram, allocator/resident memory, running optimizations, snapshot/recovery activity, and last success ages. Variables are environment and physical collection; links point to loopback Web UI/runbook only. Anonymous access/public sharing are disabled, and no datasource/API/receiver secret appears in JSON.
 

@@ -32,11 +32,11 @@ parallel_group: observability-decision
 depends_on_streams:
   - none
 parallel_decision: parallel
-status: returned
-delivery_method: n/a
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Dedicated branch is pushed for orchestrator inspection and integration.
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Reviewed and integrated as rebased equivalent b7c38638. The dedicated worktree and local branch were removed; the pushed remote research branch remains as audit evidence. The owner decision itself remains open.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -63,13 +63,13 @@ The implementation-critical correction is that Qdrant itself has no documented `
 
 `Index digest` is the immutable multi-platform manifest to pin in Compose. `linux/amd64 digest` is the selected child manifest and must be asserted by the registry verification test; it is not substituted for the index digest unless the deployment is intentionally architecture-locked.
 
-| Component | Exact image | Multi-arch index digest | linux/amd64 child digest | Release/support evidence |
-| --- | --- | --- | --- | --- |
-| Qdrant | `qdrant/qdrant:v1.18.2` | `sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c` | `sha256:da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071` | [v1.18.2 release](https://github.com/qdrant/qdrant/releases/tag/v1.18.2), published 2026-06-04; current GitHub release on access date |
-| Prometheus | `prom/prometheus:v3.13.1` | `sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893` | `sha256:bd2dcadfb0d1096e2a4c21817ac7af918e2f19ff628e4bf25fd67a924c13dd80` | [v3.13.1 release](https://github.com/prometheus/prometheus/releases/tag/v3.13.1), [downloads](https://prometheus.io/download/), [LTS policy](https://prometheus.io/docs/introduction/release-cycle/); 3.13 is supported through 2027-07-31 |
-| Grafana | `grafana/grafana:12.4.5` | `sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd` | `sha256:5e8dea6bf166881f31f370c16ba87a9eebe8ed33db7cce29ee6baf675d60676a` | [v12.4.5 release](https://github.com/grafana/grafana/releases/tag/v12.4.5), [support policy](https://grafana.com/docs/grafana/latest/upgrade-guide/when-to-upgrade/); 12.4 is the extended-support final 12.x minor through 2027-05-24 |
-| node_exporter | `prom/node-exporter:v1.12.0` | `sha256:9b0ade5e607f9dbedb0a8e11151b6011ae5bd79304c261804cfdd2cadf200a80` | `sha256:fb027a472051259b5b7cfd027fe9faf7f8ac5f5fb58af93a818a832f7a90fc57` | [v1.12.0 release](https://github.com/prometheus/node_exporter/releases/tag/v1.12.0), [downloads](https://prometheus.io/download/); current release on access date |
-| Alertmanager | `prom/alertmanager:v0.33.1` | `sha256:9e082985f56f4c8c9f724e18f2288c6708f472e56a5286b8863d080434ea065d` | `sha256:a89f8d4520954079275441eecdb71444328bd90633dd4eddfc33b9ed657f349b` | [v0.33.1 release](https://github.com/prometheus/alertmanager/releases/tag/v0.33.1), [downloads](https://prometheus.io/download/); current release on access date |
+| Component     | Exact image                  | Multi-arch index digest                                                   | linux/amd64 child digest                                                  | Release/support evidence                                                                                                                                                                                                                   |
+| ------------- | ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Qdrant        | `qdrant/qdrant:v1.18.2`      | `sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c` | `sha256:da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071` | [v1.18.2 release](https://github.com/qdrant/qdrant/releases/tag/v1.18.2), published 2026-06-04; current GitHub release on access date                                                                                                      |
+| Prometheus    | `prom/prometheus:v3.13.1`    | `sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893` | `sha256:bd2dcadfb0d1096e2a4c21817ac7af918e2f19ff628e4bf25fd67a924c13dd80` | [v3.13.1 release](https://github.com/prometheus/prometheus/releases/tag/v3.13.1), [downloads](https://prometheus.io/download/), [LTS policy](https://prometheus.io/docs/introduction/release-cycle/); 3.13 is supported through 2027-07-31 |
+| Grafana       | `grafana/grafana:12.4.5`     | `sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd` | `sha256:5e8dea6bf166881f31f370c16ba87a9eebe8ed33db7cce29ee6baf675d60676a` | [v12.4.5 release](https://github.com/grafana/grafana/releases/tag/v12.4.5), [support policy](https://grafana.com/docs/grafana/latest/upgrade-guide/when-to-upgrade/); 12.4 is the extended-support final 12.x minor through 2027-05-24     |
+| node_exporter | `prom/node-exporter:v1.12.0` | `sha256:9b0ade5e607f9dbedb0a8e11151b6011ae5bd79304c261804cfdd2cadf200a80` | `sha256:fb027a472051259b5b7cfd027fe9faf7f8ac5f5fb58af93a818a832f7a90fc57` | [v1.12.0 release](https://github.com/prometheus/node_exporter/releases/tag/v1.12.0), [downloads](https://prometheus.io/download/); current release on access date                                                                          |
+| Alertmanager  | `prom/alertmanager:v0.33.1`  | `sha256:9e082985f56f4c8c9f724e18f2288c6708f472e56a5286b8863d080434ea065d` | `sha256:a89f8d4520954079275441eecdb71444328bd90633dd4eddfc33b9ed657f349b` | [v0.33.1 release](https://github.com/prometheus/alertmanager/releases/tag/v0.33.1), [downloads](https://prometheus.io/download/); current release on access date                                                                           |
 
 Registry verification used read-only `docker buildx imagetools inspect <image> --format '{{json .Manifest}}'`. The Qdrant index is OCI; the other four are Docker v2 manifest lists. Each contains both linux/amd64 and linux/arm64 children. These registry observations must be checked again only when intentionally changing a pin; tags alone remain mutable labels.
 
@@ -96,9 +96,9 @@ scrape_configs:
   - job_name: qdrant
     metrics_path: /metrics
     params:
-      per_collection: ["true"]
+      per_collection: ['true']
     static_configs:
-      - targets: ["qdrant:6333"]
+      - targets: ['qdrant:6333']
     http_headers:
       api-key:
         files:

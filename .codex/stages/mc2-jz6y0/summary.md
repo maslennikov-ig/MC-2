@@ -113,6 +113,8 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 - Exact Prometheus 3.11.3 and Grafana 12.4.0 tags exist, but are superseded; the security/version policy needs an explicit decision before Q6/Q9 implementation.
 - Pinned Qdrant image has no curl/wget; Q6 health checks must be proven with an available probe rather than copied blindly.
 
+Accepted `.14` preflight artifacts `b7c38638` and `99e08364` close the research gaps without deciding for the owner. They verify the exact tag+index-digest candidates, authenticated Qdrant main-listener scrape through Prometheus `http_headers.api-key.files`, the unsafe unauthenticated dedicated `metrics_port` caveat, a fail-closed mounted-secret wrapper for Qdrant's missing `_FILE` convention, a textfile-only node_exporter, and single-node Alertmanager. Q6 remains blocked until the owner approves this atomic version/transport choice.
+
 ## Accepted Runtime Corrections
 
 - `mc2-jz6y0.15`: Q5 pinned Qdrant `1.18.2` proved strict Formula access requires a numeric `document_weight` payload index. Reviewed fix `d9e01ac0` adds the canonical `float` index and is integrated as `449e7ab1`; 45 affected tests, package type-check, three consecutive 9/9 Formula fixture runs and the root 19/19 pinned gate pass.
