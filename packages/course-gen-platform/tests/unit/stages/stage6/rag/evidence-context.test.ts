@@ -239,6 +239,42 @@ describe('buildStage6EvidenceContext', () => {
     expect(() => build({ cards: degradedCards })).toThrow(/terminal.*degraded|degraded.*decision/i);
   });
 
+  it('emits zero source refs for an audited unrecoverable failed card', () => {
+    const failedCards = structuredClone(cards);
+    failedCards[2] = {
+      ...failedCards[2],
+      coverage_status: 'failed',
+      coverage_reason: 'source_file_unrecoverable',
+      processing_mode: 'metadata_only',
+      summary: null,
+      key_claims: [],
+      terminology: [],
+      constraints: [],
+      token_counts: { original: 100, summary: 0, allocated: 0 },
+    };
+    const terminalDecision = decision({
+      id: id.degradedDecision,
+      subject_kind: 'degraded_evidence',
+      conflict_id: null,
+      document_id: id.documentC,
+      selected_resolution: 'Continue without unavailable source evidence.',
+      selected_recommendation_value: 'continue_limited',
+      selected_side_handle: null,
+      subject_key: 'subject-unrecoverable',
+    });
+
+    const result = build({
+      snapshot: snapshot([id.conflictDecision, id.degradedDecision]),
+      cards: failedCards,
+      decisions: [decision(), terminalDecision],
+    });
+
+    expect(result.sourceRefs).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ document_id: id.documentC })])
+    );
+    expect(result.allowedDocumentIds).not.toContain(id.documentC);
+  });
+
   it('projects long persisted options by durable option value and fails visibly for unmapped custom text', () => {
     const longStatement = `${'Authoritative retention policy '.repeat(30)}365 days.`;
     const longCards = structuredClone(cards);

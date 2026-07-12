@@ -240,6 +240,35 @@ describe('Stage 4 document evidence live wiring', () => {
     expect(analysisContext.documentEvidencePreflight).toBeUndefined();
   });
 
+  it('carries an audited source failure without forwarding stored derivatives', async () => {
+    const unrecoverable = {
+      ...summary,
+      processed_content: 'Stored derivative must not be reused',
+      summary_source_version_hash: summary.source_version_hash,
+      sourceFailure: {
+        reason: 'source_file_unrecoverable' as const,
+        recoveryRunId: '90000000-0000-4000-8000-000000000009',
+      },
+    };
+    const analysisContext = context([unrecoverable]);
+    const runPreflight = vi.fn(async input => {
+      expect(input.sources[0]).toEqual(
+        expect.objectContaining({ sourceFailure: unrecoverable.sourceFailure })
+      );
+      expect(input.sources[0].stage3Summary).toBeUndefined();
+      expect(input.sources[0].stage3SummaryVersionHash).toBeUndefined();
+      return skippedResult;
+    });
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      runPreflight,
+      preflightDependencies: {} as never,
+    });
+
+    expect(runPreflight).toHaveBeenCalledTimes(1);
+  });
+
   it('persists shadow evidence without changing downstream summaries or answers', async () => {
     const analysisContext = context();
     const summariesBefore = structuredClone(analysisContext.resolvedDocumentSummaries);

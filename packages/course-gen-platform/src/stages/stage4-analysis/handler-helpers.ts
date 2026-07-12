@@ -289,6 +289,11 @@ type SummaryMetadata = {
 };
 
 /** Document summary shape returned from buildAnalysisInput */
+export interface AuditedDocumentSourceFailure {
+  reason: 'source_file_unrecoverable';
+  recoveryRunId: string;
+}
+
 export type DocumentSummaryResult = {
   document_id: string;
   file_name: string;
@@ -308,6 +313,8 @@ export type DocumentSummaryResult = {
   stage3_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | null;
   /** Stage 3 importance score from summary_metadata.classification.importance_score */
   stage3_importance_score: number | null;
+  /** Exact audited source-recovery disposition; generic processing failures never populate it. */
+  sourceFailure?: AuditedDocumentSourceFailure;
 };
 
 /** Fetch course metadata from database */
@@ -340,6 +347,18 @@ async function fetchCourseMetadata(courseId: string): Promise<{
 /** Fetch and transform document summaries from file_catalog */
 const DOCUMENT_METADATA_PAGE_SIZE = 1_000;
 const DOCUMENT_CONTENT_BATCH_SIZE = 200;
+const AUDITED_SOURCE_FAILURE_PATTERN =
+  /^source_file_unrecoverable; recovery_run=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$/u;
+
+function parseAuditedSourceFailure(
+  vectorStatus: string,
+  errorMessage: string | null
+): AuditedDocumentSourceFailure | undefined {
+  if (vectorStatus !== 'failed' || errorMessage === null) return undefined;
+  const match = AUDITED_SOURCE_FAILURE_PATTERN.exec(errorMessage);
+  if (!match) return undefined;
+  return { reason: 'source_file_unrecoverable', recoveryRunId: match[1].toLowerCase() };
+}
 
 export async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
   const supabase = getSupabaseAdmin();
@@ -354,6 +373,8 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
     hash: string;
     summary_metadata: unknown;
     priority: string | null;
+    vector_status: string;
+    error_message: string | null;
   };
 
   const enumerateSnapshot = async (): Promise<DocumentMetadataRow[]> => {
@@ -363,9 +384,10 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
     for (;;) {
       let query = supabase
         .from('file_catalog')
-        .select('id, original_name, filename, hash, summary_metadata, priority', {
-          count: 'exact',
-        })
+        .select(
+          'id, original_name, filename, hash, summary_metadata, priority, vector_status, error_message',
+          { count: 'exact' }
+        )
         .eq('course_id', courseId)
         .order('id', { ascending: true });
       if (lastId) query = query.gt('id', lastId);
@@ -447,6 +469,7 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
     const metadata = doc.summary_metadata as SummaryMetadata | null;
     const stage3Priority = doc.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | null;
     const stage3ImportanceScore = metadata?.classification?.importance_score ?? null;
+    const sourceFailure = parseAuditedSourceFailure(doc.vector_status, doc.error_message);
 
     return {
       document_id: doc.id,
@@ -465,6 +488,7 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
       },
       stage3_priority: stage3Priority,
       stage3_importance_score: stage3ImportanceScore,
+      ...(sourceFailure ? { sourceFailure } : {}),
     };
   });
 }

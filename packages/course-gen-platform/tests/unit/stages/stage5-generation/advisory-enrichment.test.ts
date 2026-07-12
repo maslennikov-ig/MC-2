@@ -864,35 +864,58 @@ describe('Stage 5 advisory evidence enrichment', () => {
     expect(search).not.toHaveBeenCalled();
   });
 
-  it('does not count retrieval when no evidence card is eligible', async () => {
+  it('keeps the baseline unchanged when the only source is audited unrecoverable', async () => {
     const failedCard = {
       ...card(id.docA, id.claimA, 'Keep records for 30 days.'),
       coverage_status: 'failed' as const,
-      coverage_reason: 'processing failed',
+      coverage_reason: 'source_file_unrecoverable',
+      processing_mode: 'metadata_only' as const,
+      summary: null,
+      key_claims: [],
+      terminology: [],
+      constraints: [],
+      token_counts: { original: 100, summary: 0, allocated: 0 },
     };
+    const terminalDecision = {
+      id: id.decision,
+      run_id: id.run,
+      course_id: id.course,
+      organization_id: id.org,
+      conflict_id: null,
+      document_id: id.docA,
+      subject_kind: 'degraded_evidence',
+      subject_key: 'sha256:unrecoverable',
+      selected_resolution: 'Continue without unavailable source evidence.',
+      selected_recommendation_value: 'continue_limited',
+      supersedes_decision_id: null,
+      decided_at: '2026-07-12T12:00:00.000Z',
+    };
+    const original = baseline();
     const search = vi.fn();
     const result = await enrichBaselineWithDocumentEvidence(
       {
         courseId: id.course,
         organizationId: id.org,
         language: 'en',
-        baseline: baseline(),
+        baseline: original,
         snapshot: {
           ...snapshot([]),
           coverage: { source_count: 1, assessed_count: 0, degraded_count: 0, failed_count: 1 },
+          current_decision_ids: [id.decision],
         },
       },
       {
         repository: repository({
           listItems: vi.fn(async () => [failedCard]),
           listConflicts: vi.fn(async () => []),
-          getLatestDecisions: vi.fn(async () => []),
+          getLatestDecisions: vi.fn(async () => [terminalDecision]),
         }),
         search,
       }
     );
 
-    expect(result.enrichment.status).toBe('degraded');
+    expect(JSON.stringify(result.courseStructure)).toBe(JSON.stringify(original));
+    expect(result.enrichment.status).toBe('no_relevant_evidence');
     expect(result.retrievalAttempts).toBe(0);
     expect(search).not.toHaveBeenCalled();
   });

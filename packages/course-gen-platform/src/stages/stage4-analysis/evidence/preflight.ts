@@ -45,6 +45,10 @@ export interface DocumentEvidencePreflightSource {
   stage3Summary?: string;
   stage3SummaryVersionHash?: string;
   importanceScore?: number;
+  sourceFailure?: {
+    reason: 'source_file_unrecoverable';
+    recoveryRunId: string;
+  };
 }
 
 export interface DocumentEvidencePreflightInput extends EvidenceBudgetOptions {
@@ -169,6 +173,8 @@ export interface DocumentEvidencePreflightResult {
 
 const DEFAULT_VERIFICATION_BATCH_SIZE = 100;
 const DOWNSTREAM_PHASE_DOCUMENT_TOKEN_LIMIT = 24_000;
+const RECOVERY_RUN_ID_PATTERN =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/u;
 
 function sha256(value: string): string {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -177,9 +183,30 @@ function sha256(value: string): string {
 function sortedSources(
   sources: DocumentEvidencePreflightSource[]
 ): DocumentEvidencePreflightSource[] {
-  const sorted = [...sources].sort((left, right) =>
-    left.documentId.localeCompare(right.documentId)
-  );
+  const sorted = sources
+    .map(source => {
+      if (!source.sourceFailure) return source;
+      if (
+        source.sourceFailure.reason !== 'source_file_unrecoverable' ||
+        !RECOVERY_RUN_ID_PATTERN.test(source.sourceFailure.recoveryRunId) ||
+        JSON.stringify(Object.keys(source.sourceFailure).sort()) !==
+          JSON.stringify(['reason', 'recoveryRunId'].sort())
+      ) {
+        throw new Error('Audited source failure is malformed');
+      }
+      const sanitized = {
+        ...source,
+        sourceFailure: {
+          reason: source.sourceFailure.reason,
+          recoveryRunId: source.sourceFailure.recoveryRunId.toLowerCase(),
+        },
+      };
+      delete sanitized.fullText;
+      delete sanitized.stage3Summary;
+      delete sanitized.stage3SummaryVersionHash;
+      return sanitized;
+    })
+    .sort((left, right) => left.documentId.localeCompare(right.documentId));
   const seen = new Set<string>();
   for (const source of sorted) {
     if (seen.has(source.documentId))
@@ -250,6 +277,7 @@ function inputFingerprint(
         authority_scope: source.authorityScope,
         content_quality: source.contentQuality,
         summary_artifact_version: source.stage3SummaryVersionHash ?? null,
+        source_failure: source.sourceFailure ?? null,
       })),
       retry_directives: retryDirectives.map(directive => ({
         decision_id: directive.decisionId,
@@ -526,8 +554,9 @@ export async function runDocumentEvidencePreflight(
 
   const sourceManifest = manifest(sources);
   const fingerprint = inputFingerprint(input, sources, sourceManifest);
+  const processableSources = sources.filter(source => source.sourceFailure === undefined);
   const budget = allocateEvidenceBudget(
-    sources.map(source => ({
+    processableSources.map(source => ({
       documentId: source.documentId,
       priority: source.priority,
       originalTokens: source.originalTokens,
@@ -538,9 +567,19 @@ export async function runDocumentEvidencePreflight(
     })),
     input
   );
-  const plan = planBatches(budget.allocations, budget.batches);
+  const auditedFailureAllocations: EvidenceDocumentAllocation[] = sources
+    .filter(source => source.sourceFailure !== undefined)
+    .map(source => ({
+      documentId: source.documentId,
+      priority: source.priority,
+      mode: 'metadata_only',
+      allocatedTokens: 0,
+      reason: 'content_unavailable',
+    }));
+  const allocations = [...budget.allocations, ...auditedFailureAllocations];
+  const plan = planBatches(allocations, budget.batches);
   const allocationById = new Map(
-    budget.allocations.map(allocation => [allocation.documentId, allocation])
+    allocations.map(allocation => [allocation.documentId, allocation])
   );
   const sourceById = new Map(sources.map(source => [source.documentId, source]));
   const { run, reused } = await dependencies.repository.getOrCreateRun({
@@ -602,9 +641,16 @@ export async function runDocumentEvidencePreflight(
   let durableCards = reused ? await dependencies.repository.listItems(runId) : [];
   if (durableCards.length === 0) {
     durableCards = exactCards(
-      sources.map(source =>
-        createPendingEvidenceCard(source, allocationById.get(source.documentId)!)
-      ),
+      sources.map(source => {
+        const allocation = allocationById.get(source.documentId)!;
+        return source.sourceFailure
+          ? createFailedEvidenceCard(
+              source,
+              { allocatedTokens: 0, processingMode: 'metadata_only' },
+              source.sourceFailure.reason
+            )
+          : createPendingEvidenceCard(source, allocation);
+      }),
       sources
     );
   } else durableCards = exactCards(durableCards, sources);

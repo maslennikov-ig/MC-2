@@ -202,6 +202,79 @@ const baseOptions = {
 };
 
 describe('runDocumentEvidencePreflight', () => {
+  it('materializes an approved unrecoverable source before budget or derivative use', async () => {
+    const repository = new MemoryRepository();
+    const generateCard = vi.fn(async input => assessedCard(input));
+    const loadSourceContents = vi.fn(
+      async () => new Map([[documentId(1), 'Loaded derivative that must not become evidence']])
+    );
+    const failed = source(1, {
+      originalTokens: 100_000,
+      summaryTokens: 50_000,
+      fullText: 'Parsed derivative that must be ignored',
+      stage3Summary: 'Stage 3 derivative that must be ignored',
+      sourceFailure: {
+        reason: 'source_file_unrecoverable',
+        recoveryRunId: '90000000-0000-4000-8000-000000000009',
+      },
+    });
+
+    const result = await runDocumentEvidencePreflight(
+      {
+        ...baseOptions,
+        modelContext: 20_000,
+        sources: [failed, source(2)],
+      },
+      { repository, generateCard, loadSourceContents }
+    );
+
+    expect(result.coverage).toEqual({
+      source_count: 2,
+      assessed_count: 1,
+      degraded_count: 0,
+      failed_count: 1,
+    });
+    expect(result.cards[0]).toMatchObject({
+      document_id: documentId(1),
+      coverage_status: 'failed',
+      coverage_reason: 'source_file_unrecoverable',
+      processing_mode: 'metadata_only',
+      summary: null,
+      key_claims: [],
+      terminology: [],
+      constraints: [],
+      token_counts: { allocated: 0 },
+    });
+    expect(generateCard).toHaveBeenCalledTimes(1);
+    expect(generateCard.mock.calls[0][0].source.documentId).toBe(documentId(2));
+    expect(generateCard.mock.calls[0][0].allocatedTokens).toBeGreaterThan(0);
+    expect(loadSourceContents).not.toHaveBeenCalled();
+  });
+
+  it('changes run identity when an audited source becomes recoverable', async () => {
+    const repository = new MemoryRepository();
+    const generateCard = vi.fn(async input => assessedCard(input));
+    const failedSource = source(1, {
+      sourceFailure: {
+        reason: 'source_file_unrecoverable',
+        recoveryRunId: '90000000-0000-4000-8000-000000000009',
+      },
+    });
+
+    const failed = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [failedSource] },
+      { repository, generateCard }
+    );
+    const recovered = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [source(1)] },
+      { repository, generateCard }
+    );
+
+    expect(recovered.runId).not.toBe(failed.runId);
+    expect(recovered.inputFingerprint).not.toBe(failed.inputFingerprint);
+    expect(recovered.cards[0].coverage_status).toBe('assessed');
+  });
+
   it('creates a new immutable run fingerprint for a durable retry decision and reuses that retry', async () => {
     const repository = new MemoryRepository();
     const dependencies = {

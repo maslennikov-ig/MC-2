@@ -28,21 +28,35 @@ describe('Stage 4 document source enumeration', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('enumerates processed and missing-content sources regardless of Qdrant vector status', async () => {
-    const rows = ['indexed', 'pending', 'failed'].map((vectorStatus, index) => ({
-      id: documentId(index + 1),
-      original_name: `${vectorStatus}.pdf`,
-      filename: `${vectorStatus}.pdf`,
-      hash: `sha256:${vectorStatus}`,
-      summary_metadata: {},
-      priority: index === 0 ? 'CORE' : 'SUPPLEMENTARY',
-      vector_status: vectorStatus,
-    }));
+    const rows = ['indexed', 'pending', 'failed', 'failed', 'failed'].map(
+      (vectorStatus, index) => ({
+        id: documentId(index + 1),
+        original_name: `${vectorStatus}.pdf`,
+        filename: `${vectorStatus}.pdf`,
+        hash: `sha256:${vectorStatus}`,
+        summary_metadata: {},
+        priority: index === 0 ? 'CORE' : 'SUPPLEMENTARY',
+        vector_status: vectorStatus,
+        error_message:
+          index === 0
+            ? 'source_file_unrecoverable; recovery_run=10000000-0000-4000-8000-000000000001'
+            : index === 1
+              ? 'source_file_unrecoverable; recovery_run=10000000-0000-4000-8000-000000000002'
+              : index === 2
+                ? 'generic processing failure'
+                : index === 3
+                  ? 'source_file_unrecoverable; recovery_run=not-a-uuid'
+                  : 'source_file_unrecoverable; recovery_run=10000000-0000-4000-8000-000000000005',
+      })
+    );
     const filters: Array<[string, string]> = [];
+    const selects: string[] = [];
     const from = vi.fn(() => {
       let selected = '';
       const builder = {
         select(columns: string) {
           selected = columns;
+          selects.push(columns);
           return builder;
         },
         eq(column: string, value: string) {
@@ -62,7 +76,7 @@ describe('Stage 4 document source enumeration', () => {
           expect(selected).toContain('processed_content');
           return {
             data: ids
-              .filter(id => id !== documentId(3))
+              .filter(id => id !== documentId(5))
               .map(id => ({ id, processed_content: `Summary ${id}` })),
             error: null,
           };
@@ -76,8 +90,20 @@ describe('Stage 4 document source enumeration', () => {
     const result = await fetchDocumentSummaries('20000000-0000-4000-8000-000000000001');
 
     expect(result.map(item => item.document_id)).toEqual(rows.map(row => row.id));
-    expect(new Set(result.map(item => item.document_id)).size).toBe(3);
+    expect(new Set(result.map(item => item.document_id)).size).toBe(5);
     expect(filters.some(([column]) => column === 'vector_status')).toBe(false);
+    expect(selects[0]).toContain('vector_status');
+    expect(selects[0]).toContain('error_message');
+    expect(result.map(item => item.sourceFailure)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        reason: 'source_file_unrecoverable',
+        recoveryRunId: '10000000-0000-4000-8000-000000000005',
+      },
+    ]);
     expect(result.at(-1)?.processed_content).toBe('');
   });
 

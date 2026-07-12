@@ -321,7 +321,7 @@ async function runDocumentEvidencePhaseCore(
       throw new Error(`Document ${document.document_id} is missing a source version hash`);
     }
     const allocatedPriority = allocationById.get(document.document_id)?.priority;
-    return {
+    const source = {
       documentId: document.document_id,
       documentName: document.file_name,
       sourceVersionHash: document.source_version_hash,
@@ -330,9 +330,15 @@ async function runDocumentEvidencePhaseCore(
       contentQuality: document.summary_metadata.quality_score,
       originalTokens: document.summary_metadata.original_tokens,
       summaryTokens: document.summary_metadata.summary_tokens,
+      importanceScore: document.stage3_importance_score ?? document.summary_metadata.quality_score,
+    };
+    if (document.sourceFailure) {
+      return { ...source, sourceFailure: document.sourceFailure };
+    }
+    return {
+      ...source,
       stage3Summary: document.processed_content || undefined,
       stage3SummaryVersionHash: document.summary_source_version_hash,
-      importanceScore: document.stage3_importance_score ?? document.summary_metadata.quality_score,
     };
   });
 
