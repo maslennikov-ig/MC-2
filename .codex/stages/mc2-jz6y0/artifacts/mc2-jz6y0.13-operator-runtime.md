@@ -73,6 +73,7 @@ verification:
   - pinned Qdrant 1.18.2 bootstrap and verify under Compose-equivalent hardening: passed
   - systemd-analyze verify for four recovery units in rootless mount namespace: passed
   - Compose render through qdrant runtime contract: passed
+  - independent re-review of remediation commit 76caa6e5: ACCEPT with P0=0 P1=0 P2=0 P3=0
 changed_files:
   - packages/course-gen-platform/Dockerfile
   - packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh
@@ -188,6 +189,10 @@ configured supplementary metrics GID, not as host root.
   source findings. The first focused GREEN passed 17/17; expanded digest,
   ledger, lock, metrics, and secret gates passed 20/20 and then 13/13 after the
   pre-Docker digest wrapper was added.
+- Independent re-review of `76caa6e5` returned `ACCEPT` for local integration
+  with P0=0, P1=0, P2=0, P3=0. It confirmed every prior finding closed and
+  found no new regression; remaining CI publication, target provisioning,
+  manual oneshot, S3, timer, and cutover work is parent integration scope.
 - Final joined suite:
   `SUPABASE_URL=https://placeholder.supabase.co SUPABASE_SERVICE_KEY=placeholder-service-key vitest run --config vitest.config.unit.ts tests/unit/ops/qdrant-operator-runtime.test.ts tests/unit/ops/qdrant-runtime-contract.test.ts tests/unit/ops/qdrant-observability-contract.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts tests/unit/stages/stage2-document-processing/phase-6-qdrant-upload.test.ts tests/unit/tools/qdrant/reindex-course-embeddings.test.ts tests/unit/tools/qdrant/reindex-plan.test.ts`
   -> 76/76, including execute reaching enqueue with a durable target-bound
