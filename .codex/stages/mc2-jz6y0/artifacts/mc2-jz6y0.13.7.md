@@ -59,7 +59,8 @@ verification:
   - review correction RED: 12/15 failed against commit 23f24068 for stable FD consumption, path substitution, stderr residue, full traversal, exact scavenging, and no-replace publication
   - review correction no-target RED: 1/16 failed because plain ln followed a colliding symlink-to-directory
   - review correction locale RED: 1/16 failed because stat file-type parsing was not pinned to the C locale
-  - review correction GREEN: 16/16 passed
+  - backup-directory binding RED: 2/18 failed because an unsafe parent and post-lock pathname substitution were accepted
+  - review correction GREEN: 18/18 passed
   - broader ops delta: 42/44 passed; two base-commit stale contract failures are outside this diff and recorded below
   - bash -n deploy/postgres/backup-supabase.sh: passed
   - node scripts/ci/test_ci_cd_workflow_gates.mjs: passed
@@ -74,6 +75,7 @@ changed_files:
 explicit_defers:
   - independent correctness/security review and parent acceptance are required before server installation
   - current verify-full Session pooler credentials and a fresh live restore-validated backup remain mandatory remote activation inputs
+  - the observed server /opt/megacampus/backups parent mode 0775 must be changed to an approved root/current-owned non-group/world-writable mode before operator installation
   - no server script, cron, credential, CA, historical dump, live database, staging service, or remote state was read or changed by this stream
 ---
 
@@ -90,6 +92,10 @@ checks. The effective URL replaces the CA pathname with inherited
 `/proc/self/fd/<fd>`. Both paths are rechecked immediately before `pg_dump`.
 Child stderr goes to `/dev/null`, so even abrupt termination cannot persist a
 password-bearing diagnostic file. The URL is unset before offline validation.
+The backup directory has the same canonical root/current-owned,
+non-group/world-writable parent policy and is bound by device/inode/owner/mode to
+the FD holding the nonblocking lock. Its identity is rechecked before temporary
+creation, publication, and retention.
 
 The operator writes owner-only temporary files in the final directory, captures
 the real `pg_dump` status, requires more than 1024 bytes, runs
@@ -149,7 +155,9 @@ commit `23f24068`. It reproduced all four findings plus unsafe input parents,
 both deterministic inode substitutions, selective startup cleanup, inherited
 CA-FD use, and a deterministic final-name collision. A final 1/16 RED proved
 plain `ln` follows a colliding symlink-to-directory; no-target publication fixed
-that boundary. Correction GREEN is 16/16.
+that boundary. A final 2/18 RED proved an unsafe backup parent and a pathname
+replacement after lock acquisition were accepted; directory-FD binding fixed
+both. Correction GREEN is 18/18.
 
 The broader seven-file ops delta passed 42/44. Its two failures are present at
 base `dd3e6c76` and no involved source or test differs from that base: the stale

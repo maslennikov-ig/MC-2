@@ -221,6 +221,48 @@ recheck_open_input() {
   [[ "$current_identity" == "$opened_identity" && "$current_fd_identity" == "$opened_identity" ]] || fail "$label file path identity changed after open"
 }
 
+validate_backup_directory() {
+  require_absolute_path 'backup directory' "$BACKUP_DIR"
+  require_safe_parent_chain 'backup directory' "$BACKUP_DIR"
+  [[ -d "$BACKUP_DIR" && ! -L "$BACKUP_DIR" ]] || fail 'backup directory must be a regular non-symlink directory'
+  local canonical
+  canonical=$(/usr/bin/readlink -f -- "$BACKUP_DIR") || fail 'backup directory cannot be canonicalized'
+  [[ "$canonical" == "$BACKUP_DIR" ]] || fail 'backup directory has symlink/canonical drift'
+
+  local identity device inode uid gid mode kind
+  identity=$(file_identity "$BACKUP_DIR")
+  IFS=: read -r device inode uid gid mode kind <<< "$identity"
+  [[ "$kind" == 'directory' ]] || fail 'backup directory must be a regular non-symlink directory'
+  [[ "$uid" == "$(/usr/bin/id -u)" && "$gid" == "$(/usr/bin/id -g)" && "$mode" == '700' ]] || fail 'backup directory must be owned by the current user and mode 0700'
+}
+
+open_locked_backup_directory() {
+  local -n fd_result=$1
+  local -n identity_result=$2
+  validate_backup_directory
+  local opened_fd
+  exec {opened_fd}<"$BACKUP_DIR" || fail 'backup directory could not be opened'
+  local opened_identity current_identity
+  opened_identity=$(fd_identity "$opened_fd")
+  current_identity=$(file_identity "$BACKUP_DIR")
+  if [[ "$opened_identity" != "$current_identity" ]]; then
+    exec {opened_fd}<&-
+    fail 'backup directory path identity changed during lock open'
+  fi
+  fd_result=$opened_fd
+  identity_result=$opened_identity
+}
+
+recheck_locked_backup_directory() {
+  local fd=$1
+  local opened_identity=$2
+  validate_backup_directory
+  local current_identity current_fd_identity
+  current_identity=$(file_identity "$BACKUP_DIR")
+  current_fd_identity=$(fd_identity "$fd")
+  [[ "$current_identity" == "$opened_identity" && "$current_fd_identity" == "$opened_identity" ]] || fail 'backup directory path identity changed after lock'
+}
+
 cleanup_stale_temporaries() {
   local candidate name identity removed=0
   shopt -s nullglob
@@ -297,13 +339,12 @@ run_retention() {
 
 main() {
   [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || fail 'retention days must be a non-negative integer'
-  require_owned_directory 'backup directory' "$BACKUP_DIR"
+  configure_commands
 
-  local lock_fd
-  exec {lock_fd}<"$BACKUP_DIR"
+  local lock_fd lock_identity
+  open_locked_backup_directory lock_fd lock_identity
   /usr/bin/flock --nonblock "$lock_fd" || fail 'backup already running' 75
 
-  configure_commands
   cleanup_stale_temporaries
 
   open_validated_input 'URL credential' "$URL_FILE" '400:600' \
@@ -321,6 +362,7 @@ main() {
     'URL credential file must be owner-only mode 0400 or 0600' "$URL_FD" "$URL_OPEN_IDENTITY"
   recheck_open_input 'CA' "$CA_FILE" '400:440:444:600:640:644' \
     'CA file must not be group/world writable' "$CA_FD" "$CA_OPEN_IDENTITY"
+  recheck_locked_backup_directory "$lock_fd" "$lock_identity"
 
   TEMP_ARCHIVE=$(create_temp archive)
   TEMP_LIST=$(create_temp list)
@@ -356,6 +398,7 @@ main() {
     fail "pg_restore full traversal failed with status $status" "$status"
   fi
 
+  recheck_locked_backup_directory "$lock_fd" "$lock_identity"
   /usr/bin/sync -f "$TEMP_ARCHIVE"
   local timestamp final_name final_path
   if [[ $TEST_MODE_ACTIVE -eq 1 && -n "$TEST_FINAL_NAME" ]]; then
@@ -373,6 +416,7 @@ main() {
   TEMP_ARCHIVE=''
   /usr/bin/sync -d "$BACKUP_DIR"
 
+  recheck_locked_backup_directory "$lock_fd" "$lock_identity"
   run_retention
   /usr/bin/sync -d "$BACKUP_DIR"
   printf 'Supabase backup published: %s\n' "$final_name"

@@ -24,6 +24,7 @@ const roots: string[] = [];
 
 interface Fixture {
   root: string;
+  backupParent: string;
   backupDir: string;
   urlFile: string;
   caFile: string;
@@ -45,10 +46,11 @@ function fixture(): Fixture {
   const root = mkdtempSync('/tmp/mc2-supabase-backup-');
   roots.push(root);
   chmodSync(root, 0o700);
-  const backupDir = join(root, 'backups');
+  const backupParent = join(root, 'backup-parent');
+  const backupDir = join(backupParent, 'backups');
   const secretDir = join(root, 'secrets');
   const binDir = join(root, 'bin');
-  for (const directory of [backupDir, secretDir, binDir]) {
+  for (const directory of [backupParent, backupDir, secretDir, binDir]) {
     mkdirSync(directory, { mode: 0o700 });
     chmodSync(directory, 0o700);
   }
@@ -151,13 +153,18 @@ fi
     `#!/usr/bin/env bash
 set -eu
 /usr/bin/mv -- "$FAKE_SUBSTITUTE_PATH" "$FAKE_SUBSTITUTE_PATH.opened"
-printf '%s\\n' 'synthetic substituted input' > "$FAKE_SUBSTITUTE_PATH"
-/usr/bin/chmod "$FAKE_SUBSTITUTE_MODE" "$FAKE_SUBSTITUTE_PATH"
+if [[ "\${FAKE_SUBSTITUTE_KIND:-file}" == directory ]]; then
+  /usr/bin/mkdir -m "$FAKE_SUBSTITUTE_MODE" "$FAKE_SUBSTITUTE_PATH"
+else
+  printf '%s\\n' 'synthetic substituted input' > "$FAKE_SUBSTITUTE_PATH"
+  /usr/bin/chmod "$FAKE_SUBSTITUTE_MODE" "$FAKE_SUBSTITUTE_PATH"
+fi
 `
   );
 
   return {
     root,
+    backupParent,
     backupDir,
     urlFile,
     caFile,
@@ -357,6 +364,18 @@ describe('fail-closed Supabase backup operator', () => {
     expect(published(item.backupDir)).toEqual([]);
   });
 
+  it('rejects an unsafe backup parent before taking the directory lock', () => {
+    const item = fixture();
+    chmodSync(item.backupParent, 0o770);
+
+    const result = run(item);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      'backup directory parent directory must not be group/world writable'
+    );
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
   it.each([
     ['URL credential', 'url', 0o600],
     ['CA', 'ca', 0o400],
@@ -371,6 +390,21 @@ describe('fail-closed Supabase backup operator', () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(`${label} file path identity changed after open`);
+    expect(existsSync(item.argsLog)).toBe(false);
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
+  it('fails closed when the locked backup directory pathname is substituted', () => {
+    const item = fixture();
+    const result = run(item, {
+      MC2_SUPABASE_BACKUP_TEST_PRE_DUMP_HOOK: item.substituteHook,
+      FAKE_SUBSTITUTE_PATH: item.backupDir,
+      FAKE_SUBSTITUTE_MODE: '700',
+      FAKE_SUBSTITUTE_KIND: 'directory',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('backup directory path identity changed after lock');
     expect(existsSync(item.argsLog)).toBe(false);
     expect(published(item.backupDir)).toEqual([]);
   });
