@@ -266,6 +266,9 @@ Create an untracked API-key file and use the paths/variables documented in
 `packages/course-gen-platform/.env.example`, then start and verify locally:
 
 ```bash
+# docker-compose.dev.yml joins an external network owned by the infra topology.
+docker network inspect megacampus-network >/dev/null 2>&1 ||
+  docker network create --driver bridge megacampus-network >/dev/null
 docker compose -f docker-compose.dev.yml up -d qdrant-dev
 
 # Host CLI uses loopback and client.ts requires the raw QDRANT_API_KEY.

@@ -165,20 +165,79 @@ remain disabled. Provisioned dashboards are filesystem-owned and are not
 persisted back from the Grafana UI. Alertmanager reads both Telegram fields from
 files and uses `send_resolved: true`.
 
-## Bootstrap, verify, reindex, snapshot, and restore
+## Client-based bootstrap, verify, and reindex
 
-Run these only in an already authorized environment and with credential paths
-resolved outside command output:
+These five commands use the application client, which requires a host-reachable
+loopback URL and the raw `QDRANT_API_KEY`. Run them only in an authorized
+environment. The helper reads the untracked owner-only key without printing it;
+each command runs in a short-lived subshell and removes the raw values on exit:
 
 ```bash
-pnpm --dir packages/course-gen-platform qdrant:bootstrap
-pnpm --dir packages/course-gen-platform qdrant:verify
-pnpm --dir packages/course-gen-platform qdrant:reindex:plan
-pnpm --dir packages/course-gen-platform qdrant:reindex:execute
-pnpm --dir packages/course-gen-platform qdrant:reindex:verify
-pnpm --dir packages/course-gen-platform qdrant:snapshot
-pnpm --dir packages/course-gen-platform qdrant:restore-drill
+qdrant_admin() (
+  set -eu
+  key_file=${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  test -r "$key_file"
+  QDRANT_API_KEY=''
+  IFS= read -r QDRANT_API_KEY <"$key_file" || test -n "$QDRANT_API_KEY"
+  test -n "$QDRANT_API_KEY"
+  export QDRANT_URL=http://127.0.0.1:6335 QDRANT_API_KEY
+  trap 'unset QDRANT_API_KEY QDRANT_URL' EXIT
+  "$@"
+)
+
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:bootstrap
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:verify
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:plan
+# Execute only after accepting the plan output and cutover/rollback conditions.
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:execute
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:verify
+unset -f qdrant_admin
 ```
+
+`http://qdrant:6333` and `http://qdrant-dev:6333` are Docker-network names and
+must not be used by these host commands. This operator runbook uses staging's
+loopback mapping `127.0.0.1:6335`; local development uses the separate
+`127.0.0.1:6333` procedure in `packages/course-gen-platform/docs/qdrant-setup.md`.
+
+## Snapshot and restore command contracts
+
+Recovery tools do **not** use raw `QDRANT_API_KEY`. `qdrant:snapshot` reads an
+owner-only file from `QDRANT_API_KEY_FILE` and requires `QDRANT_URL` plus a
+precreated writable mode-2775 `QDRANT_METRICS_TEXTFILE_DIR`. Its accepted unit
+uses `QDRANT_URL=http://127.0.0.1:6335` and
+`QDRANT_API_KEY_FILE=%d/qdrant_api_key`, then sets `QDRANT_COLLECTION_NAME`,
+`QDRANT_SNAPSHOT_STORAGE_MODE=s3`,
+`QDRANT_SNAPSHOT_OBJECT_PREFIX`, `QDRANT_RECOVERY_STATE_DIR`,
+`QDRANT_RECOVERY_LOCK_PATH`, and `QDRANT_RECOVERY_LOCK_HELD=1`; the last value
+is valid because the unit's outer `/usr/bin/flock` already owns the shared lock.
+
+`qdrant:restore-drill` requires the same file-backed API key, Qdrant URL,
+metrics directory, state directory, collection name, and shared-lock contract.
+It additionally requires owner-only `QDRANT_SNAPSHOT_MANIFEST_FILE` and
+`QDRANT_RECOVERY_PROBE_FILE`, plus `QDRANT_SNAPSHOT_TRANSPORT_URL`. The accepted
+unit maps those files to `%d/snapshot_manifest` and `%d/recovery_probe`, uses
+`QDRANT_URL=http://127.0.0.1:6335` for the host client, and sets
+`QDRANT_SNAPSHOT_TRANSPORT_URL=http://127.0.0.1:6333` for Qdrant's authenticated
+snapshot fetch. Do not substitute the raw-key client helper for either recovery
+tool, and do not set `QDRANT_RECOVERY_LOCK_HELD=1` for an unwrapped direct run.
+
+After an authorized installation, prefer the accepted systemd services because
+`LoadCredential`, explicit environment entries, directory hardening, timeouts,
+and the shared nonblocking lock are already encoded:
+
+```bash
+sudo systemctl start megacampus-qdrant-snapshot.service
+sudo systemctl status --no-pager megacampus-qdrant-snapshot.service
+sudo journalctl --no-pager -u megacampus-qdrant-snapshot.service -n 200
+
+sudo systemctl start megacampus-qdrant-restore-drill.service
+sudo systemctl status --no-pager megacampus-qdrant-restore-drill.service
+sudo journalctl --no-pager -u megacampus-qdrant-restore-drill.service -n 200
+```
+
+The commands above are an operator procedure, not activation authorization.
+Installing units, creating credentials, starting either service, or exercising
+staging/production recovery still requires Q12 approval.
 
 The recovery implementation owns the checksum manifest, retention, systemd
 timers, isolated collection, and alias cleanup. Reindex uses deterministic,

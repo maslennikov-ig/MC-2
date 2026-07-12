@@ -25,16 +25,22 @@ graph_reviewed: used
 graph_review_notes: Read the primary checkout report `/home/me/code/mc2/graphify-out/GRAPH_REPORT.md` (local graph built from 1233be56) only for orientation. Child did not refresh shared ignored graph state; parent owns the safe post-integration refresh.
 verification:
   - Initial independent docs review returned Ready NO with six Important findings (I1-I6) and one Minor finding (M1); orchestrator acceptance remained no.
+  - Second independent docs review returned Ready NO with one remaining Important finding (I3): fresh-network setup, host reindex credentials, and snapshot/restore contracts were not yet jointly reproducible.
   - Initial broad non-archive Cloud/cluster/custom-BM25 scan recorded 108 matching lines; exact Cloud scan after edits retains 49 historical/retirement lines across 20 classified files.
   - Current-guidance exact Cloud scan found one explicit retirement sentence and zero actionable hosted setup, endpoint, account, dashboard or key instructions.
   - Active old-pin scan for Prometheus 3.11.3 and Grafana 12.4.0 found zero; current operator/deployment docs contain 21 positive pin references.
   - Current Qdrant setup/module/operator docs contain 71 positive retrieval, strict-schema, reindex, snapshot/restore, systemd, rollback and Q12 references before the final exact-truth wording pass.
   - Prettier check, git diff --check, artifact validation and process verification passed after the complete docs write.
-  - Review remediation reconciled the indexed arithmetic-only Formula, accepted 4h11 snapshot timing/systemd units, executable host CLI credentials, actual client behavior, immutable promtool digest, split image-lock ledgers, and concise upload public API/status/error semantics.
+  - First review remediation reconciled the indexed arithmetic-only Formula, accepted 4h11 snapshot timing/systemd units, bootstrap/verify host credentials, actual client behavior, immutable promtool digest, split image-lock ledgers, and concise upload public API/status/error semantics; it did not yet prove all recovery commands reproducible.
   - Remediation stale-claim scan found zero matches across six focused groups; positive evidence counted 4 Formula, 6 recovery, 6 host-CLI, 2 digest-pinned promtool, 3 dual-ledger-file and 4 upload-contract references, plus 8 existing upload-guide link targets.
-  - Full base-to-head scope contains 31 files, all Markdown; the remediation delta contains 10 Markdown files and no runtime/config changes.
+  - Full base-to-head scope contains 31 files, all Markdown; the first-remediation delta contains 10 Markdown files and no runtime/config changes.
   - Remediation Prettier check, base/current git diff checks, artifact validator and process verification passed before commit; post-commit git-show and clean-push evidence remains part of worker delivery.
-  - Independent re-review remains parent-owned and pending; this artifact does not claim acceptance.
+  - Second remediation adds idempotent `megacampus-network` preflight to both local setup entrypoints, wraps all three host reindex commands in a defined secret-safe loopback helper, and separates client, snapshot, restore, and authorized-systemd contracts in the runbook.
+  - Focused second-remediation scans cover fresh-network preflight, host reindex raw-key isolation, snapshot file-backed inputs, restore manifest/probe/transport inputs, and removal of the ambiguous seven-command block.
+  - Second-remediation focused totals are 2 fresh-network docs, 3 host reindex commands, 5 staging operator client commands, 6 snapshot contract terms, 3 restore-only terms, 2 preferred systemd start commands, and 0 ambiguous combined-block matches.
+  - Second-remediation delta contains 4 Markdown files; runtime, config, Beads, services, credentials, networks, collections, and remote state remain unchanged.
+  - Second-remediation Prettier check covered all 31 branch Markdown files; current/base diff checks, artifact validator, process verification, and full base-to-head stat inspection passed before commit.
+  - Independent third re-review remains parent-owned and pending; this artifact does not claim acceptance.
 changed_files:
   - .claude/docs/deployment-guide.md
   - .codex/project-index.md
@@ -104,7 +110,7 @@ The 16 current-guidance surfaces contain no hosted endpoint, hosted dashboard/ac
 
 # Verification and delivery
 
-The initial independent review returned Ready NO: I1-I6 identified incorrect design/recovery/setup/client/pin/ledger claims, while M1 identified an over-reduced upload guide. The remediation corrects each item against `collection-schema.ts`, `search-operations.ts`, accepted systemd units/timers, `client.ts`, both image-lock ledgers, `upload.ts`, `upload-types.ts`, the Stage 2 caller, and focused tests.
+The initial independent review returned Ready NO: I1-I6 identified incorrect design/recovery/setup/client/pin/ledger claims, while M1 identified an over-reduced upload guide. The first remediation corrected those direct claims against `collection-schema.ts`, `search-operations.ts`, accepted systemd units/timers, `client.ts`, both image-lock ledgers, `upload.ts`, `upload-types.ts`, the Stage 2 caller, and focused tests. The second review remained Ready NO because I3 command reproducibility was incomplete; the follow-up adds the external-network preflight, explicit host reindex helper, and separate client/snapshot/restore/systemd contracts.
 
 Final formatting, focused stale-claim scans, artifact validation, process verification, base-to-head diff inspection, commit and push evidence are recorded by the worker after fresh execution. Independent re-review and orchestrator acceptance intentionally remain pending.
 
@@ -118,4 +124,4 @@ graph-reviewed: used — local report read for architecture orientation; final s
 
 # Risks / Follow-ups
 
-Independent docs review and parent integration scans remain required before Q10 acceptance. Q12 is the only operational defer: staging systemd/version/path/secrets preflight and every remote activation or mutation still require explicit current-task authorization.
+Independent third docs review and parent integration scans remain required before Q10 acceptance. Q12 is the only operational defer: staging systemd/version/path/secrets preflight and every remote activation or mutation still require explicit current-task authorization.

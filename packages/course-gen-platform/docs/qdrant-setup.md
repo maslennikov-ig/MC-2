@@ -9,6 +9,10 @@ MegaCampus uses private, single-node Qdrant `1.18.2`. Images are pinned by tag a
 From the repository root, create a local secret file outside Git, set the variables described in `packages/course-gen-platform/.env.example`, and start the pinned service:
 
 ```bash
+# The dev Compose file expects this external network. Creating the named bridge
+# is safe on a fresh workstation; an existing infra-owned network is reused.
+docker network inspect megacampus-network >/dev/null 2>&1 ||
+  docker network create --driver bridge megacampus-network >/dev/null
 docker compose -f docker-compose.dev.yml up -d qdrant-dev
 
 (
@@ -42,12 +46,26 @@ Bootstrap and verification fail on incompatible schema or alias drift. Alias act
 Plan, execute, and verify a rebuild from authoritative sources:
 
 ```bash
-pnpm --dir packages/course-gen-platform qdrant:reindex:plan
-pnpm --dir packages/course-gen-platform qdrant:reindex:execute
-pnpm --dir packages/course-gen-platform qdrant:reindex:verify
+qdrant_admin() (
+  set -eu
+  key_file=${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  test -r "$key_file"
+  QDRANT_API_KEY=''
+  IFS= read -r QDRANT_API_KEY <"$key_file" || test -n "$QDRANT_API_KEY"
+  test -n "$QDRANT_API_KEY"
+  export QDRANT_URL=http://127.0.0.1:6333 QDRANT_API_KEY
+  trap 'unset QDRANT_API_KEY QDRANT_URL' EXIT
+  "$@"
+)
+
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:plan
+# Execute only after reviewing and accepting the plan output.
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:execute
+qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:verify
+unset -f qdrant_admin
 ```
 
-Use deterministic resumable batches and verify tenant/course-filtered counts and retrieval before atomic alias cutover. Snapshots do not contain aliases. Restore Qdrant `1.18.2` snapshots into an isolated collection on Qdrant `1.18.2` with `priority=snapshot`, verify the probe, then recreate or switch the alias separately. Never restore over the active alias.
+The function is defined and invoked only in this intentional reindex section. Each invocation loads the untracked key into a short-lived subshell, uses host loopback rather than Docker DNS, and removes the raw credential on exit. Use deterministic resumable batches and verify tenant/course-filtered counts and retrieval before atomic alias cutover. Snapshots do not contain aliases. Restore Qdrant `1.18.2` snapshots into an isolated collection on Qdrant `1.18.2` with `priority=snapshot`, verify the probe, then recreate or switch the alias separately. Never restore over the active alias.
 
 The complete security, monitoring, systemd, snapshot, restore, rollback, and Q12 authorization procedure is in [`docs/operations/qdrant-self-hosted.md`](../../../docs/operations/qdrant-self-hosted.md).
 
