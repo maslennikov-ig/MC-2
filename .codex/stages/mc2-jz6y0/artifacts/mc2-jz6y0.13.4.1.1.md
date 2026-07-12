@@ -52,11 +52,11 @@ resolves_review: 8a6a3b15
 review_lineage:
   - 122f3207
   - 8a6a3b15
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: branch/worktree remain for orchestrator review; temporary dependency links are removed before commit
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation, review, rereview, and final-review worktrees plus local branches were removed after fresh integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed
@@ -75,13 +75,17 @@ verification:
   - combined crash plus recovery/reindex GREEN: passed 430/430
   - course-gen-platform type-check: passed
   - focused Prettier and git diff check: passed
+  - independent final review 4d22f7d8: PASS with P0 0, P1 0, P2 0, P3 0
+  - fresh integration crash/recovery/reindex including concrete adapters: passed 453/453 across eight files
+  - fresh integration inode mutation RED: failed exactly as expected
+  - fresh integration package type-check, artifact, process, and diff gates: passed
 changed_files:
   - packages/course-gen-platform/tools/qdrant/source-recovery-manifest.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-manifest.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-crash-matrix.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.1.md
 explicit_defers:
-  - mc2-jz6y0.13.4.1.3 owns the exact host-flock, stopped-writer, UID1001, same-device capability-mount, and runtime cleanup assertions handed off below
+  - synthetic exact-count Task 6 acceptance and parent closeout remain orchestrator-owned; the runtime child is already accepted
 ---
 
 # Summary
