@@ -57,6 +57,12 @@ import {
   validateRecoveryJournalTransition,
   type RecoveryProgressJournal,
 } from './source-recovery-manifest';
+import {
+  createDefaultSourceRecoveryReindexAdapters,
+  normalizeSourceRecoveryReindexAdapterConfig,
+  type AcceptedCoverageRunConfig,
+  type SourceRecoveryReindexAdapterConfig,
+} from './source-recovery-reindex-adapters';
 
 export type ReindexCommandMode = 'plan' | 'execute' | 'verify';
 
@@ -71,24 +77,27 @@ export interface ReindexCommandOptions {
 
 export interface ReindexCliOptions extends ReindexCommandOptions {
   fixturePath?: string;
+  recoveryAdapterConfig?: SourceRecoveryReindexAdapterConfig;
   help: boolean;
 }
 
 export interface ReindexCliRuntime {
   stdout: (message: string) => void;
   stderr: (message: string) => void;
-  createDefaultDependencies: () => ReindexCommandDependencies;
+  createDefaultDependencies: (
+    config?: SourceRecoveryReindexAdapterConfig
+  ) => ReindexCommandDependencies;
   loadFixtureDependencies: (path: string) => Promise<ReindexCommandDependencies>;
 }
 
 export interface ReindexExecutionArtifact {
-  schemaVersion: 3;
+  schemaVersion: 4;
   mode: 'execute';
   runId: string;
   targetCollection: string;
   recoveryRunId: string;
   recoveryManifestSha256: string;
-  acceptedCoverageLedgerId: string;
+  acceptedCoverageLedgerIds: string[];
   acceptedCoverageStatus: 'accepted';
   acceptedCoverageFingerprint: string;
   verificationFingerprint: string;
@@ -302,6 +311,8 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
     mode: 'plan',
     help: false,
   };
+  const acceptedCoverageRuns: AcceptedCoverageRunConfig[] = [];
+  const recoveryConfig: Partial<SourceRecoveryReindexAdapterConfig> = {};
   let modeSeen = false;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -328,6 +339,12 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
       '--run-id',
       '--artifact',
       '--fixture',
+      '--recovery-manifest-path',
+      '--recovery-journal-path',
+      '--recovery-run-id',
+      '--recovery-manifest-sha256',
+      '--accepted-coverage-fingerprint',
+      '--accepted-coverage-run',
     ] as const;
     const option = optionNames.find(name => argument === name || argument.startsWith(`${name}=`));
     if (!option) throw new Error(`Unknown option: ${argument}`);
@@ -345,6 +362,26 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
     if (option === '--run-id') options.runId = value;
     if (option === '--artifact') options.artifactPath = value;
     if (option === '--fixture') options.fixturePath = value;
+    if (option === '--recovery-manifest-path') recoveryConfig.manifestPath = value;
+    if (option === '--recovery-journal-path') recoveryConfig.journalPath = value;
+    if (option === '--recovery-run-id') recoveryConfig.expectedRecoveryRunId = value;
+    if (option === '--recovery-manifest-sha256') {
+      recoveryConfig.expectedRecoveryManifestSha256 = value;
+    }
+    if (option === '--accepted-coverage-fingerprint') {
+      recoveryConfig.expectedCoverageFingerprint = value;
+    }
+    if (option === '--accepted-coverage-run') {
+      const parts = value.split(':');
+      if (parts.length !== 3) {
+        throw new Error('--accepted-coverage-run must be organization:course:run UUIDs');
+      }
+      acceptedCoverageRuns.push({
+        organizationId: parts[0],
+        courseId: parts[1],
+        runId: parts[2],
+      });
+    }
   }
 
   if (!modeSeen && !options.help) {
@@ -352,6 +389,28 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
   }
   if (options.concurrency !== undefined) resolveConcurrency(options.concurrency);
   if (options.jobTimeoutMs !== undefined) resolveJobTimeout(options.jobTimeoutMs);
+  const recoveryConfigured =
+    Object.keys(recoveryConfig).length > 0 || acceptedCoverageRuns.length > 0;
+  if (recoveryConfigured) {
+    if (
+      !recoveryConfig.manifestPath ||
+      !recoveryConfig.journalPath ||
+      !recoveryConfig.expectedRecoveryRunId ||
+      !recoveryConfig.expectedRecoveryManifestSha256 ||
+      !recoveryConfig.expectedCoverageFingerprint ||
+      acceptedCoverageRuns.length === 0
+    ) {
+      throw new Error('Exact source recovery adapter configuration is incomplete');
+    }
+    options.recoveryAdapterConfig = normalizeSourceRecoveryReindexAdapterConfig({
+      manifestPath: recoveryConfig.manifestPath,
+      journalPath: recoveryConfig.journalPath,
+      expectedRecoveryRunId: recoveryConfig.expectedRecoveryRunId,
+      expectedRecoveryManifestSha256: recoveryConfig.expectedRecoveryManifestSha256,
+      expectedCoverageFingerprint: recoveryConfig.expectedCoverageFingerprint,
+      acceptedCoverageRuns,
+    });
+  }
   return options;
 }
 
@@ -470,7 +529,8 @@ function assertArtifactRecoveryBinding(
   if (
     artifact.recoveryRunId !== plan.recoveryRunId ||
     artifact.recoveryManifestSha256 !== plan.recoveryManifestSha256 ||
-    artifact.acceptedCoverageLedgerId !== plan.acceptedCoverageLedgerId ||
+    JSON.stringify(artifact.acceptedCoverageLedgerIds) !==
+      JSON.stringify(plan.acceptedCoverageLedgerIds) ||
     artifact.acceptedCoverageStatus !== plan.acceptedCoverageStatus ||
     artifact.acceptedCoverageFingerprint !== plan.acceptedCoverageFingerprint ||
     artifact.verificationFingerprint !== plan.verificationFingerprint
@@ -718,13 +778,13 @@ async function executeReindex(
   let prepared = rebuildPreparedPlan(basePrepared, skipFileIds);
   const plannedJobIds = new Set([...(loadedArtifact?.plannedJobIds ?? []), ...currentJobIds]);
   const artifact: ReindexExecutionArtifact = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     mode: 'execute',
     runId,
     targetCollection,
     recoveryRunId: basePrepared.plan.recoveryRunId!,
     recoveryManifestSha256: basePrepared.plan.recoveryManifestSha256!,
-    acceptedCoverageLedgerId: basePrepared.plan.acceptedCoverageLedgerId!,
+    acceptedCoverageLedgerIds: basePrepared.plan.acceptedCoverageLedgerIds!,
     acceptedCoverageStatus: basePrepared.plan.acceptedCoverageStatus!,
     acceptedCoverageFingerprint: basePrepared.plan.acceptedCoverageFingerprint!,
     verificationFingerprint: calculateReindexVerificationFingerprint(basePrepared.plan),
@@ -1052,13 +1112,13 @@ function isUniqueSorted(values: readonly string[]): boolean {
 
 const ReindexExecutionArtifactSchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
     mode: z.literal('execute'),
     runId: UUID_V4_SCHEMA,
     targetCollection: z.string().min(1).max(255),
     recoveryRunId: UUID_V4_SCHEMA,
     recoveryManifestSha256: z.string().regex(/^[a-f0-9]{64}$/u),
-    acceptedCoverageLedgerId: UUID_V4_SCHEMA,
+    acceptedCoverageLedgerIds: z.array(UUID_V4_SCHEMA).min(1),
     acceptedCoverageStatus: z.literal('accepted'),
     acceptedCoverageFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
     verificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
@@ -1120,6 +1180,9 @@ const ReindexExecutionArtifactSchema = z
     const issue = (message: string): void => {
       context.addIssue({ code: 'custom', message });
     };
+    if (!isUniqueSorted(artifact.acceptedCoverageLedgerIds)) {
+      issue('accepted coverage ledger IDs must be unique and sorted');
+    }
     if (!isUniqueSorted(artifact.plannedJobIds))
       issue('planned ledger IDs must be unique and sorted');
     if (!isUniqueSorted(artifact.acceptedJobIds))
@@ -1649,12 +1712,16 @@ async function runNativeRelevanceChecks(
   return checks;
 }
 
-export function createDefaultReindexDependencies(): ReindexCommandDependencies {
+export function createDefaultReindexDependencies(
+  recoveryAdapterConfig?: SourceRecoveryReindexAdapterConfig
+): ReindexCommandDependencies {
+  if (!recoveryAdapterConfig) {
+    throw new Error('Exact source recovery adapter configuration is required');
+  }
   const queueAdapter = createDefaultReindexQueueAdapter();
+  const recoveryAdapters = createDefaultSourceRecoveryReindexAdapters(recoveryAdapterConfig);
   return {
-    loadRecoveryBinding: () => Promise.resolve(null),
-    persistRecoveryJournalTransition: () =>
-      Promise.reject(new Error('Recovery journal persistence adapter is not configured')),
+    ...recoveryAdapters,
     loadSources: () => loadReindexSources(createSourceDatabase()),
     probeSources: probeSourceFiles,
     ...queueAdapter,
@@ -1684,6 +1751,12 @@ Options:
   --run-id <uuid>             Reuse a durable run identity for idempotent execute
   --artifact <path>           Execute artifact output path
   --fixture <path>            Fully local dry fixture; no live adapters are constructed
+  --recovery-manifest-path <absolute path>
+  --recovery-journal-path <absolute path>
+  --recovery-run-id <uuid>    Exact reviewed lower-case UUIDv4 recovery run
+  --recovery-manifest-sha256 <sha256>
+  --accepted-coverage-fingerprint <sha256>
+  --accepted-coverage-run <organization_uuid:course_uuid:run_uuid> (repeat per course)
   -h, --help                  Show this help
 `;
 
@@ -1802,7 +1875,7 @@ export async function runReindexCli(
     }
     dependencies = options.fixturePath
       ? await runtime.loadFixtureDependencies(options.fixturePath)
-      : runtime.createDefaultDependencies();
+      : runtime.createDefaultDependencies(options.recoveryAdapterConfig);
     const result = await runReindexCommand(options, dependencies);
     runtime.stderr(formatHumanSummary(options, result.report));
     runtime.stdout(

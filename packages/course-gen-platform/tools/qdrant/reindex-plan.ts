@@ -67,7 +67,7 @@ export interface ReindexPlan {
   auditedFailedFileIds: string[];
   recoveryRunId?: string;
   recoveryManifestSha256?: string;
-  acceptedCoverageLedgerId?: string;
+  acceptedCoverageLedgerIds?: string[];
   acceptedCoverageStatus?: 'accepted';
   acceptedCoverageFingerprint?: string;
   verificationFingerprint?: string;
@@ -88,13 +88,20 @@ export interface AcceptedFailedCoverageEntry {
   allocatedTokens: 0;
 }
 
-export interface AcceptedFailedCoverageBinding {
+export interface AcceptedFailedCoverageLedgerBinding {
   ledgerId: string;
+  status: 'accepted';
+  organizationId: string;
+  courseId: string;
+  entries: readonly AcceptedFailedCoverageEntry[];
+}
+
+export interface AcceptedFailedCoverageBinding {
   status: 'accepted';
   recoveryRunId: string;
   recoveryManifestSha256: string;
   fingerprint: string;
-  entries: readonly AcceptedFailedCoverageEntry[];
+  ledgers: readonly AcceptedFailedCoverageLedgerBinding[];
 }
 
 export interface RecoveryReindexBinding {
@@ -112,29 +119,40 @@ const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}
 export function calculateAcceptedFailedCoverageFingerprint(
   binding: AcceptedFailedCoverageBinding
 ): string {
-  const entries = [...binding.entries]
-    .sort((left, right) => left.documentId.localeCompare(right.documentId))
-    .map(entry => ({
-      documentId: entry.documentId,
-      organizationId: entry.organizationId,
-      courseId: entry.courseId,
-      coverageStatus: entry.coverageStatus,
-      coverageReason: entry.coverageReason,
-      processingMode: entry.processingMode,
-      summary: entry.summary,
-      claims: [...entry.claims],
-      terminology: [...entry.terminology],
-      constraints: [...entry.constraints],
-      allocatedTokens: entry.allocatedTokens,
+  const ledgers = [...binding.ledgers]
+    .sort((left, right) =>
+      [left.organizationId, left.courseId, left.ledgerId]
+        .join(':')
+        .localeCompare([right.organizationId, right.courseId, right.ledgerId].join(':'))
+    )
+    .map(ledger => ({
+      ledgerId: ledger.ledgerId,
+      status: ledger.status,
+      organizationId: ledger.organizationId,
+      courseId: ledger.courseId,
+      entries: [...ledger.entries]
+        .sort((left, right) => left.documentId.localeCompare(right.documentId))
+        .map(entry => ({
+          documentId: entry.documentId,
+          organizationId: entry.organizationId,
+          courseId: entry.courseId,
+          coverageStatus: entry.coverageStatus,
+          coverageReason: entry.coverageReason,
+          processingMode: entry.processingMode,
+          summary: entry.summary,
+          claims: [...entry.claims],
+          terminology: [...entry.terminology],
+          constraints: [...entry.constraints],
+          allocatedTokens: entry.allocatedTokens,
+        })),
     }));
   return createHash('sha256')
     .update(
       JSON.stringify({
-        ledgerId: binding.ledgerId,
         status: binding.status,
         recoveryRunId: binding.recoveryRunId,
         recoveryManifestSha256: binding.recoveryManifestSha256,
-        entries,
+        ledgers,
       })
     )
     .digest('hex');
@@ -209,10 +227,7 @@ function validateRecoveryBinding(
     throw new Error('Recovery binding must contain exactly six eligible audited failures');
   }
   const coverage = binding.acceptedFailedCoverage;
-  if (!coverage || !UUID_V4_PATTERN.test(coverage.ledgerId)) {
-    throw new Error('Accepted failed coverage ledger ID must be a lowercase UUIDv4');
-  }
-  if (coverage.status !== 'accepted') {
+  if (!coverage || coverage.status !== 'accepted') {
     throw new Error('Accepted failed coverage status must be accepted');
   }
   if (
@@ -224,28 +239,53 @@ function validateRecoveryBinding(
   if (coverage.fingerprint !== calculateAcceptedFailedCoverageFingerprint(coverage)) {
     throw new Error('Accepted failed coverage fingerprint is not canonical');
   }
+  const ledgers = [...coverage.ledgers].sort((left, right) =>
+    [left.organizationId, left.courseId, left.ledgerId]
+      .join(':')
+      .localeCompare([right.organizationId, right.courseId, right.ledgerId].join(':'))
+  );
+  if (
+    ledgers.length === 0 ||
+    ledgers.some(
+      ledger =>
+        !UUID_V4_PATTERN.test(ledger.ledgerId) ||
+        !UUID_V4_PATTERN.test(ledger.organizationId) ||
+        !UUID_V4_PATTERN.test(ledger.courseId) ||
+        ledger.status !== 'accepted'
+    ) ||
+    new Set(ledgers.map(ledger => ledger.ledgerId)).size !== ledgers.length ||
+    new Set(ledgers.map(ledger => `${ledger.organizationId}:${ledger.courseId}`)).size !==
+      ledgers.length
+  ) {
+    throw new Error('Accepted failed coverage ledgers must be unique lower-case UUIDv4 scopes');
+  }
+  const coverageEntries = ledgers.flatMap(ledger => ledger.entries);
   assertExactSet(
-    coverage.entries.map(entry => entry.documentId),
+    coverageEntries.map(entry => entry.documentId),
     eligible.map(entry => entry.file_catalog_id),
     'Accepted failed coverage IDs'
   );
   const eligibleById = new Map(eligible.map(entry => [entry.file_catalog_id, entry]));
-  for (const entry of coverage.entries) {
-    const disposition = eligibleById.get(entry.documentId);
-    if (
-      !disposition ||
-      entry.organizationId !== disposition.organization_id ||
-      entry.courseId !== disposition.course_id ||
-      entry.coverageStatus !== 'failed' ||
-      entry.coverageReason !== 'source_file_unrecoverable' ||
-      entry.processingMode !== 'metadata_only' ||
-      entry.summary !== null ||
-      entry.claims.length !== 0 ||
-      entry.terminology.length !== 0 ||
-      entry.constraints.length !== 0 ||
-      entry.allocatedTokens !== 0
-    ) {
-      throw new Error('Accepted failed coverage must contain exact zero-evidence tenant truth');
+  for (const ledger of ledgers) {
+    for (const entry of ledger.entries) {
+      const disposition = eligibleById.get(entry.documentId);
+      if (
+        !disposition ||
+        entry.organizationId !== ledger.organizationId ||
+        entry.courseId !== ledger.courseId ||
+        entry.organizationId !== disposition.organization_id ||
+        entry.courseId !== disposition.course_id ||
+        entry.coverageStatus !== 'failed' ||
+        entry.coverageReason !== 'source_file_unrecoverable' ||
+        entry.processingMode !== 'metadata_only' ||
+        entry.summary !== null ||
+        entry.claims.length !== 0 ||
+        entry.terminology.length !== 0 ||
+        entry.constraints.length !== 0 ||
+        entry.allocatedTokens !== 0
+      ) {
+        throw new Error('Accepted failed coverage must contain exact zero-evidence tenant truth');
+      }
     }
   }
 
@@ -281,7 +321,7 @@ export function calculateReindexVerificationFingerprint(plan: ReindexPlan): stri
       JSON.stringify({
         recoveryRunId: plan.recoveryRunId,
         recoveryManifestSha256: plan.recoveryManifestSha256,
-        acceptedCoverageLedgerId: plan.acceptedCoverageLedgerId,
+        acceptedCoverageLedgerIds: plan.acceptedCoverageLedgerIds,
         acceptedCoverageStatus: plan.acceptedCoverageStatus,
         acceptedCoverageFingerprint: plan.acceptedCoverageFingerprint,
         auditedFailedFileIds: [...plan.auditedFailedFileIds].sort(),
@@ -429,7 +469,9 @@ export function buildReindexPlan(
       ? {
           recoveryRunId: validatedBinding.manifest.run_id,
           recoveryManifestSha256: recoveryBinding!.manifestSha256,
-          acceptedCoverageLedgerId: recoveryBinding!.acceptedFailedCoverage.ledgerId,
+          acceptedCoverageLedgerIds: recoveryBinding!.acceptedFailedCoverage.ledgers
+            .map(ledger => ledger.ledgerId)
+            .sort(),
           acceptedCoverageStatus: recoveryBinding!.acceptedFailedCoverage.status,
           acceptedCoverageFingerprint: recoveryBinding!.acceptedFailedCoverage.fingerprint,
         }

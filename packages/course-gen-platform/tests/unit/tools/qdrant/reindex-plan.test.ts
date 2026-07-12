@@ -156,6 +156,7 @@ describe('buildReindexPlan', () => {
       return {
         ...SOURCE_BASE,
         id,
+        courseId: index < 238 ? SOURCE_BASE.courseId : '22000000-0000-4000-8000-000000000002',
         storagePath: `uploads/org/course/${id}.pdf`,
         vectorStatus: 'failed',
         errorMessage: `source_file_unrecoverable; recovery_run=50000000-0000-4000-8000-000000000005`,
@@ -228,24 +229,50 @@ describe('buildReindexPlan', () => {
       manifestSha256,
       journal,
       acceptedFailedCoverage: {
-        ledgerId: '52000000-0000-4000-8000-000000000005',
         status: 'accepted',
         recoveryRunId: manifest.run_id,
         recoveryManifestSha256: manifestSha256,
         fingerprint: '',
-        entries: auditedRows.map(row => ({
-          documentId: row.id,
-          organizationId: row.organizationId,
-          courseId: row.courseId!,
-          coverageStatus: 'failed',
-          coverageReason: 'source_file_unrecoverable',
-          processingMode: 'metadata_only',
-          summary: null,
-          claims: [],
-          terminology: [],
-          constraints: [],
-          allocatedTokens: 0,
-        })),
+        ledgers: [
+          {
+            ledgerId: '52000000-0000-4000-8000-000000000005',
+            status: 'accepted',
+            organizationId: SOURCE_BASE.organizationId,
+            courseId: SOURCE_BASE.courseId!,
+            entries: auditedRows.slice(0, 4).map(row => ({
+              documentId: row.id,
+              organizationId: row.organizationId,
+              courseId: row.courseId!,
+              coverageStatus: 'failed',
+              coverageReason: 'source_file_unrecoverable',
+              processingMode: 'metadata_only',
+              summary: null,
+              claims: [],
+              terminology: [],
+              constraints: [],
+              allocatedTokens: 0,
+            })),
+          },
+          {
+            ledgerId: '53000000-0000-4000-8000-000000000005',
+            status: 'accepted',
+            organizationId: SOURCE_BASE.organizationId,
+            courseId: '22000000-0000-4000-8000-000000000002',
+            entries: auditedRows.slice(4).map(row => ({
+              documentId: row.id,
+              organizationId: row.organizationId,
+              courseId: row.courseId!,
+              coverageStatus: 'failed',
+              coverageReason: 'source_file_unrecoverable',
+              processingMode: 'metadata_only',
+              summary: null,
+              claims: [],
+              terminology: [],
+              constraints: [],
+              allocatedTokens: 0,
+            })),
+          },
+        ],
       },
     };
     binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
@@ -271,6 +298,10 @@ describe('buildReindexPlan', () => {
       missingSource: 4,
       invalidSourcePath: 2,
       expectedDocuments: 234,
+      acceptedCoverageLedgerIds: [
+        '52000000-0000-4000-8000-000000000005',
+        '53000000-0000-4000-8000-000000000005',
+      ],
       auditedFailedFileIds: auditedRows.map(row => row.id),
       gaps: expect.arrayContaining(
         rows.slice(240).map(row => ({ fileId: row.id, reason: 'missing_course' }))
@@ -338,24 +369,31 @@ describe('buildReindexPlan', () => {
         ),
       },
       acceptedFailedCoverage: {
-        ledgerId: '52000000-0000-4000-8000-000000000005',
         status: 'accepted',
         recoveryRunId: manifest.run_id,
         recoveryManifestSha256: manifestSha256,
         fingerprint: '',
-        entries: rows.map(row => ({
-          documentId: row.id,
-          organizationId: row.organizationId,
-          courseId: row.courseId!,
-          coverageStatus: 'failed',
-          coverageReason: 'source_file_unrecoverable',
-          processingMode: 'metadata_only',
-          summary: null,
-          claims: [],
-          terminology: [],
-          constraints: [],
-          allocatedTokens: 0,
-        })),
+        ledgers: [
+          {
+            ledgerId: '52000000-0000-4000-8000-000000000005',
+            status: 'accepted',
+            organizationId: SOURCE_BASE.organizationId,
+            courseId: SOURCE_BASE.courseId!,
+            entries: rows.map(row => ({
+              documentId: row.id,
+              organizationId: row.organizationId,
+              courseId: row.courseId!,
+              coverageStatus: 'failed',
+              coverageReason: 'source_file_unrecoverable',
+              processingMode: 'metadata_only',
+              summary: null,
+              claims: [],
+              terminology: [],
+              constraints: [],
+              allocatedTokens: 0,
+            })),
+          },
+        ],
       },
     };
     binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
@@ -372,7 +410,7 @@ describe('buildReindexPlan', () => {
     );
 
     const nonZero = structuredClone(binding);
-    nonZero.acceptedFailedCoverage.entries[0].claims = ['not-empty'];
+    nonZero.acceptedFailedCoverage.ledgers[0].entries[0].claims = ['not-empty'];
     nonZero.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
       nonZero.acceptedFailedCoverage
     );

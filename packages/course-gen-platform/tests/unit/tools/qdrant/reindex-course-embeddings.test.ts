@@ -9,6 +9,7 @@ import {
 } from '@megacampus/shared-types';
 import {
   buildReindexJobId,
+  createDefaultReindexDependencies,
   createReindexQueueAdapter,
   createSourceDatabase,
   loadIndexedDocumentIdentities,
@@ -140,24 +141,31 @@ function recoveryFixture(
     manifestSha256,
     journal,
     acceptedFailedCoverage: {
-      ledgerId: '52000000-0000-4000-8000-000000000005',
       status: 'accepted',
       recoveryRunId: manifest.run_id,
       recoveryManifestSha256: manifestSha256,
       fingerprint: '',
-      entries: auditedRows.map(row => ({
-        documentId: row.id,
-        organizationId: row.organizationId,
-        courseId: row.courseId!,
-        coverageStatus: 'failed',
-        coverageReason: 'source_file_unrecoverable',
-        processingMode: 'metadata_only',
-        summary: null,
-        claims: [],
-        terminology: [],
-        constraints: [],
-        allocatedTokens: 0,
-      })),
+      ledgers: [
+        {
+          ledgerId: '52000000-0000-4000-8000-000000000005',
+          status: 'accepted',
+          organizationId: auditedRows[0].organizationId,
+          courseId: auditedRows[0].courseId!,
+          entries: auditedRows.map(row => ({
+            documentId: row.id,
+            organizationId: row.organizationId,
+            courseId: row.courseId!,
+            coverageStatus: 'failed',
+            coverageReason: 'source_file_unrecoverable',
+            processingMode: 'metadata_only',
+            summary: null,
+            claims: [],
+            terminology: [],
+            constraints: [],
+            allocatedTokens: 0,
+          })),
+        },
+      ],
     },
   };
   binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
@@ -174,7 +182,9 @@ function recoveryFixture(
 }
 
 function verifiedCoverageIds(binding: RecoveryReindexBinding): string[] {
-  return binding.acceptedFailedCoverage.entries.map(entry => entry.documentId);
+  return binding.acceptedFailedCoverage.ledgers.flatMap(ledger =>
+    ledger.entries.map(entry => entry.documentId)
+  );
 }
 
 function indexed(row: ReindexSourceRow): IndexedDocumentIdentity {
@@ -235,13 +245,15 @@ function executionLedger(
   const recovery = recoveryFixture(rows, 'reindex_started');
   const plannedJobIds = rows.map(row => buildReindexJobId(RUN_ID, row.id));
   const ledger: Record<string, any> = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     mode: 'execute',
     runId: RUN_ID,
     targetCollection: TARGET,
     recoveryRunId: recovery.binding.manifest.run_id,
     recoveryManifestSha256: recovery.binding.manifestSha256,
-    acceptedCoverageLedgerId: recovery.binding.acceptedFailedCoverage.ledgerId,
+    acceptedCoverageLedgerIds: recovery.binding.acceptedFailedCoverage.ledgers.map(
+      ledger => ledger.ledgerId
+    ),
     acceptedCoverageStatus: 'accepted',
     acceptedCoverageFingerprint: recovery.binding.acceptedFailedCoverage.fingerprint,
     verificationFingerprint: calculateReindexVerificationFingerprint(recovery.plan),
@@ -545,7 +557,7 @@ describe('durable reindex ledger', () => {
       'completed status with pending work',
       (ledger: Record<string, any>) => (ledger.status = 'completed'),
     ],
-  ])('rejects an inconsistent schema-v3 ledger: %s', async (_label, mutate) => {
+  ])('rejects an inconsistent schema-v4 ledger: %s', async (_label, mutate) => {
     const directory = await mkdtemp('/tmp/mc2-qdrant-invalid-ledger-');
     const artifactPath = join(directory, 'ledger.json');
     const ledger = executionLedger([source('60000000-0000-4000-8000-000000000006')]);
@@ -1035,7 +1047,7 @@ describe('Qdrant reindex command', () => {
     expect(deps.persistArtifact).toHaveBeenCalled();
     const artifact = vi.mocked(deps.persistArtifact).mock.calls.at(-1)![0];
     expect(artifact).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       mode: 'execute',
       runId: RUN_ID,
       targetCollection: TARGET,
@@ -1376,7 +1388,7 @@ describe('Qdrant reindex command', () => {
     expect(deps.enqueueJob).not.toHaveBeenCalled();
   });
 
-  it('rejects stale audited counts in a schema-v3 resume ledger', async () => {
+  it('rejects stale audited counts in a schema-v4 resume ledger', async () => {
     const rows = [source('60000000-0000-4000-8000-000000000006')];
     const resumed = recoveryFixture(rows, 'reindex_started');
     const stale = executionLedger(rows) as { counts: Record<string, number> };
@@ -1775,6 +1787,52 @@ describe('reindex CLI parsing', () => {
     expect(() =>
       parseReindexCliArgs(['plan', '--course-id', '20000000-0000-4000-8000-000000000002'])
     ).toThrow('Unknown option');
+  });
+
+  it('parses exact recovery paths, identity, fingerprint, and sorted course-run bindings', () => {
+    expect(
+      parseReindexCliArgs([
+        'plan',
+        '--recovery-manifest-path',
+        '/secure/recovery/manifest.json',
+        '--recovery-journal-path',
+        '/secure/recovery/journal.json',
+        '--recovery-run-id',
+        '51000000-0000-4000-8000-000000000005',
+        '--recovery-manifest-sha256',
+        'a'.repeat(64),
+        '--accepted-coverage-fingerprint',
+        'b'.repeat(64),
+        '--accepted-coverage-run',
+        '10000000-0000-4000-8000-000000000001:22000000-0000-4000-8000-000000000002:53000000-0000-4000-8000-000000000005',
+        '--accepted-coverage-run',
+        '10000000-0000-4000-8000-000000000001:20000000-0000-4000-8000-000000000002:52000000-0000-4000-8000-000000000005',
+      ])
+    ).toMatchObject({
+      recoveryAdapterConfig: {
+        manifestPath: '/secure/recovery/manifest.json',
+        journalPath: '/secure/recovery/journal.json',
+        expectedRecoveryRunId: '51000000-0000-4000-8000-000000000005',
+        expectedRecoveryManifestSha256: 'a'.repeat(64),
+        expectedCoverageFingerprint: 'b'.repeat(64),
+        acceptedCoverageRuns: [
+          {
+            organizationId: '10000000-0000-4000-8000-000000000001',
+            courseId: '20000000-0000-4000-8000-000000000002',
+            runId: '52000000-0000-4000-8000-000000000005',
+          },
+          {
+            organizationId: '10000000-0000-4000-8000-000000000001',
+            courseId: '22000000-0000-4000-8000-000000000002',
+            runId: '53000000-0000-4000-8000-000000000005',
+          },
+        ],
+      },
+    });
+  });
+
+  it('fails closed when default live dependencies lack exact recovery configuration', () => {
+    expect(() => createDefaultReindexDependencies()).toThrow(/recovery.*configuration/iu);
   });
 
   it('loads and validates a complete dry fixture without live services', async () => {
