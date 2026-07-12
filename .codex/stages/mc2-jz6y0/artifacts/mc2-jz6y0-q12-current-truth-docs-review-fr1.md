@@ -82,7 +82,8 @@ parent-owned Graphify refresh is pending.
 `.codex/stages/mc2-jz6y0/summary.md:143-148` and `:166-168` now say
 `graph-reviewed: pending`, explain that the report predates the durable changes,
 and assign the local no-API/no-hook refresh to the parent after the docs commit.
-They no longer claim stale totals as delivered-tree evidence.
+The handoff Graphify state is likewise corrected to pending. Neither current
+state document now claims stale totals as delivered-tree evidence.
 
 ## Complete source-truth activation gate — resolved
 
