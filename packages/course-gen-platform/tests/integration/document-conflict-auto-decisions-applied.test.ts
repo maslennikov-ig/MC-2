@@ -152,6 +152,51 @@ function degradedQuestion() {
   };
 }
 
+function terminalUnrecoverableQuestion(
+  metadataOverrides: Record<string, unknown> = {},
+  suggestedAnswers: unknown[] = [
+    {
+      value: 'continue_limited',
+      text: 'Continue with limited evidence',
+      rationale: 'The original source is unavailable; retain the audited limitation',
+      is_recommended: true,
+    },
+    {
+      value: 'remove_document',
+      text: 'Exclude advisory evidence',
+      rationale: 'Keep source history only',
+      is_recommended: false,
+    },
+  ],
+  durableCoverage: { status: 'degraded' | 'failed'; reason: string } = {
+    status: 'failed',
+    reason: 'source_file_unrecoverable',
+  }
+) {
+  return {
+    questionId: id.degradedQuestion,
+    questionText: 'How should the unrecoverable C.pdf source be handled?',
+    priority: 'important',
+    suggestedAnswers,
+    metadata: {
+      schema_version: 'document-conflict-question-v1',
+      subject_kind: 'degraded_evidence',
+      subject_key: subjectKey(
+        id.run,
+        `degraded:${id.docC}:${durableCoverage.status}:${durableCoverage.reason}:0`
+      ),
+      run_id: id.run,
+      document_id: id.docC,
+      coverage_status: 'failed',
+      coverage_reason: 'source_file_unrecoverable',
+      attempt: 0,
+      max_attempts: 2,
+      choices: ['continue_limited', 'remove_document'],
+      ...metadataOverrides,
+    },
+  };
+}
+
 function capacityQuestion() {
   return {
     questionId: id.capacityQuestion,
@@ -210,10 +255,7 @@ function largeDegradedQuestions(count: number) {
       metadata: {
         schema_version: 'document-conflict-question-v1',
         subject_kind: 'degraded_evidence',
-        subject_key: subjectKey(
-          id.run,
-          `degraded:${documentId}:degraded:transient:0`
-        ),
+        subject_key: subjectKey(id.run, `degraded:${documentId}:degraded:transient:0`),
         run_id: id.run,
         document_id: documentId,
         attempt: 0,
@@ -278,10 +320,11 @@ async function answer(
     client,
     'authenticated',
     organizationId,
-    () => client.query(
-      'SELECT public.answer_document_evidence_questions_atomic($1,$2::jsonb) AS result',
-      [id.courseA, JSON.stringify([payload])]
-    ),
+    () =>
+      client.query(
+        'SELECT public.answer_document_evidence_questions_atomic($1,$2::jsonb) AS result',
+        [id.courseA, JSON.stringify([payload])]
+      ),
     actorUserId
   );
 }
@@ -290,7 +333,13 @@ async function resetDatabase(
   includePriorRetry = true,
   includeCapacity = true,
   includeSecondDegraded = false,
-  largeDegradedCount = 0
+  largeDegradedCount = 0,
+  includeConflicts = true,
+  documentCoverage: {
+    status: 'degraded' | 'failed';
+    reason: string;
+    allocatedTokens: number;
+  } = { status: 'degraded', reason: 'parse failed', allocatedTokens: 10 }
 ): Promise<void> {
   await admin.query(`
     DROP SCHEMA IF EXISTS public CASCADE;
@@ -459,7 +508,7 @@ async function resetDatabase(
        ($1,$2,$3,$5,'hash-b','B.pdf','IMPORTANT','course_source',.8,.8,'summary','B',
         $8::jsonb,$9,$10,100,10,10),
        ($1,$2,$3,$6,'hash-c','C.pdf','SUPPLEMENTARY','general_reference',.2,.3,
-        'metadata_only',NULL,'[]','degraded','parse failed',100,0,10)`,
+        'metadata_only',NULL,'[]',$11,$12,100,0,$13)`,
     [
       id.run,
       id.courseA,
@@ -475,12 +524,21 @@ async function resetDatabase(
       ]),
       includeSecondDegraded ? 'degraded' : 'assessed',
       includeSecondDegraded ? 'transient' : 'ok',
+      documentCoverage.status,
+      documentCoverage.reason,
+      documentCoverage.allocatedTokens,
     ]
   );
   await admin.query(
     `UPDATE document_evidence_runs SET status='accepted',assessed_count=$2,degraded_count=$3,
+       failed_count=$4,
        completed_at=now() WHERE id=$1`,
-    [id.run, includeSecondDegraded ? 1 : 2, includeSecondDegraded ? 2 : 1]
+    [
+      id.run,
+      includeSecondDegraded ? 1 : 2,
+      (includeSecondDegraded ? 1 : 0) + (documentCoverage.status === 'degraded' ? 1 : 0),
+      documentCoverage.status === 'failed' ? 1 : 0,
+    ]
   );
   const materialSides = [
     {
@@ -496,18 +554,20 @@ async function resetDatabase(
       source_refs: refsB,
     },
   ];
-  await admin.query(
-    `INSERT INTO document_evidence_conflicts(
-       id,run_id,course_id,organization_id,conflict_fingerprint,topic,severity,sides,
-       course_impact,recommended_resolution,recommendation_rationale,alternatives,
-       detection_model,detection_version
-     ) VALUES
-       ($1,$3,$4,$5,'sha256:material','Approval','important',$6::jsonb,
-        'Needs one answer','Use mandatory','Authority wins','["Explain scopes"]','test','v1'),
-       ($2,$3,$4,$5,'sha256:info','Minor','informational',$6::jsonb,
-        'No block','Keep baseline','Minor','["Ignore"]','test','v1')`,
-    [id.conflict, id.informational, id.run, id.courseA, id.orgA, JSON.stringify(materialSides)]
-  );
+  if (includeConflicts) {
+    await admin.query(
+      `INSERT INTO document_evidence_conflicts(
+         id,run_id,course_id,organization_id,conflict_fingerprint,topic,severity,sides,
+         course_impact,recommended_resolution,recommendation_rationale,alternatives,
+         detection_model,detection_version
+       ) VALUES
+         ($1,$3,$4,$5,'sha256:material','Approval','important',$6::jsonb,
+          'Needs one answer','Use mandatory','Authority wins','["Explain scopes"]','test','v1'),
+         ($2,$3,$4,$5,'sha256:info','Minor','informational',$6::jsonb,
+          'No block','Keep baseline','Minor','["Ignore"]','test','v1')`,
+      [id.conflict, id.informational, id.run, id.courseA, id.orgA, JSON.stringify(materialSides)]
+    );
+  }
   if (includeCapacity) {
     await admin.query(
       `INSERT INTO document_evidence_conflict_checkpoints(
@@ -534,6 +594,17 @@ async function resetDatabase(
   }
 }
 
+async function resetTerminalUnrecoverableDatabase(
+  status: 'degraded' | 'failed' = 'failed',
+  reason = 'source_file_unrecoverable'
+): Promise<void> {
+  await resetDatabase(false, false, false, 0, false, {
+    status,
+    reason,
+    allocatedTokens: status === 'failed' ? 0 : 10,
+  });
+}
+
 describe('document conflict applied harness guard', () => {
   it('rejects remote hosts and non-test database names before connection', () => {
     expect(() =>
@@ -543,9 +614,7 @@ describe('document conflict applied harness guard', () => {
       assertDisposableDatabaseUrl('postgresql://postgres@127.0.0.1/document_evidence')
     ).toThrow(/_test/u);
     expect(
-      assertDisposableDatabaseUrl(
-        'postgresql://postgres@127.0.0.1:55432/document_evidence_e3_test'
-      )
+      assertDisposableDatabaseUrl('postgresql://postgres@127.0.0.1:55432/document_evidence_e3_test')
     ).toContain('document_evidence_e3_test');
   });
 });
@@ -639,18 +708,15 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
   it('keeps retry lineage and subject-key helpers private behind scoped wrappers', async () => {
     await expect(
       asRole(admin, 'authenticated', id.orgA, () =>
-        admin.query('SELECT public.document_evidence_retry_attempt($1,$2)', [
-          id.courseA,
-          id.docC,
-        ])
+        admin.query('SELECT public.document_evidence_retry_attempt($1,$2)', [id.courseA, id.docC])
       )
     ).rejects.toMatchObject({ code: '42501' });
     await expect(
       asRole(admin, 'authenticated', id.orgA, () =>
-        admin.query(
-          `SELECT public.document_evidence_subject_key($1,'degraded_evidence',NULL,$2)`,
-          [id.run, id.docC]
-        )
+        admin.query(`SELECT public.document_evidence_subject_key($1,'degraded_evidence',NULL,$2)`, [
+          id.run,
+          id.docC,
+        ])
       )
     ).rejects.toMatchObject({ code: '42501' });
   });
@@ -690,9 +756,9 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
       expected: systemDecisionId,
     });
     expect(result.rows[0].result.decision_ids).toEqual([currentUserDecisionId]);
-    expect((await admin.query('SELECT count(*) FROM document_evidence_decisions')).rows[0].count).toBe(
-      '5'
-    );
+    expect(
+      (await admin.query('SELECT count(*) FROM document_evidence_decisions')).rows[0].count
+    ).toBe('5');
   });
 
   it('does not reuse another authenticated actor audit under the same idempotency key', async () => {
@@ -803,22 +869,19 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
 
   it('does not let informational conflicts block after all material subjects are decided', async () => {
     await asRole(admin, 'authenticated', id.orgA, () =>
-      admin.query(
-        'SELECT public.answer_document_evidence_questions_atomic($1,$2::jsonb)',
-        [
-          id.courseA,
-          JSON.stringify([
-            {
-              question_id: id.additionalConflictQuestion,
-              answer: 'Use mandatory approval',
-              answer_source: 'suggested',
-              selected_suggestion_index: 1,
-              idempotency_key: '90000000-0000-4000-8000-000000000019',
-              expected_current_decision_id: null,
-            },
-          ]),
-        ]
-      )
+      admin.query('SELECT public.answer_document_evidence_questions_atomic($1,$2::jsonb)', [
+        id.courseA,
+        JSON.stringify([
+          {
+            question_id: id.additionalConflictQuestion,
+            answer: 'Use mandatory approval',
+            answer_source: 'suggested',
+            selected_suggestion_index: 1,
+            idempotency_key: '90000000-0000-4000-8000-000000000019',
+            expected_current_decision_id: null,
+          },
+        ]),
+      ])
     );
     await expect(
       admin.query(`UPDATE courses SET generation_status='stage_5' WHERE id=$1`, [id.courseA])
@@ -868,7 +931,13 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
           `SELECT public.commit_document_evidence_conflict_batch(
              $1,$2,$3,'bad:1','hash',$4::jsonb,$5::jsonb,'test','v1','verified','[]'
            )`,
-          [id.run, id.courseA, id.orgA, JSON.stringify({ kind: 'test' }), JSON.stringify([badConflict])]
+          [
+            id.run,
+            id.courseA,
+            id.orgA,
+            JSON.stringify({ kind: 'test' }),
+            JSON.stringify([badConflict]),
+          ]
         )
       )
     ).rejects.toMatchObject({ code: '23514' });
@@ -898,7 +967,13 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
           `SELECT public.commit_document_evidence_conflict_batch(
              $1,$2,$3,'bad:2','hash',$4::jsonb,$5::jsonb,'test','v1','verified','[]'
            )`,
-          [id.run, id.courseA, id.orgA, JSON.stringify({ kind: 'test' }), JSON.stringify([collision])]
+          [
+            id.run,
+            id.courseA,
+            id.orgA,
+            JSON.stringify({ kind: 'test' }),
+            JSON.stringify([collision]),
+          ]
         )
       )
     ).rejects.toBeDefined();
@@ -942,14 +1017,199 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
     });
   });
 
+  it('materializes only the canonical terminal unrecoverable decision at retry zero', async () => {
+    await resetTerminalUnrecoverableDatabase();
+
+    const question = terminalUnrecoverableQuestion();
+    const first = await materialize('automatic', [question]);
+    expect(first.rows[0].result).toMatchObject({ reused: false });
+    expect(first.rows[0].result.question_ids).toEqual([id.degradedQuestion]);
+    expect(first.rows[0].result.decision_ids).toHaveLength(1);
+
+    const audit = await admin.query(
+      `SELECT d.id,d.run_id,d.course_id,d.organization_id,d.document_id,d.subject_kind,
+              d.selected_resolution,d.selected_recommendation_value,d.resolved_by,d.answer_source,
+              d.supersedes_decision_id,q.status AS question_status,q.answer_source AS question_source,
+              q.selected_suggestion_index
+       FROM document_evidence_decisions d
+       JOIN clarifying_questions q ON q.id=d.clarifying_question_id
+       WHERE d.run_id=$1 AND d.document_id=$2`,
+      [id.run, id.docC]
+    );
+    expect(audit.rows).toEqual([
+      expect.objectContaining({
+        id: first.rows[0].result.decision_ids[0],
+        run_id: id.run,
+        course_id: id.courseA,
+        organization_id: id.orgA,
+        document_id: id.docC,
+        subject_kind: 'degraded_evidence',
+        selected_resolution: 'continue_limited',
+        selected_recommendation_value: 'continue_limited',
+        resolved_by: 'system',
+        answer_source: 'system',
+        supersedes_decision_id: null,
+        question_status: 'answered',
+        question_source: 'system',
+        selected_suggestion_index: 0,
+      }),
+    ]);
+    expect(
+      (
+        await admin.query(
+          `SELECT
+             (SELECT count(*) FROM document_evidence_runs WHERE course_id=$1) AS runs,
+             (SELECT count(*) FROM document_evidence_retry_applications WHERE course_id=$1) AS retries,
+             (SELECT count(*) FROM document_evidence_decisions WHERE run_id=$2) AS decisions`,
+          [id.courseA, id.run]
+        )
+      ).rows[0]
+    ).toEqual({ runs: '1', retries: '0', decisions: '1' });
+
+    const replay = await materialize('automatic', [question]);
+    expect(replay.rows[0].result).toMatchObject({
+      reused: true,
+      question_ids: [id.degradedQuestion],
+      decision_ids: [first.rows[0].result.decision_ids[0]],
+    });
+    expect(
+      (
+        await admin.query(`SELECT count(*) FROM document_evidence_decisions WHERE run_id=$1`, [
+          id.run,
+        ])
+      ).rows[0].count
+    ).toBe('1');
+
+    await expect(
+      asRole(admin, 'service_role', id.orgA, () =>
+        admin.query(
+          `SELECT public.materialize_document_evidence_decision_gate_atomic(
+             $1,$2,$3,'automatic',$4::jsonb,$5
+           )`,
+          [
+            id.run,
+            id.courseA,
+            id.orgB,
+            JSON.stringify([question]),
+            '90000000-0000-4000-8000-000000000091',
+          ]
+        )
+      )
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it.each([
+    ['durable degraded reason', 'degraded', 'parse_failed', {}, undefined, '23514'],
+    ['durable failed reason', 'failed', 'parse_failed', {}, undefined, '23514'],
+    [
+      'forged degraded status',
+      'failed',
+      'source_file_unrecoverable',
+      { coverage_status: 'degraded' },
+      undefined,
+      '23514',
+    ],
+    [
+      'forged failed reason',
+      'failed',
+      'source_file_unrecoverable',
+      { coverage_reason: 'parse_failed' },
+      undefined,
+      '23514',
+    ],
+    [
+      'missing status',
+      'failed',
+      'source_file_unrecoverable',
+      { coverage_status: null },
+      undefined,
+      '23514',
+    ],
+    [
+      'missing reason',
+      'failed',
+      'source_file_unrecoverable',
+      { coverage_reason: null },
+      undefined,
+      '23514',
+    ],
+    [
+      'missing max attempts',
+      'failed',
+      'source_file_unrecoverable',
+      { max_attempts: null },
+      undefined,
+      '22023',
+    ],
+    [
+      'another recommendation',
+      'failed',
+      'source_file_unrecoverable',
+      {},
+      [
+        {
+          value: 'remove_document',
+          text: 'Exclude advisory evidence',
+          rationale: 'Keep source history only',
+          is_recommended: true,
+        },
+        {
+          value: 'continue_limited',
+          text: 'Continue with limited evidence',
+          rationale: 'Retain the limitation',
+          is_recommended: false,
+        },
+      ],
+      '23514',
+    ],
+  ])(
+    'fails closed below max attempts for %s',
+    async (_label, durableStatus, durableReason, metadata, answers, expectedCode) => {
+      await resetTerminalUnrecoverableDatabase(
+        durableStatus as 'degraded' | 'failed',
+        durableReason as string
+      );
+      const question = terminalUnrecoverableQuestion(
+        metadata,
+        answers ?? terminalUnrecoverableQuestion().suggestedAnswers,
+        { status: durableStatus as 'degraded' | 'failed', reason: durableReason as string }
+      );
+      await expect(
+        materialize(
+          'automatic',
+          [question],
+          `90000000-0000-4000-8000-0000000000${String(
+            [
+              'durable degraded reason',
+              'durable failed reason',
+              'forged degraded status',
+              'forged failed reason',
+              'missing status',
+              'missing reason',
+              'missing max attempts',
+              'another recommendation',
+            ].indexOf(_label) + 2
+          ).padStart(2, '0')}`
+        )
+      ).rejects.toMatchObject({ code: expectedCode });
+      expect((await admin.query(`SELECT count(*) FROM clarifying_questions`)).rows[0].count).toBe(
+        '0'
+      );
+      expect(
+        (await admin.query(`SELECT count(*) FROM document_evidence_decisions`)).rows[0].count
+      ).toBe('0');
+    }
+  );
+
   it('persists and restores the full manual zero-system-decision snapshot', async () => {
     await resetDatabase(true, true);
     const first = await materialize('manual', allDurableQuestions());
     expect(first.rows[0].result.decision_ids).toEqual([]);
     const snapshot = (
-      await admin.query(`SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`, [
-        id.courseA,
-      ])
+      await admin.query(
+        `SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`,
+        [id.courseA]
+      )
     ).rows[0].value;
     expect(snapshot).toMatchObject({
       accepted_run_id: id.run,
@@ -969,20 +1229,25 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
     const replay = await materialize('manual', allDurableQuestions());
     expect(replay.rows[0].result.reused).toBe(true);
     const restored = (
-      await admin.query(`SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`, [
-        id.courseA,
-      ])
+      await admin.query(
+        `SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`,
+        [id.courseA]
+      )
     ).rows[0].value;
     expect(restored).toEqual(snapshot);
   });
 
   it('supports the analyzing-to-manual-pause-to-approved transition path', async () => {
     await resetDatabase(true, true);
-    await admin.query('ALTER TABLE courses DISABLE TRIGGER guard_document_evidence_course_transition');
+    await admin.query(
+      'ALTER TABLE courses DISABLE TRIGGER guard_document_evidence_course_transition'
+    );
     await admin.query(`UPDATE courses SET generation_status='stage_4_analyzing' WHERE id=$1`, [
       id.courseA,
     ]);
-    await admin.query('ALTER TABLE courses ENABLE TRIGGER guard_document_evidence_course_transition');
+    await admin.query(
+      'ALTER TABLE courses ENABLE TRIGGER guard_document_evidence_course_transition'
+    );
     await materialize('manual', allDurableQuestions());
     await expect(
       admin.query(`UPDATE courses SET generation_status='stage_4_clarifying' WHERE id=$1`, [
@@ -994,11 +1259,7 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
         id.courseA,
       ])
     ).rejects.toMatchObject({ code: '23514' });
-    await materialize(
-      'automatic',
-      allDurableQuestions(),
-      '90000000-0000-4000-8000-000000000096'
-    );
+    await materialize('automatic', allDurableQuestions(), '90000000-0000-4000-8000-000000000096');
     await expect(
       admin.query(`UPDATE courses SET generation_status='stage_4_analyzing' WHERE id=$1`, [
         id.courseA,
@@ -1012,18 +1273,18 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
     const invalid = structuredClone(questions);
     invalid[999].metadata.subject_key = 'sha256:foreign';
     await expect(materialize('manual', invalid)).rejects.toMatchObject({ code: '23514' });
-    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe(
+      '0'
+    );
     const oversized = questions.map((question, index) =>
       index === 0 ? { ...question, questionText: 'x'.repeat(16_777_216) } : question
     );
     await expect(
-      materialize(
-        'manual',
-        oversized,
-        '90000000-0000-4000-8000-000000000095'
-      )
+      materialize('manual', oversized, '90000000-0000-4000-8000-000000000095')
     ).rejects.toMatchObject({ code: '22023' });
-    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM clarifying_questions')).rows[0].count).toBe(
+      '0'
+    );
     const result = await materialize('manual', questions);
     expect(result.rows[0].result.question_ids).toHaveLength(1000);
     expect(result.rows[0].result.decision_ids).toEqual([]);
@@ -1031,9 +1292,10 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
       '1000'
     );
     const snapshot = (
-      await admin.query(`SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`, [
-        id.courseA,
-      ])
+      await admin.query(
+        `SELECT analysis_result->'document_evidence' AS value FROM courses WHERE id=$1`,
+        [id.courseA]
+      )
     ).rows[0].value;
     expect(snapshot).toMatchObject({
       accepted_run_id: id.run,
@@ -1127,13 +1389,7 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
         `SELECT public.record_document_evidence_automatic_retry(
           $1,$2,$3,$4,2,$5
         ) AS result`,
-        [
-          id.run,
-          id.courseA,
-          id.orgA,
-          id.docC,
-          '90000000-0000-4000-8000-000000000099',
-        ]
+        [id.run, id.courseA, id.orgA, id.docC, '90000000-0000-4000-8000-000000000099']
       )
     );
     expect(recorded.rows[0].result).toMatchObject({
@@ -1147,13 +1403,7 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
         `SELECT public.record_document_evidence_automatic_retry(
           $1,$2,$3,$4,2,$5
         ) AS result`,
-        [
-          id.run,
-          id.courseA,
-          id.orgA,
-          id.docC,
-          '90000000-0000-4000-8000-000000000099',
-        ]
+        [id.run, id.courseA, id.orgA, id.docC, '90000000-0000-4000-8000-000000000099']
       )
     );
     expect(replayed.rows[0].result).toMatchObject({
@@ -1215,7 +1465,9 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
          completed_at=now() WHERE id=$1`,
       [id.retryTarget]
     );
-    const decisionIds = pending.rows[0].result.map((value: { decision_id: string }) => value.decision_id);
+    const decisionIds = pending.rows[0].result.map(
+      (value: { decision_id: string }) => value.decision_id
+    );
     const consumed = await asRole(admin, 'service_role', id.orgA, () =>
       admin.query(
         'SELECT public.consume_document_evidence_retry_directives($1,$2,$3,$4::jsonb) AS result',
@@ -1231,7 +1483,9 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
     );
     expect(consumedReplay.rows[0].result).toMatchObject({ reused: true });
     const after = await asRole(admin, 'service_role', id.orgA, () =>
-      admin.query('SELECT public.get_document_evidence_retry_directives($1,2) AS result', [id.courseA])
+      admin.query('SELECT public.get_document_evidence_retry_directives($1,2) AS result', [
+        id.courseA,
+      ])
     );
     expect(after.rows[0].result).toEqual([]);
     const attempts = await admin.query(

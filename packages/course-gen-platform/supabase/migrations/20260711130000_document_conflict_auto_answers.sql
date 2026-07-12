@@ -747,6 +747,8 @@ DECLARE
   v_question_subject_keys TEXT[];
   v_question_count INTEGER;
   v_question_limit INTEGER;
+  v_retry_attempt INTEGER;
+  v_retry_max_attempts INTEGER;
 BEGIN
   IF (SELECT auth.role()) IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'Decision gate materialization requires service_role' USING ERRCODE = '42501';
@@ -853,11 +855,44 @@ BEGIN
       FROM jsonb_array_elements(v_question->'suggested_answers') answer
       WHERE COALESCE((answer->>'is_recommended')::boolean, false)
       LIMIT 1;
-      IF v_question->'metadata'->>'subject_kind' = 'degraded_evidence'
-         AND (v_question->'metadata'->>'attempt')::integer <
-             (v_question->'metadata'->>'max_attempts')::integer THEN
-        RAISE EXCEPTION 'Automatic degraded decision requires exhausted retry attempts'
-          USING ERRCODE = '23514';
+      IF v_question->'metadata'->>'subject_kind' = 'degraded_evidence' THEN
+        BEGIN
+          v_retry_attempt := NULLIF(v_question->'metadata'->>'attempt', '')::integer;
+          v_retry_max_attempts := NULLIF(
+            v_question->'metadata'->>'max_attempts', ''
+          )::integer;
+        EXCEPTION WHEN invalid_text_representation THEN
+          RAISE EXCEPTION 'Automatic degraded decision retry metadata is invalid'
+            USING ERRCODE = '22023';
+        END;
+        IF v_retry_attempt IS NULL OR v_retry_max_attempts IS NULL
+           OR v_retry_attempt < 0 OR v_retry_max_attempts < 1
+           OR v_retry_attempt > v_retry_max_attempts THEN
+          RAISE EXCEPTION 'Automatic degraded decision retry metadata is invalid'
+            USING ERRCODE = '22023';
+        END IF;
+        IF v_retry_attempt < v_retry_max_attempts
+           AND (
+             v_question->'metadata'->>'coverage_status' IS DISTINCT FROM 'failed'
+             OR v_question->'metadata'->>'coverage_reason'
+                IS DISTINCT FROM 'source_file_unrecoverable'
+             OR v_question->'metadata'->'choices' IS DISTINCT FROM
+                '["continue_limited", "remove_document"]'::jsonb
+             OR v_recommended->>'value' IS DISTINCT FROM 'continue_limited'
+             OR NOT EXISTS (
+               SELECT 1
+               FROM public.document_evidence_items items
+               WHERE items.run_id = p_run_id
+                 AND items.course_id = p_course_id
+                 AND items.organization_id = p_organization_id
+                 AND items.document_id = (v_question->'metadata'->>'document_id')::uuid
+                 AND items.coverage_status = 'failed'
+                 AND items.coverage_reason = 'source_file_unrecoverable'
+             )
+           ) THEN
+          RAISE EXCEPTION 'Automatic degraded decision requires exhausted retry attempts'
+            USING ERRCODE = '23514';
+        END IF;
       END IF;
       IF v_question->'metadata'->>'subject_kind' = 'detector_capacity'
          AND v_recommended->>'value' <> 'continue_limited' THEN

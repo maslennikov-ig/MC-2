@@ -65,8 +65,12 @@ describe('document conflict automatic decision migration', () => {
     expect(source).toMatch(
       /REVOKE EXECUTE ON FUNCTION public\.append_document_evidence_decision[\s\S]*FROM authenticated/i
     );
-    expect(source).toMatch(/GRANT EXECUTE ON FUNCTION public\.materialize_document_evidence_decision_gate_atomic[\s\S]*TO service_role/i);
-    expect(source).toMatch(/GRANT EXECUTE ON FUNCTION public\.answer_document_evidence_questions_atomic[\s\S]*TO authenticated, service_role/i);
+    expect(source).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.materialize_document_evidence_decision_gate_atomic[\s\S]*TO service_role/i
+    );
+    expect(source).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.answer_document_evidence_questions_atomic[\s\S]*TO authenticated, service_role/i
+    );
     expect(source).toMatch(/'user'/i);
     expect(source).toMatch(/answer_source.*suggested.*modified.*custom/is);
   });
@@ -83,6 +87,19 @@ describe('document conflict automatic decision migration', () => {
     expect(source).toMatch(/current_decision_ids.*analysis_result/is);
     expect(source).toMatch(/accepted_run_id.*coverage/is);
     expect(source).toMatch(/unresolved_informational_conflict_ids/i);
+  });
+
+  it('allows only the durable failed source_file_unrecoverable terminal exception', () => {
+    const source = sql();
+    const gate = source.match(
+      /CREATE OR REPLACE FUNCTION public\.materialize_document_evidence_decision_gate_atomic[\s\S]*?\n\$\$;/i
+    )?.[0];
+    expect(gate).toBeDefined();
+    expect(gate).toMatch(/document_evidence_items/i);
+    expect(gate).toMatch(/coverage_status\s*=\s*'failed'/i);
+    expect(gate).toMatch(/coverage_reason\s*=\s*'source_file_unrecoverable'/i);
+    expect(gate).toMatch(/continue_limited/i);
+    expect(gate).toMatch(/Automatic degraded decision requires exhausted retry attempts/i);
   });
 
   it('forces manual origin and appends a user supersede atomically with stale-chain rejection', () => {
@@ -117,7 +134,11 @@ describe('document conflict automatic decision migration', () => {
     expect(source).toMatch(/DROP FUNCTION.*answer_document_evidence_questions_atomic/is);
     expect(source).toMatch(/DROP FUNCTION.*commit_document_evidence_conflict_batch/is);
     expect(source).toMatch(/DROP TABLE.*document_evidence_conflict_checkpoints/is);
-    expect(source).toMatch(/REVOKE EXECUTE ON FUNCTION public\.upsert_document_evidence_conflict[\s\S]*FROM authenticated, service_role/i);
-    expect(source).toMatch(/REVOKE EXECUTE ON FUNCTION public\.append_document_evidence_decision[\s\S]*FROM authenticated, service_role/i);
+    expect(source).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.upsert_document_evidence_conflict[\s\S]*FROM authenticated, service_role/i
+    );
+    expect(source).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.append_document_evidence_decision[\s\S]*FROM authenticated, service_role/i
+    );
   });
 });
