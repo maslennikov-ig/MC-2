@@ -189,7 +189,7 @@ Retain the existing quiesce-first rollback sequence and make `100 -> 0` the docu
 
 - [ ] **Step 2: Reconcile the approved design and E7 artifacts**
 
-Add a superseding decision link to `docs/superpowers/specs/2026-07-12-document-evidence-dev-activation-design.md`. Update the Stage 5 rollout artifact so it records the owner-approved 100% dev value rather than saying no value was selected. Update the E7 acceptance artifact from `status: blocked` to `status: accepted`, remove `.24.2` from `explicit_defers`, and add the dev activation verification evidence after Task 1 passes.
+Add a superseding decision link to `docs/superpowers/specs/2026-07-12-document-evidence-dev-activation-design.md`. Update the Stage 5 rollout artifact so it records the owner-approved 100% dev value rather than saying no value was selected. Remove `.24.2` from the E7 acceptance artifact's `explicit_defers`, add the dev activation verification evidence after Task 1 passes, and keep `status: blocked` only for the independent Task 3 review gate. The worker must not claim orchestrator acceptance before that review.
 
 - [ ] **Step 3: Update handoff and stage summary**
 
@@ -276,7 +276,7 @@ Expected: all commands exit `0` with exact totals recorded in the E7 artifact/Be
 
 - [ ] **Step 3: Close E7 and deliver**
 
-Close `mc2-jz6y0.24` only after review and parent reruns pass. Refresh local Graphify with `graphify update .` and `graphify cluster-only . --no-viz`, confirm the report commit matches HEAD, push Beads, pull-rebase and push `codex/self-hosted-qdrant-platform`.
+After review and parent reruns pass, update the E7 acceptance artifact to `status: accepted`, remove the Task 3 review defer, and close `mc2-jz6y0.24`. Refresh local Graphify with `graphify update .` and `graphify cluster-only . --no-viz`, confirm the report commit matches HEAD, push Beads, pull-rebase and push `codex/self-hosted-qdrant-platform`.
 
 ## Execution Handoff
 
