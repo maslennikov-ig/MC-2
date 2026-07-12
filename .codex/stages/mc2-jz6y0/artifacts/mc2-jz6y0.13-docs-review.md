@@ -11,7 +11,7 @@ repo: mc2
 branch: codex/q12-docs-review
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: 4267deeee2b9f94781592815b434ecfa652af2d6
-reviewed_commit: 4267deeee2b9f94781592815b434ecfa652af2d6
+reviewed_commit: 9e8403490df6cb854c4f6e06352844d0987e7ee3
 worktree: /home/me/code/mc2/.worktrees/q12-docs-review
 write_zone:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-docs-review.md
@@ -49,55 +49,57 @@ cleanup_status: pending
 cleanup_notes: Review created no runtime resource and performed no remote action; the dedicated artifact worktree remains for orchestrator inspection.
 risk_level: high
 docs_impact: ops-deploy-migration-handoff
-docs_reviewed: updates-required
-docs_review_notes: Six P1 documentation truth gaps must be reconciled before Q12 remote mutation; three P2 maintenance items belong to stage closeout.
+docs_reviewed: updated
+docs_review_notes: Re-review of 9e840349 confirmed all six original P1 and three original P2 documentation findings are resolved with no new P0-P3 finding.
 graph_reviewed: blocked
-graph_review_notes: The local graph available in the integration worktree was built from ebdf9c2e while the reviewed tree is 4267deee; this read-only reviewer did not refresh shared graph state. Parent closeout must run a local no-API refresh after accepted durable documentation changes.
+graph_review_notes: The local graph available in the integration worktree was built from ebdf9c2e while the reviewed docs tree is 9e840349; this read-only reviewer did not refresh shared graph state. Parent closeout must run a local no-API refresh after integration.
 verification:
-  - Compared all selected stable docs and current-state files against commit 4267deee runtime, Compose, CI, systemd, migration runners, and package commands.
-  - Ran bd show mc2-jz6y0.13 and confirmed current authorization plus the three recorded no-go inputs without reading or mutating staging.
-  - Confirmed Graphify report freshness is ebdf9c2e, older than reviewed commit 4267deee.
-  - scripts/orchestration/validate_artifact.py on this artifact passed.
-  - Prettier check and git diff --check passed.
+  - Re-reviewed documentation implementation 9e840349 against original audit 2943a942 and accepted code through 6645708d, including release-bound rollback remediation 3e14c922.
+  - All six original P1 and three original P2 findings were mapped to exact current docs and implementation contracts: passed with no residual finding.
+  - Markdown Prettier, implementation artifact validation, diff whitespace, shell syntax, CI workflow gate, blue-green fail-closed tests, and deploy change-detector tests passed.
+  - Stale host-pnpm/authorization/rollback scans returned no unexpected match; the only host-pnpm examples are explicitly local-development-only.
+  - Sanitized environment files have unique keys; changed-lines secret/product-ID scan found no credential, product/file UUID, content, or provenance leak.
+  - Handoff is 111 lines against the 200-line budget.
+  - Graphify remains intentionally parent-blocked because durable docs are not yet integrated/refreshed in the shared graph.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-docs-review.md
 explicit_defers:
-  - This review does not edit stable docs; bounded edits belong to the parent integration docs owner after findings are accepted.
+  - Parent integration must merge the accepted documentation commit, refresh local Graphify without external model/API modes, and run canonical closeout.
   - No staging, production, database, service, secret, queue, image registry, S3, notification, alias, or live Qdrant state was read or mutated.
 ---
 
 # Summary
 
-## Findings-first verdict
+## Re-review verdict
 
-**UPDATES REQUIRED BEFORE Q12 REMOTE MUTATION.** P0: 0, P1: 6, P2: 3,
-P3: 0. Commit `4267deee` contains the accepted guarded base-migration runner,
-immutable `qdrant-operator` image/profile, digest publication and pre-pull, and
-containerized recovery units. Stable documentation still describes the prior
-host-source runtime, only half of the migration chain, an authorization state
-that has already changed, and an nginx-only rollback that the implementation no
-longer performs.
+**PASS / APPROVED FOR ORCHESTRATOR INTEGRATION.** Documentation commit
+`9e840349` resolves all findings from original audit `2943a942`. Final count:
+P0: 0, P1: 0, P2: 0, P3: 0. No remote action was performed.
 
-The owner authorization is real and specific, but it does not clear the current
-no-go inputs recorded by Beads: off-host S3 credentials are unavailable,
-`file_catalog` has 80 missing and 2 invalid canonical source paths, and the
-remote PostgreSQL `verify-full` path still needs the project CA certificate.
-No remote mutation has occurred. Documentation must preserve those hard stops
-rather than treating authorization as activation readiness.
+| Original ID | Result   | Re-review evidence                                                                                                                                                      |
+| ----------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q12-DR1     | Resolved | Production/staging use the digest-checked container operator; host pnpm is confined to explicitly local-only setup/module pages.                                        |
+| Q12-DR2     | Resolved | The exact guarded `120 -> 130 -> 140 -> 150 -> 151` sequence, project CA, `verify-full`, confirmation strings, quiesce and catalog/RLS/RPC checks are documented.       |
+| Q12-DR3     | Resolved | Operator publication/digest/pre-pull and the bootstrap-before-ordinary-`/deploy` initial activation sequence match accepted runtime behavior.                           |
+| Q12-DR4     | Resolved | Exact secret paths, owners/modes, UID/GID preflight, operator wrapper, systemd oneshots/timers and credential staging are recorded.                                     |
+| Q12-DR5     | Resolved | Rollback commands require the exact 40-character release commit and matching deploy transaction; immutable app images and both workers are restored before nginx moves. |
+| Q12-DR6     | Resolved | Handoff, summary and runbooks record staging `true/active/100` authorization, no remote mutation, and the current CA/S3/source NO-GO inputs/hard stops.                 |
+| Q12-DR7     | Resolved | Every remaining host-pnpm command is explicitly local-development-only and links to the production operator runbook.                                                    |
+| Q12-DR8     | Resolved | The sanitized production environment contract includes operator digest, monitoring paths/GID, S3/recovery inputs and active/100 without real values.                    |
+| Q12-DR9     | Resolved | Prometheus retention is a bounded tracked defer and Graphify refresh ownership is explicit for parent closeout.                                                         |
 
-| ID      | Priority | Finding                                                                                                                                                                                                                                 | Required disposition                                                                                                                                              |
-| ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q12-DR1 | P1       | The production Qdrant runbook still executes host `pnpm`/source against loopback, while the accepted runtime requires the immutable container operator, Docker-local URL, file secrets, a digest and a dedicated queue/physical target. | Replace production bootstrap/reindex/recovery commands with exact `operator-compose.sh` procedures; retain host `pnpm` only in explicitly local-development docs. |
-| Q12-DR2 | P1       | The evidence runbook documents only migrations `150/151`; it omits the guarded `120 -> 130 -> 140` prerequisite runner and the complete remote apply/verification order.                                                                | Add the five-version fail-closed sequence, exact confirmation strings, `verify-full` CA requirement, quiesce window and post-apply catalog/RLS/RPC checks.        |
-| Q12-DR3 | P1       | Deployment docs omit the operator build/digest/pre-pull and first-bootstrap sequence; `/deploy` is presented as a normal zero-downtime action even though its pre-cutover verify cannot bootstrap an empty Qdrant.                      | Document the Q12 initial-activation path separately and forbid treating `/deploy` as the bootstrap/reindex command.                                               |
-| Q12-DR4 | P1       | Secret guidance is generic and the deployment guide still checks `/usr/bin/pnpm`; exact host paths, owners/modes, metrics GID and containerized systemd commands are missing.                                                           | Add one authoritative secret/path/UID/GID table and exact oneshot/timer install/verification commands for the container operator.                                 |
-| Q12-DR5 | P1       | Rollback docs say workers are not restarted, while the accepted script restores immutable color images and recreates main/Stage 6 workers before switching traffic.                                                                     | Reconcile the nine-step rollback, deploy transaction state, immutable images, worker/env coherence, queue pause and evidence containment variants.                |
-| Q12-DR6 | P1       | Handoff, stage summary and evidence rollout text still say Q12 awaits authorization and gradual staging promotion; Beads records explicit staging `true/active/100` authorization plus unresolved hard stops.                           | Record the superseding owner decision, current no-go reasons, exact stop gates, current head/accepted Q12 streams and “no remote mutation yet” truth.             |
-| Q12-DR7 | P2       | The package Qdrant setup can be read as a production reindex procedure because its second half uses host `pnpm` without a local-only qualifier.                                                                                         | Label the whole command block local-development-only and link production operators to the container runbook.                                                      |
-| Q12-DR8 | P2       | Environment examples do not expose the production operator digest, metrics directory/GID, monitoring secret paths or current staging decision context.                                                                                  | Add a sanitized production variable table/template reference; keep secret values absent and preserve local defaults in the package example.                       |
-| Q12-DR9 | P2       | Prometheus retention remains on deprecated CLI flags and Graphify/current docs evidence is stale after durable Q12 changes.                                                                                                             | Track the accepted retention-YAML defer and refresh local Graphify after doc reconciliation during closeout.                                                      |
+The remaining CA, off-host S3 and source-truth inputs are external Q12 activation
+NO-GO conditions, not residual documentation findings. The docs preserve the
+ban on `--allow-gaps`, partial activation, unverified TLS, mutable operator tags,
+restore-over-active, and incident down-migration.
 
-# Required before remote mutation (P1)
+## Original audit record
+
+The sections below preserve the original `4267deee` findings and bounded edit
+rationale for traceability. Each finding is resolved by `9e840349`; none remains
+an open P1/P2 blocker.
+
+# Original required-before-remote findings (resolved)
 
 ## Q12-DR1 — stable runbook invokes the superseded host runtime
 
@@ -330,7 +332,7 @@ hard stops:
 8. real firing/resolved notification, 60-minute observation plus one complete
    normal cycle, cleanup and retained rollback evidence.
 
-# Closeout maintenance (P2)
+# Original closeout findings (resolved)
 
 ## Q12-DR7 — package setup needs an explicit local-only boundary
 
@@ -373,7 +375,7 @@ local no-API `graphify update .` and `graphify cluster-only . --no-viz`, then
 record `graph-reviewed: updated` with the new report commit. Do not use external
 model/API modes or install Git hooks.
 
-# Recommended bounded edit order
+# Original bounded edit order (completed by 9e840349)
 
 1. Update `.codex/handoff.md` and `.codex/stages/mc2-jz6y0/summary.md` so the
    next actor sees authorization plus the three current NO-GO inputs.
@@ -391,22 +393,27 @@ model/API modes or install Git hooks.
 
 # Verification
 
-- `docs-reviewed: updates-required` — production operator, migration,
-  deployment, rollback, owner-decision and current-state docs contradict accepted
-  commit `4267deee`.
+- `docs-reviewed: updated` — production operator, complete guarded migrations,
+  initial activation, release-bound rollback, owner decision, current NO-GO
+  state, sanitized environments, and local-only developer commands match the
+  accepted implementation at `9e840349` over integration `6645708d`.
 - `graph-reviewed: blocked` — existing local graph is at `ebdf9c2e`; parent must
-  refresh locally after durable docs are updated.
-- `project-index: review-required` — if it names host pnpm/source as the stable
-  production operator entrypoint, replace that pointer with
-  `deploy/qdrant/operator-compose.sh` plus the operations runbook; otherwise no
-  content expansion is needed.
+  refresh locally after the durable docs are integrated.
+- `project-index: no-change-needed` — it already points to the stable operations
+  runbooks/assets and keeps host commands under the developer-setup entrypoint;
+  it does not claim host pnpm/source is the production runtime.
+- Fresh mechanical evidence: Markdown Prettier passed; implementation artifact
+  validation passed; `git diff --check` passed; all three deploy-contract test
+  scripts passed; stale scans returned no unexpected match; environment examples
+  have unique keys; handoff is 111/200 lines; changed-lines leak scan was clean.
 
 # Risks / Follow-ups
 
 - Remote mutation remains NO-GO until the S3 credentials, source-path product
-  truth, and verified Supabase CA inputs are available and every P1 documentation
-  gap above has been reconciled with an independently reviewed command packet.
-- This artifact records proposed bounded edits only. It does not attest that the
-  stable docs have been corrected or that any live gate has passed.
-- Parent closeout owns stable-doc edits, independent docs review, Graphify refresh,
-  Beads/handoff/summary reconciliation, commit/push, and worktree cleanup.
+  truth, and verified Supabase CA inputs are available. That is expected external
+  activation state, not a residual documentation defect.
+- This PASS attests only the reviewed repository documentation and local command
+  mapping. It does not attest that any live migration, source repair, snapshot,
+  restore, notification, deployment, reindex, cutover, or observation gate ran.
+- Parent closeout owns integration, Graphify refresh, Beads acceptance, canonical
+  closeout, final push, and worktree cleanup.
