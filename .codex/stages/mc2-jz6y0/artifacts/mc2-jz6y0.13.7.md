@@ -42,11 +42,11 @@ parallel_group: B
 depends_on_streams:
   - none
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: no remote resources were created; local dependency symlinks are removed before return
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation, review, and rereview worktrees plus local branches were removed after fresh integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -68,12 +68,14 @@ verification:
   - bash scripts/ci/test_blue_green_fail_closed.sh: passed
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
   - scripts/orchestration/run_process_verification.sh: passed
+  - independent delta rereview 0276607b: PASS with P0 0, P1 0, P2 0, P3 0
+  - fresh integration focused backup operator: passed 18/18
+  - fresh integration shell, three CI, type-check, artifact, process, and diff gates: passed
 changed_files:
   - deploy/postgres/backup-supabase.sh
   - packages/course-gen-platform/tests/unit/ops/supabase-backup-operator.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7.md
 explicit_defers:
-  - independent correctness/security review and parent acceptance are required before server installation
   - current verify-full Session pooler credentials and a fresh live restore-validated backup remain mandatory remote activation inputs
   - the observed server /opt/megacampus/backups parent mode 0775 must be changed to an approved root/current-owned non-group/world-writable mode before operator installation
   - no server script, cron, credential, CA, historical dump, live database, staging service, or remote state was read or changed by this stream
