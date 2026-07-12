@@ -39,11 +39,11 @@ parallel_group: q12-source-recovery-reindex-final-gate
 depends_on_streams:
   - mc2-jz6y0.13.4.1-reindex-final-correction
 parallel_decision: sequential - final review depends on the complete be58c34c correction
-status: returned
-delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: temporary dependency symlinks were removed before commit; final review worktree and branch remain for orchestrator integration and cleanup
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation and all three review worktrees plus local branches were removed after root integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed

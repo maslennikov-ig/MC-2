@@ -42,14 +42,14 @@ parallel_group: q12-source-recovery-dependent-streams
 depends_on_streams:
   - mc2-jz6y0.13.4.1-core
 parallel_decision: sequential within stream - plan and execution share one recovery-binding and resume contract
-status: returned
-delivery_method: merge
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
 resolves_review:
   - b82a09f8
   - 8b419f19
-cleanup_status: pending
-cleanup_notes: local dependency symlinks are removed before commit; branch/worktree cleanup waits for root acceptance
+cleanup_status: cleaned
+cleanup_notes: implementation and all three review worktrees plus local branches were removed after integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
