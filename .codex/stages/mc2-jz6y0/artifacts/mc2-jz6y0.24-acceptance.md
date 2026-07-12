@@ -16,8 +16,8 @@ cleanup_notes: Historical E7 disposable resources were cleaned. The reviewed dev
 risk_level: high
 docs_reviewed: updated
 docs_review_notes: Earlier E7 operator/product documentation passed independent review at 82831b6f with P0-P3 zero and was integrated at 756406a4. The combined 100% local/development activation checkpoint passed its final independent correctness/docs review with no P0-P3 findings and was accepted after integration reruns.
-graph_reviewed: no-change-needed
-graph_review_notes: The earlier accepted integration refresh completed with local-only Graphify 0.8.45 at 50438 nodes and 74881 edges. A final local-only refresh after the acceptance commit remains part of stage closeout.
+graph_reviewed: updated
+graph_review_notes: Local-only Graphify 0.8.45 refresh after acceptance completed with 50469 nodes, 74909 edges and 3199 communities. The focused evidence query found the approved design plus Stage 4/5/6 and observability surfaces; no external model/API mode or Git hook was used.
 verification:
   - Focused course-gen Stage 2/4/5/6 evidence and retrieval gate passed 28/28 files and 330/330 tests.
   - Shared document-evidence and clarifying contracts passed 3/3 files and 23/23 tests with zero skips.
@@ -33,6 +33,7 @@ verification:
   - @megacampus/course-gen-platform type-check passed for the dev activation checkpoint; supported YAML/TypeScript files passed Prettier, the environment example passed dotenv exact-value parsing, and diff checks passed.
   - Final independent review of the combined activation/docs branch at d3417610 reported Ready to merge Yes with P0-P3 zero.
   - Reviewed branch merged at ea183d83; parent integration rerun passed 5/5 files and 24/24 tests, package type-check, process verification, and canonical stage closeout dry-run.
+  - graphify update and graphify cluster-only --no-viz completed locally after acceptance; the report matched commit 677f35ee before this evidence-only record and is refreshed again after its commit.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-acceptance.md
 explicit_defers:

@@ -139,6 +139,6 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 docs-reviewed: updated — operator and orchestration records now reflect accepted 100% local/development activation, clean final review, parent rerun, Q10 next, and unchanged Q12 authorization.
 
-graph-reviewed: no-change-needed — the parent used the current local graph; final local-only refresh remains part of stage closeout.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh completed after E7 acceptance with 50,469 nodes, 74,909 edges and 3,199 communities; the focused query found the evidence design and Stage 4/5/6 observability surfaces. No external model/API mode or Git hook was used.
 
 project-index: reviewed-no-change — this checkpoint changes only orchestration truth and readiness evidence; Q10 still owns the required stable Qdrant/operations navigation update.

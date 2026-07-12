@@ -93,4 +93,4 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — E7 operator and orchestration truth records the accepted 100% local/development checkpoint, clean independent review, parent rerun, Q10 next, and unchanged Q12 boundary.
-graph-reviewed: no-change-needed — the parent used the current local graph; final local-only refresh remains part of stage closeout.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh completed after E7 acceptance with 50,469 nodes, 74,909 edges and 3,199 communities; the focused query found the evidence design and Stage 4/5/6 observability surfaces. No external model/API mode or Git hook was used.
