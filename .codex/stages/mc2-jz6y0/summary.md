@@ -182,8 +182,13 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 ## Explicit Defers
 
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke
-  are authorized but NO-GO until current DB credentials, missing-source truth,
-  and all hard gates pass.
+  are authorized but NO-GO until current DB credentials, a truthful fresh
+  validated database backup, and all hard gates pass. Read-only inspection on
+  2026-07-12 found that the server backup pipeline masks `pg_dump` authentication
+  failures as gzip success: files since 2026-06-28 are 20-byte empty streams,
+  while the last substantive retained dump is 2026-06-27. Beads
+  `mc2-jz6y0.13.7` tracks the required fail-closed atomic repair and validation;
+  no server file was changed or deleted.
 - Production off-host S3 remains bounded defer `mc2-jz6y0.13.6`; owner-approved
   local staging snapshots do not satisfy that future production gate.
 - Prometheus retention YAML migration remains bounded defer `mc2-jz6y0.25`
