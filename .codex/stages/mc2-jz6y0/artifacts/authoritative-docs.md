@@ -22,6 +22,7 @@ selected_docs:
   - Official Prometheus v3.11.3 release and documentation.
   - Official Grafana v12.4.0 release and documentation.
   - Official systemd source documentation and Docker Compose reference.
+  - Official Node.js v24 filesystem documentation for hard links, fsync, O_EXCL, and O_NOFOLLOW.
 selected_skills:
   - task-router
   - senior-devops
@@ -50,6 +51,7 @@ verification:
   - systemd-analyze calendar accepted and normalized *-*-* 00/6:15:00.
   - Artifact validator passed after authoring.
   - Orchestrator reviewed the complete artifact and independently confirmed BM25/IDF, Formula/grouping, tenant-index, and metrics/health claims against official Qdrant documentation and pinned client types.
+  - Node.js v24.1 first-party filesystem contract rechecked against local Node v24.16.0 and repository engine >=20.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/authoritative-docs.md
 explicit_defers:
@@ -72,6 +74,33 @@ The plan must be corrected before implementation in these areas:
 8. The systemd timer syntax is valid, but `Persistent=true`, `RandomizedDelaySec=10min`, and the default `AccuracySec=1min` mean the effective worst-case cadence is about 6 h 11 min, not a strict six-hour RPO.
 
 No third-party documentation was used. Where this artifact makes a recommendation rather than restating a documented guarantee, it is marked as an inference.
+
+## Node.js filesystem recovery primitives
+
+The accepted source-recovery core runs under local Node `v24.16.0`; the
+repository supports Node `>=20`. The official
+[Node.js v24.1 filesystem documentation](https://nodejs.org/download/release/v24.1.0/docs/api/fs.html)
+confirms the stable primitives used by the implementation:
+
+- `fsPromises.link(existingPath, newPath)` creates a new hard link and has been
+  available since Node v10. The recovery design relies on the underlying POSIX
+  `link(2)` no-replace behavior for an already existing destination; the exact
+  `EEXIST` behavior is also proved by local tests rather than inferred only from
+  the JavaScript API summary.
+- `FileHandle.sync()` requests that all data for the open descriptor be flushed
+  to storage; the docs explicitly note that final behavior remains OS/device
+  specific. Therefore same-filesystem support and the full crash-order drill
+  remain runtime acceptance gates.
+- `O_EXCL` with `O_CREAT` fails if the temporary already exists, while
+  `O_NOFOLLOW` fails when the final opened path is a symbolic link. These flags
+  are POSIX-specific on the Linux operator target and are not claimed portable
+  to Windows.
+
+The official docs also warn that promise-based filesystem operations are not
+implicitly synchronized or thread-safe. The host-level `flock`, stopped upload
+writers, owner-only directories, deterministic journal transitions, and
+single-run operator are therefore required correctness controls, not optional
+hardening.
 
 ## Routing and repository context
 
