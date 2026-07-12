@@ -137,6 +137,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 ## Explicit Defers
 
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke: blocked pending explicit current-task authorization.
+- Final workspace cleanup intentionally retains the current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree for Q12 continuation. `cleanup_stage_workspace.py` returned non-zero only because it safely refused to delete that checked-out branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are absent.
 - Capacity-triggered non-goals remain those listed in the approved design; they are not implementation debt.
 
 docs-reviewed: no-change-needed — Q10 already reconciled all durable setup, retrieval, recovery, monitoring and rollback documentation; Q11 changes release evidence and current orchestration truth only.

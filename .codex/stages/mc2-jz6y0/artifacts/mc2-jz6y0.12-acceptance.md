@@ -12,7 +12,7 @@ status: accepted
 delivery_method: merge
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: All Q11-owned PostgreSQL and Qdrant containers, database, collections, aliases, loopback listeners, recovery directories and temporary worktrees/local branches were removed. Remote evidence branches remain. Build/dependency outputs are ignored workspace caches, not delivery state. No Cloud, S3, notification, service, secret, staging or production mutation occurred.
+cleanup_notes: All Q11-owned PostgreSQL and Qdrant containers, database, collections, aliases, loopback listeners, recovery directories and temporary worktrees/local branches were removed. Remote evidence branches remain. Final `cleanup_stage_workspace.py` correctly refused to delete the current pushed integration branch because it remains the Q12 continuation branch; this intentional safety refusal is the only cleanup-script non-zero state. Build/dependency outputs are ignored workspace caches, not delivery state. No Cloud, S3, notification, service, secret, staging or production mutation occurred.
 risk_level: high
 docs_reviewed: no-change-needed
 docs_review_notes: Q10 already reconciled all durable setup/retrieval/recovery/monitoring/rollback docs. Q11 adds only release evidence and orchestration truth; final independent review reported Ready Yes with P0-P3 zero.
