@@ -38,11 +38,11 @@ explicit_defers:
 
 Q11 is not pass-ready because Q10 is open and E7 awaits `.24.2`. Existing evidence is strong but is not a substitute for the fresh release-confidence run required after the final Q10/E7 documentation commit. The canonical closeout metadata defect discovered by the audit has already been repaired by the parent: the initial dry-run failed on five fields, while the post-fix validators and dry-run pass.
 
-Fresh Q11 must cover focused Qdrant/Stage 2/4/5/6 behavior, shared and web conflict contracts, applied PostgreSQL migration/recovery/isolation, pinned Qdrant 1.18.2 integration 19/19, Compose 8/8, local snapshot/restore 5/5, pinned promtool/amtool, workspace type-check/build, process verification, stage readiness, canonical closeout, and cleanup proofs. Test totals must be recorded from the actual final run rather than copied from historical artifacts.
+Fresh Q11 must cover focused Qdrant/Stage 2/4/5/6 behavior, shared and web conflict contracts, applied PostgreSQL migration/recovery/isolation, the exact pinned Qdrant 1.18.2 two-file integration set, Compose 8/8, local snapshot/restore 5/5, pinned promtool/amtool, workspace type-check/build, process verification, stage readiness, canonical closeout, and cleanup proofs. Test totals must be recorded from the actual final run rather than copied from historical artifacts.
 
 # Verification
 
-The authoritative command matrix is derived from the Qdrant and document-evidence plans, repository scripts and accepted artifacts. It requires synthetic loopback Supabase variables for unit/build gates, a disposable PostgreSQL 16 database ending `_test` for 64 applied migration tests, an exact-digest disposable Qdrant `1.18.2` on loopback for 19 integration and 5 recovery tests, and four full/no-env Compose renders through the 8-test runtime contract.
+The authoritative command matrix is derived from the Qdrant and document-evidence plans, repository scripts and accepted artifacts. It requires synthetic loopback Supabase variables for unit/build gates, a disposable PostgreSQL 16 database ending `_test` for 64 applied migration tests, an exact-digest disposable Qdrant `1.18.2` on loopback for 15 two-file integration tests and 5 separate recovery tests, and four full/no-env Compose renders through the 8-test runtime contract.
 
 The local recovery drill intentionally uses Qdrant local snapshot storage. The approved design reserves real off-host S3 effects for Q12; Q11 statically validates the S3 Compose mapping and proves checksum/relevance/isolation against the local pinned service. Every disposable database/container/collection/alias/manifest/metric artifact must be checked absent after its gate.
 
@@ -50,6 +50,6 @@ Final global gates are `pnpm type-check`, `pnpm build` with synthetic non-secret
 
 # Risks / Follow-ups
 
-The old 330/330 E7 result lacks its exact 28-file command, so Q11 must run the literal broader Stage 4/5/6 paths from the approved plan and record current totals. Historical pinned Qdrant 19/19, Compose 8/8, restore 5/5 and build evidence are valid implementation evidence but must be rerun on the final Q11 SHA.
+The old 330/330 E7 result lacks its exact 28-file command, so Q11 must run the literal broader Stage 4/5/6 paths from the approved plan and record current totals. The historical pinned-Qdrant `19/19` label combined 15 Qdrant tests with 4 unrelated Career Playbook schema tests. Q11 must rerun and report the actual two-file Qdrant total separately, while also preserving the full deploy-gate composition, Compose 8/8, restore 5/5 and build evidence.
 
 Before running any non-mutating dev reindex plan, Q11 must define and verify the exact local/dev source context. `qdrant:reindex:execute`, real S3, deploy, service changes, secrets, staging, live reindex and traffic cutover remain outside Q11 authority.

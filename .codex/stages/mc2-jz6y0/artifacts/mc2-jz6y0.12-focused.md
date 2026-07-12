@@ -41,11 +41,11 @@ parallel_group: Q11-F
 depends_on_streams:
   - none
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: No services, containers, databases, collections, aliases, snapshots, secrets, or remote runtime state were created. Ignored node_modules and shared package build output remain only inside the dedicated worktree for parent cleanup after acceptance.
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: No services, containers, databases, collections, aliases, snapshots, secrets, or remote runtime state were created. Pushed evidence commit 4f94cebf merged as 61d71fbe; the parent removed the dedicated worktree and local branch while retaining the remote evidence branch.
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed

@@ -37,11 +37,11 @@ parallel_group: Q11-P
 depends_on_streams:
   - none - executed alongside Q11-F and Q11-I on an isolated database and write zone
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: The database was force-dropped, the uniquely named container was removed, and the loopback port was verified closed; no unrelated database, container, port, secret, or remote state was touched.
+cleanup_notes: The database was force-dropped, the uniquely named container was removed, and the loopback port was verified closed. Pushed evidence commit ec68b8a5 merged as b946d22b; the dedicated worktree/local branch were removed and the remote evidence branch retained. No unrelated database, container, port, secret, or remote state was touched.
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed
