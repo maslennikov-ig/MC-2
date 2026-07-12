@@ -164,8 +164,9 @@ for (const requiredFile of [
 }
 assert(
   rollbackCommand?.includes("grep -Eq '^status=(switched|accepted)$'") &&
-    rollbackCommand.includes('rollback_blue_green.sh'),
-  'workflow rollback must run only after the remote transaction switched traffic'
+    rollbackCommand.includes("grep -qx 'commit=${{ github.sha }}'") &&
+    rollbackCommand.includes('rollback_blue_green.sh production ${{ github.sha }}'),
+  'workflow rollback must run only for the current release after its transaction switched traffic'
 );
 assert(
   !createProductionEnv.includes('QDRANT_URL=${{ secrets.QDRANT_URL }}'),
@@ -218,6 +219,11 @@ assert(
   deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256') <
     deployScript.indexOf('up -d redis qdrant prometheus grafana'),
   'operator image digest must be resolved and persisted before infrastructure Compose starts'
+);
+assert(
+  deployScript.indexOf('write_deploy_state preparing') <
+    deployScript.indexOf('OPERATOR_IMAGE="$(resolve_repo_digest'),
+  'app/config deploy transaction must enter preparing before operator image resolution'
 );
 const appSwitchSection = deployScript.slice(
   deployScript.indexOf(

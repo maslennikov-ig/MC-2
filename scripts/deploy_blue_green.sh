@@ -236,6 +236,10 @@ echo "   Target:  $NEW_COLOR (web:$NEW_WEB_PORT, api:$NEW_API_PORT)"
 echo "   Changes: web=$DEPLOY_WEB_CHANGED api=$DEPLOY_API_CHANGED bridge=$DEPLOY_BRIDGE_CHANGED config=$DEPLOY_CONFIG_CHANGED"
 echo ""
 
+if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    write_deploy_state preparing
+fi
+
 # Resolve and pre-pull the exact operator image before any Compose invocation.
 # The CI change detector publishes this target for every deploy-relevant commit.
 if [ -n "$GITHUB_TOKEN" ]; then
@@ -250,10 +254,6 @@ QDRANT_OPERATOR_IMAGE_SHA256="${OPERATOR_IMAGE#"$OPERATOR_REPOSITORY@sha256:"}"
 }
 upsert_env "$BASE_PATH/.env.$ENV" QDRANT_OPERATOR_IMAGE_SHA256 "$QDRANT_OPERATOR_IMAGE_SHA256"
 unset OPERATOR_IMAGE QDRANT_OPERATOR_IMAGE_SHA256
-
-if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
-    write_deploy_state preparing
-fi
 
 # 2. Check docling-mcp image exists (manually built, 8GB)
 DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"

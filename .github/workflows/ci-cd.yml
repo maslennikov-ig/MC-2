@@ -930,7 +930,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && if test -r deploy_state && grep -Eq '^status=(switched|accepted)$' deploy_state; then bash scripts/rollback_blue_green.sh; else echo 'Rollback skipped: deployment never switched traffic'; fi"
+            "cd ${{ env.DEPLOY_PATH }} && if test -r deploy_state && grep -Eq '^status=(switched|accepted)$' deploy_state && grep -qx 'commit=${{ github.sha }}' deploy_state; then bash scripts/rollback_blue_green.sh production ${{ github.sha }}; else echo 'Rollback skipped: current deployment never switched traffic'; fi"
 
       - name: Cleanup SSH
         if: always()

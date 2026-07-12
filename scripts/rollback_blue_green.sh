@@ -10,9 +10,15 @@ set -e
 #   Green: web:3002, api:4002
 
 ENV=${1:-production}
+EXPECTED_COMMIT=${2:-}
 BASE_PATH=${BASE_PATH:-/opt/megacampus}
 NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
 DEPLOY_STATE="$BASE_PATH/deploy_state"
+
+[[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "Error: rollback requires the exact 40-character release commit." >&2
+    exit 1
+}
 
 state_value() {
     local key="$1"
@@ -36,6 +42,11 @@ fi
 DEPLOY_STATUS="$(state_value status)"
 PREVIOUS_COLOR="$(state_value previous_color)"
 SWITCHED_COLOR="$(state_value target_color)"
+STATE_COMMIT="$(state_value commit)"
+if [ "$STATE_COMMIT" != "$EXPECTED_COMMIT" ]; then
+    echo "Error: deploy_state commit does not match the requested release; refusing stale rollback." >&2
+    exit 1
+fi
 if [ "$DEPLOY_STATUS" != "switched" ] && [ "$DEPLOY_STATUS" != "accepted" ]; then
     echo "Error: deployment did not reach status=switched; refusing to promote an unaccepted target." >&2
     exit 1
