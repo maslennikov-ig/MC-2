@@ -2,6 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  calculateRecoveryManifestSha256,
   createInitialProgressJournal,
   normalizeRecoveryManifest,
   replaceProgressJournal,
@@ -11,6 +12,8 @@ import {
   type RecoveryCopyEntry,
   type SourceRecoveryManifest,
 } from '../../../../tools/qdrant/source-recovery-manifest.js';
+
+const canonicalManifestSha256 = (): string => calculateRecoveryManifestSha256(manifest());
 
 const copy = (overrides: Partial<RecoveryCopyEntry> = {}): RecoveryCopyEntry => ({
   entry_id: 'copy-b',
@@ -285,7 +288,7 @@ describe('source recovery manifest', () => {
   it('rejects skipped phases and per-entry state transitions', () => {
     const current = createInitialProgressJournal(
       normalizeRecoveryManifest(manifest()),
-      'c'.repeat(64)
+      canonicalManifestSha256()
     );
 
     expect(() =>
@@ -353,7 +356,7 @@ describe('source recovery manifest', () => {
   it('supports a durable Career Playbook source-CAS checkpoint', () => {
     const initial = createInitialProgressJournal(
       normalizeRecoveryManifest(manifest()),
-      'f'.repeat(64)
+      canonicalManifestSha256()
     );
     const copying = validateRecoveryJournalTransition(initial, {
       ...initial,
@@ -388,12 +391,23 @@ describe('source recovery manifest', () => {
         },
       })
     ).toThrow(/eligible disposition/iu);
+
+    expect(() =>
+      validateRecoveryJournalTransition(copied, {
+        ...copied,
+        revision: 3,
+        disposition_states: {
+          ...copied.disposition_states,
+          'disposition-b': 'disposition_applied',
+        },
+      })
+    ).toThrow(/source CAS checkpoint/iu);
   });
 
   it('accepts the complete write-ahead phase and paired-disposition sequence', () => {
     let journal = createInitialProgressJournal(
       normalizeRecoveryManifest(manifest()),
-      '2'.repeat(64)
+      canonicalManifestSha256()
     );
     journal = validateRecoveryJournalTransition(journal, {
       ...journal,
@@ -459,7 +473,7 @@ describe('source recovery manifest', () => {
     const target = join(directory, 'progress.json');
     const current = createInitialProgressJournal(
       normalizeRecoveryManifest(manifest()),
-      'd'.repeat(64)
+      canonicalManifestSha256()
     );
 
     try {
@@ -489,7 +503,7 @@ describe('source recovery manifest', () => {
     const directory = await mkdtemp('/tmp/mc2-source-recovery-initial-journal-');
     const target = join(directory, 'progress.json');
     const normalized = normalizeRecoveryManifest(manifest());
-    const current = createInitialProgressJournal(normalized, '1'.repeat(64));
+    const current = createInitialProgressJournal(normalized, canonicalManifestSha256());
 
     try {
       await expect(
@@ -510,5 +524,11 @@ describe('source recovery manifest', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('rejects a format-valid hash that is not the canonical manifest SHA-256', () => {
+    expect(() =>
+      createInitialProgressJournal(normalizeRecoveryManifest(manifest()), '9'.repeat(64))
+    ).toThrow(/does not match/iu);
   });
 });

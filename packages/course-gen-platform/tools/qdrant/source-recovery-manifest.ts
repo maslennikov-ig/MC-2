@@ -404,12 +404,22 @@ export async function writeImmutableManifest(
   return sha256;
 }
 
+export function calculateRecoveryManifestSha256(manifest: SourceRecoveryManifest): string {
+  return createHash('sha256')
+    .update(serialize(normalizeRecoveryManifest(manifest)))
+    .digest('hex');
+}
+
 export function createInitialProgressJournal(
   manifest: SourceRecoveryManifest,
   manifestSha256: string
 ): RecoveryProgressJournal {
   if (!SHA256_PATTERN.test(manifestSha256)) throw new Error('Invalid manifest SHA-256');
   const normalized = normalizeRecoveryManifest(manifest);
+  const expectedManifestSha256 = calculateRecoveryManifestSha256(normalized);
+  if (manifestSha256 !== expectedManifestSha256) {
+    throw new Error('Progress journal manifest SHA-256 does not match canonical manifest bytes');
+  }
   return {
     schema_version: 'megacampus.qdrant.source-recovery-progress/v1',
     run_id: normalized.run_id,
@@ -562,6 +572,13 @@ export function validateRecoveryJournalTransition(
     ) {
       throw new Error('Eligible disposition cannot use a Career Playbook source checkpoint');
     }
+    if (
+      next.disposition_kinds[entryId] === 'career_playbook_retained_derived' &&
+      currentState === 'disposition_planned' &&
+      nextState === 'disposition_applied'
+    ) {
+      throw new Error('Career Playbook disposition must persist its source CAS checkpoint first');
+    }
     if (currentState !== nextState && phaseIndex(next.phase) < phaseIndex('copied')) {
       throw new Error('Disposition updates cannot begin before copied phase');
     }
@@ -605,5 +622,7 @@ export async function replaceProgressJournal(
     }
   }
 
-  await writeDurableReplacement(targetPath, serialize(next), { publication: 'replace' });
+  await writeDurableReplacement(targetPath, serialize(next), {
+    publication: current ? 'replace' : 'immutable',
+  });
 }

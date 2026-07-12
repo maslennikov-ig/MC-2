@@ -63,6 +63,10 @@ verification:
   - correction RED: passed with 13 reproduced contract failures
   - correction GREEN and recovery regression: passed 47/47
   - corrected package type-check and focused Prettier: passed
+  - first correction re-review ddd77560: NEEDS_WORK with 0 P0, 2 P1, and 2 P2
+  - second correction RED: canonical SHA and paired-CAS bypass reproduced
+  - second correction GREEN and recovery regression: passed 48/48
+  - second corrected package type-check: passed
 changed_files:
   - packages/course-gen-platform/tools/qdrant/source-recovery-manifest.ts
   - packages/course-gen-platform/tools/qdrant/source-recovery-filesystem.ts
@@ -151,3 +155,17 @@ Correction RED reproduced 13 failures. The corrected suite passed 47/47 across
 12 manifest, 5 filesystem, 14 snapshot, and 16 reindex-plan tests. Full package
 type-check and focused formatting/whitespace checks passed. A second independent
 review is still required before acceptance.
+
+The first correction re-review additionally proved that the journal accepted a
+format-valid hash without recomputing canonical manifest bytes, and that a
+Career Playbook entry could skip directly from `disposition_planned` to
+`disposition_applied`. Both are blocking because they weaken the reviewed
+identity and paired-CAS write-ahead claims.
+
+The second correction exports one canonical manifest hash function and requires
+an exact match before creating the initial journal. The absent initial-journal
+path now uses the same atomic no-replace publication as the immutable manifest.
+Kind-aware transition validation requires every Career Playbook disposition to
+persist `career_playbook_source_applied` before the catalog-applied state. The
+new negative probes are GREEN; the expanded regression passed 48/48 and package
+type-check passed. A final independent re-review remains required.
