@@ -45,11 +45,11 @@ parallel_group: q12-source-recovery-evidence-terminal-rpc
 depends_on_streams:
   - mc2-jz6y0.13.4.1-evidence-final-review
 parallel_decision: sequential - RED, SQL correction, catalog re-approval, rollback/reapply, and final verification share one migration and disposable database state
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: disposable databases and temporary dependency symlinks are removed before return; branch/worktree remain pending independent review and orchestrator acceptance
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: disposable databases, ports, volumes and dependency symlinks were removed; implementation and both database review worktrees/local branches were removed after integration verification
 risk_level: high
 docs_impact: migration
 docs_reviewed: no-change-needed
@@ -78,7 +78,7 @@ changed_files:
   - packages/course-gen-platform/tests/integration/document-conflict-auto-decisions-applied.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.2.md
 explicit_defers:
-  - independent review and orchestrator acceptance remain required; this returned correction is not accepted or integrated
+  - none - independent final review and orchestrator integration verification passed
 ---
 
 # Summary

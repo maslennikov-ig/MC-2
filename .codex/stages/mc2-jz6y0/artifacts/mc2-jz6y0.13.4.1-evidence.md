@@ -49,11 +49,11 @@ parallel_group: q12-source-recovery-dependent-streams
 depends_on_streams:
   - mc2-jz6y0.13.4.1-core
 parallel_decision: parallel with reindex/operator streams after accepted core
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: worktree remains for independent review; temporary dependency symlinks are removed before commit
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation and five review/database worktrees plus all local branches were removed after integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed
