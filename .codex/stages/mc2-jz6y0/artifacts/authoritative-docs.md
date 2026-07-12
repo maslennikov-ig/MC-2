@@ -36,7 +36,7 @@ parallel_decision: parallel
 status: accepted
 delivery_method: manual integration
 accepted_by_orchestrator: yes
-cleanup_status: not_applicable
+cleanup_status: cleaned
 cleanup_notes: Read-only research stream reviewed and accepted by the orchestrator; no branch, service, container, or source mutation was performed.
 risk_level: high
 docs_impact: ops-deploy

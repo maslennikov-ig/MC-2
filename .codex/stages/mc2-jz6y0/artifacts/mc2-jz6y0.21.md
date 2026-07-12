@@ -55,7 +55,7 @@ depends_on_streams:
   - mc2-jz6y0.20
 parallel_decision: isolated UI stream running in parallel with E5 and E6; implementation stayed sequential because metadata parsing, grouping, decision controls, and browser fixtures share one UI contract
 status: accepted
-delivery_method: n/a
+delivery_method: manual integration
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: Integrated linearly through rebased final reviewed equivalent 2538bb5c; the dedicated worktree and local worker branch were removed. The pushed remote evidence branch and hosted Lazyweb report remain as audit evidence.
@@ -141,8 +141,8 @@ Manual conflict choices use Radix radio semantics with required state, arrow-key
 
 # Delivery / Cleanup
 
-The branch is returned for independent review before parent integration. The local development server, Playwright CLI browser session, `.next`, Playwright reports/results/auth, and ignored screenshots are worker-local runtime evidence and are cleaned before handoff. No remote runtime action occurred.
+The independently reviewed branch was integrated linearly through the rebased equivalent `2538bb5c`. The local development server, Playwright CLI browser session, `.next`, Playwright reports/results/auth, ignored screenshots, dedicated worktree, and local worker branch were cleaned. The pushed remote evidence branch and hosted Lazyweb report remain as audit evidence. No remote runtime action occurred.
 
 # Risks / Follow-ups / Explicit Defers
 
-The UI consumes only the durable question rows returned by the existing clarification API; it does not move or weaken the Stage 4 Phase 0.5 pause/approval boundary. The parent should independently inspect the diff, rerun focused web tests after integration, and retain the computed contrast test while axe/Chromium OKLCH interoperability remains inconsistent.
+The UI consumes only the durable question rows returned by the existing clarification API; it does not move or weaken the Stage 4 Phase 0.5 pause/approval boundary. Independent review and integration reruns passed; the computed contrast test remains required while axe/Chromium OKLCH interoperability remains inconsistent.

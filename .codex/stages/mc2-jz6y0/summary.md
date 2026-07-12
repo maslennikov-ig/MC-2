@@ -65,22 +65,23 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 
 ## Current Recovery Point
 
-- Integration branch contains accepted Q1-Q7 and evidence E1-E6; Q6 is integrated as merge `f7930913`, and E6 is integrated linearly through reviewed equivalent `5201a786`.
+- Integration branch contains accepted Q1-Q9, evidence E1-E6, and the locally accepted E7 implementation/docs through `a5a657e3`; E7 remains formally open only for owner decision `.24.2`.
 - Q7 / `mc2-jz6y0.8` is accepted: both integration lookups use document-scoped point IDs, the pinned Qdrant `1.18.2` gate passes 19/19, focused Q7 tests pass 85/85, and the dedicated worktree/local branch are cleaned. The remote evidence branch remains.
 - E1 / `mc2-jz6y0.18` is accepted: immutable source manifests survive deletion-before-persist, guarded RPCs replace authenticated table writes, terminal coverage and user-only override direction are enforced, PostgreSQL 15.18 applied tests pass 9/9, and the dedicated worktree/local branch/container are cleaned. The remote evidence branch remains.
 - E2 / `mc2-jz6y0.19` is accepted: complete authoritative source enumeration, exact durable outcomes, structured per-document and cross-document hierarchy, atomic resume, claim-scoped verification, and exact `tiktoken 1.0.22` safety bounds are integrated. The final independent reviewer reported no findings (`Spec PASS`, `Quality APPROVED`).
 - E3 / `mc2-jz6y0.20` is accepted: persisted-card conflict detection, bounded RU/EN classification and Qdrant verification, explicit degraded/capacity questions, atomic manual/system decisions, full snapshots, guarded approval and recoverable multi-document retry lineage are integrated. Final independent review reported no findings (`Spec PASS`, `Quality APPROVED`).
-- E4 / `mc2-jz6y0.21`, E5 / `mc2-jz6y0.22`, and E6 / `mc2-jz6y0.23` are accepted and integrated. E7 remains dependency-blocked by Q8/Q9.
-- Q6 / `mc2-jz6y0.7` is accepted and integrated: Qdrant is pinned to `1.18.2` by index digest and `linux/amd64` child lock, file-backed secrets fail closed, ports remain loopback-only, Stage 7 stays isolated, and deploy gates verify readiness/auth/schema before RAG consumer recreation. Independent final review returned `PASS`; the integration rerun passed focused 8/8 plus artifact/process verification. Q8 and Q9 are now unblocked and may run in parallel.
+- E4 / `mc2-jz6y0.21`, E5 / `mc2-jz6y0.22`, and E6 / `mc2-jz6y0.23` are accepted and integrated.
+- E7 / `mc2-jz6y0.24` implementation, observability, reviewed docs and local cross-stage acceptance are integrated through `a5a657e3`. Stage 2/4/5/6 passed 330/330, shared contracts 23/23, web conflicts 20/20, PostgreSQL 16.14 migrations/recovery/isolation 64/64, observability 122/122, Prometheus 3.13.1 checks 14 rules, workspace type-check and independent code/docs reviews P0-P3 zero. The accepted artifact is `artifacts/mc2-jz6y0.24-acceptance.md`; only owner decision `.24.2` remains open, and the Stage 5 cohort fails closed at 0%.
+- Q6 / `mc2-jz6y0.7` is accepted and integrated: Qdrant is pinned to `1.18.2` by index digest and `linux/amd64` child lock, file-backed secrets fail closed, ports remain loopback-only, Stage 7 stays isolated, and deploy gates verify readiness/auth/schema before RAG consumer recreation. Independent final review returned `PASS`; the integration rerun passed focused 8/8 plus artifact/process verification.
 - Decision `mc2-jz6y0.14` is owner-approved and closed: Prometheus `3.13.1` LTS, Grafana `12.4.5` extended support, node_exporter `1.12.0`, Alertmanager `0.33.1`, authenticated main-listener scrape, no Qdrant `metrics_port`, and file-backed fail-closed secret transport.
-- Q8 / `mc2-jz6y0.9` and Q9 / `mc2-jz6y0.10` are accepted and integrated as `da126a8a` and `5d4282ee`. The shared recovery/textfile contract is unified at `/var/lib/megacampus/qdrant-metrics`; both final independent reviews returned `PASS`. E7 is now dependency-ready.
+- Q8 / `mc2-jz6y0.9` and Q9 / `mc2-jz6y0.10` are accepted and integrated as `da126a8a` and `5d4282ee`. The shared recovery/textfile contract is unified at `/var/lib/megacampus/qdrant-metrics`; both final independent reviews returned `PASS`.
 
 ## Routing Evidence
 
 - Selected installed skills: `orchestrator-stage`, `task-router`, `senior-architect`, `senior-devops`, `subagent-driven-development`, `test-driven-development`, `test-pass`, `verification-before-completion`, `orchestration-closeout`, and `prompt-authoring`.
 - Selected installed agents: `docs_researcher`, `backend_developer`/worker, `deploy_specialist`, `db_migration_specialist`, `correctness_reviewer`, and `docs_reviewer`.
 - Catalog candidates: none — installed assets cover the stage.
-- Graphify used and refreshed locally after E6 integration: focused query `Qdrant course embeddings upload search Stage 2 Stage 5 Stage 6`, then `graphify update .` and `graphify cluster-only . --no-viz`. The final code graph has 50,053 nodes and 74,224 edges; zero external model/API tokens and no Git hooks. Community totals are omitted because reclustering may repartition an unchanged graph.
+- Graphify used and refreshed locally after E7 acceptance and again after durable readiness/orchestration updates: focused document-evidence Stage 4/5/6 observability/rollout query, then `graphify update .` and `graphify cluster-only . --no-viz`. The final delivered report must match the delivered integration HEAD; runs use zero external model/API tokens and no Git hooks. Community totals are omitted because reclustering may repartition an unchanged graph.
 - Authoritative docs: Qdrant, Prometheus, Grafana, and systemd first-party sources; consulted versions will be recorded in `artifacts/authoritative-docs.md`.
 
 ## Baseline Evidence
@@ -133,5 +134,12 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 ## Explicit Defers
 
+- Document-evidence Stage 5 activation remains fail-closed at a 0% cohort until owner decision `.24.2` supplies exact cohort/threshold/window/owner/rollback values or explicitly defers activation. This product truth is not inferred by engineering.
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke: blocked pending explicit current-task authorization.
 - Capacity-triggered non-goals remain those listed in the approved design; they are not implementation debt.
+
+docs-reviewed: updated — E7 docs remain independently accepted; Q10/Q11 readiness audits record exact remaining docs and verification work without closing either task.
+
+graph-reviewed: updated — local-only `graphify update .` and `graphify cluster-only . --no-viz` are rerun after the durable readiness checkpoint; no external model/API mode or Graphify git hook is authorized.
+
+project-index: reviewed-no-change — this checkpoint changes only orchestration truth and readiness evidence; Q10 still owns the required stable Qdrant/operations navigation update.

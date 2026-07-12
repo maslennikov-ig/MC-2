@@ -9,9 +9,9 @@ base_branch: origin/codex/self-hosted-qdrant-platform
 base_commit: 9284529a68bbf140f7cf41213e7e1b28e42a19f4
 worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
 status: blocked
-delivery_method: n/a
+delivery_method: manual integration
 accepted_by_orchestrator: yes
-cleanup_status: not_applicable
+cleanup_status: cleaned
 cleanup_notes: All disposable PostgreSQL databases were dropped with FORCE; Graphify output remains ignored local state; no remote, staging, live, Q12, Qdrant Cloud, service, secret, or deployment state was changed.
 risk_level: high
 docs_reviewed: updated

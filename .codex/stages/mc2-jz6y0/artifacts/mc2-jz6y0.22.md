@@ -48,7 +48,7 @@ depends_on_streams:
   - accepted Q5/Q7 retrieval
 parallel_decision: parallel isolated E5 worker beside disjoint E4 UI and E6 lesson-retrieval streams
 status: accepted
-delivery_method: not accepted
+delivery_method: manual integration
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: Integrated through final reviewed commit cf438826; dependency symlinks, the dedicated worktree, and the local worker branch were removed. The pushed remote evidence branch remains as audit evidence.
@@ -118,7 +118,7 @@ Fresh final commands and exact totals are recorded in frontmatter. The initial r
 
 # Delivery / Cleanup
 
-The branch is ready for independent correctness review. Parent orchestration must inspect the diff, run a fresh review, integrate only after approval, rerun focused gates on the integration branch, then update this artifact to accepted/merged and clean the dedicated worktree/branch.
+The final reviewed implementation was integrated through `cf438826`. Parent integration reruns passed, and the dependency symlinks, dedicated worktree, and local worker branch were cleaned; the pushed remote evidence branch remains as audit evidence.
 
 # Risks / Follow-ups / Explicit Defers
 

@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-11
+Updated: 2026-07-12
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 Integration branch: `codex/self-hosted-qdrant-platform`
 Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-qdrant-platform`
@@ -31,7 +31,7 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 ## Accepted and Open Work
 
-- Accepted and pushed: Q1-Q7, strict Formula index fix `.15`, and evidence E1-E6. E6 `.23` is independently approved and integrated linearly through rebased reviewed equivalent `5201a786`; its tree `fda761f0` is byte-identical to reviewed merge `1e681027`. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
+- Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E6, and the locally accepted E7 implementation/docs through `a5a657e3`. E7 remains formally open only for owner decision `.24.2`; integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
 - Q6 `.7`, Q8 `.9` and Q9 `.10` are reviewed, integrated as `f7930913`, `da126a8a` and `5d4282ee`, and closed. Q10 `.11` and Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
@@ -41,7 +41,8 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 - E3 `.20` is reviewed and integrated through `89a7948e`: focused 136/136, shared 13/13, PostgreSQL 15.18 static/applied 36/36, both type-checks and process verification pass. Material conflicts, degraded/capacity decisions, manual/system atomicity, full snapshots, approval guards and plural retry recovery are accepted. Its disposable containers/symlinks and dedicated local worktree/branch are cleaned.
 - E5 `.22` is reviewed and integrated through `cf438826`: focused 52/52, shared 20/20, full Stage5/Qdrant 532/532, workspace type-check/build and process verification pass. Baseline-first live enrichment, exact chunk grounding, fallback audit and CAS persistence are accepted. Its worktree/local branch are cleaned.
 - E4 `.21` is reviewed and integrated through rebased equivalent `2538bb5c`: web 20/20, shared 2/2, real-panel Chromium/mobile/dark E2E 4 pass/2 expected skips, type-check/build/process pass. Distinct conflict UI, CAS edit semantics, localized system audit, fail-closed metadata and accessibility are accepted. Its worktree/local branch are cleaned.
-- E6 `.23` is reviewed and integrated linearly through `5201a786` from final recovery commit `a6c39e7a`; the rebased tree is byte-identical to reviewed merge `1e681027`. Fresh integration evidence: shared 21/21, joined E5/E6 111/111, Stage4 267/267, migrations 14/14, PostgreSQL 15.18 E3 26/26 and side identity 8/8; independent merged-tree review additionally passed E4 20/20, E5 35/35, Qdrant 14/14, E6 76/76, Stage4 evidence 49/49 and type-check. Its disposable containers and dedicated worktree/local branch are cleaned. E7 `.24` remains blocked by Q8/Q9.
+- E6 `.23` is reviewed and integrated linearly through `5201a786` from final recovery commit `a6c39e7a`; the rebased tree is byte-identical to reviewed merge `1e681027`. Fresh integration evidence: shared 21/21, joined E5/E6 111/111, Stage4 267/267, migrations 14/14, PostgreSQL 15.18 E3 26/26 and side identity 8/8; independent merged-tree review additionally passed E4 20/20, E5 35/35, Qdrant 14/14, E6 76/76, Stage4 evidence 49/49 and type-check. Its disposable containers and dedicated worktree/local branch are cleaned.
+- E7 `.24` implementation, observability, reviewed docs and local cross-stage acceptance are integrated through `a5a657e3`. Fresh evidence: Stage 2/4/5/6 330/330, shared contracts 23/23, web conflicts 20/20, PostgreSQL 16.14 migrations/recovery/isolation 64/64, observability 122/122, pinned Prometheus 3.13.1 rule/config checks with 14 rules, workspace type-check, independent code/docs reviews with P0-P3 zero, and local Graphify refresh. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-acceptance.md`. The only remaining E7 blocker is owner decision `.24.2`; the fail-closed Stage 5 cohort remains 0%.
 - Q6 `.7` final branch commits `bd6237b3` + `14322c8f` are independently approved and integrated as `f7930913`. Exact Qdrant index/amd64 child locks, fail-closed file secrets, loopback services, native S3 mapping, Stage 7 isolation and pre-recreate verification gates are accepted. Branch evidence: focused 8/8, Compose 8/8, pinned auth smoke `200/401/200/403/200/200`, type-check/build/process pass and disposable cleanup; integration focused 8/8 plus process verification pass. Its dedicated worktree/local branch are cleaned; the remote evidence branch remains.
 - Q8 `.9` is independently approved and integrated as `da126a8a`: recovery relevance/isolation, checksum/manifest/retention, cleanup postconditions, shared metrics and systemd schedules pass unit 26/26 plus exact Qdrant restore 5/5. Q9 `.10` is independently approved and integrated as `5d4282ee`: approved LTS/extended-support monitoring pins, authenticated scrape, alerts, persistent notification path, dashboard and shared UID/GID textfile contract pass focused 33/33 and local service smokes. Combined Q6/Q8/Q9 integration passed 59/59, type-check, pinned promtool/amtool and process verification. Both worktrees/local branches are cleaned; remote evidence branches remain.
 
@@ -53,7 +54,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: execute E7 cross-stage acceptance/observability/rollout on accepted E1-E6 + Q8/Q9, then Q10/Q11.
+Recommended action: obtain the owner decision for `.24.2`. Recommended safe choice is to defer activation and retain the fail-closed Stage 5 cohort at 0%; then close E7 and execute Q10/Q11 locally.
 
 ## Starter prompt for next orchestrator
 
@@ -65,7 +66,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 - E1-E6 and Q7 are accepted and integrated.
 - Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
-- E7 is the shared evidence/observability/docs gate and blocks Q10/Q11 close.
+- E7 implementation/acceptance is complete locally; owner decision `.24.2` is its only remaining dependency and therefore blocks Q10/Q11 close.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
@@ -87,9 +88,10 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 ## Explicit defers
 
+- Document-evidence Stage 5 activation remains deferred at the fail-closed 0% cohort until `.24.2` records an exact cohort/threshold/window/owner decision or explicit activation defer. No value is inferred from engineering evidence.
 - Q12 deploy, staging/live reindex, secret changes, runtime activation, and any remote mutation require explicit current-task permission after presenting exact actions, effects, rollback, and live evidence plan.
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: updated — approved evidence design and companion execution plan now define durable Stage 4/5/6 behavior and operator acceptance.
-graph-reviewed: updated — after Q6 integration and workspace cleanup, local-only Graphify `0.8.45` ran `graphify update .` plus `graphify cluster-only . --no-viz`; the graph has 50,114 nodes and 74,284 edges, zero external model/API tokens, no excluded runtime/noise source paths, and no Git hooks. Focused Qdrant runtime/recovery queries completed; shell assets are not direct graph nodes, so Q8/Q9 should use their tracked paths plus focused TypeScript/config neighbors.
+docs-reviewed: updated — E7 behavior/operator docs passed independent review; Q10 readiness review now records the remaining Cloud-first and lifecycle-documentation gaps without claiming Q10 completion.
+graph-reviewed: updated — local-only Graphify `0.8.45` is refreshed after durable E7/orchestration changes with zero external model/API tokens and no Git hooks; the final delivered report must be built from the delivered integration HEAD.
