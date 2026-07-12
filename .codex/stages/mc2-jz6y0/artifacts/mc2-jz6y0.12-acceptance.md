@@ -31,6 +31,7 @@ verification:
   - Full pnpm build passed, including Next.js generation of 75/75 static pages. The root run emitted non-blocking Next workspace-root inference, webpack big-string cache, stale Browserslist, Supabase Edge-runtime Node API and Node DEP0169 url.parse diagnostics. The independent fresh rerun emitted the workspace-root, Browserslist and three DEP0169 warnings but no Edge diagnostic, consistent with cached compilation. These diagnostics predate and are unrelated to the Qdrant/evidence stage; both builds exited zero.
   - Final independent review reran pnpm type-check and pnpm build (75/75 static pages), validated all artifacts/format/diff/process evidence, and reported Ready Yes with P0-P3 zero.
   - `python3 scripts/orchestration/check_stage_ready.py mc2-jz6y0` passed with `artifact validation OK` and `stage mc2-jz6y0 ready` at parent HEAD 3681afb9. Canonical real closeout, Beads closure and push remain parent-owned.
+  - Canonical `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-jz6y0` passed with inherited synthetic local Supabase build variables: workspace type-check, production build with 75/75 static pages, process verification, artifact/stage readiness, child cleanup, project-index/docs review and debt scan all passed, ending with `stage closeout verification OK`. The first invocation without those required variables failed at web environment validation before compilation; the unchanged command passed after restoring the already documented local build environment.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.12-acceptance.md
 explicit_defers:
@@ -74,7 +75,7 @@ No runtime rollback is required because Q11 made no remote or durable service/da
 
 # Risks / Follow-ups
 
-Canonical `run_stage_closeout`, Beads closure and push remain required before Q11 closeout. Q12 remains the only operational defer and requires a separate explicit authorization packet.
+Beads closure and push remain required before Q11 closeout. Q12 remains the only operational defer and requires a separate explicit authorization packet.
 
 docs-reviewed: no-change-needed - Q10 completed durable documentation; Q11 adds evidence only.
 
