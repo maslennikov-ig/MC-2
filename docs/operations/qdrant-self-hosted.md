@@ -3,10 +3,13 @@
 This runbook covers the private Qdrant 1.18.2 retrieval, reindex, recovery,
 observability, and rollback path. The owner explicitly authorized the Q12
 staging activation on 2026-07-12, including live reindex, recovery drill, real
-notification, and document evidence at `true/active/100`. This runbook is not a
-second authorization source, and activation remains **NO-GO** until the project
-CA, off-host S3 inputs, and authoritative source-path gaps listed under
-“Initial activation” are resolved. No remote mutation has occurred yet.
+notification, and document evidence at `true/active/100`. The owner subsequently
+approved local-disk snapshots for development staging on 2026-07-12 and deferred
+off-host S3 to the production gate `mc2-jz6y0.13.6`. This runbook is not a second
+authorization source, and activation remains **NO-GO** until the downloaded
+project CA is validated for `verify-full` and the authoritative source-path gaps
+listed under “Initial activation” are resolved. No remote mutation has occurred
+yet.
 
 ## Immutable runtime
 
@@ -79,8 +82,6 @@ artifact, Beads note, or shell history.
 | -------------------------------------------------------------------- | ------------------------------------------------ | -------------- | ------ |
 | `/opt/megacampus/secrets/qdrant_api_key`                             | Qdrant and root operator wrapper                 | `root:root`    | `0400` |
 | `/opt/megacampus/secrets/qdrant_read_only_api_key`                   | Qdrant server                                    | `root:root`    | `0400` |
-| `/opt/megacampus/secrets/qdrant_s3_access_key`                       | Qdrant S3 snapshot backend                       | `root:root`    | `0400` |
-| `/opt/megacampus/secrets/qdrant_s3_secret_key`                       | Qdrant S3 snapshot backend                       | `root:root`    | `0400` |
 | `/opt/megacampus/secrets/prometheus_qdrant_read_only_api_key`        | Prometheus                                       | `65534:65534`  | `0400` |
 | `/opt/megacampus/secrets/grafana_admin_password`                     | Grafana                                          | `472:472`      | `0400` |
 | `/opt/megacampus/secrets/alertmanager_telegram_bot_token`            | Alertmanager                                     | `65534:65534`  | `0400` |
@@ -319,11 +320,9 @@ The ordinary blue/green deploy intentionally runs verify-only before starting
 the inactive app color. It cannot bootstrap an empty first installation. The
 owner authorization does not waive these current hard stops:
 
-1. the Supabase project Server root certificate is not yet available for the
-   required `sslmode=verify-full` and `sslrootcert` remote migration path;
-2. off-host S3 bucket, region, HTTPS endpoint, credentials, and lifecycle inputs
-   are not yet available;
-3. the last read-only inventory found 80 missing and 2 invalid canonical source
+1. the downloaded Supabase project Server root certificate must pass the
+   required `sslmode=verify-full` and `sslrootcert` remote migration preflight;
+2. the last read-only inventory found 80 missing and 2 invalid canonical source
    paths. Activation requires zero, or a separate explicit audited owner
    product-truth decision; `--allow-gaps` is forbidden.
 
@@ -343,8 +342,8 @@ window:
 5. run operator `self-check` and `metrics-check`, then bootstrap the physical
    collection before any deploy verify gate;
 6. run the gap-free deterministic plan/worker/execute/verify procedure above;
-7. prove checksum-verified off-host snapshot and isolated restore, both firing
-   and resolved notification, private listeners, and rollback evidence;
+7. prove a checksum-verified local-volume snapshot and isolated restore, both
+   firing and resolved notification, private listeners, and rollback evidence;
 8. only then invoke the normal release-bound blue/green deploy and observe the
    accepted app/worker environment for at least 60 minutes plus one complete
    normal course cycle.
@@ -353,6 +352,23 @@ window:
 alias switch without the preceding evidence are not activation alternatives.
 
 ## Snapshot and restore command contracts
+
+Development staging uses Qdrant `snapshots_storage=local`. Snapshot files stay
+inside `/qdrant/storage` on the persistent `qdrant-data` Docker volume; the
+manifest records `storage_mode: local` and intentionally contains no remote
+object or URI. No S3 credential is required, mounted, read, or copied in this
+mode. This protects against collection/operator mistakes and proves recoverable
+Qdrant 1.18.2 snapshots, but it does **not** protect against host, disk, volume,
+or datacenter loss and therefore does not satisfy off-host RPO/DR. Before a
+production launch, complete `mc2-jz6y0.13.6`, provision the reviewed HTTPS
+S3-compatible backend and lifecycle, switch both Qdrant and the recovery
+operator explicitly to `s3`, and repeat the checksum/restore/alert evidence.
+
+`QDRANT_SNAPSHOT_STORAGE_MODE` is mandatory and accepts only `local` or `s3`.
+The local staging environment sets it to `local`; the S3 path additionally
+requires a sanitized object prefix plus the existing mode-0400 credentials and
+bucket/region configuration. An absent or unknown mode and an incomplete S3
+configuration fail before a successful manifest can be emitted.
 
 Recovery tools never use a raw-key host environment. Both run inside the pinned
 operator with Docker-local `QDRANT_URL=http://qdrant:6333`, the exact file-backed
@@ -390,7 +406,7 @@ sudo journalctl --no-pager -u megacampus-qdrant-restore-drill.service -n 200
 ```
 
 The commands above are an operator procedure under the recorded authorization;
-they still remain NO-GO until the required S3/CA/source inputs and all initial
+they still remain NO-GO until the required CA/source inputs and all initial
 activation preconditions are satisfied.
 
 The recovery implementation owns the checksum manifest, retention, systemd
@@ -455,6 +471,8 @@ systemctl list-timers 'megacampus-qdrant-*'
 Require both service exit statuses to be zero, no credential files left in the
 per-unit runtime directories, exact manifest/evidence ownership, no residual
 drill collection/alias, and fresh textfile metrics before timer enablement.
+Do not enable either timer until both manual oneshots and all cleanup
+postconditions have passed in the installed staging environment.
 The snapshot timer runs every four hours with jitter; the restore drill is
 monthly. `Persistent=true` catches up after short downtime but does not protect
 against a host outage, so stale alerts remain mandatory. Snapshot and restore
@@ -472,8 +490,9 @@ share a nonblocking `flock`; a collision must fail visibly, not overlap.
   changes, change the rule atomically or add a real limit exporter.
 - `QdrantPointCountUnexpectedDrop`: check reindex/alias activity. Maintenance
   suppression requires an audited Alertmanager silence.
-- `QdrantSnapshotStale`: check the last durable manifest and off-host copy; do
-  not delete the last known-good snapshot.
+- `QdrantSnapshotStale`: in staging, check the last durable manifest and local
+  Qdrant volume snapshot; do not claim off-host protection or delete the last
+  known-good snapshot. In production, also require the off-host object.
 - `QdrantRestoreDrillStale`: inspect the monthly drill evidence and cleanup
   state before retrying.
 - `QdrantHybridFallbackHigh`: group by application service/instance, inspect

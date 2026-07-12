@@ -1,0 +1,144 @@
+---
+schema_version: orchestration-artifact/v1
+artifact_type: delegated-stream
+task_id: mc2-jz6y0.13.5
+stage_id: mc2-jz6y0
+agent_type: deploy_specialist
+subagent_model: inherit_orchestrator
+reasoning_effort: high
+model_reasoning_rationale: snapshot durability, credential isolation, restore safety, and production deferral are high-risk operational contracts
+repo: mc2
+branch: codex/q12-local-snapshots
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: 52269005
+worktree: /home/me/code/mc2/.worktrees/q12-local-snapshots
+write_zone:
+  - docker-compose.infra.yml
+  - deploy/qdrant/secret-entrypoint.sh
+  - deploy/systemd/megacampus-qdrant-snapshot.service
+  - packages/course-gen-platform/tools/qdrant/snapshot.ts
+  - packages/course-gen-platform/tools/qdrant/snapshot-recovery.ts
+  - focused Qdrant recovery tests and integration
+  - .env.production.example
+  - packages/course-gen-platform/.env.example
+  - docs/operations/qdrant-self-hosted.md
+  - this artifact
+success_criteria:
+  - staging local mode requires no S3 configuration or credential mount
+  - local manifest records local mode and no remote object or URI
+  - isolated exact-version checksum/count/RU/EN/Formula/isolation restore remains intact
+  - S3 remains an explicit fail-closed production mode and off-host DR is not claimed
+  - timers remain opt-in until both manual oneshots and cleanup pass
+selected_docs:
+  - docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md (staging snapshot location superseded only by owner decision)
+  - docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md
+  - docs/operations/qdrant-self-hosted.md
+  - accepted first-party Qdrant 1.18.2 references already recorded in the runbook
+selected_skills:
+  - senior-devops
+  - superpowers:test-driven-development
+  - superpowers:systematic-debugging
+  - superpowers:verification-before-completion
+selected_agents:
+  - deploy_specialist
+catalog_candidates:
+  - none - installed skills and accepted repository contracts cover this stream
+parallel_group: Q12-owner-input-recovery
+depends_on_streams:
+  - mc2-jz6y0.13.2
+parallel_decision: parallel
+status: returned
+delivery_method: merge
+accepted_by_orchestrator: no
+cleanup_status: pending
+cleanup_notes: worktree-only dependency symlinks and any disposable pinned-Qdrant resources must be removed before handoff
+risk_level: high
+docs_impact: ops-deploy
+docs_reviewed: updated
+docs_review_notes: runbook records the staging-only tradeoff, manual-first schedule, lack of off-host RPO/DR, and production gate
+graph_reviewed: blocked
+graph_review_notes: parent integration owns the safe local Graphify refresh after merge
+verification:
+  - focused recovery/runtime Vitest RED: passed (6 expected failures, 31 existing passes)
+  - focused recovery/runtime Vitest GREEN: passed 37/37
+  - pinned Qdrant 1.18.2 local snapshot/restore integration: passed 5/5
+  - pinned wrapper local-only boot and S3 fail-closed smoke: passed
+  - staging Compose local render without S3 inputs: passed
+  - recovery systemd rootless namespace verification: passed
+  - package type-check: passed
+  - artifact validation, Markdown validation, and process verification: passed
+changed_files:
+  - .env.production.example
+  - deploy/qdrant/secret-entrypoint.sh
+  - deploy/systemd/megacampus-qdrant-snapshot.service
+  - docker-compose.infra.yml
+  - docs/operations/qdrant-self-hosted.md
+  - packages/course-gen-platform/.env.example
+  - packages/course-gen-platform/tests/integration/qdrant-snapshot-restore.test.ts
+  - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/recovery-systemd.test.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/restore-drill.test.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/snapshot.test.ts
+  - packages/course-gen-platform/tools/qdrant/snapshot-recovery.ts
+  - packages/course-gen-platform/tools/qdrant/snapshot.ts
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.5.md
+explicit_defers:
+  - mc2-jz6y0.13.6 - mandatory production gate for HTTPS off-host S3-compatible snapshots, lifecycle, restore drill, alerts, and rollback evidence
+---
+
+# Summary
+
+The owner-approved development-staging recovery mode now keeps Qdrant 1.18.2
+snapshots in the persistent `qdrant-data` volume and does not mount, read, copy,
+or require S3 credentials. Local manifests identify `storage_mode: local` and
+omit `remote_object`; restore still uses the authenticated Qdrant transport into
+an isolated collection and never mutates the stable alias.
+
+The compromise is explicit: local snapshots protect against collection and
+operator mistakes but not loss of the host, disk, volume, or datacenter. They do
+not satisfy off-host RPO/DR. Production remains gated by `mc2-jz6y0.13.6`.
+
+# Scope / Routing
+
+This was a dedicated deployment stream with a strict Qdrant recovery write
+zone. The orchestrator explicitly expanded the zone only for the snapshot and
+restore systemd service contracts and their focused tests. No staging host,
+service, secret, database, queue, alias, volume, registry, or notification was
+mutated.
+
+# Verification
+
+The TDD RED run produced six requirement-specific failures: staging still used
+S3, systemd hardcoded S3, the runbook lacked the manual-first wording, local
+manifest construction required a remote prefix, explicit storage-mode parsing
+was absent, and local retention failed without a remote object. The GREEN run
+passed 37/37 focused unit/runtime tests.
+
+An exact pinned
+`qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c`
+container passed the five-test local snapshot/restore suite. The suite proved a
+streamed checksum, manifest without `remote_object`, exact point count, dense,
+RU/EN BM25, Formula priority, negative tenant/course isolation, stable-alias
+immutability, intentional mismatch failure, and owned-resource cleanup. The
+container, listener, and temporary recovery directory were absent afterward.
+
+The same pinned image booted through `secret-entrypoint.sh` in local mode with
+only admin/read-only file secrets. A separate S3-mode invocation without bucket
+configuration exited nonzero before Qdrant startup with the expected redacted
+error. Synthetic staging Compose rendered with explicit `local` mode and no S3
+input or rendered S3 key. Package type-check, rootless `systemd-analyze verify`,
+artifact validation, Markdown validation (repository-compatible MD013/MD025
+exclusions), and process verification all exited zero.
+
+# Delivery / Cleanup
+
+The branch is committed and pushed for independent orchestrator review. Merge,
+acceptance, parent-owned Graphify refresh, and worktree cleanup remain pending.
+
+# Risks / Follow-ups / Explicit Defers
+
+- Local snapshots share the staging server failure domain with live Qdrant.
+- `mc2-jz6y0.13.6` is a hard production launch gate, not an optional polish item.
+- The parent integration workflow must emit
+  `QDRANT_SNAPSHOT_STORAGE_MODE=local` into the staging environment; this stream
+  does not own `.github/workflows/ci-cd.yml`.

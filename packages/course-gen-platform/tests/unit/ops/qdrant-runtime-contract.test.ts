@@ -89,6 +89,7 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
     expect(wrapper).toContain('GET /readyz HTTP/1.1');
     expect(wrapper).toContain('[[ $# -eq 1 && "$1" == ./entrypoint.sh ]] && set --');
     expect(wrapper).toContain('exec /qdrant/entrypoint.sh');
+    expect(wrapper).toContain('snapshot_storage="${QDRANT_SNAPSHOT_STORAGE:-}"');
     expect(wrapper).not.toMatch(/\b(curl|wget|nc)\b/);
     expect(wrapper).not.toMatch(/set\s+-[^\n]*x/);
 
@@ -177,22 +178,32 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
     }
   });
 
-  it('maps staging S3 values without rendering credentials and keeps dev snapshots local', () => {
+  it('keeps dev and staging snapshots local without mounting S3 credentials', () => {
     const dev = serviceBlock(source('docker-compose.dev.yml'), 'qdrant-dev');
     expect(dev).toContain('QDRANT_SNAPSHOT_STORAGE=local');
 
-    for (const file of ['docker-compose.infra.yml', 'docker-compose.production.yml']) {
-      const block = serviceBlock(source(file), 'qdrant');
-      expect(block).toContain('QDRANT_SNAPSHOT_STORAGE=s3');
-      expect(block).toContain('QDRANT_S3_BUCKET=${QDRANT_S3_BUCKET}');
-      expect(block).toContain('QDRANT_S3_REGION=${QDRANT_S3_REGION}');
-      expect(block).toContain('QDRANT_S3_ENDPOINT_URL=${QDRANT_S3_ENDPOINT_URL:-}');
-      expect(block).toContain('/run/secrets/qdrant_s3_access_key');
-      expect(block).toContain('/run/secrets/qdrant_s3_secret_key');
-      expect(block).not.toMatch(
-        /QDRANT__STORAGE__SNAPSHOTS_CONFIG__S3_CONFIG__(ACCESS|SECRET)_KEY=/
-      );
-    }
+    const staging = serviceBlock(source('docker-compose.infra.yml'), 'qdrant');
+    expect(staging).toContain('QDRANT_SNAPSHOT_STORAGE=local');
+    expect(staging).not.toMatch(/QDRANT_S3_|qdrant_s3_/u);
+
+    const stagingRecovery = serviceBlock(
+      source('docker-compose.infra.yml'),
+      'qdrant-recovery-operator'
+    );
+    expect(stagingRecovery).toContain(
+      'QDRANT_SNAPSHOT_STORAGE_MODE=${QDRANT_SNAPSHOT_STORAGE_MODE:?QDRANT_SNAPSHOT_STORAGE_MODE must be local or s3}'
+    );
+
+    const production = serviceBlock(source('docker-compose.production.yml'), 'qdrant');
+    expect(production).toContain('QDRANT_SNAPSHOT_STORAGE=s3');
+    expect(production).toContain('QDRANT_S3_BUCKET=${QDRANT_S3_BUCKET}');
+    expect(production).toContain('QDRANT_S3_REGION=${QDRANT_S3_REGION}');
+    expect(production).toContain('QDRANT_S3_ENDPOINT_URL=${QDRANT_S3_ENDPOINT_URL:-}');
+    expect(production).toContain('/run/secrets/qdrant_s3_access_key');
+    expect(production).toContain('/run/secrets/qdrant_s3_secret_key');
+    expect(production).not.toMatch(
+      /QDRANT__STORAGE__SNAPSHOTS_CONFIG__S3_CONFIG__(ACCESS|SECRET)_KEY=/
+    );
   });
 
   it('gates every RAG-capable recreate before traffic or workers and redacts keys', () => {
@@ -245,11 +256,13 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
       expect(example).toContain('QDRANT_PHYSICAL_COLLECTION_NAME=course_embeddings_v1');
       expect(example).toContain('QDRANT_API_KEY_FILE=');
       expect(example).toContain('QDRANT_READ_ONLY_API_KEY_FILE=');
-      expect(example).toContain('QDRANT_S3_BUCKET=');
-      expect(example).toContain('QDRANT_S3_REGION=');
-      expect(example).toContain('QDRANT_S3_ENDPOINT_URL=');
+      expect(example).toContain('QDRANT_SNAPSHOT_STORAGE_MODE=local');
       expect(example).toMatch(/external.*unsupported|unsupported.*external/i);
     }
+    const stagingExample = source('.env.production.example');
+    expect(stagingExample).toContain('mc2-jz6y0.13.6');
+    const packageExample = source('packages/course-gen-platform/.env.example');
+    expect(packageExample).not.toMatch(/^QDRANT_S3_/gmu);
   });
 
   it('keeps all four Compose models syntactically renderable', () => {
@@ -275,6 +288,7 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
         `QDRANT_READ_ONLY_API_KEY_FILE=${join(directory, 'qdrant_read_only_api_key')}`,
         `QDRANT_S3_ACCESS_KEY_FILE=${join(directory, 'qdrant_s3_access_key')}`,
         `QDRANT_S3_SECRET_KEY_FILE=${join(directory, 'qdrant_s3_secret_key')}`,
+        'QDRANT_SNAPSHOT_STORAGE_MODE=local',
         'QDRANT_S3_BUCKET=synthetic-qdrant-snapshots',
         'QDRANT_S3_REGION=eu-test-1',
         'QDRANT_S3_ENDPOINT_URL=https://s3.example.invalid',

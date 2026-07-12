@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   acquireRecoveryLock,
   buildSnapshotManifest,
+  parseSnapshotStorageMode,
   renderRecoveryMetrics,
   resolvePhysicalCollection,
   SNAPSHOT_MANIFEST_SCHEMA,
@@ -95,6 +96,34 @@ describe('Qdrant snapshot recovery contract', () => {
     expect(JSON.stringify(manifest)).not.toMatch(/bucket|access|secret|api[_-]?key/iu);
   });
 
+  it('records local storage without a remote object or URI', () => {
+    const manifest = buildSnapshotManifest({
+      logicalAlias: 'course_embeddings',
+      physicalCollection: 'course_embeddings_v7',
+      snapshot: {
+        name: 'course_embeddings_v7-2026-07-11.snapshot',
+        size: 1234,
+      },
+      pointCount: 42,
+      createdAt: new Date('2026-07-11T12:00:00Z'),
+      storageMode: 'local',
+      locallyVerifiedSha256: 'a'.repeat(64),
+      serverVersion: '1.18.2',
+      clientVersion: '1.18.0',
+    });
+
+    expect(manifest.storage_mode).toBe('local');
+    expect(manifest).not.toHaveProperty('remote_object');
+    expect(JSON.stringify(manifest)).not.toMatch(/s3|https?:\/\//iu);
+  });
+
+  it('requires an explicit supported storage mode', () => {
+    expect(parseSnapshotStorageMode('local')).toBe('local');
+    expect(parseSnapshotStorageMode('s3')).toBe('s3');
+    expect(() => parseSnapshotStorageMode(undefined)).toThrow(/must be local or s3/iu);
+    expect(() => parseSnapshotStorageMode('filesystem')).toThrow(/must be local or s3/iu);
+  });
+
   it('selects deterministic 30-day retention without deleting newest or foreign prefixes', () => {
     const base = {
       schema_version: 'megacampus.qdrant.snapshot-manifest/v1',
@@ -145,6 +174,7 @@ describe('Qdrant snapshot recovery contract', () => {
         now: new Date('2026-07-11T00:00:00.000Z'),
         retentionDays: 30,
         physicalCollection: 'course_embeddings_v7',
+        storageMode: 's3',
         ownedPrefix: 'owned/',
       })
     ).toEqual(['owned-old-a.snapshot', 'owned-old-b.snapshot']);
@@ -154,6 +184,7 @@ describe('Qdrant snapshot recovery contract', () => {
         now: new Date('2026-07-11T00:00:00.000Z'),
         retentionDays: 30,
         physicalCollection: 'course_embeddings_v7',
+        storageMode: 's3',
         ownedPrefix: 'owned/',
       })
     ).toEqual(['owned-old-a.snapshot']);
@@ -287,7 +318,6 @@ describe('Qdrant snapshot recovery contract', () => {
         size_bytes: 10,
         created_at: '2026-01-01T00:00:00.000Z',
         storage_mode: 'local',
-        remote_object: 'owned/owned-old.snapshot',
         server_version: '1.18.2',
         client_version: '1.18.0',
       })
@@ -299,7 +329,6 @@ describe('Qdrant snapshot recovery contract', () => {
       qdrantUrl: 'http://127.0.0.1:6333',
       apiKey: 'local-test-key',
       storageMode: 'local',
-      remotePrefix: 'owned',
       manifestDirectory: manifestDir,
       metricStatePath: join(directory, 'metrics-state.json'),
       metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),

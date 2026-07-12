@@ -67,6 +67,7 @@ describe('Qdrant recovery systemd contract', () => {
     );
     expect(restore).toContain('LoadCredential=recovery_probe:/opt/megacampus/recovery/probe.json');
     expect(snapshot).toContain('qdrant-recovery-operator snapshot');
+    expect(snapshot).not.toContain('QDRANT_SNAPSHOT_STORAGE_MODE=s3');
     expect(restore).toContain('qdrant-restore-operator restore-drill');
     expect(restore).toContain('Environment=QDRANT_SNAPSHOT_TRANSPORT_URL=http://qdrant:6333');
 
@@ -119,5 +120,19 @@ describe('Qdrant recovery systemd contract', () => {
     expect(timer).toContain('Persistent=true');
     expect(timer).toContain('RandomizedDelaySec=1h');
     expect(timer).toContain('AccuracySec=1m');
+  });
+
+  it('keeps timers opt-in until both manual oneshots have passed', async () => {
+    for (const name of [
+      'megacampus-qdrant-snapshot.timer',
+      'megacampus-qdrant-restore-drill.timer',
+    ]) {
+      const timer = await read(`deploy/systemd/${name}`);
+      expect(timer).not.toContain('Also=');
+      expect(timer).not.toContain('WantedBy=multi-user.target');
+    }
+
+    const runbook = await read('docs/operations/qdrant-self-hosted.md');
+    expect(runbook).toContain('Do not enable either timer until both manual oneshots');
   });
 });

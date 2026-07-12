@@ -47,12 +47,7 @@ services:
     environment:
       - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
       - QDRANT_READ_ONLY_API_KEY_FILE=/run/secrets/qdrant_read_only_api_key
-      - QDRANT_SNAPSHOT_STORAGE=s3
-      - QDRANT_S3_BUCKET=${QDRANT_S3_BUCKET}
-      - QDRANT_S3_REGION=${QDRANT_S3_REGION}
-      - QDRANT_S3_ENDPOINT_URL=${QDRANT_S3_ENDPOINT_URL:-}
-      - QDRANT_S3_ACCESS_KEY_FILE=/run/secrets/qdrant_s3_access_key
-      - QDRANT_S3_SECRET_KEY_FILE=/run/secrets/qdrant_s3_secret_key
+      - QDRANT_SNAPSHOT_STORAGE=local
       - QDRANT__TELEMETRY_DISABLED=true
       - QDRANT__SERVICE__METRICS_PREFIX=qdrant_
     volumes:
@@ -61,8 +56,6 @@ services:
     secrets:
       - qdrant_api_key
       - qdrant_read_only_api_key
-      - qdrant_s3_access_key
-      - qdrant_s3_secret_key
     healthcheck:
       test: ['CMD', '/opt/megacampus/qdrant-secret-entrypoint.sh', 'healthcheck']
       interval: 10s
@@ -159,8 +152,8 @@ services:
       - QDRANT_COLLECTION_NAME=course_embeddings
       - QDRANT_API_KEY=
       - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
-      - QDRANT_SNAPSHOT_STORAGE_MODE=s3
-      - QDRANT_SNAPSHOT_OBJECT_PREFIX=megacampus/qdrant
+      - QDRANT_SNAPSHOT_STORAGE_MODE=${QDRANT_SNAPSHOT_STORAGE_MODE:?QDRANT_SNAPSHOT_STORAGE_MODE must be local or s3}
+      - QDRANT_SNAPSHOT_OBJECT_PREFIX=${QDRANT_SNAPSHOT_OBJECT_PREFIX:-}
       - QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
       - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
       - QDRANT_RECOVERY_LOCK_PATH=/var/lib/megacampus-qdrant-recovery/recovery.lock
@@ -607,10 +600,6 @@ secrets:
     file: ${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
   qdrant_read_only_api_key:
     file: ${QDRANT_READ_ONLY_API_KEY_FILE:-./secrets/qdrant_read_only_api_key}
-  qdrant_s3_access_key:
-    file: ${QDRANT_S3_ACCESS_KEY_FILE:-./secrets/qdrant_s3_access_key}
-  qdrant_s3_secret_key:
-    file: ${QDRANT_S3_SECRET_KEY_FILE:-./secrets/qdrant_s3_secret_key}
   prometheus_qdrant_read_only_api_key:
     file: ${PROMETHEUS_QDRANT_READ_ONLY_API_KEY_FILE:-./secrets/prometheus_qdrant_read_only_api_key}
   grafana_admin_password:

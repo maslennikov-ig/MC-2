@@ -10,8 +10,6 @@ LoadCredential=qdrant_api_key:/opt/megacampus/secrets/qdrant_api_key
 Environment=QDRANT_URL=http://qdrant:6333
 Environment=QDRANT_API_KEY_FILE=/run/megacampus-qdrant-snapshot-credentials/qdrant_api_key
 Environment=QDRANT_COLLECTION_NAME=course_embeddings
-Environment=QDRANT_SNAPSHOT_STORAGE_MODE=s3
-Environment=QDRANT_SNAPSHOT_OBJECT_PREFIX=megacampus/qdrant
 Environment=QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
 Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
 Environment=QDRANT_RECOVERY_LOCK_PATH=/run/megacampus-qdrant-recovery/recovery.lock

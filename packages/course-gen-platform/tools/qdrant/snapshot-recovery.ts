@@ -29,9 +29,15 @@ export interface SnapshotManifest {
   sha256?: string;
   created_at: string;
   storage_mode: 'local' | 's3';
-  remote_object: string;
+  remote_object?: string;
   server_version: string;
   client_version: string;
+}
+
+export function parseSnapshotStorageMode(value: string | undefined): 'local' | 's3' {
+  const normalized = value?.trim();
+  if (normalized === 'local' || normalized === 's3') return normalized;
+  throw new Error('QDRANT_SNAPSHOT_STORAGE_MODE must be local or s3');
 }
 
 export function resolvePhysicalCollection(
@@ -75,13 +81,16 @@ export function buildSnapshotManifest(input: {
   pointCount: number;
   createdAt: Date;
   storageMode: 'local' | 's3';
-  remotePrefix: string;
+  remotePrefix?: string;
   locallyVerifiedSha256?: string;
   serverVersion: string;
   clientVersion: string;
 }): SnapshotManifest {
   const snapshotName = requireSafeName(input.snapshot.name, 'snapshot name');
-  const remotePrefix = normalizeRemotePrefix(input.remotePrefix);
+  const remotePrefix =
+    input.storageMode === 's3'
+      ? normalizeRemotePrefix(input.remotePrefix ?? '')
+      : undefined;
   if (!Number.isSafeInteger(input.pointCount) || input.pointCount < 0) {
     throw new Error('pointCount must be a non-negative safe integer');
   }
@@ -107,7 +116,7 @@ export function buildSnapshotManifest(input: {
     ...(input.locallyVerifiedSha256 ? { sha256: input.locallyVerifiedSha256 } : {}),
     created_at: input.createdAt.toISOString(),
     storage_mode: input.storageMode,
-    remote_object: `${remotePrefix}/${snapshotName}`,
+    ...(remotePrefix ? { remote_object: `${remotePrefix}/${snapshotName}` } : {}),
     server_version: requireSafeName(input.serverVersion, 'server version'),
     client_version: requireSafeName(input.clientVersion, 'client version'),
   };
@@ -119,20 +128,25 @@ export function selectRetentionDeletions(
     now: Date;
     retentionDays: number;
     physicalCollection: string;
-    ownedPrefix: string;
+    storageMode: 'local' | 's3';
+    ownedPrefix?: string;
   }
 ): string[] {
   if (!Number.isSafeInteger(options.retentionDays) || options.retentionDays < 1) {
     throw new Error('retentionDays must be a positive integer');
   }
-  const prefix = normalizeRemotePrefix(options.ownedPrefix) + '/';
+  const prefix =
+    options.storageMode === 's3'
+      ? normalizeRemotePrefix(options.ownedPrefix ?? '') + '/'
+      : undefined;
   const eligible = manifests
     .filter(
       manifest =>
         manifest.schema_version === SNAPSHOT_MANIFEST_SCHEMA &&
         manifest.status === 'success' &&
         manifest.physical_collection === options.physicalCollection &&
-        manifest.remote_object.startsWith(prefix)
+        manifest.storage_mode === options.storageMode &&
+        (prefix === undefined || manifest.remote_object?.startsWith(prefix) === true)
     )
     .sort(
       (left, right) =>

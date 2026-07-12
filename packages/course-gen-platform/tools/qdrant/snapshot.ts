@@ -8,6 +8,7 @@ import {
   acquireRecoveryLock,
   assertSharedMetricsDirectory,
   buildSnapshotManifest,
+  parseSnapshotStorageMode,
   renderRecoveryMetrics,
   resolvePhysicalCollection,
   selectRetentionDeletions,
@@ -35,7 +36,7 @@ export interface SnapshotOperationOptions {
   qdrantUrl: string;
   apiKey: string;
   storageMode: 'local' | 's3';
-  remotePrefix: string;
+  remotePrefix?: string;
   manifestDirectory: string;
   metricStatePath: string;
   metricsPath: string;
@@ -230,6 +231,7 @@ export async function runSnapshotOperation(
       now,
       retentionDays: options.retentionDays ?? 30,
       physicalCollection,
+      storageMode: options.storageMode,
       ownedPrefix: options.remotePrefix,
     });
     const listedNames = new Set(listed.map(candidate => candidate.name));
@@ -298,6 +300,9 @@ async function runCli(): Promise<void> {
   const root =
     process.env.QDRANT_RECOVERY_STATE_DIR?.trim() || '/var/lib/megacampus-qdrant-recovery';
   const metricsDirectory = requiredEnv('QDRANT_METRICS_TEXTFILE_DIR');
+  const storageMode = parseSnapshotStorageMode(process.env.QDRANT_SNAPSHOT_STORAGE_MODE);
+  const remotePrefix =
+    storageMode === 's3' ? requiredEnv('QDRANT_SNAPSHOT_OBJECT_PREFIX') : undefined;
   const client = new QdrantClient({
     url: qdrantUrl,
     apiKey,
@@ -309,8 +314,8 @@ async function runCli(): Promise<void> {
     logicalAlias: process.env.QDRANT_COLLECTION_NAME?.trim() || 'course_embeddings',
     qdrantUrl,
     apiKey,
-    storageMode: process.env.QDRANT_SNAPSHOT_STORAGE_MODE === 's3' ? 's3' : 'local',
-    remotePrefix: process.env.QDRANT_SNAPSHOT_OBJECT_PREFIX?.trim() || 'megacampus/qdrant',
+    storageMode,
+    remotePrefix,
     manifestDirectory: join(root, 'manifests'),
     metricStatePath: join(root, 'metrics-state.json'),
     metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),

@@ -224,7 +224,6 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
       qdrantUrl,
       apiKey,
       storageMode: 'local',
-      remotePrefix: `integration/${physical}`,
       manifestDirectory: join(directory, 'manifests'),
       metricStatePath: join(directory, 'metrics-state.json'),
       metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
@@ -242,6 +241,8 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
     });
     expect(snapshotResult.manifest.sha256).toMatch(/^[a-f0-9]{64}$/u);
     expect(snapshotResult.manifest.sha256).toBe(snapshotResult.manifest.server_checksum);
+    expect(snapshotResult.manifest.storage_mode).toBe('local');
+    expect(snapshotResult.manifest).not.toHaveProperty('remote_object');
     expect((await client.listSnapshots(physical)).map(item => item.name)).toContain(
       snapshotResult.manifest.snapshot_name
     );

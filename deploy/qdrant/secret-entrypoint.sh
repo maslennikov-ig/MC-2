@@ -53,7 +53,7 @@ read_secret 'read-only API key' "${QDRANT_READ_ONLY_API_KEY_FILE:-}"
 export QDRANT__SERVICE__READ_ONLY_API_KEY="$REPLY"
 unset REPLY
 
-snapshot_storage="${QDRANT_SNAPSHOT_STORAGE:-local}"
+snapshot_storage="${QDRANT_SNAPSHOT_STORAGE:-}"
 case "$snapshot_storage" in
   local)
     export QDRANT__STORAGE__SNAPSHOTS_CONFIG__SNAPSHOTS_STORAGE=local

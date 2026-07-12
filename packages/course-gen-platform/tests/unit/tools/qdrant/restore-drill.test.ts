@@ -23,7 +23,6 @@ const MANIFEST: SnapshotManifest = {
   sha256: 'b'.repeat(64),
   created_at: '2026-07-11T12:00:00.000Z',
   storage_mode: 'local',
-  remote_object: 'owned/course embeddings v7.snapshot',
   server_version: '1.18.2',
   client_version: '1.18.0',
 };
