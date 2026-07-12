@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { ensureCourseEmbeddingsCollection } from '../../src/shared/qdrant/collection-manager';
 import { COLLECTION_CREATE_PARAMS } from '../../src/shared/qdrant/collection-schema';
@@ -100,6 +100,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
   let client: QdrantClient;
   let apiKey: string;
   let qdrantUrl: string;
+  let snapshotTransportUrl: string;
   let directory: string;
   let metricsDirectory: string;
   let snapshotResult: SnapshotOperationResult;
@@ -140,6 +141,8 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
       containerName,
       '--platform',
       'linux/amd64',
+      '--add-host',
+      'host.docker.internal:host-gateway',
       '-p',
       `127.0.0.1:${hostPort}:6333`,
       '--entrypoint',
@@ -185,6 +188,22 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
   beforeAll(async () => {
     apiKey = requireEnv('QDRANT_API_KEY');
     qdrantUrl = requireEnv('QDRANT_URL');
+    const transport = new URL(requireEnv('QDRANT_SNAPSHOT_TRANSPORT_URL'));
+    if (
+      transport.protocol !== 'http:' ||
+      transport.username ||
+      transport.password ||
+      transport.pathname !== '/' ||
+      transport.search ||
+      transport.hash
+    ) {
+      throw new Error('QDRANT_SNAPSHOT_TRANSPORT_URL must be a credential-free HTTP origin');
+    }
+    snapshotTransportUrl = transport.origin;
+    if (MANAGED_RECREATE) {
+      expect(transport.hostname).toBe('host.docker.internal');
+      expect(transport.port).not.toBe('6333');
+    }
     directory = await mkdtemp(join('/tmp', 'mc2-qdrant-recovery-integration-'));
     metricsDirectory = join(directory, 'qdrant-metrics');
     await mkdir(metricsDirectory, { mode: 0o700 });
@@ -353,6 +372,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
     const stableBefore = (await client.getAliases()).aliases.find(
       candidate => candidate.alias_name === alias
     )?.collection_name;
+    const recoverSpy = vi.spyOn(client, 'recoverSnapshot');
 
     let result;
     try {
@@ -361,7 +381,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
         manifest: snapshotResult.manifest,
         probe: PROBE,
         apiKey,
-        transportBaseUrl: 'http://127.0.0.1:6333',
+        transportBaseUrl: snapshotTransportUrl,
         stableAlias: alias,
         targetCollection: target,
         drillAlias,
@@ -385,6 +405,13 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
       formula_priority: 'pass',
       tenant_course_isolation: 'pass',
     });
+    expect(recoverSpy).toHaveBeenCalledWith(
+      target,
+      expect.objectContaining({
+        location: `${snapshotTransportUrl}/collections/${encodeURIComponent(physical)}/snapshots/${encodeURIComponent(snapshotResult.manifest.snapshot_name)}`,
+      })
+    );
+    recoverSpy.mockRestore();
     expect((await client.getCollections()).collections.map(item => item.name)).not.toContain(
       target
     );
@@ -420,7 +447,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
           },
         },
         apiKey,
-        transportBaseUrl: 'http://127.0.0.1:6333',
+        transportBaseUrl: snapshotTransportUrl,
         stableAlias: alias,
         targetCollection: target,
         drillAlias,
@@ -453,7 +480,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
     const stableBefore = (await client.getAliases()).aliases.find(
       candidate => candidate.alias_name === alias
     )?.collection_name;
-    const location = `http://127.0.0.1:6333/collections/${encodeURIComponent(physical)}/snapshots/${encodeURIComponent(snapshotResult.manifest.snapshot_name)}`;
+    const location = `${snapshotTransportUrl}/collections/${encodeURIComponent(physical)}/snapshots/${encodeURIComponent(snapshotResult.manifest.snapshot_name)}`;
 
     for (const [suffix, checksum, transportKey] of [
       ['corrupt', '0'.repeat(64), apiKey],
@@ -493,7 +520,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
         manifest: snapshotResult.manifest,
         probe: PROBE,
         apiKey,
-        transportBaseUrl: 'http://127.0.0.1:6333',
+        transportBaseUrl: snapshotTransportUrl,
         stableAlias: alias,
         targetCollection: target,
         drillAlias,
@@ -531,7 +558,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
           manifest: snapshotResult.manifest,
           probe: PROBE,
           apiKey,
-          transportBaseUrl: 'http://127.0.0.1:6333',
+          transportBaseUrl: snapshotTransportUrl,
           stableAlias: alias,
           targetCollection: target,
           drillAlias,

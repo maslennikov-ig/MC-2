@@ -71,6 +71,8 @@ verification:
   - Q12-LR1 focused recovery/runtime GREEN: passed 37/37
   - pinned wrapper named-volume replacement and negative deletion recovery: passed 7/7
   - corrected package type-check: passed
+  - managed transport isolation RED on Docker-selected port 41352: passed (expected 6/7)
+  - managed transport isolation GREEN on Docker-selected port 40776: passed 7/7
 changed_files:
   - .env.production.example
   - deploy/qdrant/secret-entrypoint.sh
@@ -181,3 +183,29 @@ incremented `restoreFailuresTotal`, kept `lastOperationSuccess=false`, and did
 not mutate the stable alias. All owned containers, volume, listeners, temporary
 credentials, recovery directories, and dependency symlinks were removed after
 verification.
+
+## Managed transport isolation correction
+
+A later orchestrator check found that the managed recovery test still hardcoded
+`http://127.0.0.1:6333` in five transport call sites. Although this address is
+Qdrant's own loopback from the server-side recovery perspective, it did not
+prove that the test honored its owned endpoint and made the host-side test
+contract ambiguous while unrelated `helixa-qdrant-1` listened on host port
+6333.
+
+The test now requires a credential-free HTTP origin in
+`QDRANT_SNAPSHOT_TRANSPORT_URL` and uses it for every recovery location. Managed
+containers receive only the explicit `host.docker.internal:host-gateway` route.
+Docker chooses the owned host port atomically for the initial container through
+`-p 127.0.0.1::6333`; the harness reads that assignment with
+`docker port <owned-name> 6333/tcp`, validates it is numeric and not 6333, and
+reuses it across controlled replacement.
+
+The RED run used Docker-selected port `41352`: 6/7 passed and the only expected
+failure proved `recoverSnapshot.location` still received the hardcoded 6333 URL
+instead of `http://host.docker.internal:41352`. The GREEN run used a fresh
+Docker-selected port `40776` and passed 7/7, including an assertion on the exact
+owned recovery location, replacement persistence, full relevance/isolation,
+negative volume deletion, and cleanup. Exact owned container/volume/port/tmp
+matches were zero afterward. Read-only inspection showed `helixa-qdrant-1`
+remained continuously up on host 6333/6334; no command targeted or mutated it.
