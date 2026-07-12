@@ -18,6 +18,10 @@ Runtime services receive `QDRANT_URL` on the private Docker network and a file-i
 
 ## Commands
 
+These host-pnpm commands are for a checked-out local-development repository and
+the isolated dev Qdrant only. Staging/production must use the digest-pinned
+container operator documented in `docs/operations/qdrant-self-hosted.md`.
+
 ```bash
 pnpm --dir packages/course-gen-platform qdrant:bootstrap
 pnpm --dir packages/course-gen-platform qdrant:verify

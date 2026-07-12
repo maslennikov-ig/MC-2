@@ -2,6 +2,10 @@
 
 Use the stable alias `course_embeddings` over a versioned physical collection such as `course_embeddings_v1`. Application traffic never uses the physical name directly.
 
+The host-pnpm examples on this page are local-development-only. Production and
+staging use the immutable container operator from
+`docs/operations/qdrant-self-hosted.md`.
+
 ```bash
 pnpm --dir packages/course-gen-platform qdrant:bootstrap
 pnpm --dir packages/course-gen-platform qdrant:verify

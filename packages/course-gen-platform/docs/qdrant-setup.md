@@ -43,6 +43,12 @@ Bootstrap and verification fail on incompatible schema or alias drift. Alias act
 
 ## Reindex and recovery
 
+The entire command block below is **local-development-only**: it requires a
+checked-out repository and the isolated dev Qdrant on loopback. Staging and
+production use the digest-pinned container operator in
+[`docs/operations/qdrant-self-hosted.md`](../../../docs/operations/qdrant-self-hosted.md),
+never host pnpm/source or this raw-key helper.
+
 Plan, execute, and verify a rebuild from authoritative sources:
 
 ```bash

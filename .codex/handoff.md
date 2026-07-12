@@ -3,7 +3,8 @@
 Updated: 2026-07-12
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 Integration branch: `codex/self-hosted-qdrant-platform`
-Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-qdrant-platform`
+Remote base at docs reconciliation start: `6645708d`; resolve current
+`origin/codex/self-hosted-qdrant-platform` before continuation.
 
 ## Product Truth
 
@@ -33,7 +34,8 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 - Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E7, and exact 100% local/development document-evidence activation. Final independent activation/docs review at `d3417610` reported no P0-P3 findings; integration merge `ea183d83` passed 24/24 focused tests, package type-check, process verification, and canonical closeout dry-run. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
-- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. Q11 passed the full local release matrix and independent review with P0-P3 zero: backend 1,869/1,869, shared 23/23, web 20/20, PostgreSQL 64/64, exact Qdrant 15/15 plus recovery 5/5, Compose 8/8, Prometheus 14 rules, Alertmanager config, type-check and build 75/75. Canonical real stage closeout also passed after supplying the documented synthetic local build environment. Q12 `.13` is the only explicit remote-authorization gate.
+- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. Q11 passed the full local release matrix and independent review with P0-P3 zero: backend 1,869/1,869, shared 23/23, web 20/20, PostgreSQL 64/64, exact Qdrant 15/15 plus recovery 5/5, Compose 8/8, Prometheus 14 rules, Alertmanager config, type-check and build 75/75. Canonical real stage closeout also passed after supplying the documented synthetic local build environment.
+- Q12 local remediation streams are accepted and integrated through `6645708d`: guarded base migrations `.13.1`, immutable operator `.13.2`, release-bound app/worker rollback `.13.3`, operator digest publication/pre-pull, and rollback transaction binding all have independent zero-finding reviews. The owner authorized staging deploy, live reindex, S3 drill, service/secret changes, real notification, and document evidence at exact `true/active/100`. No remote mutation has occurred.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
@@ -54,7 +56,11 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: present the exact Q12 staging activation packet and obtain explicit current-task authorization before any remote mutation. Without that authorization, keep `.13` open and do not partially activate it.
+Recommended action: keep Q12 NO-GO while safely resolving the three missing
+inputs: Supabase project CA for `verify-full`, off-host S3 credentials/config,
+and 80 missing plus 2 invalid canonical source paths (or an explicit audited
+owner product-truth decision). Then execute the already authorized activation
+packet without `--allow-gaps` or partial activation.
 
 ## Starter prompt for next orchestrator
 
@@ -66,7 +72,8 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 - E1-E6 and Q7 are accepted and integrated.
 - Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
-- E7, Q10 and Q11 are accepted locally. Q12 is the only remaining boundary and covers every staging/production or other remote mutation.
+- E7, Q10, Q11 and Q12 local remediation are accepted. Q12 live execution and
+  observation remain the only open boundary.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
@@ -88,10 +95,17 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 ## Explicit defers
 
-- Q12 deploy, staging/live reindex, secret changes, runtime activation, and any remote mutation require explicit current-task permission after presenting exact actions, effects, rollback, and live evidence plan.
+- Q12 staging mutation is owner-authorized, but remains NO-GO until the CA, S3,
+  and source-truth inputs above are available and every documented hard gate
+  passes. Do not partially activate.
+- Prometheus retention YAML migration is the bounded nonblocking defer
+  `mc2-jz6y0.25`, due before the next Prometheus pin change.
 - The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: no-change-needed — Q10 already reconciled setup, deployment, native retrieval, recovery, monitoring, rollback, historical Cloud classification and stable project navigation; Q11 adds release evidence only.
-graph-reviewed: updated — local-only Graphify 0.8.45 refresh on the delivered post-closeout tree contains 50,490 nodes and 75,065 edges and matched `GRAPH_REPORT.md` to the current HEAD. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
+docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
+authorization, and sanitized environment contracts are reconciled.
+graph-reviewed: blocked — parent closeout must refresh the local graph after
+these durable docs merge with `graphify update .` and
+`graphify cluster-only . --no-viz`; no external model/API mode or Git hook.

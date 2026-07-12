@@ -1,10 +1,12 @@
 # Self-hosted Qdrant operator runbook
 
 This runbook covers the private Qdrant 1.18.2 retrieval, reindex, recovery,
-observability, and rollback path. It does not
-authorize a deployment, live reindex, secret change, notification to a real
-receiver, or any staging/production mutation. Those actions remain behind the
-Q12 approval gate.
+observability, and rollback path. The owner explicitly authorized the Q12
+staging activation on 2026-07-12, including live reindex, recovery drill, real
+notification, and document evidence at `true/active/100`. This runbook is not a
+second authorization source, and activation remains **NO-GO** until the project
+CA, off-host S3 inputs, and authoritative source-path gaps listed under
+“Initial activation” are resolved. No remote mutation has occurred yet.
 
 ## Immutable runtime
 
@@ -67,12 +69,30 @@ Docker bridge plus loopback; cross-host access requires TLS first.
 
 ## Secret and directory preparation
 
-Tracked files contain paths only. Before an authorized activation, provision
-separate local files for the Qdrant read-only scrape credential, Grafana admin
-password, Telegram bot token, and Telegram chat ID. Give each file only the UID
-of its consuming image and mode `0400`; do not make the Qdrant server credential
-more broadly readable to accommodate Prometheus. The Prometheus copy must carry
-the same read-only value but has an independent path and ownership.
+Tracked files contain paths and sanitized identifiers only. Compose file
+secrets preserve host ownership; they do not remap it for a container. Provision
+each input atomically at the exact path and identity below. Never print values,
+checksums, file IDs, source content, or provenance hashes into a command log,
+artifact, Beads note, or shell history.
+
+| Host path                                                            | Consumer                                         | Required owner | Mode   |
+| -------------------------------------------------------------------- | ------------------------------------------------ | -------------- | ------ |
+| `/opt/megacampus/secrets/qdrant_api_key`                             | Qdrant and root operator wrapper                 | `root:root`    | `0400` |
+| `/opt/megacampus/secrets/qdrant_read_only_api_key`                   | Qdrant server                                    | `root:root`    | `0400` |
+| `/opt/megacampus/secrets/qdrant_s3_access_key`                       | Qdrant S3 snapshot backend                       | `root:root`    | `0400` |
+| `/opt/megacampus/secrets/qdrant_s3_secret_key`                       | Qdrant S3 snapshot backend                       | `root:root`    | `0400` |
+| `/opt/megacampus/secrets/prometheus_qdrant_read_only_api_key`        | Prometheus                                       | `65534:65534`  | `0400` |
+| `/opt/megacampus/secrets/grafana_admin_password`                     | Grafana                                          | `472:472`      | `0400` |
+| `/opt/megacampus/secrets/alertmanager_telegram_bot_token`            | Alertmanager                                     | `65534:65534`  | `0400` |
+| `/opt/megacampus/secrets/alertmanager_telegram_chat_id`              | Alertmanager                                     | `65534:65534`  | `0400` |
+| `/opt/megacampus/recovery/probe.json`                                | restore drill via `LoadCredential`               | `root:root`    | `0400` |
+| `/var/lib/megacampus-qdrant-recovery/manifests/latest-manifest.json` | restore drill input produced by snapshot service | `1001:1001`    | `0600` |
+
+The Prometheus file is an independent copy of the read-only value. Never broaden
+the root-owned Qdrant copy to make it readable by another container. The
+operator wrapper accepts its mounted API key, manifest, and probe only after
+systemd stages them as exact `root:root 0400` inputs in private per-unit runtime
+directories.
 
 The shared textfile directory has one supported production path and a dedicated
 supplementary group. Run this preflight before Compose activation. It creates
@@ -91,11 +111,29 @@ conflicting GID, or a wrong path, owner, or mode:
   echo "unsupported Qdrant metrics directory" >&2
   exit 1
 }
+if getent group "$QDRANT_METRICS_GID" >/dev/null &&
+   [[ $(getent group "$QDRANT_METRICS_GID" | cut -d: -f1) != megacampus-metrics ]]; then
+  echo "candidate metrics GID is already assigned" >&2
+  exit 1
+fi
 if ! getent group megacampus-metrics >/dev/null; then
   sudo groupadd --system --gid "$QDRANT_METRICS_GID" megacampus-metrics
 fi
 [[ $(getent group megacampus-metrics | cut -d: -f3) == "$QDRANT_METRICS_GID" ]] || {
   echo "megacampus-metrics GID conflicts with QDRANT_METRICS_GID" >&2
+  exit 1
+}
+
+if ! getent passwd megacampus >/dev/null; then
+  getent passwd 1001 >/dev/null && {
+    echo "UID 1001 is already assigned to another host identity" >&2
+    exit 1
+  }
+  sudo useradd --system --uid 1001 --gid megacampus-metrics \
+    --home-dir /nonexistent --shell /usr/sbin/nologin megacampus
+fi
+[[ $(getent passwd 1001 | cut -d: -f1) == megacampus ]] || {
+  echo "UID 1001 must resolve to the reviewed megacampus runtime identity" >&2
   exit 1
 }
 
@@ -117,6 +155,12 @@ and restore jobs publish their gauges the same way. Only `*.prom` final files
 belong there; samples must not carry explicit timestamps, and writers must use a
 same-directory temporary file plus atomic `mv`. Temporary files must never be
 observed after a successful write.
+
+The previously documented example GID conflicts on the target. `900` is only a
+candidate: immediately before mutation, require both `getent group 900` and
+`getent passwd 900` to show it is unused, then set
+`QDRANT_METRICS_GID=900`. Any new conflict is a hard stop; do not choose another
+identity silently.
 
 ## Safe local validation before activation
 
@@ -165,61 +209,171 @@ remain disabled. Provisioned dashboards are filesystem-owned and are not
 persisted back from the Grafana UI. Alertmanager reads both Telegram fields from
 files and uses `send_resolved: true`.
 
-## Client-based bootstrap, verify, and reindex
+## Immutable operator bootstrap, verify, and reindex
 
-These five commands use the application client, which requires a host-reachable
-loopback URL and the raw `QDRANT_API_KEY`. Run them only in an authorized
-environment. The helper reads the untracked owner-only key without printing it;
-each command runs in a short-lived subshell and removes the raw values on exit:
+Production and staging never require repository source, host Node, host pnpm, or
+a raw-key shell helper. CI builds the `qdrant-operator` Docker target for every
+deploy-relevant release commit. `scripts/deploy_blue_green.sh` pulls the exact
+40-character release tag, resolves its registry digest, writes only the 64-hex
+`QDRANT_OPERATOR_IMAGE_SHA256` identifier to `.env.production`, and pre-pulls
+the resulting fixed GHCR `repo@sha256:<digest>` reference. `latest`, a tag-only
+reference, a missing digest, and `--force` are not bootstrap shortcuts.
+
+Before any operator command, validate the release/digest contract without
+printing environment or secret values:
 
 ```bash
-qdrant_admin() (
-  set -eu
-  key_file=${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
-  test -r "$key_file"
-  QDRANT_API_KEY=''
-  IFS= read -r QDRANT_API_KEY <"$key_file" || test -n "$QDRANT_API_KEY"
-  test -n "$QDRANT_API_KEY"
-  export QDRANT_URL=http://127.0.0.1:6335 QDRANT_API_KEY
-  trap 'unset QDRANT_API_KEY QDRANT_URL' EXIT
-  "$@"
-)
+cd /opt/megacampus
+release_sha='<40-lowercase-hex-release-commit>'
+[[ $release_sha =~ ^[0-9a-f]{40}$ ]]
 
-qdrant_admin pnpm --dir packages/course-gen-platform qdrant:bootstrap
-qdrant_admin pnpm --dir packages/course-gen-platform qdrant:verify
-qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:plan
-# Execute only after accepting the plan output and cutover/rollback conditions.
-qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:execute
-qdrant_admin pnpm --dir packages/course-gen-platform qdrant:reindex:verify
-unset -f qdrant_admin
+operator_repo='ghcr.io/maslennikov-ig/mc-2/qdrant-operator'
+docker pull "$operator_repo:$release_sha" >/dev/null
+operator_ref="$(docker image inspect \
+  --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+  "$operator_repo:$release_sha" |
+  awk -v prefix="$operator_repo@sha256:" 'index($0, prefix) == 1 { print; exit }')"
+operator_digest="${operator_ref#"$operator_repo@sha256:"}"
+[[ $operator_ref == "$operator_repo@sha256:"* ]]
+[[ $operator_digest =~ ^[0-9a-f]{64}$ ]]
+
+tmp="$(mktemp .env.production.XXXXXX)"
+awk 'index($0, "QDRANT_OPERATOR_IMAGE_SHA256=") != 1' .env.production >"$tmp"
+printf 'QDRANT_OPERATOR_IMAGE_SHA256=%s\n' "$operator_digest" >>"$tmp"
+chmod --reference=.env.production "$tmp"
+mv "$tmp" .env.production
+unset operator_digest operator_ref
 ```
 
-`http://qdrant:6333` and `http://qdrant-dev:6333` are Docker-network names and
-must not be used by these host commands. This operator runbook uses staging's
-loopback mapping `127.0.0.1:6335`; local development uses the separate
-`127.0.0.1:6333` procedure in `packages/course-gen-platform/docs/qdrant-setup.md`.
+The supported production prefix is:
+
+```bash
+OPERATOR=(
+  /opt/megacampus/deploy/qdrant/operator-compose.sh
+  --project-directory /opt/megacampus
+  -f /opt/megacampus/docker-compose.infra.yml
+  --env-file /opt/megacampus/.env.production
+  --profile operator run --rm --no-deps -T
+)
+
+"${OPERATOR[@]}" qdrant-operator self-check
+"${OPERATOR[@]}" qdrant-recovery-operator metrics-check
+```
+
+The wrapper rejects any non-64-hex digest before Docker runs. The operator
+container is read-only, reads exact `root:root 0400` file secrets as a minimal
+root wrapper, and drops every tool to UID/GID `1001:1001`.
+
+### Deterministic first rebuild
+
+Generate one UUIDv4 and reuse it for the isolated queue, execute run, ledger,
+and worker target. The physical target must never equal the stable alias.
+
+```bash
+physical_collection=course_embeddings_v1
+run_id="$(uuidgen | tr 'A-F' 'a-f')"
+[[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+queue_name="qdrant-reindex-$run_id"
+worker_name="megacampus-qdrant-reindex-$run_id"
+
+"${OPERATOR[@]}" qdrant-operator bootstrap \
+  --physical "$physical_collection" --alias course_embeddings
+"${OPERATOR[@]}" qdrant-operator verify \
+  --physical "$physical_collection" --alias course_embeddings
+"${OPERATOR[@]}" qdrant-operator reindex plan
+
+# Continue only when the plan has zero source gaps. Never pass --allow-gaps.
+"${OPERATOR[@]}" -d --name "$worker_name" \
+  -e BULLMQ_QUEUE_NAME="$queue_name" \
+  -e QDRANT_REINDEX_TARGET_COLLECTION="$physical_collection" \
+  qdrant-operator reindex-worker
+trap 'docker rm -f "$worker_name" >/dev/null 2>&1 || true' EXIT
+
+"${OPERATOR[@]}" \
+  -e BULLMQ_QUEUE_NAME="$queue_name" \
+  qdrant-operator reindex execute \
+  --target-collection "$physical_collection" \
+  --run-id "$run_id"
+
+docker stop --time 30 "$worker_name"
+"${OPERATOR[@]}" qdrant-operator reindex verify \
+  --target-collection "$physical_collection"
+trap - EXIT
+```
+
+The execute ledger is forced to
+`/var/lib/megacampus-qdrant-recovery/reindex/<run-id>.json`; a different path is
+rejected. Before alias cutover, inspect the dedicated queue in the private Bull
+Board, require zero active/waiting jobs, preserve failed-job and ledger evidence,
+and verify gap-free source parity, strict schema, exact point identities, RU and
+EN BM25/RRF/Formula relevance, and negative organization/course isolation. Do
+not flush Redis or touch the live course-generation queue to clean up a reindex.
+
+Host `pnpm` and loopback commands remain supported only for the checked-out
+local-development procedure in
+`packages/course-gen-platform/docs/qdrant-setup.md`.
+
+## Q12 initial activation is not `/deploy`
+
+The ordinary blue/green deploy intentionally runs verify-only before starting
+the inactive app color. It cannot bootstrap an empty first installation. The
+owner authorization does not waive these current hard stops:
+
+1. the Supabase project Server root certificate is not yet available for the
+   required `sslmode=verify-full` and `sslrootcert` remote migration path;
+2. off-host S3 bucket, region, HTTPS endpoint, credentials, and lifecycle inputs
+   are not yet available;
+3. the last read-only inventory found 80 missing and 2 invalid canonical source
+   paths. Activation requires zero, or a separate explicit audited owner
+   product-truth decision; `--allow-gaps` is forbidden.
+
+After all three are resolved, execute this order as one observed activation
+window:
+
+1. confirm backup/PITR and apply/verify the complete document-evidence
+   `120 -> 130 -> 140 -> 150 -> 151` migration chain using the project CA;
+2. copy the reviewed Compose, `deploy/qdrant`, `deploy/systemd`, and
+   `ops/qdrant` assets; provision exact secret metadata, UID 1001, free metrics
+   GID, recovery state, metrics, upload, and probe paths;
+3. publish the release-SHA `qdrant-operator`, resolve and persist only its
+   registry digest, and pre-pull every exact image;
+4. start only `qdrant`, `prometheus`, `node_exporter`, `alertmanager`, and
+   `grafana` from `docker-compose.infra.yml`; keep app traffic and RAG workers on
+   the previous environment;
+5. run operator `self-check` and `metrics-check`, then bootstrap the physical
+   collection before any deploy verify gate;
+6. run the gap-free deterministic plan/worker/execute/verify procedure above;
+7. prove checksum-verified off-host snapshot and isolated restore, both firing
+   and resolved notification, private listeners, and rollback evidence;
+8. only then invoke the normal release-bound blue/green deploy and observe the
+   accepted app/worker environment for at least 60 minutes plus one complete
+   normal course cycle.
+
+`/deploy`, `/deploy --force`, mutable tags, the retired Cloud endpoint, and an
+alias switch without the preceding evidence are not activation alternatives.
 
 ## Snapshot and restore command contracts
 
-Recovery tools do **not** use raw `QDRANT_API_KEY`. `qdrant:snapshot` reads an
-owner-only file from `QDRANT_API_KEY_FILE` and requires `QDRANT_URL` plus a
-precreated writable mode-2775 `QDRANT_METRICS_TEXTFILE_DIR`. Its accepted unit
-uses `QDRANT_URL=http://127.0.0.1:6335` and
-`QDRANT_API_KEY_FILE=%d/qdrant_api_key`, then sets `QDRANT_COLLECTION_NAME`,
-`QDRANT_SNAPSHOT_STORAGE_MODE=s3`,
-`QDRANT_SNAPSHOT_OBJECT_PREFIX`, `QDRANT_RECOVERY_STATE_DIR`,
-`QDRANT_RECOVERY_LOCK_PATH`, and `QDRANT_RECOVERY_LOCK_HELD=1`; the last value
-is valid because the unit's outer `/usr/bin/flock` already owns the shared lock.
+Recovery tools never use a raw-key host environment. Both run inside the pinned
+operator with Docker-local `QDRANT_URL=http://qdrant:6333`, the exact file-backed
+API key, precreated recovery state, and the mode-2775 shared metrics directory.
+Restore additionally mounts the latest manifest and deterministic recovery
+probe as file secrets. A direct Compose oneshot keeps
+`QDRANT_RECOVERY_LOCK_HELD=0` and acquires the internal lock in shared recovery
+state:
 
-`qdrant:restore-drill` requires the same file-backed API key, Qdrant URL,
-metrics directory, state directory, collection name, and shared-lock contract.
-It additionally requires owner-only `QDRANT_SNAPSHOT_MANIFEST_FILE` and
-`QDRANT_RECOVERY_PROBE_FILE`, plus `QDRANT_SNAPSHOT_TRANSPORT_URL`. The accepted
-unit maps those files to `%d/snapshot_manifest` and `%d/recovery_probe`, uses
-`QDRANT_URL=http://127.0.0.1:6335` for the host client, and sets
-`QDRANT_SNAPSHOT_TRANSPORT_URL=http://127.0.0.1:6333` for Qdrant's authenticated
-snapshot fetch. Do not substitute the raw-key client helper for either recovery
-tool, and do not set `QDRANT_RECOVERY_LOCK_HELD=1` for an unwrapped direct run.
+```bash
+"${OPERATOR[@]}" qdrant-recovery-operator snapshot
+"${OPERATOR[@]}" qdrant-restore-operator restore-drill
+```
+
+Only the reviewed systemd units may override
+`QDRANT_RECOVERY_LOCK_HELD=1`: each already owns the outer host
+`/usr/bin/flock`. The units use `LoadCredential`, copy inputs into distinct
+root-only runtime directories visible to Docker, call the digest-checking
+operator wrapper, test metrics writability as UID 1001 with the configured
+supplementary GID, and let systemd clean the staged credentials. Do not pass
+`QDRANT_RECOVERY_LOCK_HELD=1` to an unwrapped direct run.
 
 After an authorized installation, prefer the accepted systemd services because
 `LoadCredential`, explicit environment entries, directory hardening, timeouts,
@@ -235,9 +389,9 @@ sudo systemctl status --no-pager megacampus-qdrant-restore-drill.service
 sudo journalctl --no-pager -u megacampus-qdrant-restore-drill.service -n 200
 ```
 
-The commands above are an operator procedure, not activation authorization.
-Installing units, creating credentials, starting either service, or exercising
-staging/production recovery still requires Q12 approval.
+The commands above are an operator procedure under the recorded authorization;
+they still remain NO-GO until the required S3/CA/source inputs and all initial
+activation preconditions are satisfied.
 
 The recovery implementation owns the checksum manifest, retention, systemd
 timers, isolated collection, and alias cleanup. Reindex uses deterministic,
@@ -254,25 +408,53 @@ stable alias untouched and keeps evidence for triage.
 ## systemd installation and verification
 
 The units in `deploy/systemd/` require systemd **247 or newer** because they use
-`LoadCredential`; the reference manuals consulted for hardening are systemd 257. Before an authorized install, verify `systemd --version`, confirm pnpm is
-available at `/usr/bin/pnpm`, provision the `megacampus` user and exact
-state/runtime/metrics paths, and place credentials/probe/manifest files at the
-unit-declared paths. Do not edit the units to embed secret values.
+`LoadCredential`; the reference manuals consulted for hardening are systemd 257. Host Node, pnpm, and repository source are not runtime prerequisites.
+Before installation, verify systemd and Docker Compose, complete the exact
+identity/directory preflight, place the reviewed credential/probe files, and
+confirm `.env.production` contains a valid operator digest identifier without
+printing the file.
 
-After copying reviewed units in an authorized environment:
+Install the reviewed wrapper and units without editing their commands:
 
 ```bash
-sudo systemd-analyze verify \
+systemd --version
+docker compose version
+
+sudo install -d -o root -g root -m 0755 /opt/megacampus/deploy/qdrant
+sudo install -o root -g root -m 0555 \
+  deploy/qdrant/operator-compose.sh \
+  /opt/megacampus/deploy/qdrant/operator-compose.sh
+sudo install -o root -g root -m 0644 \
   deploy/systemd/megacampus-qdrant-snapshot.service \
   deploy/systemd/megacampus-qdrant-snapshot.timer \
   deploy/systemd/megacampus-qdrant-restore-drill.service \
-  deploy/systemd/megacampus-qdrant-restore-drill.timer
+  deploy/systemd/megacampus-qdrant-restore-drill.timer \
+  /etc/systemd/system/
+
+sudo systemd-analyze verify \
+  /etc/systemd/system/megacampus-qdrant-snapshot.service \
+  /etc/systemd/system/megacampus-qdrant-snapshot.timer \
+  /etc/systemd/system/megacampus-qdrant-restore-drill.service \
+  /etc/systemd/system/megacampus-qdrant-restore-drill.timer
 sudo systemctl daemon-reload
+
+# Manual-first proof. Do not enable timers until both oneshots and cleanup pass.
+sudo systemctl start megacampus-qdrant-snapshot.service
+sudo systemctl status --no-pager megacampus-qdrant-snapshot.service
+sudo journalctl --no-pager -u megacampus-qdrant-snapshot.service -n 200
+
+sudo systemctl start megacampus-qdrant-restore-drill.service
+sudo systemctl status --no-pager megacampus-qdrant-restore-drill.service
+sudo journalctl --no-pager -u megacampus-qdrant-restore-drill.service -n 200
+
 sudo systemctl enable --now megacampus-qdrant-snapshot.timer
 sudo systemctl enable --now megacampus-qdrant-restore-drill.timer
 systemctl list-timers 'megacampus-qdrant-*'
 ```
 
+Require both service exit statuses to be zero, no credential files left in the
+per-unit runtime directories, exact manifest/evidence ownership, no residual
+drill collection/alias, and fresh textfile metrics before timer enablement.
 The snapshot timer runs every four hours with jitter; the restore drill is
 monthly. `Persistent=true` catches up after short downtime but does not protect
 against a host outage, so stale alerts remain mandatory. Snapshot and restore
@@ -316,10 +498,20 @@ known-good snapshot during the rollback window. If compatibility is uncertain,
 keep traffic stopped and restore an exact-version snapshot into a new isolated
 collection; never overwrite the active collection.
 
-Development document evidence is already active for 100% of eligible courses.
-That local/dev decision does not authorize staging/production deploy, service or
-secret activation, live reindex, alias cutover, or any remote mutation; all of
-those remain Q12-gated.
+The owner has superseded gradual staging promotion and authorized document
+evidence at exactly `enabled=true`, `mode=active`, Stage 5 cohort `100` for every
+eligible staging course. Rollback remains three distinct operations: the
+release-bound immutable app/color rollback recreates API, web, main worker and
+Stage 6 from one prior environment; evidence containment quiesces queues before
+setting cohort `0` or disabling the shared active gate; index rollback atomically
+returns the alias to an already verified physical collection. Preserve evidence
+rows, failed collections, manifests, and snapshots in every case. Do not use a
+database down-migration or restore-over-active as incident rollback.
+
+Prometheus `3.13.1` still accepts the current retention CLI flags but deprecates
+them. This is the bounded nonblocking follow-up `mc2-jz6y0.25`: migrate the
+accepted 30-day/20-GB policy to supported YAML before the next Prometheus pin
+change. It is not permission to change retention during Q12 activation.
 
 ## First-party references checked for this configuration
 
