@@ -55,11 +55,11 @@ depends_on_streams:
   - accepted source-recovery workflow/CAS
   - accepted source-recovery reindex and evidence streams
 parallel_decision: sequential - entrypoint, Compose model, host wrapper, and runtime tests share one security and mount contract
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: implementation is committed and pushed for independent review; dedicated branch/worktree cleanup waits for orchestrator acceptance
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation, review, and rereview worktrees plus local branches were removed after fresh integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -82,6 +82,9 @@ verification:
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
   - scripts/orchestration/run_process_verification.sh: passed
   - artifact validation and git diff --check: passed
+  - independent delta rereview 26d6559e: PASS with P0 0, P1 0, P2 0, P3 0
+  - fresh integration focused runtime/operator/Compose: passed 34/34
+  - fresh integration package type-check, shell syntax, CI, artifact, process, and diff gates: passed
 changed_files:
   - packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh
   - packages/course-gen-platform/Dockerfile
@@ -91,7 +94,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.3.md
 explicit_defers:
-  - independent P0/P1 review, Task 6 runbook integration, parent graph refresh, and any staging execution remain with the orchestrator; no remote execution is authorized here
+  - Task 6 runbook integration, parent graph refresh, and any staging execution remain with the orchestrator; no remote execution occurred here
 ---
 
 # Summary
