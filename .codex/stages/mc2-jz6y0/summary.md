@@ -76,6 +76,12 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
   125 eligible rows (109 -> 234/240); six eligible originals and eighteen
   non-eligible Career Playbook originals are absent. No remote mutation or copy
   has occurred.
+- On 2026-07-12 the owner approved the narrow exact-copy and audited-disposition
+  design for `.13.4.1`: six eligible rows become durable
+  `source_file_unrecoverable` failures and eighteen absent non-eligible Career
+  Playbook sources become `retained-derived-only`. The written specification is
+  `docs/superpowers/specs/2026-07-12-q12-source-recovery-design.md` and is the
+  next review gate before implementation.
 - Q7 / `mc2-jz6y0.8` is accepted: both integration lookups use document-scoped point IDs, the pinned Qdrant `1.18.2` gate passes 19/19, focused Q7 tests pass 85/85, and the dedicated worktree/local branch are cleaned. The remote evidence branch remains.
 - E1 / `mc2-jz6y0.18` is accepted: immutable source manifests survive deletion-before-persist, guarded RPCs replace authenticated table writes, terminal coverage and user-only override direction are enforced, PostgreSQL 15.18 applied tests pass 9/9, and the dedicated worktree/local branch/container are cleaned. The remote evidence branch remains.
 - E2 / `mc2-jz6y0.19` is accepted: complete authoritative source enumeration, exact durable outcomes, structured per-document and cross-document hierarchy, atomic resume, claim-scoped verification, and exact `tiktoken 1.0.22` safety bounds are integrated. The final independent reviewer reported no findings (`Spec PASS`, `Quality APPROVED`).
