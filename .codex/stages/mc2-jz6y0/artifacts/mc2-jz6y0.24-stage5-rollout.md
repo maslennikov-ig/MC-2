@@ -51,10 +51,10 @@ cleanup_status: cleaned
 cleanup_notes: Five authorized setup-only node_modules symlinks were removed; no containers, services, secrets, live data or runtime resources were created. After integration merge ad66dd50 and acceptance commit 0dab9df7 were pushed, the dedicated worktree and local branch were removed; the remote evidence branch remains.
 risk_level: high
 docs_impact: behavior
-docs_reviewed: no-change-needed
-docs_review_notes: E7-D owns durable documentation; handoff contract is exact enabled plus active mode, Stage 5-only numeric cohort, and rollback by disabling the feature or leaving active mode while retaining audit rows.
-graph_reviewed: used
-graph_review_notes: Read the fresh integration report built from 7b542c8d and queried the live Stage 5 handler/orchestrator path; child graph refresh is outside this stream's write zone and remains integration-owned.
+docs_reviewed: updated
+docs_review_notes: The operator guide, approved design chain and E7 orchestration records now distinguish the closed 100% local/development decision from fail-closed runtime defaults and Q12-gated staging/production activation.
+graph_reviewed: no-change-needed
+graph_review_notes: The parent used the current local graph; this docs-only child was explicitly prohibited from refreshing it, and Task 3 owns any post-acceptance refresh.
 verification:
   - Stage 5 RED with synthetic local Supabase setup: exit 1; rollout module absent and cohort-zero handler still constructed the adapter.
   - Expanded Stage 6 RED with synthetic local Supabase setup: exit 1; shared active gate absent and default/disabled/shadow loaded accepted evidence in 3 failing cases.
@@ -66,6 +66,8 @@ verification:
   - git commit 0aad2c20 and git push -u origin codex/e7-stage5-rollout: passed.
   - Independent correctness review of 7b542c8d..b7359f32: PASS / MERGE with no branch findings; the separately found Stage 4 shadow-conflict gap is tracked by mc2-jz6y0.24.3.
   - Integration rerun after merge: focused Stage 5 rollout/handler plus Stage 6 loader passed 14/14; @megacampus/course-gen-platform type-check passed.
+  - Owner decision mc2-jz6y0.24.2 closed on 2026-07-12 with the exact local/development active gate and Stage 5 cohort value 100; staging/production remained Q12-gated.
+  - Dev activation contract at c50d8420 plus exact-value review fix ba27d573 passed 5/5 files and 24/24 tests, including coherent values on both dev workers, the package environment example, and production/staging non-activation.
 changed_files:
   - packages/course-gen-platform/src/shared/document-evidence/rollout.ts
   - packages/course-gen-platform/src/stages/stage5-generation/evidence/rollout.ts
@@ -76,19 +78,19 @@ changed_files:
   - packages/course-gen-platform/tests/unit/stages/stage6/rag/evidence-loader.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-stage5-rollout.md
 explicit_defers:
-  - Numeric Stage 5 cohort percentage and production rollout thresholds remain owner-configured; this stream selects no live value.
-  - E7-D owns durable environment/rollback documentation, and the orchestrator owns acceptance plus Beads closure.
+  - Staging/production activation, remote deployment, live reindex, service or secret changes, and every other remote mutation remain Q12 authorization-gated; the approved 100% value is local/development only.
+  - Independent Task 3 correctness/docs review and parent acceptance remain orchestrator-owned before E7 can be accepted.
 ---
 
 # Summary
 
-Stage 5 now constructs its production advisory-evidence adapter only when `DOCUMENT_EVIDENCE_ENABLED=true`, `DOCUMENT_EVIDENCE_MODE=active`, and the course falls inside `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT`. The percentage defaults and fails closed to zero, while a versioned SHA-256 contract assigns stable 0-99 course buckets. Outside the cohort the normal `GenerationOrchestrator` still runs with no evidence adapter, so baseline generation is unchanged and no audit rows are deleted.
+Stage 5 now constructs its production advisory-evidence adapter only when `DOCUMENT_EVIDENCE_ENABLED=true`, `DOCUMENT_EVIDENCE_MODE=active`, and the course falls inside `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT`. The runtime parser still defaults and fails closed to zero, while a versioned SHA-256 contract assigns stable 0-99 course buckets. The owner-approved checked-in local/development configuration explicitly supplies the exact active gate and `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100`; it does not change the fail-closed parser or authorize staging/production. Outside the configured cohort the normal `GenerationOrchestrator` still runs with no evidence adapter, so baseline generation is unchanged and no audit rows are deleted.
 
 The docs-review expansion added a generic exact-active gate shared by Stage 5 and Stage 6. Stage 6 always resolves the current course organization and rejects mismatched requested scope first. Default, disabled and shadow modes then return no evidence context without reading accepted evidence. Active Stage 6 consumes current durable accepted evidence regardless of the Stage 5 cohort percentage, because that cohort bounds only advisory Stage 5 enrichment.
 
 # Scope / Routing
 
-The implementation stayed within the expanded E7-R write zone. It did not modify the Stage 5 orchestrator, advisory enrichment algorithm, Stage 6 retriever/job processor, metrics, docs, Compose, systemd, handoff, stage summary, Beads or any Q10-Q12 asset. No external dependency research or catalog discovery was needed.
+The original runtime implementation stayed within the expanded E7-R write zone. It did not modify the Stage 5 orchestrator, advisory enrichment algorithm, Stage 6 retriever/job processor, metrics, docs, Compose, systemd, handoff, stage summary, Beads or any Q10-Q12 asset. This later decision reconciliation changes only approved E7 operator/orchestration records; it does not change runtime, Beads, Q10-Q12 assets or remote state. No external dependency research or catalog discovery was needed.
 
 No new ordinary log or metric was added. The rollout helper hashes a course UUID internally but never logs it; it adds no document IDs, content, claims, answers or errors to labels or logs.
 
@@ -98,12 +100,12 @@ The first requested command could not start Vitest because the new worktree lack
 
 # Delivery / Cleanup
 
-Implementation commit `0aad2c20` was pushed to `origin/codex/e7-stage5-rollout`. All five setup-only dependency symlinks were removed before artifact creation. The branch is returned for independent correctness review; the Beads task remains open for orchestrator acceptance.
+Implementation commit `0aad2c20` was pushed to `origin/codex/e7-stage5-rollout`. All five setup-only dependency symlinks were removed before artifact creation. That runtime stream subsequently passed independent correctness review and orchestrator acceptance as recorded in the frontmatter. The later local/development value decision and checked-in activation remain subject to the separate Task 3 review before E7 acceptance.
 
 # Risks / Follow-ups / Explicit Defers
 
-The implementation intentionally chooses no rollout percentage. Operators must explicitly set all three values for Stage 5 activation. Setting the global flag false, using any mode other than exact `active`, omitting the cohort, or providing a malformed/out-of-range cohort disables live Stage 5 enrichment. Stage 6 ignores the Stage 5 cohort but requires the same exact global active gate. Rollback disables the global flag or active mode and retains stored audit rows.
+The original runtime implementation intentionally chose no rollout percentage and retained a fail-closed zero default. The superseding owner decision closed `mc2-jz6y0.24.2` on 2026-07-12 and approved all three exact local/development values, including a 100% Stage 5 cohort. Setting the global flag false, using any mode other than exact `active`, omitting the cohort, or providing a malformed/out-of-range cohort still disables live Stage 5 enrichment. Stage 6 ignores the Stage 5 cohort but requires the same exact global active gate. Development containment quiesces first and changes the cohort `100 -> 0`; full audit-only rollback additionally changes mode or disables the global flag. Both retain stored audit rows.
 
-docs-reviewed: no-change-needed - durable environment and rollback documentation belongs to sibling E7-D; this artifact records the exact contract.
+docs-reviewed: updated - the operator guide, approved design chain and E7 records now capture the closed 100% local/development decision, quiesce-first 100 -> 0 containment, and unchanged Q12 boundary.
 
-graph-reviewed: used - fresh base report/query identified the production Stage 5 injection boundary; no child graph refresh was authorized.
+graph-reviewed: no-change-needed - the parent used the current local graph; this docs-only child was explicitly prohibited from refreshing it, and Task 3 owns any post-acceptance refresh.

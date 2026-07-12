@@ -9,15 +9,15 @@ base_branch: origin/codex/self-hosted-qdrant-platform
 base_commit: 9284529a68bbf140f7cf41213e7e1b28e42a19f4
 worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
 status: blocked
-delivery_method: manual integration
-accepted_by_orchestrator: yes
-cleanup_status: cleaned
-cleanup_notes: All disposable PostgreSQL databases were dropped with FORCE; Graphify output remains ignored local state; no remote, staging, live, Q12, Qdrant Cloud, service, secret, or deployment state was changed.
+delivery_method: not accepted
+accepted_by_orchestrator: no
+cleanup_status: pending
+cleanup_notes: Historical E7 disposable resources were cleaned; the 100% local/development activation checkpoint awaits independent Task 3 correctness/docs review and orchestrator acceptance. No remote, staging, live, Q12, Qdrant Cloud, service, secret, or deployment state was changed.
 risk_level: high
 docs_reviewed: updated
-docs_review_notes: E7 operator/product documentation passed independent review at 82831b6f with P0-P3 zero and was integrated at 756406a4; only the owner rollout decision remains intentionally unresolved.
-graph_reviewed: updated
-graph_review_notes: graphify 0.8.45 local-only update and cluster-only completed against the committed integration state with 50438 nodes and 74881 edges; no external model/API mode or Graphify git hook was used.
+docs_review_notes: Earlier E7 operator/product documentation passed independent review at 82831b6f with P0-P3 zero and was integrated at 756406a4. The closed owner decision and 100% local/development activation are now documented, but this checkpoint still awaits the independent Task 3 review.
+graph_reviewed: no-change-needed
+graph_review_notes: The earlier accepted integration refresh completed with local-only Graphify 0.8.45 at 50438 nodes and 74881 edges. The parent used the current graph for this docs-only reconciliation; this child was explicitly prohibited from refreshing it, and Task 3 owns any post-acceptance refresh.
 verification:
   - Focused course-gen Stage 2/4/5/6 evidence and retrieval gate passed 28/28 files and 330/330 tests.
   - Shared document-evidence and clarifying contracts passed 3/3 files and 23/23 tests with zero skips.
@@ -28,22 +28,27 @@ verification:
   - Workspace pnpm type-check passed after a clean ignored-cache rebuild.
   - E7 docs independent review passed at 82831b6f with P0-P3 zero; Prettier, artifact validation, and diff checks passed.
   - graphify update and graphify cluster-only --no-viz passed; focused document-evidence query found the approved design and Stage 4/5/6 graph surfaces.
+  - Owner decision mc2-jz6y0.24.2 closed on 2026-07-12 with the exact active gate and a 100% local/development Stage 5 cohort; advisory signals and hard invariants are recorded in the approved dev activation design.
+  - Dev activation contract at c50d8420 plus exact-value review fix ba27d573 passed 5/5 files and 24/24 tests; both dev workers and the package environment example use coherent exact values, while production/staging assets remain unactivated.
+  - @megacampus/course-gen-platform type-check passed for the dev activation checkpoint; supported YAML/TypeScript files passed Prettier, the environment example passed dotenv exact-value parsing, and diff checks passed.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-acceptance.md
 explicit_defers:
-  - mc2-jz6y0.24.2 remains the product-truth boundary for exact Stage 5 cohort, numeric promotion thresholds, measurement windows, accountable owners, and rollback contacts; the implementation fails closed at a zero-percent cohort until an owner decision exists.
+  - Independent Task 3 correctness/docs review plus parent acceptance reruns must pass before this artifact can change from blocked to accepted.
   - Q12 mc2-jz6y0.13 remains open and authorization-gated; no remote deployment, live reindex, service or secret change, staging mutation, or production mutation is authorized.
 ---
 
 # Summary
 
-The integrated E1-E7 implementation is locally accepted across shared contracts, the material-conflict UI, durable PostgreSQL migrations and isolation, Stage 2/4/5/6 behavior, observability, and reviewed operator documentation. Courses without documents retain the baseline path; every document outcome remains explicit; automatic decisions are atomic and audited; Stage 5 remains non-destructive and advisory; Stage 6 consumes the same accepted decision/evidence contract.
+The earlier integrated E1-E7 implementation through `a5a657e3` is locally accepted across shared contracts, the material-conflict UI, durable PostgreSQL migrations and isolation, Stage 2/4/5/6 behavior, observability, and reviewed operator documentation. Courses without documents retain the baseline path; every document outcome remains explicit; automatic decisions are atomic and audited; Stage 5 remains non-destructive and advisory; Stage 6 consumes the same accepted decision/evidence contract. The later 100% local/development activation checkpoint is not yet accepted.
 
-The local engineering implementation is complete enough to remain safely disabled. E7 cannot close only because the repository contains no approved product source for a live Stage 5 cohort, numeric cost/latency/false-conflict/degradation/quality thresholds, their measurement windows, accountable owners, or rollback contacts. The zero-percent fail-closed default prevents accidental activation.
+The owner closed `mc2-jz6y0.24.2` on 2026-07-12 by approving the exact active gate and a 100% Stage 5 cohort for local/development. Development has no cohort-promotion step: cost, latency, false-conflict, degradation/failure and enrichment-quality signals are advisory, while coverage and baseline preservation remain 100% and tenant/course isolation violations plus unresolved P0/P1 findings remain zero. The checked-in dev values do not alter the fail-closed runtime parser or authorize staging/production.
+
+E7 remains blocked only for the independent Task 3 correctness/docs review and parent acceptance rerun. This worker does not claim orchestrator acceptance. Q12 remains the separate authorization boundary for every remote mutation.
 
 # Verification
 
-The root focused Stage 2/4/5/6 run passed 28 files and 330 tests. An independent contract worker then passed the three shared-type suites with 23 tests and the three web conflict suites with 20 tests. An independent database worker used the loopback-only disposable database `mc2_e7_db_verify_20260712_v2_test` with:
+The root focused Stage 2/4/5/6 run passed 28 files and 330 tests. An independent contract worker then passed the three shared-type suites with 23 tests and the three web conflict suites with 20 tests. The later dev activation contract passed 5/5 files and 24/24 tests at `c50d8420` plus exact-value review fix `ba27d573`; it proves coherent exact values for both dev workers and the package environment example and proves staging/production non-activation. An independent database worker used the loopback-only disposable database `mc2_e7_db_verify_20260712_v2_test` with:
 
 ```bash
 DOCUMENT_EVIDENCE_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/mc2_e7_db_verify_20260712_v2_test \
@@ -61,6 +66,6 @@ The local Graphify refresh used version 0.8.45 and only `graphify update .`, `gr
 
 # Risks / Follow-ups
 
-The remaining blocker is not code or infrastructure: it is an absent product/operational decision. The safe recommendation is to explicitly defer activation, retain the Stage 5 cohort at 0%, and continue Q10/Q11 local documentation and acceptance. If activation is desired instead, the owner must provide the exact cohort percentage, numeric thresholds and windows for cost, latency, false material conflicts, degradation/failure, and enrichment quality, plus named owners and rollback contacts.
+The owner decision is resolved and is not an E7 defer. The sole E7 acceptance blocker is the independent Task 3 correctness/docs review and parent rerun over the combined dev activation and documentation diff. Any P0/P1 finding blocks acceptance; after a clean review, the orchestrator may mark E7 accepted and proceed to Q10.
 
 Q12 remains a separate hard authorization boundary. Before any remote action, the orchestrator must present exact staging actions, external effects, secret requirements, observation, rollback, and expected downtime/data effects and obtain explicit current-task authorization.

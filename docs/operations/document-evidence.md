@@ -347,7 +347,7 @@ The dashboard evidence section contains exactly these six panels:
 
 ## Rollout sequence
 
-Rollout is ordered and must not skip a step:
+Any future staging/production rollout is ordered and must not skip a step:
 
 1. disabled, then the current integrated shadow evidence/conflict collection;
 2. active conflict questions for internal/manual courses;
@@ -356,9 +356,18 @@ Rollout is ordered and must not skip a step:
    cohort;
 5. broader promotion only after every owner decision below is recorded.
 
-Step 4 uses `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT`. Keep it at `0` until the
-owner records the cohort definition and unresolved product gates below. A
-nonzero value is not permission to skip the exact global active gate.
+For local/development, the owner approved the exact active gate and a 100%
+Stage 5 cohort on 2026-07-12. Development has no cohort-promotion step: cost,
+latency, false-conflict, degradation/failure and enrichment-quality signals are
+advisory. Coverage and baseline preservation must remain 100%, tenant/course
+isolation violations and unresolved P0/P1 findings must remain zero.
+Staging/production activation is not implied and remains Q12-gated. The exact
+checked-in development decision and environment are recorded in
+[`Document Evidence: 100% Dev Activation Design`](../superpowers/specs/2026-07-12-document-evidence-dev-activation-design.md).
+
+The active development value is
+`DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100`. A nonzero value never replaces
+the exact global active gate.
 
 Shadow mode is not an acceptance claim. Before advancing, compare exact coverage,
 conflict precision, degraded outcomes, model/cost/latency observations, and
@@ -366,11 +375,15 @@ baseline/enriched structure diffs. Preserve representative RU and EN evidence
 and include no-document, irrelevant-document, oversized-document, large-corpus,
 resume, Qdrant-unavailable, and tenant-isolation cases.
 
-## Owner decisions required before promotion
+## Development decision and future remote promotion
 
-No numeric product rollout thresholds have been accepted. Record all fields
-below in the authorized rollout decision; do not infer them from test totals,
-historical averages, dashboard defaults, or alert expressions.
+The local/development decision treats the cost, latency, false-conflict,
+degradation/failure and enrichment-quality fields below as advisory observation,
+not numeric promotion gates. Its hard invariants are 100% coverage, 100%
+baseline preservation, zero tenant/course isolation violations and zero
+unresolved P0/P1 findings. Any future staging/production promotion must obtain
+its own Q12 authorization and record the applicable fields below; the
+local/development decision must not be reused as remote authorization.
 
 | Decision field     | Evidence to present                                                           | Required record                                                          |
 | ------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -402,6 +415,11 @@ Choose one rollback objective before changing configuration:
 
 Do not promise audit-only behavior and evidence-aware Stage 6 behavior in the
 same configuration; the shared active gate makes them mutually exclusive.
+
+The documented development containment action is
+`DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100 -> 0`. Quiesce first and complete
+the coherent restart and verification sequence below; do not flip the value on
+an in-flight job. This containment keeps stored evidence and audit rows.
 
 Use this order for either rollback objective:
 

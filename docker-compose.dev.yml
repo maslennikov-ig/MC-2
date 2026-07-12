@@ -206,6 +206,10 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant-dev:6333
+      # Document evidence is owner-approved for every eligible local/dev course.
+      - DOCUMENT_EVIDENCE_ENABLED=true
+      - DOCUMENT_EVIDENCE_MODE=active
+      - DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       - DOCLING_CACHE_PATH=/app/docling-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
@@ -255,6 +259,10 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant-dev:6333
+      # Document evidence is owner-approved for every eligible local/dev course.
+      - DOCUMENT_EVIDENCE_ENABLED=true
+      - DOCUMENT_EVIDENCE_MODE=active
+      - DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
       # Enable dedicated Stage 6 worker mode (30 concurrent)
       - STAGE6_WORKER=true
       # DEV queue isolation - listens to DEV-only stage6 queue
