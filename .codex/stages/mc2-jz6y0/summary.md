@@ -141,6 +141,6 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 docs-reviewed: no-change-needed — Q10 already reconciled all durable setup, retrieval, recovery, monitoring and rollback documentation; Q11 changes release evidence and current orchestration truth only.
 
-graph-reviewed: updated — local-only Graphify 0.8.45 refresh at Q11 accepted parent HEAD `3681afb9` contains 50,490 nodes and 75,065 edges; `GRAPH_REPORT.md` matched HEAD. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh on the delivered post-closeout tree contains 50,490 nodes and 75,065 edges; `GRAPH_REPORT.md` matched the current HEAD. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.

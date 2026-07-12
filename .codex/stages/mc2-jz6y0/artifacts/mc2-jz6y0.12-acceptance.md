@@ -17,7 +17,7 @@ risk_level: high
 docs_reviewed: no-change-needed
 docs_review_notes: Q10 already reconciled all durable setup/retrieval/recovery/monitoring/rollback docs. Q11 adds only release evidence and orchestration truth; final independent review reported Ready Yes with P0-P3 zero.
 graph_reviewed: updated
-graph_review_notes: Local-only Graphify 0.8.45 was refreshed with `graphify update . --force` and `graphify cluster-only . --no-viz` at accepted parent HEAD 3681afb9. `GRAPH_REPORT.md` matched that HEAD and contained 50,490 nodes and 75,065 edges. No external model/API mode or Git hook was used; community totals are intentionally omitted because reclustering is not stable evidence.
+graph_review_notes: Local-only Graphify 0.8.45 was refreshed with `graphify update . --force` and `graphify cluster-only . --no-viz` on the delivered post-closeout tree. `GRAPH_REPORT.md` matched the current HEAD and contained 50,490 nodes and 75,065 edges. No external model/API mode or Git hook was used; community totals are intentionally omitted because reclustering is not stable evidence.
 verification:
   - Focused backend Stage 2/4/5/6, shared Qdrant, activation, privacy and observability gate passed 124/124 files and 1869/1869 tests with zero skips.
   - Shared document-evidence, clarifying and Stage 5 audit contracts passed 3/3 files and 23/23 tests with zero skips.
@@ -32,6 +32,7 @@ verification:
   - Final independent review reran pnpm type-check and pnpm build (75/75 static pages), validated all artifacts/format/diff/process evidence, and reported Ready Yes with P0-P3 zero.
   - `python3 scripts/orchestration/check_stage_ready.py mc2-jz6y0` passed with `artifact validation OK` and `stage mc2-jz6y0 ready` at parent HEAD 3681afb9. Canonical real closeout, Beads closure and push remain parent-owned.
   - Canonical `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-jz6y0` passed with inherited synthetic local Supabase build variables: workspace type-check, production build with 75/75 static pages, process verification, artifact/stage readiness, child cleanup, project-index/docs review and debt scan all passed, ending with `stage closeout verification OK`. The first invocation without those required variables failed at web environment validation before compilation; the unchanged command passed after restoring the already documented local build environment.
+  - The mandatory final `git pull --rebase` found the remote zero commits ahead and linearized six local Q11 commits; `git diff --stat 3f91bd27 49c928a2` was empty, proving the rebased delivery tree is byte-identical to the canonically verified pre-rebase tree.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.12-acceptance.md
 explicit_defers:
@@ -79,4 +80,4 @@ Beads closure and push remain required before Q11 closeout. Q12 remains the only
 
 docs-reviewed: no-change-needed - Q10 completed durable documentation; Q11 adds evidence only.
 
-graph-reviewed: updated - local-only Graphify 0.8.45 refresh at accepted parent HEAD `3681afb9` produced 50,490 nodes and 75,065 edges; report/HEAD match passed, with no external model/API mode or Git hook.
+graph-reviewed: updated - local-only Graphify 0.8.45 refresh on the delivered post-closeout tree produced 50,490 nodes and 75,065 edges; report/current-HEAD match passed, with no external model/API mode or Git hook.

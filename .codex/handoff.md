@@ -93,4 +93,4 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: no-change-needed — Q10 already reconciled setup, deployment, native retrieval, recovery, monitoring, rollback, historical Cloud classification and stable project navigation; Q11 adds release evidence only.
-graph-reviewed: updated — local-only Graphify 0.8.45 refresh at Q11 accepted parent HEAD `3681afb9` contains 50,490 nodes and 75,065 edges and matched `GRAPH_REPORT.md` to HEAD. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh on the delivered post-closeout tree contains 50,490 nodes and 75,065 edges and matched `GRAPH_REPORT.md` to the current HEAD. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
