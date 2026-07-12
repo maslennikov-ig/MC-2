@@ -1,0 +1,113 @@
+---
+schema_version: orchestration-artifact/v1
+artifact_type: delegated-stream
+task_id: mc2-jz6y0.11
+stage_id: mc2-jz6y0
+agent_type: technical_docs_worker
+subagent_model: inherit_orchestrator
+reasoning_effort: high
+model_reasoning_rationale: Setup, retrieval, security, recovery, monitoring, systemd and rollback guidance required one coherent architectural and operations reconciliation.
+repo: /home/me/code/mc2
+branch: codex/q10-docs
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: d7be7adc341e567c2ad9a5be5a241489a4814ac9
+worktree: /home/me/code/mc2/.worktrees/q10-docs
+status: returned
+delivery_method: not accepted
+accepted_by_orchestrator: no
+cleanup_status: pending
+cleanup_notes: Docs-only worker created no services, containers, volumes, databases, credentials, deployment state, live index writes, or remote runtime mutations; branch cleanup remains parent-owned after review/integration.
+risk_level: high
+docs_impact: ops-deploy
+docs_reviewed: updated
+docs_review_notes: Reconciled current setup, deployment, retrieval, recovery, monitoring and rollback guidance; explicitly bannered retained historical research/specification material. Independent docs review remains parent-owned.
+graph_reviewed: used
+graph_review_notes: Read `/home/me/code/mc2/graphify-out/GRAPH_REPORT.md` (local graph built from 1233be56) for orientation. Child did not refresh shared ignored graph state; parent closeout owns the safe final refresh.
+verification:
+  - Initial broad non-archive Cloud/cluster/custom-BM25 scan recorded 108 matching lines; exact Cloud scan after edits retains 49 historical/retirement lines across 20 classified files.
+  - Current-guidance exact Cloud scan found one explicit retirement sentence and zero actionable hosted setup, endpoint, account, dashboard or key instructions.
+  - Active old-pin scan for Prometheus 3.11.3 and Grafana 12.4.0 found zero; current operator/deployment docs contain 21 positive pin references.
+  - Current Qdrant setup/module/operator docs contain 71 positive retrieval, strict-schema, reindex, snapshot/restore, systemd, rollback and Q12 references before the final exact-truth wording pass.
+  - Prettier check, git diff --check, artifact validation and process verification passed after the complete docs write.
+changed_files:
+  - .claude/docs/deployment-guide.md
+  - .codex/project-index.md
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.11-docs.md
+  - README.md
+  - docs/ARCHITECTURE-DIAGRAM.md
+  - docs/TECHNICAL_SPECIFICATION_PRODUCTION_EN.md
+  - docs/operations/qdrant-self-hosted.md
+  - docs/quickstart.md
+  - docs/reports/repository/REPOSITORY_SUMMARY.md
+  - docs/research/RAG-vs-KAG-ADDENDUM.md
+  - docs/research/RAG1.md
+  - docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md
+  - docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md
+  - packages/course-gen-platform/docs/T072-qdrant-client-implementation.md
+  - packages/course-gen-platform/docs/qdrant-setup.md
+  - packages/course-gen-platform/src/shared/qdrant/COLLECTION_SETUP.md
+  - packages/course-gen-platform/src/shared/qdrant/README.md
+  - packages/course-gen-platform/src/shared/qdrant/UPLOAD-GUIDE.md
+  - packages/course-gen-platform/src/stages/stage2-document-processing/README.md
+  - specs/001-stage-0-foundation/plan.md
+  - specs/001-stage-0-foundation/research.md
+  - specs/001-stage-0-foundation/spec.md
+  - specs/001-stage-0-foundation/tasks-archive.md
+  - specs/003-stage-2-implementation/plan.md
+  - specs/003-stage-2-implementation/quickstart.md
+  - specs/003-stage-2-implementation/spec.md
+  - specs/003-stage-2-implementation/tasks.md
+  - specs/005-stage-3-create/data-model.md
+  - specs/005-stage-3-create/plan.md
+  - specs/005-stage-3-create/quickstart.md
+  - specs/008-generation-generation-json/plan.md
+explicit_defers:
+  - Q12 only: staging/production file transfer, deploy, secret creation/change, service installation/enabling, live reindex, alias cutover, real notification and every remote mutation remain unauthorized.
+  - Before any Q12 activation, staging must prove systemd >=247, the packaged `/usr/bin/pnpm` path, required file-backed credentials, metrics directory ownership, and rollback operator availability.
+---
+
+# Summary
+
+Q10 replaces active hosted-Qdrant setup and stale retrieval claims with one current contract: private digest-pinned Qdrant 1.18.2, exact JavaScript client 1.18.0, stable `course_embeddings` alias over versioned physical collections, native multilingual BM25 documents with collection-side IDF, dense+sparse server RRF nested in Formula over `$score`, and strict tenant/filter indexes including float `document_weight`.
+
+The operator and deployment docs now cover authoritative-source deterministic reindex, atomic alias cutover/rollback, exact-version isolated snapshot restore with `priority=snapshot`, authenticated `/metrics` on listener 6333, the approved monitoring pins, file-backed credentials, textfile atomicity, provisioned Grafana behavior, systemd >=247, timer/lock behavior, and the Q12 boundary. The development document-evidence decision is explicitly separated from any staging/production activation authority.
+
+# Source packet
+
+First-party sources checked 2026-07-12:
+
+- Qdrant 1.18.2 release: <https://github.com/qdrant/qdrant/releases/tag/v1.18.2>
+- Qdrant text/BM25: <https://qdrant.tech/documentation/search/text-search/full-text-search/>
+- Qdrant hybrid/RRF/Formula: <https://qdrant.tech/documentation/search/hybrid-queries/>
+- Qdrant indexing and administration: <https://qdrant.tech/documentation/manage-data/indexing/> and <https://qdrant.tech/documentation/operations/administration/>
+- Qdrant collections/aliases, snapshots, security and monitoring: <https://qdrant.tech/documentation/manage-data/collections/>, <https://qdrant.tech/documentation/operations/snapshots/>, <https://qdrant.tech/documentation/security/>, <https://qdrant.tech/documentation/tutorials-operations/secure-qdrant/>, and <https://qdrant.tech/documentation/ops-monitoring/monitoring/>
+- Prometheus 3.13.1 release/LTS/config: <https://github.com/prometheus/prometheus/releases/tag/v3.13.1>, <https://prometheus.io/docs/introduction/release-cycle/>, and <https://github.com/prometheus/prometheus/blob/v3.13.1/docs/configuration/configuration.md>
+- Grafana 12.4.5/support/provisioning/Docker: <https://github.com/grafana/grafana/releases/tag/v12.4.5>, <https://grafana.com/docs/grafana/latest/upgrade-guide/when-to-upgrade/>, <https://grafana.com/docs/grafana/latest/administration/provisioning/>, and <https://grafana.com/docs/grafana/latest/setup-grafana/configure-docker/>
+- node_exporter 1.12.0/textfile and Alertmanager 0.33.1/config: <https://github.com/prometheus/node_exporter/releases/tag/v1.12.0>, <https://github.com/prometheus/node_exporter/blob/v1.12.0/README.md#textfile-collector>, <https://github.com/prometheus/alertmanager/releases/tag/v0.33.1>, and <https://github.com/prometheus/alertmanager/blob/v0.33.1/docs/configuration.md>
+- systemd 257 manuals: <https://www.freedesktop.org/software/systemd/man/257/systemd.exec.html>, <https://www.freedesktop.org/software/systemd/man/257/systemd.service.html>, and <https://www.freedesktop.org/software/systemd/man/257/systemd.timer.html>. Runtime minimum is 247 because `LoadCredential` was added in 247.
+
+# Cloud scan classification
+
+The initial broad scan returned 108 matching lines. After reconciliation, exact hosted-Qdrant terms remain only in these classified files:
+
+- Current retirement statements: `packages/course-gen-platform/docs/qdrant-setup.md`, `.codex/handoff.md`, the approved 2026-07-10 Qdrant design/plan, and the continuation prompt. Each explicitly says the old test-only service is retired/lost, forbids recovery/mutation, or describes the superseded baseline.
+- Bannered historical research/specifications: both `docs/research/RAG*` files; `specs/001-stage-0-foundation/{plan,research,spec,tasks-archive}.md`; `specs/003-stage-2-implementation/{plan,quickstart,spec,tasks}.md`; `specs/005-stage-3-create/{data-model,plan,quickstart}.md`; and `specs/008-generation-generation-json/plan.md`. Every file begins with a conspicuous historical/superseded/not-runtime-guidance banner and links to the operator runbook.
+- Non-runtime persona metadata: `.claude/agents/infrastructure/workers/infrastructure-specialist.md` contains a generic legacy service-specialist phrase, no endpoint, key, provisioning command, or application runtime instruction. It was outside the authorized docs/research/spec write zone and is not actionable guidance.
+
+The 16 current-guidance surfaces contain no hosted endpoint, hosted dashboard/account creation, hosted API-key acquisition, or active hosted deployment instruction. The one exact phrase outside the approved design/plan is the explicit retirement warning in the setup guide.
+
+# Verification and delivery
+
+Final formatting, artifact validation, process verification, diff checks, commit and push evidence are appended by the worker after fresh execution. Independent docs review and orchestrator acceptance intentionally remain pending.
+
+# Rollback and cleanup
+
+This stream changes Markdown only. Rollback is the branch revert; no runtime rollback is necessary because no service, secret, collection, snapshot, notification, deployment, staging or production state was touched. The dedicated worktree/local branch may be removed only after parent review and integration; the pushed evidence branch remains available until then.
+
+docs-reviewed: updated — durable developer/operator/retrieval/recovery guidance and historical classification are reconciled; independent review pending.
+
+graph-reviewed: used — local report read for architecture orientation; final shared local-only refresh is parent-owned after integration.
+
+# Risks / Follow-ups
+
+Independent docs review and parent integration scans remain required before Q10 acceptance. Q12 is the only operational defer: staging systemd/version/path/secrets preflight and every remote activation or mutation still require explicit current-task authorization.

@@ -13,7 +13,7 @@ The repository houses all source needed to intake instructor material, convert i
 - **Workspace layout**: Defined by `pnpm-workspace.yaml`, the repo includes the Next.js frontend (`courseai-next`), the tRPC/BullMQ backend (`packages/course-gen-platform`), shared contract packages, infra services, and a large `docs/` + `specs/` knowledge base.
 - **Frontend layer**: `courseai-next` is a React 19 + Next.js 15 app using the App Router, Tailwind, shadcn UI, Supabase SSR helpers, and dynamic shader-heavy hero experiences. It exposes creation flows, course dashboards, and feature catalogs while handling auth/session management.
 - **API & orchestration layer**: `packages/course-gen-platform` exposes a tRPC server, schedules work with BullMQ on Redis, and contains LangGraph/LangChain-based Stage 5 services plus Supabase migrations/tests. Job status, validation, and incremental regeneration live here.
-- **Intelligence layer**: Docling MCP microservice (`services/docling-mcp`) converts uploads into structured Markdown/JSON, Jina-v3 embeddings feed Qdrant Cloud, and hybrid BM25 + dense retrieval drives the RAG context consumed by multi-model OpenRouter calls.
+- **Intelligence layer**: Docling MCP microservice (`services/docling-mcp`) converts uploads into structured Markdown/JSON, Jina-v3 embeddings feed private pinned Qdrant 1.18.2, and native multilingual BM25/IDF plus dense retrieval is fused by server RRF and Formula for the RAG context consumed by multi-model OpenRouter calls.
 - **Data & security layer**: Supabase provides PostgreSQL with 100% RLS coverage, JWT auth, storage buckets, and tier-aware quotas. Shared Zod + generated Supabase types enforce contract fidelity across packages.
 
 ## Key Components
@@ -29,7 +29,7 @@ The repository houses all source needed to intake instructor material, convert i
 
 - **Languages & runtimes**: TypeScript 5.9, Node.js 20+, React 19, Next.js 15, pnpm workspaces.
 - **Frameworks & libs**: tRPC, BullMQ, LangGraph/LangChain, Supabase SSR helpers, Tailwind CSS 4, shadcn/ui, Radix UI primitives, Zustand state, React Hook Form, Playwright, Jest, Vitest, ESLint 9, Prettier 3.
-- **Platforms & data stores**: Supabase PostgreSQL (pgvector), Qdrant Cloud for vectors, Redis 7 for queues, Docling MCP service, OpenRouter multi-model inference, Jina-v3 embeddings, Dockerized Docling stack.
+- **Platforms & data stores**: Supabase PostgreSQL, self-hosted Qdrant 1.18.2 for the derived vector index, Redis 7 for queues, Docling MCP service, OpenRouter multi-model inference, Jina-v3 embeddings, Dockerized Docling stack.
 - **Tooling & workflows**: GitHub Actions CI, Supabase CLI, MCP profiles (`mcp/.mcp.*`), n8n automation workflows, comprehensive documentation inside `docs/` and `specs/`.
 
 ## Data Flow

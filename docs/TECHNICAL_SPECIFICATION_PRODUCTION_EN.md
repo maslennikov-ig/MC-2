@@ -524,10 +524,12 @@ const content = await db
 
 **Vector DB:**
 
-- ✅ **ACTUAL IMPLEMENTATION:** Qdrant Cloud (free tier, 1GB storage)
+- ✅ **ACTUAL IMPLEMENTATION:** private, pinned self-hosted Qdrant 1.18.2
   - HNSW index (m=16, ef_construct=100)
   - Cosine similarity distance
-  - Payload indexes for multi-tenancy (organization_id, course_id)
+  - Native multilingual BM25/IDF plus server RRF and Formula priority scoring
+  - Strict payload indexes for tenant/course/document filters and float `document_weight`
+  - Stable `course_embeddings` alias over versioned physical collections
   - Batch upload (100-500 vectors per batch)
   - Superior performance compared to pgvector
 - ⏸️ **ORIGINAL PLAN:** pgvector (extension in Supabase PostgreSQL)

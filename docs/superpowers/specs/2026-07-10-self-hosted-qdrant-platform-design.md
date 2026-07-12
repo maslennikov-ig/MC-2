@@ -6,6 +6,12 @@ Implementation epic: `mc2-jz6y0`
 Planning task: `mc2-jz6y0.1`
 Status: approved for implementation planning by the product owner
 
+> Implementation status (2026-07-12): Q6-Q9 are accepted locally. Runtime truth
+> is pinned Qdrant 1.18.2 with native multilingual BM25/IDF, server RRF nested in
+> Formula, strict indexes, recoverable reindex/snapshots, and pinned monitoring.
+> The “Current runtime” and “correctness gaps” below are the superseded discovery
+> baseline, not current runtime guidance. Q12 remote activation remains unauthorized.
+
 ## Executive Decision
 
 MegaCampus will replace the unusable Qdrant Cloud dependency with a version-pinned, single-node, self-hosted Qdrant service on the existing server. The old Cloud database was test-only and is lost, so there is no cloud-data migration. Qdrant remains a derived search index; source documents and their database metadata remain the system of record.
@@ -28,6 +34,9 @@ This design does not create a multi-node cluster, enable quantization, or move h
 ## Context And Evidence
 
 ### Current runtime
+
+> Historical discovery snapshot from 2026-07-10; superseded by the accepted
+> implementation described in this design and the operator runbook.
 
 - The live local Qdrant server reports version `1.18.2`; the application uses `@qdrant/js-client-rest` `1.18.0`.
 - Dev already has a local `qdrant-dev` container, but the image is `latest`, has no readiness health check, and exposes only an admin API key.

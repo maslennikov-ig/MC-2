@@ -317,17 +317,12 @@ See `/home/me/code/megacampus2/docs/API.md#document-processing-router` for API d
 - Tokens: ~5,000
 - Cost: ~$0.0005 per document
 
-### Qdrant Costs
+### Qdrant capacity
 
-**Storage:** $0.40 per GB per month (Qdrant Cloud)
-**Vectors:** ~1KB per vector
-**Average Document:** ~50KB storage
-
-**Monthly Cost (1000 docs):**
-
-- Storage: 1000 docs × 50KB = 50MB = ~$0.02/month
-- Embedding: 1000 docs × $0.0005 = $0.50
-- **Total:** ~$0.52 per 1000 documents
+Qdrant 1.18.2 is self-hosted and pinned; capacity is governed by the enforced
+host/container limits rather than a hosted storage tier. Treat the collection
+as rebuildable derived state and monitor points, vectors, memory, optimization,
+snapshot age, and restore-drill age.
 
 ---
 
@@ -344,9 +339,10 @@ OPENAI_API_KEY=sk-...
 EMBEDDING_MODEL=text-embedding-ada-002
 
 # Qdrant
-QDRANT_URL=https://qdrant.example.com
-QDRANT_API_KEY=...
-QDRANT_COLLECTION=course-chunks
+QDRANT_URL=http://qdrant-dev:6333
+QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+QDRANT_COLLECTION_NAME=course_embeddings
+QDRANT_PHYSICAL_COLLECTION_NAME=course_embeddings_v1
 ```
 
 ### Chunking Config

@@ -1,3 +1,5 @@
+> **SUPERSEDED SPECIFICATION — NOT RUNTIME GUIDANCE.** Hosted Qdrant prerequisites below are retained as history and replaced by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Feature Specification: Stage 2 Implementation Verification and Completion
 
 **Feature Branch**: `003-stage-2-implementation`

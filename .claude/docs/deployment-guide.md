@@ -281,6 +281,37 @@ docker image prune -a --filter "label!=docling"
 
 ## Rollback
 
+### Self-hosted Qdrant activation boundary
+
+The application runtime is designed for private, digest-pinned Qdrant `1.18.2`
+at `http://qdrant:6333`. The stable `course_embeddings` alias points to a
+versioned physical collection. Qdrant is a derived index: rebuild it from
+`file_catalog` and authoritative source files; do not attempt to recover or
+mutate the retired hosted proof-of-concept.
+
+The repository includes Compose, `deploy/qdrant`, `deploy/systemd`, and
+`ops/qdrant` assets, but this guide does not authorize their staging/production
+activation. Q12 requires separate current-task approval before copying files,
+creating/changing secrets, starting/enabling services, live reindexing, alias
+cutover, sending real notifications, or any other remote mutation.
+
+Before an authorized activation, require:
+
+1. Qdrant/monitoring images match `ops/qdrant/image-lock.json`: Qdrant 1.18.2,
+   Prometheus 3.13.1 LTS, Grafana 12.4.5, node_exporter 1.12.0, and Alertmanager
+   0.33.1.
+2. Target systemd is at least 247 (`LoadCredential`); verify the packaged
+   absolute `/usr/bin/pnpm` path and all secret/state/metrics ownership.
+3. Qdrant, dashboard, Prometheus, Grafana, Alertmanager, and node_exporter are
+   private/loopback only; `/metrics` is authenticated on listener 6333.
+4. Native multilingual BM25/IDF, dense+sparse server RRF nested into Formula,
+   strict indexes including float `document_weight`, and tenant isolation pass.
+5. Reindex plan/execute/verify completes before atomic alias cutover; exact
+   version snapshot/isolated restore and alias recreation are proven separately.
+
+The exact preflight, monitoring, systemd, recovery, notification, and rollback
+commands are maintained in `docs/operations/qdrant-self-hosted.md`.
+
 Instant rollback via nginx reload (9 steps):
 
 1. Read active color, derive target (opposite)

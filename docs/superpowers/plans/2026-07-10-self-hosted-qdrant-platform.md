@@ -6,7 +6,11 @@
 
 **Architecture:** Run a version-pinned single Qdrant node per environment, expose only private/loopback interfaces, and keep `course_embeddings` as an alias over versioned physical collections. Ingest Jina dense vectors plus Qdrant-native multilingual BM25 documents, retrieve with server-side RRF and Formula Query priority scoring, and operate the derived index through deterministic bootstrap, reindex, snapshots, restore drills, Prometheus, and Grafana.
 
-**Tech Stack:** Qdrant Server `1.18.2`, `@qdrant/js-client-rest` `1.18.0`, TypeScript, Vitest, Docker Compose, Prometheus `3.11.3`, Grafana `12.4.0`, Bash/systemd, pnpm.
+**Tech Stack:** Qdrant Server `1.18.2`, `@qdrant/js-client-rest` `1.18.0`, TypeScript, Vitest, Docker Compose, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, Bash/systemd, pnpm.
+
+> Implementation status (2026-07-12): Q6-Q9 are accepted locally; this plan is
+> retained as execution evidence. Current operations guidance lives in
+> `docs/operations/qdrant-self-hosted.md`. Q12 remote activation is unauthorized.
 
 ## Approved Scope Expansion (2026-07-11)
 
@@ -778,7 +782,7 @@ git commit -m "feat(qdrant): automate snapshots and restore drills"
 
 - [ ] **Step 1: Add Prometheus and Grafana services**
 
-Use `prom/prometheus:v3.11.3` and `grafana/grafana:12.4.0`. Bind Prometheus to `127.0.0.1:9090` and Grafana to `127.0.0.1:3005`, mount persistent named volumes, provision the read-only Qdrant credential from a secret file, and set bounded Prometheus retention to 15 days/5 GiB.
+Use `prom/prometheus:v3.13.1`, `grafana/grafana:12.4.5`, `prom/node-exporter:v1.12.0`, and `prom/alertmanager:v0.33.1`, each with the approved digest in `ops/qdrant/image-lock.json`. Bind operator surfaces to loopback, mount persistent named volumes, provision the read-only Qdrant credential from a secret file, and set bounded Prometheus retention to 15 days/5 GiB.
 
 - [ ] **Step 2: Add scrape and alert configuration**
 
@@ -801,8 +805,8 @@ Document Web UI `/dashboard`, read-only key use, bootstrap, verify, snapshot, re
 - [ ] **Step 5: Validate configurations**
 
 ```bash
-docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.11.3 check config /etc/prometheus/prometheus.yml
-docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.11.3 check rules /etc/prometheus/alerts.yml
+docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.13.1 check config /etc/prometheus/prometheus.yml
+docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.13.1 check rules /etc/prometheus/alerts.yml
 docker compose -f docker-compose.infra.yml --env-file .env.production.example config --quiet
 ```
 

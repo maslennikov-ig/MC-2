@@ -1,3 +1,5 @@
+> **SUPERSEDED SPECIFICATION — NOT RUNTIME GUIDANCE.** Qdrant Cloud requirements below describe the original proof-of-concept and are replaced by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Feature Specification: Stage 0 - Foundation
 
 **Feature Branch**: `001-stage-0-foundation`

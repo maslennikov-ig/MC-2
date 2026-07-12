@@ -1,14 +1,16 @@
 # Self-hosted Qdrant operator runbook
 
-This runbook covers the private Qdrant 1.18.2 observability path. It does not
+This runbook covers the private Qdrant 1.18.2 retrieval, reindex, recovery,
+observability, and rollback path. It does not
 authorize a deployment, live reindex, secret change, notification to a real
 receiver, or any staging/production mutation. Those actions remain behind the
 Q12 approval gate.
 
 ## Immutable runtime
 
-The approved monitoring images are pinned in `ops/qdrant/image-lock.json`:
+The approved runtime and monitoring images are pinned in `ops/qdrant/image-lock.json`:
 
+- Qdrant 1.18.2;
 - Prometheus 3.13.1 LTS;
 - Grafana 12.4.5 extended support;
 - node_exporter 1.12.0;
@@ -17,6 +19,25 @@ The approved monitoring images are pinned in `ops/qdrant/image-lock.json`:
 Compose uses each tag plus its approved multi-platform index digest and
 `linux/amd64`. The lock also records the approved platform child digest. Do not
 replace a pin with `latest` or a tag-only reference.
+
+The application uses exact `@qdrant/js-client-rest` 1.18.0. The stable alias
+`course_embeddings` points to a versioned physical collection such as
+`course_embeddings_v1`. Alias actions are atomic; applications never target a
+physical name directly. Source documents and `file_catalog` are authoritative,
+while Qdrant is a rebuildable derived index.
+
+## Retrieval and strict-schema contract
+
+The named `dense` vector is Jina v3 768D Cosine. The named `sparse` vector has
+`modifier: idf`; ingest and query both send a Qdrant `Document` with
+`model=qdrant/bm25`, `language=none`, `tokenizer=multilingual`, `lowercase=true`,
+`k=1.2`, `b=0.75`, and `avg_len=256`. There is no custom/process-local BM25.
+
+Qdrant executes dense and sparse prefetch, server RRF, then a nested Formula
+Query over `$score` and `document_weight`. The application does not fuse or
+boost scores client-side. Strict mode requires indexes for tenant
+`organization_id`; `course_id`, `document_id`, `chunk_id`, `level`, `chapter`,
+`section`; all four `has_*` flags; and float `document_weight`.
 
 ## Access: loopback and SSH tunnel only
 
@@ -92,7 +113,9 @@ path read-only, and relies only on directory traversal plus final file mode
 `0644`; it never runs as root or joins the writer group. Application containers
 write one persistent file per service and instance by atomic rename. Snapshot
 and restore jobs publish their gauges the same way. Only `*.prom` final files
-belong there; temporary files must never be observed after a successful write.
+belong there; samples must not carry explicit timestamps, and writers must use a
+same-directory temporary file plus atomic `mv`. Temporary files must never be
+observed after a successful write.
 
 ## Safe local validation before activation
 
@@ -124,7 +147,8 @@ real Telegram receiver during local acceptance.
 
 Prometheus must show these three targets as healthy:
 
-- `qdrant:6333/metrics?per_collection=true`, with `api-key` loaded from a file;
+- `qdrant:6333/metrics?per_collection=true`, with the `api-key` loaded through
+  `http_headers.api-key.files`;
 - `node_exporter:9100`, reachable only on the private bridge;
 - `alertmanager:9093`, reachable only on the private bridge.
 
@@ -136,7 +160,9 @@ The provisioned Grafana dashboard must show target/alert state, recovery mode,
 Qdrant app/version info, points and vectors, request/error/p95, memory,
 optimizations, snapshot/recovery age and activity, and hybrid fallback rate.
 Anonymous access, sign-up, UI edits of provisioned assets, and public dashboards
-remain disabled.
+remain disabled. Provisioned dashboards are filesystem-owned and are not
+persisted back from the Grafana UI. Alertmanager reads both Telegram fields from
+files and uses `send_resolved: true`.
 
 ## Bootstrap, verify, reindex, snapshot, and restore
 
@@ -153,10 +179,44 @@ pnpm --dir packages/course-gen-platform qdrant:snapshot
 pnpm --dir packages/course-gen-platform qdrant:restore-drill
 ```
 
-The Q8 recovery implementation owns the final snapshot/restore command details,
-checksum manifest, retention, systemd timers, isolated collection and alias
-cleanup. Never restore over the active alias. A failed drill leaves the stable
-alias untouched and keeps evidence for triage.
+The recovery implementation owns the checksum manifest, retention, systemd
+timers, isolated collection, and alias cleanup. Reindex uses deterministic,
+bounded, resumable batches from `file_catalog` and authoritative source files;
+verify targeted tenant/course counts, RU/EN retrieval, strict filters, and point
+identity before an atomic alias cutover.
+
+Qdrant snapshots do not contain aliases. Restore a Qdrant 1.18.2 snapshot only
+on Qdrant 1.18.2 into an isolated collection with `priority=snapshot`, validate
+the manifest checksum and recovery probe, and recreate/switch the alias as a
+separate action. Never restore over the active alias. A failed drill leaves the
+stable alias untouched and keeps evidence for triage.
+
+## systemd installation and verification
+
+The units in `deploy/systemd/` require systemd **247 or newer** because they use
+`LoadCredential`; the reference manuals consulted for hardening are systemd 257. Before an authorized install, verify `systemd --version`, confirm pnpm is
+available at `/usr/bin/pnpm`, provision the `megacampus` user and exact
+state/runtime/metrics paths, and place credentials/probe/manifest files at the
+unit-declared paths. Do not edit the units to embed secret values.
+
+After copying reviewed units in an authorized environment:
+
+```bash
+sudo systemd-analyze verify \
+  deploy/systemd/megacampus-qdrant-snapshot.service \
+  deploy/systemd/megacampus-qdrant-snapshot.timer \
+  deploy/systemd/megacampus-qdrant-restore-drill.service \
+  deploy/systemd/megacampus-qdrant-restore-drill.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now megacampus-qdrant-snapshot.timer
+sudo systemctl enable --now megacampus-qdrant-restore-drill.timer
+systemctl list-timers 'megacampus-qdrant-*'
+```
+
+The snapshot timer runs every four hours with jitter; the restore drill is
+monthly. `Persistent=true` catches up after short downtime but does not protect
+against a host outage, so stale alerts remain mandatory. Snapshot and restore
+share a nonblocking `flock`; a collision must fail visibly, not overlap.
 
 ## Alert triage
 
@@ -188,13 +248,29 @@ Remove the application metrics environment/mount only in the same reviewed
 release. Qdrant and its stable alias remain untouched. If notification routing
 is wrong, stop Alertmanager first; never patch a token into tracked YAML.
 
+For application/index rollback, stop new writes, point the alias atomically back
+to the last verified physical collection, run targeted tenant/course retrieval
+checks, and only then resume workers. Preserve the failed collection, manifests,
+logs, and metrics for diagnosis. Do not delete the last verified collection or
+known-good snapshot during the rollback window. If compatibility is uncertain,
+keep traffic stopped and restore an exact-version snapshot into a new isolated
+collection; never overwrite the active collection.
+
+Development document evidence is already active for 100% of eligible courses.
+That local/dev decision does not authorize staging/production deploy, service or
+secret activation, live reindex, alias cutover, or any remote mutation; all of
+those remain Q12-gated.
+
 ## First-party references checked for this configuration
 
-Accessed 2026-07-11:
+Accessed 2026-07-12:
 
+- Qdrant 1.18.2 release, native text search, hybrid queries, indexing, administration, aliases, snapshots, security, and metrics: <https://github.com/qdrant/qdrant/releases/tag/v1.18.2>, <https://qdrant.tech/documentation/search/text-search/full-text-search/>, <https://qdrant.tech/documentation/search/hybrid-queries/>, <https://qdrant.tech/documentation/manage-data/indexing/>, <https://qdrant.tech/documentation/operations/administration/>, <https://qdrant.tech/documentation/manage-data/collections/>, <https://qdrant.tech/documentation/operations/snapshots/>, <https://qdrant.tech/documentation/security/>, and <https://qdrant.tech/documentation/ops-monitoring/monitoring/>
 - Prometheus 3.13.1 configuration: <https://github.com/prometheus/prometheus/blob/v3.13.1/docs/configuration/configuration.md>
 - Prometheus release/LTS policy: <https://github.com/prometheus/prometheus/releases/tag/v3.13.1> and <https://prometheus.io/docs/introduction/release-cycle/>
 - Alertmanager 0.33.1 configuration: <https://github.com/prometheus/alertmanager/blob/v0.33.1/docs/configuration.md>
 - node_exporter 1.12.0 textfile collector: <https://github.com/prometheus/node_exporter/blob/v1.12.0/README.md#textfile-collector>
 - Grafana provisioning and Docker secrets: <https://grafana.com/docs/grafana/latest/administration/provisioning/> and <https://grafana.com/docs/grafana/latest/setup-grafana/configure-docker/>
+- Grafana 12.4.5 and support policy: <https://github.com/grafana/grafana/releases/tag/v12.4.5> and <https://grafana.com/docs/grafana/latest/upgrade-guide/when-to-upgrade/>
+- systemd 257 execution, service, and timer manuals (runtime minimum 247 for `LoadCredential`): <https://www.freedesktop.org/software/systemd/man/257/systemd.exec.html>, <https://www.freedesktop.org/software/systemd/man/257/systemd.service.html>, and <https://www.freedesktop.org/software/systemd/man/257/systemd.timer.html>
 - Docker Compose services, secrets and ports: <https://docs.docker.com/reference/compose-file/services/>, <https://docs.docker.com/reference/compose-file/secrets/>, and <https://docs.docker.com/compose/how-tos/networking/>

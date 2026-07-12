@@ -1,3 +1,5 @@
+> **SUPERSEDED QUICKSTART — NOT RUNTIME GUIDANCE.** Do not use the hosted Qdrant endpoint below; use private pinned Qdrant 1.18.2 via `docs/quickstart.md` and `docs/operations/qdrant-self-hosted.md`.
+
 # Quickstart: Stage 2 Verification Testing
 
 **Date**: 2025-10-24

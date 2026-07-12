@@ -60,8 +60,8 @@ graph TB
     end
 
     subgraph "Vector & Search"
-        VS1[Qdrant Cloud Vector DB<br/>HNSW Index<br/>Cosine Similarity]
-        VS2[BM25 Hybrid Search<br/>Sparse + Dense Vectors]
+        VS1[Private Qdrant 1.18.2<br/>Stable alias + versioned collection]
+        VS2[Native BM25/IDF + Dense<br/>Server RRF then Formula]
         VS3[Late Chunking<br/>-67% Retrieval Failures]
         VS4[Content Deduplication<br/>80% Cost Savings]
     end
@@ -463,7 +463,7 @@ graph LR
     end
 
     subgraph "Vector Storage"
-        VEC1[Qdrant Cloud<br/>HNSW Index<br/>m=16, ef=100]
+        VEC1[Private Qdrant 1.18.2<br/>HNSW m=16, ef=100]
         VEC2[Parent Metadata<br/>chunk_id, heading_path]
         VEC3[Child Vectors<br/>Indexed for Search]
     end
@@ -683,7 +683,7 @@ mindmap
       tiktoken Tokenization
       DOMPurify XSS Protection
     Vector & Search
-      Qdrant Cloud
+      Self-hosted Qdrant 1.18.2
       HNSW Index
       BM25 Hybrid
       Late Chunking
@@ -1042,7 +1042,7 @@ graph TB
 
     subgraph "Managed Services"
         SVC1[Supabase Cloud<br/>PostgreSQL + Auth]
-        SVC2[Qdrant Cloud<br/>Vector Database]
+        SVC2[Private Qdrant 1.18.2<br/>Derived Search Index]
         SVC3[Redis Cloud<br/>Queue + Cache]
         SVC4[Docling MCP<br/>Document Processing]
     end

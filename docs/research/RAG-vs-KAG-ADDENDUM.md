@@ -1,3 +1,5 @@
+> **HISTORICAL RESEARCH — NOT RUNTIME GUIDANCE.** Hosted Qdrant cost/architecture assumptions below are superseded by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # КРИТИЧЕСКОЕ ДОПОЛНЕНИЕ: Пересмотр анализа RAG vs KAG
 
 **Дата**: 2025-01-25 (обновлено)
