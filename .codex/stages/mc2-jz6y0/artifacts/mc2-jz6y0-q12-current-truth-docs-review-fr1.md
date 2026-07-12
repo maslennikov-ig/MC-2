@@ -30,11 +30,11 @@ parallel_group: Q12-current-truth-correction
 depends_on_streams:
   - mc2-jz6y0-q12-current-truth-docs-review
 parallel_decision: sequential
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: review worktree/local branch may be removed after correction-review acceptance and integration
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: correction review is integrated; review worktree/local branch and disposable resources are removed; pushed evidence branch remains
 risk_level: high
 docs_impact: docs-only
 docs_reviewed: no-change-needed

@@ -111,6 +111,7 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
-graph-reviewed: pending — the previous local Graphify `0.8.45` report predates
-the accepted snapshot/current-truth changes. Root refreshes it after this
-durable docs commit; no external model/API mode or Git hook is authorized.
+graph-reviewed: updated — local Graphify `0.8.45` ran `graphify update .` and
+`graphify cluster-only . --no-viz` after the accepted snapshot/current-truth
+changes. The refreshed graph has 50,883 nodes, 75,529 edges, and zero forbidden
+source paths; no external model/API mode or Git hook was used.
