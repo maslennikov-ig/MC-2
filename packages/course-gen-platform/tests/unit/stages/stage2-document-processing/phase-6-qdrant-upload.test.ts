@@ -67,6 +67,7 @@ describe('phase-6-qdrant-upload', () => {
     process.env.MAX_QDRANT_RETRIES = '1';
     process.env.QDRANT_UPLOAD_TIMEOUT_MS = '1000';
     process.env.QDRANT_BASE_RETRY_DELAY_MS = '1';
+    delete process.env.QDRANT_REINDEX_TARGET_COLLECTION;
   });
 
   it('treats soft upload failures as failed indexing and never logs success', async () => {
@@ -209,6 +210,34 @@ describe('phase-6-qdrant-upload', () => {
       enable_sparse: true,
     });
   });
+
+  it.each([
+    ['missing', undefined],
+    ['different', 'course_embeddings_v3'],
+  ])(
+    'refuses a %s job target when an isolated reindex worker is bound to one physical collection',
+    async (_case, qdrantTargetCollection) => {
+      process.env.QDRANT_REINDEX_TARGET_COLLECTION = 'course_embeddings_v2';
+
+      const { executeQdrantUpload } = await import(
+        '@/stages/stage2-document-processing/phases/phase-6-qdrant-upload'
+      );
+      const embeddings = [
+        {
+          chunk: {
+            document_id: 'doc-1',
+          },
+        },
+      ] as EmbeddingResult[];
+      const { job } = createJob({ qdrantTargetCollection });
+
+      await expect(executeQdrantUpload(embeddings, job)).rejects.toThrow(
+        /reindex job target must equal the worker physical collection/u
+      );
+      expect(mockUploadChunksToQdrant).not.toHaveBeenCalled();
+      expect(mockGetSupabaseAdmin).not.toHaveBeenCalled();
+    }
+  );
 
   it('leaves collection selection to the stable alias default for normal jobs', async () => {
     mockUploadChunksToQdrant.mockResolvedValue({

@@ -38,19 +38,20 @@ describe('Qdrant recovery systemd contract', () => {
         'ReadWritePaths=/var/lib/megacampus-qdrant-recovery /var/lib/megacampus/qdrant-metrics /run/megacampus-qdrant-recovery'
       );
       const metricsPreflight =
-        'ExecStartPre=/usr/bin/bash -eu -c \'test -d "$1" && test ! -L "$1" && test -w "$1" && test "$(/usr/bin/stat -c %%a -- "$1")" = 2775\' -- /var/lib/megacampus/qdrant-metrics';
+        'ExecStartPre=/opt/megacampus/deploy/qdrant/operator-compose.sh --project-directory /opt/megacampus -f /opt/megacampus/docker-compose.infra.yml --env-file /opt/megacampus/.env.production --profile operator run --rm --no-deps -T qdrant-recovery-operator metrics-check';
       expect(unit).toContain(metricsPreflight);
       expect(unit.indexOf(metricsPreflight)).toBeLessThan(unit.indexOf('ExecStart='));
-      expect(unit).toContain('/usr/bin/docker compose');
+      expect(unit).toContain('/opt/megacampus/deploy/qdrant/operator-compose.sh');
       expect(unit).toContain('--project-directory /opt/megacampus');
       expect(unit).toContain('-f /opt/megacampus/docker-compose.infra.yml');
       expect(unit).toContain('--env-file /opt/megacampus/.env.production');
       expect(unit).toContain('run --rm --no-deps -T');
+      expect(unit).toContain('-e QDRANT_RECOVERY_LOCK_HELD=1');
       expect(unit).not.toContain('/usr/bin/pnpm');
       expect(unit).not.toContain('WorkingDirectory=/opt/megacampus/packages/course-gen-platform');
       expect(unit).not.toContain('EnvironmentFile=');
       expect(unit).not.toMatch(/access[_-]?key|secret[_-]?key|api[_-]?key=/iu);
-      expect(unit).not.toMatch(/(?:mkdir|chmod).*qdrant-metrics/iu);
+      expect(unit).not.toMatch(/(?:mkdir|chmod|test -w).*qdrant-metrics/iu);
     }
 
     expect(snapshot.match(/^LoadCredential=/gmu)).toHaveLength(1);
@@ -70,33 +71,35 @@ describe('Qdrant recovery systemd contract', () => {
     expect(restore).toContain('Environment=QDRANT_SNAPSHOT_TRANSPORT_URL=http://qdrant:6333');
 
     expect(snapshot).toContain(
-      'Environment=QDRANT_API_KEY_FILE=/var/lib/megacampus-qdrant-recovery/runtime/snapshot/qdrant_api_key'
+      'Environment=QDRANT_API_KEY_FILE=/run/megacampus-qdrant-snapshot-credentials/qdrant_api_key'
     );
     expect(snapshot).toContain(
-      'ExecStartPre=/usr/bin/install -D -o 0 -g 0 -m 0400 %d/qdrant_api_key /var/lib/megacampus-qdrant-recovery/runtime/snapshot/qdrant_api_key'
+      'ExecStartPre=/usr/bin/install -o 0 -g 0 -m 0400 %d/qdrant_api_key /run/megacampus-qdrant-snapshot-credentials/qdrant_api_key'
     );
     expect(snapshot).toContain(
-      'ExecStopPost=/usr/bin/rm -rf /var/lib/megacampus-qdrant-recovery/runtime/snapshot'
+      'RuntimeDirectory=megacampus-qdrant-recovery megacampus-qdrant-snapshot-credentials'
     );
+    expect(snapshot).not.toContain('ExecStopPost=/usr/bin/rm -rf');
 
     expect(restore).toContain(
-      'Environment=QDRANT_API_KEY_FILE=/var/lib/megacampus-qdrant-recovery/runtime/restore/qdrant_api_key'
+      'Environment=QDRANT_API_KEY_FILE=/run/megacampus-qdrant-restore-credentials/qdrant_api_key'
     );
     expect(restore).toContain(
-      'Environment=QDRANT_SNAPSHOT_MANIFEST_FILE=/var/lib/megacampus-qdrant-recovery/runtime/restore/snapshot_manifest'
+      'Environment=QDRANT_SNAPSHOT_MANIFEST_FILE=/run/megacampus-qdrant-restore-credentials/snapshot_manifest'
     );
     expect(restore).toContain(
-      'Environment=QDRANT_RECOVERY_PROBE_FILE=/var/lib/megacampus-qdrant-recovery/runtime/restore/recovery_probe'
+      'Environment=QDRANT_RECOVERY_PROBE_FILE=/run/megacampus-qdrant-restore-credentials/recovery_probe'
     );
     expect(restore).toContain(
-      'ExecStartPre=/usr/bin/install -D -o 0 -g 0 -m 0400 %d/snapshot_manifest /var/lib/megacampus-qdrant-recovery/runtime/restore/snapshot_manifest'
+      'ExecStartPre=/usr/bin/install -o 0 -g 0 -m 0400 %d/snapshot_manifest /run/megacampus-qdrant-restore-credentials/snapshot_manifest'
     );
     expect(restore).toContain(
-      'ExecStartPre=/usr/bin/install -D -o 0 -g 0 -m 0400 %d/recovery_probe /var/lib/megacampus-qdrant-recovery/runtime/restore/recovery_probe'
+      'ExecStartPre=/usr/bin/install -o 0 -g 0 -m 0400 %d/recovery_probe /run/megacampus-qdrant-restore-credentials/recovery_probe'
     );
     expect(restore).toContain(
-      'ExecStopPost=/usr/bin/rm -rf /var/lib/megacampus-qdrant-recovery/runtime/restore'
+      'RuntimeDirectory=megacampus-qdrant-recovery megacampus-qdrant-restore-credentials'
     );
+    expect(restore).not.toContain('ExecStopPost=/usr/bin/rm -rf');
   });
 
   it('proves snapshot cadence plus jitter and accuracy stays below six hours', async () => {

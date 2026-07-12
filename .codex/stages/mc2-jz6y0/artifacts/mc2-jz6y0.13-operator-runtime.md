@@ -15,16 +15,19 @@ worktree: /home/me/code/mc2/.worktrees/q12-operator-runtime
 write_zone:
   - packages/course-gen-platform/Dockerfile
   - packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh
+  - deploy/qdrant/operator-compose.sh
   - docker-compose.infra.yml
   - deploy/systemd/megacampus-qdrant-snapshot.service
   - deploy/systemd/megacampus-qdrant-restore-drill.service
   - packages/course-gen-platform/tests/unit/ops/qdrant-operator-runtime.test.ts
   - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/recovery-systemd.test.ts
+  - packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-qdrant-upload.ts
+  - packages/course-gen-platform/tests/unit/stages/stage2-document-processing/phase-6-qdrant-upload.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-operator-runtime.md
 success_criteria:
   - bootstrap, verify, reindex, snapshot, and restore tools run from an immutable separately published image without host Node, pnpm, or source
-  - reindex refuses the live queue, stable alias, wrong source root, and non-local Qdrant transport
+  - reindex refuses the live queue, stable alias, wrong source root, non-local Qdrant transport, missing durable ledger, and every worker job not bound to its exact physical target
   - operator services are profile-only, non-public, read-only, capability-minimized, and file-secret-backed
   - systemd uses the container operator and exposes credentials to Docker without leaking private systemd credential mounts
   - focused tests, Compose render, image build/runtime smoke, pinned Qdrant bootstrap/verify, type-check, build, and unit verification pass
@@ -53,7 +56,7 @@ status: returned
 delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: cleaned
-cleanup_notes: disposable local Qdrant containers, network, image, fixtures, logs, and worktree-only dependency symlinks were removed; branch remains for review and integration
+cleanup_notes: disposable local Qdrant containers, networks, images, fixtures, logs, and worktree-only dependency symlinks were removed; branch remains for re-review and integration
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updates-required
@@ -61,23 +64,27 @@ docs_review_notes: the stable Qdrant runbook still describes host pnpm and must 
 graph_reviewed: blocked
 graph_review_notes: graphify-out is absent from this isolated worktree; parent integration must run a safe local refresh after merge without external model/API modes
 verification:
-  - focused operator/runtime/observability/systemd Vitest: passed 25/25
+  - focused operator/runtime/observability/systemd/reindex/Stage 2 Vitest: passed 76/76
   - package type-check: passed
   - package build: passed
   - qdrant-operator Docker target build and embedded self-check: passed
   - fresh container help, UID 1001 self-check, queue/alias guards: passed
+  - UID 1001 plus configured supplementary GID metrics write preflight: passed
   - pinned Qdrant 1.18.2 bootstrap and verify under Compose-equivalent hardening: passed
   - systemd-analyze verify for four recovery units in rootless mount namespace: passed
   - Compose render through qdrant runtime contract: passed
 changed_files:
   - packages/course-gen-platform/Dockerfile
   - packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh
+  - deploy/qdrant/operator-compose.sh
   - docker-compose.infra.yml
   - deploy/systemd/megacampus-qdrant-snapshot.service
   - deploy/systemd/megacampus-qdrant-restore-drill.service
   - packages/course-gen-platform/tests/unit/ops/qdrant-operator-runtime.test.ts
   - packages/course-gen-platform/tests/unit/ops/qdrant-runtime-contract.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/recovery-systemd.test.ts
+  - packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-qdrant-upload.ts
+  - packages/course-gen-platform/tests/unit/stages/stage2-document-processing/phase-6-qdrant-upload.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-operator-runtime.md
 explicit_defers:
   - mc2-jz6y0.25 - move Prometheus 3.13.1 retention from deprecated CLI flags to supported YAML before the next pin upgrade
@@ -107,14 +114,15 @@ remote image was changed by this stream.
 ## Immutable image and commands
 
 - Docker target: `qdrant-operator`, built separately from the normal API target.
-- Required publication form: a release-SHA tag or digest supplied as
-  `QDRANT_OPERATOR_IMAGE`; `latest` is rejected by contract and Compose uses
-  `pull_policy: never` during operation.
+- Required publication form: the fixed GHCR operator repository plus an exact
+  lowercase 64-hex `QDRANT_OPERATOR_IMAGE_SHA256`. Compose constructs only a
+  `repo@sha256:<digest>` reference, while `operator-compose.sh` rejects malformed
+  values before Docker runs. Mutable tags cannot enter the operator path.
 - Commands: `bootstrap`, `verify`, `reindex plan|execute|verify`,
   `reindex-worker`, `snapshot`, `restore-drill`, and `self-check`.
 - Final local image manifest-list digest:
-  `sha256:130775f2eebfd877a6039a49f2ce7ef158a9d045a86c08f12272adc1884d886f`.
-- Local image size: `641109603` bytes. The target is intentionally derived from
+  `sha256:171336922814576156cb2959d19561c2656cbaa716121b3bf6a3867634029007`.
+- Local image size: `641547696` bytes. The target is intentionally derived from
   the proven runner for Q12 safety; slimming is not an activation prerequisite.
 
 ## Reindex isolation
@@ -126,7 +134,10 @@ The entrypoint refuses execution unless all of these invariants hold:
 3. execution/worker queues match a dedicated UUIDv4
    `qdrant-reindex-<uuid>` name;
 4. the target is an explicit physical collection and is not the stable alias;
-5. the isolated worker has `STAGE6_WORKER=false`.
+5. execute has an explicit UUIDv4 run ID and a run-bound ledger below
+   `/var/lib/megacampus-qdrant-recovery/reindex`;
+6. the isolated worker has `STAGE6_WORKER=false`, an explicit physical target,
+   and every Stage 2 job carries that exact target before upload begins.
 
 The Compose default queue is deliberately invalid (`qdrant-reindex-disabled`),
 so an operator must explicitly supply a newly generated dedicated queue for a
@@ -141,12 +152,19 @@ recovery services do not load the broad production environment.
 
 The systemd units retain `LoadCredential`, but Docker daemon cannot safely be
 assumed to see the service-private `%d` credential mount. Each unit therefore
-copies its credentials into a distinct root-owned mode-0400 path below the
-host-visible recovery `StateDirectory`, passes that path only to Compose secret
-resolution, and deletes the unit-specific directory in `ExecStopPost`. Snapshot
-and restore use different directories, so a failed nonblocking lock attempt
-cannot remove another run's credentials. Inside the container, the root wrapper
-copies those inputs to tmpfs with UID 1001 ownership before executing tools.
+copies its credentials into a distinct root-owned mode-0400 systemd
+`RuntimeDirectory`, passes that host-visible path only to Compose secret
+resolution, and relies on systemd lifecycle cleanup. UID 1001 owns the separate
+recovery `StateDirectory` but cannot replace either credential directory or
+mount target. Inside the container, the root wrapper accepts only exact
+root:root mode-0400 inputs, copies them to tmpfs with UID 1001 ownership, and
+then executes tools.
+
+Direct Compose snapshot/restore commands use the internal shared-state lock.
+Only systemd, which already holds the outer host `flock`, overrides
+`QDRANT_RECOVERY_LOCK_HELD=1`. Its metrics preflight is another hardened
+operator container and therefore tests writability as UID 1001 with the actual
+configured supplementary metrics GID, not as host root.
 
 # Verification
 
@@ -161,14 +179,23 @@ copies those inputs to tmpfs with UID 1001 ownership before executing tools.
   probe files were not staged for UID 1001; GREEN passed the operator file 6/6.
 - Docker-daemon visibility RED: one expected systemd failure proved `%d` was
   still being passed as a host Compose secret path; GREEN passed 4/4 after
-  staging credentials in distinct host-visible state paths with cleanup.
+  staging credentials in distinct host-visible runtime paths with cleanup.
+- Independent review of `48cf8378` returned `CHANGES_REQUIRED` with P0=0,
+  P1=4, P2=2, P3=0. The six findings were reproduced: mutable image input,
+  read-only default ledger path, worker target fallback, direct lock bypass,
+  root-only metrics preflight, and permissive secret identity/mode.
+- Review remediation RED produced five expected failures plus the reviewer
+  source findings. The first focused GREEN passed 17/17; expanded digest,
+  ledger, lock, metrics, and secret gates passed 20/20 and then 13/13 after the
+  pre-Docker digest wrapper was added.
 - Final joined suite:
-  `SUPABASE_URL=https://placeholder.supabase.co SUPABASE_SERVICE_KEY=placeholder-service-key vitest run --config vitest.config.unit.ts tests/unit/ops/qdrant-operator-runtime.test.ts tests/unit/ops/qdrant-runtime-contract.test.ts tests/unit/ops/qdrant-observability-contract.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts`
-  -> 25/25.
+  `SUPABASE_URL=https://placeholder.supabase.co SUPABASE_SERVICE_KEY=placeholder-service-key vitest run --config vitest.config.unit.ts tests/unit/ops/qdrant-operator-runtime.test.ts tests/unit/ops/qdrant-runtime-contract.test.ts tests/unit/ops/qdrant-observability-contract.test.ts tests/unit/tools/qdrant/recovery-systemd.test.ts tests/unit/stages/stage2-document-processing/phase-6-qdrant-upload.test.ts tests/unit/tools/qdrant/reindex-course-embeddings.test.ts tests/unit/tools/qdrant/reindex-plan.test.ts`
+  -> 76/76, including execute reaching enqueue with a durable target-bound
+  ledger and partial-failure resume checkpoints.
 
 ## Image and pinned integration
 
-`docker build --target qdrant-operator -t mc2-qdrant-operator:q12o-test -f packages/course-gen-platform/Dockerfile .`
+`docker build --target qdrant-operator -t mc2-qdrant-operator:q12o-final -f packages/course-gen-platform/Dockerfile .`
 completed successfully. Its embedded check returned
 `{"status":"ok","uid":1001,"modules":5}`. Fresh containers then passed the
 top-level help plus bootstrap, verify, and reindex help. Deliberate execution
@@ -178,7 +205,7 @@ credentials.
 A disposable local network used exact Qdrant
 `qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c`.
 The operator ran with a read-only filesystem, no-new-privileges, all
-capabilities dropped except `CHOWN/SETGID/SETUID`, a root-owned mode-0600 API-key
+capabilities dropped except `CHOWN/SETGID/SETUID`, a root-owned mode-0400 API-key
 file, and no public host port. Bootstrap created physical collection
 `course_embeddings_v1` plus alias `course_embeddings`; verify passed; the
 collection was green with zero points. The synthetic key did not occur in the
@@ -190,7 +217,8 @@ were removed by the test trap.
 - `pnpm --filter @megacampus/course-gen-platform type-check` -> exit 0 after
   restoring ignored worktree-local pnpm package links.
 - `pnpm --filter @megacampus/course-gen-platform build` -> exit 0.
-- Rootless `unshare -Urmpf` with a private writable `/run`, followed by
+- Rootless `unshare -Urmpf` with private writable `/run` and `/opt` plus the
+  packaged operator wrapper at its target absolute path, followed by
   `systemd-analyze verify` over both service/timer pairs -> exit 0 with no
   diagnostics. Direct host verification is unavailable because this WSL profile
   has no `/run/systemd`.
@@ -202,9 +230,9 @@ were removed by the test trap.
 
 The parent integration stream must still:
 
-1. teach CI to build and publish the `qdrant-operator` target under the same
-   release SHA as the application release, then deliver that exact
-   `QDRANT_OPERATOR_IMAGE` and pull it before `pull_policy: never` operations;
+1. teach CI to build and publish the `qdrant-operator` target, resolve its
+   registry digest, deliver the exact `QDRANT_OPERATOR_IMAGE_SHA256`, and pull
+   that digest before `pull_policy: never` operations;
 2. copy the accepted Compose, Qdrant wrapper, monitoring, recovery units, and
    operator-aware runbook to the authorized target;
 3. provision owner-only secret files and prove the systemd-to-Docker credential

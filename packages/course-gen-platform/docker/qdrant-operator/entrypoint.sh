@@ -13,6 +13,8 @@ readonly DEFAULT_API_KEY_FILE='/run/secrets/qdrant_api_key'
 readonly STAGED_API_KEY_FILE='/run/qdrant-operator/qdrant_api_key'
 readonly STAGED_MANIFEST_FILE='/run/qdrant-operator/snapshot_manifest'
 readonly STAGED_PROBE_FILE='/run/qdrant-operator/recovery_probe'
+readonly REINDEX_ARTIFACT_ROOT='/var/lib/megacampus-qdrant-recovery/reindex'
+readonly REQUIRED_METRICS_DIR='/var/lib/megacampus/qdrant-metrics'
 
 fail() {
   printf '%s: %s\n' "$OPERATOR_NAME" "$1" >&2
@@ -30,6 +32,7 @@ Commands:
   reindex-worker                      Consume only a dedicated qdrant-reindex-<uuid> queue
   snapshot                            Create and record an authenticated snapshot
   restore-drill                       Restore and verify an isolated collection
+  metrics-check                       Prove UID 1001 can write the shared metrics directory
   self-check                          Import all tools and prove the effective tool UID
   -h, --help                          Show this help
 USAGE
@@ -50,6 +53,16 @@ require_reindex_queue() {
     fail 'BULLMQ_QUEUE_NAME must be a dedicated qdrant-reindex-<uuid> queue'
 }
 
+require_reindex_worker_target() {
+  local target alias
+  target="${QDRANT_REINDEX_TARGET_COLLECTION:-}"
+  alias="${QDRANT_COLLECTION_NAME:-course_embeddings}"
+  [[ -n $target ]] ||
+    fail 'QDRANT_REINDEX_TARGET_COLLECTION must name an explicit physical collection'
+  [[ $target != "$alias" ]] ||
+    fail 'QDRANT_REINDEX_TARGET_COLLECTION must not equal the stable alias'
+}
+
 target_collection_from_args() {
   local previous=''
   local argument
@@ -67,6 +80,24 @@ target_collection_from_args() {
   return 1
 }
 
+cli_value_from_args() {
+  local option="$1"
+  shift
+  local previous='' argument
+  for argument in "$@"; do
+    if [[ $previous == "$option" ]]; then
+      printf '%s' "$argument"
+      return 0
+    fi
+    if [[ $argument == "$option="* ]]; then
+      printf '%s' "${argument#*=}"
+      return 0
+    fi
+    previous="$argument"
+  done
+  return 1
+}
+
 require_physical_target() {
   local target alias
   target="$(target_collection_from_args "$@")" ||
@@ -76,13 +107,29 @@ require_physical_target() {
     fail '--target-collection must name a physical collection, not the stable alias'
 }
 
+require_reindex_execution_artifact() {
+  local run_id artifact expected
+  run_id="$(cli_value_from_args --run-id "$@" || true)"
+  [[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
+    fail '--run-id must be an explicit UUIDv4 for reindex execution'
+  expected="$REINDEX_ARTIFACT_ROOT/$run_id.json"
+  artifact="$(cli_value_from_args --artifact "$@" || true)"
+  if [[ -n $artifact && $artifact != "$expected" ]]; then
+    fail '--artifact must equal /var/lib/megacampus-qdrant-recovery/reindex/<run-id>.json'
+  fi
+  REINDEX_ARTIFACT_ARGS=()
+  if [[ -z $artifact ]]; then
+    REINDEX_ARTIFACT_ARGS=(--artifact "$expected")
+  fi
+}
+
 read_secret_file() {
   local path="$1"
-  local mode value
+  local identity value
 
   [[ -f $path && ! -L $path && -r $path ]] || fail 'Qdrant API key file is missing or unreadable'
-  mode="$(stat -c '%a' -- "$path")"
-  (( (8#$mode & 077) == 0 )) || fail 'Qdrant API key file permissions are unsafe'
+  identity="$(stat -c '%u:%g:%a' -- "$path")"
+  [[ $identity == '0:0:400' ]] || fail 'Qdrant API key file must be root:root mode 0400'
 
   value="$(cat -- "$path"; printf x)"
   value="${value%x}"
@@ -129,12 +176,12 @@ stage_api_key_for_file_client() {
 stage_owner_only_file() {
   local source="$1"
   local target="$2"
-  local mode
+  local identity
 
   [[ -f $source && ! -L $source && -r $source ]] ||
     fail 'Recovery input file is missing or unreadable'
-  mode="$(stat -c '%a' -- "$source")"
-  (( (8#$mode & 077) == 0 )) || fail 'Recovery input file permissions are unsafe'
+  identity="$(stat -c '%u:%g:%a' -- "$source")"
+  [[ $identity == '0:0:400' ]] || fail 'Recovery input file must be root:root mode 0400'
   install -d -o "$NODE_UID" -g "$NODE_GID" -m 0700 "$(dirname "$target")"
   install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- "$source" "$target"
 }
@@ -158,6 +205,7 @@ run_self_check() {
 
 command_name="${1:---help}"
 shift || true
+REINDEX_ARTIFACT_ARGS=()
 
 case "$command_name" in
   -h|--help|help)
@@ -195,6 +243,7 @@ case "$command_name" in
       execute)
         require_reindex_queue
         require_physical_target "$@"
+        require_reindex_execution_artifact "$@"
         ;;
       verify)
         require_physical_target "$@"
@@ -204,12 +253,13 @@ case "$command_name" in
         ;;
     esac
     load_raw_api_key
-    exec_as_node "$TSX_BIN" tools/qdrant/reindex-course-embeddings.ts "$@"
+    exec_as_node "$TSX_BIN" tools/qdrant/reindex-course-embeddings.ts "$@" "${REINDEX_ARTIFACT_ARGS[@]}"
     ;;
   reindex-worker)
     require_qdrant_url
     require_upload_base
     require_reindex_queue
+    require_reindex_worker_target
     [[ ${STAGE6_WORKER:-false} != 'true' ]] || fail 'reindex worker cannot run in Stage 6 mode'
     load_raw_api_key
     exec_as_node "$TSX_BIN" dist/orchestrator/worker-entrypoint.js
@@ -239,6 +289,16 @@ case "$command_name" in
     export QDRANT_SNAPSHOT_MANIFEST_FILE="$STAGED_MANIFEST_FILE"
     export QDRANT_RECOVERY_PROBE_FILE="$STAGED_PROBE_FILE"
     exec_as_node "$TSX_BIN" tools/qdrant/restore-drill.ts
+    ;;
+  metrics-check)
+    [[ $# -eq 0 ]] || fail 'metrics-check accepts no arguments'
+    [[ ${QDRANT_METRICS_TEXTFILE_DIR:-} == "$REQUIRED_METRICS_DIR" ]] ||
+      fail "QDRANT_METRICS_TEXTFILE_DIR must equal $REQUIRED_METRICS_DIR"
+    exec_as_node /usr/bin/bash -eu -c '
+      path="$1"
+      [[ -d "$path" && ! -L "$path" && -w "$path" ]]
+      [[ $(/usr/bin/stat -c %a -- "$path") == 2775 ]]
+    ' -- "$REQUIRED_METRICS_DIR"
     ;;
   *)
     fail "unknown command: $command_name"
