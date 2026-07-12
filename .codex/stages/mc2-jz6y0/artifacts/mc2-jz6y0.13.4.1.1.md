@@ -21,6 +21,7 @@ success_criteria:
   - inject before/after every copy publication and journal durability boundary
   - prove all 42 copy and rollback state transitions are restart-safe
   - prove exact deterministic temp reconciliation and fail-closed mismatches
+  - prove an exact reused journal temporary is fsynced before initial or replacement publication
   - model real process death and securely reconcile deterministic journal residue
   - cover rollback parent-directory fsync through the public workflow restart
   - prove same-byte replacement inode and changed or untracked targets are never deleted
@@ -47,7 +48,10 @@ depends_on_streams:
   - mc2-jz6y0.13.4.1-core
   - mc2-jz6y0.13.4.1-workflow
 parallel_decision: sequential - one fault harness owns the shared filesystem and journal state model
-resolves_review: 122f3207
+resolves_review: 8a6a3b15
+review_lineage:
+  - 122f3207
+  - 8a6a3b15
 status: returned
 delivery_method: not accepted
 accepted_by_orchestrator: no
@@ -64,8 +68,11 @@ verification:
   - inode mutation RED: failed as expected when stale inode metadata made the guard ineffective
   - correction CM1 RED: 24/302 failed on real journal residue/restart/tamper before deterministic reconciliation
   - correction focused crash plus manifest GREEN: passed 318/318
-  - focused crash matrix GREEN: passed 302/302
-  - combined crash plus recovery/reindex GREEN: passed 426/426
+  - correction CMR1 RED: 4/4 reused-temp ordering cases failed because retry skipped the temp fsync
+  - correction CMR1 focused GREEN: passed 4/4
+  - focused crash matrix GREEN: passed 306/306
+  - correction focused crash plus manifest GREEN: passed 322/322
+  - combined crash plus recovery/reindex GREEN: passed 430/430
   - course-gen-platform type-check: passed
   - focused Prettier and git diff check: passed
 changed_files:
@@ -79,15 +86,17 @@ explicit_defers:
 
 # Summary
 
-The bounded P2 is closed by a real-process-death fault model over the Node
-filesystem API plus a narrow recovery-manifest correction. Review `122f3207`
+The bounded P2 and subsequent P1 are closed by a real-process-death fault model
+over the Node filesystem API plus narrow recovery-manifest corrections. Review `122f3207`
 showed that random PID/UUID journal temporaries could not be safely reconciled
 after process death. Progress-journal persistence now uses a content-SHA-bound
 same-directory temporary and securely validates any restart residue before
-reuse or cleanup.
+reuse or cleanup. Rereview `8a6a3b15` showed that an exact pre-existing
+temporary was published without a retry-time file durability barrier. Every
+exact reuse now performs a protected descriptor fsync before link or rename.
 
-The final test file contains 302 cases: 22 real-filesystem publication,
-rollback, parent-fsync, and inode cases; 24 initial/replacement journal
+The final test file contains 306 cases: 22 real-filesystem publication,
+rollback, parent-fsync, and inode cases; 28 initial/replacement journal
 persistence and tamper cases;
 and 256 workflow cases spanning the copying marker, all 42
 `planned -> published` transitions, copied terminal persistence, and all 42
@@ -112,6 +121,13 @@ fsyncs the target and parent, removes only its exact temporary, fsyncs the
 parent again, and still returns the original revision mismatch so CAS semantics
 remain unchanged.
 
+Before any uncommitted exact temporary is reused, it is reopened with
+`O_NOFOLLOW`; mode, current UID, device, inode, and complete content are
+revalidated on that descriptor; the descriptor is synced and closed; and the
+path identity is checked again before `link()` or `rename()`. A directory fsync
+is retained only for directory-entry durability and is not treated as a
+substitute for this file barrier.
+
 Node 24.16 authoritative documentation confirms that `FileHandle.sync()`
 requests device flush, `link()` creates a hard link, `lstat()` observes the
 link itself, and `Stats.dev` plus `Stats.ino` represent device/inode identity.
@@ -121,13 +137,6 @@ No dependency lookup or new package was needed.
 
 ## RED and GREEN
 
-- The first direct runner command failed before test discovery because the
-  isolated worktree had no package-local `node_modules`. The first `pnpm exec`
-  attempt likewise failed with `EACCES`. Temporary links to the repository's
-  existing installed dependencies corrected only the runner environment.
-- The first package type-check stopped in `shared-logger` because its own
-  dependency link was absent and `pino` could not resolve. Temporary shared
-  package links allowed the unchanged canonical command to pass.
 - A test-only mutation made the final `lstat()` return stale pre-replacement
   inode metadata. The same-byte replacement test failed exactly because
   rollback resolved and deleted the replacement instead of rejecting. With the
@@ -136,7 +145,11 @@ No dependency lookup or new package was needed.
   because the random path was ignored, residue remained, tampering was accepted,
   or committed replay could not reconcile. After the deterministic secure
   correction, crash plus manifest passed 318/318.
-- The fresh combined command passed 426/426 across crash, manifest, filesystem,
+- CMR1 RED then failed four initial/replacement retry cases after crashes just
+  after the write or just before the original temp fsync: publication occurred
+  with no retry-time `FileHandle.sync()` event. The narrow protected reopen and
+  fsync made all four pass before link/rename.
+- The fresh combined command passed 430/430 across crash, manifest, filesystem,
   database, workflow, reindex plan, and reindex command tests.
 
 ## Covered ordering
@@ -145,7 +158,8 @@ No dependency lookup or new package was needed.
   first parent fsync, temp unlink, and second parent fsync.
 - Journal: before/after initial temp write/fsync/link/parent fsync/temp
   unlink/second parent fsync, and replacement temp write/fsync/rename/parent
-  fsync.
+  fsync. Exact retry residue from after-write and before-fsync crashes is
+  descriptor-fsynced before both initial hard-link and replacement rename.
 - Workflow: before/after copying, every published state, copied terminal,
   every rollback_planned state, target unlink, and every rolled_back state.
 - Reconciliation: exact run/entry temp is rejected while still planned and is

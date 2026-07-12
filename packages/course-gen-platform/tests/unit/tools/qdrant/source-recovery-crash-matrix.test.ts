@@ -30,6 +30,7 @@ const fault = vi.hoisted(() => ({
   replaceTargetOnLstat: false,
   replacementBytes: '',
   journalTemporaryUidDelta: 0,
+  journalEvents: [] as string[],
   rollbackUnlinkCount: 0,
 }));
 
@@ -96,7 +97,10 @@ vi.mock('node:fs/promises', async importOriginal => {
               return () => around('parent-fsync', () => target.sync());
             }
             if (isJournalTemporary(path)) {
-              return () => around('journal-temp-fsync', () => target.sync());
+              return () => {
+                fault.journalEvents.push('journal-temp-fsync');
+                return around('journal-temp-fsync', () => target.sync());
+              };
             }
             if (path === fault.journalDirectory) {
               return () => around('journal-parent-fsync', () => target.sync());
@@ -116,6 +120,7 @@ vi.mock('node:fs/promises', async importOriginal => {
         return around('publish-link', () => actual.link(existingPath, newPath));
       }
       if (targetPath === fault.journalTarget) {
+        fault.journalEvents.push('journal-link');
         return around('journal-link', () => actual.link(existingPath, newPath));
       }
       return actual.link(existingPath, newPath);
@@ -125,6 +130,7 @@ vi.mock('node:fs/promises', async importOriginal => {
       newPath: Parameters<typeof actual.rename>[1]
     ) => {
       if (String(newPath) === fault.journalTarget) {
+        fault.journalEvents.push('journal-rename');
         return around('journal-rename', () => actual.rename(oldPath, newPath));
       }
       return actual.rename(oldPath, newPath);
@@ -340,6 +346,7 @@ function disarm(): void {
   fault.replaceTargetOnLstat = false;
   fault.replacementBytes = '';
   fault.journalTemporaryUidDelta = 0;
+  fault.journalEvents = [];
   fault.rollbackUnlinkCount = 0;
 }
 
@@ -636,6 +643,57 @@ const journalInitialBoundaries = [
 ] as const;
 
 describe('source recovery journal persistence crash matrix', () => {
+  it.each(
+    (['initial', 'replacement'] as const).flatMap(publication => [
+      { publication, boundary: 'journal-temp-write', phase: 'after' as const },
+      { publication, boundary: 'journal-temp-fsync', phase: 'before' as const },
+    ])
+  )(
+    'fsyncs the reused $publication temporary before publication following $phase $boundary',
+    async ({ publication, boundary, phase }) => {
+      const directory = await mkdtemp('/tmp/mc2-source-recovery-journal-reuse-');
+      const journalPath = join(directory, 'journal.json');
+      const manifest = recoveryManifest();
+      const initial = createInitialProgressJournal(
+        manifest,
+        calculateRecoveryManifestSha256(manifest)
+      );
+      const next: RecoveryProgressJournal =
+        publication === 'initial' ? initial : { ...initial, revision: 1, phase: 'copying' };
+      const expectedRevision = publication === 'initial' ? -1 : initial.revision;
+      const publicationEvent = publication === 'initial' ? 'journal-link' : 'journal-rename';
+
+      try {
+        await chmod(directory, 0o700);
+        if (publication === 'replacement') {
+          await replaceProgressJournal(journalPath, -1, initial, manifest);
+        }
+        arm(boundary, phase, { journal: journalPath });
+        await expect(
+          replaceProgressJournal(journalPath, expectedRevision, next, manifest)
+        ).rejects.toThrow(/simulated crash/iu);
+        const residue = await journalTemporaryPaths(directory);
+        expect(residue).toHaveLength(1);
+        expect(await readFile(residue[0], 'utf8')).toBe(`${JSON.stringify(next, null, 2)}\n`);
+
+        disarm();
+        fault.journalTarget = journalPath;
+        fault.journalDirectory = directory;
+        await expect(
+          replaceProgressJournal(journalPath, expectedRevision, next, manifest)
+        ).resolves.toBeUndefined();
+
+        const reusedTemporaryFsync = fault.journalEvents.indexOf('journal-temp-fsync');
+        const publicationIndex = fault.journalEvents.indexOf(publicationEvent);
+        expect(reusedTemporaryFsync).toBeGreaterThanOrEqual(0);
+        expect(publicationIndex).toBeGreaterThan(reusedTemporaryFsync);
+      } finally {
+        disarm();
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each(
     journalInitialBoundaries.flatMap(item =>
       (['before', 'after'] as const).map(phase => ({ ...item, phase }))

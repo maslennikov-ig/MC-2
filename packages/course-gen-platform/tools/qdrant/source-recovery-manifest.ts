@@ -432,6 +432,36 @@ async function assertStableOwnerOnlyFile(
   }
 }
 
+async function fsyncProtectedOwnerOnlyContentFile(
+  path: string,
+  expectedContent: string,
+  expected: DurableFileIdentity,
+  label: string
+): Promise<void> {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat();
+    if (
+      !opened.isFile() ||
+      (opened.mode & 0o777) !== 0o600 ||
+      opened.dev !== expected.device ||
+      opened.ino !== expected.inode
+    ) {
+      throw new Error(`${label} changed before protected fsync`);
+    }
+    const expectedUid = process.getuid?.();
+    if (expectedUid !== undefined && opened.uid !== expectedUid) {
+      throw new Error(`${label} must be owned by the current UID`);
+    }
+    if ((await handle.readFile('utf8')) !== expectedContent) {
+      throw new Error(`${label} mismatch requires operator investigation`);
+    }
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
 async function reconcileCommittedTemporary(targetPath: string, content: string): Promise<void> {
   const temporaryPath = durableTemporaryPath(targetPath, content);
   const temporary = await inspectOwnerOnlyContentFile(
@@ -483,7 +513,7 @@ async function writeDurableReplacement(
   );
   let handle: DurableWriteHandle | undefined;
   let closed = true;
-  let safeTemporary = existingTemporary.status === 'exact';
+  let safeTemporary = false;
   try {
     if (existingTemporary.status === 'absent') {
       handle = await operations.openTemporary(temporaryPath, 0o600);
@@ -495,7 +525,14 @@ async function writeDurableReplacement(
       await handle.close();
       closed = true;
     } else {
+      await fsyncProtectedOwnerOnlyContentFile(
+        temporaryPath,
+        content,
+        existingTemporary,
+        'Recovery state temporary'
+      );
       await assertStableOwnerOnlyFile(temporaryPath, existingTemporary, 'Recovery state temporary');
+      safeTemporary = true;
     }
     if (options.publication === 'immutable') {
       try {
