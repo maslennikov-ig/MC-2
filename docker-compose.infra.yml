@@ -82,6 +82,150 @@ services:
         max-size: '50m'
         max-file: '3'
 
+  # On-demand release-SHA operator for bootstrap/reindex and its isolated worker.
+  # The profile prevents a normal infrastructure `up` from starting this service.
+  qdrant-operator:
+    image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
+    platform: linux/amd64
+    pull_policy: never
+    profiles: ['operator']
+    restart: 'no'
+    user: '0:0'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    env_file:
+      - ${PRODUCTION_ENV_FILE:-.env.production}
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=course_embeddings
+      - QDRANT_API_KEY=
+      - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+      - DOCLING_UPLOADS_BASE_PATH=/opt/megacampus/data
+      - BULLMQ_QUEUE_NAME=qdrant-reindex-disabled
+      - QDRANT_REINDEX_TARGET_COLLECTION=
+      - WORKER_CONCURRENCY=2
+      - STAGE6_WORKER=false
+      - REDIS_URL=redis://redis:6379
+      - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+      - DOCLING_CACHE_PATH=/app/docling-cache
+      - LKG_CONFIG_PATH=/app/data/lkg-config.json
+      - QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_RECOVERY_LOCK_PATH=/var/lib/megacampus-qdrant-recovery/recovery.lock
+      - QDRANT_RECOVERY_LOCK_HELD=0
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
+    volumes:
+      - ./data/uploads:/opt/megacampus/data/uploads:ro
+      - docling-json-cache:/app/docling-cache
+      - worker-data:/app/data
+      - /var/lib/megacampus-qdrant-recovery:/var/lib/megacampus-qdrant-recovery
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
+    secrets:
+      - qdrant_api_key
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /run/qdrant-operator:size=1m,mode=0700
+    networks:
+      - megacampus
+
+  # Narrow recovery service: no broad production env is loaded.
+  qdrant-recovery-operator:
+    image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
+    platform: linux/amd64
+    pull_policy: never
+    profiles: ['operator']
+    restart: 'no'
+    user: '0:0'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=course_embeddings
+      - QDRANT_API_KEY=
+      - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+      - QDRANT_SNAPSHOT_STORAGE_MODE=s3
+      - QDRANT_SNAPSHOT_OBJECT_PREFIX=megacampus/qdrant
+      - QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_RECOVERY_LOCK_PATH=/var/lib/megacampus-qdrant-recovery/recovery.lock
+      - QDRANT_RECOVERY_LOCK_HELD=0
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
+    volumes:
+      - /var/lib/megacampus-qdrant-recovery:/var/lib/megacampus-qdrant-recovery
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
+    secrets:
+      - qdrant_api_key
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /run/qdrant-operator:size=1m,mode=0700
+    networks:
+      - megacampus
+
+  # Restore adds only the owner-only manifest and deterministic recovery probe.
+  qdrant-restore-operator:
+    image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
+    platform: linux/amd64
+    pull_policy: never
+    profiles: ['operator']
+    restart: 'no'
+    user: '0:0'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=course_embeddings
+      - QDRANT_API_KEY=
+      - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+      - QDRANT_SNAPSHOT_TRANSPORT_URL=http://qdrant:6333
+      - QDRANT_SNAPSHOT_MANIFEST_FILE=/run/secrets/snapshot_manifest
+      - QDRANT_RECOVERY_PROBE_FILE=/run/secrets/recovery_probe
+      - QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_RECOVERY_LOCK_PATH=/var/lib/megacampus-qdrant-recovery/recovery.lock
+      - QDRANT_RECOVERY_LOCK_HELD=0
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
+    volumes:
+      - /var/lib/megacampus-qdrant-recovery:/var/lib/megacampus-qdrant-recovery
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
+    secrets:
+      - qdrant_api_key
+      - source: qdrant_snapshot_manifest
+        target: snapshot_manifest
+      - source: qdrant_recovery_probe
+        target: recovery_probe
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /run/qdrant-operator:size=1m,mode=0700
+    networks:
+      - megacampus
+
   # Authenticated Qdrant and textfile metrics collection.
   prometheus:
     image: prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
@@ -475,3 +619,7 @@ secrets:
     file: ${ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE:-./secrets/alertmanager_telegram_bot_token}
   alertmanager_telegram_chat_id:
     file: ${ALERTMANAGER_TELEGRAM_CHAT_ID_FILE:-./secrets/alertmanager_telegram_chat_id}
+  qdrant_snapshot_manifest:
+    file: ${QDRANT_SNAPSHOT_MANIFEST_FILE:-/var/lib/megacampus-qdrant-recovery/manifests/latest-manifest.json}
+  qdrant_recovery_probe:
+    file: ${QDRANT_RECOVERY_PROBE_FILE:-./recovery/probe.json}
