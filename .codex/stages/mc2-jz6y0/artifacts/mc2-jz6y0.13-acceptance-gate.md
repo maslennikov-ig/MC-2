@@ -855,3 +855,85 @@ focused CI contracts are accepted at `7d893d42`. Remote mutation is still
 outside this review and must not begin solely from this READY result; the full
 Q12 acceptance matrix and remaining remote evidence gates continue to govern
 activation.
+
+# Integration review 4267deee
+
+**Scope:** independent review of integration commit `4267deee` against parent
+`4f7f2d22`, limited to Qdrant operator publication, immutable release
+resolution and deploy/rollback behavior. **Verdict: CHANGES REQUIRED.** P0: 0,
+P1: 1, P2: 0, P3: 0. No remote or runtime action was performed.
+
+## P1: stale accepted transaction can roll back the previous good release
+
+The operator image is pulled, resolved and written to `.env.production` before
+the current app deployment records `status=preparing`
+(`scripts/deploy_blue_green.sh:239-256`). If login, pull, digest inspection or
+the env update fails in that window, `deploy_state` remains the `accepted`
+transaction from the previous successful deployment. This window exists for
+config-only deploys as well. A bridge-only deploy never starts an app
+transaction, so its operator-resolution failure necessarily leaves the same
+old state.
+
+The automatic rollback job accepts any readable state with
+`status=switched|accepted` and does not bind it to the current workflow SHA
+(`.github/workflows/ci-cd.yml:929-933`). If the previous transaction's target
+color is still active, `rollback_blue_green.sh` accepts it and switches traffic
+back from the previously successful release even though the current release
+never switched traffic. The executable condition reproduction against the
+exact target produced:
+
+```text
+operator_resolution_line=245
+preparing_state_line=255
+workflow_gate_on_stale_accepted=OPEN
+rollback_gate_current_equals_old_target=OPEN
+stale-state rollback reproduction: FAILS CLOSEDNESS (confirmed)
+```
+
+Before integration, bind automatic rollback to the current deployment
+transaction: compare the state `commit` to the exact current 40-character SHA
+without sourcing the state file, and permit rollback only for a state/status
+created by that workflow. For app/config deploys, recording `preparing` before
+operator resolution additionally closes the early-failure window. Do not
+unconditionally create an app transaction for a successful bridge-only deploy,
+because that would erase the prior manual rollback state without an app
+cutover. Add executable regressions for:
+
+- stale previous `accepted` state plus current pre-switch operator failure;
+- current `switched` transaction, where rollback remains allowed;
+- bridge-only operator/deploy failure, which must not roll back app traffic;
+- config-only early failure, which must not consume stale state.
+
+## Accepted behavior in this commit
+
+- Every deploy-relevant detector result adds `qdrant-operator` exactly once;
+  docs-only changes add nothing. Synthetic web, API, bridge, config, combined
+  and forced-deploy cases passed.
+- Matrix targets are coherent: web and bridge use the default target, API uses
+  `runner`, and operator uses `qdrant-operator`.
+- Docker metadata publishes the full `${{ github.sha }}` tag for every matrix
+  image. Deploy resolves the fixed operator repository from the exact 40-hex
+  tag, validates the literal repository plus a 64-hex digest, and writes only
+  the digest value before the first Compose invocation.
+- Registry authentication uses `--password-stdin`; no mutable operator fallback
+  or token echo was found.
+
+## Fresh verification
+
+- `node scripts/ci/test_ci_cd_workflow_gates.mjs`: passed.
+- `bash scripts/ci/test_detect_deploy_changes.sh`: passed.
+- `bash scripts/ci/test_blue_green_fail_closed.sh`: passed.
+- `bash -n` for detector, detector test, deploy, rollback and fail-closed test:
+  passed.
+- Synthetic change matrix: docs `0`; web `web+operator`; API `api+operator`;
+  bridge `bridge+operator`; config `operator`; combined/forced each contained
+  web, API, bridge and operator once with the expected targets.
+- Exact-target stale-state condition reproduction: failed the required
+  rollback closedness as documented above.
+
+## Readiness boundary
+
+Commit `4267deee` is **not ready for integration or remote activation** until
+the P1 rollback binding is corrected and independently rechecked. The prior
+Q12 remote migration, protected smoke/recovery-probe and durable rollout gates
+remain mandatory and are outside this implementation review.
