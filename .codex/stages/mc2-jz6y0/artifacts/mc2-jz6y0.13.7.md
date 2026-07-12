@@ -2,6 +2,7 @@
 schema_version: orchestration-artifact/v1
 artifact_type: delegated-stream
 task_id: mc2-jz6y0.13.7
+resolves_review: cfc818d3
 stage_id: mc2-jz6y0
 agent_type: deploy_specialist
 subagent_model: inherit_orchestrator
@@ -18,8 +19,8 @@ write_zone:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7.md
 success_criteria:
   - pg_dump failure is observed directly and cannot publish a backup
-  - a nontrivial custom archive passes pg_restore list validation before atomic publication and directory fsync
-  - credentials and CA are explicit owner-controlled files using verify-full and are never logged
+  - a nontrivial custom archive passes pg_restore TOC and full offline traversal before atomic publication and directory fsync
+  - credentials and CA are stable opened inputs using verify-full and are never logged or retained in diagnostic residue
   - one nonblocking lock covers the complete operation and retention runs only after validated publication
   - crash and ordinary failure cannot create a published partial backup or remove historical/unrelated files
 selected_docs:
@@ -27,6 +28,7 @@ selected_docs:
   - PostgreSQL 18 pg_restore — https://www.postgresql.org/docs/18/app-pgrestore.html
   - PostgreSQL 18 libpq TLS/connect parameters — https://www.postgresql.org/docs/18/libpq-connect.html
 selected_skills:
+  - superpowers:receiving-code-review
   - senior-devops
   - superpowers:test-driven-development
   - superpowers:systematic-debugging
@@ -54,6 +56,10 @@ verification:
   - TDD RED command portability/hardening: two 1/9 cycles failed for rejecting distro-managed PostgreSQL symlinks and for a PATH-resolved interpreter
   - TDD RED credential minimization: 4/9 failed because pg_restore list inherited PGDATABASE unnecessarily
   - focused GREEN vitest: 9/9 passed
+  - review correction RED: 12/15 failed against commit 23f24068 for stable FD consumption, path substitution, stderr residue, full traversal, exact scavenging, and no-replace publication
+  - review correction no-target RED: 1/16 failed because plain ln followed a colliding symlink-to-directory
+  - review correction locale RED: 1/16 failed because stat file-type parsing was not pinned to the C locale
+  - review correction GREEN: 16/16 passed
   - broader ops delta: 42/44 passed; two base-commit stale contract failures are outside this diff and recorded below
   - bash -n deploy/postgres/backup-supabase.sh: passed
   - node scripts/ci/test_ci_cd_workflow_gates.mjs: passed
@@ -78,19 +84,27 @@ fail-open `pg_dump | gzip` shape with a direct custom-format archive. It keeps
 `set -Eeuo pipefail`, holds one nonblocking directory lock for the complete
 window, reads but never sources an owner-only one-line URL file, requires the
 URL's exact `sslmode=verify-full` and explicit `sslrootcert` path, and sends the
-URL to `pg_dump` only through `PGDATABASE`. Child stderr is quarantined and
-removed so even a failing child that repeats its environment cannot disclose the
-password in operator output. The URL is unset before offline archive validation.
+URL to `pg_dump` only through `PGDATABASE`. The URL and CA are bound to stable
+opened descriptors after canonical parent/path, device, inode, owner, and mode
+checks. The effective URL replaces the CA pathname with inherited
+`/proc/self/fd/<fd>`. Both paths are rechecked immediately before `pg_dump`.
+Child stderr goes to `/dev/null`, so even abrupt termination cannot persist a
+password-bearing diagnostic file. The URL is unset before offline validation.
 
 The operator writes owner-only temporary files in the final directory, captures
 the real `pg_dump` status, requires more than 1024 bytes, runs
-`pg_restore --list`, requires a real TOC entry, fsyncs the archive, atomically
-renames it, and fsyncs the directory. Retention occurs only after that validated
-publication. It owns only mode-0600, current-user, regular non-symlink files
+`pg_restore --list`, requires a real TOC entry, and then completes an offline
+credential-free `pg_restore --file=/dev/null` traversal. It fsyncs the archive,
+publishes through an atomic same-directory no-replace hard link, fsyncs the
+directory, removes the temporary name, and fsyncs the directory again. Retention
+occurs only after that validated publication. It owns only mode-0600,
+current-user, regular non-symlink files
 matching `supabase-YYYYMMDDTHHMMSSZ-PID.dump`; unrelated files, the historical
 `.sql.gz` input, symlinks, and all existing files on failure remain untouched.
-Ordinary failures remove only this run's exact dot-temporaries. A forced crash
-may leave a dot-temporary, but it can never match or become a published backup.
+Ordinary failures remove only this run's exact dot-temporaries. Startup cleanup
+removes only exact current-owner mode-0600 non-symlink archive/list/legacy-stderr
+temporary patterns. A forced crash may leave a non-secret dot-temporary, but it
+can never match or become a published backup.
 
 # Scope / Routing
 
@@ -130,7 +144,12 @@ failed because the tracked script was absent. The first GREEN reached 8/8. Two
 additional bounded RED/GREEN cycles proved distro-managed `/usr/bin/pg_dump`
 symlinks remain usable while synthetic overrides stay confined, fixed the
 interpreter to `/usr/bin/bash`, and proved `pg_restore --list` receives no
-database credentials. Fresh focused evidence is 9/9 passed.
+database credentials. The correction RED then failed 12/15 against reviewed
+commit `23f24068`. It reproduced all four findings plus unsafe input parents,
+both deterministic inode substitutions, selective startup cleanup, inherited
+CA-FD use, and a deterministic final-name collision. A final 1/16 RED proved
+plain `ln` follows a colliding symlink-to-directory; no-target publication fixed
+that boundary. Correction GREEN is 16/16.
 
 The broader seven-file ops delta passed 42/44. Its two failures are present at
 base `dd3e6c76` and no involved source or test differs from that base: the stale
@@ -143,7 +162,7 @@ All assigned focused shell, CI, type, and process gates passed.
 # Delivery / Cleanup
 
 The branch is returned committed and pushed for independent security/correctness
-review. No remote operator installation, cron change, secret read/write, CA
+re-review. No remote operator installation, cron change, secret read/write, CA
 copy, live dump, database connection, retention deletion, or staging mutation
 was performed. Synthetic temporary roots were deleted by the tests; worktree
 dependency symlinks are removed before return.

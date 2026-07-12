@@ -28,6 +28,9 @@ interface Fixture {
   urlFile: string;
   caFile: string;
   argsLog: string;
+  restoreArgsLog: string;
+  identityLog: string;
+  substituteHook: string;
   readyFile: string;
   releaseFile: string;
   env: NodeJS.ProcessEnv;
@@ -62,16 +65,24 @@ function fixture(): Fixture {
   chmodSync(urlFile, 0o600);
 
   const argsLog = join(root, 'pg-dump-args');
+  const restoreArgsLog = join(root, 'pg-restore-args');
+  const identityLog = join(root, 'pg-dump-identity');
   const readyFile = join(root, 'dump-ready');
   const releaseFile = join(root, 'dump-release');
   const pgDump = join(binDir, 'pg_dump');
   const pgRestore = join(binDir, 'pg_restore');
+  const substituteHook = join(binDir, 'substitute-input');
 
   executable(
     pgDump,
     `#!/usr/bin/env bash
 set -eu
 printf '%s\\n' "$*" > "$FAKE_ARGS_LOG"
+[[ "\${PGSSLROOTCERT:-}" == /proc/self/fd/* ]] || exit 94
+[[ -r "$PGSSLROOTCERT" ]] || exit 95
+[[ "$PGDATABASE" == *"sslrootcert=$PGSSLROOTCERT"* ]] || exit 96
+[[ "$PGDATABASE" != *"$FAKE_ORIGINAL_CA_PATH"* ]] || exit 97
+printf 'ca_fd=yes\\nurl_ca_fd=yes\\nca_content=%s\\n' "$(/usr/bin/cat "$PGSSLROOTCERT")" > "$FAKE_IDENTITY_LOG"
 output=''
 for argument in "$@"; do
   case "$argument" in
@@ -96,6 +107,7 @@ case "\${FAKE_DUMP_MODE:-success}" in
     while [[ ! -e "$FAKE_RELEASE_FILE" ]]; do /usr/bin/sleep 0.02; done
     ;;
   crash)
+    printf 'synthetic abrupt diagnostic for %s\\n' "$PGDATABASE" >&2
     printf 'PGDMP-partial' > "$output"
     /usr/bin/kill -KILL "$PPID"
     ;;
@@ -116,12 +128,31 @@ if [[ -n "\${PGDATABASE:-}" ]]; then
   printf 'pg_restore list must not receive database credentials\\n' >&2
   exit 93
 fi
-if [[ "\${FAKE_RESTORE_MODE:-success}" == failure ]]; then
+printf '%s\\n' "$*" >> "$FAKE_RESTORE_ARGS_LOG"
+if [[ "\${FAKE_RESTORE_MODE:-success}" == list-failure && "$*" == *--list* ]]; then
   printf 'synthetic pg_restore failure\\n' >&2
   exit 23
 fi
-printf '; Archive created by synthetic test\\n'
-printf '1; 1259 16384 TABLE public synthetic postgres\\n'
+if [[ "\${FAKE_RESTORE_MODE:-success}" == traversal-failure && "$*" == *--file=/dev/null* ]]; then
+  printf 'synthetic full traversal failure\\n' >&2
+  exit 42
+fi
+if [[ "$*" == *--list* ]]; then
+  printf '; Archive created by synthetic test\\n'
+  printf '1; 1259 16384 TABLE public synthetic postgres\\n'
+elif [[ "$*" != *--file=/dev/null* ]]; then
+  exit 98
+fi
+`
+  );
+
+  executable(
+    substituteHook,
+    `#!/usr/bin/env bash
+set -eu
+/usr/bin/mv -- "$FAKE_SUBSTITUTE_PATH" "$FAKE_SUBSTITUTE_PATH.opened"
+printf '%s\\n' 'synthetic substituted input' > "$FAKE_SUBSTITUTE_PATH"
+/usr/bin/chmod "$FAKE_SUBSTITUTE_MODE" "$FAKE_SUBSTITUTE_PATH"
 `
   );
 
@@ -131,6 +162,9 @@ printf '1; 1259 16384 TABLE public synthetic postgres\\n'
     urlFile,
     caFile,
     argsLog,
+    restoreArgsLog,
+    identityLog,
+    substituteHook,
     readyFile,
     releaseFile,
     env: {
@@ -144,6 +178,9 @@ printf '1; 1259 16384 TABLE public synthetic postgres\\n'
       MC2_SUPABASE_BACKUP_TEST_PG_DUMP: pgDump,
       MC2_SUPABASE_BACKUP_TEST_PG_RESTORE: pgRestore,
       FAKE_ARGS_LOG: argsLog,
+      FAKE_RESTORE_ARGS_LOG: restoreArgsLog,
+      FAKE_IDENTITY_LOG: identityLog,
+      FAKE_ORIGINAL_CA_PATH: caFile,
       FAKE_READY_FILE: readyFile,
       FAKE_RELEASE_FILE: releaseFile,
     },
@@ -178,6 +215,7 @@ describe('fail-closed Supabase backup operator', () => {
     const operator = readFileSync(OPERATOR, 'utf8');
 
     expect(operator.startsWith('#!/usr/bin/bash\n')).toBe(true);
+    expect(operator).toContain('export LC_ALL=C');
     expect(operator).toContain("PG_DUMP='/usr/bin/pg_dump'");
     expect(operator).toContain("PG_RESTORE='/usr/bin/pg_restore'");
     expect(operator).toContain("require_test_command 'pg_dump'");
@@ -209,12 +247,25 @@ describe('fail-closed Supabase backup operator', () => {
     const item = fixture();
     const result = run(item, {
       FAKE_DUMP_MODE: 'validation-failure',
-      FAKE_RESTORE_MODE: 'failure',
+      FAKE_RESTORE_MODE: 'list-failure',
     });
 
     expect(result.status).toBe(23);
     expect(result.stderr).toContain('pg_restore validation failed with status 23');
     expect(result.stderr).not.toContain('synthetic-password-never-log');
+    expect(result.stdout).not.toContain('published');
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
+  it('rejects an archive whose TOC lists but whose full offline traversal fails', () => {
+    const item = fixture();
+    const result = run(item, {
+      FAKE_DUMP_MODE: 'validation-failure',
+      FAKE_RESTORE_MODE: 'traversal-failure',
+    });
+
+    expect(result.status).toBe(42);
+    expect(result.stderr).toContain('pg_restore full traversal failed with status 42');
     expect(result.stdout).not.toContain('published');
     expect(published(item.backupDir)).toEqual([]);
   });
@@ -234,6 +285,12 @@ describe('fail-closed Supabase backup operator', () => {
     expect(dumpArgs).toContain('--format=custom');
     expect(dumpArgs).toContain('--file=');
     expect(dumpArgs).not.toContain('synthetic-password-never-log');
+    expect(readFileSync(item.identityLog, 'utf8')).toBe(
+      'ca_fd=yes\nurl_ca_fd=yes\nca_content=synthetic CA only\n'
+    );
+    const restoreArgs = readFileSync(item.restoreArgsLog, 'utf8');
+    expect(restoreArgs).toContain('--list');
+    expect(restoreArgs).toContain('--file=/dev/null');
   });
 
   it('takes one nonblocking lock across the complete dump window', async () => {
@@ -290,6 +347,34 @@ describe('fail-closed Supabase backup operator', () => {
     expect(published(item.backupDir)).toEqual([]);
   });
 
+  it('rejects unsafe parent-directory permissions for credential inputs', () => {
+    const item = fixture();
+    chmodSync(join(item.root, 'secrets'), 0o770);
+
+    const result = run(item);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('parent directory must not be group/world writable');
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
+  it.each([
+    ['URL credential', 'url', 0o600],
+    ['CA', 'ca', 0o400],
+  ] as const)('fails closed when the validated %s path is substituted', (label, target, mode) => {
+    const item = fixture();
+    const path = target === 'url' ? item.urlFile : item.caFile;
+    const result = run(item, {
+      MC2_SUPABASE_BACKUP_TEST_PRE_DUMP_HOOK: item.substituteHook,
+      FAKE_SUBSTITUTE_PATH: path,
+      FAKE_SUBSTITUTE_MODE: mode.toString(8),
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(`${label} file path identity changed after open`);
+    expect(existsSync(item.argsLog)).toBe(false);
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
   it('never turns crash residue into a published backup', () => {
     const item = fixture();
     const crashed = run(item, { FAKE_DUMP_MODE: 'crash' });
@@ -298,6 +383,63 @@ describe('fail-closed Supabase backup operator', () => {
     expect(published(item.backupDir)).toEqual([]);
     const residue = readdirSync(item.backupDir);
     expect(residue.every(name => name.startsWith('.supabase-backup.tmp.'))).toBe(true);
+    expect(residue.some(name => name.includes('.stderr.'))).toBe(false);
+    for (const name of residue) {
+      expect(readFileSync(join(item.backupDir, name), 'utf8')).not.toContain(
+        'synthetic-password-never-log'
+      );
+    }
+
+    const recovered = run(item);
+    expect(recovered.status).toBe(0);
+    expect(
+      readdirSync(item.backupDir).filter(name => name.startsWith('.supabase-backup.tmp.'))
+    ).toEqual([]);
+  });
+
+  it('startup cleanup removes only exact owned mode-0600 non-symlink temporaries', () => {
+    const item = fixture();
+    const owned = join(item.backupDir, '.supabase-backup.tmp.stderr.Abc123');
+    const wrongMode = join(item.backupDir, '.supabase-backup.tmp.archive.Def456');
+    const target = join(item.backupDir, 'manual-residue');
+    const linked = join(item.backupDir, '.supabase-backup.tmp.list.Ghi789');
+    const unrelated = join(item.backupDir, '.supabase-backup.tmp.other.Jkl012');
+    writeFileSync(owned, 'synthetic old diagnostic', { mode: 0o600 });
+    writeFileSync(wrongMode, 'keep wrong mode', { mode: 0o644 });
+    writeFileSync(target, 'keep symlink target', { mode: 0o600 });
+    symlinkSync(target, linked);
+    writeFileSync(unrelated, 'keep unrelated', { mode: 0o600 });
+
+    const result = run(item, { FAKE_DUMP_MODE: 'failure' });
+    expect(result.status).toBe(17);
+    expect(existsSync(owned)).toBe(false);
+    for (const path of [wrongMode, target, linked, unrelated]) expect(existsSync(path)).toBe(true);
+  });
+
+  it('publishes with atomic no-replace semantics and preserves collision content', () => {
+    const item = fixture();
+    const finalName = 'supabase-20300101T000000Z-777.dump';
+    const existing = join(item.backupDir, finalName);
+    writeFileSync(existing, 'racer-content-must-survive', { mode: 0o600 });
+
+    const result = run(item, { MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: finalName });
+    expect(result.status).toBe(73);
+    expect(result.stderr).toContain('refusing to replace an existing backup path');
+    expect(readFileSync(existing, 'utf8')).toBe('racer-content-must-survive');
+    expect(result.stdout).not.toContain('published');
+  });
+
+  it('treats a colliding symlink-to-directory as the final name, not a target directory', () => {
+    const item = fixture();
+    const finalName = 'supabase-20300101T000000Z-778.dump';
+    const collisionDirectory = join(item.root, 'collision-directory');
+    mkdirSync(collisionDirectory, { mode: 0o700 });
+    symlinkSync(collisionDirectory, join(item.backupDir, finalName));
+
+    const result = run(item, { MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: finalName });
+    expect(result.status).toBe(73);
+    expect(readdirSync(collisionDirectory)).toEqual([]);
+    expect(result.stdout).not.toContain('published');
   });
 
   it('runs exact-pattern non-symlink retention only after successful validation', () => {
