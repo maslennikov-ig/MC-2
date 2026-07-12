@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { link, lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
@@ -353,6 +353,117 @@ async function fsyncDirectory(
   }
 }
 
+interface DurableFileIdentity {
+  device: number;
+  inode: number;
+}
+
+type DurableFileInspection = { status: 'absent' } | ({ status: 'exact' } & DurableFileIdentity);
+
+function durableTemporaryPath(targetPath: string, content: string): string {
+  const contentSha256 = createHash('sha256').update(content).digest('hex');
+  return `${targetPath}.${contentSha256}.tmp`;
+}
+
+async function inspectOwnerOnlyContentFile(
+  path: string,
+  expectedContent: string,
+  label: string
+): Promise<DurableFileInspection> {
+  let metadata: Awaited<ReturnType<typeof lstat>>;
+  try {
+    metadata = await lstat(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { status: 'absent' };
+    throw error;
+  }
+  const expectedUid = process.getuid?.();
+  if (metadata.isSymbolicLink() || !metadata.isFile()) {
+    throw new Error(`${label} must be a non-symlink regular file`);
+  }
+  if ((metadata.mode & 0o777) !== 0o600) {
+    throw new Error(`${label} must have mode 0600`);
+  }
+  if (expectedUid !== undefined && metadata.uid !== expectedUid) {
+    throw new Error(`${label} must be owned by the current UID`);
+  }
+
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat();
+    if (
+      !opened.isFile() ||
+      (opened.mode & 0o777) !== 0o600 ||
+      opened.dev !== metadata.dev ||
+      opened.ino !== metadata.ino
+    ) {
+      throw new Error(`${label} changed during protected open`);
+    }
+    if (expectedUid !== undefined && opened.uid !== expectedUid) {
+      throw new Error(`${label} must be owned by the current UID`);
+    }
+    if ((await handle.readFile('utf8')) !== expectedContent) {
+      throw new Error(`${label} mismatch requires operator investigation`);
+    }
+    return { status: 'exact', device: opened.dev, inode: opened.ino };
+  } finally {
+    await handle.close();
+  }
+}
+
+async function assertStableOwnerOnlyFile(
+  path: string,
+  expected: DurableFileIdentity,
+  label: string
+): Promise<void> {
+  const metadata = await lstat(path);
+  if (
+    metadata.isSymbolicLink() ||
+    !metadata.isFile() ||
+    (metadata.mode & 0o777) !== 0o600 ||
+    metadata.dev !== expected.device ||
+    metadata.ino !== expected.inode
+  ) {
+    throw new Error(`${label} changed before publication`);
+  }
+  const expectedUid = process.getuid?.();
+  if (expectedUid !== undefined && metadata.uid !== expectedUid) {
+    throw new Error(`${label} must be owned by the current UID`);
+  }
+}
+
+async function reconcileCommittedTemporary(targetPath: string, content: string): Promise<void> {
+  const temporaryPath = durableTemporaryPath(targetPath, content);
+  const temporary = await inspectOwnerOnlyContentFile(
+    temporaryPath,
+    content,
+    'Recovery state temporary'
+  );
+  const target = await inspectOwnerOnlyContentFile(
+    targetPath,
+    content,
+    'Recovery progress journal'
+  );
+  if (target.status === 'absent') return;
+
+  const targetHandle = await open(targetPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await targetHandle.stat();
+    if (opened.dev !== target.device || opened.ino !== target.inode) {
+      throw new Error('Recovery progress journal changed before reconciliation fsync');
+    }
+    await targetHandle.sync();
+  } finally {
+    await targetHandle.close();
+  }
+  const directory = dirname(targetPath);
+  await fsyncDirectory(directory, defaultDurableWriteOperations);
+  if (temporary.status === 'absent') return;
+  await assertStableOwnerOnlyFile(temporaryPath, temporary, 'Recovery state temporary');
+  await unlink(temporaryPath);
+  await fsyncDirectory(directory, defaultDurableWriteOperations);
+}
+
 async function writeDurableReplacement(
   targetPath: string,
   content: string,
@@ -364,15 +475,28 @@ async function writeDurableReplacement(
   await operations.assertSecureDirectory(directory);
   if (options.publication === 'immutable') await operations.assertAbsent(targetPath);
 
-  const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
-  const handle = await operations.openTemporary(temporaryPath, 0o600);
-  let closed = false;
+  const temporaryPath = durableTemporaryPath(targetPath, content);
+  const existingTemporary = await inspectOwnerOnlyContentFile(
+    temporaryPath,
+    content,
+    'Recovery state temporary'
+  );
+  let handle: DurableWriteHandle | undefined;
+  let closed = true;
+  let safeTemporary = existingTemporary.status === 'exact';
   try {
-    await handle.writeFile(content, 'utf8');
-    await handle.chmod(0o600);
-    await handle.sync();
-    await handle.close();
-    closed = true;
+    if (existingTemporary.status === 'absent') {
+      handle = await operations.openTemporary(temporaryPath, 0o600);
+      safeTemporary = true;
+      closed = false;
+      await handle.writeFile(content, 'utf8');
+      await handle.chmod(0o600);
+      await handle.sync();
+      await handle.close();
+      closed = true;
+    } else {
+      await assertStableOwnerOnlyFile(temporaryPath, existingTemporary, 'Recovery state temporary');
+    }
     if (options.publication === 'immutable') {
       try {
         await operations.link(temporaryPath, targetPath);
@@ -390,8 +514,8 @@ async function writeDurableReplacement(
       await fsyncDirectory(directory, operations);
     }
   } catch (error) {
-    if (!closed) await handle.close().catch(() => undefined);
-    await operations.unlink(temporaryPath).catch(() => undefined);
+    if (!closed) await handle?.close().catch(() => undefined);
+    if (safeTemporary) await operations.unlink(temporaryPath).catch(() => undefined);
     throw error;
   }
 }
@@ -677,7 +801,11 @@ export async function replaceProgressJournal(
   }
 
   const actualRevision = current?.revision ?? -1;
-  if (actualRevision !== expectedRevision) {
+  const exactNextRevisionReplay =
+    current !== undefined &&
+    actualRevision === expectedRevision + 1 &&
+    serialize(current) === serialize(next);
+  if (actualRevision !== expectedRevision && !exactNextRevisionReplay) {
     throw new Error(
       `Progress journal revision mismatch: expected ${expectedRevision}, found ${actualRevision}`
     );
@@ -687,6 +815,12 @@ export async function replaceProgressJournal(
       validateRecoveryProgressJournalBinding(manifest, current.manifest_sha256, current);
     }
     validateRecoveryProgressJournalBinding(manifest, next.manifest_sha256, next);
+  }
+  if (exactNextRevisionReplay) {
+    await reconcileCommittedTemporary(targetPath, serialize(next));
+    throw new Error(
+      `Progress journal revision mismatch: expected ${expectedRevision}, found ${actualRevision}`
+    );
   }
   if (current) validateRecoveryJournalTransition(current, next);
   else {

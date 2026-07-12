@@ -8,6 +8,7 @@ import {
   readdir,
   rm,
   stat,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
@@ -28,6 +29,8 @@ const fault = vi.hoisted(() => ({
   journalDirectory: '',
   replaceTargetOnLstat: false,
   replacementBytes: '',
+  journalTemporaryUidDelta: 0,
+  rollbackUnlinkCount: 0,
 }));
 
 vi.mock('node:fs/promises', async importOriginal => {
@@ -128,7 +131,7 @@ vi.mock('node:fs/promises', async importOriginal => {
     },
     unlink: async (path: Parameters<typeof actual.unlink>[0]) => {
       const value = String(path);
-      if (fault.crashed && isRecoveryTemporary(value)) {
+      if (fault.crashed && (isRecoveryTemporary(value) || isJournalTemporary(value))) {
         const error = new Error(
           'simulated process termination before cleanup'
         ) as NodeJS.ErrnoException;
@@ -139,6 +142,7 @@ vi.mock('node:fs/promises', async importOriginal => {
         return around('temp-unlink', () => actual.unlink(path));
       }
       if (value === fault.recoveryTarget) {
+        fault.rollbackUnlinkCount += 1;
         return around('rollback-unlink', () => actual.unlink(path));
       }
       if (isJournalTemporary(value)) {
@@ -148,6 +152,12 @@ vi.mock('node:fs/promises', async importOriginal => {
     },
     lstat: async (...args: Parameters<typeof actual.lstat>) => {
       const path = String(args[0]);
+      if (fault.journalTemporaryUidDelta !== 0 && isJournalTemporary(path)) {
+        const metadata = await actual.lstat(...args);
+        return Object.assign(Object.create(Object.getPrototypeOf(metadata)), metadata, {
+          uid: metadata.uid + fault.journalTemporaryUidDelta,
+        });
+      }
       if (fault.replaceTargetOnLstat && path === fault.recoveryTarget) {
         fault.replaceTargetOnLstat = false;
         const staleMetadata = await actual.lstat(...args);
@@ -168,6 +178,7 @@ import {
   preflightRecoveryExecution,
   publishNoReplace,
   reconcilePublishedTarget,
+  reconcileRollbackTarget,
   rollbackPublished,
   type PublishInput,
 } from '../../../../tools/qdrant/source-recovery-filesystem.js';
@@ -328,6 +339,8 @@ function disarm(): void {
   fault.journalDirectory = '';
   fault.replaceTargetOnLstat = false;
   fault.replacementBytes = '';
+  fault.journalTemporaryUidDelta = 0;
+  fault.rollbackUnlinkCount = 0;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -338,6 +351,12 @@ async function exists(path: string): Promise<boolean> {
       throw error;
     }
   );
+}
+
+async function journalTemporaryPaths(directory: string): Promise<string[]> {
+  return (await readdir(directory))
+    .filter(name => name.startsWith('journal.json.') && name.endsWith('.tmp'))
+    .map(name => join(directory, name));
 }
 
 afterEach(() => disarm());
@@ -510,6 +529,101 @@ describe('source recovery crash-order and inode acceptance matrix', () => {
       }
     }
   );
+
+  it.each(['before', 'after'] as const)(
+    'restarts the public rollback workflow after a %s parent-fsync crash',
+    async phase => {
+      const value = await filesystemFixture();
+      const base = recoveryManifest();
+      const entry = {
+        ...value.input.entry,
+        entry_id: base.copies[0].entry_id,
+        affected_file_catalog_rows: base.copies[0].affected_file_catalog_rows,
+      };
+      const manifest = recoveryManifest({
+        development_root: value.input.developmentRoot,
+        production_root: value.input.productionRoot,
+        copies: [entry, ...base.copies.slice(1)],
+      });
+      const publishInput: PublishInput = { ...value.input, entry };
+      let journal = createInitialProgressJournal(
+        manifest,
+        calculateRecoveryManifestSha256(manifest)
+      );
+      journal = {
+        ...journal,
+        phase: 'copied',
+        copy_states: Object.fromEntries(
+          manifest.copies.map(copyEntry => [
+            copyEntry.entry_id,
+            copyEntry.entry_id === entry.entry_id ? 'rollback_planned' : 'rolled_back',
+          ])
+        ),
+      };
+      const dependencies: RecoveryWorkflowDependencies = {
+        createPlan: () => Promise.resolve(manifest),
+        preflightCopies: () => Promise.resolve(),
+        preflightExecution: () => Promise.resolve(),
+        writePlan: () =>
+          Promise.resolve({
+            manifest,
+            manifestSha256: calculateRecoveryManifestSha256(manifest),
+            journal,
+          }),
+        loadReviewedState: () =>
+          Promise.resolve({
+            manifest,
+            manifestSha256: calculateRecoveryManifestSha256(manifest),
+            journal,
+          }),
+        persistJournal: (_current, next) => {
+          journal = next;
+          return Promise.resolve();
+        },
+        readSourceCounts: () => Promise.resolve(manifest.expected_post_counts),
+        inspectCopy: () => Promise.resolve('absent'),
+        publishCopy: () => Promise.reject(new Error('rollback must not publish')),
+        rollbackCopy: async (_entry, current) => {
+          const reconciliation = await reconcileRollbackTarget(publishInput, 'rollback_planned');
+          if (reconciliation === 'ready_to_rollback') {
+            await rollbackPublished({
+              ...publishInput,
+              phase: current.phase,
+              journalState: 'rollback_planned',
+            });
+          }
+        },
+        applyDisposition: () => Promise.resolve('disposition_applied'),
+        verifyDispositions: () => Promise.resolve(),
+      };
+
+      try {
+        await publishNoReplace(publishInput);
+        arm('parent-fsync', phase, { target: value.target });
+        await expect(
+          runSourceRecoveryCommand({ mode: 'rollback', confirmRunId: RUN_ID }, dependencies)
+        ).rejects.toThrow(/simulated crash/iu);
+        expect(journal.copy_states[entry.entry_id]).toBe('rollback_planned');
+        expect(await exists(value.target)).toBe(false);
+        const unlinkCount = fault.rollbackUnlinkCount;
+
+        disarm();
+        fault.recoveryTarget = value.target;
+        fault.recoveryDirectory = dirname(value.target);
+        fault.rollbackUnlinkCount = unlinkCount;
+        await expect(
+          runSourceRecoveryCommand({ mode: 'rollback', confirmRunId: RUN_ID }, dependencies)
+        ).resolves.toMatchObject({ mode: 'rollback', rolledBack: 1 });
+
+        expect(fault.rollbackUnlinkCount).toBe(1);
+        expect(journal.copy_states[entry.entry_id]).toBe('rolled_back');
+        expect((await readdir(dirname(value.target))).sort()).toEqual([]);
+      } finally {
+        disarm();
+        await rm(value.root, { recursive: true, force: true });
+      }
+    }
+  );
 });
 
 const journalInitialBoundaries = [
@@ -542,15 +656,29 @@ describe('source recovery journal persistence crash matrix', () => {
         await expect(replaceProgressJournal(journalPath, -1, journal, manifest)).rejects.toThrow(
           /simulated crash/iu
         );
+        const residue = await journalTemporaryPaths(directory);
+        const expectsResidue =
+          !(boundary === 'journal-parent-fsync' && occurrence === 2) &&
+          !(boundary === 'journal-temp-unlink' && phase === 'after');
+        expect(residue).toHaveLength(expectsResidue ? 1 : 0);
         disarm();
 
-        if (await exists(journalPath)) {
-          expect(JSON.parse(await readFile(journalPath, 'utf8'))).toEqual(journal);
+        const expectedContent = `${JSON.stringify(journal, null, 2)}\n`;
+        const committedBeforeRestart = await exists(journalPath);
+        if (residue.length > 0 && (await readFile(residue[0], 'utf8')) !== expectedContent) {
+          await expect(replaceProgressJournal(journalPath, -1, journal, manifest)).rejects.toThrow(
+            /temporary.*mismatch/iu
+          );
+          expect(await journalTemporaryPaths(directory)).toEqual(residue);
+          return;
+        } else if (committedBeforeRestart) {
           await expect(replaceProgressJournal(journalPath, -1, journal, manifest)).rejects.toThrow(
             /revision mismatch/iu
           );
         } else {
-          await replaceProgressJournal(journalPath, -1, journal, manifest);
+          await expect(
+            replaceProgressJournal(journalPath, -1, journal, manifest)
+          ).resolves.toBeUndefined();
         }
         expect(JSON.parse(await readFile(journalPath, 'utf8'))).toEqual(journal);
         expect((await readdir(directory)).sort()).toEqual(['journal.json']);
@@ -586,19 +714,82 @@ describe('source recovery journal persistence crash matrix', () => {
         await expect(
           replaceProgressJournal(journalPath, initial.revision, copying, manifest)
         ).rejects.toThrow(/simulated crash/iu);
+        const residue = await journalTemporaryPaths(directory);
+        expect(residue).toHaveLength(
+          boundary === 'journal-parent-fsync' ||
+            (boundary === 'journal-rename' && phase === 'after')
+            ? 0
+            : 1
+        );
         disarm();
 
-        const durable = JSON.parse(await readFile(journalPath, 'utf8')) as RecoveryProgressJournal;
-        if (durable.revision === initial.revision) {
-          await replaceProgressJournal(journalPath, initial.revision, copying, manifest);
-        } else {
-          expect(durable).toEqual(copying);
+        const expectedContent = `${JSON.stringify(copying, null, 2)}\n`;
+        const durableBeforeRestart = JSON.parse(
+          await readFile(journalPath, 'utf8')
+        ) as RecoveryProgressJournal;
+        if (residue.length > 0 && (await readFile(residue[0], 'utf8')) !== expectedContent) {
+          await expect(
+            replaceProgressJournal(journalPath, initial.revision, copying, manifest)
+          ).rejects.toThrow(/temporary.*mismatch/iu);
+          expect(await journalTemporaryPaths(directory)).toEqual(residue);
+          return;
+        } else if (durableBeforeRestart.revision === copying.revision) {
           await expect(
             replaceProgressJournal(journalPath, initial.revision, copying, manifest)
           ).rejects.toThrow(/revision mismatch/iu);
+        } else {
+          await expect(
+            replaceProgressJournal(journalPath, initial.revision, copying, manifest)
+          ).resolves.toBeUndefined();
         }
         expect(JSON.parse(await readFile(journalPath, 'utf8'))).toEqual(copying);
         expect((await readdir(directory)).sort()).toEqual(['journal.json']);
+      } finally {
+        disarm();
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.each(['mismatch', 'mode', 'symlink', 'owner'] as const)(
+    'fails closed for a %s journal crash temporary',
+    async corruption => {
+      const directory = await mkdtemp('/tmp/mc2-source-recovery-journal-corrupt-');
+      const journalPath = join(directory, 'journal.json');
+      const manifest = recoveryManifest();
+      const journal = createInitialProgressJournal(
+        manifest,
+        calculateRecoveryManifestSha256(manifest)
+      );
+      try {
+        await chmod(directory, 0o700);
+        arm('journal-temp-write', 'after', { journal: journalPath });
+        await expect(replaceProgressJournal(journalPath, -1, journal, manifest)).rejects.toThrow(
+          /simulated crash/iu
+        );
+        const [temporaryPath] = await journalTemporaryPaths(directory);
+        expect(temporaryPath).toBeTruthy();
+        disarm();
+
+        if (corruption === 'mismatch') await writeFile(temporaryPath, 'wrong bytes');
+        if (corruption === 'mode') await chmod(temporaryPath, 0o640);
+        if (corruption === 'symlink') {
+          const exact = await readFile(temporaryPath);
+          const external = join(directory, 'external.json');
+          await rm(temporaryPath);
+          await writeFile(external, exact, { mode: 0o600 });
+          await symlink(external, temporaryPath);
+        }
+        if (corruption === 'owner') {
+          fault.journalTarget = journalPath;
+          fault.journalDirectory = directory;
+          fault.journalTemporaryUidDelta = 1;
+        }
+
+        await expect(replaceProgressJournal(journalPath, -1, journal, manifest)).rejects.toThrow(
+          /temporary.*(mismatch|0600|own|symlink|regular)/iu
+        );
+        expect(await exists(temporaryPath)).toBe(true);
       } finally {
         disarm();
         await rm(directory, { recursive: true, force: true });

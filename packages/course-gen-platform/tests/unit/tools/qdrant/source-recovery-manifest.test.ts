@@ -301,6 +301,31 @@ describe('source recovery manifest', () => {
     expect(calls).toEqual(['cleanup-temp']);
   });
 
+  it('does not unlink a deterministic temporary that races its exclusive open', async () => {
+    let unlinkCalls = 0;
+    const operations: DurableWriteOperations = {
+      async mkdir() {},
+      async assertSecureDirectory() {},
+      async assertAbsent() {},
+      async openTemporary() {
+        throw Object.assign(new Error('temporary raced'), { code: 'EEXIST' });
+      },
+      async rename() {},
+      async link() {},
+      async openDirectory() {
+        return { async sync() {}, async close() {} };
+      },
+      async unlink() {
+        unlinkCalls += 1;
+      },
+    };
+
+    await expect(
+      writeImmutableManifest('/state/manifest.json', manifest(), operations)
+    ).rejects.toMatchObject({ code: 'EEXIST' });
+    expect(unlinkCalls).toBe(0);
+  });
+
   it('rejects skipped phases and per-entry state transitions', () => {
     const current = createInitialProgressJournal(
       normalizeRecoveryManifest(manifest()),
