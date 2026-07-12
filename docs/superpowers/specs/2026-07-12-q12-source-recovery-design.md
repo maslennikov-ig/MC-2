@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-12  
 **Beads:** `mc2-jz6y0.13.4`, `mc2-jz6y0.13.4.1`  
-**Status:** owner-approved design; written specification awaiting review  
+**Status:** written specification approved for implementation
 **Parent:** `2026-07-10-self-hosted-qdrant-platform-design.md`
 
 ## Purpose
@@ -77,7 +77,8 @@ aggregate counts and redacted evidence.
   application secret;
 - mounts development uploads read-only;
 - mounts production uploads read-write;
-- mounts only the selected owner-only manifest/state directory read-write;
+- mounts the selected reviewed manifest read-only and a separate owner-only
+  progress-journal directory read-write;
 - supports `execute` and `rollback` with an exact `--confirm-run-id`;
 - refuses an absent, changed, unreviewed, non-write-ahead, or already terminal
   manifest.
@@ -92,6 +93,7 @@ writable production upload mount.
 - uses the pinned operator image and Supabase service credentials;
 - receives the reviewed manifest read-only;
 - mounts neither upload root writable;
+- writes CAS progress only to the separate owner-only progress journal;
 - supports `apply-dispositions` and `verify-dispositions`;
 - updates only the exact rows named by the reviewed manifest using compare-and-
   set predicates over ID, organization/course ownership, source hash, storage
@@ -109,7 +111,7 @@ No new database migration is required. Existing durable fields are used:
 - the three non-eligible Career Playbook rows whose exact files exist are not
   failed by this decision.
 
-The applier is resumable. Each CAS result is persisted to the recovery manifest
+The applier is resumable. Each CAS result is persisted to the progress journal
 before advancing. A mismatched or unexpectedly changed row is a hard stop, not
 an overwrite.
 
@@ -124,8 +126,14 @@ The manifest schema includes:
   expected size/hash, affected row count, and state;
 - one sorted disposition entry per absent original with exact expected database
   predicates, selected outcome/reason, and state;
-- append-free current state plus a bounded transition history whose entries do
-  not contain source text or credentials.
+- an immutable reviewed plan whose entries do not contain source text or
+  credentials.
+
+The manifest is never modified after review. Its SHA-256 is the execution
+identity. Mutable phase and per-entry states live in a separate mode-`0600`
+progress journal bound to `run_id + manifest_sha256`. The planner initializes
+that journal before execution; executor, disposition, verifier, and rollback
+refuse a missing or differently bound journal.
 
 The run phase is one of:
 
@@ -134,10 +142,11 @@ The run phase is one of:
 Rollback is rejected at or after `reindex_started`. Every phase transition is
 persisted through the same crash-durable manifest replacement protocol.
 
-Before the first copy, the full `planned` manifest is written to a same-directory
-temporary file, its inode is `fsync`ed, it is atomically renamed, and the parent
-directory is `fsync`ed. Every later transition uses the same
-temp/`fsync`/atomic-replace/parent-`fsync` sequence.
+Before the first copy, the full `planned` manifest and initial progress journal
+are each written to a same-directory temporary file, their inodes are
+`fsync`ed, they are atomically renamed, and each parent directory is `fsync`ed.
+The manifest is then reviewed and mounted read-only. Every later journal
+transition uses the same temp/`fsync`/atomic-replace/parent-`fsync` sequence.
 
 Allowed copy states:
 
@@ -163,11 +172,12 @@ For each of the 42 sorted physical targets:
 3. Require the production target to be absent.
 4. Verify every catalog row sharing the target agrees on expected size/hash.
 5. Copy to an owner-only same-directory temporary file.
-6. `fsync` and re-hash the temporary file; apply owner/group `1001:1001` and
-   mode `0644`.
+6. Run the executor as UID/GID `1001:1001`, create the temporary file with that
+   ownership, apply mode `0644`, then `fsync` and re-hash it. The executor never
+   runs Node as root and never performs an arbitrary `chown`.
 7. Publish with an atomic no-replace hard link; `EEXIST` is a hard stop.
 8. `fsync` the published file and target directory before durably transitioning
-   the manifest entry to `published`.
+   the journal entry to `published`.
 9. Remove the temporary link and `fsync` the directory again.
 
 The source and target must be on filesystems that support the required link and
@@ -190,7 +200,7 @@ For a `published` entry:
 
 Rollback is allowed only before Qdrant reindex execution begins.
 
-- Persist `rollback_planned` before unlinking.
+- Persist `rollback_planned` in the journal before unlinking.
 - Re-hash the target and require the manifest's expected hash.
 - Never remove a pre-existing, changed, mismatched, or untracked file.
 - Unlink, `fsync` the parent directory, and then persist `rolled_back`.
@@ -268,7 +278,10 @@ disposition verification is stale or incomplete.
 
 ### Staging execution gates
 
-1. Pause new uploads or acquire the accepted recovery lock.
+1. Pause new uploads and hold a host-level `flock` across the complete
+   plan/review/execute/disposition/verify window. The existing container-local
+   Qdrant recovery lock is insufficient because it does not block application
+   uploads or span separate one-shot containers.
 2. Reproduce `261/240/109/129/2/21` before publication.
 3. Execute exactly 42 physical no-replace copies.
 4. Re-hash all targets and require 125 affected eligible rows.

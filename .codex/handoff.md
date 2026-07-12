@@ -59,11 +59,11 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 Next stage id: `mc2-jz6y0`
 
 Recommended action: keep Q12 NO-GO while obtaining the current Supabase Session
-pooler URL. The owner approved the recovery design and audited dispositions on
-2026-07-12; the written specification is
-`docs/superpowers/specs/2026-07-12-q12-source-recovery-design.md` and awaits the
-required written-spec review. After that review, plan/implement/review
-`.13.4.1`, execute only the 42 exact crash-durable copies, and then run the
+pooler URL. The owner approved the recovery design, written specification, and
+audited dispositions on 2026-07-12. The implementation plan is
+`docs/superpowers/plans/2026-07-12-q12-source-recovery.md`; execute it through
+isolated TDD/review streams under `.13.4.1`, publish only the 42 exact
+crash-durable copies after local acceptance, and then run the
 already authorized activation packet without `--allow-gaps` or partial cutover.
 
 ## Starter prompt for next orchestrator
