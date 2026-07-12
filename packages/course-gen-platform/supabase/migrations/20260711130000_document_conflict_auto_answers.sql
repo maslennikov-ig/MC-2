@@ -736,6 +736,7 @@ DECLARE
   v_question JSONB;
   v_recommended JSONB;
   v_recommended_count INTEGER;
+  v_suggested_values JSONB;
   v_decision_result JSONB;
   v_question_ids JSONB := '[]'::jsonb;
   v_decision_ids JSONB := '[]'::jsonb;
@@ -855,6 +856,13 @@ BEGIN
       FROM jsonb_array_elements(v_question->'suggested_answers') answer
       WHERE COALESCE((answer->>'is_recommended')::boolean, false)
       LIMIT 1;
+      SELECT COALESCE(
+        jsonb_agg(COALESCE(answer->>'value', answer->>'text') ORDER BY ordinality),
+        '[]'::jsonb
+      )
+      INTO v_suggested_values
+      FROM jsonb_array_elements(v_question->'suggested_answers')
+        WITH ORDINALITY options(answer, ordinality);
       IF v_question->'metadata'->>'subject_kind' = 'degraded_evidence' THEN
         BEGIN
           v_retry_attempt := NULLIF(v_question->'metadata'->>'attempt', '')::integer;
@@ -876,9 +884,11 @@ BEGIN
              v_question->'metadata'->>'coverage_status' IS DISTINCT FROM 'failed'
              OR v_question->'metadata'->>'coverage_reason'
                 IS DISTINCT FROM 'source_file_unrecoverable'
-             OR v_question->'metadata'->'choices' IS DISTINCT FROM
+             OR v_suggested_values IS DISTINCT FROM
                 '["continue_limited", "remove_document"]'::jsonb
-             OR v_recommended->>'value' IS DISTINCT FROM 'continue_limited'
+             OR v_question->'metadata'->'choices' IS DISTINCT FROM v_suggested_values
+             OR COALESCE(v_recommended->>'value', v_recommended->>'text')
+                IS DISTINCT FROM 'continue_limited'
              OR NOT EXISTS (
                SELECT 1
                FROM public.document_evidence_items items

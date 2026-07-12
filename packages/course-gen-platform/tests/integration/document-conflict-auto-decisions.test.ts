@@ -98,6 +98,13 @@ describe('document conflict automatic decision migration', () => {
     expect(gate).toMatch(/document_evidence_items/i);
     expect(gate).toMatch(/coverage_status\s*=\s*'failed'/i);
     expect(gate).toMatch(/coverage_reason\s*=\s*'source_file_unrecoverable'/i);
+    expect(gate).toMatch(
+      /jsonb_agg\(COALESCE\(answer->>'value', answer->>'text'\) ORDER BY ordinality\)/i
+    );
+    expect(gate).toMatch(
+      /v_suggested_values IS DISTINCT FROM[\s\S]*continue_limited[\s\S]*remove_document/i
+    );
+    expect(gate).toMatch(/metadata'->'choices' IS DISTINCT FROM v_suggested_values/i);
     expect(gate).toMatch(/continue_limited/i);
     expect(gate).toMatch(/Automatic degraded decision requires exhausted retry attempts/i);
   });

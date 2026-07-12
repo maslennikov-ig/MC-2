@@ -1098,6 +1098,38 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
     ).rejects.toMatchObject({ code: '23514' });
   });
 
+  it('uses the resolver value fallback for canonical terminal choices', async () => {
+    await resetTerminalUnrecoverableDatabase();
+    const question = terminalUnrecoverableQuestion({}, [
+      {
+        text: 'continue_limited',
+        rationale: 'Retain the limitation',
+        is_recommended: true,
+      },
+      {
+        text: 'remove_document',
+        rationale: 'Keep source history only',
+        is_recommended: false,
+      },
+    ]);
+
+    const result = await materialize(
+      'automatic',
+      [question],
+      '90000000-0000-4000-8000-000000000090'
+    );
+    expect(result.rows[0].result.decision_ids).toHaveLength(1);
+    expect(
+      (
+        await admin.query(
+          `SELECT selected_recommendation_value FROM document_evidence_decisions
+           WHERE run_id=$1 AND document_id=$2`,
+          [id.run, id.docC]
+        )
+      ).rows[0].selected_recommendation_value
+    ).toBe('continue_limited');
+  });
+
   it.each([
     ['durable degraded reason', 'degraded', 'parse_failed', {}, undefined, '23514'],
     ['durable failed reason', 'failed', 'parse_failed', {}, undefined, '23514'],
@@ -1140,6 +1172,96 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
       { max_attempts: null },
       undefined,
       '22023',
+    ],
+    [
+      'actual extra retry',
+      'failed',
+      'source_file_unrecoverable',
+      {},
+      [
+        {
+          value: 'continue_limited',
+          text: 'Continue with limited evidence',
+          rationale: 'Retain the limitation',
+          is_recommended: true,
+        },
+        {
+          value: 'remove_document',
+          text: 'Exclude advisory evidence',
+          rationale: 'Keep source history only',
+          is_recommended: false,
+        },
+        {
+          value: 'retry',
+          text: 'Retry source processing',
+          rationale: 'Try processing again',
+          is_recommended: false,
+        },
+      ],
+      '23514',
+    ],
+    [
+      'actual missing remove_document',
+      'failed',
+      'source_file_unrecoverable',
+      {},
+      [
+        {
+          value: 'continue_limited',
+          text: 'Continue with limited evidence',
+          rationale: 'Retain the limitation',
+          is_recommended: true,
+        },
+      ],
+      '23514',
+    ],
+    [
+      'actual duplicate values',
+      'failed',
+      'source_file_unrecoverable',
+      {},
+      [
+        {
+          value: 'continue_limited',
+          text: 'Continue with limited evidence',
+          rationale: 'Retain the limitation',
+          is_recommended: true,
+        },
+        {
+          value: 'remove_document',
+          text: 'Exclude advisory evidence',
+          rationale: 'Keep source history only',
+          is_recommended: false,
+        },
+        {
+          value: 'remove_document',
+          text: 'Exclude the same advisory evidence again',
+          rationale: 'Duplicate values are invalid',
+          is_recommended: false,
+        },
+      ],
+      '23514',
+    ],
+    [
+      'actual order disagrees with metadata choices',
+      'failed',
+      'source_file_unrecoverable',
+      {},
+      [
+        {
+          value: 'remove_document',
+          text: 'Exclude advisory evidence',
+          rationale: 'Keep source history only',
+          is_recommended: false,
+        },
+        {
+          value: 'continue_limited',
+          text: 'Continue with limited evidence',
+          rationale: 'Retain the limitation',
+          is_recommended: true,
+        },
+      ],
+      '23514',
     ],
     [
       'another recommendation',
@@ -1187,6 +1309,10 @@ appliedDescribe('document conflict applied PostgreSQL 15 matrix', () => {
               'missing status',
               'missing reason',
               'missing max attempts',
+              'actual extra retry',
+              'actual missing remove_document',
+              'actual duplicate values',
+              'actual order disagrees with metadata choices',
               'another recommendation',
             ].indexOf(_label) + 2
           ).padStart(2, '0')}`

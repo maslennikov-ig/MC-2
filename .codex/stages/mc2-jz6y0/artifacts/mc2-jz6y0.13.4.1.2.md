@@ -31,6 +31,7 @@ selected_docs:
   - docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md
   - docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md
   - /home/me/code/mc2/.worktrees/q12-source-recovery-evidence-rereview/.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1-evidence-final-review.md
+  - /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform/.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.2-review.md
 selected_skills:
   - superpowers:systematic-debugging
   - superpowers:test-driven-development
@@ -55,12 +56,16 @@ docs_reviewed: no-change-needed
 docs_review_notes: approved specifications already require terminal source-file failure to continue through an audited automatic decision; no operator or public API prose changed
 graph_reviewed: blocked
 graph_review_notes: focused orientation used /home/me/code/mc2/graphify-out/GRAPH_REPORT.md plus a local query; this isolated worktree has no graphify-out and the parent integration stream owns the post-integration graph refresh
-resolves_review: 60d1ae42
+resolves_review:
+  - 60d1ae42
+  - 845dc0ee
 verification:
   - RED static migration test: failed 1/1 because the RPC lacked the exact terminal predicate
   - RED disposable PostgreSQL 15.18 applied test: failed 1/1 with Automatic degraded decision requires exhausted retry attempts
   - targeted terminal and fail-closed PostgreSQL 15.18 matrix: passed 9/9
-  - full document-conflict static and applied PostgreSQL 15.18 matrix: passed 46/46 including rollback/reapply
+  - review 845dc0ee RED on disposable PostgreSQL 15.18: 4/4 malformed actual suggested-answer arrays materialized decisions instead of rejecting
+  - targeted actual-choice correction PostgreSQL 15.18 matrix: passed 5/5 including four rollback negatives and resolver text fallback
+  - full document-conflict static and applied PostgreSQL 15.18 matrix: passed 51/51 including rollback/reapply
   - approved migration guard RED: failed on the old source SHA and cumulative catalog allowlists
   - approved migration PostgreSQL 16.14 matrix: passed 19/19 including apply/reuse/reverse rollback/reapply
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
@@ -86,6 +91,13 @@ tenant/course/run-scoped durable evidence item both equal
 `continue_limited`. Retry counters remain truthful at `0/2`; the transaction
 creates no retry application or replacement evidence run.
 
+The correction for review `845dc0ee` additionally derives the complete ordered
+choice-value array from the persisted question's actual `suggested_answers`
+using the resolver's `value` then `text` fallback. The terminal exception now
+requires that derived array to equal exactly
+`[continue_limited, remove_document]` and requires `metadata.choices` to equal
+the same derived array.
+
 # Scope / Routing
 
 The implementation stayed within the migration, its static/applied tests, and
@@ -100,8 +112,21 @@ same SQL object and disposable database state.
 Strict TDD reproduced the exact production failure on PostgreSQL 15.18 before
 the SQL edit. GREEN covers the canonical terminal path, eight rejected
 below-max variants, one decision/question, system provenance, append-only root,
-idempotent replay, zero retries/new runs, and tenant mismatch. The full 46-test
+idempotent replay, zero retries/new runs, and tenant mismatch. The expanded 51-test
 document-conflict suite proves rollback/reapply and existing atomic behavior.
+
+The `845dc0ee` delta RED then reproduced four independently materialized
+malformed questions: extra `retry`, missing `remove_document`, duplicate
+values, and actual/metadata order disagreement. The correction rejects all
+four atomically with zero question/decision rows and preserves a positive
+resolver-fallback case. The expanded full document-conflict suite is 51/51.
+
+The applied delta used `postgres:15.18-alpine` at image digest
+`sha256:3d0f7584ed7d04e27fa050d6683a74746608faf21f202be78460d679cc56461f`
+and the approved catalog guard used `postgres:16.14-alpine` at image digest
+`sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777`.
+Named containers, named data volumes, loopback ports `55443`/`55444`, and all
+five temporary dependency symlinks were removed after the final fresh gates.
 
 Changing an approved migration correctly made the fixed allowlist fail RED.
 Only the `20260711130000` source SHA and affected cumulative PostgreSQL 16.14
