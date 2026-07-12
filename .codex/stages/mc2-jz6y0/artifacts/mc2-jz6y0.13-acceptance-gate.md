@@ -457,3 +457,127 @@ or local service mutation.
   explicit superseding staging decision with observation and rollback ownership.
 - No other defer is accepted: relevance, strict mode, restore, resume, coverage,
   baseline preservation, notification and isolation remain blocking gates.
+
+# Remediation review 8e8b1f30
+
+**Scope:** independent read-only review of `ebdf9c2e..8e8b1f30`. Line numbers
+below refer to tree `8e8b1f30`. **Verdict: Ready — no.** P0: 0, P1: 4,
+P2: 1, P3: 0. The asset copy, local Qdrant URL, monitoring dependency startup
+and newly added infra `--env-file` uses are directionally correct, but the
+deployment and rollback are not executable/safe yet.
+
+## Findings
+
+### P1 — required metrics GID is absent from the generated production environment
+
+- **Confidence:** high.
+- **Evidence:** `.github/workflows/ci-cd.yml:740-786` writes the complete
+  `.env.production` block and includes only
+  `QDRANT_METRICS_TEXTFILE_HOST_DIR` at line 764. The rendered services require
+  `QDRANT_METRICS_GID` in `docker-compose.infra.yml:348`,
+  `docker-compose.app.yml:55-56`, and
+  `docker-compose.production.yml:320-321,379-380`.
+- **Fresh reproduction:** the commit's own workflow gate passes, but rendering
+  the same target Compose with every new non-secret Qdrant value except the GID
+  exits `1`: `required variable QDRANT_METRICS_GID is missing a value`.
+- **Impact:** forward deploy stops at the first Compose interpolation; rollback
+  colors created before Q12 also lack the value and cannot recreate API/workers.
+- **Required fix:** provision one approved numeric host group ID through a
+  GitHub environment variable, write it to production and color snapshots,
+  preflight the actual host group/directory, and add the exact generated-env
+  render to the workflow test. A synthetic standalone render is insufficient.
+
+### P1 — automatic rollback can deploy the wrong color after a pre-switch failure
+
+- **Confidence:** high.
+- **Evidence:** Qdrant verification occurs before the new app starts at
+  `scripts/deploy_blue_green.sh:198-202`; `active_color` changes only at line 271. Nevertheless every deploy-job failure invokes rollback at
+  `.github/workflows/ci-cd.yml:845-869`. Rollback always chooses the color
+  opposite the still-active color at `scripts/rollback_blue_green.sh:16-37`,
+  starts it, recreates workers, and switches nginx at lines 59-139.
+- **Impact:** an infra, secret, schema, Qdrant verify, pull, or pre-switch health
+  failure can cause the rollback job to start and promote the not-yet-accepted
+  target color. This defeats the new fail-closed gate.
+- **Required fix:** persist/pass an explicit deployment phase plus previous and
+  attempted colors. Before-switch failures must only clean the attempted color
+  and leave active traffic/workers untouched; actual rollback is permitted only
+  after proving `active_color` changed to the attempted color. Add executable
+  tests for pre-switch and post-switch failure branches.
+
+### P1 — rollback recreates mutable `latest`, not the previous immutable image
+
+- **Confidence:** high.
+- **Evidence:** app and worker images remain
+  `ghcr.io/maslennikov-ig/mc-2/{web,api}:latest` in
+  `docker-compose.app.yml:11-12,49-51` and
+  `docker-compose.production.yml:314-316,374-375`. The rollback uses
+  `up -d --force-recreate` at `scripts/rollback_blue_green.sh:59-61,104-110`
+  and records/restores no digest or `master-<sha>` tag.
+- **Impact:** after the forward pull moves `latest`, rollback recreates both the
+  target color and workers from the same new image that failed. Restoring only
+  `.env.$TARGET_COLOR` does not restore code and cannot satisfy immutable-image
+  rollback.
+- **Required fix:** capture and retain exact pre-change web/API image digests,
+  bind each color and worker snapshot to immutable tags/digests, and verify the
+  restored container image IDs before switching traffic or resuming queues.
+
+### P1 — the deploy gate verifies a different admin key than applications receive
+
+- **Confidence:** high.
+- **Evidence:** `.github/workflows/ci-cd.yml:755-758` writes raw
+  `QDRANT_API_KEY` from GitHub while pointing the server secret at an independent
+  host file. `qdrant_staging_gate()` reads the host file and injects that value
+  only into the one-shot verifier (`scripts/deploy_blue_green.sh:80-91`). There
+  is no equality check, and the contract test checks only file-path text
+  (`scripts/ci/test_ci_cd_workflow_gates.mjs:75-96`).
+- **Impact:** schema verification can pass while API, main worker and Stage 6
+  all receive a stale/different raw key and fail authentication after cutover.
+- **Required fix:** make the owner-only host file the single source for the app
+  value or compare values on-host without printing/checksumming them into logs;
+  then run an authenticated request from each new consumer before traffic and
+  queue resume. Also verify the Prometheus read-only copy matches the server
+  read-only key without exposing either value.
+
+### P2 — monitoring-only changes do not trigger deployment and the new guard is not CI-enforced
+
+- **Confidence:** high.
+- **Evidence:** `scripts/ci/detect_deploy_changes.sh:83-161` classifies
+  `deploy/*` but never `ops/qdrant/*`. A fresh target-tree invocation with
+  `ops/qdrant/prometheus/alerts.yml` returns
+  `should_deploy=false` and `deploy_config_changed=false`. The new static guard
+  validates copy strings but is not invoked anywhere in
+  `.github/workflows/ci-cd.yml`.
+- **Impact:** a future alert/dashboard/Prometheus fix can pass CI yet never reach
+  staging; regressions such as the missing GID are not blocked by the added test.
+- **Required fix:** classify `ops/qdrant/*` as deploy configuration, extend
+  change-detector tests, and execute `test_ci_cd_workflow_gates.mjs` in a
+  blocking CI job.
+
+## Verified positive surfaces
+
+- `deploy/qdrant`, `deploy/systemd`, and `ops/qdrant` are copied to the expected
+  remote parent directories (`.github/workflows/ci-cd.yml:704-734`). Copy remains
+  overlay-only, so Q12 preflight must reject stale unexpected remote assets.
+- The generated active environment excludes the retired Cloud variable and uses
+  `QDRANT_URL=http://qdrant:6333` (`.github/workflows/ci-cd.yml:740-767`).
+- Starting Prometheus brings its declared `node_exporter` and Alertmanager
+  dependencies; Grafana depends on Prometheus. Exact pins remain in Compose.
+- All modified `$INFRA_COMPOSE` calls and rollback infra startup now pass an
+  explicit environment file (`scripts/deploy_blue_green.sh:294-304`,
+  `scripts/rollback_blue_green.sh:53-55`).
+- Main and Stage 6 workers are recreated before nginx traffic switch, which is
+  the correct relative ordering once phase selection, immutable images and
+  required env are fixed (`scripts/rollback_blue_green.sh:104-123`).
+- Fresh target-tree checks: static workflow guard passed; both shell files passed
+  `bash -n`; `git diff --check ebdf9c2e..8e8b1f30` passed. Those checks do not
+  exercise rollback phases, image identity, key equality, or generated-env
+  Compose rendering.
+
+## Ready / residual blockers
+
+**Ready: no.** Do not run staging mutation from `8e8b1f30`. Close the four P1
+findings and independently rerun the workflow/change-detector tests plus all
+three Compose renders using the literal generated production environment.
+Previous Q12 blockers for exact remote evidence migrations, protected live
+smoke/recovery probe, and durable staging rollout decision remain outside this
+commit and are not resolved by it.
