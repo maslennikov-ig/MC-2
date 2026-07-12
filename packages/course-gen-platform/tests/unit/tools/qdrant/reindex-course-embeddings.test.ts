@@ -1870,6 +1870,60 @@ describe('reindex CLI parsing', () => {
     }
   });
 
+  it('rejects an unrelated empty dry-fixture ledger before artifact publication', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mc2-qdrant-reindex-scope-'));
+    const fixturePath = join(directory, 'fixture.json');
+    const artifactPath = join(directory, 'artifact.json');
+    const row = source('60000000-0000-4000-8000-000000000006');
+    const recovery = recoveryFixture([row]);
+    recovery.binding.acceptedFailedCoverage.ledgers.push({
+      ledgerId: '54000000-0000-4000-8000-000000000005',
+      status: 'accepted',
+      organizationId: row.organizationId,
+      courseId: '22000000-0000-4000-8000-000000000002',
+      entries: [],
+    });
+    recovery.binding.acceptedFailedCoverage.fingerprint =
+      calculateAcceptedFailedCoverageFingerprint(recovery.binding.acceptedFailedCoverage);
+    await writeFile(
+      fixturePath,
+      JSON.stringify({
+        runId: RUN_ID,
+        now: '2026-07-10T12:00:00.000Z',
+        recoveryBinding: recovery.binding,
+        sources: recovery.rows.map(sourceRow => ({
+          ...sourceRow,
+          sourceAvailable: sourceRow.id === row.id,
+          invalidSourcePath: verifiedCoverageIds(recovery.binding).slice(4).includes(sourceRow.id),
+        })),
+        schemaVerification: { ok: true, mismatches: [] },
+        indexedDocuments: [indexed(row)],
+        relevanceChecks: [
+          { language: 'ru', passed: true, nativeHybrid: true },
+          { language: 'en', passed: true, nativeHybrid: true },
+        ],
+      })
+    );
+
+    try {
+      const deps = await loadReindexFixtureDependencies(fixturePath);
+      await expect(
+        runReindexCommand(
+          {
+            mode: 'execute',
+            targetCollection: TARGET,
+            runId: RUN_ID,
+            artifactPath,
+          },
+          deps
+        )
+      ).rejects.toThrow(/ledger.*scope|scope.*ledger/iu);
+      await expect(stat(artifactPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown modes and options', () => {
     expect(() => parseReindexCliArgs(['mutate'])).toThrow('mode');
     expect(() => parseReindexCliArgs(['plan', '--unsafe'])).toThrow('Unknown option');

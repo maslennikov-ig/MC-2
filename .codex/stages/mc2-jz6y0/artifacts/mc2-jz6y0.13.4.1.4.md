@@ -11,6 +11,7 @@ repo: mc2
 branch: codex/q12-source-recovery-adapters
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: f4a1d0ae9f1c62b983d9c3410824d8155d6f98a1
+resolves_review: fffbfc6034606c4529395a869f5d15162070608e
 worktree: /home/me/code/mc2/.worktrees/q12-source-recovery-adapters
 write_zone:
   - packages/course-gen-platform/tools/qdrant/source-recovery-reindex-adapters.ts
@@ -70,6 +71,12 @@ verification:
   - focused Prettier and git diff --check: passed
   - delegated artifact validation: passed
   - repository process verification: passed
+  - correction RED for review fffbfc60: pure plan accepted an unrelated empty ledger and dry-fixture execute advanced to artifact state checks
+  - correction focused GREEN: passed 85/85 across reindex plan and command tests
+  - correction recovery plus reindex regression: passed 146/146 across seven files
+  - correction evidence repository plus Stage 4/5/6 regression: passed 132/132 across seven files
+  - correction course-gen-platform package type-check: passed
+  - correction self code-review: P0 0, P1 0, P2 0, P3 0
 changed_files:
   - packages/course-gen-platform/tools/qdrant/source-recovery-reindex-adapters.ts
   - packages/course-gen-platform/tools/qdrant/reindex-plan.ts
@@ -150,3 +157,25 @@ Independent review must confirm the schema-v4 aggregate seam, durable repository
 scope proof, and accepted workflow reload/CAS use before orchestrator
 acceptance. The adjacent runtime stream must pass the exact repeated CLI inputs
 through the pinned operator without adding a permissive fallback.
+
+# Correction for review fffbfc60
+
+The independent review reproduced one P2 in the shared binding validator: a
+canonical binding could append an unrelated accepted ledger with zero entries.
+The flattened six document IDs still matched, and entry-level tenant checks
+never visited the empty ledger. The default database adapter already rejected
+this shape, but injected and dry-fixture dependencies could persist the
+unrelated ledger ID in schema-v4 provenance.
+
+Two RED regressions reproduced the shared-seam defect. The pure plan reached a
+later post-recovery count check instead of rejecting ledger scope, and the local
+dry-fixture execute reached artifact-state validation instead of failing at
+recovery binding validation. No live service or network was used.
+
+`validateRecoveryBinding()` now derives the unique sorted
+`organization_id:course_id` set from the exact six eligible manifest
+dispositions and requires byte-equal set membership with the unique sorted
+accepted-ledger scopes before flattening entries or planning. Extra empty
+ledgers, missing course ledgers, and unrelated tenant/course scopes therefore
+fail before plan or artifact publication. The correction preserves the default
+adapter, aggregate fingerprint, schema-v4 artifact, and bounded CLI output.

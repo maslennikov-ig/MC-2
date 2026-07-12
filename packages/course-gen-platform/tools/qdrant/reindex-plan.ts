@@ -259,6 +259,15 @@ function validateRecoveryBinding(
   ) {
     throw new Error('Accepted failed coverage ledgers must be unique lower-case UUIDv4 scopes');
   }
+  const eligibleScopes = [
+    ...new Set(eligible.map(entry => `${entry.organization_id}:${entry.course_id}`)),
+  ].sort();
+  const ledgerScopes = ledgers.map(ledger => `${ledger.organizationId}:${ledger.courseId}`).sort();
+  if (JSON.stringify(ledgerScopes) !== JSON.stringify(eligibleScopes)) {
+    throw new Error(
+      'Accepted failed coverage ledger scopes must exactly match reviewed eligible dispositions'
+    );
+  }
   const coverageEntries = ledgers.flatMap(ledger => ledger.entries);
   assertExactSet(
     coverageEntries.map(entry => entry.documentId),

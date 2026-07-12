@@ -310,7 +310,7 @@ describe('buildReindexPlan', () => {
     expect(getReindexPlanExitCode(plan)).toBe(0);
   });
 
-  it('rejects stale or non-zero accepted failed coverage evidence', () => {
+  it('rejects stale, scope-invalid, or non-zero accepted failed coverage evidence', () => {
     const rows = Array.from({ length: 6 }, (_, index) => ({
       ...SOURCE_BASE,
       id: `e0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
@@ -429,6 +429,20 @@ describe('buildReindexPlan', () => {
       binding.acceptedFailedCoverage.fingerprint
     );
     expect(() => buildReindexPlan(rows, () => false, nonAccepted)).toThrow(/accepted.*status/iu);
+
+    const unrelatedEmptyLedger = structuredClone(binding);
+    unrelatedEmptyLedger.acceptedFailedCoverage.ledgers.push({
+      ledgerId: '54000000-0000-4000-8000-000000000005',
+      status: 'accepted',
+      organizationId: SOURCE_BASE.organizationId,
+      courseId: '22000000-0000-4000-8000-000000000002',
+      entries: [],
+    });
+    unrelatedEmptyLedger.acceptedFailedCoverage.fingerprint =
+      calculateAcceptedFailedCoverageFingerprint(unrelatedEmptyLedger.acceptedFailedCoverage);
+    expect(() => buildReindexPlan(rows, () => false, unrelatedEmptyLedger)).toThrow(
+      /ledger.*scope|scope.*ledger/iu
+    );
   });
 
   it('reports unknown point/request estimates instead of inventing batch precision', () => {
