@@ -114,5 +114,5 @@ docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
 graph-reviewed: updated — local Graphify `0.8.45` ran `graphify update .` and
 `graphify cluster-only . --no-viz` after the accepted snapshot/current-truth
-changes. The refreshed graph has 50,883 nodes, 75,529 edges, and zero forbidden
+changes. The refreshed graph has 50,904 nodes, 75,549 edges, and zero forbidden
 source paths; no external model/API mode or Git hook was used.

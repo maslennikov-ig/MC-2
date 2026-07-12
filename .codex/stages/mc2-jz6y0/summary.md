@@ -149,7 +149,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - `project-index: update required` — stable Qdrant/operations entrypoints change.
 - `graph-reviewed: updated` — local Graphify `0.8.45` ran
   `graphify update .` and `graphify cluster-only . --no-viz` after the accepted
-  local-snapshot and current-truth documentation changes: 50,883 nodes, 75,529
+  local-snapshot and current-truth documentation changes: 50,904 nodes, 75,549
   edges, and zero forbidden source paths, without external model/API mode or Git
   hooks.
 - Q12 remains open until every live gate and observation passes; authorization
