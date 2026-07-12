@@ -143,10 +143,14 @@ Rollback is rejected at or after `reindex_started`. Every phase transition is
 persisted through the same crash-durable manifest replacement protocol.
 
 Before the first copy, the full `planned` manifest and initial progress journal
-are each written to a same-directory temporary file, their inodes are
-`fsync`ed, they are atomically renamed, and each parent directory is `fsync`ed.
-The manifest is then reviewed and mounted read-only. Every later journal
-transition uses the same temp/`fsync`/atomic-replace/parent-`fsync` sequence.
+are each written to a same-directory temporary file and their inodes are
+`fsync`ed. Immutable manifest creation uses an atomic no-replace hard link,
+followed by parent-directory `fsync`, temporary-link removal, and another
+parent `fsync`; it can never replace a raced or pre-existing manifest. The
+initial and every later journal transition use
+temp/`fsync`/atomic-rename/parent-`fsync`. The state directory must be a real,
+current-executor-owned mode-`0700` directory. The manifest is then reviewed and
+mounted read-only.
 
 Allowed copy states:
 
@@ -158,7 +162,17 @@ Allowed rollback states:
 
 Allowed disposition states:
 
+Eligible source:
+
 `disposition_planned -> disposition_applied -> disposition_verified`
+
+Career Playbook source:
+
+`disposition_planned -> career_playbook_source_applied -> disposition_applied -> disposition_verified`
+
+The immutable manifest records exact prior file status/error for every
+disposition and exact Career Playbook ownership/status/error predicates when
+applicable. Duplicate catalog or Career Playbook source identities fail closed.
 
 Unknown states, skipped transitions, duplicate targets, or mixed run IDs fail
 closed.

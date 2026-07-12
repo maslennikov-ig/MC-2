@@ -121,6 +121,14 @@ export interface RecoveryDispositionEntry {
   course_id: string | null;
   expected_hash: string;
   expected_storage_path: string;
+  expected_vector_status: 'pending' | 'indexing' | 'indexed' | 'failed';
+  expected_file_error_message: string | null;
+  expected_career_playbook?: {
+    playbook_id: string;
+    user_id: string;
+    status: 'uploaded' | 'processing' | 'ready' | 'failed' | 'removed';
+    error_message: string | null;
+  };
   reason: 'source_file_unrecoverable' | 'retained-derived-only';
 }
 
@@ -128,6 +136,11 @@ export interface SourceRecoveryManifest {
   schema_version: 'megacampus.qdrant.source-recovery/v1';
   run_id: string;
   release_sha: string;
+  generated_at: string;
+  operator_image_digest: `sha256:${string}`;
+  source_audit_version: string;
+  development_root: string;
+  production_root: string;
   pre_counts: RecoveryCounts;
   expected_post_counts: RecoveryCounts;
   copies: readonly RecoveryCopyEntry[];
@@ -135,8 +148,10 @@ export interface SourceRecoveryManifest {
 }
 
 export interface PublishInput {
+  runId: string;
   developmentRoot: string;
   productionRoot: string;
+  rootBinding: Pick<SourceRecoveryManifest, 'development_root' | 'production_root'>;
   entry: RecoveryCopyEntry;
 }
 
@@ -152,9 +167,13 @@ export interface RecoveryProgressJournal {
   revision: number;
   phase: RecoveryRunPhase;
   copy_states: Record<string, 'planned' | 'published' | 'rollback_planned' | 'rolled_back'>;
+  disposition_kinds: Record<string, 'eligible_unrecoverable' | 'career_playbook_retained_derived'>;
   disposition_states: Record<
     string,
-    'disposition_planned' | 'disposition_applied' | 'disposition_verified'
+    | 'disposition_planned'
+    | 'career_playbook_source_applied'
+    | 'disposition_applied'
+    | 'disposition_verified'
   >;
 }
 
@@ -165,7 +184,8 @@ export async function writeImmutableManifest(
 export async function replaceProgressJournal(
   path: string,
   expectedRevision: number,
-  next: RecoveryProgressJournal
+  next: RecoveryProgressJournal,
+  manifest?: SourceRecoveryManifest
 ): Promise<void>;
 export async function publishNoReplace(input: PublishInput): Promise<void>;
 export async function rollbackPublished(input: RollbackInput): Promise<void>;
@@ -173,10 +193,12 @@ export async function rollbackPublished(input: RollbackInput): Promise<void>;
 
 - [ ] **Step 1: Write RED manifest tests**
 
-Cover deterministic sorting, duplicate target rejection, exact aggregate counts,
-manifest SHA binding, illegal state transitions, temp-file cleanup, file fsync,
-atomic rename, and parent-directory fsync. Use injected filesystem operations so
-the test proves call order:
+Cover deterministic sorting, duplicate target/database-identity rejection,
+exact aggregate counts, operator/audit/root and manifest-SHA binding, canonical
+initial state, paired Career Playbook CAS progress, illegal whole-journal phase
+states, temp-file cleanup, file fsync, atomic immutable no-replace publication,
+and parent-directory fsync. Use injected filesystem operations so the test
+proves call order:
 
 ```ts
 expect(calls).toEqual([
@@ -184,7 +206,11 @@ expect(calls).toEqual([
   'write',
   'fsync-file',
   'close',
-  'rename',
+  'link-no-replace',
+  'open-parent',
+  'fsync-parent',
+  'close-parent',
+  'unlink-temp',
   'open-parent',
   'fsync-parent',
   'close-parent',
@@ -204,8 +230,10 @@ Expected: FAIL because the module does not exist.
 - [ ] **Step 3: Implement the minimal manifest/journal contract**
 
 Use strict Zod schemas, UUIDv4 run IDs, lower-case 64-hex SHA-256, sorted entries,
-exact counts, `open('wx', 0o600)`, `FileHandle.sync()`, `rename()`, and directory
-`FileHandle.sync()`. Do not store source text or credentials.
+exact counts, `open('wx', 0o600)`, an atomic no-replace hard link for immutable
+manifest creation, ordinary atomic rename only for journal replacement, and
+file plus directory `FileHandle.sync()`. Require a real current-UID-owned
+mode-`0700` state directory. Do not store source text or credentials.
 
 - [ ] **Step 4: Run manifest tests GREEN**
 
@@ -217,7 +245,7 @@ Use real temporary directories and assert:
 
 ```ts
 await publishNoReplace(input);
-expect(await sha256(target)).toBe(input.expectedSha256);
+expect(await sha256(target)).toBe(input.entry.expected_sha256);
 await expect(publishNoReplace(input)).rejects.toThrow(/target already exists/iu);
 await writeFile(target, 'changed');
 await expect(rollbackPublished(input)).rejects.toThrow(/hash mismatch/iu);
@@ -232,10 +260,13 @@ Expected: FAIL because filesystem functions do not exist.
 
 - [ ] **Step 7: Implement minimal filesystem engine**
 
-Resolve both roots with `realpath`, reject symlinks/non-regular files, stream
-SHA-256, create the temp in the target directory as UID 1001, apply `0644`, use
-`link(temp, target)` for no-replace publication, fsync target and directory, then
-unlink the temp and fsync again.
+Resolve both runtime roots with `realpath`, require the immutable manifest root
+binding and non-overlap, reject symlinks/non-regular files, stream SHA-256, and
+create a deterministic run/entry-bound temp in the target directory as UID 1001.
+Apply `0644`, use `link(temp, target)` for no-replace publication, fsync target
+and directory, then unlink the temp and fsync again. Restart may reuse or remove
+only an exact bound temp; mismatch fails closed. Rollback revalidates target
+device/inode immediately before unlink.
 
 - [ ] **Step 8: Run Task 1 GREEN and type-check**
 
