@@ -99,7 +99,7 @@ pnpm --filter @megacampus/course-gen-platform exec vitest run \
   tests/unit/ops/document-evidence-dev-activation-contract.test.ts
 ```
 
-Expected: `2` failures because the active values are absent from both dev workers and the package env example.
+Expected: the dev-activation `it` fails because the active values are absent from both dev workers and the package env example; the separate production non-activation guard already passes.
 
 - [ ] **Step 3: Add the minimal explicit dev configuration**
 
@@ -146,12 +146,11 @@ Expected: all selected files and tests pass; existing invalid/missing rollout ca
 pnpm --filter @megacampus/course-gen-platform type-check
 pnpm exec prettier --check \
   docker-compose.dev.yml \
-  packages/course-gen-platform/.env.example \
   packages/course-gen-platform/tests/unit/ops/document-evidence-dev-activation-contract.test.ts
 git diff --check
 ```
 
-Expected: all commands exit `0`.
+Expected: all commands exit `0`. Prettier does not provide a dotenv parser; the package env example is verified by the static contract and `git diff --check` instead.
 
 - [ ] **Step 6: Commit the configuration checkpoint**
 
