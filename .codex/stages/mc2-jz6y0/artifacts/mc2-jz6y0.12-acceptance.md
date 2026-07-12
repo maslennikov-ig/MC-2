@@ -76,7 +76,7 @@ No runtime rollback is required because Q11 made no remote or durable service/da
 
 # Risks / Follow-ups
 
-Beads closure and push remain required before Q11 closeout. Q12 remains the only operational defer and requires a separate explicit authorization packet.
+Q11 is closed in Beads, the Dolt ledger and integration branch are pushed, and the delivered branch matches origin. Q12 remains the only operational defer and requires separate explicit current-task authorization before any remote mutation.
 
 docs-reviewed: no-change-needed - Q10 completed durable documentation; Q11 adds evidence only.
 
