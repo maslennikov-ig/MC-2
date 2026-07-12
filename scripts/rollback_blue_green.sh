@@ -2,7 +2,7 @@
 set -e
 
 # MegaCampus Blue/Green Rollback Script
-# Usage: ./rollback_blue_green.sh [environment]
+# Usage: ./rollback_blue_green.sh [environment] <expected_commit>
 #
 # Instantly switches traffic back to the previous color.
 # Ports:
