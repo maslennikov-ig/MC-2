@@ -56,6 +56,7 @@ verification:
   - exact buildReindexPlan proposed-copy replay: passed
   - whole-host exact-size plus SHA-256 search for unresolved eligible sources: zero matches
   - whole-host exact-size plus SHA-256 search for unresolved non-eligible sources: zero matches
+  - independent review e82cd456 finding Q12-FR1: crash-durable write-ahead contract added; re-review pending
   - remote mutation audit: zero mutations
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-source-recovery.md
@@ -234,19 +235,57 @@ file outside Git and must never be printed.
 
 ## Atomic copy and verification contract
 
-- Use a same-directory owner-only temporary file for each target, copy bytes,
-  `fsync`, verify size/SHA-256, apply final ownership/mode, then publish with an
-  atomic **no-replace** operation.
-- Process a deterministic sorted list with bounded concurrency. Persist an
-  owner-only manifest containing source/target identity, expected and observed
-  size/hash, timestamps, and publication result.
+- Before the first target copy, serialize the complete deterministic 42-target
+  plan to an owner-only manifest with every target in durable `planned` state.
+  Write it to an owner-only temporary inode in the recovery directory, `fsync`
+  the inode, atomically rename it to its immutable run-specific manifest name,
+  then `fsync` the manifest parent directory. No target publication may start
+  until that write-ahead sequence succeeds.
+- Each planned record contains the protected source/target identity, expected
+  size/hash, selection rule, and run identity. Process the sorted set with
+  bounded concurrency, but serialize manifest state transitions under the same
+  recovery lock so concurrent workers cannot lose a completed transition.
+- For a `planned` target, use a same-directory owner-only temporary file, copy
+  bytes, `fsync` and verify the temporary inode, apply final ownership/mode, then
+  publish with an atomic **no-replace** operation. After publication, open and
+  `fsync` the target file and `fsync` its parent directory before treating the
+  bytes as durable.
+- Only after both target durability barriers succeed, rewrite the complete
+  owner-only manifest through a new temporary inode, recording that target as
+  `published` with observed size/hash and publication timestamp. `fsync` the
+  new manifest inode, atomically replace the prior manifest, and `fsync` the
+  manifest parent directory. A log line or in-memory result is never a durable
+  state transition.
+- On restart, reconcile each durable state before doing any work:
+  - `planned` plus absent target is eligible for a no-replace retry;
+  - `planned` plus exact expected target means publication completed before the
+    manifest transition, so re-`fsync` the target/directory and durably advance
+    it to `published` without recopying;
+  - `planned` plus a size/hash mismatch is a hard stop and must never overwrite
+    or delete the target;
+  - `published` plus the exact expected target is complete;
+  - `published` plus an absent or mismatching target is an integrity failure and
+    a hard stop, not permission to recreate, overwrite, or delete anything.
+- Retry and cleanup decisions derive only from these reconciled durable states.
+  Never remove temporary or target files by glob, age, filename convention, or
+  an in-memory work list.
 - After all 42 publications, rerun `buildReindexPlan()` and require exactly
   `eligible=240`, `recoverable=234`, `missingSource=4`,
   `invalidSourcePath=2`, and `unsupported=21` before Qdrant enqueueing.
 - Re-hash every restored target and prove that all 125 affected eligible rows
   resolve to the recorded content. A partial batch is not acceptance evidence.
-- Before reindex starts, rollback may delete only manifest-created targets that
-  still match the recorded hash. Never delete a pre-existing or changed file.
+- Before reindex starts, rollback may operate only on a durable `published`
+  record whose target still matches the observed expected hash. First durably
+  transition it to `rollback_planned` using the same manifest temp/`fsync`/
+  atomic-replace/parent-`fsync` protocol; then unlink the exact target and
+  `fsync` its parent directory; finally durably record `rolled_back`. On restart,
+  `rollback_planned` plus exact target retries the unlink, while an absent target
+  advances to `rolled_back`; any mismatch hard-stops. `rolled_back` requires an
+  absent target. Rollback must never delete a pre-existing or changed file.
+
+This crash-durable write-ahead amendment addresses independent review
+`e82cd456`, finding `Q12-FR1`. It is a required implementation contract for the
+future reviewed copy runner; no current shell or operator command implements it.
 
 # Risks / Follow-ups
 
