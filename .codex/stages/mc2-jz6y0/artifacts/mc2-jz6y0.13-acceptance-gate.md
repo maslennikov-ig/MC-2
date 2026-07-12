@@ -736,3 +736,122 @@ exercise pre-switch failure, successful post-switch rollback, bridge-only,
 web-only, API-only and config-only state transitions. The previously recorded
 remote migration, protected live smoke/recovery-probe and durable rollout gates
 also remain required.
+
+# Re-review 17dbd4f4
+
+**Scope:** focused independent re-review of `e7130b3e..17dbd4f4`, with the full
+`bcfc6b71..17dbd4f4` result rechecked for the five findings immediately above.
+Line numbers refer to tree `17dbd4f4`. **Verdict: Ready — no.** P0: 0, P1: 0,
+P2: 2, P3: 0. All three P1 findings are resolved. The two P2 remediations close
+their common paths but still do not meet the exact-repository and
+failure/cancellation cleanup contracts.
+
+## Finding disposition
+
+| Prior finding                                       | Disposition | Independent evidence                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1 first-cutover snapshot cannot render             | resolved    | `write_color_env` rebuilds both current and target colors from the new self-hosted production contract with their exact current/new digests, inside an app transaction (`scripts/deploy_blue_green.sh:47-68,295-310`). Synthetic current and target app plus worker renders passed `4/4`; both contain local `QDRANT_URL` and required metrics values. |
+| P1 bridge-only destroys accepted rollback target    | resolved    | Color writes now occur only in the app block. A target-tree bridge-only mock preserved the inactive color file and `deploy_state` byte-for-byte.                                                                                                                                                                                                       |
+| P1 web-only splits API and worker runtime contracts | resolved    | Worker recreation is now gated by `APP_DEPLOY_NEEDED`, not API/config-only (`scripts/deploy_blue_green.sh:405-421`). A target-tree web-only mock proved new web plus reused API digests, normalized current/target envs, and both main and Stage 6 Compose calls with `PRODUCTION_ENV_FILE=.env.green`.                                                |
+| P2 rollback accepts an arbitrary repository         | open        | The obvious wrong path is rejected, but the fixed repository is interpolated into Bash regex without escaping (`scripts/rollback_blue_green.sh:72-82`). `ghcrXio/maslennikov-ig/mc-2/web@sha256:<64 hex>` is accepted because the dot in `ghcr.io` acts as a wildcard.                                                                                 |
+| P2 failed secret upload leaves plaintext copy       | open        | The remote `EXIT` trap now removes the upload after a failing `sudo install`, but it is installed only by the final SSH command (`.github/workflows/ci-cd.yml:830-838`). Cancellation, runner loss or failure opening that SSH session after SCP still leaves the populated owner-only upload directory.                                               |
+
+## Remaining P2 corrections
+
+### Exact repository validation must be literal
+
+The new wrong-repository test uses a different path and passes, but it does not
+exercise regex metacharacters. A fresh direct reproduction against the exact
+validator printed `REGEX_ACCEPTED_NON_EXACT_REPOSITORY` for `ghcrXio/...`.
+Validate the literal prefix/equality separately from a regex over only the
+64-character digest (or safely escape the repository), then add the dot-
+substitution case to `test_blue_green_fail_closed.sh`. Apply the same correction
+to forward `require_immutable_ref`, which uses the same pattern.
+
+### Upload cleanup must span the SCP-to-install window
+
+The remote trap correctly handles failures after its shell starts. It cannot
+handle the preceding inter-command window because the upload directory already
+contains all plaintext files and no remote cleanup handler exists yet. Add a
+local `EXIT`/signal cleanup that performs a best-effort SSH removal after
+`upload_dir` is assigned, plus an `if: always()` cleanup step or equivalent
+bounded stale-upload reaper. Test both a failing install and a failure/cancel
+between SCP and the final SSH command; never print filenames' contents.
+
+## Fresh verification
+
+- Target archive: workflow contract, change detector and blue/green fail-closed
+  tests passed; deploy/rollback scripts passed `bash -n`.
+- Compose: normalized current and target app/worker renders passed `4/4`; infra
+  render passed `1/1`.
+- Web-only executable mock: exact new web digest, reused API digest, local Qdrant
+  contract and both target-env worker recreations passed.
+- Bridge-only executable mock: inactive color snapshot and deploy transaction
+  state remained byte-identical.
+- Existing wrong-path repository test passed; the added dot-substitution probe
+  failed the intended exactness contract as described above.
+- `git diff --check e7130b3e..17dbd4f4` and
+  `git diff --check bcfc6b71..17dbd4f4` passed.
+
+## Ready / residual blockers
+
+The three prior P1 blockers are closed, so no P0/P1 remains in this remediation.
+However, Q12-B's explicit secure exact-repository and cleanup success criteria
+are not fully met; keep this implementation **not ready for remote activation**
+until both P2 cases are fixed and rechecked. Independent of this diff, the
+previous remote migration, protected live smoke/recovery-probe and durable
+rollout gates remain mandatory.
+
+# Final re-review 7d893d42
+
+**Scope:** final independent review of `17dbd4f4..7d893d42` and complete
+`bcfc6b71..7d893d42`, limited to the five remediation findings above. **Verdict:
+READY for local integration of Q12-B.** P0: 0, P1: 0, P2: 0, P3: 0. This is
+not authorization or evidence for remote activation; the independent migration,
+live smoke/recovery-probe and rollout gates remain unchanged.
+
+## Final finding disposition
+
+- **Exact repository validation — resolved.** Forward deploy now tests a literal
+  `${repository}@sha256:` prefix and applies regex only to the remaining digest
+  (`scripts/deploy_blue_green.sh:70-84`). Rollback uses the same split literal
+  prefix/digest contract (`scripts/rollback_blue_green.sh:72-84`). The fail-
+  closed suite now rejects both a different repository path and the prior
+  `ghcrXio` dot-substitution bypass.
+- **Remote plaintext upload cleanup — resolved.** The final install shell retains
+  its `EXIT` trap, and the workflow now has a separate run-scoped cleanup step
+  with `if: always()` before deployment (`.github/workflows/ci-cd.yml:830-845`).
+  Thus install failure and the normal failed/cancelled step path both retry
+  removal without reading or printing secret contents. The target workflow
+  contract asserts the exact run-scoped path and unconditional cleanup step.
+- **Prior P1 findings remain resolved.** Re-running on the final tree confirmed
+  normalized current/target rollback environments, byte-identical bridge-only
+  preservation, and main plus Stage 6 target-env recreation on web-only app
+  switch. No regression was introduced by the final P2 changes.
+
+## Final fresh verification
+
+- `node scripts/ci/test_ci_cd_workflow_gates.mjs`: passed.
+- `bash scripts/ci/test_detect_deploy_changes.sh`: passed.
+- `bash scripts/ci/test_blue_green_fail_closed.sh`: passed, including mutable,
+  wrong-path and `ghcrXio` repository rejection.
+- `bash -n` for deploy, rollback and fail-closed scripts: passed.
+- Synthetic Compose: current/target app and worker renders `4/4`; infra render
+  `1/1`.
+- Failing-install `EXIT` trap simulation: nonzero install path removed the
+  populated upload directory.
+- Final-tree web-only mock: normalized local-Qdrant current/target snapshots,
+  correct new-web/reused-API digests, and both main/Stage-6 target-env restarts.
+- Final-tree bridge-only mock: inactive rollback snapshot and `deploy_state`
+  remained byte-identical.
+- `git diff --check 17dbd4f4..7d893d42` and
+  `git diff --check bcfc6b71..7d893d42`: passed.
+
+## Final readiness boundary
+
+Q12-B's immutable image, secret parity/ownership, pre-switch refusal,
+post-switch rollback, partial/config-only coherence, change detection and
+focused CI contracts are accepted at `7d893d42`. Remote mutation is still
+outside this review and must not begin solely from this READY result; the full
+Q12 acceptance matrix and remaining remote evidence gates continue to govern
+activation.
