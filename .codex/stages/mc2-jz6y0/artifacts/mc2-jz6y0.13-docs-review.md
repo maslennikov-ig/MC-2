@@ -51,8 +51,8 @@ risk_level: high
 docs_impact: ops-deploy-migration-handoff
 docs_reviewed: updated
 docs_review_notes: Re-review of 9e840349 confirmed all six original P1 and three original P2 documentation findings are resolved with no new P0-P3 finding.
-graph_reviewed: blocked
-graph_review_notes: The local graph available in the integration worktree was built from ebdf9c2e while the reviewed docs tree is 9e840349; this read-only reviewer did not refresh shared graph state. Parent closeout must run a local no-API refresh after integration.
+graph_reviewed: updated
+graph_review_notes: After review integration, the parent ran Graphify 0.8.45 update and cluster-only locally; report totals were 50,796 nodes and 75,445 edges with no forbidden source paths, external model/API mode, or hook.
 verification:
   - Re-reviewed documentation implementation 9e840349 against original audit 2943a942 and accepted code through 6645708d, including release-bound rollback remediation 3e14c922.
   - All six original P1 and three original P2 findings were mapped to exact current docs and implementation contracts: passed with no residual finding.
@@ -60,11 +60,11 @@ verification:
   - Stale host-pnpm/authorization/rollback scans returned no unexpected match; the only host-pnpm examples are explicitly local-development-only.
   - Sanitized environment files have unique keys; changed-lines secret/product-ID scan found no credential, product/file UUID, content, or provenance leak.
   - Handoff is 111 lines against the 200-line budget.
-  - Graphify remains intentionally parent-blocked because durable docs are not yet integrated/refreshed in the shared graph.
+  - Parent Graphify refresh completed after durable docs integration; the final report commit is rechecked after the closeout-state commit.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-docs-review.md
 explicit_defers:
-  - Parent integration must merge the accepted documentation commit, refresh local Graphify without external model/API modes, and run canonical closeout.
+  - Parent integration must run the remaining Q12 canonical closeout only after live activation gates pass.
   - No staging, production, database, service, secret, queue, image registry, S3, notification, alias, or live Qdrant state was read or mutated.
 ---
 

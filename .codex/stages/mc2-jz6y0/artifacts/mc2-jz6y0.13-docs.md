@@ -57,8 +57,8 @@ risk_level: high
 docs_impact: ops-deploy-migration-handoff
 docs_reviewed: updated
 docs_review_notes: six blocking and three closeout findings were reconciled against accepted Q12 runtime truth
-graph_reviewed: blocked
-graph_review_notes: parent integration owns the immediate local no-API Graphify refresh after this durable docs merge; no external model/API mode or hook is authorized
+graph_reviewed: updated
+graph_review_notes: parent integration ran Graphify 0.8.45 update and cluster-only locally; report totals were 50,796 nodes and 75,445 edges with no external model/API mode, forbidden source path, or hook
 verification:
   - documented command/package/script mapping scan: passed
   - stale host-pnpm/authorization/latest/rollback scan: passed with local-only host pnpm as the sole intentional match
@@ -80,7 +80,6 @@ changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-docs.md
 explicit_defers:
   - mc2-jz6y0.25 - move Prometheus retention to supported YAML before the next pin change
-  - parent closeout - refresh local Graphify after merge without external model/API modes or git hooks
   - mc2-jz6y0.13 - live activation remains NO-GO until project CA, off-host S3, source truth, and every documented hard gate pass
 ---
 

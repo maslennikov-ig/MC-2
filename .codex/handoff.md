@@ -106,6 +106,7 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
-graph-reviewed: blocked — parent closeout must refresh the local graph after
-these durable docs merge with `graphify update .` and
-`graphify cluster-only . --no-viz`; no external model/API mode or Git hook.
+graph-reviewed: updated — local Graphify `0.8.45` refresh ran with
+`graphify update .` and `graphify cluster-only . --no-viz`; the report records
+50,796 nodes, 75,445 edges and no forbidden source paths. No external model/API
+mode or Git hook was used.

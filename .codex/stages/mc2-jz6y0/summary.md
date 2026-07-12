@@ -139,8 +139,9 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 - `docs-reviewed: updated` — retrieval, deployment, recovery, monitoring, and operator behavior change.
 - `project-index: update required` — stable Qdrant/operations entrypoints change.
-- `graph-reviewed: blocked` — parent closeout must run `graphify update .` and
-  `graphify cluster-only . --no-viz` after these durable docs merge.
+- `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .`
+  and `graphify cluster-only . --no-viz`; report totals are 50,796 nodes and
+  75,445 edges with no external model/API mode or Git hook.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while the CA/S3/source inputs are hard stops.
 
@@ -156,7 +157,8 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
 
-graph-reviewed: blocked — parent closeout owns the local no-API refresh after
-merge. Do not install hooks or use an external model/API mode.
+graph-reviewed: updated — local no-API refresh completed after the durable Q12
+merge; final report commit is rechecked after the closeout-state commit. No
+hooks or external model/API mode were used.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.
