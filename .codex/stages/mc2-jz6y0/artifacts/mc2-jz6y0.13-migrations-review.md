@@ -10,7 +10,7 @@ base_branch: codex/self-hosted-qdrant-platform
 base_commit: 5c74869f
 worktree: /home/me/code/mc2/.worktrees/q12-migrations
 status: accepted
-delivery_method: n/a
+delivery_method: merge
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: Temporary dependency links and disposable PostgreSQL were removed; review 16d84cd9 was merged and accepted after the integration type-check passed.

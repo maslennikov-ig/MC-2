@@ -46,7 +46,7 @@ depends_on_streams:
   - Q12 acceptance follow-up review
 parallel_decision: parallel
 status: accepted
-delivery_method: n/a
+delivery_method: manual integration
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: no remote resource or staging state was created; independent review accepted bcfc6b71..7d893d42 with P0/P1/P2/P3 all zero

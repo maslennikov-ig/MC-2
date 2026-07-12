@@ -37,10 +37,10 @@ depends_on_streams:
   - mc2-jz6y0.13-deploy-preflight
 parallel_decision: parallel
 status: accepted
-delivery_method: n/a
+delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: not_applicable
-cleanup_notes: Review created no container, image, service, queue, alias, database, S3, or remote resource. Temporary synthetic files and dependency links created for verification were removed. Concurrent implementation edits in the assigned worktree were not touched or staged.
+cleanup_status: cleaned
+cleanup_notes: The immutable findings were integrated and resolved by the accepted operator remediation/rereview; the dedicated worktree/local branch, synthetic files, and dependency links were removed without touching any remote resource.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed

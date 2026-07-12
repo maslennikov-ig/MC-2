@@ -43,7 +43,7 @@ depends_on_streams:
   - mc2-jz6y0.13.3
 parallel_decision: parallel read-only audit with a disjoint artifact-only write zone
 status: accepted
-delivery_method: n/a
+delivery_method: merge
 accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: Review created no runtime resource or remote action; zero-finding review 9bcca13a was merged and accepted.

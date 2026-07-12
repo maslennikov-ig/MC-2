@@ -44,8 +44,8 @@ parallel_decision: sequential
 status: accepted
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: implementation worktree and dependency symlinks remain until independent review and integration
+cleanup_status: cleaned
+cleanup_notes: implementation and review were integrated; the dedicated worktree/local branch and temporary dependency symlinks were removed, while pushed evidence branches remain
 risk_level: high
 docs_impact: durable-recovery-contract
 docs_reviewed: no-change-needed
