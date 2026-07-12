@@ -188,7 +188,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 - `docs-reviewed: updated` — final independent rereview found P0-P3 zero after the backup/restore and activation-order corrections.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
-- `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .` and `graphify cluster-only . --no-viz`: 51,658 nodes, 76,782 edges, 3,284 communities, zero model/API tokens, and no Git hooks. The post-metadata rerun must match the delivered HEAD.
+- `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .` and `graphify cluster-only . --no-viz`: 51,658 nodes, 76,782 edges, zero model/API tokens, and no Git hooks. Community totals are omitted because reclustering may repartition an unchanged graph; the required post-metadata rerun reports the delivered HEAD.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while current verify-full DB credentials and source truth are
   hard stops.
