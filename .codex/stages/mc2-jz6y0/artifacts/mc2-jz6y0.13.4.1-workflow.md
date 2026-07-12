@@ -53,7 +53,7 @@ status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
 cleanup_status: pending
-cleanup_notes: temporary dependency symlinks must be removed before commit; worktree/branch remain for orchestrator review
+cleanup_notes: temporary dependency symlinks were removed before commit; worktree/branch remain for orchestrator review
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed
