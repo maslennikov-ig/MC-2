@@ -114,6 +114,7 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
-graph-reviewed: pending final refresh — the prior local Graphify `0.8.45`
-refresh used no external model/API mode or Git hook. Final delivered-HEAD counts
-will replace this line during canonical closeout.
+graph-reviewed: updated — local Graphify `0.8.45` ran `graphify update .` and
+`graphify cluster-only . --no-viz`: 51,658 nodes, 76,782 edges, 3,284
+communities, zero model/API tokens, and no Git hooks. A final rerun after the
+metadata commit must report the delivered HEAD.

@@ -188,7 +188,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 - `docs-reviewed: updated` — final independent rereview found P0-P3 zero after the backup/restore and activation-order corrections.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
-- `graph-reviewed: pending final refresh` — run local Graphify `0.8.45` at the delivered HEAD with no external model/API mode or Git hooks, then record exact counts.
+- `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .` and `graphify cluster-only . --no-viz`: 51,658 nodes, 76,782 edges, 3,284 communities, zero model/API tokens, and no Git hooks. The post-metadata rerun must match the delivered HEAD.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while current verify-full DB credentials and source truth are
   hard stops.
@@ -213,7 +213,8 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
 
-graph-reviewed: pending final refresh — no hooks or external model/API mode will
-be used; delivered-HEAD evidence is recorded by canonical closeout.
+graph-reviewed: updated — local `graphify update .` and
+`graphify cluster-only . --no-viz` completed with zero model/API tokens and no
+hooks; the final post-metadata rerun must match the delivered HEAD.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.

@@ -42,14 +42,14 @@ parallel_decision: focused, infrastructure, database, and documentation verifica
 status: accepted
 delivery_method: cherry-pick
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: final stage workspace audit and canonical closeout remain to run after this artifact is committed
+cleanup_status: cleaned
+cleanup_notes: all accepted stage worktrees/local branches and owned runtime resources are removed; the integration worktree is intentionally retained for Q12, while unrelated dirty Career Playbook work and its clean review worktree remain untouched
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: final runbooks now encode truthful database backup before migrations and source recovery before reindex; independent rereview passed P0-P3 zero
-graph_reviewed: pending
-graph_review_notes: final local no-API refresh will run after the acceptance metadata commit and must match final HEAD
+graph_reviewed: updated
+graph_review_notes: local Graphify 0.8.45 ran update and cluster-only with zero model/API tokens and no hooks; the final rerun after this metadata commit must match the delivered HEAD
 verification:
   - root final backend Stage 2/4/5/6 matrix passed 125/125 files and 1893/1893 tests with zero skips
   - root shared contracts passed 3/3 files and 23/23 tests; web material conflicts passed 3/3 files and 20/20 tests
