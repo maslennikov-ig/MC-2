@@ -205,7 +205,7 @@ services:
 
   # Next.js Web Application
   web:
-    image: ghcr.io/maslennikov-ig/mc-2/web:latest
+    image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable image reference}
     container_name: megacampus-web
     restart: unless-stopped
     ports:
@@ -247,7 +247,7 @@ services:
 
   # API Server (Express + tRPC)
   api:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
     container_name: megacampus-api
     restart: unless-stopped
     user: '1001:1001'
@@ -313,7 +313,7 @@ services:
 
   # BullMQ Worker for background jobs (course generation stages 1-6)
   worker:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
     container_name: megacampus-worker
     restart: unless-stopped
     user: '1001:1001'
@@ -372,7 +372,7 @@ services:
   # Uses separate queue 'stage6-lesson-content' for high-throughput I/O-bound operations
   # @see docs/plans/sprightly-wondering-widget.md
   worker-stage6:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
     container_name: megacampus-worker-stage6
     restart: unless-stopped
     user: '1001:1001'
@@ -425,7 +425,7 @@ services:
 
   # Stage 7 Enrichment Worker (cover images, audio, video, quiz, presentation)
   worker-stage7:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
     container_name: megacampus-worker-stage7
     restart: unless-stopped
     command: ['tsx', 'dist/stages/stage7-enrichments/worker-entrypoint.js']

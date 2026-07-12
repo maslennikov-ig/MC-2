@@ -177,6 +177,12 @@ jobs:
       - name: Run lint
         run: pnpm lint
 
+      - name: Verify deploy contracts
+        run: |
+          node scripts/ci/test_ci_cd_workflow_gates.mjs
+          bash scripts/ci/test_detect_deploy_changes.sh
+          bash scripts/ci/test_blue_green_fail_closed.sh
+
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
@@ -620,6 +626,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
+            type=raw,value=${{ github.sha }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push ${{ matrix.image }}
@@ -762,6 +769,7 @@ jobs:
           QDRANT_S3_ACCESS_KEY_FILE=/opt/megacampus/secrets/qdrant_s3_access_key
           QDRANT_S3_SECRET_KEY_FILE=/opt/megacampus/secrets/qdrant_s3_secret_key
           QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics
+          QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}
           DOCUMENT_EVIDENCE_ENABLED=true
           DOCUMENT_EVIDENCE_MODE=active
           DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
@@ -785,11 +793,38 @@ jobs:
           ENVEOF
           chmod 600 ${{ env.DEPLOY_PATH }}/.env.production"
 
+      - name: Create Qdrant secret files
+        env:
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          QDRANT_READ_ONLY_API_KEY: ${{ secrets.QDRANT_READ_ONLY_API_KEY }}
+          QDRANT_S3_ACCESS_KEY: ${{ secrets.QDRANT_S3_ACCESS_KEY }}
+          QDRANT_S3_SECRET_KEY: ${{ secrets.QDRANT_S3_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          secret_dir="$(mktemp -d)"
+          trap 'rm -rf "$secret_dir"' EXIT
+          for name in QDRANT_API_KEY QDRANT_READ_ONLY_API_KEY QDRANT_S3_ACCESS_KEY QDRANT_S3_SECRET_KEY; do
+            value="${!name:-}"
+            test -n "$value" || { echo "::error::$name is required"; exit 1; }
+            case "$value" in *$'\n'*|*$'\r'*) echo "::error::$name must be a single line"; exit 1;; esac
+            file_name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+            printf '%s' "$value" > "$secret_dir/$file_name"
+          done
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "install -d -m 0700 ${{ env.DEPLOY_PATH }}/secrets"
+          scp -i ~/.ssh/deploy_key "$secret_dir"/* \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/secrets/
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "chmod 0400 ${{ env.DEPLOY_PATH }}/secrets/qdrant_api_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_read_only_api_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_s3_access_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_s3_secret_key"
+
       - name: Deploy
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && DEPLOY_WEB_CHANGED='${{ needs.changes.outputs.web_changed }}' DEPLOY_API_CHANGED='${{ needs.changes.outputs.api_changed }}' DEPLOY_BRIDGE_CHANGED='${{ needs.changes.outputs.bridge_changed }}' DEPLOY_CONFIG_CHANGED='${{ needs.changes.outputs.deploy_config_changed }}' GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' GITHUB_ACTOR='${{ github.actor }}' bash scripts/deploy_blue_green.sh production latest"
+            "cd ${{ env.DEPLOY_PATH }} && DEPLOY_WEB_CHANGED='${{ needs.changes.outputs.web_changed }}' DEPLOY_API_CHANGED='${{ needs.changes.outputs.api_changed }}' DEPLOY_BRIDGE_CHANGED='${{ needs.changes.outputs.bridge_changed }}' DEPLOY_CONFIG_CHANGED='${{ needs.changes.outputs.deploy_config_changed }}' GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' GITHUB_ACTOR='${{ github.actor }}' bash scripts/deploy_blue_green.sh production ${{ github.sha }}"
 
       - name: Verify deployment
         run: |
@@ -835,6 +870,10 @@ jobs:
             exit 1
           fi
 
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "sed -i 's/^status=switched$/status=accepted/' /opt/megacampus/deploy_state && grep -qx 'status=accepted' /opt/megacampus/deploy_state"
+
       - name: Cleanup SSH
         if: always()
         run: rm -f ~/.ssh/deploy_key
@@ -866,7 +905,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && bash scripts/rollback_blue_green.sh"
+            "cd ${{ env.DEPLOY_PATH }} && if test -r deploy_state && grep -Eq '^status=(switched|accepted)$' deploy_state; then bash scripts/rollback_blue_green.sh; else echo 'Rollback skipped: deployment never switched traffic'; fi"
 
       - name: Cleanup SSH
         if: always()

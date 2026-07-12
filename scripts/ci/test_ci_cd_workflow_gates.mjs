@@ -16,6 +16,8 @@ const workflow = yaml.load(readFileSync(workflowPath, 'utf8'));
 const jobs = workflow?.jobs ?? {};
 const deployScript = readFileSync(resolve(rootDir, 'scripts/deploy_blue_green.sh'), 'utf8');
 const rollbackScript = readFileSync(resolve(rootDir, 'scripts/rollback_blue_green.sh'), 'utf8');
+const appCompose = readFileSync(resolve(rootDir, 'docker-compose.app.yml'), 'utf8');
+const productionCompose = readFileSync(resolve(rootDir, 'docker-compose.production.yml'), 'utf8');
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -31,15 +33,26 @@ function needsList(job) {
   return Array.isArray(job.needs) ? job.needs : [job.needs];
 }
 
+const deployContractStep = jobs.lint?.steps?.find(
+  step => step?.name === 'Verify deploy contracts'
+)?.run;
+for (const contractCommand of [
+  'node scripts/ci/test_ci_cd_workflow_gates.mjs',
+  'bash scripts/ci/test_detect_deploy_changes.sh',
+  'bash scripts/ci/test_blue_green_fail_closed.sh',
+]) {
+  assert(
+    deployContractStep?.includes(contractCommand),
+    `CI lint job must run deploy contract: ${contractCommand}`
+  );
+}
+
 for (const jobName of ['deploy', 'deploy-dev']) {
   const job = jobs[jobName];
   const condition = job?.if ?? '';
 
   assert(job, `${jobName} job must exist`);
-  assert(
-    needsList(job).includes('ci-success'),
-    `${jobName} must depend on ci-success`
-  );
+  assert(needsList(job).includes('ci-success'), `${jobName} must depend on ci-success`);
   assert(
     condition.includes("needs.ci-success.result == 'success'"),
     `${jobName} must require ci-success to pass`
@@ -59,13 +72,18 @@ const copyDeploymentFiles = stagingDeploy?.steps?.find(
 const createProductionEnv = stagingDeploy?.steps?.find(
   step => step?.name === 'Create .env.production'
 )?.run;
+const createQdrantSecretsStep = stagingDeploy?.steps?.find(
+  step => step?.name === 'Create Qdrant secret files'
+);
+const createQdrantSecrets = createQdrantSecretsStep?.run;
+const deployCommand = stagingDeploy?.steps?.find(step => step?.name === 'Deploy')?.run;
+const verifyDeployment = stagingDeploy?.steps?.find(
+  step => step?.name === 'Verify deployment'
+)?.run;
+const rollbackCommand = jobs.rollback?.steps?.find(step => step?.name === 'Execute rollback')?.run;
 
 assert(copyDeploymentFiles, 'staging deploy must copy deployment files');
-for (const requiredPath of [
-  'deploy/qdrant',
-  'deploy/systemd',
-  'ops/qdrant',
-]) {
+for (const requiredPath of ['deploy/qdrant', 'deploy/systemd', 'ops/qdrant']) {
   assert(
     copyDeploymentFiles.includes(requiredPath),
     `staging deploy package must include ${requiredPath}`
@@ -81,6 +99,7 @@ for (const requiredLine of [
   'QDRANT_S3_REGION=${{ secrets.QDRANT_S3_REGION }}',
   'QDRANT_S3_ENDPOINT_URL=${{ secrets.QDRANT_S3_ENDPOINT_URL }}',
   'QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics',
+  'QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}',
   'DOCUMENT_EVIDENCE_ENABLED=true',
   'DOCUMENT_EVIDENCE_MODE=active',
   'DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100',
@@ -90,10 +109,80 @@ for (const requiredLine of [
     `staging production env must include ${requiredLine}`
   );
 }
+assert(createQdrantSecrets, 'staging deploy must materialize Qdrant secret files');
+for (const sharedSecret of [
+  'QDRANT_API_KEY',
+  'QDRANT_READ_ONLY_API_KEY',
+  'QDRANT_S3_ACCESS_KEY',
+  'QDRANT_S3_SECRET_KEY',
+]) {
+  assert(
+    createQdrantSecretsStep?.env?.[sharedSecret] === `\${{ secrets.${sharedSecret} }}`,
+    `staging secret materialization must use GitHub ${sharedSecret}`
+  );
+}
+assert(
+  createQdrantSecrets.includes('chmod 0400'),
+  'staging Qdrant secret files must be host-readable only'
+);
+assert(
+  rollbackCommand?.includes("grep -Eq '^status=(switched|accepted)$'") &&
+    rollbackCommand.includes('rollback_blue_green.sh'),
+  'workflow rollback must run only after the remote transaction switched traffic'
+);
 assert(
   !createProductionEnv.includes('QDRANT_URL=${{ secrets.QDRANT_URL }}'),
   'staging deploy must not restore the retired Qdrant Cloud URL'
 );
+
+assert(
+  workflow.jobs?.['build-docker']?.steps
+    ?.find(step => step?.name === 'Extract metadata')
+    ?.with?.tags?.includes('type=raw,value=${{ github.sha }}'),
+  'application images must publish a full commit SHA tag'
+);
+assert(
+  deployCommand?.includes('deploy_blue_green.sh production ${{ github.sha }}'),
+  'staging deploy must request the immutable commit image tag'
+);
+assert(
+  verifyDeployment?.includes('status=accepted') &&
+    verifyDeployment.includes('/opt/megacampus/deploy_state'),
+  'successful external verification must accept the rollback transaction marker'
+);
+assert(
+  appCompose.includes('image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable image reference}') &&
+    appCompose.includes('image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}'),
+  'blue/green application compose must require immutable image references'
+);
+assert(
+  productionCompose.includes('image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}'),
+  'API-backed worker compose must require the same immutable API image'
+);
+for (const requiredGuard of [
+  'TAG must be an immutable commit tag',
+  'resolve_repo_digest',
+  'WEB_IMAGE=',
+  'API_IMAGE=',
+  'write_deploy_state preparing',
+  'write_deploy_state switched',
+]) {
+  assert(
+    deployScript.includes(requiredGuard),
+    `deploy script must include immutable rollback guard: ${requiredGuard}`
+  );
+}
+for (const requiredGuard of [
+  'status=switched',
+  'active color does not match the switched deployment',
+  'WEB_IMAGE',
+  'API_IMAGE',
+]) {
+  assert(
+    rollbackScript.includes(requiredGuard),
+    `rollback script must fail closed with guard: ${requiredGuard}`
+  );
+}
 
 for (const service of ['qdrant', 'prometheus', 'grafana']) {
   assert(

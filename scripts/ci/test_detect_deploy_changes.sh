@@ -91,6 +91,12 @@ assert_value "$deploy_config" should_build_docker false
 assert_value "$deploy_config" deploy_config_changed true
 assert_value "$deploy_config" docker_matrix '{"include":[]}'
 
+qdrant_ops="$(run_case "qdrant-ops" ops/qdrant/prometheus/prometheus.yml)"
+assert_value "$qdrant_ops" should_deploy true
+assert_value "$qdrant_ops" should_build_docker false
+assert_value "$qdrant_ops" deploy_config_changed true
+assert_value "$qdrant_ops" docker_matrix '{"include":[]}'
+
 deploy_script="$(run_case "deploy-script" scripts/deploy_blue_green.sh scripts/deploy_dev.sh)"
 assert_value "$deploy_script" should_deploy true
 assert_value "$deploy_script" should_build_docker false

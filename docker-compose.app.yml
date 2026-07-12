@@ -9,7 +9,7 @@ services:
 
   # Next.js Web Application
   web:
-    image: ghcr.io/maslennikov-ig/mc-2/web:latest
+    image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable image reference}
     container_name: megacampus-web-${COLOR:-blue}
     restart: unless-stopped
     ports:
@@ -48,7 +48,7 @@ services:
 
   # API Server (Express + tRPC)
   api:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ${API_IMAGE:?API_IMAGE must be an immutable image reference}
     container_name: megacampus-api-${COLOR:-blue}
     restart: unless-stopped
     user: '1001:1001'

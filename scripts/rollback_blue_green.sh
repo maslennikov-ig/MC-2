@@ -10,8 +10,14 @@ set -e
 #   Green: web:3002, api:4002
 
 ENV=${1:-production}
-BASE_PATH="/opt/megacampus"
-NGINX_CONFIG_PATH="/etc/nginx/sites-enabled/megacampus"
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
+DEPLOY_STATE="$BASE_PATH/deploy_state"
+
+state_value() {
+    local key="$1"
+    awk -v key="$key" 'index($0, key "=") == 1 { value=substr($0, length(key) + 2) } END { print value }' "$DEPLOY_STATE"
+}
 
 # 1. Determine Current Active Color
 if [ -f "$BASE_PATH/active_color" ]; then
@@ -22,17 +28,31 @@ else
     exit 1
 fi
 
-# 2. Determine Target Color (The previous one)
-if [ "$CURRENT_COLOR" == "blue" ]; then
-    TARGET_COLOR="green"
+# 2. Require a deployment transaction that actually switched traffic.
+[ -r "$DEPLOY_STATE" ] || {
+    echo "Error: deploy_state is missing; refusing an ambiguous rollback." >&2
+    exit 1
+}
+DEPLOY_STATUS="$(state_value status)"
+PREVIOUS_COLOR="$(state_value previous_color)"
+SWITCHED_COLOR="$(state_value target_color)"
+if [ "$DEPLOY_STATUS" != "switched" ] && [ "$DEPLOY_STATUS" != "accepted" ]; then
+    echo "Error: deployment did not reach status=switched; refusing to promote an unaccepted target." >&2
+    exit 1
+fi
+if [ "$CURRENT_COLOR" != "$SWITCHED_COLOR" ]; then
+    echo "Error: active color does not match the switched deployment; refusing rollback." >&2
+    exit 1
+fi
+TARGET_COLOR="$PREVIOUS_COLOR"
+if [ "$TARGET_COLOR" == "green" ]; then
     TARGET_WEB_PORT=3002
     TARGET_API_PORT=4002
-elif [ "$CURRENT_COLOR" == "green" ]; then
-    TARGET_COLOR="blue"
+elif [ "$TARGET_COLOR" == "blue" ]; then
     TARGET_WEB_PORT=3001
     TARGET_API_PORT=4001
 else
-    echo "Error: Unknown active color '$CURRENT_COLOR'."
+    echo "Error: Unknown rollback target color '$TARGET_COLOR'."
     exit 1
 fi
 
@@ -49,6 +69,13 @@ if [ ! -f "$BASE_PATH/.env.$TARGET_COLOR" ]; then
     echo "   This may mean there was no previous deployment to roll back to."
     exit 1
 fi
+for image_key in WEB_IMAGE API_IMAGE; do
+    image_value="$(awk -v key="$image_key" 'index($0, key "=") == 1 { value=substr($0, length(key) + 2) } END { print value }' "$BASE_PATH/.env.$TARGET_COLOR")"
+    [[ "$image_value" =~ @sha256:[0-9a-f]{64}$ ]] || {
+        echo "Error: $image_key is missing or mutable in rollback target configuration." >&2
+        exit 1
+    }
+done
 
 # 4. Ensure Infrastructure is Running
 echo "Ensuring infrastructure is running..."
@@ -132,11 +159,12 @@ fi
 
 # 8. Update State
 echo "$TARGET_COLOR" > "$BASE_PATH/active_color"
+sed -i 's/^status=.*/status=rolled_back/' "$DEPLOY_STATE"
 
 # 9. Stop broken application environment
 echo ""
 echo "Stopping broken application environment ($CURRENT_COLOR)..."
-docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
+docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$CURRENT_COLOR" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 
 echo ""
 echo "Rollback Complete!"

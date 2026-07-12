@@ -9,14 +9,101 @@ set -e
 #   Green: web:3002, api:4002
 
 ENV=${1:-production}
-TAG=${2:-latest}
-BASE_PATH="/opt/megacampus"
-NGINX_CONFIG_PATH="/etc/nginx/sites-enabled/megacampus"
+TAG=${2:-}
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
+DEPLOY_STATE="$BASE_PATH/deploy_state"
+WEB_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/web"
+API_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/api"
 DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
 DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}
 DEPLOY_BRIDGE_CHANGED=${DEPLOY_BRIDGE_CHANGED:-true}
 DEPLOY_CONFIG_CHANGED=${DEPLOY_CONFIG_CHANGED:-true}
 APP_DEPLOY_NEEDED=false
+
+if [[ ! "$TAG" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ERROR: TAG must be an immutable commit tag (40 lowercase hexadecimal characters)" >&2
+    exit 1
+fi
+
+env_value() {
+    local path="$1"
+    local key="$2"
+    awk -v key="$key" 'index($0, key "=") == 1 { value=substr($0, length(key) + 2) } END { print value }' "$path"
+}
+
+upsert_env() {
+    local path="$1"
+    local key="$2"
+    local value="$3"
+    local temp
+    temp="$(mktemp "${path}.XXXXXX")"
+    awk -v key="$key" 'index($0, key "=") != 1' "$path" > "$temp"
+    printf '%s=%s\n' "$key" "$value" >> "$temp"
+    chmod --reference="$path" "$temp"
+    mv "$temp" "$path"
+}
+
+require_immutable_ref() {
+    local value="$1"
+    local repository="$2"
+    local label="$3"
+    [[ "$value" =~ ^${repository}@sha256:[0-9a-f]{64}$ ]] || {
+        echo "ERROR: $label must be a repository digest under $repository" >&2
+        return 1
+    }
+}
+
+resolve_repo_digest() {
+    local reference="$1"
+    local repository="$2"
+    local digest
+    docker pull "$reference" > /dev/null
+    digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$reference" | awk -v prefix="$repository@sha256:" 'index($0, prefix) == 1 { print; exit }')"
+    require_immutable_ref "$digest" "$repository" "$reference"
+    printf '%s' "$digest"
+}
+
+resolve_container_digest() {
+    local container="$1"
+    local repository="$2"
+    local image_id digest
+    image_id="$(docker inspect --format '{{.Image}}' "$container")"
+    digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id" | awk -v prefix="$repository@sha256:" 'index($0, prefix) == 1 { print; exit }')"
+    require_immutable_ref "$digest" "$repository" "$container"
+    printf '%s' "$digest"
+}
+
+ensure_color_image_ref() {
+    local color="$1"
+    local key="$2"
+    local repository="$3"
+    local container="$4"
+    local env_file="$BASE_PATH/.env.$color"
+    local value
+    [ -r "$env_file" ] || { echo "ERROR: missing $env_file" >&2; return 1; }
+    value="$(env_value "$env_file" "$key")"
+    if [ -z "$value" ]; then
+        value="$(resolve_container_digest "$container" "$repository")"
+        upsert_env "$env_file" "$key" "$value"
+    fi
+    require_immutable_ref "$value" "$repository" "$key"
+    REPLY="$value"
+}
+
+write_deploy_state() {
+    local status="$1"
+    local temp
+    temp="$(mktemp "${DEPLOY_STATE}.XXXXXX")"
+    {
+        printf 'status=%s\n' "$status"
+        printf 'previous_color=%s\n' "$CURRENT_COLOR"
+        printf 'target_color=%s\n' "$NEW_COLOR"
+        printf 'commit=%s\n' "$TAG"
+    } > "$temp"
+    chmod 0600 "$temp"
+    mv "$temp" "$DEPLOY_STATE"
+}
 
 read_secret_file() {
     local path="$1"
@@ -119,6 +206,10 @@ echo "   Target:  $NEW_COLOR (web:$NEW_WEB_PORT, api:$NEW_API_PORT)"
 echo "   Changes: web=$DEPLOY_WEB_CHANGED api=$DEPLOY_API_CHANGED bridge=$DEPLOY_BRIDGE_CHANGED config=$DEPLOY_CONFIG_CHANGED"
 echo ""
 
+if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    write_deploy_state preparing
+fi
+
 # 2. Check docling-mcp image exists (manually built, 8GB)
 DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"
 if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
@@ -175,6 +266,26 @@ if [ -n "$GITHUB_TOKEN" ]; then
 fi
 
 if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    ensure_color_image_ref "$CURRENT_COLOR" WEB_IMAGE "$WEB_REPOSITORY" "megacampus-web-$CURRENT_COLOR"
+    CURRENT_WEB_IMAGE="$REPLY"
+    unset REPLY
+    ensure_color_image_ref "$CURRENT_COLOR" API_IMAGE "$API_REPOSITORY" "megacampus-api-$CURRENT_COLOR"
+    CURRENT_API_IMAGE="$REPLY"
+    unset REPLY
+
+    if [ "$DEPLOY_WEB_CHANGED" = "true" ]; then
+        NEW_WEB_IMAGE="$(resolve_repo_digest "$WEB_REPOSITORY:$TAG" "$WEB_REPOSITORY")"
+    else
+        NEW_WEB_IMAGE="$CURRENT_WEB_IMAGE"
+    fi
+    if [ "$DEPLOY_API_CHANGED" = "true" ]; then
+        NEW_API_IMAGE="$(resolve_repo_digest "$API_REPOSITORY:$TAG" "$API_REPOSITORY")"
+    else
+        NEW_API_IMAGE="$CURRENT_API_IMAGE"
+    fi
+    upsert_env "$BASE_PATH/.env.$NEW_COLOR" WEB_IMAGE "$NEW_WEB_IMAGE"
+    upsert_env "$BASE_PATH/.env.$NEW_COLOR" API_IMAGE "$NEW_API_IMAGE"
+
     # 7. Deploy Application to New Color
     echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
     # Force remove containers by name (handles orphans from different project names)
@@ -183,17 +294,6 @@ if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     # Also try compose down for proper cleanup
     # NOTE: do NOT use --remove-orphans here, it kills shared infra (Redis, docling-mcp)!
     docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down 2>/dev/null || true
-
-    PULL_SERVICES=()
-    [ "$DEPLOY_WEB_CHANGED" = "true" ] && PULL_SERVICES+=("web")
-    [ "$DEPLOY_API_CHANGED" = "true" ] && PULL_SERVICES+=("api")
-
-    if [ "${#PULL_SERVICES[@]}" -gt 0 ]; then
-        echo "Pulling changed app images: ${PULL_SERVICES[*]}"
-        docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull "${PULL_SERVICES[@]}"
-    else
-        echo "No app image changes; using locally cached app images."
-    fi
 
     qdrant_staging_gate
 
@@ -269,11 +369,12 @@ if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
 
     # 10. Update State
     echo "$NEW_COLOR" > "$BASE_PATH/active_color"
+    write_deploy_state switched
 
     # 11. Cleanup Old Application Environment
     echo ""
     echo "Stopping old application environment ($CURRENT_COLOR)..."
-    docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
+    docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$CURRENT_COLOR" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 else
     echo "No web/api/config changes; skipping Blue/Green app switch."
 fi
@@ -285,12 +386,16 @@ WORKER_COMPOSE="$BASE_PATH/docker-compose.production.yml"
 INFRA_COMPOSE="$BASE_PATH/docker-compose.infra.yml"
 
 if [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
+    WORKER_COLOR="${NEW_COLOR:-$CURRENT_COLOR}"
+    WORKER_ENV_FILE="$BASE_PATH/.env.$WORKER_COLOR"
+    PRODUCTION_ENV_FILE="$WORKER_ENV_FILE"
+    export PRODUCTION_ENV_FILE
     echo "Updating API-backed workers..."
-    docker compose -f "$WORKER_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" pull worker worker-stage6 2>/dev/null || true
     for SVC in worker worker-stage6; do
         echo "   Restarting $SVC..."
-        docker compose -f "$WORKER_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" up -d --force-recreate --no-deps "$SVC"
+        docker compose -f "$WORKER_COMPOSE" --env-file "$WORKER_ENV_FILE" up -d --force-recreate --no-deps "$SVC"
     done
+    unset PRODUCTION_ENV_FILE
     echo "   Updating worker-stage7..."
     docker compose -f "$INFRA_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" pull worker-stage7 2>/dev/null || true
     docker compose -f "$INFRA_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" up -d --force-recreate --no-deps worker-stage7
