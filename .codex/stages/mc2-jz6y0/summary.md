@@ -43,6 +43,18 @@ and service isolation. Catalog candidates are none; installed skills and local
 approved contracts cover the work. All runtime work is local/synthetic and
 authorizes no staging or production mutation.
 
+### Q12 Database Backup Gate Decomposition (2026-07-13)
+
+| Stream | Beads            | Goal                                                                   | Agent                                   | Write zone                                                    | Dependencies                           | Verification                                                                   | Decision/reason                                       |
+| ------ | ---------------- | ---------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| B      | `mc2-jz6y0.13.7` | fail-closed atomic local-disk Supabase/PostgreSQL backup operator      | deploy specialist using `senior-devops` | tracked backup shell, synthetic ops tests, delegated artifact | current local integration; no live URL | masked `pg_dump` failure, validation, atomic publish, retention, shell/CI/type | parallel; independent of Task 5 code and remote state |
+| BR     | `mc2-jz6y0.13.7` | independent security/correctness review after immutable implementation | non-author correctness/DevOps reviewer  | review artifact only                                          | B                                      | P0-P3 zero plus fresh focused/process gates                                    | sequential review gate                                |
+
+The implementation is local and synthetic. It may consult only first-party
+PostgreSQL documentation for `pg_dump`/`pg_restore` behavior and does not
+authorize copying the CA, changing the server script or crontab, reading secret
+values, taking a live dump, or deleting any historical backup.
+
 ## Parallel Decomposition
 
 | Stream | Goal                                 | Agent                                        | Write zone                                         | Dependencies          | Verification                                         | Decision                                                          |
