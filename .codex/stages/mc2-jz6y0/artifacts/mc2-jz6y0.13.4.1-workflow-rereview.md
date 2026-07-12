@@ -39,9 +39,9 @@ catalog_candidates:
 parallel_group: q12-source-recovery-workflow-correction-gate
 depends_on_streams:
   - mc2-jz6y0.13.4.1-workflow-correction
-parallel_decision: sequential - identity, filesystem, and workflow-order evidence jointly determine one correction verdict; repo spawn authorization was not present
+parallel_decision: sequential - independent re-review follows the completed correction and gates root acceptance
 status: returned
-delivery_method: merge
+delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: pending
 cleanup_notes: temporary dependency symlinks are removed before commit; review branch/worktree cleanup waits for root acceptance
