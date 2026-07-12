@@ -66,7 +66,7 @@ MegaCampusAI provides robust infrastructure for building AI-powered educational 
 ### Infrastructure Services
 
 - **Database**: Supabase (PostgreSQL 15+ with pgvector)
-- **Vector Database**: Qdrant Cloud (HNSW index, 768D)
+- **Vector Database**: private self-hosted Qdrant 1.18.2 (768D dense + native multilingual BM25/IDF)
 - **Job Queue**: BullMQ 5.x + Redis 7+
 - **Embeddings**: Jina-v3 (768-dimensional, multilingual)
 - **Document Processing**: Docling MCP (PDF/DOCX/PPTX conversion)
@@ -183,7 +183,7 @@ For detailed setup instructions, see the Quick Installation section below. A com
 - Node.js 20+ (LTS)
 - pnpm 8+
 - Supabase account (free tier sufficient for development)
-- Qdrant Cloud account (free 1GB tier)
+- Docker/Compose for the pinned local Qdrant 1.18.2 service
 - Redis instance (local or Upstash)
 - Jina AI API key (free tier: 1M tokens/month)
 

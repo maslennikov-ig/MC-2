@@ -2,6 +2,8 @@
 description: 'Task list for Stage 2 Implementation Verification and Completion'
 ---
 
+> **HISTORICAL TASK RECORD — NOT RUNTIME GUIDANCE.** Hosted Qdrant task text below is superseded by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Tasks: Stage 2 Implementation Verification and Completion
 
 **Input**: Design documents from `/specs/003-stage-2-implementation/`

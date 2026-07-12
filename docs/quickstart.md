@@ -256,54 +256,42 @@ Should show all applied migration files.
 
 ## External Services Setup
 
-### 1. Qdrant Cloud Setup
+### 1. Private self-hosted Qdrant 1.18.2
 
-Qdrant is our vector database for semantic search.
+Qdrant is a derived search index. The supported development target is the
+digest-pinned `qdrant/qdrant:v1.18.2` service in `docker-compose.dev.yml`; no
+hosted account or external endpoint is required.
 
-**Steps:**
-
-1. Go to [cloud.qdrant.io](https://cloud.qdrant.io/)
-2. Sign up for free account
-3. Click "Create Cluster"
-4. Fill in:
-   - **Cluster Name**: `megacampus-dev`
-   - **Region**: Choose closest to you
-   - **Tier**: Free (1GB storage, 50K vectors)
-5. Click "Create"
-6. Wait 1-2 minutes for provisioning
-
-**Get credentials:**
-
-1. Click on your cluster name
-2. Copy **Cluster URL**: `https://<cluster-id>.qdrant.cloud`
-3. Click **API Keys** tab
-4. Create new API key
-5. Copy the key (shown only once!)
-
-**Configure environment:**
-
-Edit `packages/course-gen-platform/.env`:
+Create an untracked API-key file and use the paths/variables documented in
+`packages/course-gen-platform/.env.example`, then start and verify locally:
 
 ```bash
-# Qdrant Configuration
-QDRANT_URL=https://<cluster-id>.qdrant.cloud
-QDRANT_API_KEY=<your-qdrant-api-key>
+# docker-compose.dev.yml joins an external network owned by the infra topology.
+docker network inspect megacampus-network >/dev/null 2>&1 ||
+  docker network create --driver bridge megacampus-network >/dev/null
+docker compose -f docker-compose.dev.yml up -d qdrant-dev
+
+# Host CLI uses loopback and client.ts requires the raw QDRANT_API_KEY.
+# Read it without printing it; the EXIT trap removes both exported values.
+(
+  set -eu
+  key_file=${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  test -r "$key_file"
+  QDRANT_API_KEY=''
+  IFS= read -r QDRANT_API_KEY <"$key_file" || test -n "$QDRANT_API_KEY"
+  test -n "$QDRANT_API_KEY"
+  export QDRANT_URL=http://127.0.0.1:6333 QDRANT_API_KEY
+  trap 'unset QDRANT_API_KEY QDRANT_URL' EXIT
+  pnpm --dir packages/course-gen-platform qdrant:bootstrap
+  pnpm --dir packages/course-gen-platform qdrant:verify
+)
 ```
 
-**Verify connection:**
-
-```bash
-# From packages/course-gen-platform/
-pnpm run verify:qdrant
-```
-
-**Expected outcome:**
-
-```
-✓ Connected to Qdrant Cloud
-✓ Cluster info retrieved
-Collection count: 0
-```
+Compose supplies `QDRANT_URL=http://qdrant-dev:6333` to application services.
+That Docker DNS name is not reachable from a host CLI. `client.ts` reads raw
+`QDRANT_URL` and `QDRANT_API_KEY`; it does not read `QDRANT_API_KEY_FILE`.
+Keep Qdrant on the private bridge/loopback and never expose its API, dashboard,
+or authenticated `/metrics` endpoint through nginx.
 
 ### 2. Jina AI API Key
 
@@ -442,22 +430,28 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
 
 ### 1. Create Qdrant Collection
 
-Initialize the vector database collection:
+The setup block above initializes and verifies the collection. To repeat only
+the bootstrap from the host, use the same loopback/key subshell and replace its
+two package commands with:
 
 ```bash
-# From packages/course-gen-platform/
-pnpm run qdrant:create-collection
+pnpm --dir packages/course-gen-platform qdrant:bootstrap
 ```
+
+Do not run a host CLI with `QDRANT_URL=http://qdrant-dev:6333`; that name is
+available only to services attached to the Compose network.
 
 **Expected outcome:**
 
 ```
-✓ Collection 'course_documents' created successfully
+✓ Alias 'course_embeddings' points to a compatible physical collection
 Configuration:
   - Vectors: 768 dimensions (Jina-v3)
   - Distance: Cosine
   - Index: HNSW (m=16, ef_construct=100)
-  - Sparse vectors: BM25 enabled
+  - Sparse vectors: native multilingual BM25 with collection-side IDF
+  - Retrieval: dense+sparse prefetch → server RRF → Formula using $score
+  - Strict payload indexes include tenant filters and float document_weight
 ```
 
 ### 2. Start Development Server
@@ -770,15 +764,16 @@ Unauthorized (401)
 
 **Solutions:**
 
-1. Verify credentials in `.env`:
-   - `QDRANT_URL` should be: `https://<cluster-id>.qdrant.cloud`
-   - `QDRANT_API_KEY` should be valid (check Qdrant dashboard)
+1. Verify the private service and secret-file configuration:
+   - Compose application URL is `http://qdrant-dev:6333`
+   - the API-key file exists, is untracked, and matches the Qdrant service key
 2. Test connection manually:
    ```bash
    pnpm run verify:qdrant
    ```
-3. Check cluster status in [Qdrant Cloud dashboard](https://cloud.qdrant.io/)
-4. Regenerate API key if needed
+3. Inspect `docker compose -f docker-compose.dev.yml ps qdrant-dev` and `/readyz`
+   through loopback.
+4. Run `qdrant:verify`; do not weaken strict-mode or authentication checks.
 
 #### Issue: Redis connection fails
 
@@ -1052,9 +1047,15 @@ REDIS_URL=redis://localhost:6379
 # ============================================
 # Qdrant Configuration (Vector Database)
 # ============================================
-# Get these from: https://cloud.qdrant.io/
-QDRANT_URL=https://<cluster-id>.qdrant.cloud
-QDRANT_API_KEY=<your-qdrant-api-key>
+# Application values inside the Compose network.
+QDRANT_URL=http://qdrant-dev:6333
+# client.ts requires this raw value; a deployment wrapper must materialize it
+# from an untracked file. Never commit the real value.
+QDRANT_API_KEY=<runtime-only-admin-key>
+# Wrapper/Qdrant-service input only; client.ts does not read this variable.
+QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+QDRANT_COLLECTION_NAME=course_embeddings
+QDRANT_PHYSICAL_COLLECTION_NAME=course_embeddings_v1
 
 # ============================================
 # Jina AI Embeddings

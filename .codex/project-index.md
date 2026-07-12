@@ -25,6 +25,9 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Self-hosted Qdrant platform design/plan: `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md` and `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`.
 - Advisory document evidence design/plan: `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md` and `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`.
 - Document-evidence operator runbook: `docs/operations/document-evidence.md`; self-hosted Qdrant runtime/recovery runbook: `docs/operations/qdrant-self-hosted.md`.
+- Qdrant developer setup and module contracts: `packages/course-gen-platform/docs/qdrant-setup.md` and `packages/course-gen-platform/src/shared/qdrant/README.md`.
+- Qdrant schema/retrieval source: `packages/course-gen-platform/src/shared/qdrant/config.ts`, `collection-schema.ts`, `collection-manager.ts`, and `search-operations.ts`; reindex/recovery CLIs: `packages/course-gen-platform/tools/qdrant/`.
+- Qdrant operations assets: `deploy/qdrant/`, `deploy/systemd/`, and `ops/qdrant/`; Qdrant server image ledger: `deploy/qdrant/image-lock.json`; monitoring image ledger: `ops/qdrant/image-lock.json`.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
 - `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.
