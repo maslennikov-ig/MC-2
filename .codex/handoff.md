@@ -33,7 +33,7 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 - Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E7, and exact 100% local/development document-evidence activation. Final independent activation/docs review at `d3417610` reported no P0-P3 findings; integration merge `ea183d83` passed 24/24 focused tests, package type-check, process verification, and canonical closeout dry-run. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
-- Q6 `.7`, Q8 `.9` and Q9 `.10` are reviewed, integrated as `f7930913`, `da126a8a` and `5d4282ee`, and closed. Q10 `.11` and Q11 `.12` remain open. Q12 `.13` is the explicit remote-authorization gate.
+- Q6 `.7`, Q8 `.9`, Q9 `.10` and Q10 `.11` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero, parent scans/gates and cleanup. Q11 `.12` remains open. Q12 `.13` is the explicit remote-authorization gate.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
@@ -54,7 +54,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: proceed automatically to Q10 documentation reconciliation; Q11 full verification follows Q10.
+Recommended action: run the complete Q11 local/dev acceptance matrix and canonical stage closeout. Stop before Q12 remote mutation.
 
 ## Starter prompt for next orchestrator
 
@@ -66,7 +66,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 - E1-E6 and Q7 are accepted and integrated.
 - Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
-- E7 implementation, owner decision, independent review, and parent acceptance are complete locally. Q10 is next and Q11 follows Q10.
+- E7 and Q10 are accepted locally. Q11 is the remaining local acceptance/closeout gate before the Q12 authorization boundary.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
@@ -92,5 +92,5 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: updated — E7 operator and orchestration truth records the accepted 100% local/development checkpoint, clean independent review, parent rerun, Q10 next, and unchanged Q12 boundary.
+docs-reviewed: updated — Q10 reconciles setup, deployment, native retrieval, recovery, monitoring, rollback, historical Cloud classification and stable project navigation; final independent review and parent acceptance passed.
 graph-reviewed: updated — local-only Graphify 0.8.45 refresh completed after E7 acceptance with 50,469 nodes, 74,909 edges and 3,199 communities; the focused query found the evidence design and Stage 4/5/6 observability surfaces. No external model/API mode or Git hook was used.

@@ -12,15 +12,15 @@ branch: codex/q10-docs
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: d7be7adc341e567c2ad9a5be5a241489a4814ac9
 worktree: /home/me/code/mc2/.worktrees/q10-docs
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Docs-only worker created no services, containers, volumes, databases, credentials, deployment state, live index writes, or remote runtime mutations; branch cleanup remains parent-owned after review/integration.
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Docs-only worker created no services, containers, volumes, databases, credentials, deployment state, live index writes, or remote runtime mutations. Reviewed head 42ed1322 merged as 3c9dd641; the dedicated worktree and local branch were removed while the remote evidence branch was retained.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: Reconciled current setup, deployment, retrieval, recovery, monitoring and rollback guidance; explicitly bannered retained historical research/specification material. Independent docs review remains parent-owned.
+docs_review_notes: Reconciled current setup, deployment, retrieval, recovery, monitoring and rollback guidance; explicitly bannered retained historical research/specification material. The final independent review at 42ed1322 reported Ready to merge Yes with P0-P3 zero.
 graph_reviewed: used
 graph_review_notes: Read the primary checkout report `/home/me/code/mc2/graphify-out/GRAPH_REPORT.md` (local graph built from 1233be56) only for orientation. Child did not refresh shared ignored graph state; parent owns the safe post-integration refresh.
 verification:
@@ -40,7 +40,9 @@ verification:
   - Second-remediation focused totals are 2 fresh-network docs, 3 host reindex commands, 5 staging operator client commands, 6 snapshot contract terms, 3 restore-only terms, 2 preferred systemd start commands, and 0 ambiguous combined-block matches.
   - Second-remediation delta contains 4 Markdown files; runtime, config, Beads, services, credentials, networks, collections, and remote state remain unchanged.
   - Second-remediation Prettier check covered all 31 branch Markdown files; current/base diff checks, artifact validator, process verification, and full base-to-head stat inspection passed before commit.
-  - Independent third re-review remains parent-owned and pending; this artifact does not claim acceptance.
+  - Independent third re-review at 42ed1322 passed with Critical/Important/Minor all zero; all three Bash snippets passed bash -n and the reviewer reported Ready to merge Yes.
+  - Reviewed head 42ed1322 merged as 3c9dd641. Parent integration acceptance passed Prettier on 31 Markdown files, diff checks, artifact validation, process verification and canonical stage closeout dry-run.
+  - Parent scans found 0 actionable Cloud instructions, 0 stale Prometheus/Grafana pins, 0 stale Formula/recovery claims and 86 positive current-contract references.
 changed_files:
   - .claude/docs/deployment-guide.md
   - .codex/project-index.md
@@ -112,7 +114,7 @@ The 16 current-guidance surfaces contain no hosted endpoint, hosted dashboard/ac
 
 The initial independent review returned Ready NO: I1-I6 identified incorrect design/recovery/setup/client/pin/ledger claims, while M1 identified an over-reduced upload guide. The first remediation corrected those direct claims against `collection-schema.ts`, `search-operations.ts`, accepted systemd units/timers, `client.ts`, both image-lock ledgers, `upload.ts`, `upload-types.ts`, the Stage 2 caller, and focused tests. The second review remained Ready NO because I3 command reproducibility was incomplete; the follow-up adds the external-network preflight, explicit host reindex helper, and separate client/snapshot/restore/systemd contracts.
 
-Final formatting, focused stale-claim scans, artifact validation, process verification, base-to-head diff inspection, commit and push evidence are recorded by the worker after fresh execution. Independent re-review and orchestrator acceptance intentionally remain pending.
+Final formatting, focused stale-claim scans, artifact validation, process verification, base-to-head diff inspection, commit and push evidence passed on the worker branch. The third independent review passed with no findings, and the merged integration tree passed the parent acceptance gates.
 
 # Rollback and cleanup
 
@@ -124,4 +126,4 @@ graph-reviewed: used — local report read for architecture orientation; final s
 
 # Risks / Follow-ups
 
-Independent third docs review and parent integration scans remain required before Q10 acceptance. Q12 is the only operational defer: staging systemd/version/path/secrets preflight and every remote activation or mutation still require explicit current-task authorization.
+Q10 is accepted. Q12 is the only operational defer: staging systemd/version/path/secrets preflight and every remote activation or mutation still require explicit current-task authorization.

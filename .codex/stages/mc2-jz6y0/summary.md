@@ -75,6 +75,7 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 - Q6 / `mc2-jz6y0.7` is accepted and integrated: Qdrant is pinned to `1.18.2` by index digest and `linux/amd64` child lock, file-backed secrets fail closed, ports remain loopback-only, Stage 7 stays isolated, and deploy gates verify readiness/auth/schema before RAG consumer recreation. Independent final review returned `PASS`; the integration rerun passed focused 8/8 plus artifact/process verification.
 - Decision `mc2-jz6y0.14` is owner-approved and closed: Prometheus `3.13.1` LTS, Grafana `12.4.5` extended support, node_exporter `1.12.0`, Alertmanager `0.33.1`, authenticated main-listener scrape, no Qdrant `metrics_port`, and file-backed fail-closed secret transport.
 - Q8 / `mc2-jz6y0.9` and Q9 / `mc2-jz6y0.10` are accepted and integrated as `da126a8a` and `5d4282ee`. The shared recovery/textfile contract is unified at `/var/lib/megacampus/qdrant-metrics`; both final independent reviews returned `PASS`.
+- Q10 / `mc2-jz6y0.11` is accepted and integrated from reviewed head `42ed1322` as merge `3c9dd641`. Current setup/deployment/module/architecture/design/plan/runbook docs now agree on private pinned Qdrant 1.18.2, native multilingual BM25/IDF, server RRF→Formula, strict indexes, deterministic reindex, exact-version restore, monitoring pins, reproducible credential/systemd commands, rollback and Q12. Historical Cloud materials are explicitly bannered. Three review rounds closed six Important and one Minor finding; final verdict Ready to merge Yes with P0-P3 zero. Parent scans found 0 actionable Cloud instructions, 0 old pins, 0 stale Formula/recovery claims and 86 positive contract references; Prettier, artifact/process verification and canonical closeout dry-run passed. Dedicated worktree/local branch cleaned; remote evidence branch retained.
 
 ## Routing Evidence
 
@@ -141,4 +142,4 @@ docs-reviewed: updated — operator and orchestration records now reflect accept
 
 graph-reviewed: updated — local-only Graphify 0.8.45 refresh completed after E7 acceptance with 50,469 nodes, 74,909 edges and 3,199 communities; the focused query found the evidence design and Stage 4/5/6 observability surfaces. No external model/API mode or Git hook was used.
 
-project-index: reviewed-no-change — this checkpoint changes only orchestration truth and readiness evidence; Q10 still owns the required stable Qdrant/operations navigation update.
+project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.
