@@ -10,6 +10,7 @@ const QDRANT_IMAGE =
   'qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c';
 const QDRANT_LINUX_AMD64_DIGEST =
   'sha256:da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071';
+const QDRANT_LOCAL_SNAPSHOT_PATH = '/qdrant/storage/snapshots';
 const COMPOSE_FILES = [
   'docker-compose.dev.yml',
   'docker-compose.infra.yml',
@@ -90,6 +91,9 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
     expect(wrapper).toContain('[[ $# -eq 1 && "$1" == ./entrypoint.sh ]] && set --');
     expect(wrapper).toContain('exec /qdrant/entrypoint.sh');
     expect(wrapper).toContain('snapshot_storage="${QDRANT_SNAPSHOT_STORAGE:-}"');
+    expect(wrapper).toContain(
+      'QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots'
+    );
     expect(wrapper).not.toMatch(/\b(curl|wget|nc)\b/);
     expect(wrapper).not.toMatch(/set\s+-[^\n]*x/);
 
@@ -184,6 +188,9 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
 
     const staging = serviceBlock(source('docker-compose.infra.yml'), 'qdrant');
     expect(staging).toContain('QDRANT_SNAPSHOT_STORAGE=local');
+    expect(staging).toContain(
+      `QDRANT__STORAGE__SNAPSHOTS_PATH=${QDRANT_LOCAL_SNAPSHOT_PATH}`
+    );
     expect(staging).not.toMatch(/QDRANT_S3_|qdrant_s3_/u);
 
     const stagingRecovery = serviceBlock(
@@ -313,6 +320,32 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
       );
       for (const secretValue of secretValues) {
         expect(rendered).not.toContain(secretValue);
+      }
+      if (composeFile === 'docker-compose.infra.yml') {
+        const model = JSON.parse(
+          execFileSync(
+            'docker',
+            ['compose', '-f', composeFile, '--env-file', envFile, 'config', '--format', 'json'],
+            { cwd: REPO_ROOT, encoding: 'utf8' }
+          )
+        ) as {
+          services: {
+            qdrant: {
+              environment: Record<string, string>;
+              volumes: Array<{ type: string; source: string; target: string }>;
+            };
+          };
+        };
+        const qdrant = model.services.qdrant;
+        expect(qdrant.environment.QDRANT__STORAGE__SNAPSHOTS_PATH).toBe(
+          QDRANT_LOCAL_SNAPSHOT_PATH
+        );
+        const persistentMount = qdrant.volumes.find(
+          volume =>
+            volume.type === 'volume' &&
+            QDRANT_LOCAL_SNAPSHOT_PATH.startsWith(`${volume.target}/`)
+        );
+        expect(persistentMount).toMatchObject({ target: '/qdrant/storage' });
       }
       expect(() =>
         execFileSync(

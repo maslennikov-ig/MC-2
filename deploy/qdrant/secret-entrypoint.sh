@@ -57,8 +57,10 @@ snapshot_storage="${QDRANT_SNAPSHOT_STORAGE:-}"
 case "$snapshot_storage" in
   local)
     export QDRANT__STORAGE__SNAPSHOTS_CONFIG__SNAPSHOTS_STORAGE=local
+    export QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots
     ;;
   s3)
+    unset QDRANT__STORAGE__SNAPSHOTS_PATH
     [[ -n "${QDRANT_S3_BUCKET:-}" ]] || fail 'S3 bucket is required'
     [[ -n "${QDRANT_S3_REGION:-}" ]] || fail 'S3 region is required'
     read_secret 'S3 access key' "${QDRANT_S3_ACCESS_KEY_FILE:-}"

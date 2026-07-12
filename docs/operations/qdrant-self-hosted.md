@@ -353,16 +353,23 @@ alias switch without the preceding evidence are not activation alternatives.
 
 ## Snapshot and restore command contracts
 
-Development staging uses Qdrant `snapshots_storage=local`. Snapshot files stay
-inside `/qdrant/storage` on the persistent `qdrant-data` Docker volume; the
-manifest records `storage_mode: local` and intentionally contains no remote
+Development staging uses Qdrant `snapshots_storage=local` and explicitly sets
+`storage.snapshots_path=/qdrant/storage/snapshots`. Snapshot files therefore
+stay below `/qdrant/storage` on the persistent `qdrant-data` Docker volume and
+survive a Qdrant container replacement as long as that named volume is
+preserved. This exact path corrects review finding Q12-LR1 from the immutable
+review of commit `ac494372`; the pinned-image default `/qdrant/snapshots` is in
+the disposable container layer and must never be used for staging recovery.
+
+The manifest records `storage_mode: local` and intentionally contains no remote
 object or URI. No S3 credential is required, mounted, read, or copied in this
 mode. This protects against collection/operator mistakes and proves recoverable
-Qdrant 1.18.2 snapshots, but it does **not** protect against host, disk, volume,
-or datacenter loss and therefore does not satisfy off-host RPO/DR. Before a
-production launch, complete `mc2-jz6y0.13.6`, provision the reviewed HTTPS
-S3-compatible backend and lifecycle, switch both Qdrant and the recovery
-operator explicitly to `s3`, and repeat the checksum/restore/alert evidence.
+Qdrant 1.18.2 snapshots, but it does **not** protect against deletion of the
+named volume or loss of the host, disk, volume, or datacenter and therefore does
+not satisfy off-host RPO/DR. Before a production launch, complete
+`mc2-jz6y0.13.6`, provision the reviewed HTTPS S3-compatible backend and
+lifecycle, switch both Qdrant and the recovery operator explicitly to `s3`, and
+repeat the checksum/restore/alert evidence.
 
 `QDRANT_SNAPSHOT_STORAGE_MODE` is mandatory and accepts only `local` or `s3`.
 The local staging environment sets it to `local`; the S3 path additionally

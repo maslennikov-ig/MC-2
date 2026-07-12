@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -45,6 +46,7 @@ const SUPPLEMENTARY_VECTOR = (() => {
   vector[1] = Math.sqrt(1 - 0.99 ** 2);
   return vector;
 })();
+const MANAGED_RECREATE = process.env.QDRANT_TEST_MANAGED_RECREATE === '1';
 
 const PROBE: RecoveryProbe = {
   dense_vector: FORMULA_VECTOR,
@@ -101,6 +103,84 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
   let directory: string;
   let metricsDirectory: string;
   let snapshotResult: SnapshotOperationResult;
+
+  function runDocker(args: string[]): string {
+    const result = spawnSync('docker', args, { encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new Error(`Managed Qdrant Docker command failed: ${result.stderr.trim()}`);
+    }
+    return result.stdout.trim();
+  }
+
+  async function replaceManagedQdrant(deleteVolume = false): Promise<void> {
+    const containerName = requireEnv('QDRANT_TEST_CONTAINER_NAME');
+    const volumeName = requireEnv('QDRANT_TEST_VOLUME_NAME');
+    const image = requireEnv('QDRANT_TEST_IMAGE');
+    const hostPort = requireEnv('QDRANT_TEST_HOST_PORT');
+    const wrapperPath = requireEnv('QDRANT_TEST_WRAPPER_PATH');
+    const adminKeyPath = requireEnv('QDRANT_TEST_ADMIN_KEY_FILE');
+    const readOnlyKeyPath = requireEnv('QDRANT_TEST_READ_ONLY_KEY_FILE');
+    if (!/^mc2-q12-[a-z0-9_-]+$/u.test(containerName)) {
+      throw new Error('Managed Qdrant container name is outside the owned test namespace');
+    }
+    if (!/^mc2_q12_[a-z0-9_-]+$/u.test(volumeName)) {
+      throw new Error('Managed Qdrant volume name is outside the owned test namespace');
+    }
+    if (!/^\d{4,5}$/u.test(hostPort)) throw new Error('Managed Qdrant host port is invalid');
+
+    spawnSync('docker', ['rm', '-f', containerName], { stdio: 'ignore' });
+    if (deleteVolume) {
+      spawnSync('docker', ['volume', 'rm', '-f', volumeName], { stdio: 'ignore' });
+      runDocker(['volume', 'create', volumeName]);
+    }
+    runDocker([
+      'run',
+      '-d',
+      '--name',
+      containerName,
+      '--platform',
+      'linux/amd64',
+      '-p',
+      `127.0.0.1:${hostPort}:6333`,
+      '--entrypoint',
+      '/opt/megacampus/qdrant-secret-entrypoint.sh',
+      '-e',
+      'QDRANT_API_KEY_FILE=/run/secrets/admin',
+      '-e',
+      'QDRANT_READ_ONLY_API_KEY_FILE=/run/secrets/read-only',
+      '-e',
+      'QDRANT_SNAPSHOT_STORAGE=local',
+      '-e',
+      'QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots',
+      '--mount',
+      `type=volume,source=${volumeName},target=/qdrant/storage`,
+      '--mount',
+      `type=bind,source=${wrapperPath},target=/opt/megacampus/qdrant-secret-entrypoint.sh,readonly`,
+      '--mount',
+      `type=bind,source=${adminKeyPath},target=/run/secrets/admin,readonly`,
+      '--mount',
+      `type=bind,source=${readOnlyKeyPath},target=/run/secrets/read-only,readonly`,
+      image,
+    ]);
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try {
+        const response = await fetch(`${qdrantUrl}/readyz`);
+        if (response.ok) break;
+      } catch {
+        // The replacement container is not accepting connections yet.
+      }
+      if (attempt === 59) throw new Error('Managed Qdrant replacement did not become ready');
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    client = new QdrantClient({
+      url: qdrantUrl,
+      apiKey,
+      checkCompatibility: false,
+      timeout: 30_000,
+    });
+    expect((await client.versionInfo()).version).toBe('1.18.2');
+  }
 
   beforeAll(async () => {
     apiKey = requireEnv('QDRANT_API_KEY');
@@ -248,6 +328,22 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
     );
     expect(await readFile(snapshotResult.manifestPath, 'utf8')).not.toContain(apiKey);
   }, 60_000);
+
+  it.runIf(MANAGED_RECREATE)(
+    'keeps the checksummed snapshot after replacing the pinned wrapper container',
+    async () => {
+      await replaceManagedQdrant();
+
+      const persisted = (await client.listSnapshots(physical)).find(
+        item => item.name === snapshotResult.manifest.snapshot_name
+      );
+      expect(persisted).toMatchObject({
+        name: snapshotResult.manifest.snapshot_name,
+        checksum: snapshotResult.manifest.server_checksum,
+      });
+    },
+    120_000
+  );
 
   it('recovers, recreates an alias, verifies relevance/isolation, and cleans owned resources', async () => {
     const target = `qdrant_restore_drill_${runId}`;
@@ -410,4 +506,58 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
 
     expect((await client.getCollections()).collections.map(item => item.name)).toContain(target);
   }, 60_000);
+
+  it.runIf(MANAGED_RECREATE)(
+    'fails visibly when the owned named volume and its local snapshot are deleted',
+    async () => {
+      await replaceManagedQdrant(true);
+      const ensured = await ensureCourseEmbeddingsCollection({
+        client,
+        aliasName: alias,
+        physicalName: physical,
+      });
+      if (!ensured.ok) throw new Error(ensured.mismatches.join('; '));
+
+      expect(await client.listSnapshots(physical)).toEqual([]);
+      const target = `qdrant_restore_drill_missing_volume_${runId}`;
+      const drillAlias = `qdrant_restore_drill_alias_missing_volume_${runId}`;
+      const evidenceDirectory = join(directory, 'missing-volume-evidence');
+      ownedCollections.add(target);
+      ownedAliases.add(drillAlias);
+
+      await expect(
+        runRestoreDrill({
+          client,
+          manifest: snapshotResult.manifest,
+          probe: PROBE,
+          apiKey,
+          transportBaseUrl: 'http://127.0.0.1:6333',
+          stableAlias: alias,
+          targetCollection: target,
+          drillAlias,
+          evidenceDirectory,
+          metricStatePath: join(directory, 'metrics-state.json'),
+          metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
+          lockPath: join(directory, 'recovery.lock'),
+        })
+      ).rejects.toThrow(/restore drill failed/iu);
+
+      const evidenceFiles = await readdir(evidenceDirectory);
+      const evidence = JSON.parse(
+        await readFile(join(evidenceDirectory, evidenceFiles[0]), 'utf8')
+      ) as { status: string; cleanup_failures: string[] };
+      expect(evidence.status).toBe('failed');
+      expect(evidence.cleanup_failures).toEqual([]);
+      const metricState = JSON.parse(
+        await readFile(join(directory, 'metrics-state.json'), 'utf8')
+      ) as { lastOperationSuccess: boolean; restoreFailuresTotal: number };
+      expect(metricState.lastOperationSuccess).toBe(false);
+      expect(metricState.restoreFailuresTotal).toBeGreaterThan(0);
+      expect(
+        (await client.getAliases()).aliases.find(candidate => candidate.alias_name === alias)
+          ?.collection_name
+      ).toBe(physical);
+    },
+    120_000
+  );
 });

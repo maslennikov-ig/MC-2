@@ -48,6 +48,7 @@ services:
       - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
       - QDRANT_READ_ONLY_API_KEY_FILE=/run/secrets/qdrant_read_only_api_key
       - QDRANT_SNAPSHOT_STORAGE=local
+      - QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots
       - QDRANT__TELEMETRY_DISABLED=true
       - QDRANT__SERVICE__METRICS_PREFIX=qdrant_
     volumes:

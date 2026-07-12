@@ -67,6 +67,10 @@ verification:
   - recovery systemd rootless namespace verification: passed
   - package type-check: passed
   - artifact validation, Markdown validation, and process verification: passed
+  - Q12-LR1 persistence regression RED: passed (3 expected failures, 5 existing passes)
+  - Q12-LR1 focused recovery/runtime GREEN: passed 37/37
+  - pinned wrapper named-volume replacement and negative deletion recovery: passed 7/7
+  - corrected package type-check: passed
 changed_files:
   - .env.production.example
   - deploy/qdrant/secret-entrypoint.sh
@@ -142,3 +146,38 @@ acceptance, parent-owned Graphify refresh, and worktree cleanup remain pending.
 - The parent integration workflow must emit
   `QDRANT_SNAPSHOT_STORAGE_MODE=local` into the staging environment; this stream
   does not own `.github/workflows/ci-cd.yml`.
+
+# Correction Q12-LR1
+
+The independent review of `ac494372` is immutable at review commit `6326769d`,
+artifact `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.5-review.md`, and parent
+integration commit `146429bc`. It correctly found that pinned Qdrant 1.18.2
+defaults local snapshots to `/qdrant/snapshots`, while the original staging
+Compose persisted only `/qdrant/storage`.
+
+The correction explicitly sets
+`QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots` in both rendered
+staging Compose and the fail-closed local wrapper branch. The S3 branch removes
+that local-path override. A managed pinned-wrapper integration now creates a
+checksummed snapshot on an owned named volume, replaces the container without
+deleting the volume, and executes the existing exact isolated restore checks.
+Its negative control deletes the owned volume, recreates an empty stable
+collection/alias, and requires the drill to emit durable failed evidence and a
+failure metric rather than success.
+
+Q12-LR1 TDD evidence is exact. Before the fix, the focused runtime contract
+reported three expected failures: the wrapper lacked a persistent snapshot
+path, staging Compose lacked it, and rendered Compose returned no path inside a
+volume mount. After the fix, the four-file focused suite passed 37/37.
+
+The managed pinned-wrapper recovery suite passed 7/7. It created the snapshot
+with the exact Qdrant 1.18.2 image and file-secret wrapper, preserved the named
+volume while replacing the container, re-listed the same snapshot checksum,
+and then passed count, dense, RU/EN BM25, Formula ordering, negative
+tenant/course isolation, stable-alias immutability, and owned cleanup. The final
+negative test deleted the owned named volume, recreated an empty verified
+stable collection/alias, and proved the old manifest produced `status: failed`,
+incremented `restoreFailuresTotal`, kept `lastOperationSuccess=false`, and did
+not mutate the stable alias. All owned containers, volume, listeners, temporary
+credentials, recovery directories, and dependency symlinks were removed after
+verification.
