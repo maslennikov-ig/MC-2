@@ -336,11 +336,11 @@ case "$command_name" in
     exec_as_node "$TSX_BIN" dist/orchestrator/worker-entrypoint.js
     ;;
   source-recovery)
+    unset QDRANT_API_KEY QDRANT_API_KEY_FILE QDRANT_READ_ONLY_API_KEY QDRANT_READ_ONLY_API_KEY_FILE
     if [[ ${1:-} == '-h' || ${1:-} == '--help' ]]; then
       exec_as_node "$TSX_BIN" tools/qdrant/source-recovery.ts "$@"
     fi
     require_source_recovery_arguments "$@"
-    unset QDRANT_API_KEY QDRANT_API_KEY_FILE
     exec_as_node "$TSX_BIN" tools/qdrant/source-recovery.ts "$@"
     ;;
   snapshot)

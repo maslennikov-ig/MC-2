@@ -240,6 +240,8 @@ services:
     environment:
       - QDRANT_API_KEY=
       - QDRANT_API_KEY_FILE=
+      - QDRANT_READ_ONLY_API_KEY=
+      - QDRANT_READ_ONLY_API_KEY_FILE=
       - SOURCE_RECOVERY_MANIFEST_PATH=/var/lib/megacampus-source-recovery/manifest.json
       - SOURCE_RECOVERY_JOURNAL_PATH=/var/lib/megacampus-source-recovery/progress/journal.json
       - SOURCE_RECOVERY_PLAN_INPUT_PATH=/run/source-recovery/plan-input.json
@@ -276,6 +278,8 @@ services:
     environment:
       - QDRANT_API_KEY=
       - QDRANT_API_KEY_FILE=
+      - QDRANT_READ_ONLY_API_KEY=
+      - QDRANT_READ_ONLY_API_KEY_FILE=
       - SOURCE_RECOVERY_MANIFEST_PATH=/run/source-recovery/manifest.json
       - SOURCE_RECOVERY_JOURNAL_PATH=/run/source-recovery/progress/journal.json
     volumes:
@@ -307,6 +311,8 @@ services:
     environment:
       - QDRANT_API_KEY=
       - QDRANT_API_KEY_FILE=
+      - QDRANT_READ_ONLY_API_KEY=
+      - QDRANT_READ_ONLY_API_KEY_FILE=
       - SOURCE_RECOVERY_MANIFEST_PATH=/run/source-recovery/manifest.json
       - SOURCE_RECOVERY_JOURNAL_PATH=/run/source-recovery/progress/journal.json
     volumes:

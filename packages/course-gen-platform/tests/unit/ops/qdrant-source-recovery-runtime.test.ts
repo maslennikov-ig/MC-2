@@ -59,7 +59,9 @@ function renderInfraCompose(): Record<string, any> {
     envFile,
     [
       `PRODUCTION_ENV_FILE=${envFile}`,
+      'QDRANT_API_KEY=source-recovery-admin-value-sentinel',
       `QDRANT_API_KEY_FILE=${join(directory, 'qdrant_api_key')}`,
+      'QDRANT_READ_ONLY_API_KEY=source-recovery-read-only-value-sentinel',
       `QDRANT_READ_ONLY_API_KEY_FILE=${join(directory, 'qdrant_read_only_api_key')}`,
       'QDRANT_SNAPSHOT_STORAGE_MODE=local',
       `QDRANT_METRICS_TEXTFILE_HOST_DIR=${directory}`,
@@ -126,6 +128,8 @@ describe('Q12 source-recovery operator isolation', () => {
       expect(service.secrets).toBeUndefined();
       expect(service.environment.QDRANT_API_KEY ?? '').toBe('');
       expect(service.environment.QDRANT_API_KEY_FILE ?? '').toBe('');
+      expect(service.environment.QDRANT_READ_ONLY_API_KEY ?? '').toBe('');
+      expect(service.environment.QDRANT_READ_ONLY_API_KEY_FILE ?? '').toBe('');
     }
 
     expect(planner.networks).toHaveProperty('megacampus');
@@ -181,7 +185,9 @@ describe('Q12 source-recovery operator isolation', () => {
 
     const entrypoint = source('packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh');
     expect(entrypoint).toContain('tools/qdrant/source-recovery.ts');
-    expect(entrypoint).toContain('unset QDRANT_API_KEY QDRANT_API_KEY_FILE');
+    expect(entrypoint).toContain(
+      'unset QDRANT_API_KEY QDRANT_API_KEY_FILE QDRANT_READ_ONLY_API_KEY QDRANT_READ_ONLY_API_KEY_FILE'
+    );
     expect(entrypoint).toMatch(/source-recovery\)[\s\S]*require_source_recovery_arguments/);
     expect(entrypoint).not.toMatch(
       /source-recovery\)[\s\S]{0,500}(?:stage_api_key_for_file_client|load_raw_api_key)/
@@ -189,6 +195,56 @@ describe('Q12 source-recovery operator isolation', () => {
 
     const dockerfile = source('packages/course-gen-platform/Dockerfile');
     expect(dockerfile).toContain('qdrant-operator-entrypoint.sh source-recovery --help');
+  });
+
+  it('removes every Qdrant credential variable before help and execution children', () => {
+    const directory = temporaryDirectory('source-recovery-entrypoint-child');
+    const child = join(directory, 'tsx-child');
+    const entrypoint = join(directory, 'entrypoint.sh');
+    writeFileSync(
+      child,
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s|%s|%s|%s\n' "\${QDRANT_API_KEY-unset}" "\${QDRANT_API_KEY_FILE-unset}" "\${QDRANT_READ_ONLY_API_KEY-unset}" "\${QDRANT_READ_ONLY_API_KEY_FILE-unset}"
+`,
+      { mode: 0o700 }
+    );
+    const currentUid = String(process.getuid?.() ?? 1000);
+    const currentGid = String(process.getgid?.() ?? 1000);
+    const isolatedEntrypoint = source(
+      'packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh'
+    )
+      .replace("readonly TSX_BIN='/usr/local/bin/tsx'", `readonly TSX_BIN='${child}'`)
+      .replace("readonly NODE_UID='1001'", `readonly NODE_UID='${currentUid}'`)
+      .replace("readonly NODE_GID='1001'", `readonly NODE_GID='${currentGid}'`);
+    writeFileSync(entrypoint, isolatedEntrypoint, { mode: 0o700 });
+
+    for (const args of [
+      ['--help'],
+      [
+        'execute',
+        '--manifest-path',
+        '/reviewed/manifest.json',
+        '--journal-path',
+        '/reviewed/progress/journal.json',
+        '--confirm-run-id',
+        '123e4567-e89b-42d3-a456-426614174000',
+      ],
+    ]) {
+      const result = spawnSync('bash', [entrypoint, 'source-recovery', ...args], {
+        env: {
+          PATH: process.env.PATH,
+          QDRANT_API_KEY: 'admin-value-sentinel',
+          QDRANT_API_KEY_FILE: '/admin-file-sentinel',
+          QDRANT_READ_ONLY_API_KEY: 'read-only-value-sentinel',
+          QDRANT_READ_ONLY_API_KEY_FILE: '/read-only-file-sentinel',
+        },
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim()).toBe('unset|unset|unset|unset');
+      expect(`${result.stdout}${result.stderr}`).not.toContain('sentinel');
+    }
   });
 });
 
@@ -199,6 +255,7 @@ interface WrapperFixture {
   statePath(service: string): string;
   composeLog: string;
   systemctlLog: string;
+  dockerLog: string;
 }
 
 function wrapperFixture(active: readonly string[] = []): WrapperFixture {
@@ -217,6 +274,7 @@ function wrapperFixture(active: readonly string[] = []): WrapperFixture {
   chmodSync(capability, 0o700);
   const systemctlLog = join(directory, 'systemctl.log');
   const composeLog = join(directory, 'compose.log');
+  const dockerLog = join(directory, 'docker.log');
   writeFileSync(join(project, 'docker-compose.infra.yml'), 'services: {}\n', { mode: 0o600 });
   for (const service of SERVICES) {
     writeFileSync(
@@ -246,8 +304,20 @@ esac
     docker,
     `#!/usr/bin/env bash
 set -euo pipefail
-[[ "$1 $2 $3" == 'context inspect default' ]]
-printf 'unix:///var/run/docker.sock\n'
+printf '%s\n' "$*" >> "$DOCKER_LOG"
+if [[ "$1 $2" == 'context show' ]]; then
+  printf '%s\n' "$DOCKER_CURRENT_CONTEXT"
+elif [[ "$1 $2" == 'context inspect' ]]; then
+  if [[ "$3" == default ]]; then
+    printf '%s\n' "$DOCKER_DEFAULT_ENDPOINT"
+  elif [[ "$3" == "$DOCKER_CURRENT_CONTEXT" ]]; then
+    printf '%s\n' "$DOCKER_CURRENT_ENDPOINT"
+  else
+    exit 65
+  fi
+else
+  exit 64
+fi
 `,
     { mode: 0o700 }
   );
@@ -256,9 +326,12 @@ printf 'unix:///var/run/docker.sock\n'
     compose,
     `#!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$*" >> "$COMPOSE_LOG"
+printf 'context=%s %s\n' "\${DOCKER_CONTEXT:-unset}" "$*" >> "$COMPOSE_LOG"
 if [[ -n "\${SOURCE_RECOVERY_TEST_SLEEP:-}" ]]; then sleep "$SOURCE_RECOVERY_TEST_SLEEP"; fi
-if [[ -n "\${SOURCE_RECOVERY_TEST_FAIL_MODE:-}" && "$*" == *" \${SOURCE_RECOVERY_TEST_FAIL_MODE} "* ]]; then exit 71; fi
+if [[ -n "\${SOURCE_RECOVERY_TEST_FAIL_MODE:-}" && "$*" == *" \${SOURCE_RECOVERY_TEST_FAIL_MODE} "* ]]; then
+  printf '%s_phase_rejected\n' "$SOURCE_RECOVERY_TEST_FAIL_MODE" >&2
+  exit 71
+fi
 if [[ "$*" == *' qdrant-source-recovery-planner source-recovery plan' ]]; then
   printf '{}\n' > "$SOURCE_RECOVERY_MANIFEST_FILE"
   chmod 0400 "$SOURCE_RECOVERY_MANIFEST_FILE"
@@ -285,6 +358,7 @@ fi
     statePath: service => join(serviceState, service),
     composeLog,
     systemctlLog,
+    dockerLog,
     env: {
       PATH: process.env.PATH,
       SOURCE_RECOVERY_SYSTEMCTL_BIN: systemctl,
@@ -297,6 +371,10 @@ fi
       SYSTEMCTL_LOG: systemctlLog,
       SERVICE_STATE: serviceState,
       COMPOSE_LOG: composeLog,
+      DOCKER_LOG: dockerLog,
+      DOCKER_CURRENT_CONTEXT: 'default',
+      DOCKER_DEFAULT_ENDPOINT: 'unix:///var/run/docker.sock',
+      DOCKER_CURRENT_ENDPOINT: 'unix:///var/run/docker.sock',
     },
     args: [
       '--run-id',
@@ -327,6 +405,26 @@ function states(fixture: WrapperFixture): Record<string, string> {
   );
 }
 
+function removeOption(args: string[], option: string): string | undefined {
+  const index = args.indexOf(option);
+  if (index < 0) return undefined;
+  const [, value] = args.splice(index, 2);
+  return value;
+}
+
+function prepareReviewedState(fixture: WrapperFixture, removePlannerAssets = false): void {
+  const manifest = fixture.args[fixture.args.indexOf('--manifest') + 1];
+  const progress = fixture.args[fixture.args.indexOf('--progress-directory') + 1];
+  writeFileSync(manifest, '{}\n', { mode: 0o400 });
+  writeFileSync(join(progress, 'journal.json'), '{}\n', { mode: 0o600 });
+  if (removePlannerAssets) {
+    const planInput = removeOption(fixture.args, '--plan-input');
+    const capability = removeOption(fixture.args, '--capability-directory');
+    rmSync(planInput!, { force: true });
+    rmSync(capability!, { recursive: true, force: true });
+  }
+}
+
 describe('Q12 source-recovery host lock and writer restoration', () => {
   it('uses the fixed production lock and exact six writer names', () => {
     const wrapper = source('deploy/qdrant/source-recovery-run.sh');
@@ -337,6 +435,37 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(wrapper).toContain('flock -n');
     expect(wrapper).toContain('DOCKER_HOST');
     expect(wrapper).toContain('unix://');
+  });
+
+  it('rejects a remote current Docker context even when default is local', () => {
+    const fixture = wrapperFixture();
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: {
+        ...fixture.env,
+        DOCKER_CURRENT_CONTEXT: 'remote-production',
+        DOCKER_DEFAULT_ENDPOINT: 'unix:///var/run/docker.sock',
+        DOCKER_CURRENT_ENDPOINT: 'tcp://production.example.invalid:2376',
+      },
+      encoding: 'utf8',
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('active Docker context must use a local Unix socket');
+    expect(readFileSync(fixture.dockerLog, 'utf8')).toContain('context show');
+  });
+
+  it('pins operator Compose to the exact verified active local context', () => {
+    const fixture = wrapperFixture();
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: {
+        ...fixture.env,
+        DOCKER_CURRENT_CONTEXT: 'desktop-linux',
+        DOCKER_CURRENT_ENDPOINT: 'unix:///home/test/.docker/desktop.sock',
+      },
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).toContain('context inspect desktop-linux');
+    expect(readFileSync(fixture.composeLog, 'utf8')).toContain('context=desktop-linux');
   });
 
   it('refuses active writers without the explicit wrapper-controlled stop sequence', () => {
@@ -395,12 +524,9 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(log).toContain('start megacampus-worker-stage6');
   });
 
-  it('resumes reviewed protected state without silently replanning', () => {
+  it('resumes reviewed protected state without planner-only files or silent replanning', () => {
     const fixture = wrapperFixture();
-    const manifest = fixture.args[fixture.args.indexOf('--manifest') + 1];
-    const progress = fixture.args[fixture.args.indexOf('--progress-directory') + 1];
-    writeFileSync(manifest, '{}\n', { mode: 0o400 });
-    writeFileSync(join(progress, 'journal.json'), '{}\n', { mode: 0o600 });
+    prepareReviewedState(fixture, true);
 
     const result = spawnSync('bash', [WRAPPER, '--resume-from', 'execute', ...fixture.args], {
       env: fixture.env,
@@ -417,10 +543,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it('reruns copy verification before every disposition-stage resume', () => {
     const fixture = wrapperFixture();
-    const manifest = fixture.args[fixture.args.indexOf('--manifest') + 1];
-    const progress = fixture.args[fixture.args.indexOf('--progress-directory') + 1];
-    writeFileSync(manifest, '{}\n', { mode: 0o400 });
-    writeFileSync(join(progress, 'journal.json'), '{}\n', { mode: 0o600 });
+    prepareReviewedState(fixture);
 
     const result = spawnSync(
       'bash',
@@ -436,6 +559,73 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(verify).toBeGreaterThanOrEqual(0);
     expect(apply).toBeGreaterThan(verify);
     expect(composeLog).not.toContain('qdrant-source-recovery-executor source-recovery execute');
+  });
+
+  it('runs only guarded networkless rollback and restores exact writer state', () => {
+    const fixture = wrapperFixture(['megacampus-api-blue', 'megacampus-worker']);
+    const before = states(fixture);
+    prepareReviewedState(fixture, true);
+    const result = spawnSync(
+      'bash',
+      [WRAPPER, '--operation', 'rollback', '--stop-writers', ...fixture.args],
+      { env: fixture.env, encoding: 'utf8' }
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(states(fixture)).toEqual(before);
+    const composeLines = readFileSync(fixture.composeLog, 'utf8').trim().split('\n');
+    expect(composeLines).toHaveLength(1);
+    expect(composeLines[0]).toContain(
+      'qdrant-source-recovery-executor source-recovery rollback --confirm-run-id 123e4567-e89b-42d3-a456-426614174000'
+    );
+    expect(composeLines[0]).not.toMatch(
+      /source-recovery (?:plan|execute|verify|apply-dispositions|verify-dispositions)/u
+    );
+  });
+
+  it('propagates rollback phase rejection and still restores exact writer state', () => {
+    const fixture = wrapperFixture(['megacampus-api-green']);
+    const before = states(fixture);
+    prepareReviewedState(fixture, true);
+    const result = spawnSync(
+      'bash',
+      [WRAPPER, '--operation', 'rollback', '--stop-writers', ...fixture.args],
+      {
+        env: { ...fixture.env, SOURCE_RECOVERY_TEST_FAIL_MODE: 'rollback' },
+        encoding: 'utf8',
+      }
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('rollback_phase_rejected');
+    expect(states(fixture)).toEqual(before);
+    const composeLog = readFileSync(fixture.composeLog, 'utf8');
+    expect(composeLog).toContain('source-recovery rollback');
+    expect(composeLog).not.toMatch(/source-recovery (?:verify|apply-dispositions)/u);
+  });
+
+  it('restores exact writer state when guarded rollback receives SIGTERM', async () => {
+    const fixture = wrapperFixture(['megacampus-worker-stage7']);
+    const before = states(fixture);
+    prepareReviewedState(fixture, true);
+    const child = spawn(
+      'bash',
+      [WRAPPER, '--operation', 'rollback', '--stop-writers', ...fixture.args],
+      {
+        env: { ...fixture.env, SOURCE_RECOVERY_TEST_SLEEP: '5' },
+        detached: true,
+        stdio: 'ignore',
+      }
+    );
+    const deadline = Date.now() + 2_000;
+    while (states(fixture)['megacampus-worker-stage7'] !== 'inactive' && Date.now() < deadline) {
+      await new Promise(resolveWait => setTimeout(resolveWait, 20));
+    }
+    expect(states(fixture)['megacampus-worker-stage7']).toBe('inactive');
+    process.kill(-child.pid!, 'SIGTERM');
+    await new Promise<void>((resolveExit, reject) => {
+      child.once('error', reject);
+      child.once('exit', () => resolveExit());
+    });
+    expect(states(fixture)).toEqual(before);
   });
 
   it('holds one non-blocking flock across the complete command chain', async () => {

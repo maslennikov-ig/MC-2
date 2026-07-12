@@ -26,6 +26,8 @@ success_criteria:
   - prove the narrow same-filesystem UID:GID 1001:1001 mode-0700 capability directory while both planner upload roots remain read-only
   - hold one host flock across the full workflow and restore the exact prior state of six writer services after success, failure, or signal
   - resume reviewed owner-only manifest/journal state without replanning or bypassing fresh copy verification
+  - pin Compose to the exact active local-Unix Docker context that the wrapper verified
+  - expose reviewed rollback through the same lock, writer-state, and networkless-executor boundary without any forward command
   - keep the result local and synthetic, pass focused runtime, Compose, shell, CI, type-check, artifact, and process gates, then commit and push clean
 selected_docs:
   - AGENTS.md
@@ -36,8 +38,10 @@ selected_docs:
   - docs/superpowers/plans/2026-07-12-q12-source-recovery.md Task 5
   - .codex/stages/mc2-jz6y0/artifacts/authoritative-docs.md
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1-workflow-rereview.md
+  - 03c32ef7:.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.3-review.md
 selected_skills:
   - senior-devops
+  - superpowers:receiving-code-review
   - superpowers:test-driven-development
   - systematic-debugging
   - superpowers:verification-before-completion
@@ -62,11 +66,17 @@ docs_reviewed: no-change-needed
 docs_review_notes: Task 5 implements the approved runtime contract; operator/runbook prose is explicitly owned by Task 6 and was outside this worker write zone
 graph_reviewed: used
 graph_review_notes: read graphify-out/GRAPH_REPORT.md and ran a focused operator/Compose/source-recovery query for orientation; child refresh is prohibited and integration owns graph refresh
+resolves_review:
+  - 03c32ef7
 verification:
   - strict RED runtime test: passed as RED with 7/7 expected failures before implementation
   - resume RED runtime test: passed as RED because the fresh-only wrapper rejected --resume-from
-  - focused Task 5 Vitest: passed 28/28 across source-recovery, operator, and existing runtime contracts
-  - docker compose synthetic operator-profile config: passed
+  - RR1 active-context RED: failed because remote currentContext passed when default was local and Compose received no pinned context
+  - RR3 credential RED: failed because read-only Qdrant sentinels reached rendered services and help child
+  - RR4 durable-resume RED: failed because missing plan input blocked reviewed manifest/journal resume
+  - RR2 rollback RED: failed because --operation was rejected and no guarded rollback path existed
+  - focused Task 5 Vitest: passed 34/34 across source-recovery, operator, and existing runtime contracts
+  - docker compose synthetic operator-profile config with Qdrant sentinels: passed
   - bash -n entrypoint and host wrapper: passed
   - node scripts/ci/test_ci_cd_workflow_gates.mjs: passed
   - pnpm --filter @megacampus/course-gen-platform type-check: passed
@@ -95,15 +105,17 @@ read-only, and progress writable. Disposition work is networked, has no upload
 mount, and receives only the reviewed manifest read-only plus progress writable.
 
 The pinned entrypoint now exposes all six approved modes, validates normalized
-manifest/journal paths and UUIDv4 confirmation for mutating modes, unsets both
-Qdrant credential variables, and never invokes Qdrant credential staging for
+manifest/journal paths and UUIDv4 confirmation for mutating modes, unsets all
+four admin/read-only Qdrant value/file variables before help or execution, and never invokes Qdrant credential staging for
 source recovery. The Docker target imports the source-recovery module during
 self-check and executes its help path at build time.
 
 The host wrapper uses the fixed default lock
 `/run/megacampus-qdrant-source-recovery/source-recovery.lock`, rejects selected
-or non-Unix Docker contexts, and refuses the default run if any named writer is
-active. Explicit `--stop-writers` records all six exact active/inactive states,
+context overrides, resolves Docker's active context, verifies that exact
+endpoint is a local Unix socket, and pins operator Compose to the verified
+context. It refuses the default run if any named writer is active. Explicit
+`--stop-writers` records all six exact active/inactive states,
 stops only previously active writers, holds the flock through plan, execute,
 copy verify, disposition apply, and disposition verify, then restores every
 exact prior state on success, command failure, SIGINT, or SIGTERM.
@@ -115,6 +127,13 @@ accepted idempotent CLI phase checks. Planner copy verification is rerun in the
 same locked/stopped-writer window before every disposition command, including a
 direct disposition-stage resume; the operator-selected label is never treated
 as proof that verification already happened.
+
+Plan input and the same-filesystem capability directory are now fresh-plan-only.
+Resume and rollback need only the protected manifest/journal plus upload/state
+roots; `/dev/null` and the already-authorized state bind satisfy unused Compose
+interpolation without adding a writable capability. Explicit rollback runs only
+the networkless executor's `rollback` mode under the same host lock and writer
+trap, and never forwards plan/execute/verify/disposition commands.
 
 # Scope / Routing
 
@@ -134,6 +153,13 @@ restoration, concurrent lock refusal, and SIGTERM restoration. A second RED
 proved the fresh-only wrapper could not resume an immutable reviewed manifest;
 the final resume tests prove no replan and mandatory copy verification before
 disposition continuation.
+
+Correction TDD reproduced all four findings from review `03c32ef7`: active
+remote context bypass, read-only Qdrant sentinel inheritance, durable resume
+coupled to missing planner assets, and unreachable guarded rollback. GREEN adds
+current-context/pinning negatives, rendered and child-process secret sentinels,
+resume with physically absent plan-only assets, and rollback success, phase
+rejection, command ordering, and SIGTERM restoration.
 
 The existing Compose contract received only the synthetic variables and local
 fixture paths required to render the new mandatory binds. Final fresh evidence

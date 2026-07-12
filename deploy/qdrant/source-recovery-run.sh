@@ -23,12 +23,14 @@ fail() {
 usage() {
   cat <<'USAGE'
 Usage: source-recovery-run.sh [--stop-writers] \
+  [--operation forward|rollback] \
   [--resume-from execute|verify|apply-dispositions|verify-dispositions] \
   --run-id UUID \
-  --project-directory PATH --env-file PATH --plan-input PATH \
+  --project-directory PATH --env-file PATH \
   --manifest PATH --progress-directory PATH \
-  --development-root PATH --production-root PATH \
-  --capability-directory PATH
+  --development-root PATH --production-root PATH
+
+Fresh plan only: --plan-input PATH --capability-directory PATH
 
 By default, any active writer service blocks the run. --stop-writers explicitly
 authorizes this wrapper to record, stop, and restore the exact six-service state.
@@ -71,10 +73,18 @@ readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN LOCK_FILE expected_uid expected_gi
 [[ $expected_gid =~ ^[0-9]+$ ]] || fail 'expected source-recovery GID must be numeric'
 [[ -z ${DOCKER_HOST:-} && -z ${DOCKER_CONTEXT:-} ]] ||
   fail 'remote or selected Docker contexts are forbidden'
-docker_endpoint="$($DOCKER_BIN context inspect default --format '{{(index .Endpoints "docker").Host}}')"
-[[ $docker_endpoint == unix:///* ]] || fail 'the default Docker context must use a local Unix socket'
+docker_context="$($DOCKER_BIN context show)"
+[[ $docker_context =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$ ]] ||
+  fail 'active Docker context name is invalid'
+docker_endpoint="$($DOCKER_BIN context inspect "$docker_context" --format '{{(index .Endpoints "docker").Host}}')"
+[[ $docker_endpoint == unix:///* ]] ||
+  fail 'active Docker context must use a local Unix socket'
+# Caller overrides are rejected above. Pin every later plain `docker compose`
+# invocation to the exact context whose endpoint was verified here.
+export DOCKER_CONTEXT="$docker_context"
 
 stop_writers=0
+operation='forward'
 resume_from=''
 run_id=''
 project_directory=''
@@ -92,12 +102,13 @@ while [[ $# -gt 0 ]]; do
       stop_writers=1
       shift
       ;;
-    --resume-from|--run-id|--project-directory|--env-file|--plan-input|--manifest|--progress-directory|--development-root|--production-root|--capability-directory)
+    --operation|--resume-from|--run-id|--project-directory|--env-file|--plan-input|--manifest|--progress-directory|--development-root|--production-root|--capability-directory)
       [[ $# -ge 2 && -n $2 ]] || fail "$1 requires a value"
       option="$1"
       value="$2"
       shift 2
       case "$option" in
+        --operation) operation="$value" ;;
         --resume-from) resume_from="$value" ;;
         --run-id) run_id="$value" ;;
         --project-directory) project_directory="$value" ;;
@@ -120,10 +131,21 @@ done
 
 [[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
   fail '--run-id must be a UUIDv4'
+case "$operation" in
+  forward|rollback) ;;
+  *) fail '--operation must be forward or rollback' ;;
+esac
 case "$resume_from" in
   ''|execute|verify|apply-dispositions|verify-dispositions) ;;
   *) fail '--resume-from must name an approved durable recovery continuation' ;;
 esac
+[[ $operation != rollback || -z $resume_from ]] ||
+  fail 'rollback cannot be combined with a forward resume stage'
+fresh_plan=0
+if [[ $operation == forward && -z $resume_from ]]; then
+  fresh_plan=1
+fi
+readonly fresh_plan
 
 require_real_path() {
   local value="$1"
@@ -134,15 +156,12 @@ require_real_path() {
 
 require_real_path "$project_directory" 'project directory'
 require_real_path "$env_file" 'Compose environment file'
-require_real_path "$plan_input" 'protected plan input'
 require_real_path "$progress_directory" 'progress directory'
 require_real_path "$development_root" 'development upload root'
 require_real_path "$production_root" 'production upload root'
-require_real_path "$capability_directory" 'capability directory'
 [[ -f $env_file && -r $env_file ]] || fail 'Compose environment file must be a readable file'
-[[ -f $plan_input ]] || fail 'protected plan input must be a file'
-[[ -d $progress_directory && -d $development_root && -d $production_root && -d $capability_directory ]] ||
-  fail 'progress, upload roots, and capability paths must be directories'
+[[ -d $progress_directory && -d $development_root && -d $production_root ]] ||
+  fail 'progress and upload-root paths must be directories'
 compose_file="$project_directory/docker-compose.infra.yml"
 [[ -f $compose_file && ! -L $compose_file ]] || fail 'project Compose file is missing or unsafe'
 
@@ -159,7 +178,11 @@ owner_group_mode() {
 }
 
 journal="$progress_directory/journal.json"
-if [[ -z $resume_from ]]; then
+if [[ $fresh_plan -eq 1 ]]; then
+  require_real_path "$plan_input" 'protected plan input'
+  require_real_path "$capability_directory" 'capability directory'
+  [[ -f $plan_input && -d $capability_directory ]] ||
+    fail 'fresh plan input and capability paths have invalid types'
   [[ ! -e $manifest && ! -e $journal ]] ||
     fail 'fresh recovery requires absent manifest and journal state'
 else
@@ -167,18 +190,17 @@ else
     fail 'resume requires an owner-only immutable manifest'
   [[ -f $journal && ! -L $journal && $(owner_group_mode "$journal") == "$expected_uid:$expected_gid:600" ]] ||
     fail 'resume requires an owner-only progress journal'
+  # Compose interpolates every profile service even when `run` selects only a
+  # verifier/executor. These non-authoritative placeholders are ignored by all
+  # resume commands and add no writable path beyond the existing state bind.
+  plan_input='/dev/null'
+  capability_directory="$state_directory"
 fi
 
 [[ $(owner_group_mode "$state_directory") == "$expected_uid:$expected_gid:700" ]] ||
   fail 'state directory must be owned by UID:GID 1001:1001 with mode 0700'
 [[ $(owner_group_mode "$progress_directory") == "$expected_uid:$expected_gid:700" ]] ||
   fail 'progress directory must be owned by UID:GID 1001:1001 with mode 0700'
-[[ $(owner_group_mode "$capability_directory") == "$expected_uid:$expected_gid:700" ]] ||
-  fail 'capability directory must be owned by UID:GID 1001:1001 with mode 0700'
-[[ $(owner_group_mode "$plan_input") == "$expected_uid:$expected_gid:600" ]] ||
-  fail 'protected plan input must be owned by UID:GID 1001:1001 with mode 0600'
-[[ -z $(find "$capability_directory" -mindepth 1 -maxdepth 1 -print -quit) ]] ||
-  fail 'capability directory must be empty before planning'
 
 contains_path() {
   local parent="$1"
@@ -186,13 +208,21 @@ contains_path() {
   [[ $child == "$parent" || $child == "$parent/"* ]]
 }
 
-for root in "$development_root" "$production_root"; do
-  if contains_path "$root" "$capability_directory" || contains_path "$capability_directory" "$root"; then
-    fail 'capability directory must be outside and not a parent of either upload root'
-  fi
-  [[ $(stat -c '%d' -- "$capability_directory") == $(stat -c '%d' -- "$root") ]] ||
-    fail 'capability directory and both upload roots must share one filesystem device'
-done
+if [[ $fresh_plan -eq 1 ]]; then
+  [[ $(owner_group_mode "$capability_directory") == "$expected_uid:$expected_gid:700" ]] ||
+    fail 'capability directory must be owned by UID:GID 1001:1001 with mode 0700'
+  [[ $(owner_group_mode "$plan_input") == "$expected_uid:$expected_gid:600" ]] ||
+    fail 'protected plan input must be owned by UID:GID 1001:1001 with mode 0600'
+  [[ -z $(find "$capability_directory" -mindepth 1 -maxdepth 1 -print -quit) ]] ||
+    fail 'capability directory must be empty before planning'
+  for root in "$development_root" "$production_root"; do
+    if contains_path "$root" "$capability_directory" || contains_path "$capability_directory" "$root"; then
+      fail 'capability directory must be outside and not a parent of either upload root'
+    fi
+    [[ $(stat -c '%d' -- "$capability_directory") == $(stat -c '%d' -- "$root") ]] ||
+      fail 'capability directory and both upload roots must share one filesystem device'
+  done
+fi
 
 lock_directory="$(dirname -- "$LOCK_FILE")"
 if [[ $local_test == 1 ]]; then
@@ -272,7 +302,12 @@ compose_run() {
     --profile operator run --rm --no-deps -T "$service" "$@"
 }
 
-if [[ -z $resume_from ]]; then
+if [[ $operation == rollback ]]; then
+  compose_run qdrant-source-recovery-executor source-recovery rollback --confirm-run-id "$run_id"
+  exit 0
+fi
+
+if [[ $fresh_plan -eq 1 ]]; then
   compose_run qdrant-source-recovery-planner source-recovery plan
   [[ -f $manifest && ! -L $manifest && $(owner_group_mode "$manifest") == "$expected_uid:$expected_gid:400" ]] ||
     fail 'planner did not publish an owner-only immutable manifest'
@@ -281,7 +316,7 @@ if [[ -z $resume_from ]]; then
   [[ -z $(find "$capability_directory" -mindepth 1 -maxdepth 1 -print -quit) ]] ||
     fail 'planner left capability probe residue'
 fi
-if [[ -z $resume_from || $resume_from == execute ]]; then
+if [[ $fresh_plan -eq 1 || $resume_from == execute ]]; then
   compose_run qdrant-source-recovery-executor source-recovery execute --confirm-run-id "$run_id"
 fi
 # This verification is deliberately unconditional. An operator-selected resume
