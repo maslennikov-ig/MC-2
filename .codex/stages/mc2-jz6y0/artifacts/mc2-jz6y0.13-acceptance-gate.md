@@ -937,3 +937,72 @@ Commit `4267deee` is **not ready for integration or remote activation** until
 the P1 rollback binding is corrected and independently rechecked. The prior
 Q12 remote migration, protected smoke/recovery-probe and durable rollout gates
 remain mandatory and are outside this implementation review.
+
+# Integration re-review 3e14c922
+
+**Scope:** independent re-review of `4267deee..3e14c922` and the complete
+integration range `4f7f2d22..3e14c922`, focused on the stale accepted
+transaction P1. **Verdict: READY for local integration.** P0: 0, P1: 0, P2: 0,
+P3: 1. No remote or runtime action was performed.
+
+## P1 disposition: resolved
+
+- App and config-only deploys now atomically write a current
+  `status=preparing`, `commit=<current 40-hex SHA>` transaction before operator
+  login, pull, digest inspection or env update can fail
+  (`scripts/deploy_blue_green.sh:239-255`). An early failure therefore cannot
+  leave the previous transaction eligible for automatic rollback.
+- The workflow now requires both `status=switched|accepted` and an exact
+  `commit=${{ github.sha }}` line before invoking rollback, and passes that exact
+  SHA as the rollback script's required second argument
+  (`.github/workflows/ci-cd.yml:929-933`).
+- `rollback_blue_green.sh` independently requires a 40-character lowercase-hex
+  expected commit, reads state with `awk` rather than sourcing it, and compares
+  exact values before checking status or touching Compose/nginx
+  (`scripts/rollback_blue_green.sh:12-53`). This closes a check-to-execution
+  stale-state change as well as direct/manual invocation without the expected
+  release identity.
+- Bridge-only deploys still create no app transaction. A failed bridge-only
+  attempt leaves prior state byte-identical, but its old commit cannot satisfy
+  the workflow's current-SHA gate.
+
+Four executable transaction mocks passed:
+
+```text
+stale mock: rejected old commit; active color unchanged
+config-only mock: current preparing recorded before failed operator pull; rollback gate closed
+bridge-only mock: no app transaction; stale accepted state cannot match current SHA
+current mock: exact switched transaction rolled back successfully
+transaction mocks: 4/4 passed
+```
+
+## P3: rollback script usage comment is stale
+
+The implementation now requires `<expected-commit>` as argument two, but the
+header still says `Usage: ./rollback_blue_green.sh [environment]`
+(`scripts/rollback_blue_green.sh:5,12-20`). The automated workflow is correct,
+and the script fails closed when the argument is absent, so this does not block
+integration. Update the self-documenting usage line to include the mandatory
+40-hex release commit in the next owned edit; the old command in
+`docs/reports/PROGRESS-REPORT-JAN-2026.md:114` is historical rather than the
+current operator runbook.
+
+## Fresh verification
+
+- `node scripts/ci/test_ci_cd_workflow_gates.mjs`: passed.
+- `bash scripts/ci/test_detect_deploy_changes.sh`: passed.
+- `bash scripts/ci/test_blue_green_fail_closed.sh`: passed, including stale
+  expected-commit rejection.
+- `bash -n` for detector, detector test, deploy, rollback and fail-closed test:
+  passed.
+- Stale/current/bridge-only/config-only transaction mocks: `4/4` passed.
+- `git diff --check 4267deee..3e14c922` and
+  `git diff --check 4f7f2d22..3e14c922`: passed.
+
+## Readiness boundary
+
+The P1 raised against `4267deee` is closed at `3e14c922`; the operator
+publication and immutable-digest changes are ready for local integration. This
+review is not remote activation approval or staging evidence. The existing Q12
+migration, protected smoke/recovery-probe, observability and rollback gates
+remain mandatory before or during authorized activation.
