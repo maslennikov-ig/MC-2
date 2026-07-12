@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { Client } from 'pg';
@@ -15,7 +15,62 @@ type LoadedMigration = {
   apply: LoadedSource;
   rollback: LoadedSource;
 };
+type RepositoryMigration = { version: string; name: string; filename: string };
 type HistoryRow = { version: string; name: string | null; statements: string[] | null };
+type CatalogRow = Record<string, unknown>;
+
+const DOCUMENT_EVIDENCE_TABLES = [
+  'document_evidence_batch_checkpoints',
+  'document_evidence_conflict_checkpoints',
+  'document_evidence_conflicts',
+  'document_evidence_decisions',
+  'document_evidence_items',
+  'document_evidence_retry_applications',
+  'document_evidence_runs',
+] as const;
+
+const DOCUMENT_EVIDENCE_FUNCTIONS = [
+  'append_document_evidence_decision',
+  'answer_document_evidence_question_atomic',
+  'answer_document_evidence_questions_atomic',
+  'auto_answer_questions_atomic',
+  'checkpoint_document_evidence_run_metrics',
+  'commit_document_evidence_batch',
+  'commit_document_evidence_conflict_batch',
+  'consume_document_evidence_retry_directives',
+  'create_or_reuse_document_evidence_run',
+  'document_evidence_conflict_side_handle',
+  'document_evidence_retry_attempt',
+  'document_evidence_sha256',
+  'document_evidence_subject_key',
+  'enforce_document_evidence_run_source_manifest',
+  'ensure_document_evidence_question_atomic',
+  'finalize_document_evidence_run',
+  'get_document_evidence_retry_directives',
+  'get_document_evidence_retry_state',
+  'guard_document_evidence_course_transition',
+  'materialize_document_evidence_decision_gate_atomic',
+  'normalize_document_evidence_source_manifest',
+  'persist_document_evidence_items',
+  'prevent_document_evidence_terminal_item_mutation',
+  'prevent_document_evidence_terminal_run_mutation',
+  'record_document_evidence_automatic_retry',
+  'refresh_document_evidence_decision_snapshot',
+  'reject_document_evidence_conflict_checkpoint_mutation',
+  'reject_document_evidence_mutation',
+  'resolve_document_evidence_question_atomic',
+  'set_document_evidence_updated_at',
+  'upsert_document_evidence_conflict',
+  'validate_document_evidence_batch_checkpoint_scope',
+  'validate_document_evidence_conflict_allowlist',
+  'validate_document_evidence_conflict_checkpoint_scope',
+  'validate_document_evidence_conflict_scope',
+  'validate_document_evidence_conflict_side_identity',
+  'validate_document_evidence_decision_chain',
+  'validate_document_evidence_item_scope',
+  'validate_document_evidence_run_tenant',
+  'verify_document_evidence_terminal_coverage',
+] as const;
 
 export const DOCUMENT_EVIDENCE_APPROVED_REMOTE_CONFIRMATION = {
   apply: 'APPLY REMOTE DOCUMENT EVIDENCE BASE 20260711120000 20260711130000 20260711140000',
@@ -83,6 +138,71 @@ export const DOCUMENT_EVIDENCE_APPROVED_MIGRATIONS = [
   apply: SourceSpec;
   rollback: SourceSpec;
 }>;
+
+const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
+  {
+    version: '20260711150000',
+    name: 'document_evidence_observability_index',
+    apply: {
+      url: new URL(
+        '../../supabase/migrations/20260711150000_document_evidence_observability_index.sql',
+        import.meta.url
+      ),
+      sha256: 'a7f6d6958b158d10f53f3fb0103047f0ea1ade8a020d78176e365237e4eccfe8',
+    },
+  },
+  {
+    version: '20260711151000',
+    name: 'document_evidence_observability_totals',
+    apply: {
+      url: new URL(
+        '../../supabase/migrations/20260711151000_document_evidence_observability_totals.sql',
+        import.meta.url
+      ),
+      sha256: '5f675b1a8a933128520b2fb9d42632a9cbefff2e57ec72f06cd42cd6e0a090e3',
+    },
+  },
+] as const satisfies ReadonlyArray<{ version: string; name: string; apply: SourceSpec }>;
+
+const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
+  '3ee5b37c2f727b0d68b00860235362ed72f9fd21a5a1fd871959378379ede1bf';
+
+const DOCUMENT_EVIDENCE_SECURITY_MANIFEST_SHA256 = {
+  '20260711120000': [
+    '72988256cbd42ae01d6dc0beb32029f7cfa54df514ed6ab5d26f796e33eab982',
+    '85fed12a7a1b7983767f11e87165c342f80303fb60ab0d49b970da982ebb97c1',
+    'bca89c734c52e02f98b187ff9e1fbc497bd268e38f6dfc2db86a49a2e494f668',
+    'dab2121a219eab7e085db98528f399a390dcbb15d3f342fa4b969a49c79b8321',
+    'b5271e29b09e9793cfe6ba87cf2a953111b62c5e5005d4e87ea99a3bf83ba8fb',
+  ],
+  '20260711130000': [
+    '85fed12a7a1b7983767f11e87165c342f80303fb60ab0d49b970da982ebb97c1',
+    'bca89c734c52e02f98b187ff9e1fbc497bd268e38f6dfc2db86a49a2e494f668',
+    'dab2121a219eab7e085db98528f399a390dcbb15d3f342fa4b969a49c79b8321',
+  ],
+  '20260711140000': ['bca89c734c52e02f98b187ff9e1fbc497bd268e38f6dfc2db86a49a2e494f668'],
+} as const;
+
+const DOCUMENT_EVIDENCE_ABSENT_SECURITY_MANIFEST_SHA256 = {
+  '20260711120000': [
+    '77ab45ff3adb8c5f0b935f7c2b2a169ced88a11bc4773b99ae2f1256a9b70766',
+    '9e6d9be5a369b1b4677437d2031288d88057938640348c53ae7626dc66b6e39e',
+  ],
+  '20260711130000': [
+    '77ab45ff3adb8c5f0b935f7c2b2a169ced88a11bc4773b99ae2f1256a9b70766',
+    '9e6d9be5a369b1b4677437d2031288d88057938640348c53ae7626dc66b6e39e',
+    '72988256cbd42ae01d6dc0beb32029f7cfa54df514ed6ab5d26f796e33eab982',
+    'b5271e29b09e9793cfe6ba87cf2a953111b62c5e5005d4e87ea99a3bf83ba8fb',
+  ],
+  '20260711140000': [
+    '77ab45ff3adb8c5f0b935f7c2b2a169ced88a11bc4773b99ae2f1256a9b70766',
+    '9e6d9be5a369b1b4677437d2031288d88057938640348c53ae7626dc66b6e39e',
+    '72988256cbd42ae01d6dc0beb32029f7cfa54df514ed6ab5d26f796e33eab982',
+    'b5271e29b09e9793cfe6ba87cf2a953111b62c5e5005d4e87ea99a3bf83ba8fb',
+    '85fed12a7a1b7983767f11e87165c342f80303fb60ab0d49b970da982ebb97c1',
+    'dab2121a219eab7e085db98528f399a390dcbb15d3f342fa4b969a49c79b8321',
+  ],
+} as const;
 
 export interface DocumentEvidenceApprovedMigrationOptions extends RemoteGate {
   databaseUrl: string;
@@ -222,6 +342,35 @@ export async function loadDocumentEvidenceApprovedMigrations(): Promise<LoadedMi
   );
 }
 
+async function loadRepositoryMigrations(): Promise<RepositoryMigration[]> {
+  const directory = new URL('../../supabase/migrations/', import.meta.url);
+  const filenames = (await readdir(directory))
+    .filter(filename => /^\d{14}_.+\.sql$/u.test(filename))
+    .sort();
+  const digest = createHash('sha256')
+    .update(`${filenames.join('\n')}\n`)
+    .digest('hex');
+  if (digest !== REPOSITORY_MIGRATION_MANIFEST_SHA256) {
+    throw new Error('Repository migration manifest differs from the fixed frontier');
+  }
+  return filenames.map(filename => {
+    const match = filename.match(/^(\d{14})_(.+)\.sql$/u);
+    if (!match) throw new Error('Repository migration filename is unsupported');
+    return { version: match[1], name: match[2], filename };
+  });
+}
+
+async function loadDownstreamMigrations(): Promise<LoadedMigration[]> {
+  return Promise.all(
+    DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS.map(async migration => ({
+      version: migration.version,
+      name: migration.name,
+      apply: await loadSource(migration.apply),
+      rollback: await loadSource(migration.apply),
+    }))
+  );
+}
+
 async function requireSupabaseHistory(client: Client): Promise<void> {
   const relation = await client.query<{ relation: string | null }>(
     `SELECT to_regclass('supabase_migrations.schema_migrations')::text AS relation`
@@ -251,6 +400,54 @@ async function readHistory(client: Client, version: string): Promise<HistoryRow 
       [version]
     )
   ).rows[0];
+}
+
+async function assertRepositoryMigrationFrontier(
+  client: Client,
+  approved: LoadedMigration[]
+): Promise<number> {
+  const repository = await loadRepositoryMigrations();
+  const downstream = await loadDownstreamMigrations();
+  const chain = [...approved, ...downstream];
+  const firstChainVersion = chain[0].version;
+  const expectedPrevious = repository.filter(migration => migration.version < firstChainVersion);
+  const expectedVersions = new Set(repository.map(migration => migration.version));
+  const history = (
+    await client.query<HistoryRow>(
+      `SELECT version,name,statements FROM supabase_migrations.schema_migrations ORDER BY version`
+    )
+  ).rows;
+  const historyByVersion = new Map<string, HistoryRow>();
+  for (const row of history) {
+    if (historyByVersion.has(row.version) || !expectedVersions.has(row.version)) {
+      throw new Error('Supabase repository migration frontier contains unknown history');
+    }
+    historyByVersion.set(row.version, row);
+  }
+  for (const migration of expectedPrevious) {
+    const row = historyByVersion.get(migration.version);
+    if (!row || row.name !== migration.name) {
+      throw new Error('Supabase repository migration frontier has an earlier pending migration');
+    }
+  }
+  let prefixLength = 0;
+  let missing = false;
+  for (const migration of chain) {
+    const row = historyByVersion.get(migration.version);
+    if (!row) {
+      missing = true;
+      continue;
+    }
+    if (missing) {
+      throw new Error('Approved document evidence migration history is not a supported prefix');
+    }
+    assertExactHistory(row, migration);
+    prefixLength += 1;
+  }
+  if (history.length !== expectedPrevious.length + prefixLength) {
+    throw new Error('Supabase repository migration frontier is ambiguous');
+  }
+  return prefixLength;
 }
 
 function assertExactHistory(row: HistoryRow, migration: LoadedMigration): void {
@@ -323,6 +520,237 @@ async function assertIndexes(client: Client, names: string[], version: string): 
   }
 }
 
+function normalizeCatalogText(value: unknown): unknown {
+  return typeof value === 'string' ? value.replace(/\s+/gu, ' ').trim() : value;
+}
+
+function normalizeCatalogRows(rows: CatalogRow[], definitionKeys: string[] = []): CatalogRow[] {
+  return rows.map(row =>
+    Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [
+        key,
+        definitionKeys.includes(key) ? normalizeCatalogText(value) : value,
+      ])
+    )
+  );
+}
+
+export async function readDocumentEvidenceSecurityManifest(client: Client): Promise<{
+  tables: CatalogRow[];
+  columns: CatalogRow[];
+  constraints: CatalogRow[];
+  indexes: CatalogRow[];
+  triggers: CatalogRow[];
+  policies: CatalogRow[];
+  tablePrivileges: CatalogRow[];
+  functions: CatalogRow[];
+  functionPrivileges: CatalogRow[];
+}> {
+  const tables = (
+    await client.query<CatalogRow>(
+      `SELECT relname AS table_name,relrowsecurity AS rls_enabled,
+              relforcerowsecurity AS rls_forced
+       FROM pg_class
+       JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace
+       WHERE pg_namespace.nspname='public' AND relkind='r'
+         AND relname=ANY($1::text[])
+       ORDER BY relname`,
+      [DOCUMENT_EVIDENCE_TABLES]
+    )
+  ).rows;
+  const columns = normalizeCatalogRows(
+    (
+      await client.query<CatalogRow>(
+        `SELECT tables.relname AS table_name,attributes.attnum AS ordinal,
+                attributes.attname AS column_name,
+                format_type(attributes.atttypid,attributes.atttypmod) AS data_type,
+                attributes.attnotnull AS not_null,attributes.attidentity AS identity_kind,
+                attributes.attgenerated AS generated_kind,
+                pg_get_expr(defaults.adbin,defaults.adrelid) AS default_expression
+         FROM pg_attribute attributes
+         JOIN pg_class tables ON tables.oid=attributes.attrelid
+         JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+         LEFT JOIN pg_attrdef defaults
+           ON defaults.adrelid=attributes.attrelid AND defaults.adnum=attributes.attnum
+         WHERE namespaces.nspname='public' AND tables.relname=ANY($1::text[])
+           AND attributes.attnum > 0 AND NOT attributes.attisdropped
+         ORDER BY tables.relname,attributes.attnum`,
+        [DOCUMENT_EVIDENCE_TABLES]
+      )
+    ).rows,
+    ['default_expression']
+  );
+  const constraints = normalizeCatalogRows(
+    (
+      await client.query<CatalogRow>(
+        `SELECT tables.relname AS table_name,constraints.conname AS constraint_name,
+                constraints.contype AS constraint_type,
+                constraints.convalidated AS validated,
+                constraints.condeferrable AS deferrable,
+                constraints.condeferred AS initially_deferred,
+                pg_get_constraintdef(constraints.oid,true) AS definition
+         FROM pg_constraint constraints
+         JOIN pg_class tables ON tables.oid=constraints.conrelid
+         JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+         WHERE namespaces.nspname='public' AND tables.relname=ANY($1::text[])
+         ORDER BY tables.relname,constraints.conname`,
+        [DOCUMENT_EVIDENCE_TABLES]
+      )
+    ).rows,
+    ['definition']
+  );
+  const indexes = normalizeCatalogRows(
+    (
+      await client.query<CatalogRow>(
+        `SELECT tables.relname AS table_name,index_rel.relname AS index_name,
+                indexes.indisunique AS is_unique,indexes.indisprimary AS is_primary,
+                indexes.indisvalid AS is_valid,indexes.indisready AS is_ready,
+                indexes.indislive AS is_live,pg_get_indexdef(indexes.indexrelid) AS definition
+         FROM pg_index indexes
+         JOIN pg_class tables ON tables.oid=indexes.indrelid
+         JOIN pg_class index_rel ON index_rel.oid=indexes.indexrelid
+         JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+         WHERE namespaces.nspname='public' AND tables.relname=ANY($1::text[])
+         ORDER BY tables.relname,index_rel.relname`,
+        [DOCUMENT_EVIDENCE_TABLES]
+      )
+    ).rows,
+    ['definition']
+  );
+  const triggers = normalizeCatalogRows(
+    (
+      await client.query<CatalogRow>(
+        `SELECT tables.relname AS table_name,triggers.tgname AS trigger_name,
+                triggers.tgenabled AS enabled,triggers.tgdeferrable AS deferrable,
+                triggers.tginitdeferred AS initially_deferred,
+                pg_get_triggerdef(triggers.oid,true) AS definition,
+                procedures.proname || '(' || pg_get_function_identity_arguments(procedures.oid) || ')'
+                  AS function_signature
+         FROM pg_trigger triggers
+         JOIN pg_class tables ON tables.oid=triggers.tgrelid
+         JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+         JOIN pg_proc procedures ON procedures.oid=triggers.tgfoid
+         WHERE namespaces.nspname='public' AND NOT triggers.tgisinternal
+           AND (tables.relname=ANY($1::text[]) OR tables.relname='courses')
+           AND procedures.proname=ANY($2::text[])
+         ORDER BY tables.relname,triggers.tgname`,
+        [DOCUMENT_EVIDENCE_TABLES, DOCUMENT_EVIDENCE_FUNCTIONS]
+      )
+    ).rows,
+    ['definition']
+  );
+  const policies = normalizeCatalogRows(
+    (
+      await client.query<CatalogRow>(
+        `SELECT tables.relname AS table_name,policies.polname AS policy_name,
+                policies.polpermissive AS permissive,policies.polcmd AS command,
+                to_json(ARRAY(
+                  SELECT CASE WHEN role_oid=0 THEN 'public' ELSE roles.rolname END
+                  FROM unnest(policies.polroles) role_oid
+                  LEFT JOIN pg_roles roles ON roles.oid=role_oid
+                  ORDER BY CASE WHEN role_oid=0 THEN 'public' ELSE roles.rolname END
+                )) AS roles,
+                pg_get_expr(policies.polqual,policies.polrelid) AS using_expression,
+                pg_get_expr(policies.polwithcheck,policies.polrelid) AS check_expression
+         FROM pg_policy policies
+         JOIN pg_class tables ON tables.oid=policies.polrelid
+         JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+         WHERE namespaces.nspname='public' AND tables.relname=ANY($1::text[])
+         ORDER BY tables.relname,policies.polname`,
+        [DOCUMENT_EVIDENCE_TABLES]
+      )
+    ).rows,
+    ['using_expression', 'check_expression']
+  );
+  const tablePrivileges = (
+    await client.query<CatalogRow>(
+      `SELECT tables.relname AS table_name,
+              CASE WHEN privileges.grantee=0 THEN 'public' ELSE grantees.rolname END AS grantee,
+              privileges.privilege_type,privileges.is_grantable
+       FROM pg_class tables
+       JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+       CROSS JOIN LATERAL aclexplode(COALESCE(tables.relacl,acldefault('r',tables.relowner))) privileges
+       LEFT JOIN pg_roles grantees ON grantees.oid=privileges.grantee
+       WHERE namespaces.nspname='public' AND tables.relname=ANY($1::text[])
+         AND privileges.grantee <> tables.relowner
+       ORDER BY tables.relname,grantee,privileges.privilege_type`,
+      [DOCUMENT_EVIDENCE_TABLES]
+    )
+  ).rows;
+  const rawFunctions = (
+    await client.query<
+      CatalogRow & { function_body: string; function_oid: string; function_name: string }
+    >(
+      `SELECT procedures.oid::text AS function_oid,procedures.proname AS function_name,
+              procedures.proname || '(' || pg_get_function_identity_arguments(procedures.oid) || ')'
+                AS signature,
+              pg_get_function_result(procedures.oid) AS result_type,
+              languages.lanname AS language,procedures.prosecdef AS security_definer,
+              procedures.provolatile AS volatility,procedures.proisstrict AS strict,
+              COALESCE(to_json(procedures.proconfig),'[]'::json) AS configuration,
+              procedures.prosrc AS function_body
+       FROM pg_proc procedures
+       JOIN pg_namespace namespaces ON namespaces.oid=procedures.pronamespace
+       JOIN pg_language languages ON languages.oid=procedures.prolang
+       WHERE namespaces.nspname='public' AND procedures.proname=ANY($1::text[])
+       ORDER BY procedures.proname,pg_get_function_identity_arguments(procedures.oid)`,
+      [DOCUMENT_EVIDENCE_FUNCTIONS]
+    )
+  ).rows;
+  const functions = rawFunctions.map(({ function_body, function_oid: _oid, ...row }) => ({
+    ...row,
+    function_body_sha256: createHash('sha256')
+      .update(function_body.replace(/\r\n/gu, '\n').trim())
+      .digest('hex'),
+  }));
+  const functionPrivileges = (
+    await client.query<CatalogRow>(
+      `SELECT procedures.proname || '(' || pg_get_function_identity_arguments(procedures.oid) || ')'
+                AS signature,
+              CASE WHEN privileges.grantee=0 THEN 'public' ELSE grantees.rolname END AS grantee,
+              privileges.privilege_type,privileges.is_grantable
+       FROM pg_proc procedures
+       JOIN pg_namespace namespaces ON namespaces.oid=procedures.pronamespace
+       CROSS JOIN LATERAL aclexplode(
+         COALESCE(procedures.proacl,acldefault('f',procedures.proowner))
+       ) privileges
+       LEFT JOIN pg_roles grantees ON grantees.oid=privileges.grantee
+       WHERE namespaces.nspname='public' AND procedures.proname=ANY($1::text[])
+         AND privileges.grantee <> procedures.proowner
+       ORDER BY signature,grantee,privileges.privilege_type`,
+      [DOCUMENT_EVIDENCE_FUNCTIONS]
+    )
+  ).rows;
+  return {
+    tables,
+    columns,
+    constraints,
+    indexes,
+    triggers,
+    policies,
+    tablePrivileges,
+    functions,
+    functionPrivileges,
+  };
+}
+
+export async function digestDocumentEvidenceSecurityManifest(client: Client): Promise<string> {
+  return createHash('sha256')
+    .update(JSON.stringify(await readDocumentEvidenceSecurityManifest(client)))
+    .digest('hex');
+}
+
+async function assertDocumentEvidenceSecurityManifest(
+  client: Client,
+  version: keyof typeof DOCUMENT_EVIDENCE_SECURITY_MANIFEST_SHA256
+): Promise<void> {
+  const digest = await digestDocumentEvidenceSecurityManifest(client);
+  const allowed: readonly string[] = DOCUMENT_EVIDENCE_SECURITY_MANIFEST_SHA256[version];
+  if (!allowed.includes(digest)) {
+    throw new Error(`Live document evidence security manifest does not match ${version}`);
+  }
+}
+
 async function assertLiveMigration(client: Client, version: string): Promise<void> {
   if (version === '20260711120000') {
     await assertRelations(
@@ -346,6 +774,7 @@ async function assertLiveMigration(client: Client, version: string): Promise<voi
       ],
       version
     );
+    await assertDocumentEvidenceSecurityManifest(client, version);
     return;
   }
   if (version === '20260711130000') {
@@ -382,6 +811,7 @@ async function assertLiveMigration(client: Client, version: string): Promise<voi
       ],
       version
     );
+    await assertDocumentEvidenceSecurityManifest(client, version);
     return;
   }
   if (!(await columnExists(client, 'document_evidence_decisions', 'selected_side_handle'))) {
@@ -412,6 +842,7 @@ async function assertLiveMigration(client: Client, version: string): Promise<voi
   if (!trigger.rows[0]?.present) {
     throw new Error(`Live document evidence side trigger does not match migration ${version}`);
   }
+  await assertDocumentEvidenceSecurityManifest(client, version);
 }
 
 async function versionSentinelExists(client: Client, version: string): Promise<boolean> {
@@ -454,6 +885,16 @@ async function assertMigrationAbsent(client: Client, version: string): Promise<v
       `Live document evidence side function exists without migration history ${version}`
     );
   }
+  if (version in DOCUMENT_EVIDENCE_ABSENT_SECURITY_MANIFEST_SHA256) {
+    const digest = await digestDocumentEvidenceSecurityManifest(client);
+    const allowed: readonly string[] =
+      DOCUMENT_EVIDENCE_ABSENT_SECURITY_MANIFEST_SHA256[
+        version as keyof typeof DOCUMENT_EVIDENCE_ABSENT_SECURITY_MANIFEST_SHA256
+      ];
+    if (!allowed.includes(digest)) {
+      throw new Error(`Live document evidence security manifest contains residue for ${version}`);
+    }
+  }
 }
 
 async function assertApprovedHistoryTopology(
@@ -471,6 +912,24 @@ async function assertApprovedHistoryTopology(
     if (missingEarlier) {
       throw new Error('Approved document evidence migration history is not a supported prefix');
     }
+  }
+}
+
+async function assertNoDownstreamLiveObjects(client: Client): Promise<void> {
+  const result = await client.query<{
+    index_relation: string | null;
+    totals_relation: string | null;
+    totals_rpc: string | null;
+  }>(`
+    SELECT
+      to_regclass('public.idx_clarifying_pending_critical_evidence_created_at')::text
+        AS index_relation,
+      to_regclass('public.document_evidence_observability_totals')::text AS totals_relation,
+      to_regprocedure('public.get_document_evidence_observability_totals()')::text AS totals_rpc
+  `);
+  const row = result.rows[0];
+  if (row?.index_relation || row?.totals_relation || row?.totals_rpc) {
+    throw new Error('Refusing base rollback while downstream live objects remain');
   }
 }
 
@@ -572,7 +1031,14 @@ export async function runDocumentEvidenceApprovedMigrations(
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', ['20260711120000']);
     try {
+      const repositoryPrefix = await assertRepositoryMigrationFrontier(client, migrations);
       await assertApprovedHistoryTopology(client, migrations);
+      if (options.direction === 'rollback' && repositoryPrefix > migrations.length) {
+        throw new Error(
+          'Refusing base rollback while downstream 20260711150000/20260711151000 migrations remain'
+        );
+      }
+      if (options.direction === 'rollback') await assertNoDownstreamLiveObjects(client);
       const ordered = options.direction === 'apply' ? migrations : [...migrations].reverse();
       const results: MigrationResult[] = [];
       for (const migration of ordered) {
