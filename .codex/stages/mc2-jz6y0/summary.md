@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: Q12 staging authorized; source-recovery implementation locally accepted; live activation remains NO-GO until current DB credentials and truthful backup evidence
+Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 staging authorized but live activation remains NO-GO until current DB credentials and truthful backup evidence
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: `7a808fc2` (accepted core, workflow/CAS, audited reindex, failed-coverage evidence/SQL, multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6 acceptance)
+Current accepted integration evidence: through `a869bcb4`, including Task 6 source recovery, final activation-contract correction/review, and final documentation correction/rereview; final closeout metadata is delivered at the branch HEAD
 Integration branch: `codex/self-hosted-qdrant-platform`
-Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback/snapshot and the complete source-recovery operator are locally accepted. Exact-count Task 6 composes the real recovery adapter and proves 42 physical/125 logical recovery, 24 dispositions, 234+6 parity, crash resume, guarded rollback, tenant isolation, and zero residue. Fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus package type-check, Prettier, artifact, and process gates; runtime/operator/Compose remains accepted at 34/34. Local closeout and live execution remain open.
+Implementation scope: Q1-Q11, E1-E7, Q12 guarded migration/operator/rollback/local snapshots, and the complete source-recovery operator are locally accepted. Exact-count Task 6 proves 42 physical/125 logical recovery, 24 dispositions, 234+6 parity, crash resume, guarded rollback, tenant isolation, and zero residue. Final root verification passed backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, exact Qdrant 15/15, applicable local recovery 5/5, Compose 8/8, type-check, and build 75/75. Local closeout is in progress; live execution remains fail-closed.
 
 ## Beads Mapping
 
@@ -133,7 +133,7 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 - Decision `mc2-jz6y0.14` is owner-approved and closed: Prometheus `3.13.1` LTS, Grafana `12.4.5` extended support, node_exporter `1.12.0`, Alertmanager `0.33.1`, authenticated main-listener scrape, no Qdrant `metrics_port`, and file-backed fail-closed secret transport.
 - Q8 / `mc2-jz6y0.9` and Q9 / `mc2-jz6y0.10` are accepted and integrated as `da126a8a` and `5d4282ee`. The shared recovery/textfile contract is unified at `/var/lib/megacampus/qdrant-metrics`; both final independent reviews returned `PASS`.
 - Q10 / `mc2-jz6y0.11` is accepted and integrated from reviewed head `42ed1322` as merge `3c9dd641`. Current setup/deployment/module/architecture/design/plan/runbook docs now agree on private pinned Qdrant 1.18.2, native multilingual BM25/IDF, server RRF→Formula, strict indexes, deterministic reindex, exact-version restore, monitoring pins, reproducible credential/systemd commands, rollback and Q12. Historical Cloud materials are explicitly bannered. Three review rounds closed six Important and one Minor finding; final verdict Ready to merge Yes with P0-P3 zero. Parent scans found 0 actionable Cloud instructions, 0 old pins, 0 stale Formula/recovery claims and 86 positive contract references; Prettier, artifact/process verification and canonical closeout dry-run passed. Dedicated worktree/local branch cleaned; remote evidence branch retained.
-- Q11 / `mc2-jz6y0.12` is accepted on the integrated local tree. Focused backend Stage 2/4/5/6 coverage passed 124/124 files and 1,869/1,869 tests; shared contracts passed 23/23, web conflicts 20/20, and PostgreSQL 16.14 migration/recovery/isolation passed 64/64. The exact-digest Qdrant 1.18.2 gate passed 15/15 Qdrant tests, with a separate 5/5 snapshot/restore drill; the historical 19-test label included four unrelated Career Playbook schema tests. Compose/runtime passed 8/8, Prometheus 3.13.1 validated 14 rules, Alertmanager 0.33.1 validated its config, and both `pnpm type-check` and `pnpm build` passed with 75/75 pages. Final independent review reported Ready Yes with P0-P3 zero. Canonical real closeout passed type-check, build, process verification, artifact/stage readiness, cleanup, docs/index review and debt scan; its initial invocation without required synthetic Supabase build variables stopped at env validation before compilation, and the unchanged closeout passed when run with the documented local build environment. All Q11 containers, ports, temporary recovery data, worktrees and local branches are cleaned; remote evidence branches remain.
+- Q11 / `mc2-jz6y0.12` is accepted on the integrated local tree. The final expanded Stage 2/4/5/6 matrix passed 125/125 files and 1,893/1,893 tests with zero skips; shared contracts passed 23/23, web conflicts 20/20, and PostgreSQL 16.14 migration/recovery/isolation passed 78/78 with zero skips. The exact-digest Qdrant 1.18.2 gate passed 15/15, with 5/5 applicable local snapshot/restore tests; the two managed-recreate cases are explicitly non-applicable to staging local-volume mode. Compose/runtime passed 8/8, Prometheus 3.13.1 validated 14 rules, Alertmanager 0.33.1 validated its config, `pnpm type-check` passed, and `pnpm build` generated 75/75 pages. Activation-contract correction `.26` and final docs correction both passed independent P0-P3-zero rereviews. All owned containers, ports, temporary data, accepted verification worktrees, and local branches are cleaned; the integration worktree remains for Q12.
 
 ## Routing Evidence
 
@@ -184,15 +184,11 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 - `mc2-jz6y0.15`: Q5 pinned Qdrant `1.18.2` proved strict Formula access requires a numeric `document_weight` payload index. Reviewed fix `d9e01ac0` adds the canonical `float` index and is integrated as `449e7ab1`; 45 affected tests, package type-check, three consecutive 9/9 Formula fixture runs and the root 19/19 pinned gate pass.
 
-## Closeout Expectations
+## Closeout Evidence
 
-- `docs-reviewed: updated` — retrieval, deployment, recovery, monitoring, and operator behavior change.
-- `project-index: update required` — stable Qdrant/operations entrypoints change.
-- `graph-reviewed: updated` — local Graphify `0.8.45` ran
-  `graphify update .` and `graphify cluster-only . --no-viz` after the accepted
-  local-snapshot and current-truth documentation changes: 50,904 nodes, 75,549
-  edges, and zero forbidden source paths, without external model/API mode or Git
-  hooks.
+- `docs-reviewed: updated` — final independent rereview found P0-P3 zero after the backup/restore and activation-order corrections.
+- `project-index: updated` — stable Qdrant/operations entrypoints are current.
+- `graph-reviewed: pending final refresh` — run local Graphify `0.8.45` at the delivered HEAD with no external model/API mode or Git hooks, then record exact counts.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while current verify-full DB credentials and source truth are
   hard stops.
@@ -217,7 +213,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
 
-graph-reviewed: updated — parent-owned local refresh completed after the durable
-docs commit. No hooks or external model/API mode were used.
+graph-reviewed: pending final refresh — no hooks or external model/API mode will
+be used; delivered-HEAD evidence is recorded by canonical closeout.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.

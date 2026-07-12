@@ -37,11 +37,11 @@ selected_agents:
 catalog_candidates:
   - none - installed correctness and verification skills cover this test-only correction
 parallel_decision: sequential - one stale assertion is the sole failed seam and the broad matrix depends on its focused correction
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: dedicated worktree and branch remain available for orchestrator inspection and independent review; local build outputs are ignored and no runtime resource was started
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: correction and independent zero-finding review were integrated; dedicated implementation/review worktrees and local branches were removed
 risk_level: medium
 docs_impact: tests-only
 docs_reviewed: no-change-needed

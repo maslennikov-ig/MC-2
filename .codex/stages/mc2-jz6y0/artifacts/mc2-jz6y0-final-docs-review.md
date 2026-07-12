@@ -40,8 +40,8 @@ parallel_decision: sequential - this reviewer evaluates one joined final documen
 status: returned
 delivery_method: cherry-pick
 accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: review worktree and local branch remain for orchestrator inspection and integration; no runtime or remote state was changed
+cleanup_status: cleaned
+cleanup_notes: Immutable findings were integrated as history, resolved by bc76f720 and rereview 5c5f937a, and the dedicated worktree/local branch were removed; no runtime or remote state was changed
 risk_level: high
 docs_impact: none
 docs_reviewed: review-complete-with-findings

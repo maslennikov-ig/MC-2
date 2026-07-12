@@ -39,11 +39,11 @@ selected_agents:
 catalog_candidates:
   - none - installed review and closeout skills cover this bounded documentation correction
 parallel_decision: sequential - all findings reconcile one joined executable activation sequence and current-state packet
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: dedicated correction worktree and local branch remain for independent rereview and orchestrator integration
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: correction and independent zero-finding rereview were integrated; dedicated correction and rereview worktrees/local branches were removed
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated

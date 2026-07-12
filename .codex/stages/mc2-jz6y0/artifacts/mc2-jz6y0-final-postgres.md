@@ -34,11 +34,11 @@ parallel_group: q12-final-verification
 depends_on_streams:
   - final integration head e033465e
 parallel_decision: parallel - disposable database and artifact-only write zone are isolated
-status: returned
-delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: The owned database, container, and listener are absent; the orchestrator may remove the dedicated worktree and local branch after artifact integration.
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Evidence was integrated and the dedicated worktree/local branch removed. The owned database, container, and listener are absent; final exact counts are zero.
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed

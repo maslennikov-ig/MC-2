@@ -31,11 +31,11 @@ parallel_group: q12-final-gates
 depends_on_streams:
   - final integration SHA e033465e
 parallel_decision: parallel
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: Removed only mc2-q12-final-qdrant-20260713 with -v; the named promtool container used --rm. Exact owned container, port, temp-directory, volume and network matches are all zero.
+cleanup_notes: Evidence was integrated and the dedicated worktree/local branch removed. Removed only mc2-q12-final-qdrant-20260713 with -v; exact owned container, port, temp-directory, volume and network matches are all zero.
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed

@@ -37,11 +37,11 @@ selected_agents:
 catalog_candidates:
   - none - installed review and closeout skills cover this bounded correction rereview
 parallel_decision: sequential - one correction joins all four immutable documentation findings into a single executable activation order
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: rereview worktree and local branch remain for orchestrator inspection and integration; no runtime or remote state was changed
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: zero-finding rereview was integrated and its dedicated worktree/local branch removed; no runtime or remote state was changed
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed

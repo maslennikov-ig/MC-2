@@ -40,7 +40,7 @@ status: blocked
 delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: cleaned
-cleanup_notes: The temporary JSON report was removed. Ignored dependency links and package build outputs remain confined to the disposable worker worktree. No service, database, Docker, browser, secret, SSH, staging, production, or remote runtime was touched.
+cleanup_notes: The immutable NO-GO artifact was integrated, its linked correction/review passed, and the dedicated worktree/local branch were removed. The temporary JSON report and ignored worktree build outputs are gone; no remote runtime was touched.
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed

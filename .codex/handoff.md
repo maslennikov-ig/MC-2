@@ -34,7 +34,7 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 
 - Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E7, and exact 100% local/development document-evidence activation. Final independent activation/docs review at `d3417610` reported no P0-P3 findings; integration merge `ea183d83` passed 24/24 focused tests, package type-check, process verification, and canonical closeout dry-run. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
-- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. Q11 passed the full local release matrix and independent review with P0-P3 zero: backend 1,869/1,869, shared 23/23, web 20/20, PostgreSQL 64/64, exact Qdrant 15/15 plus recovery 5/5, Compose 8/8, Prometheus 14 rules, Alertmanager config, type-check and build 75/75. Canonical real stage closeout also passed after supplying the documented synthetic local build environment.
+- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. The final local release matrix passed backend 1,893/1,893 with zero skips, shared 23/23, web 20/20, PostgreSQL 78/78 with zero skips, exact Qdrant 15/15, applicable local snapshot/restore 5/5, Compose/runtime 8/8, Prometheus 14 rules, Alertmanager config, `pnpm type-check`, and build 75/75. The stale activation-contract test was corrected under `.26`; implementation and independent review are integrated with P0-P3 zero.
 - Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and reaches the pooler with `verify-full`. Exhaustive read-only discovery inspected 16 unique DSN candidates across server files, processes, containers, systemd, cron, CLI caches, histories, Docker layers, repo and all 6,290 Git commits; all six complete external URIs failed strict read-only validation and working count is zero. The only plausible current server file, `/opt/megacampus/.env.backup`, is stale; the repo Actions secret is intentionally non-extractable. A current owner-supplied or rotated Session pooler URL is still required. The daily database-backup job has been fail-open since 2026-06-28: `pg_dump` authentication fails, but gzip masks it; resulting files are 20-byte empty streams, with only the 2026-06-27 dump substantive. The corrected tracked operator is locally accepted after P0-P3-zero rereview and fresh 18/18 integration. `mc2-jz6y0.13.7` remains open until a current verify-full URL exists, `/opt/megacampus/backups` is corrected from observed mode `0775`, and a fresh isolated restore-validated backup succeeds. The audit changed no remote state.
@@ -49,6 +49,7 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 - E7 `.24` is accepted locally. Owner decision `.24.2` closed on 2026-07-12 with exact local/development values `enabled=true`, `mode=active`, and Stage 5 cohort `100`; the final combined branch at `d3417610` passed independent review with no P0-P3 findings and merged as `ea183d83`. Parent acceptance passed 5/5 files and 24/24 tests, package type-check, process verification, and canonical closeout dry-run. Q12 remains the boundary for every staging/production or other remote mutation.
 - Q6 `.7` final branch commits `bd6237b3` + `14322c8f` are independently approved and integrated as `f7930913`. Exact Qdrant index/amd64 child locks, fail-closed file secrets, loopback services, native S3 mapping, Stage 7 isolation and pre-recreate verification gates are accepted. Branch evidence: focused 8/8, Compose 8/8, pinned auth smoke `200/401/200/403/200/200`, type-check/build/process pass and disposable cleanup; integration focused 8/8 plus process verification pass. Its dedicated worktree/local branch are cleaned; the remote evidence branch remains.
 - Q8 `.9` is independently approved and integrated as `da126a8a`: recovery relevance/isolation, checksum/manifest/retention, cleanup postconditions, shared metrics and systemd schedules pass unit 26/26 plus exact Qdrant restore 5/5. Q9 `.10` is independently approved and integrated as `5d4282ee`: approved LTS/extended-support monitoring pins, authenticated scrape, alerts, persistent notification path, dashboard and shared UID/GID textfile contract pass focused 33/33 and local service smokes. Combined Q6/Q8/Q9 integration passed 59/59, type-check, pinned promtool/amtool and process verification. Both worktrees/local branches are cleaned; remote evidence branches remain.
+- Final documentation correction is integrated and independently rereviewed with P0-P3 zero. The runbooks now require the `.13.7` fresh custom-format backup and isolated restore before migrations, place source recovery before reindex, preserve guarded rollback, and reject the observed 20-byte empty backup artifacts. All final verification/correction worktrees and local branches are cleaned; no remote runtime was touched.
 
 ## Completed Recovery Gate
 
@@ -58,12 +59,12 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: complete final local release-confidence/docs/Graphify
-closeout. The exhaustive read-only credential search found no working Session
-pooler DSN, so keep Q12 remote execution NO-GO until an authorized Supabase
-owner supplies or rotates one and a fresh restore-validated backup passes. Then
-execute the already authorized exact-copy/disposition/reindex and cutover packet
-without `--allow-gaps` or partial activation.
+Recommended action: obtain a current Supabase Session pooler DSN from an
+authorized owner or rotate it. Keep Q12 remote execution NO-GO until that URL
+passes `verify-full` and the reviewed `.13.7` operator produces a fresh custom
+dump that successfully restores in isolation. Then execute the already
+authorized exact-copy/disposition/reindex and cutover packet without
+`--allow-gaps` or partial activation.
 
 ## Starter prompt for next orchestrator
 
@@ -91,8 +92,8 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 ## Verification and Delivery
 
 - Do not weaken RU/EN relevance, strict-mode, restore, resume, coverage, or tenant-isolation tests.
-- Required final gates: focused Stage 2/4/5/6 tests, shared contracts/migrations, pinned Qdrant integration, snapshot/restore, Compose validation, `pnpm type-check`, `pnpm build`, process verification, and canonical stage closeout.
-- Update durable docs, project index, Graphify (`graphify update .`; `graphify cluster-only . --no-viz`), Beads, artifacts, stage summary, and this handoff.
+- Completed local gates: focused Stage 2/4/5/6 backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, pinned Qdrant 15/15, applicable local snapshot/restore 5/5, Compose 8/8, `pnpm type-check`, and `pnpm build` 75/75. Process verification, final Graphify refresh, and canonical closeout are recorded at the delivered HEAD.
+- Keep durable docs, project index, Graphify (`graphify update .`; `graphify cluster-only . --no-viz`), Beads, artifacts, stage summary, and this handoff synchronized before any Q12 continuation.
 - All accepted branches/commits must be pushed under the repo contract.
 - Primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
 
@@ -113,7 +114,6 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
-graph-reviewed: updated — local Graphify `0.8.45` ran `graphify update .` and
-`graphify cluster-only . --no-viz` after the accepted snapshot/current-truth
-changes. The refreshed graph has 50,904 nodes, 75,549 edges, and zero forbidden
-source paths; no external model/API mode or Git hook was used.
+graph-reviewed: pending final refresh — the prior local Graphify `0.8.45`
+refresh used no external model/API mode or Git hook. Final delivered-HEAD counts
+will replace this line during canonical closeout.

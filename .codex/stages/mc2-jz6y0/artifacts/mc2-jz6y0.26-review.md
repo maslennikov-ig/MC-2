@@ -40,11 +40,11 @@ selected_agents:
 catalog_candidates:
   - none - installed review and verification assets cover this bounded test-only correction
 parallel_decision: sequential - one two-test activation contract joins the environment example and all three production Compose files
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: reviewer worktree and branch remain for orchestrator integration; temporary dependency symlinks are removed before commit and ignored build outputs remain disposable
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: review artifact was integrated and the dedicated implementation/review worktrees plus local branches were removed
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed
