@@ -72,12 +72,11 @@ The shared downstream gate is active only when both strings are exact:
 and Stage 6 do not consume a shadow snapshot. Stage 6 still resolves and
 validates course/organization ownership before returning without evidence.
 
-The shadow conflict contract additionally depends on integration task
-`mc2-jz6y0.24.3`. After its GREEN change is integrated, shadow mode detects and
-persists conflicts for comparison, but it creates no questions or decisions and
-cannot influence Phase 2-4, Stage 5, or Stage 6. Before that dependency is in the
-integration tree, shadow mode does not provide conflict-comparison evidence and
-must not be used to approve the manual-conflict rollout step.
+`mc2-jz6y0.24.3` is accepted and integrated in `b5262f4e`, with accepted/pushed
+state recorded by `c7a51996`. Shadow mode therefore detects and persists
+conflicts for comparison, but it creates no questions or decisions and cannot
+influence Phase 2-4, Stage 5, or Stage 6. This current behavior supplies rollout
+evidence; it does not itself approve the manual-conflict rollout step.
 
 The preflight runs after Phase 1 and before Phase 0.5. Large corpora use
 deterministic token-bounded batches, per-document hierarchy, cross-document
@@ -222,8 +221,8 @@ retention.
 
 ## Evidence observability integration gate
 
-The semantics in this section belong to tracked remediation `mc2-jz6y0.24.5`;
-final code `7a7d54ae` received an independent PASS, was integrated as
+Tracked remediation `mc2-jz6y0.24.5` is accepted and integrated: final code
+`7a7d54ae` received an independent PASS, was integrated as
 `b5262f4e`, and was accepted/pushed through `c7a51996`. That satisfies the
 `.24.5` code/integration dependency. It does not authorize rollout, remote
 migration, or Q12 execution; the owner decisions and authorization gates below
@@ -261,13 +260,13 @@ The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 - The append-only decision ledger and canonical Stage 4 tables remain the source
   of truth. The singleton is derived bounded export state, not permission to
   rewrite or replace history.
-- Textfile read-modify-write uses the pending `.24.5` Linux kernel `flock` on a
-  persistent regular `0600` lock file. The parent keeps the inherited FileHandle
-  open while `flock --exclusive --timeout 5 3` is held across read, apply,
-  temp-file write, and atomic rename; close or process death releases the kernel
-  lock. The runtime Dockerfile explicitly supplies `util-linux`, which provides
-  `flock`. A process-local mutex or user-space heartbeat/stale-owner protocol is
-  not the accepted cross-process guarantee.
+- Textfile read-modify-write uses the accepted/integrated `.24.5` Linux kernel
+  `flock` on a persistent regular `0600` lock file. The parent keeps the inherited
+  FileHandle open while `flock --exclusive --timeout 5 3` is held across read,
+  apply, temp-file write, and atomic rename; close or process death releases the
+  kernel lock. The runtime Dockerfile explicitly supplies `util-linux`, which
+  provides `flock`. A process-local mutex or user-space heartbeat/stale-owner
+  protocol is not the accepted cross-process guarantee.
 - Stage 5 publishes actual Stage 5 retrieval attempts: increment immediately
   before each live search and preserve the count through success, no-material,
   fallback, fail-open, and unexpected completion paths. Do not infer attempts
@@ -284,8 +283,11 @@ both versions. Apply exact-checks both allowlisted files, installs
 `20260711150000` plus its exact history row statement-by-statement in autocommit
 mode, then installs `20260711151000` plus its exact history row in one
 transaction. Rollback reverses that order: transactional totals SQL/history
-first, then concurrent index SQL/history. Mismatched history or live definitions
-fail closed; exact repeats and bounded partial recovery are idempotent.
+first, then concurrent index SQL/history. Validation is deliberately bounded: it
+exact-checks allowlisted file SHA/history, the index catalog definition/comment,
+totals table columns/RLS, expected trigger names, and RPC presence/signature. It
+does not validate arbitrary live function bodies. Mismatches in those checked
+surfaces fail closed; exact repeats and bounded partial recovery are idempotent.
 
 The transactional totals step acquires write-conflicting locks on its canonical
 source tables, including the decision ledger, before it creates/seeds the
@@ -341,14 +343,13 @@ The dashboard evidence section contains exactly these six panels:
 - Evidence processing modes;
 - Evidence cost and duration;
 - Evidence conflicts and decisions;
-- Evidence Stage 5/6 retrieval.
+- Evidence Stage 5 / 6 retrieval.
 
 ## Rollout sequence
 
 Rollout is ordered and must not skip a step:
 
-1. disabled, then shadow evidence and conflict collection after
-   `mc2-jz6y0.24.3` is integrated;
+1. disabled, then the current integrated shadow evidence/conflict collection;
 2. active conflict questions for internal/manual courses;
 3. automatic system decisions only after manual conflict evidence is reviewed;
 4. Stage 5 advisory enrichment for an explicitly bounded deterministic course
@@ -391,9 +392,8 @@ Choose one rollback objective before changing configuration:
 - **Audit-only rollback:** make the shared active gate false. New Stage 5/6 jobs
   do not consume evidence snapshots. Stage 6 keeps baseline tenant/course and
   required-RAG protections, but its evidence decision/ref allowlist and
-  evidence-aware cache identity are off. After `mc2-jz6y0.24.3` is integrated,
-  shadow may continue collecting cards/conflicts without decisions or downstream
-  influence.
+  evidence-aware cache identity are off. The integrated shadow path may continue
+  collecting cards/conflicts without decisions or downstream influence.
 - **Evidence-aware containment:** keep the shared gate exactly active so Stage 6
   continues honoring current decisions/refs, but set the Stage 5 cohort to zero.
   This is not audit-only: admitted Stage 4 jobs remain active and can create
@@ -473,13 +473,13 @@ but no product IDs, content, source names/excerpts, runtime hashes, raw errors, 
 model names. This requirement is specific to new evidence logging and does not
 claim that unrelated legacy pipeline logs have already been remediated.
 
-This privacy guarantee becomes true for the evidence rollout only after tracked
-remediation `mc2-jz6y0.24.4` is GREEN and integrated. Until then, privacy is a
-rollout blocker. The targeted remediation scope is limited to Stage 4
-decision/detector completion logs, Stage 5 advisory/fail-open/completion logs,
-and Stage 6 evidence-exclusion logs. Unrelated legacy/general logs are excluded
-from `.24.4`; that exclusion does not weaken this boundary or permit evidence
-rollout through a log path that emits restricted data.
+Tracked remediation `mc2-jz6y0.24.4` is accepted and integrated in `b5262f4e`,
+with accepted/pushed state recorded by `c7a51996`; the privacy boundary is
+current. Its targeted scope remains limited to Stage 4 decision/detector
+completion logs, Stage 5 advisory/fail-open/completion logs, and Stage 6
+evidence-exclusion logs. Unrelated legacy/general logs are excluded from `.24.4`;
+that exclusion does not weaken this boundary or permit evidence rollout through
+a log path that emits restricted data.
 
 Repository, stage, Beads, and commit IDs identify engineering work, not product
 records. They may appear in Beads and `.codex` orchestration artifacts, but must

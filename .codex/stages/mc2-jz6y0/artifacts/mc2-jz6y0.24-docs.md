@@ -51,10 +51,10 @@ depends_on_streams:
   - mc2-jz6y0.9
   - mc2-jz6y0.10
   - mc2-jz6y0.24.1 - exact active gate and Stage 5 cohort, commits 0aad2c20 and b7359f32
-  - mc2-jz6y0.24.2 - owner rollout decision for cohort and promotion thresholds
-  - mc2-jz6y0.24.3 - shadow conflict detection/persistence without decisions or downstream influence; integration dependency, not branch-local behavior
-  - mc2-jz6y0.24.4 - targeted Stage 4/5/6 evidence-log privacy remediation; rollout blocker until GREEN and integrated
-  - mc2-jz6y0.24.5 - final code SHA 7a7d54ae passed independent review, was integrated as b5262f4e, and was accepted/pushed through c7a51996; the code/integration dependency is satisfied without authorizing rollout or Q12
+  - mc2-jz6y0.24.2 - unresolved owner rollout decision for cohort and promotion thresholds
+  - mc2-jz6y0.24.3 - accepted and integrated in b5262f4e, accepted/pushed through c7a51996; current shadow conflict detection/persistence has no decisions or downstream influence
+  - mc2-jz6y0.24.4 - accepted and integrated in b5262f4e, accepted/pushed through c7a51996; targeted Stage 4/5/6 evidence-log privacy boundary is current
+  - mc2-jz6y0.24.5 - accepted and integrated: final code SHA 7a7d54ae passed independent review, was integrated as b5262f4e, and was accepted/pushed through c7a51996
 parallel_decision: parallel with the disjoint E7 observability stream; documentation is sequentially truth-reviewed because the cross-stage contract and rollout procedure share one durable narrative
 status: returned
 delivery_method: merge
@@ -64,7 +64,7 @@ cleanup_notes: Dedicated worktree remains for parent review and integration.
 risk_level: medium
 docs_impact: docs-only
 docs_reviewed: updated
-docs_review_notes: Durable Stage 4/5/6 and operator docs describe accepted evidence behavior, quiesce-first rollback choices, post-gate Stage 6 protections, strict telemetry/log privacy, and dependency-gated observability semantics including absolute epoch reconciliation, kernel locking, unified migration ordering, the complete metric-label allowlist, four alerts, and six panels; project index adds stable navigation only.
+docs_review_notes: Durable Stage 4/5/6 and operator docs describe accepted evidence behavior, quiesce-first rollback choices, post-gate Stage 6 protections, strict telemetry/log privacy, and current integrated observability semantics including absolute epoch reconciliation, kernel locking, unified migration ordering, the complete metric-label allowlist, four alerts, and six panels. Tasks mc2-jz6y0.24.3, .24.4, and .24.5 are accepted/integrated; only mc2-jz6y0.24.2 owner rollout decisions and Q12 remain unresolved. Project index adds stable navigation only.
 graph_reviewed: used
 graph_review_notes: Read and queried the integration worktree's parent Graphify report read-only at base 7b542c8d (50,252 nodes, 74,520 edges, zero model/API tokens). The report oriented the evidence design and Stage 5 enrichment community; accepted artifacts and focused current-source reads supplied exact runtime names. No graph files or hooks were changed; root owns the post-integration refresh.
 verification:
@@ -78,6 +78,8 @@ verification:
   - pre-unification mc2-jz6y0.24.5 aggregate/lock/migration/label docs-invariant GREEN scan: passed, then superseded by final code SHA 7a7d54ae; this docs scan is distinct from the recorded code independent PASS
   - final 7a7d54ae unified-contract docs RED scan: failed on obsolete index-only commands and missing runtime epoch, four-alert, and six-panel contracts
   - final 7a7d54ae unified-runner/epoch/alerts/panels docs-invariant GREEN scan: passed; code independent PASS 7a7d54ae, integration b5262f4e, and accepted/pushed state c7a51996 are recorded separately
+  - final current-state docs RED scan: failed on pending .24.3/.24.4/.24.5 wording, overbroad runner validation, stale defers, and the Stage 5/6 panel title
+  - final current-state/defer/bounded-validation/exact-panel docs-invariant GREEN scan: passed
   - combined reviewed-docs invariant GREEN scan: passed
   - git cat-file integration-order gate for both rollout paths at 0aad2c20: passed; rollout task must merge before docs
   - /home/me/code/mc2/node_modules/.bin/prettier --check over all six changed Markdown files: passed
@@ -96,10 +98,7 @@ changed_files:
   - .codex/project-index.md
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-docs.md
 explicit_defers:
-  - Owner rollout decisions remain unresolved for Stage 5 cohort size/definition, cost, latency, false-conflict, degradation, enrichment quality, observation windows, and rollback ownership; no numeric threshold is claimed.
-  - mc2-jz6y0.24.3 must integrate before docs may claim shadow conflict comparison; it detects/persists conflicts without questions, decisions, or downstream influence.
-  - mc2-jz6y0.24.4 must be GREEN and integrated before the evidence-log privacy guarantee is considered true or rollout may proceed. Its targeted scope is Stage 4 decision/detector completion, Stage 5 advisory/fail-open/completion, and Stage 6 evidence-exclusion logs; unrelated legacy/general logs are excluded without weakening the boundary.
-  - mc2-jz6y0.24.5 code/integration dependency is satisfied by independent PASS 7a7d54ae, integration b5262f4e, and accepted/pushed state c7a51996. This does not satisfy unresolved owner rollout decisions or authorize Q12; no remote runner or Q12 migration command was executed by this docs stream.
+  - mc2-jz6y0.24.2 owner rollout decisions remain unresolved for Stage 5 cohort size/definition, cost, latency, false-conflict, degradation, enrichment quality, observation windows, and rollback ownership; no numeric threshold is claimed.
   - Q12 deployment, live reindex, secret/service changes, staging activation, and every production mutation remain authorization-gated.
 ---
 
