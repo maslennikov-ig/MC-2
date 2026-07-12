@@ -530,6 +530,69 @@ appliedDescribe('approved document evidence migrations applied', () => {
     ).rejects.toThrow(/live document evidence security manifest/iu);
   });
 
+  it('refuses reuse after the clarifying subject index keeps its name but changes shape', async () => {
+    await runDocumentEvidenceApprovedMigrations({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'apply',
+    });
+    await client.query('DROP INDEX clarifying_questions_document_evidence_subject_unique');
+    await client.query(
+      `CREATE UNIQUE INDEX clarifying_questions_document_evidence_subject_unique
+       ON clarifying_questions(id)`
+    );
+    await expect(
+      runDocumentEvidenceApprovedMigrations({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      })
+    ).rejects.toThrow(/clarifying.*subject.*index|security manifest/iu);
+  });
+
+  it('refuses reuse when the required pgcrypto digest dependency is removed', async () => {
+    await runDocumentEvidenceApprovedMigrations({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'apply',
+    });
+    await client.query('DROP EXTENSION pgcrypto CASCADE');
+    await expect(
+      runDocumentEvidenceApprovedMigrations({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      })
+    ).rejects.toThrow(/pgcrypto|digest dependency|security manifest/iu);
+  });
+
+  it('refuses base rollback for an unhistoried downstream increment function', async () => {
+    await runDocumentEvidenceApprovedMigrations({
+      databaseUrl: disposableUrl(databaseUrl!),
+      direction: 'apply',
+    });
+    await client.query(`
+      CREATE FUNCTION increment_document_evidence_terminal_totals()
+      RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+      BEGIN RETURN NEW; END
+      $$
+    `);
+    await expect(
+      runDocumentEvidenceApprovedMigrations({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'rollback',
+      })
+    ).rejects.toThrow(/downstream.*live|live.*downstream/iu);
+    expect(
+      (
+        await client.query(
+          `SELECT to_regclass('public.document_evidence_runs')::text AS base,
+                  to_regprocedure('public.increment_document_evidence_terminal_totals()')::text
+                    AS downstream_function`
+        )
+      ).rows[0]
+    ).toEqual({
+      base: 'document_evidence_runs',
+      downstream_function: 'increment_document_evidence_terminal_totals()',
+    });
+  });
+
   it('refuses rollback recovery when an introduced security object remains', async () => {
     await runDocumentEvidenceApprovedMigrations({
       databaseUrl: disposableUrl(databaseUrl!),

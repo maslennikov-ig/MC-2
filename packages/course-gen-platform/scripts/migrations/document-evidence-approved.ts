@@ -72,6 +72,27 @@ const DOCUMENT_EVIDENCE_FUNCTIONS = [
   'verify_document_evidence_terminal_coverage',
 ] as const;
 
+const DOCUMENT_EVIDENCE_DOWNSTREAM_RELATIONS = [
+  'document_evidence_observability_totals',
+  'idx_clarifying_pending_critical_evidence_created_at',
+] as const;
+
+const DOCUMENT_EVIDENCE_DOWNSTREAM_FUNCTIONS = [
+  'get_document_evidence_observability_totals',
+  'increment_document_evidence_checkpoint_totals',
+  'increment_document_evidence_conflict_totals',
+  'increment_document_evidence_observability_totals',
+  'increment_document_evidence_terminal_totals',
+] as const;
+
+const DOCUMENT_EVIDENCE_DOWNSTREAM_TRIGGERS = [
+  'increment_document_evidence_checkpoint_totals',
+  'increment_document_evidence_conflict_totals',
+  'increment_document_evidence_observability_totals',
+  'increment_document_evidence_terminal_insert_totals',
+  'increment_document_evidence_terminal_totals',
+] as const;
+
 export const DOCUMENT_EVIDENCE_APPROVED_REMOTE_CONFIRMATION = {
   apply: 'APPLY REMOTE DOCUMENT EVIDENCE BASE 20260711120000 20260711130000 20260711140000',
   rollback: 'ROLL BACK REMOTE DOCUMENT EVIDENCE BASE 20260711140000 20260711130000 20260711120000',
@@ -520,6 +541,95 @@ async function assertIndexes(client: Client, names: string[], version: string): 
   }
 }
 
+async function assertClarifyingSubjectIndex(client: Client): Promise<void> {
+  const result = await client.query<{
+    definition: string;
+    predicate: string;
+    indisunique: boolean;
+    indisvalid: boolean;
+    indisready: boolean;
+    indislive: boolean;
+    indnkeyatts: number;
+    indnatts: number;
+    expressions: string[];
+  }>(`
+    SELECT pg_get_indexdef(indexes.indexrelid) AS definition,
+      pg_get_expr(indexes.indpred,indexes.indrelid) AS predicate,
+      indexes.indisunique,indexes.indisvalid,indexes.indisready,indexes.indislive,
+      indexes.indnkeyatts,indexes.indnatts,
+      to_json(ARRAY(
+        SELECT pg_get_indexdef(indexes.indexrelid,position,true)
+        FROM generate_series(1,indexes.indnkeyatts) position ORDER BY position
+      )) AS expressions
+    FROM pg_index indexes
+    JOIN pg_class index_rel ON index_rel.oid=indexes.indexrelid
+    JOIN pg_class table_rel ON table_rel.oid=indexes.indrelid
+    JOIN pg_namespace namespaces ON namespaces.oid=table_rel.relnamespace
+    WHERE namespaces.nspname='public' AND table_rel.relname='clarifying_questions'
+      AND index_rel.relname='clarifying_questions_document_evidence_subject_unique'
+  `);
+  const index = result.rows[0];
+  if (
+    !index ||
+    index.definition !==
+      "CREATE UNIQUE INDEX clarifying_questions_document_evidence_subject_unique ON public.clarifying_questions USING btree (course_id, ((metadata ->> 'run_id'::text)), ((metadata ->> 'subject_key'::text))) WHERE (question_category = 'document_conflicts'::text)" ||
+    index.predicate !== "(question_category = 'document_conflicts'::text)" ||
+    !index.indisunique ||
+    !index.indisvalid ||
+    !index.indisready ||
+    !index.indislive ||
+    index.indnkeyatts !== 3 ||
+    index.indnatts !== 3 ||
+    JSON.stringify(index.expressions) !==
+      JSON.stringify([
+        'course_id',
+        "(metadata ->> 'run_id'::text)",
+        "(metadata ->> 'subject_key'::text)",
+      ])
+  ) {
+    throw new Error('Live clarifying document evidence subject index does not match');
+  }
+}
+
+async function assertPgcryptoDigestDependency(client: Client): Promise<void> {
+  const result = await client.query<{
+    extname: string;
+    extversion: string;
+    nspname: string;
+    digest_signature: string | null;
+    result_type: string | null;
+    language: string | null;
+    security_definer: boolean | null;
+    configuration: string[];
+  }>(`
+    SELECT extensions.extname,extensions.extversion,namespaces.nspname,
+      to_regprocedure('extensions.digest(bytea,text)')::text AS digest_signature,
+      procedures.prorettype::regtype::text AS result_type,languages.lanname AS language,
+      procedures.prosecdef AS security_definer,
+      COALESCE(to_json(procedures.proconfig),'[]'::json) AS configuration
+    FROM pg_extension extensions
+    JOIN pg_namespace namespaces ON namespaces.oid=extensions.extnamespace
+    LEFT JOIN pg_proc procedures
+      ON procedures.oid=to_regprocedure('extensions.digest(bytea,text)')
+    LEFT JOIN pg_language languages ON languages.oid=procedures.prolang
+    WHERE extensions.extname='pgcrypto'
+  `);
+  const dependency = result.rows[0];
+  if (
+    !dependency ||
+    dependency.extname !== 'pgcrypto' ||
+    dependency.extversion !== '1.3' ||
+    dependency.nspname !== 'extensions' ||
+    dependency.digest_signature !== 'extensions.digest(bytea,text)' ||
+    dependency.result_type !== 'bytea' ||
+    dependency.language !== 'c' ||
+    dependency.security_definer !== false ||
+    JSON.stringify(dependency.configuration) !== '[]'
+  ) {
+    throw new Error('Required extensions.pgcrypto digest dependency does not match');
+  }
+}
+
 function normalizeCatalogText(value: unknown): unknown {
   return typeof value === 'string' ? value.replace(/\s+/gu, ' ').trim() : value;
 }
@@ -801,6 +911,8 @@ async function assertLiveMigration(client: Client, version: string): Promise<voi
       ],
       version
     );
+    await assertClarifyingSubjectIndex(client);
+    await assertPgcryptoDigestDependency(client);
     await assertProcedures(
       client,
       [
@@ -818,6 +930,8 @@ async function assertLiveMigration(client: Client, version: string): Promise<voi
     throw new Error(`Live document evidence side identity does not match migration ${version}`);
   }
   await assertProcedures(client, ['document_evidence_conflict_side_handle(uuid,jsonb)'], version);
+  await assertClarifyingSubjectIndex(client);
+  await assertPgcryptoDigestDependency(client);
   const constraints = await client.query<{ name: string }>(
     `SELECT conname AS name FROM pg_constraint
      WHERE conrelid='public.document_evidence_decisions'::regclass
@@ -874,6 +988,14 @@ async function assertMigrationAbsent(client: Client, version: string): Promise<v
     );
   }
   if (
+    version === '20260711130000' &&
+    (await relationExists(client, 'public.clarifying_questions_document_evidence_subject_unique'))
+  ) {
+    throw new Error(
+      `Live clarifying document evidence subject index exists without migration history ${version}`
+    );
+  }
+  if (
     version === '20260711140000' &&
     (
       await client.query<{ procedure: string | null }>(
@@ -917,18 +1039,42 @@ async function assertApprovedHistoryTopology(
 
 async function assertNoDownstreamLiveObjects(client: Client): Promise<void> {
   const result = await client.query<{
-    index_relation: string | null;
-    totals_relation: string | null;
-    totals_rpc: string | null;
-  }>(`
-    SELECT
-      to_regclass('public.idx_clarifying_pending_critical_evidence_created_at')::text
-        AS index_relation,
-      to_regclass('public.document_evidence_observability_totals')::text AS totals_relation,
-      to_regprocedure('public.get_document_evidence_observability_totals()')::text AS totals_rpc
-  `);
+    relations: string[];
+    functions: string[];
+    triggers: string[];
+  }>(
+    `SELECT
+       to_json(ARRAY(
+         SELECT classes.relname
+         FROM pg_class classes
+         JOIN pg_namespace namespaces ON namespaces.oid=classes.relnamespace
+         WHERE namespaces.nspname='public' AND classes.relname=ANY($1::text[])
+         ORDER BY classes.relname
+       )) AS relations,
+       to_json(ARRAY(
+         SELECT procedures.proname || '(' || pg_get_function_identity_arguments(procedures.oid) || ')'
+         FROM pg_proc procedures
+         JOIN pg_namespace namespaces ON namespaces.oid=procedures.pronamespace
+         WHERE namespaces.nspname='public' AND procedures.proname=ANY($2::text[])
+         ORDER BY procedures.proname,pg_get_function_identity_arguments(procedures.oid)
+       )) AS functions,
+       to_json(ARRAY(
+         SELECT triggers.tgname
+         FROM pg_trigger triggers
+         JOIN pg_class tables ON tables.oid=triggers.tgrelid
+         JOIN pg_namespace namespaces ON namespaces.oid=tables.relnamespace
+         WHERE namespaces.nspname='public' AND NOT triggers.tgisinternal
+           AND triggers.tgname=ANY($3::text[])
+         ORDER BY triggers.tgname
+       )) AS triggers`,
+    [
+      DOCUMENT_EVIDENCE_DOWNSTREAM_RELATIONS,
+      DOCUMENT_EVIDENCE_DOWNSTREAM_FUNCTIONS,
+      DOCUMENT_EVIDENCE_DOWNSTREAM_TRIGGERS,
+    ]
+  );
   const row = result.rows[0];
-  if (row?.index_relation || row?.totals_relation || row?.totals_rpc) {
+  if (row && (row.relations.length > 0 || row.functions.length > 0 || row.triggers.length > 0)) {
     throw new Error('Refusing base rollback while downstream live objects remain');
   }
 }
