@@ -179,11 +179,14 @@ COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/src 
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/tools ./tools
 COPY packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh /opt/megacampus/qdrant-operator-entrypoint.sh
 
-RUN chmod 0555 /opt/megacampus/qdrant-operator-entrypoint.sh && \
+RUN install -d -o nodejs -g nodejs -m 0555 /run/source-recovery && \
+    install -d -o nodejs -g nodejs -m 0555 /var/lib/megacampus-source-recovery && \
+    chmod 0555 /opt/megacampus/qdrant-operator-entrypoint.sh && \
     /opt/megacampus/qdrant-operator-entrypoint.sh self-check && \
     /opt/megacampus/qdrant-operator-entrypoint.sh bootstrap --help >/dev/null && \
     /opt/megacampus/qdrant-operator-entrypoint.sh verify --help >/dev/null && \
     /opt/megacampus/qdrant-operator-entrypoint.sh reindex --help >/dev/null && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh source-recovery --help >/dev/null && \
     /opt/megacampus/qdrant-operator-entrypoint.sh snapshot --help >/dev/null && \
     /opt/megacampus/qdrant-operator-entrypoint.sh restore-drill --help >/dev/null
 

@@ -220,6 +220,105 @@ services:
     networks:
       - megacampus
 
+  # Source-recovery planning and copy verification require database access but
+  # receive both upload roots read-only. The only writable filesystem
+  # capability outside reviewed state is the narrow same-filesystem probe bind.
+  qdrant-source-recovery-planner:
+    image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
+    platform: linux/amd64
+    pull_policy: never
+    profiles: ['operator']
+    restart: 'no'
+    user: '1001:1001'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file:
+      - ${PRODUCTION_ENV_FILE:-.env.production}
+    environment:
+      - QDRANT_API_KEY=
+      - QDRANT_API_KEY_FILE=
+      - SOURCE_RECOVERY_MANIFEST_PATH=/var/lib/megacampus-source-recovery/manifest.json
+      - SOURCE_RECOVERY_JOURNAL_PATH=/var/lib/megacampus-source-recovery/progress/journal.json
+      - SOURCE_RECOVERY_PLAN_INPUT_PATH=/run/source-recovery/plan-input.json
+      - SOURCE_RECOVERY_CAPABILITY_PROBE_DIRECTORY=/run/source-recovery/capability
+    volumes:
+      - ${SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT:?SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT must be set}:/opt/megacampus/data/uploads-dev:ro
+      - ${SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT:?SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT must be set}:/opt/megacampus/data/uploads:ro
+      - ${SOURCE_RECOVERY_STATE_HOST_DIR:?SOURCE_RECOVERY_STATE_HOST_DIR must be set}:/var/lib/megacampus-source-recovery:rw
+      - ${SOURCE_RECOVERY_PLAN_INPUT_FILE:?SOURCE_RECOVERY_PLAN_INPUT_FILE must be set}:/run/source-recovery/plan-input.json:ro
+      - ${SOURCE_RECOVERY_CAPABILITY_HOST_DIR:?SOURCE_RECOVERY_CAPABILITY_HOST_DIR must be set}:/run/source-recovery/capability:rw
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /run/qdrant-operator:size=1m,mode=0700,uid=1001,gid=1001
+    networks:
+      - megacampus
+    command: ['source-recovery', '--help']
+
+  # The copy executor has no network, environment file, or secrets. It can
+  # read development uploads and the immutable reviewed manifest, and can
+  # write only production uploads plus the owner-only progress journal.
+  qdrant-source-recovery-executor:
+    image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
+    platform: linux/amd64
+    pull_policy: never
+    profiles: ['operator']
+    restart: 'no'
+    user: '1001:1001'
+    read_only: true
+    network_mode: none
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      - QDRANT_API_KEY=
+      - QDRANT_API_KEY_FILE=
+      - SOURCE_RECOVERY_MANIFEST_PATH=/run/source-recovery/manifest.json
+      - SOURCE_RECOVERY_JOURNAL_PATH=/run/source-recovery/progress/journal.json
+    volumes:
+      - ${SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT:?SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT must be set}:/opt/megacampus/data/uploads-dev:ro
+      - ${SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT:?SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT must be set}:/opt/megacampus/data/uploads:rw
+      - ${SOURCE_RECOVERY_MANIFEST_FILE:?SOURCE_RECOVERY_MANIFEST_FILE must be set}:/run/source-recovery/manifest.json:ro
+      - ${SOURCE_RECOVERY_PROGRESS_HOST_DIR:?SOURCE_RECOVERY_PROGRESS_HOST_DIR must be set}:/run/source-recovery/progress:rw
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /run/qdrant-operator:size=1m,mode=0700,uid=1001,gid=1001
+    command: ['source-recovery', '--help']
+
+  # Database dispositions are isolated from every upload tree. Only the
+  # reviewed manifest is read-only and the CAS progress directory is writable.
+  qdrant-source-recovery-disposition:
+    image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
+    platform: linux/amd64
+    pull_policy: never
+    profiles: ['operator']
+    restart: 'no'
+    user: '1001:1001'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file:
+      - ${PRODUCTION_ENV_FILE:-.env.production}
+    environment:
+      - QDRANT_API_KEY=
+      - QDRANT_API_KEY_FILE=
+      - SOURCE_RECOVERY_MANIFEST_PATH=/run/source-recovery/manifest.json
+      - SOURCE_RECOVERY_JOURNAL_PATH=/run/source-recovery/progress/journal.json
+    volumes:
+      - ${SOURCE_RECOVERY_MANIFEST_FILE:?SOURCE_RECOVERY_MANIFEST_FILE must be set}:/run/source-recovery/manifest.json:ro
+      - ${SOURCE_RECOVERY_PROGRESS_HOST_DIR:?SOURCE_RECOVERY_PROGRESS_HOST_DIR must be set}:/run/source-recovery/progress:rw
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /run/qdrant-operator:size=1m,mode=0700,uid=1001,gid=1001
+    networks:
+      - megacampus
+    command: ['source-recovery', '--help']
+
   # Authenticated Qdrant and textfile metrics collection.
   prometheus:
     image: prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893

@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -91,9 +91,7 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
     expect(wrapper).toContain('[[ $# -eq 1 && "$1" == ./entrypoint.sh ]] && set --');
     expect(wrapper).toContain('exec /qdrant/entrypoint.sh');
     expect(wrapper).toContain('snapshot_storage="${QDRANT_SNAPSHOT_STORAGE:-}"');
-    expect(wrapper).toContain(
-      'QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots'
-    );
+    expect(wrapper).toContain('QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/storage/snapshots');
     expect(wrapper).not.toMatch(/\b(curl|wget|nc)\b/);
     expect(wrapper).not.toMatch(/set\s+-[^\n]*x/);
 
@@ -188,9 +186,7 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
 
     const staging = serviceBlock(source('docker-compose.infra.yml'), 'qdrant');
     expect(staging).toContain('QDRANT_SNAPSHOT_STORAGE=local');
-    expect(staging).toContain(
-      `QDRANT__STORAGE__SNAPSHOTS_PATH=${QDRANT_LOCAL_SNAPSHOT_PATH}`
-    );
+    expect(staging).toContain(`QDRANT__STORAGE__SNAPSHOTS_PATH=${QDRANT_LOCAL_SNAPSHOT_PATH}`);
     expect(staging).not.toMatch(/QDRANT_S3_|qdrant_s3_/u);
 
     const stagingRecovery = serviceBlock(
@@ -286,6 +282,24 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
       writeFileSync(join(directory, name), `${secretValues[index]}\n`, { mode: 0o400 });
     }
     const envFile = join(directory, 'compose.env');
+    const sourceRecoveryState = join(directory, 'source-recovery-state');
+    const sourceRecoveryProgress = join(sourceRecoveryState, 'progress');
+    const sourceRecoveryDevelopment = join(directory, 'uploads-dev');
+    const sourceRecoveryProduction = join(directory, 'uploads');
+    const sourceRecoveryCapability = join(directory, 'source-recovery-capability');
+    for (const path of [
+      sourceRecoveryState,
+      sourceRecoveryProgress,
+      sourceRecoveryDevelopment,
+      sourceRecoveryProduction,
+      sourceRecoveryCapability,
+    ]) {
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+    }
+    const sourceRecoveryPlan = join(directory, 'source-recovery-plan.json');
+    const sourceRecoveryManifest = join(sourceRecoveryState, 'manifest.json');
+    writeFileSync(sourceRecoveryPlan, '{}\n', { mode: 0o600 });
+    writeFileSync(sourceRecoveryManifest, '{}\n', { mode: 0o400 });
     writeFileSync(
       envFile,
       [
@@ -302,6 +316,13 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
         `QDRANT_METRICS_TEXTFILE_HOST_DIR=${directory}`,
         'QDRANT_METRICS_GID=2001',
         'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        `SOURCE_RECOVERY_STATE_HOST_DIR=${sourceRecoveryState}`,
+        `SOURCE_RECOVERY_PROGRESS_HOST_DIR=${sourceRecoveryProgress}`,
+        `SOURCE_RECOVERY_PLAN_INPUT_FILE=${sourceRecoveryPlan}`,
+        `SOURCE_RECOVERY_MANIFEST_FILE=${sourceRecoveryManifest}`,
+        `SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT=${sourceRecoveryDevelopment}`,
+        `SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT=${sourceRecoveryProduction}`,
+        `SOURCE_RECOVERY_CAPABILITY_HOST_DIR=${sourceRecoveryCapability}`,
         'WEB_IMAGE=ghcr.io/maslennikov-ig/mc-2/web@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         'API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         'COLOR=blue',
@@ -337,13 +358,10 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
           };
         };
         const qdrant = model.services.qdrant;
-        expect(qdrant.environment.QDRANT__STORAGE__SNAPSHOTS_PATH).toBe(
-          QDRANT_LOCAL_SNAPSHOT_PATH
-        );
+        expect(qdrant.environment.QDRANT__STORAGE__SNAPSHOTS_PATH).toBe(QDRANT_LOCAL_SNAPSHOT_PATH);
         const persistentMount = qdrant.volumes.find(
           volume =>
-            volume.type === 'volume' &&
-            QDRANT_LOCAL_SNAPSHOT_PATH.startsWith(`${volume.target}/`)
+            volume.type === 'volume' && QDRANT_LOCAL_SNAPSHOT_PATH.startsWith(`${volume.target}/`)
         );
         expect(persistentMount).toMatchObject({ target: '/qdrant/storage' });
       }

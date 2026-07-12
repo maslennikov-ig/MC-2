@@ -29,6 +29,8 @@ Commands:
   bootstrap [options]                 Create/verify the physical collection and alias
   verify [options]                    Verify the physical collection and alias
   reindex plan|execute|verify [...]   Plan, execute, or verify source-driven reindex
+  source-recovery plan|verify|execute|rollback|apply-dispositions|verify-dispositions
+                                      Recover audited source files and dispositions
   reindex-worker                      Consume only a dedicated qdrant-reindex-<uuid> queue
   snapshot                            Create and record an authenticated snapshot
   restore-drill                       Restore and verify an isolated collection
@@ -153,8 +155,76 @@ node_privilege_args() {
 }
 
 exec_as_node() {
+  if [[ $(id -u) == "$NODE_UID" && $(id -g) == "$NODE_GID" ]]; then
+    exec "$@"
+  fi
   node_privilege_args
   exec /usr/bin/setpriv "${NODE_PRIVILEGE_ARGS[@]}" -- "$@"
+}
+
+require_normalized_absolute_path() {
+  local value="$1"
+  local label="$2"
+  [[ $value == /* && $(realpath -m -- "$value") == "$value" ]] ||
+    fail "$label must be a normalized absolute path"
+}
+
+require_source_recovery_arguments() {
+  local mode="${1:-}"
+  shift || true
+  local manifest='' journal='' plan_input='' capability='' confirmation=''
+  local previous='' argument value
+
+  case "$mode" in
+    plan|verify|execute|rollback|apply-dispositions|verify-dispositions) ;;
+    *) fail 'source-recovery requires an approved mode' ;;
+  esac
+
+  for argument in "$@"; do
+    if [[ -n $previous ]]; then
+      value="$argument"
+      case "$previous" in
+        --manifest-path) manifest="$value" ;;
+        --journal-path) journal="$value" ;;
+        --plan-input-path) plan_input="$value" ;;
+        --capability-probe-directory) capability="$value" ;;
+        --confirm-run-id) confirmation="$value" ;;
+      esac
+      previous=''
+      continue
+    fi
+    case "$argument" in
+      --manifest-path|--journal-path|--plan-input-path|--capability-probe-directory|--confirm-run-id)
+        previous="$argument"
+        ;;
+      --manifest-path=*|--journal-path=*|--plan-input-path=*|--capability-probe-directory=*|--confirm-run-id=*)
+        value="${argument#*=}"
+        case "${argument%%=*}" in
+          --manifest-path) manifest="$value" ;;
+          --journal-path) journal="$value" ;;
+          --plan-input-path) plan_input="$value" ;;
+          --capability-probe-directory) capability="$value" ;;
+          --confirm-run-id) confirmation="$value" ;;
+        esac
+        ;;
+    esac
+  done
+  [[ -z $previous ]] || fail "$previous requires a value"
+
+  manifest="${manifest:-${SOURCE_RECOVERY_MANIFEST_PATH:-}}"
+  journal="${journal:-${SOURCE_RECOVERY_JOURNAL_PATH:-}}"
+  require_normalized_absolute_path "$manifest" 'source-recovery manifest path'
+  require_normalized_absolute_path "$journal" 'source-recovery journal path'
+
+  if [[ $mode == plan ]]; then
+    plan_input="${plan_input:-${SOURCE_RECOVERY_PLAN_INPUT_PATH:-}}"
+    capability="${capability:-${SOURCE_RECOVERY_CAPABILITY_PROBE_DIRECTORY:-}}"
+    require_normalized_absolute_path "$plan_input" 'source-recovery plan input path'
+    require_normalized_absolute_path "$capability" 'source-recovery capability directory'
+  elif [[ $mode != verify ]]; then
+    [[ $confirmation =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
+      fail 'source-recovery mutating modes require --confirm-run-id UUIDv4'
+  fi
 }
 
 load_raw_api_key() {
@@ -192,6 +262,7 @@ run_self_check() {
       "./src/shared/qdrant/create-collection.ts",
       "./tools/qdrant/verify-collection.ts",
       "./tools/qdrant/reindex-course-embeddings.ts",
+      "./tools/qdrant/source-recovery.ts",
       "./tools/qdrant/snapshot.ts",
       "./tools/qdrant/restore-drill.ts",
     ];
@@ -263,6 +334,14 @@ case "$command_name" in
     [[ ${STAGE6_WORKER:-false} != 'true' ]] || fail 'reindex worker cannot run in Stage 6 mode'
     load_raw_api_key
     exec_as_node "$TSX_BIN" dist/orchestrator/worker-entrypoint.js
+    ;;
+  source-recovery)
+    if [[ ${1:-} == '-h' || ${1:-} == '--help' ]]; then
+      exec_as_node "$TSX_BIN" tools/qdrant/source-recovery.ts "$@"
+    fi
+    require_source_recovery_arguments "$@"
+    unset QDRANT_API_KEY QDRANT_API_KEY_FILE
+    exec_as_node "$TSX_BIN" tools/qdrant/source-recovery.ts "$@"
     ;;
   snapshot)
     if [[ ${1:-} == '-h' || ${1:-} == '--help' ]]; then
