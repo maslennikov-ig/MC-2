@@ -75,7 +75,9 @@ for image_spec in \
     image_key="${image_spec%%:*}"
     image_repository="${image_spec#*:}"
     image_value="$(awk -v key="$image_key" 'index($0, key "=") == 1 { value=substr($0, length(key) + 2) } END { print value }' "$BASE_PATH/.env.$TARGET_COLOR")"
-    [[ "$image_value" =~ ^${image_repository}@sha256:[0-9a-f]{64}$ ]] || {
+    image_prefix="${image_repository}@sha256:"
+    image_digest="${image_value#"$image_prefix"}"
+    [[ "$image_value" == "$image_prefix"* && "$image_digest" =~ ^[0-9a-f]{64}$ ]] || {
         echo "Error: $image_key is missing or mutable in rollback target configuration." >&2
         exit 1
     }

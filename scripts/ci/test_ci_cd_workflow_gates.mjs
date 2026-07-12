@@ -76,6 +76,9 @@ const createQdrantSecretsStep = stagingDeploy?.steps?.find(
   step => step?.name === 'Create Qdrant secret files'
 );
 const createQdrantSecrets = createQdrantSecretsStep?.run;
+const cleanupQdrantSecretsStep = stagingDeploy?.steps?.find(
+  step => step?.name === 'Cleanup Qdrant secret upload'
+);
 const deployCommand = stagingDeploy?.steps?.find(step => step?.name === 'Deploy')?.run;
 const verifyDeployment = stagingDeploy?.steps?.find(
   step => step?.name === 'Verify deployment'
@@ -133,6 +136,11 @@ assert(
     createQdrantSecrets.includes('sudo install -o 65534 -g 65534 -m 0400') &&
     createQdrantSecrets.includes('sudo install -o 472 -g 472 -m 0400'),
   'staging secret files must be owner-only for their exact container consumers'
+);
+assert(
+  cleanupQdrantSecretsStep?.if === 'always()' &&
+    cleanupQdrantSecretsStep?.run?.includes('.qdrant-secrets-${{ github.run_id }}'),
+  'workflow must retry remote plaintext upload cleanup after secret-step failure or cancellation'
 );
 assert(
   createQdrantSecrets.includes("trap 'rm -rf") && createQdrantSecrets.includes("' EXIT"),

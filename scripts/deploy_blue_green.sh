@@ -70,7 +70,14 @@ require_immutable_ref() {
     local value="$1"
     local repository="$2"
     local label="$3"
-    [[ "$value" =~ ^${repository}@sha256:[0-9a-f]{64}$ ]] || {
+    local prefix="${repository}@sha256:"
+    local digest
+    if [[ "$value" != "$prefix"* ]]; then
+        echo "ERROR: $label must be a repository digest under $repository" >&2
+        return 1
+    fi
+    digest="${value#"$prefix"}"
+    [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || {
         echo "ERROR: $label must be a repository digest under $repository" >&2
         return 1
     }

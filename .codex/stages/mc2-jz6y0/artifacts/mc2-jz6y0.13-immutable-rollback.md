@@ -119,6 +119,11 @@ wrong-repository digests, and failed remote secret-upload cleanup. The final
 focused suite passes all three scripts and both Compose renders without using a
 live server or secret value.
 
+Repository identity is compared as a literal prefix plus a separately validated
+64-character digest, avoiding regex metacharacter ambiguity. A dedicated
+workflow `always()` step repeats cleanup of the run-scoped remote upload path if
+the install command fails or the preceding step is cancelled.
+
 # Remote state
 
 No SSH write, service change, secret write, image pull, deploy, database change,
