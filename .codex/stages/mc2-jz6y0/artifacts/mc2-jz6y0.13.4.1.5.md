@@ -45,11 +45,11 @@ selected_agents:
 catalog_candidates:
   - none - installed skills and accepted public repository seams fully cover the local acceptance task
 parallel_decision: sequential - the single synthetic truth fixture binds filesystem, journal, disposition, evidence, and reindex identities; rollback uses a separate fixture to avoid mutating forward evidence
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: dedicated worktree remains for orchestrator review and integration; both disposable runtime roots are removed by test finally blocks
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation, negative-review, and rereview worktrees plus local branches were removed after fresh integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed
@@ -75,7 +75,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-acceptance.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.5.md
 explicit_defers:
-  - independent correction rereview and orchestrator acceptance remain required before integration
+  - no implementation defer; authorized staging execution remains a separate Q12 live gate
 ---
 
 # Source Recovery Acceptance Report: mc2-jz6y0.13.4.1.5

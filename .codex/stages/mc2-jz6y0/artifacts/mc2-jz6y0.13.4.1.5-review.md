@@ -43,10 +43,10 @@ depends_on_streams:
   - mc2-jz6y0.13.4.1.4
 parallel_decision: sequential - the acceptance join depends on every accepted recovery stream
 status: returned
-delivery_method: not accepted
+delivery_method: cherry-pick
 accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: review worktree and branch remain for orchestrator integration; temporary dependency symlinks are removed before commit
+cleanup_status: cleaned
+cleanup_notes: immutable negative review was integrated as history; its dedicated worktree/local branch were removed after the linked correction rereview passed and integration verification completed
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed

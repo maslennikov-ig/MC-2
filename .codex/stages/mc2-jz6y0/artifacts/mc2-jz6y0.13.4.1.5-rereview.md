@@ -44,11 +44,11 @@ depends_on_streams:
   - mc2-jz6y0.13.4.1.3
   - mc2-jz6y0.13.4.1.4
 parallel_decision: sequential - this independent rereview evaluates the single joined Task 6 correction after all accepted recovery streams
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: reviewer worktree and branch remain for orchestrator integration; temporary dependency symlinks are removed before commit
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: rereview artifact was integrated; the dedicated worktree/local branch were removed after fresh integration verification, while the pushed remote evidence branch remains
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed
@@ -66,7 +66,7 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.5-rereview.md
 explicit_defers:
-  - orchestrator acceptance, integration, and dedicated-worktree cleanup remain outside the reviewer write zone
+  - none - the local Task 6 acceptance correction is integrated and independently accepted
 ---
 
 # Summary

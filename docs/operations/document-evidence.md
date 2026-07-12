@@ -404,9 +404,10 @@ No remote mutation has occurred. Activation remains NO-GO until:
 2. the accepted checksum-verified local-volume snapshot and isolated restore
    remain green; this is staging evidence only, while production S3 stays gated
    by `mc2-jz6y0.13.6`;
-3. implementation/review bead `.13.4.1` completes, followed by the 42 exact
-   source copies through the crash-durable recovery contract; the six absent
-   eligible originals receive an explicit audited owner disposition—never
+3. implementation/review bead `.13.4.1` is locally accepted at 3/3 focused and
+   456/456 joined recovery/reindex tests; the authorized window must then run
+   the 42 exact source copies through the crash-durable recovery contract. The
+   six absent eligible originals receive an explicit audited owner disposition—never
    `--allow-gaps` or derived substitution—and the separate eighteen-row
    Career Playbook retention/data-hygiene disposition is recorded without
    counting those non-eligible rows in the 240-document Qdrant denominator;

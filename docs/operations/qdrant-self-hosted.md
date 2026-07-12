@@ -310,6 +310,47 @@ and verify gap-free source parity, strict schema, exact point identities, RU and
 EN BM25/RRF/Formula relevance, and negative organization/course isolation. Do
 not flush Redis or touch the live course-generation queue to clean up a reindex.
 
+### Audited source recovery before reindex
+
+The source-recovery implementation and disposable exact-count acceptance are
+locally complete. The acceptance harness passed 3/3 focused and 456/456 joined
+recovery/reindex tests, including a publish-before-checkpoint restart, concrete
+Stage 4 adapter binding, tenant CAS, guarded rollback, and pre-teardown residue
+checks. This does not mean that staging files have already been copied.
+
+For the authorized activation window, prepare the reviewed owner-only plan input
+and empty UID/GID `1001:1001` mode-0700 state, progress, and capability
+directories. The capability directory must be a sibling of both upload roots on
+their filesystem, never inside either root. The plan input is mode 0600. Run the
+single host wrapper; it holds the flock, requires explicit writer stopping,
+restores exact prior service state, and sequences plan, networkless execute, copy
+verification, disposition apply, and disposition verification:
+
+```bash
+sudo /opt/megacampus/deploy/qdrant/source-recovery-run.sh \
+  --stop-writers \
+  --operation forward \
+  --run-id "$recovery_run_id" \
+  --project-directory /opt/megacampus \
+  --env-file /opt/megacampus/.env.production \
+  --plan-input /var/lib/megacampus-source-recovery/plan-input.json \
+  --manifest /var/lib/megacampus-source-recovery/state/manifest.json \
+  --progress-directory /var/lib/megacampus-source-recovery/state/progress \
+  --development-root /opt/megacampus/data/uploads-dev \
+  --production-root /opt/megacampus/data/uploads \
+  --capability-directory /opt/megacampus/data/source-recovery-capability
+```
+
+After an interruption, reuse the same run ID and immutable manifest/journal,
+omit the fresh-only plan/capability arguments, and select the earliest durable
+continuation with `--resume-from execute|verify|apply-dispositions|verify-dispositions`.
+The wrapper never replans a resume and always reruns copy verification before a
+disposition step. Before reindex, require exact post-truth
+`240 = 234 recoverable + 6 audited failed`, all 24 dispositions verified, zero
+unresolved eligible gaps, and no owned temporary residue. If rollback is
+required before reindex, use `--operation rollback`; it removes only unchanged
+manifest-created targets and refuses a replaced inode.
+
 Host `pnpm` and loopback commands remain supported only for the checked-out
 local-development procedure in
 `packages/course-gen-platform/docs/qdrant-setup.md`.
@@ -329,10 +370,10 @@ owner authorization does not waive these current hard stops:
    copies can raise recoverable eligible sources from 109 to 234; exact
    originals for the remaining four missing and two invalid eligible rows were
    not found. Eighteen non-eligible Career Playbook originals are also absent;
-3. source-recovery implementation `.13.4.1`, its independent review, the 42
-   crash-durable copies, and the explicit audited owner disposition for absent
-   originals must complete. `--allow-gaps` and derived-content substitution are
-   forbidden.
+3. source-recovery implementation `.13.4.1` and its independent local acceptance
+   are complete; the authorized window must still execute the 42 crash-durable
+   copies and all 24 audited dispositions before reindex. `--allow-gaps` and
+   derived-content substitution are forbidden.
 
 After these gates are resolved, execute this order as one observed activation
 window:
