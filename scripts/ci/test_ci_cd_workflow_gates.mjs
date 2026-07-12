@@ -138,6 +138,11 @@ assert(
   'staging secret files must be owner-only for their exact container consumers'
 );
 assert(
+  workflow.jobs?.['build-docker']?.steps?.find(step => step?.name?.startsWith('Build and push'))
+    ?.with?.target === '${{ matrix.target }}',
+  'Docker matrix builds must honor the qdrant-operator target'
+);
+assert(
   cleanupQdrantSecretsStep?.if === 'always()' &&
     cleanupQdrantSecretsStep?.run?.includes('.qdrant-secrets-${{ github.run_id }}'),
   'workflow must retry remote plaintext upload cleanup after secret-step failure or cancellation'
@@ -201,14 +206,24 @@ for (const requiredGuard of [
   'write_color_env "$CURRENT_COLOR"',
   'write_color_env "$NEW_COLOR"',
   'if [ "$APP_DEPLOY_NEEDED" = "true" ]; then',
+  'OPERATOR_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/qdrant-operator"',
+  'QDRANT_OPERATOR_IMAGE_SHA256',
 ]) {
   assert(
     deployScript.includes(requiredGuard),
     `deploy script must include immutable rollback guard: ${requiredGuard}`
   );
 }
+assert(
+  deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256') <
+    deployScript.indexOf('up -d redis qdrant prometheus grafana'),
+  'operator image digest must be resolved and persisted before infrastructure Compose starts'
+);
 const appSwitchSection = deployScript.slice(
-  deployScript.indexOf('# 6. Docker Login'),
+  deployScript.indexOf(
+    'if [ "$APP_DEPLOY_NEEDED" = "true" ]; then',
+    deployScript.indexOf('# 4. Ensure Infrastructure')
+  ),
   deployScript.indexOf('# 12. Update Workers')
 );
 assert(

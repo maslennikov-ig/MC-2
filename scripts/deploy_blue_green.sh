@@ -15,6 +15,7 @@ NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
 DEPLOY_STATE="$BASE_PATH/deploy_state"
 WEB_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/web"
 API_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/api"
+OPERATOR_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/qdrant-operator"
 DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
 DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}
 DEPLOY_BRIDGE_CHANGED=${DEPLOY_BRIDGE_CHANGED:-true}
@@ -235,6 +236,21 @@ echo "   Target:  $NEW_COLOR (web:$NEW_WEB_PORT, api:$NEW_API_PORT)"
 echo "   Changes: web=$DEPLOY_WEB_CHANGED api=$DEPLOY_API_CHANGED bridge=$DEPLOY_BRIDGE_CHANGED config=$DEPLOY_CONFIG_CHANGED"
 echo ""
 
+# Resolve and pre-pull the exact operator image before any Compose invocation.
+# The CI change detector publishes this target for every deploy-relevant commit.
+if [ -n "$GITHUB_TOKEN" ]; then
+    echo "Logging in to GHCR..."
+    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
+fi
+OPERATOR_IMAGE="$(resolve_repo_digest "$OPERATOR_REPOSITORY:$TAG" "$OPERATOR_REPOSITORY")"
+QDRANT_OPERATOR_IMAGE_SHA256="${OPERATOR_IMAGE#"$OPERATOR_REPOSITORY@sha256:"}"
+[[ "$QDRANT_OPERATOR_IMAGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "ERROR: QDRANT_OPERATOR_IMAGE_SHA256 was not resolved from the release image" >&2
+    exit 1
+}
+upsert_env "$BASE_PATH/.env.$ENV" QDRANT_OPERATOR_IMAGE_SHA256 "$QDRANT_OPERATOR_IMAGE_SHA256"
+unset OPERATOR_IMAGE QDRANT_OPERATOR_IMAGE_SHA256
+
 if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     write_deploy_state preparing
 fi
@@ -277,12 +293,6 @@ docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.
     up -d redis qdrant prometheus grafana docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
 echo "   Infrastructure ready."
 echo ""
-
-# 6. Docker Login to GHCR (if GITHUB_TOKEN provided)
-if [ -n "$GITHUB_TOKEN" ]; then
-    echo "Logging in to GHCR..."
-    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
-fi
 
 if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     ensure_color_image_ref "$CURRENT_COLOR" WEB_IMAGE "$WEB_REPOSITORY" "megacampus-web-$CURRENT_COLOR"
