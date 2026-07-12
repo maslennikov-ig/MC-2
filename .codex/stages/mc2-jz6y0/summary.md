@@ -1,6 +1,6 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: Q12 staging authorized; live activation remains NO-GO on required CA/S3/source inputs
+Status: Q12 staging authorized; live activation remains NO-GO on current DB credentials and missing-source product truth
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
 Current accepted integration at docs reconciliation start: `6645708dcb1c0792ef293744ac921838f258cb4f`
@@ -31,17 +31,17 @@ Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback remedi
 
 ## Parallel Decomposition
 
-| Stream | Goal                                 | Agent                                        | Write zone                                         | Dependencies             | Verification                                         | Decision                                                          |
-| ------ | ------------------------------------ | -------------------------------------------- | -------------------------------------------------- | ------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| D      | authoritative version-sensitive docs | `docs_researcher`                            | `artifacts/authoritative-docs.md` only             | none                     | primary links and exact request/config shapes        | parallel now                                                      |
-| F      | Q1 schema foundation                 | `backend_developer`                          | config/schema/tests/package pin                    | none                     | RED/GREEN unit and package type-check                | first contract gate                                               |
-| S      | Q2-Q5 search correctness             | `backend_developer` + `correctness_reviewer` | Qdrant runtime, Stage 5/6 callers, Qdrant tests/CI | F                        | focused unit and pinned integration                  | parallel with I after F; sequential internally due shared modules |
-| I      | Q6 runtime/security                  | `deploy_specialist`                          | Compose, deploy scripts, env examples              | F                        | Compose config, shell syntax, secret/exposure review | parallel with S                                                   |
-| L      | Q7-Q8 data/recovery                  | `db_migration_specialist`/worker + reviewer  | Stage 2 contract, Qdrant tools, systemd, tests     | Q2/Q3 and Q6 for Q8      | plan, shared types, snapshot/restore                 | sequential internally due shared tools/package files              |
-| O      | Q9 observability                     | `deploy_specialist`                          | monitoring config, Compose, ops runbook            | Q6                       | promtool, Compose, alert/dashboard audit             | parallel with Q7                                                  |
-| C      | Q10 docs retirement                  | bounded worker then `docs_reviewer`          | named docs and project index                       | Q1-Q9                    | Cloud/custom-BM25 scans                              | sequential after implementation truth                             |
-| A      | Q11 acceptance/closeout              | root + reviewers                             | evidence and in-scope corrections                  | Q1-Q10                   | full local gates and canonical closeout              | sequential shared gate                                            |
-| X      | Q12 staging                          | root + deploy review                         | live evidence/state only                           | Q11 + CA/S3/source truth | live cutover gates                                   | authorized; NO-GO until hard inputs and gates pass                |
+| Stream | Goal                                 | Agent                                        | Write zone                                         | Dependencies          | Verification                                         | Decision                                                          |
+| ------ | ------------------------------------ | -------------------------------------------- | -------------------------------------------------- | --------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| D      | authoritative version-sensitive docs | `docs_researcher`                            | `artifacts/authoritative-docs.md` only             | none                  | primary links and exact request/config shapes        | parallel now                                                      |
+| F      | Q1 schema foundation                 | `backend_developer`                          | config/schema/tests/package pin                    | none                  | RED/GREEN unit and package type-check                | first contract gate                                               |
+| S      | Q2-Q5 search correctness             | `backend_developer` + `correctness_reviewer` | Qdrant runtime, Stage 5/6 callers, Qdrant tests/CI | F                     | focused unit and pinned integration                  | parallel with I after F; sequential internally due shared modules |
+| I      | Q6 runtime/security                  | `deploy_specialist`                          | Compose, deploy scripts, env examples              | F                     | Compose config, shell syntax, secret/exposure review | parallel with S                                                   |
+| L      | Q7-Q8 data/recovery                  | `db_migration_specialist`/worker + reviewer  | Stage 2 contract, Qdrant tools, systemd, tests     | Q2/Q3 and Q6 for Q8   | plan, shared types, snapshot/restore                 | sequential internally due shared tools/package files              |
+| O      | Q9 observability                     | `deploy_specialist`                          | monitoring config, Compose, ops runbook            | Q6                    | promtool, Compose, alert/dashboard audit             | parallel with Q7                                                  |
+| C      | Q10 docs retirement                  | bounded worker then `docs_reviewer`          | named docs and project index                       | Q1-Q9                 | Cloud/custom-BM25 scans                              | sequential after implementation truth                             |
+| A      | Q11 acceptance/closeout              | root + reviewers                             | evidence and in-scope corrections                  | Q1-Q10                | full local gates and canonical closeout              | sequential shared gate                                            |
+| X      | Q12 staging                          | root + deploy review                         | live evidence/state only                           | Q11 + DB/source truth | live cutover gates                                   | authorized; NO-GO until hard inputs and gates pass                |
 
 ## Approved Evidence Expansion (2026-07-11)
 
@@ -66,14 +66,16 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 ## Current Recovery Point
 
 - Integration branch contains accepted Q1-Q9 and evidence E1-E7 with exact 100% local/development activation. The combined activation/docs branch passed final independent review at `d3417610`, merged as `ea183d83`, and passed its parent acceptance rerun.
-- Q12 local remediation is accepted through integration `6645708d`: guarded
-  migrations `.13.1`, immutable operator `.13.2`, coherent release-bound
-  rollback `.13.3`, digest publication/pre-pull, and transaction-bound rollback
-  all have independent zero-finding reviews. The owner authorized staging
-  deploy/reindex/recovery/notification and evidence `true/active/100`; no remote
-  mutation has occurred. Live activation remains NO-GO on the project CA,
-  off-host S3 inputs, and 80 missing plus 2 invalid source paths unless an
-  explicit audited product-truth decision resolves the latter.
+- Q12 local remediation now also includes accepted staging-local snapshot mode
+  `.13.5`: exact Qdrant `1.18.2` snapshots persist under
+  `/qdrant/storage/snapshots`, survive container replacement with the named
+  volume, pass 7/7 exact restore/isolation checks, and fail durably after volume
+  deletion. This is not host/disk/off-host DR; production S3 is tracked by
+  `.13.6`. The Supabase CA is valid, but all retrievable database URLs have
+  stale credentials. Source audit `.13.4` proves 42 exact copies can restore
+  125 eligible rows (109 -> 234/240); six eligible originals and eighteen
+  non-eligible Career Playbook originals are absent. No remote mutation or copy
+  has occurred.
 - Q7 / `mc2-jz6y0.8` is accepted: both integration lookups use document-scoped point IDs, the pinned Qdrant `1.18.2` gate passes 19/19, focused Q7 tests pass 85/85, and the dedicated worktree/local branch are cleaned. The remote evidence branch remains.
 - E1 / `mc2-jz6y0.18` is accepted: immutable source manifests survive deletion-before-persist, guarded RPCs replace authenticated table writes, terminal coverage and user-only override direction are enforced, PostgreSQL 15.18 applied tests pass 9/9, and the dedicated worktree/local branch/container are cleaned. The remote evidence branch remains.
 - E2 / `mc2-jz6y0.19` is accepted: complete authoritative source enumeration, exact durable outcomes, structured per-document and cross-document hierarchy, atomic resume, claim-scoped verification, and exact `tiktoken 1.0.22` safety bounds are integrated. The final independent reviewer reported no findings (`Spec PASS`, `Quality APPROVED`).
@@ -139,16 +141,21 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 - `docs-reviewed: updated` — retrieval, deployment, recovery, monitoring, and operator behavior change.
 - `project-index: update required` — stable Qdrant/operations entrypoints change.
-- `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .`
-  and `graphify cluster-only . --no-viz`; report totals are 50,796 nodes and
-  75,445 edges with no external model/API mode or Git hook.
+- `graph-reviewed: pending` — the previous Graphify report predates the accepted
+  local-snapshot and current-truth documentation changes; root refreshes it
+  locally after this durable docs commit, without external model/API mode or
+  Git hooks.
 - Q12 remains open until every live gate and observation passes; authorization
-  is recorded, while the CA/S3/source inputs are hard stops.
+  is recorded, while current verify-full DB credentials and source truth are
+  hard stops.
 
 ## Explicit Defers
 
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke
-  are authorized but NO-GO until the CA/S3/source inputs and all hard gates pass.
+  are authorized but NO-GO until current DB credentials, missing-source truth,
+  and all hard gates pass.
+- Production off-host S3 remains bounded defer `mc2-jz6y0.13.6`; owner-approved
+  local staging snapshots do not satisfy that future production gate.
 - Prometheus retention YAML migration remains bounded defer `mc2-jz6y0.25`
   before the next Prometheus pin change.
 - Final workspace cleanup intentionally retains the current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree for Q12 continuation. `cleanup_stage_workspace.py` returned non-zero only because it safely refused to delete that checked-out branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are absent.
@@ -157,8 +164,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
 
-graph-reviewed: updated — local no-API refresh completed after the durable Q12
-merge; final report commit is rechecked after the closeout-state commit. No
-hooks or external model/API mode were used.
+graph-reviewed: pending — parent-owned local refresh follows this durable docs
+commit. No hooks or external model/API mode are authorized.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.

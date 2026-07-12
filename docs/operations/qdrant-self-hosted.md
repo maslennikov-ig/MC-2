@@ -6,10 +6,10 @@ staging activation on 2026-07-12, including live reindex, recovery drill, real
 notification, and document evidence at `true/active/100`. The owner subsequently
 approved local-disk snapshots for development staging on 2026-07-12 and deferred
 off-host S3 to the production gate `mc2-jz6y0.13.6`. This runbook is not a second
-authorization source, and activation remains **NO-GO** until the downloaded
-project CA is validated for `verify-full` and the authoritative source-path gaps
-listed under “Initial activation” are resolved. No remote mutation has occurred
-yet.
+authorization source. The downloaded Supabase Root 2021 CA is validated for
+`verify-full`; activation remains **NO-GO** until a current Session pooler URL
+passes with that CA and the authoritative source truth listed under “Initial
+activation” is resolved. No remote mutation has occurred yet.
 
 ## Immutable runtime
 
@@ -320,13 +320,21 @@ The ordinary blue/green deploy intentionally runs verify-only before starting
 the inactive app color. It cannot bootstrap an empty first installation. The
 owner authorization does not waive these current hard stops:
 
-1. the downloaded Supabase project Server root certificate must pass the
-   required `sslmode=verify-full` and `sslrootcert` remote migration preflight;
-2. the last read-only inventory found 80 missing and 2 invalid canonical source
-   paths. Activation requires zero, or a separate explicit audited owner
-   product-truth decision; `--allow-gaps` is forbidden.
+1. the downloaded Supabase Root 2021 CA is valid, but the locally and
+   server-stored Session pooler credentials are stale. A current URL must pass
+   the required `sslmode=verify-full` and `sslrootcert` remote migration
+   preflight;
+2. the accepted read-only source audit found 261 catalog rows: 240 are
+   Qdrant-eligible and 21 are `missing_course`. Forty-two exact no-replace
+   copies can raise recoverable eligible sources from 109 to 234; exact
+   originals for the remaining four missing and two invalid eligible rows were
+   not found. Eighteen non-eligible Career Playbook originals are also absent;
+3. source-recovery implementation `.13.4.1`, its independent review, the 42
+   crash-durable copies, and the explicit audited owner disposition for absent
+   originals must complete. `--allow-gaps` and derived-content substitution are
+   forbidden.
 
-After all three are resolved, execute this order as one observed activation
+After these gates are resolved, execute this order as one observed activation
 window:
 
 1. confirm backup/PITR and apply/verify the complete document-evidence
@@ -413,8 +421,8 @@ sudo journalctl --no-pager -u megacampus-qdrant-restore-drill.service -n 200
 ```
 
 The commands above are an operator procedure under the recorded authorization;
-they still remain NO-GO until the required CA/source inputs and all initial
-activation preconditions are satisfied.
+they still remain NO-GO until the current verify-full database URL, source
+recovery/disposition, and all initial activation preconditions are satisfied.
 
 The recovery implementation owns the checksum manifest, retention, systemd
 timers, isolated collection, and alias cleanup. Reindex uses deterministic,

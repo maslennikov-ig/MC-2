@@ -3,8 +3,10 @@
 This runbook covers the optional advisory document-evidence path across Stage 4,
 Stage 5, and Stage 6. The owner has authorized the exact staging
 `true/active/100` state, but this document is not an activation command. The
-current CA, S3, and source-truth NO-GO inputs below must be resolved first; no
-remote mutation has occurred.
+current database-credential and source-truth NO-GO inputs below must be resolved
+first; no remote mutation has occurred. Development staging uses accepted local
+Qdrant snapshots; off-host S3 remains the production gate
+`mc2-jz6y0.13.6`.
 
 ## Runtime contract
 
@@ -303,10 +305,12 @@ The accepted remote chain is exactly
 unknown or later frontier, history/catalog mismatch, lock overrun, or TLS failure
 is a hard stop.
 
-The owner authorized the staging migration, but the project Server root
-certificate is still a required input. Use the official project CA with both
-`sslmode=verify-full` and `sslrootcert`; never use `rejectUnauthorized=false`,
-`sslmode=require`, or an unverified pooler connection.
+The owner authorized the staging migration and the downloaded Supabase Root
+2021 CA has been validated. The remaining input is a current Session pooler URL;
+the retrievable local/server URLs have stale credentials. Use the validated CA
+with both `sslmode=verify-full` and `sslrootcert`; never use
+`rejectUnauthorized=false`, `sslmode=require`, or an unverified pooler
+connection.
 
 1. Confirm backup/PITR and inventory the exact remote migration frontier in a
    read-only session. Do not continue unless it is compatible with the five
@@ -395,11 +399,17 @@ DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
 This authorizes the intended final staging state; it does not waive hard gates.
 No remote mutation has occurred. Activation remains NO-GO until:
 
-1. the project CA enables the guarded five-migration path with
-   `sslmode=verify-full` and `sslrootcert`;
-2. off-host S3 inputs and checksum-verified snapshot/isolated restore exist;
-3. authoritative sources have zero missing/invalid paths, or a separate audited
-   owner product-truth decision is recorded—never `--allow-gaps`;
+1. a current Session pooler URL enables the guarded five-migration path with the
+   validated CA, `sslmode=verify-full`, and `sslrootcert`;
+2. the accepted checksum-verified local-volume snapshot and isolated restore
+   remain green; this is staging evidence only, while production S3 stays gated
+   by `mc2-jz6y0.13.6`;
+3. implementation/review bead `.13.4.1` completes, followed by the 42 exact
+   source copies through the crash-durable recovery contract; the six absent
+   eligible originals receive an explicit audited owner disposition—never
+   `--allow-gaps` or derived substitution—and the separate eighteen-row
+   Career Playbook retention/data-hygiene disposition is recorded without
+   counting those non-eligible rows in the 240-document Qdrant denominator;
 4. exact digests, private listeners, secret metadata, free metrics GID, Compose,
    and systemd oneshots pass;
 5. deterministic reindex, RU/EN relevance, strict schema, parity, and negative

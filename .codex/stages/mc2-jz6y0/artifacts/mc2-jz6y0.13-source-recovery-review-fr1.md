@@ -14,11 +14,11 @@ base_commit: 726b2b5d
 worktree: /home/me/code/mc2/.worktrees/q12-source-recovery-review
 write_zone:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-source-recovery-review-fr1.md
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: review worktree and branch may be removed after both review artifacts are integrated
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: correction review artifact is integrated; review worktree/local branch and all disposable resources are removed; pushed evidence branch remains
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed

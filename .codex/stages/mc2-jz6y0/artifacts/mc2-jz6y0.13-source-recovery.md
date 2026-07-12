@@ -37,11 +37,11 @@ parallel_group: Q12-F
 depends_on_streams:
   - mc2-jz6y0.13.2
 parallel_decision: isolated
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: protected temporary audit data remains local until orchestrator acceptance; no remote resources were created
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: blocked
+cleanup_notes: worktree/local branch and remote resources are cleaned; owner-only protected audit data remains intentionally under /tmp for implementation mc2-jz6y0.13.4.1 and must be removed after that recovery decision/execution closes
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed
@@ -87,14 +87,14 @@ inventory describes all `file_catalog` rows across both server upload roots. It
 is not the Qdrant reindex plan, which resolves relative paths only under the
 production base path and excludes rows without a course.
 
-| Classification | All rows | Qdrant-eligible | Distinct physical target paths | Evidence |
-| --- | ---: | ---: | ---: | --- |
-| Exact canonical production source | 109 | 109 | 61 | canonical path, size, and database SHA-256 all match |
-| Exact alternate development source | 70 | 67 | 42 total; 39 eligible | alternate path, size, and database SHA-256 all match |
-| Canonical path absent, exact content elsewhere in development | 58 | 58 | 3 | each logical content has five physical development copies; all size and SHA-256 values match |
-| Valid path, source truly absent | 22 | 4 | 20 total; 2 eligible | no exact bytes on the host; 18 rows are non-eligible Career Playbook sources |
-| Invalid relative path and source absent | 2 | 2 | 2 | path lacks the required `uploads/` prefix; no exact bytes exist on the host |
-| **Total** | **261** | **240** | — | independently counted catalog and course inventories |
+| Classification                                                | All rows | Qdrant-eligible | Distinct physical target paths | Evidence                                                                                     |
+| ------------------------------------------------------------- | -------: | --------------: | -----------------------------: | -------------------------------------------------------------------------------------------- |
+| Exact canonical production source                             |      109 |             109 |                             61 | canonical path, size, and database SHA-256 all match                                         |
+| Exact alternate development source                            |       70 |              67 |          42 total; 39 eligible | alternate path, size, and database SHA-256 all match                                         |
+| Canonical path absent, exact content elsewhere in development |       58 |              58 |                              3 | each logical content has five physical development copies; all size and SHA-256 values match |
+| Valid path, source truly absent                               |       22 |               4 |           20 total; 2 eligible | no exact bytes on the host; 18 rows are non-eligible Career Playbook sources                 |
+| Invalid relative path and source absent                       |        2 |               2 |                              2 | path lacks the required `uploads/` prefix; no exact bytes exist on the host                  |
+| **Total**                                                     |  **261** |         **240** |                              — | independently counted catalog and course inventories                                         |
 
 The all-row `source_missing=80` therefore separates into:
 
@@ -116,10 +116,10 @@ Those derivatives are not accepted substitutes for the original source file.
 The repository's real `buildReindexPlan()` was run over the complete protected
 read-only inventory, not a handwritten approximation.
 
-| State | Eligible | Recoverable | Missing source | Invalid source path | Unsupported | Expected documents | Estimated points |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Current production base path | 240 | 109 | 129 | 2 | 21 | 109 | 7,294 |
-| After the reviewed 42-file copy | 240 | 234 | 4 | 2 | 21 | 234 | 12,114 |
+| State                           | Eligible | Recoverable | Missing source | Invalid source path | Unsupported | Expected documents | Estimated points |
+| ------------------------------- | -------: | ----------: | -------------: | ------------------: | ----------: | -----------------: | ---------------: |
+| Current production base path    |      240 |         109 |            129 |                   2 |          21 |                109 |            7,294 |
+| After the reviewed 42-file copy |      240 |         234 |              4 |                   2 |          21 |                234 |           12,114 |
 
 The current-plan count of 129 missing sources contains the 67 eligible files
 whose exact canonical-relative counterparts are presently under the development

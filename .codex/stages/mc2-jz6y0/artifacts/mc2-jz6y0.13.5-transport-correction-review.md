@@ -38,9 +38,9 @@ parallel_group: Q12-owner-input-recovery
 depends_on_streams:
   - mc2-jz6y0.13.5-correction-review
 parallel_decision: sequential
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: Read-only inspection found no mc2-q12 managed container, mc2_q12 named volume, or listener on RED/GREEN ports 41352/40776; no local resource was created by this bounded static review.
 risk_level: high
@@ -109,14 +109,14 @@ the validated server-side origin; none retains the ambiguous host
 
 ## Bounded matrix
 
-| Surface                         | Evidence                                                   | Result                 |
-| ------------------------------- | ---------------------------------------------------------- | ---------------------- |
-| five recovery locations         | static call-site scan and line review                      | PASS, 5/5 owned origin |
-| origin validation               | protocol/credentials/path/query/hash/host/port guards      | PASS                   |
-| exact transport assertion       | `recoverSnapshot.location` spy                             | PASS                   |
-| unrelated host Qdrant isolation | RED/GREEN artifact plus read-only container inspection     | PASS                   |
-| cleanup                         | container, volume, and listener absence                    | PASS                   |
-| CI/runtime/env regression       | path-scoped no-change diff                                 | PASS                   |
+| Surface                         | Evidence                                                    | Result                 |
+| ------------------------------- | ----------------------------------------------------------- | ---------------------- |
+| five recovery locations         | static call-site scan and line review                       | PASS, 5/5 owned origin |
+| origin validation               | protocol/credentials/path/query/hash/host/port guards       | PASS                   |
+| exact transport assertion       | `recoverSnapshot.location` spy                              | PASS                   |
+| unrelated host Qdrant isolation | RED/GREEN artifact plus read-only container inspection      | PASS                   |
+| cleanup                         | container, volume, and listener absence                     | PASS                   |
+| CI/runtime/env regression       | path-scoped no-change diff                                  | PASS                   |
 | broad release matrix            | intentionally not repeated for this test-only bounded delta | not required           |
 
 Commands and results:

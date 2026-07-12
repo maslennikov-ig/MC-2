@@ -47,11 +47,11 @@ parallel_group: Q12-owner-input-recovery
 depends_on_streams:
   - mc2-jz6y0.13.2
 parallel_decision: parallel
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: worktree-only dependency symlinks and any disposable pinned-Qdrant resources must be removed before handoff
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation and review worktrees/local branches, dependency symlinks, pinned-Qdrant containers, named volumes, listeners, temporary keys, and recovery data were removed; pushed evidence branches remain
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
@@ -73,6 +73,9 @@ verification:
   - corrected package type-check: passed
   - managed transport isolation RED on Docker-selected port 41352: passed (expected 6/7)
   - managed transport isolation GREEN on Docker-selected port 40776: passed 7/7
+  - integration-root managed transport on Docker-selected port 41262: passed 7/7
+  - integration-root workspace type-check: passed
+  - integration-root CI/CD workflow gate and process verification: passed
 changed_files:
   - .env.production.example
   - deploy/qdrant/secret-entrypoint.sh
@@ -138,8 +141,11 @@ exclusions), and process verification all exited zero.
 
 # Delivery / Cleanup
 
-The branch is committed and pushed for independent orchestrator review. Merge,
-acceptance, parent-owned Graphify refresh, and worktree cleanup remain pending.
+The implementation and correction reviews are accepted and integrated; all
+owned worktrees, local branches, containers, volumes, listeners, keys, and
+temporary recovery data are cleaned. The pushed evidence branches remain.
+Only the parent-owned Graphify refresh remains pending after this durable docs
+update.
 
 # Risks / Follow-ups / Explicit Defers
 
@@ -190,8 +196,7 @@ A later orchestrator check found that the managed recovery test still hardcoded
 `http://127.0.0.1:6333` in five transport call sites. Although this address is
 Qdrant's own loopback from the server-side recovery perspective, it did not
 prove that the test honored its owned endpoint and made the host-side test
-contract ambiguous while unrelated `helixa-qdrant-1` listened on host port
-6333.
+contract ambiguous while unrelated `helixa-qdrant-1` listened on host port 6333.
 
 The test now requires a credential-free HTTP origin in
 `QDRANT_SNAPSHOT_TRANSPORT_URL` and uses it for every recovery location. Managed

@@ -9,7 +9,7 @@ Remote base at docs reconciliation start: `6645708d`; resolve current
 ## Product Truth
 
 - Qdrant Cloud data was test-only and is lost. Do not recover or mutate it; rebuild the derived index from authoritative sources.
-- Target remains private self-hosted Qdrant `1.18.2`, native multilingual BM25/IDF, server RRF/Formula priority, strict indexes, aliases, source reindex, S3 snapshots/restore, Prometheus/Grafana/alerts, and secure loopback Web UI.
+- Target remains private self-hosted Qdrant `1.18.2`, native multilingual BM25/IDF, server RRF/Formula priority, strict indexes, aliases, source reindex, Prometheus/Grafana/alerts, and secure loopback Web UI. Development staging uses persistent local-volume snapshots; off-host S3 is the production gate `mc2-jz6y0.13.6`.
 - Documents are optional but important advisory evidence. A course without documents remains fully supported.
 - Every uploaded document must receive a durable `assessed`, `degraded`, or `failed` coverage outcome; none may disappear through context truncation.
 - Documents supplement the baseline structure. They may add facts, terminology, constraints, examples, and source-backed topics but cannot silently replace baseline curriculum requirements.
@@ -35,7 +35,9 @@ Remote base at docs reconciliation start: `6645708d`; resolve current
 - Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E7, and exact 100% local/development document-evidence activation. Final independent activation/docs review at `d3417610` reported no P0-P3 findings; integration merge `ea183d83` passed 24/24 focused tests, package type-check, process verification, and canonical closeout dry-run. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. Q11 passed the full local release matrix and independent review with P0-P3 zero: backend 1,869/1,869, shared 23/23, web 20/20, PostgreSQL 64/64, exact Qdrant 15/15 plus recovery 5/5, Compose 8/8, Prometheus 14 rules, Alertmanager config, type-check and build 75/75. Canonical real stage closeout also passed after supplying the documented synthetic local build environment.
-- Q12 local remediation streams are accepted and integrated through `6645708d`: guarded base migrations `.13.1`, immutable operator `.13.2`, release-bound app/worker rollback `.13.3`, operator digest publication/pre-pull, and rollback transaction binding all have independent zero-finding reviews. The owner authorized staging deploy, live reindex, S3 drill, service/secret changes, real notification, and document evidence at exact `true/active/100`. No remote mutation has occurred.
+- Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
+- Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The crash-durable write-ahead mutation contract is accepted, but no copy has run; implementation bead `.13.4.1` and an owner product-truth disposition remain open.
+- The downloaded Supabase Root 2021 CA is valid through 2031 and reaches the pooler with `verify-full`. Both locally/server-stored database URLs have stale credentials; the repo Actions secret is not extractable. A current Session pooler URL is still required for the guarded remote migration frontier/apply.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
@@ -56,11 +58,12 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: keep Q12 NO-GO while safely resolving the three missing
-inputs: Supabase project CA for `verify-full`, off-host S3 credentials/config,
-and 80 missing plus 2 invalid canonical source paths (or an explicit audited
-owner product-truth decision). Then execute the already authorized activation
-packet without `--allow-gaps` or partial activation.
+Recommended action: keep Q12 NO-GO while obtaining the current Supabase Session
+pooler URL and the owner's audited disposition for the six unrecoverable
+eligible originals (plus the separate 18-row Career Playbook retention truth).
+After approval of the narrow source-recovery operator design, implement/review
+`.13.4.1`, execute only the 42 exact crash-durable copies, and then run the
+already authorized activation packet without `--allow-gaps` or partial cutover.
 
 ## Starter prompt for next orchestrator
 
@@ -95,9 +98,11 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 ## Explicit defers
 
-- Q12 staging mutation is owner-authorized, but remains NO-GO until the CA, S3,
-  and source-truth inputs above are available and every documented hard gate
-  passes. Do not partially activate.
+- Q12 staging mutation is owner-authorized, but remains NO-GO until a current
+  verify-full Session pooler URL and the missing-source product truth above are
+  resolved and every documented hard gate passes. Do not partially activate.
+- Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
+  remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
   `mc2-jz6y0.25`, due before the next Prometheus pin change.
 - The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
@@ -106,7 +111,6 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
 authorization, and sanitized environment contracts are reconciled.
-graph-reviewed: updated — local Graphify `0.8.45` refresh ran with
-`graphify update .` and `graphify cluster-only . --no-viz`; the report records
-50,796 nodes, 75,445 edges and no forbidden source paths. No external model/API
-mode or Git hook was used.
+graph-reviewed: pending — the previous local Graphify `0.8.45` report predates
+the accepted snapshot/current-truth changes. Root refreshes it after this
+durable docs commit; no external model/API mode or Git hook is authorized.

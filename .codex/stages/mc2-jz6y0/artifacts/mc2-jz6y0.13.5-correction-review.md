@@ -39,9 +39,9 @@ depends_on_streams:
   - mc2-jz6y0.13.5
   - mc2-jz6y0.13.5-review
 parallel_decision: sequential
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: Independently owned pinned test container, named volume, loopback listener, synthetic key files, recovery directories, temporary Vitest config, and dependency symlinks were removed; no implementation, Beads, staging, database, remote service, secret, queue, or alias was mutated outside the disposable test namespace.
 risk_level: high
@@ -115,13 +115,13 @@ starting Qdrant. This closes the failure recorded immutably in review commit
 
 ## Bounded test matrix
 
-| Tier        | Risk / surface                                  | Result                                          |
-| ----------- | ----------------------------------------------- | ----------------------------------------------- |
-| delta       | correction diff and documentation               | PASS, no whitespace error and no finding        |
-| inner       | wrapper, Compose render, manifest, retention     | PASS, 37/37                                     |
+| Tier        | Risk / surface                                  | Result                                           |
+| ----------- | ----------------------------------------------- | ------------------------------------------------ |
+| delta       | correction diff and documentation               | PASS, no whitespace error and no finding         |
+| inner       | wrapper, Compose render, manifest, retention    | PASS, 37/37                                      |
 | integration | pinned recreate with preserved named volume     | PASS, checksum survives and exact restore passes |
-| negative    | named-volume deletion and failed recovery audit  | PASS, durable failure and no alias cutover      |
-| release     | broad type-check/build/release matrix            | not repeated by bounded-review instruction      |
+| negative    | named-volume deletion and failed recovery audit | PASS, durable failure and no alias cutover       |
+| release     | broad type-check/build/release matrix           | not repeated by bounded-review instruction       |
 
 Commands and results:
 
