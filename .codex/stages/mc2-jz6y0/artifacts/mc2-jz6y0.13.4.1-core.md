@@ -41,9 +41,9 @@ parallel_group: q12-source-recovery-core-gate
 depends_on_streams:
   - mc2-jz6y0.13.4-read-only-audit
 parallel_decision: sequential
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: pending
 cleanup_notes: implementation worktree and dependency symlinks remain until independent review and integration
 risk_level: high
@@ -67,6 +67,9 @@ verification:
   - second correction RED: canonical SHA and paired-CAS bypass reproduced
   - second correction GREEN and recovery regression: passed 48/48
   - second corrected package type-check: passed
+  - final independent review c1ef4f86: PASS with 0 P0, 0 P1, 1 bounded P2
+  - integration-root focused recovery regression: passed 48/48
+  - integration-root package type-check and process verification: passed
 changed_files:
   - packages/course-gen-platform/tools/qdrant/source-recovery-manifest.ts
   - packages/course-gen-platform/tools/qdrant/source-recovery-filesystem.ts
