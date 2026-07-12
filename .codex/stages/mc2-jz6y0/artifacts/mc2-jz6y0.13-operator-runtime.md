@@ -52,11 +52,11 @@ parallel_group: Q12-local-remediation
 depends_on_streams:
   - mc2-jz6y0.13-deploy-preflight
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: disposable local Qdrant containers, networks, images, fixtures, logs, and worktree-only dependency symlinks were removed; branch remains for re-review and integration
+cleanup_notes: disposable local Qdrant containers, networks, images, fixtures, logs, and worktree-only dependency symlinks were removed; remediation 76caa6e5 and review 843465b8 were merged, and 28 integration tests passed
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updates-required

@@ -11,7 +11,7 @@ repo: mc2
 branch: codex/q12-operator-runtime
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: f9389b69e3b4a48bf9cfc6868ff1ef432e32027e
-reviewed_commit: 48cf8378d6f8aefea0a1d619a2e24c96416bdbf1
+reviewed_commit: 76caa6e5
 worktree: /home/me/code/mc2/.worktrees/q12-operator-runtime
 write_zone:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-operator-runtime-review.md
@@ -36,9 +36,9 @@ parallel_group: Q12-local-remediation
 depends_on_streams:
   - mc2-jz6y0.13-deploy-preflight
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
 cleanup_status: not_applicable
 cleanup_notes: Review created no container, image, service, queue, alias, database, S3, or remote resource. Temporary synthetic files and dependency links created for verification were removed. Concurrent implementation edits in the assigned worktree were not touched or staged.
 risk_level: high
