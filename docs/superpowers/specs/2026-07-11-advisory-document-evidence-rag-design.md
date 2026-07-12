@@ -7,6 +7,13 @@
 **Extends:** `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`
 **Approved by owner:** 2026-07-11
 
+**Superseding local/development activation decision:**
+[`Document Evidence: 100% Dev Activation Design`](2026-07-12-document-evidence-dev-activation-design.md)
+records the owner-approved exact active gate and 100% Stage 5 development cohort.
+The staged rollout below remains the historical design and the boundary for any
+future staging/production proposal; it is not the current local/development
+configuration and does not bypass Q12.
+
 ## Summary
 
 Documents are optional but important advisory evidence. A course must remain fully generatable without documents, while every uploaded document must be assessed and accounted for rather than silently ignored. Documents may enrich structure and lesson content, supply organization-specific facts, terminology, examples, constraints, and source material, but they must not automatically replace the baseline course structure because their quality and consistency are unknown.
@@ -441,6 +448,13 @@ Alerts must cover failed evidence runs, coverage below 100%, repeated degraded a
 4. Enable automatic system decisions with audit metrics.
 5. Enable Stage 5 enrichment for a bounded cohort while preserving the baseline result.
 6. Promote after coverage, cost, latency, false-conflict and enrichment-quality thresholds are accepted.
+
+For local/development, steps 5-6 are superseded by the 2026-07-12 owner decision:
+the exact active gate uses a 100% Stage 5 cohort with no dev promotion step.
+Cost, latency, false-conflict, degradation/failure and enrichment quality remain
+advisory signals; coverage and baseline preservation remain 100%, while
+tenant/course isolation violations and unresolved P0/P1 findings remain zero.
+Staging/production activation remains Q12-gated.
 
 Rollback disables evidence preflight and Stage 5 enrichment while leaving stored audit rows intact. The current no-document and Stage 6 baseline paths remain available throughout rollout.
 
