@@ -45,11 +45,11 @@ parallel_group: B
 depends_on_streams:
   - Q12 acceptance follow-up review
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: no remote resource or staging state was created
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: no remote resource or staging state was created; independent review accepted bcfc6b71..7d893d42 with P0/P1/P2/P3 all zero
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: pending
