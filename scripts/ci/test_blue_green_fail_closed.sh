@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY="$ROOT_DIR/scripts/deploy_blue_green.sh"
 ROLLBACK="$ROOT_DIR/scripts/rollback_blue_green.sh"
 TEMP_DIR="$(mktemp -d)"
+CURRENT_COMMIT='0000000000000000000000000000000000000000'
+STALE_COMMIT='1111111111111111111111111111111111111111'
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 fail() {
@@ -34,7 +36,7 @@ previous_color=green
 target_color=blue
 commit=0000000000000000000000000000000000000000
 EOF
-expect_failure "did not reach status=switched" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
+expect_failure "did not reach status=switched" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
 
 cat > "$TEMP_DIR/deploy_state" <<'EOF'
 status=switched
@@ -42,7 +44,15 @@ previous_color=blue
 target_color=green
 commit=0000000000000000000000000000000000000000
 EOF
-expect_failure "active color does not match the switched deployment" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
+expect_failure "active color does not match the switched deployment" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
+
+cat > "$TEMP_DIR/deploy_state" <<EOF
+status=accepted
+previous_color=green
+target_color=blue
+commit=$STALE_COMMIT
+EOF
+expect_failure "does not match the requested release" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
 
 cat > "$TEMP_DIR/deploy_state" <<'EOF'
 status=accepted
@@ -54,19 +64,19 @@ cat > "$TEMP_DIR/.env.green" <<'EOF'
 WEB_IMAGE=ghcr.io/maslennikov-ig/mc-2/web:latest
 API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api:latest
 EOF
-expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
+expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
 
 DIGEST="$(printf 'a%.0s' {1..64})"
 cat > "$TEMP_DIR/.env.green" <<EOF
 WEB_IMAGE=ghcrXio/maslennikov-ig/mc-2/web@sha256:$DIGEST
 API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api@sha256:$DIGEST
 EOF
-expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
+expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
 
 cat > "$TEMP_DIR/.env.green" <<EOF
 WEB_IMAGE=ghcr.io/attacker/example/web@sha256:$DIGEST
 API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api@sha256:$DIGEST
 EOF
-expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
+expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
 
 echo "blue/green fail-closed tests passed"
