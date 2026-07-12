@@ -141,6 +141,7 @@ function recoveryFixture(
     journal,
     acceptedFailedCoverage: {
       ledgerId: '52000000-0000-4000-8000-000000000005',
+      status: 'accepted',
       recoveryRunId: manifest.run_id,
       recoveryManifestSha256: manifestSha256,
       fingerprint: '',
@@ -241,6 +242,7 @@ function executionLedger(
     recoveryRunId: recovery.binding.manifest.run_id,
     recoveryManifestSha256: recovery.binding.manifestSha256,
     acceptedCoverageLedgerId: recovery.binding.acceptedFailedCoverage.ledgerId,
+    acceptedCoverageStatus: 'accepted',
     acceptedCoverageFingerprint: recovery.binding.acceptedFailedCoverage.fingerprint,
     verificationFingerprint: calculateReindexVerificationFingerprint(recovery.plan),
     status: 'running',
@@ -364,6 +366,65 @@ describe('durable reindex ledger', () => {
     }
   });
 
+  it('rejects an artifact file or parent reached through a symbolic link', async () => {
+    const root = await mkdtemp('/tmp/mc2-qdrant-ledger-link-');
+    const stateDirectory = join(root, 'state');
+    const linkedDirectory = join(root, 'linked-state');
+    const artifactPath = join(stateDirectory, 'ledger.json');
+    const linkedArtifactPath = join(stateDirectory, 'linked-ledger.json');
+    const ledger = executionLedger([source('60000000-0000-4000-8000-000000000006')]);
+    try {
+      await mkdir(stateDirectory, { mode: 0o700 });
+      await writeFile(artifactPath, JSON.stringify(ledger), { mode: 0o600 });
+      await symlink('ledger.json', linkedArtifactPath);
+      await expect(loadExecutionArtifact(linkedArtifactPath)).rejects.toThrow(
+        /symbolic link|symlink|real parent/iu
+      );
+
+      await symlink(stateDirectory, linkedDirectory, 'dir');
+      await expect(loadExecutionArtifact(join(linkedDirectory, 'ledger.json'))).rejects.toThrow(
+        /symbolic link|symlink|real parent|secure real directory/iu
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['parent', 0o755, 0o600, /0700|parent/iu],
+    ['file', 0o700, 0o644, /0600|file/iu],
+  ])('rejects an artifact with insecure %s mode', async (_label, parentMode, fileMode, pattern) => {
+    const directory = await mkdtemp('/tmp/mc2-qdrant-ledger-mode-');
+    const artifactPath = join(directory, 'ledger.json');
+    const ledger = executionLedger([source('60000000-0000-4000-8000-000000000006')]);
+    try {
+      await chmod(directory, parentMode);
+      await writeFile(artifactPath, JSON.stringify(ledger), { mode: fileMode });
+      await chmod(artifactPath, fileMode);
+      await expect(loadExecutionArtifact(artifactPath)).rejects.toThrow(pattern);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an artifact not owned by the current executor UID', async () => {
+    const directory = await mkdtemp('/tmp/mc2-qdrant-ledger-owner-');
+    const artifactPath = join(directory, 'ledger.json');
+    const ledger = executionLedger([source('60000000-0000-4000-8000-000000000006')]);
+    try {
+      await writeFile(artifactPath, JSON.stringify(ledger), { mode: 0o600 });
+      if (!process.getuid) return;
+      const getuid = vi.spyOn(process, 'getuid').mockReturnValue(process.getuid() + 1);
+      try {
+        await expect(loadExecutionArtifact(artifactPath)).rejects.toThrow(/owner|uid/iu);
+      } finally {
+        getuid.mockRestore();
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('uses crash-durable initial no-replace and replacement ordering', async () => {
     const calls: string[] = [];
     const operations: ReindexArtifactWriteOperations = {
@@ -434,7 +495,7 @@ describe('durable reindex ledger', () => {
   });
 
   it('rejects insecure state directories and an initial publication race', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'mc2-qdrant-insecure-ledger-'));
+    const directory = await mkdtemp('/tmp/mc2-qdrant-insecure-ledger-');
     const artifactPath = join(directory, 'ledger.json');
     const ledger = executionLedger([source('60000000-0000-4000-8000-000000000006')]);
     try {
@@ -485,7 +546,7 @@ describe('durable reindex ledger', () => {
       (ledger: Record<string, any>) => (ledger.status = 'completed'),
     ],
   ])('rejects an inconsistent schema-v3 ledger: %s', async (_label, mutate) => {
-    const directory = await mkdtemp(join(tmpdir(), 'mc2-qdrant-invalid-ledger-'));
+    const directory = await mkdtemp('/tmp/mc2-qdrant-invalid-ledger-');
     const artifactPath = join(directory, 'ledger.json');
     const ledger = executionLedger([source('60000000-0000-4000-8000-000000000006')]);
     mutate(ledger);
@@ -1537,6 +1598,108 @@ describe('Qdrant reindex command', () => {
     expect(result.report).toMatchObject({ enqueued: 1, alreadyEnqueued: 1 });
   });
 
+  it('keeps source truth immutable after retained completion through verify and second resume', async () => {
+    const rows = [
+      source('60000000-0000-4000-8000-000000000006'),
+      source('70000000-0000-4000-8000-000000000007'),
+    ];
+    const retainedJobId = buildReindexJobId(RUN_ID, rows[0].id);
+    const retainedData = DocumentProcessingJobDataSchema.parse({
+      jobType: JobType.DOCUMENT_PROCESSING,
+      organizationId: rows[0].organizationId,
+      courseId: rows[0].courseId,
+      userId: rows[0].userId,
+      fileId: rows[0].id,
+      filePath: '/tmp/source.pdf',
+      mimeType: rows[0].mimeType,
+      createdAt: '2026-07-10T12:00:00.000Z',
+      qdrantTargetCollection: TARGET,
+      qdrantReindexRunId: RUN_ID,
+    });
+    const firstPersisted: Array<Record<string, any>> = [];
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const firstDeps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi.fn().mockResolvedValue(
+        executionLedger(rows, {
+          status: 'running',
+          acceptedJobIds: [retainedJobId],
+          completedJobIds: [retainedJobId],
+        })
+      ),
+      inspectJobs: vi
+        .fn()
+        .mockResolvedValue([{ jobId: retainedJobId, state: 'completed', data: retainedData }]),
+      persistArtifact: vi.fn((artifact: Record<string, unknown>) => {
+        firstPersisted.push(structuredClone(artifact));
+        return Promise.resolve();
+      }),
+    });
+
+    const firstResult = await runReindexCommand(
+      {
+        mode: 'execute',
+        targetCollection: TARGET,
+        runId: RUN_ID,
+        artifactPath: '/tmp/q7-retained-source-truth.json',
+      },
+      firstDeps
+    );
+    const terminalLedger = firstPersisted.at(-1)!;
+    expect(firstResult).toMatchObject({ exitCode: 0, report: { alreadyEnqueued: 1 } });
+    expect(terminalLedger).toMatchObject({
+      status: 'completed',
+      counts: {
+        recoverable: rows.length,
+        alreadyEnqueued: 0,
+        accepted: rows.length,
+        completed: rows.length,
+        pending: 0,
+      },
+    });
+
+    let verifyBinding = recoveryFixture(rows, 'reindex_started').binding;
+    const verifyDeps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn(() => Promise.resolve(structuredClone(verifyBinding))),
+      persistRecoveryJournalTransition: vi.fn(({ next }) => {
+        verifyBinding = { ...verifyBinding, journal: structuredClone(next) };
+        return Promise.resolve();
+      }),
+      loadArtifact: vi.fn().mockResolvedValue(terminalLedger),
+    });
+    await expect(
+      runReindexCommand({ mode: 'verify', targetCollection: TARGET, runId: RUN_ID }, verifyDeps)
+    ).resolves.toMatchObject({ exitCode: 0, report: { ok: true } });
+
+    const secondPersisted: Array<Record<string, any>> = [];
+    const secondResume = recoveryFixture(rows, 'reindex_started');
+    const secondDeps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(secondResume.binding),
+      loadArtifact: vi.fn().mockResolvedValue(terminalLedger),
+      inspectJobs: vi.fn().mockResolvedValue([]),
+      persistArtifact: vi.fn((artifact: Record<string, unknown>) => {
+        secondPersisted.push(structuredClone(artifact));
+        return Promise.resolve();
+      }),
+    });
+    await expect(
+      runReindexCommand(
+        {
+          mode: 'execute',
+          targetCollection: TARGET,
+          runId: RUN_ID,
+          artifactPath: '/tmp/q7-retained-source-truth.json',
+        },
+        secondDeps
+      )
+    ).resolves.toMatchObject({ exitCode: 0, report: { enqueued: 0, completed: rows.length } });
+    expect(secondDeps.enqueueJob).not.toHaveBeenCalled();
+    expect(secondPersisted.at(-1)).toMatchObject({
+      status: 'completed',
+      counts: { recoverable: rows.length, alreadyEnqueued: 0, pending: 0 },
+    });
+  });
+
   it('returns nonzero when verify finds parity, schema, or relevance failures', async () => {
     const rows = [
       source('60000000-0000-4000-8000-000000000006', 'ru'),
@@ -1722,6 +1885,84 @@ describe('reindex CLI parsing', () => {
     expect(stdout.mock.calls[0][0]).not.toContain(rows[1].id);
     expect(stdout.mock.calls[0][0]).not.toContain(recovery.binding.manifestSha256);
     expect(deps.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it('reports execute schema failures with aggregate counts and no target or raw mismatch text', async () => {
+    const row = source('60000000-0000-4000-8000-000000000006');
+    const sensitive = `/private/${RUN_ID}/${row.id}/${row.hash}/${TARGET}`;
+    const deps = dependencies([row], {
+      verifyPhysicalTarget: vi.fn().mockResolvedValue({ ok: false, mismatches: [sensitive] }),
+    });
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    const exitCode = await runReindexCli(
+      ['execute', '--target-collection', TARGET, '--run-id', RUN_ID],
+      {
+        stdout,
+        stderr,
+        createDefaultDependencies: () => deps,
+        loadFixtureDependencies: vi.fn(),
+      }
+    );
+
+    expect(exitCode).toBe(1);
+    const output = JSON.parse(stdout.mock.calls[0][0] as string) as {
+      report: Record<string, unknown>;
+    };
+    expect(output.report).toMatchObject({ schemaMismatchCount: 1 });
+    expect(output.report).not.toHaveProperty('targetCollection');
+    expect(output.report).not.toHaveProperty('schemaMismatches');
+    const combined = `${stdout.mock.calls[0][0]}${stderr.mock.calls[0][0]}`;
+    expect(combined).not.toContain(TARGET);
+    expect(combined).not.toContain(sensitive);
+  });
+
+  it('reports verify failures with counts only and no raw target, schema, or relevance strings', async () => {
+    const rows = [
+      source('60000000-0000-4000-8000-000000000006', 'ru'),
+      source('70000000-0000-4000-8000-000000000007', 'en'),
+    ];
+    const sensitive = `/private/${RUN_ID}/${rows[0].id}/${rows[0].hash}/${TARGET}`;
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const deps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi.fn().mockResolvedValue(completedExecutionLedger(rows)),
+      verifyPhysicalTarget: vi.fn().mockResolvedValue({ ok: false, mismatches: [sensitive] }),
+      loadIndexedDocuments: vi.fn().mockResolvedValue([indexed(rows[0])]),
+      runRelevanceChecks: vi.fn().mockResolvedValue([
+        { language: 'ru', passed: true, nativeHybrid: true },
+        { language: 'en', passed: false, nativeHybrid: true },
+      ]),
+    });
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    const exitCode = await runReindexCli(
+      ['verify', '--target-collection', TARGET, '--run-id', RUN_ID],
+      {
+        stdout,
+        stderr,
+        createDefaultDependencies: () => deps,
+        loadFixtureDependencies: vi.fn(),
+      }
+    );
+
+    expect(exitCode).toBe(1);
+    const output = JSON.parse(stdout.mock.calls[0][0] as string) as {
+      report: Record<string, unknown>;
+    };
+    expect(output.report).toMatchObject({
+      schemaMismatchCount: 1,
+      relevanceFailureCount: 1,
+      missingDocuments: 1,
+    });
+    expect(output.report).not.toHaveProperty('targetCollection');
+    expect(output.report).not.toHaveProperty('schemaMismatches');
+    expect(output.report).not.toHaveProperty('relevanceFailures');
+    const combined = `${stdout.mock.calls[0][0]}${stderr.mock.calls[0][0]}`;
+    expect(combined).not.toContain(TARGET);
+    expect(combined).not.toContain(sensitive);
   });
 
   it.each([

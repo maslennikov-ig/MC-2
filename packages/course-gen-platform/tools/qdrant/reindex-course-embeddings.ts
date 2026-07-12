@@ -89,6 +89,7 @@ export interface ReindexExecutionArtifact {
   recoveryRunId: string;
   recoveryManifestSha256: string;
   acceptedCoverageLedgerId: string;
+  acceptedCoverageStatus: 'accepted';
   acceptedCoverageFingerprint: string;
   verificationFingerprint: string;
   status: 'planned' | 'running' | 'completed' | 'failed';
@@ -470,6 +471,7 @@ function assertArtifactRecoveryBinding(
     artifact.recoveryRunId !== plan.recoveryRunId ||
     artifact.recoveryManifestSha256 !== plan.recoveryManifestSha256 ||
     artifact.acceptedCoverageLedgerId !== plan.acceptedCoverageLedgerId ||
+    artifact.acceptedCoverageStatus !== plan.acceptedCoverageStatus ||
     artifact.acceptedCoverageFingerprint !== plan.acceptedCoverageFingerprint ||
     artifact.verificationFingerprint !== plan.verificationFingerprint
   ) {
@@ -477,13 +479,16 @@ function assertArtifactRecoveryBinding(
   }
   if (
     artifact.counts.eligible !== plan.eligible ||
+    artifact.counts.recoverable !== plan.recoverable ||
     artifact.counts.auditedFailed !== plan.auditedFailed ||
     artifact.counts.unresolvedMissing !== plan.unresolvedMissing ||
     artifact.counts.unresolvedInvalid !== plan.unresolvedInvalid ||
     artifact.counts.expectedDocuments !== plan.expectedDocuments ||
+    artifact.counts.alreadyEnqueued !== plan.alreadyEnqueued ||
     artifact.counts.missingSource !== plan.missingSource ||
     artifact.counts.invalidSourcePath !== plan.invalidSourcePath ||
-    artifact.counts.unsupported !== plan.unsupported
+    artifact.counts.unsupported !== plan.unsupported ||
+    artifact.counts.gaps !== plan.gaps.length
   ) {
     throw new Error('Run artifact audited recovery counts are stale');
   }
@@ -720,6 +725,7 @@ async function executeReindex(
     recoveryRunId: basePrepared.plan.recoveryRunId!,
     recoveryManifestSha256: basePrepared.plan.recoveryManifestSha256!,
     acceptedCoverageLedgerId: basePrepared.plan.acceptedCoverageLedgerId!,
+    acceptedCoverageStatus: basePrepared.plan.acceptedCoverageStatus!,
     acceptedCoverageFingerprint: basePrepared.plan.acceptedCoverageFingerprint!,
     verificationFingerprint: calculateReindexVerificationFingerprint(basePrepared.plan),
     status: loadedArtifact?.status ?? 'planned',
@@ -728,28 +734,28 @@ async function executeReindex(
     concurrency,
     jobTimeoutMs,
     counts: {
-      eligible: prepared.plan.eligible,
-      recoverable: prepared.plan.recoverable,
-      auditedFailed: prepared.plan.auditedFailed,
-      unresolvedMissing: prepared.plan.unresolvedMissing,
-      unresolvedInvalid: prepared.plan.unresolvedInvalid,
-      expectedDocuments: prepared.plan.expectedDocuments,
+      eligible: basePrepared.plan.eligible,
+      recoverable: basePrepared.plan.recoverable,
+      auditedFailed: basePrepared.plan.auditedFailed,
+      unresolvedMissing: basePrepared.plan.unresolvedMissing,
+      unresolvedInvalid: basePrepared.plan.unresolvedInvalid,
+      expectedDocuments: basePrepared.plan.expectedDocuments,
       planned: plannedJobIds.size,
       accepted: 0,
       completed: 0,
       failed: 0,
       pending: plannedJobIds.size,
-      alreadyEnqueued: prepared.plan.alreadyEnqueued,
-      missingSource: prepared.plan.missingSource,
-      invalidSourcePath: prepared.plan.invalidSourcePath,
-      unsupported: prepared.plan.unsupported,
-      gaps: prepared.plan.gaps.length,
+      alreadyEnqueued: basePrepared.plan.alreadyEnqueued,
+      missingSource: basePrepared.plan.missingSource,
+      invalidSourcePath: basePrepared.plan.invalidSourcePath,
+      unsupported: basePrepared.plan.unsupported,
+      gaps: basePrepared.plan.gaps.length,
     },
     plannedJobIds: [...plannedJobIds].sort(),
     acceptedJobIds: [],
     completedJobIds: [],
     failures: [],
-    gaps: prepared.plan.gaps,
+    gaps: basePrepared.plan.gaps,
   };
 
   let checkpointChain = Promise.resolve();
@@ -1053,6 +1059,7 @@ const ReindexExecutionArtifactSchema = z
     recoveryRunId: UUID_V4_SCHEMA,
     recoveryManifestSha256: z.string().regex(/^[a-f0-9]{64}$/u),
     acceptedCoverageLedgerId: UUID_V4_SCHEMA,
+    acceptedCoverageStatus: z.literal('accepted'),
     acceptedCoverageFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
     verificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
     status: z.enum(['planned', 'running', 'completed', 'failed']),
@@ -1216,6 +1223,9 @@ const defaultArtifactWriteOperations: ReindexArtifactWriteOperations = {
     if (expectedUid !== undefined && metadata.uid !== expectedUid) {
       throw new Error('Reindex state directory must be owned by the current executor');
     }
+    if ((await realpath(directory)) !== resolve(directory)) {
+      throw new Error('Reindex state directory must use a real parent boundary');
+    }
   },
   openTemporary: (path, mode) => open(path, 'wx', mode),
   link,
@@ -1284,12 +1294,39 @@ export async function persistExecutionArtifact(
 export async function loadExecutionArtifact(
   artifactPath: string
 ): Promise<ReindexExecutionArtifact | null> {
+  let metadata: Awaited<ReturnType<typeof lstat>>;
   try {
-    const parsed = JSON.parse(await readFile(artifactPath, 'utf8')) as unknown;
-    return ReindexExecutionArtifactSchema.parse(parsed);
+    metadata = await lstat(artifactPath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
+  }
+  if (metadata.isSymbolicLink() || !metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+    throw new Error('Reindex artifact must be a non-symlink mode-0600 regular file');
+  }
+  const expectedUid = process.getuid?.();
+  if (expectedUid !== undefined && metadata.uid !== expectedUid) {
+    throw new Error('Reindex artifact must be owned by the current executor UID');
+  }
+  await defaultArtifactWriteOperations.assertSecureDirectory(dirname(artifactPath));
+  const handle = await open(artifactPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat();
+    if (
+      !opened.isFile() ||
+      (opened.mode & 0o777) !== 0o600 ||
+      opened.dev !== metadata.dev ||
+      opened.ino !== metadata.ino
+    ) {
+      throw new Error('Reindex artifact changed during protected open');
+    }
+    if (expectedUid !== undefined && opened.uid !== expectedUid) {
+      throw new Error('Reindex artifact must be owned by the current executor UID');
+    }
+    const parsed = JSON.parse(await handle.readFile('utf8')) as unknown;
+    return ReindexExecutionArtifactSchema.parse(parsed);
+  } finally {
+    await handle.close();
   }
 }
 
@@ -1662,10 +1699,10 @@ function formatHumanSummary(options: ReindexCommandOptions, report: ReindexComma
   }
   if (options.mode === 'execute') {
     const execution = report as Extract<ReindexCommandReport, { runId: string; enqueued: number }>;
-    return `EXECUTE status=${execution.ok ? 'ok' : 'failed'} target=${execution.targetCollection} enqueued=${execution.enqueued} completed=${execution.completed} failed=${execution.failed} pending=${execution.pending} gaps=${execution.gaps.length} action=${execution.ok ? 'verify' : 'resume-run'}\n`;
+    return `EXECUTE status=${execution.ok ? 'ok' : 'failed'} enqueued=${execution.enqueued} completed=${execution.completed} failed=${execution.failed} pending=${execution.pending} gaps=${execution.gaps.length} schema_mismatches=${execution.schemaMismatches.length} action=${execution.ok ? 'verify' : 'resume-run'}\n`;
   }
   const verification = report as ReindexVerificationResult & { gaps: ReindexPlan['gaps'] };
-  return `VERIFY status=${verification.ok ? 'ok' : 'failed'} target=${options.targetCollection ?? 'missing'} expected_documents=${verification.expectedDocuments} indexed_documents=${verification.indexedDocuments} expected_points=${verification.expectedKnownPoints} indexed_points=${verification.indexedPoints} gaps=${verification.gaps.length} action=${verification.ok ? 'review-cutover' : 'repair'}\n`;
+  return `VERIFY status=${verification.ok ? 'ok' : 'failed'} expected_documents=${verification.expectedDocuments} indexed_documents=${verification.indexedDocuments} expected_points=${verification.expectedKnownPoints} indexed_points=${verification.indexedPoints} gaps=${verification.gaps.length} schema_mismatches=${verification.schemaMismatches.length} relevance_failures=${verification.relevanceFailures.length} action=${verification.ok ? 'review-cutover' : 'repair'}\n`;
 }
 
 function classifyCliError(error: unknown): string {
@@ -1724,14 +1761,13 @@ function redactReportForCli(report: ReindexCommandReport): Record<string, unknow
   if ('enqueued' in report) {
     return {
       ok: report.ok,
-      targetCollection: report.targetCollection,
       enqueued: report.enqueued,
       completed: report.completed,
       failed: report.failed,
       pending: report.pending,
       alreadyEnqueued: report.alreadyEnqueued,
       gapReasons: countGapReasons(report.gaps),
-      schemaMismatches: report.schemaMismatches,
+      schemaMismatchCount: report.schemaMismatches.length,
     };
   }
   return {
@@ -1745,8 +1781,8 @@ function redactReportForCli(report: ReindexCommandReport): Record<string, unknow
     contextMismatches: report.contextMismatches.length,
     countMismatches: report.countMismatches.length,
     pointCountMismatches: report.pointCountMismatches.length,
-    schemaMismatches: report.schemaMismatches,
-    relevanceFailures: report.relevanceFailures,
+    schemaMismatchCount: report.schemaMismatches.length,
+    relevanceFailureCount: report.relevanceFailures.length,
     gapReasons: countGapReasons(report.gaps),
   };
 }

@@ -229,6 +229,7 @@ describe('buildReindexPlan', () => {
       journal,
       acceptedFailedCoverage: {
         ledgerId: '52000000-0000-4000-8000-000000000005',
+        status: 'accepted',
         recoveryRunId: manifest.run_id,
         recoveryManifestSha256: manifestSha256,
         fingerprint: '',
@@ -338,6 +339,7 @@ describe('buildReindexPlan', () => {
       },
       acceptedFailedCoverage: {
         ledgerId: '52000000-0000-4000-8000-000000000005',
+        status: 'accepted',
         recoveryRunId: manifest.run_id,
         recoveryManifestSha256: manifestSha256,
         fingerprint: '',
@@ -375,6 +377,20 @@ describe('buildReindexPlan', () => {
       nonZero.acceptedFailedCoverage
     );
     expect(() => buildReindexPlan(rows, () => false, nonZero)).toThrow(/zero|claims|evidence/iu);
+
+    const nonAccepted = structuredClone(binding) as RecoveryReindexBinding & {
+      acceptedFailedCoverage: RecoveryReindexBinding['acceptedFailedCoverage'] & {
+        status: 'processing';
+      };
+    };
+    nonAccepted.acceptedFailedCoverage.status = 'processing';
+    nonAccepted.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
+      nonAccepted.acceptedFailedCoverage
+    );
+    expect(nonAccepted.acceptedFailedCoverage.fingerprint).not.toBe(
+      binding.acceptedFailedCoverage.fingerprint
+    );
+    expect(() => buildReindexPlan(rows, () => false, nonAccepted)).toThrow(/accepted.*status/iu);
   });
 
   it('reports unknown point/request estimates instead of inventing batch precision', () => {

@@ -45,7 +45,9 @@ parallel_decision: sequential within stream - plan and execution share one recov
 status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
-resolves_review: b82a09f8
+resolves_review:
+  - b82a09f8
+  - 8b419f19
 cleanup_status: pending
 cleanup_notes: local dependency symlinks are removed before commit; branch/worktree cleanup waits for root acceptance
 risk_level: high
@@ -67,8 +69,20 @@ verification:
   - bounded CLI output and errors GREEN: passed 5/5
   - focused reindex command regression after review corrections: passed 56/56
   - core plus reindex regression: passed 93/93
-  - package type-check: passed via direct equivalent Node tsc after pnpm shim EACCES
+  - accepted terminal coverage status correction RED: 2 expected failures
+  - accepted terminal coverage status correction GREEN: passed 2/2
+  - secure existing-artifact load correction RED: 4 expected failures
+  - secure existing-artifact load correction GREEN: passed 5/5
+  - immutable source-ledger resume correction RED: 1 expected failure
+  - immutable source-ledger resume correction GREEN: passed 1/1
+  - aggregate-only CLI correction RED: 2 expected failures
+  - aggregate-only CLI correction GREEN: passed 2/2
+  - corrected core plus reindex regression: passed 100/100
+  - package type-check: passed through the normal root pnpm command
   - focused Prettier and git diff check: passed
+  - delegated artifact validation: passed
+  - repository process verification: passed
+  - post-cleanup git diff check: passed
   - self code-review: passed after correcting failed-ledger retry and cleanup-error bounding
 changed_files:
   - packages/course-gen-platform/tools/qdrant/reindex-plan.ts
@@ -91,11 +105,13 @@ zero. Generic failed status or error text never qualifies by itself.
 Every command mode requires an injected recovery binding. The planner
 recomputes the canonical immutable-manifest digest and checks the progress
 journal binding, exact verified dispositions, and a typed accepted Stage 4
-failed-coverage ledger bound to its lowercase UUIDv4, recovery run, manifest
-SHA, canonical fingerprint, tenant/course identities, and zero-evidence fields.
+failed-coverage ledger whose terminal status is exactly `accepted`, bound to its
+lowercase UUIDv4, recovery run, manifest SHA, canonical fingerprint,
+tenant/course identities, and zero-evidence fields.
 Candidate and parity IDs contain only recoverable documents. CLI output and all
-error paths are bounded and exclude source paths, full identities, job IDs,
-manifest hashes, and verification fingerprints.
+error paths are aggregate-only and exclude source paths, target identities, raw
+schema/relevance strings, full identities, job IDs, manifest hashes, and
+verification fingerprints.
 
 Execution artifacts use strict schema v3 and persist recovery and accepted
 coverage bindings, audited counts, exact deterministic job IDs, and a coherent
@@ -106,7 +122,12 @@ an independent reload returns the exact persisted revision and contents. Crash
 states between initial ledger and `reindex_started` are resumable, while stale
 or incoherent ledgers stop before enqueue. Successful parity verification moves
 the journal to unambiguous `complete`; complete plan/verify are idempotent and
-execute is rejected.
+execute is rejected. Existing artifacts are opened only through a real mode-0700
+current-UID parent and a real mode-0600 current-UID file, with symlink,
+descriptor identity, device, and inode checks. Immutable source counts remain
+bound to the base plan across retained completed jobs; only accepted/completed
+progress arrays advance, including persisted-ledger verification and a second
+resume.
 
 # Scope / Routing
 
@@ -121,9 +142,10 @@ will source it from the accepted evidence run and item repositories.
 Strict TDD recorded separate RED and GREEN cycles for plan classification,
 projection, missing binding, schema-v3 persistence, resume fingerprint/count
 drift, unresolved-gap side-effect blocking, journal-before-enqueue ordering,
-and aggregate-only CLI output. The final regression covers the accepted core
-plus reindex contract. Package type-check and focused formatting/whitespace
-checks pass.
+aggregate-only CLI output, accepted terminal coverage status, secure artifact
+loading, and retained-completion resume stability. The final regression covers
+the accepted core plus corrected reindex contract. Package type-check and
+focused formatting/whitespace checks pass.
 
 # Delivery / Cleanup
 

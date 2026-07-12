@@ -68,6 +68,7 @@ export interface ReindexPlan {
   recoveryRunId?: string;
   recoveryManifestSha256?: string;
   acceptedCoverageLedgerId?: string;
+  acceptedCoverageStatus?: 'accepted';
   acceptedCoverageFingerprint?: string;
   verificationFingerprint?: string;
   gaps: ReindexGap[];
@@ -89,6 +90,7 @@ export interface AcceptedFailedCoverageEntry {
 
 export interface AcceptedFailedCoverageBinding {
   ledgerId: string;
+  status: 'accepted';
   recoveryRunId: string;
   recoveryManifestSha256: string;
   fingerprint: string;
@@ -129,6 +131,7 @@ export function calculateAcceptedFailedCoverageFingerprint(
     .update(
       JSON.stringify({
         ledgerId: binding.ledgerId,
+        status: binding.status,
         recoveryRunId: binding.recoveryRunId,
         recoveryManifestSha256: binding.recoveryManifestSha256,
         entries,
@@ -209,6 +212,9 @@ function validateRecoveryBinding(
   if (!coverage || !UUID_V4_PATTERN.test(coverage.ledgerId)) {
     throw new Error('Accepted failed coverage ledger ID must be a lowercase UUIDv4');
   }
+  if (coverage.status !== 'accepted') {
+    throw new Error('Accepted failed coverage status must be accepted');
+  }
   if (
     coverage.recoveryRunId !== manifest.run_id ||
     coverage.recoveryManifestSha256 !== canonicalSha256
@@ -276,6 +282,7 @@ export function calculateReindexVerificationFingerprint(plan: ReindexPlan): stri
         recoveryRunId: plan.recoveryRunId,
         recoveryManifestSha256: plan.recoveryManifestSha256,
         acceptedCoverageLedgerId: plan.acceptedCoverageLedgerId,
+        acceptedCoverageStatus: plan.acceptedCoverageStatus,
         acceptedCoverageFingerprint: plan.acceptedCoverageFingerprint,
         auditedFailedFileIds: [...plan.auditedFailedFileIds].sort(),
         candidateFileIds: [...plan.candidateFileIds].sort(),
@@ -423,6 +430,7 @@ export function buildReindexPlan(
           recoveryRunId: validatedBinding.manifest.run_id,
           recoveryManifestSha256: recoveryBinding!.manifestSha256,
           acceptedCoverageLedgerId: recoveryBinding!.acceptedFailedCoverage.ledgerId,
+          acceptedCoverageStatus: recoveryBinding!.acceptedFailedCoverage.status,
           acceptedCoverageFingerprint: recoveryBinding!.acceptedFailedCoverage.fingerprint,
         }
       : {}),
