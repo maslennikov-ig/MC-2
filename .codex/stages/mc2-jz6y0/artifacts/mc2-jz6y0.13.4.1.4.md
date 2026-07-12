@@ -47,11 +47,11 @@ selected_agents:
 catalog_candidates:
   - none - installed workflow skills and accepted repository contracts cover the task
 parallel_decision: sequential - adapter, typed aggregate seam, artifact schema, and default CLI wiring share one provenance contract
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: dedicated worktree and branch remain for independent review; temporary dependency symlinks are removed before commit
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation, review, and rereview worktrees plus local branches were removed after fresh integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -77,6 +77,10 @@ verification:
   - correction evidence repository plus Stage 4/5/6 regression: passed 132/132 across seven files
   - correction course-gen-platform package type-check: passed
   - correction self code-review: P0 0, P1 0, P2 0, P3 0
+  - independent delta rereview 4dc3edd2: PASS with P0 0, P1 0, P2 0, P3 0
+  - fresh integration recovery plus reindex regression: passed 146/146 across seven files
+  - fresh integration course-gen-platform package type-check: passed
+  - fresh integration artifact and process verification: passed
 changed_files:
   - packages/course-gen-platform/tools/qdrant/source-recovery-reindex-adapters.ts
   - packages/course-gen-platform/tools/qdrant/reindex-plan.ts
@@ -86,7 +90,6 @@ changed_files:
   - packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.4.md
 explicit_defers:
-  - independent correctness review and orchestrator acceptance remain required
   - adjacent runtime stream must pass the exact CLI configuration through the pinned operator service; no Compose, entrypoint, wrapper, database, Qdrant, Redis, or remote state was modified here
 ---
 
