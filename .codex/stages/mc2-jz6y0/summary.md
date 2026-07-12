@@ -36,10 +36,12 @@ Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback/snapsh
 | R      | `mc2-jz6y0.13.4.1.3` | isolated three-service operator, narrow capability bind, host flock/writer restore | deploy specialist using `senior-devops` | Compose, Dockerfile, entrypoint, host wrapper, ops tests/artifact | accepted workflow/reindex CLIs               | accepted: 34/34 plus final P0-P3-zero rereview   | complete; worktrees/local branches cleaned    |
 | A      | `mc2-jz6y0.13.4.1.4` | concrete manifest/journal and accepted evidence adapters                           | search/data correctness worker          | Qdrant adapter/reindex seams, focused tests/artifact              | accepted workflow/reindex/evidence contracts | accepted: 146/146 plus final P0-P3-zero rereview | complete; worktrees/local branches cleaned    |
 | C      | `mc2-jz6y0.13.4.1.1` | crash-order, temp reconciliation and replacement-inode matrix                      | correctness/QA worker                   | recovery crash tests/support/artifact                             | accepted core/workflow                       | accepted: integrated 453/453 plus mutation RED   | complete; final P0-P3-zero review and cleanup |
+| X      | `mc2-jz6y0.13.4.1.5` | disposable exact-count end-to-end source recovery acceptance                       | search/data correctness worker          | new focused acceptance test and delegated artifact                | accepted R/A/C plus evidence contracts       | 42/125, 24 dispositions, 234+6, restart/rollback | sequential join; no server or live database   |
 
-All three inherit the orchestrator model with high reasoning because they cover
+The first three streams inherited the orchestrator model with high reasoning because they cover
 filesystem durability, destructive rollback, tenant-bound evidence, secrets,
-and service isolation. Catalog candidates are none; installed skills and local
+and service isolation. The exact-count join uses the same reasoning level because
+it exercises all accepted boundaries together. Catalog candidates are none; installed skills and local
 approved contracts cover the work. All runtime work is local/synthetic and
 authorizes no staging or production mutation.
 
