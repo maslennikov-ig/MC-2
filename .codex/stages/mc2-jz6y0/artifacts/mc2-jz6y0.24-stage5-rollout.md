@@ -54,7 +54,7 @@ docs_impact: behavior
 docs_reviewed: updated
 docs_review_notes: The operator guide, approved design chain and E7 orchestration records now distinguish the closed 100% local/development decision from fail-closed runtime defaults and Q12-gated staging/production activation.
 graph_reviewed: no-change-needed
-graph_review_notes: The parent used the current local graph; this docs-only child was explicitly prohibited from refreshing it, and Task 3 owns any post-acceptance refresh.
+graph_review_notes: The parent used the current local graph; final local-only refresh remains part of stage closeout.
 verification:
   - Stage 5 RED with synthetic local Supabase setup: exit 1; rollout module absent and cohort-zero handler still constructed the adapter.
   - Expanded Stage 6 RED with synthetic local Supabase setup: exit 1; shared active gate absent and default/disabled/shadow loaded accepted evidence in 3 failing cases.
@@ -79,7 +79,6 @@ changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-stage5-rollout.md
 explicit_defers:
   - Staging/production activation, remote deployment, live reindex, service or secret changes, and every other remote mutation remain Q12 authorization-gated; the approved 100% value is local/development only.
-  - Independent Task 3 correctness/docs review and parent acceptance remain orchestrator-owned before E7 can be accepted.
 ---
 
 # Summary
@@ -100,7 +99,7 @@ The first requested command could not start Vitest because the new worktree lack
 
 # Delivery / Cleanup
 
-Implementation commit `0aad2c20` was pushed to `origin/codex/e7-stage5-rollout`. All five setup-only dependency symlinks were removed before artifact creation. That runtime stream subsequently passed independent correctness review and orchestrator acceptance as recorded in the frontmatter. The later local/development value decision and checked-in activation remain subject to the separate Task 3 review before E7 acceptance.
+Implementation commit `0aad2c20` was pushed to `origin/codex/e7-stage5-rollout`. All five setup-only dependency symlinks were removed before artifact creation. That runtime stream subsequently passed independent correctness review and orchestrator acceptance as recorded in the frontmatter. The later local/development value decision and checked-in activation also passed final independent review at `d3417610`, merged as `ea183d83`, and passed the parent acceptance rerun.
 
 # Risks / Follow-ups / Explicit Defers
 
@@ -108,4 +107,4 @@ The original runtime implementation intentionally chose no rollout percentage an
 
 docs-reviewed: updated - the operator guide, approved design chain and E7 records now capture the closed 100% local/development decision, quiesce-first 100 -> 0 containment, and unchanged Q12 boundary.
 
-graph-reviewed: no-change-needed - the parent used the current local graph; this docs-only child was explicitly prohibited from refreshing it, and Task 3 owns any post-acceptance refresh.
+graph-reviewed: no-change-needed - the parent used the current local graph; final local-only refresh remains part of stage closeout.

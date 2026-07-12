@@ -8,16 +8,16 @@ branch: codex/self-hosted-qdrant-platform
 base_branch: origin/codex/self-hosted-qdrant-platform
 base_commit: 9284529a68bbf140f7cf41213e7e1b28e42a19f4
 worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
-status: blocked
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Historical E7 disposable resources were cleaned; the 100% local/development activation checkpoint awaits independent Task 3 correctness/docs review and orchestrator acceptance. No remote, staging, live, Q12, Qdrant Cloud, service, secret, or deployment state was changed.
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Historical E7 disposable resources were cleaned. The reviewed dev-activation branch was merged as ea183d83; its dedicated worktree and local branch were removed after the remote evidence branch was updated. No remote, staging, live, Q12, Qdrant Cloud, service, secret, or deployment state was changed.
 risk_level: high
 docs_reviewed: updated
-docs_review_notes: Earlier E7 operator/product documentation passed independent review at 82831b6f with P0-P3 zero and was integrated at 756406a4. The closed owner decision and 100% local/development activation are now documented, but this checkpoint still awaits the independent Task 3 review.
+docs_review_notes: Earlier E7 operator/product documentation passed independent review at 82831b6f with P0-P3 zero and was integrated at 756406a4. The combined 100% local/development activation checkpoint passed its final independent correctness/docs review with no P0-P3 findings and was accepted after integration reruns.
 graph_reviewed: no-change-needed
-graph_review_notes: The earlier accepted integration refresh completed with local-only Graphify 0.8.45 at 50438 nodes and 74881 edges. The parent used the current graph for this docs-only reconciliation; this child was explicitly prohibited from refreshing it, and Task 3 owns any post-acceptance refresh.
+graph_review_notes: The earlier accepted integration refresh completed with local-only Graphify 0.8.45 at 50438 nodes and 74881 edges. A final local-only refresh after the acceptance commit remains part of stage closeout.
 verification:
   - Focused course-gen Stage 2/4/5/6 evidence and retrieval gate passed 28/28 files and 330/330 tests.
   - Shared document-evidence and clarifying contracts passed 3/3 files and 23/23 tests with zero skips.
@@ -31,20 +31,21 @@ verification:
   - Owner decision mc2-jz6y0.24.2 closed on 2026-07-12 with the exact active gate and a 100% local/development Stage 5 cohort; advisory signals and hard invariants are recorded in the approved dev activation design.
   - Dev activation contract at c50d8420 plus exact-value review fix ba27d573 passed 5/5 files and 24/24 tests; both dev workers and the package environment example use coherent exact values, while production/staging assets remain unactivated.
   - @megacampus/course-gen-platform type-check passed for the dev activation checkpoint; supported YAML/TypeScript files passed Prettier, the environment example passed dotenv exact-value parsing, and diff checks passed.
+  - Final independent review of the combined activation/docs branch at d3417610 reported Ready to merge Yes with P0-P3 zero.
+  - Reviewed branch merged at ea183d83; parent integration rerun passed 5/5 files and 24/24 tests, package type-check, process verification, and canonical stage closeout dry-run.
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-acceptance.md
 explicit_defers:
-  - Independent Task 3 correctness/docs review plus parent acceptance reruns must pass before this artifact can change from blocked to accepted.
   - Q12 mc2-jz6y0.13 remains open and authorization-gated; no remote deployment, live reindex, service or secret change, staging mutation, or production mutation is authorized.
 ---
 
 # Summary
 
-The earlier integrated E1-E7 implementation through `a5a657e3` is locally accepted across shared contracts, the material-conflict UI, durable PostgreSQL migrations and isolation, Stage 2/4/5/6 behavior, observability, and reviewed operator documentation. Courses without documents retain the baseline path; every document outcome remains explicit; automatic decisions are atomic and audited; Stage 5 remains non-destructive and advisory; Stage 6 consumes the same accepted decision/evidence contract. The later 100% local/development activation checkpoint is not yet accepted.
+The integrated E1-E7 implementation and its 100% local/development activation checkpoint are accepted across shared contracts, the material-conflict UI, durable PostgreSQL migrations and isolation, Stage 2/4/5/6 behavior, observability, and reviewed operator documentation. Courses without documents retain the baseline path; every document outcome remains explicit; automatic decisions are atomic and audited; Stage 5 remains non-destructive and advisory; Stage 6 consumes the same accepted decision/evidence contract.
 
 The owner closed `mc2-jz6y0.24.2` on 2026-07-12 by approving the exact active gate and a 100% Stage 5 cohort for local/development. Development has no cohort-promotion step: cost, latency, false-conflict, degradation/failure and enrichment-quality signals are advisory, while coverage and baseline preservation remain 100% and tenant/course isolation violations plus unresolved P0/P1 findings remain zero. The checked-in dev values do not alter the fail-closed runtime parser or authorize staging/production.
 
-E7 remains blocked only for the independent Task 3 correctness/docs review and parent acceptance rerun. This worker does not claim orchestrator acceptance. Q12 remains the separate authorization boundary for every remote mutation.
+The combined activation/docs checkpoint passed independent review at `d3417610`, merged as `ea183d83`, and passed the parent acceptance rerun. E7 is accepted locally. Q12 remains the separate authorization boundary for every remote mutation.
 
 # Verification
 
@@ -66,6 +67,6 @@ The local Graphify refresh used version 0.8.45 and only `graphify update .`, `gr
 
 # Risks / Follow-ups
 
-The owner decision is resolved and is not an E7 defer. The sole E7 acceptance blocker is the independent Task 3 correctness/docs review and parent rerun over the combined dev activation and documentation diff. Any P0/P1 finding blocks acceptance; after a clean review, the orchestrator may mark E7 accepted and proceed to Q10.
+The owner decision and E7 acceptance are resolved. Q10 documentation reconciliation is next, followed by the complete Q11 verification matrix. Q12 remains authorization-gated.
 
 Q12 remains a separate hard authorization boundary. Before any remote action, the orchestrator must present exact staging actions, external effects, secret requirements, observation, rollback, and expected downtime/data effects and obtain explicit current-task authorization.

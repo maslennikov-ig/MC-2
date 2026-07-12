@@ -65,13 +65,13 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 
 ## Current Recovery Point
 
-- Integration branch contains accepted Q1-Q9, evidence E1-E6, and the locally accepted E7 implementation/docs through `a5a657e3`. Owner decision `.24.2` is closed with exact 100% local/development activation; the combined dev activation checkpoint remains blocked only for independent Task 3 review before final E7 acceptance.
+- Integration branch contains accepted Q1-Q9 and evidence E1-E7 with exact 100% local/development activation. The combined activation/docs branch passed final independent review at `d3417610`, merged as `ea183d83`, and passed its parent acceptance rerun.
 - Q7 / `mc2-jz6y0.8` is accepted: both integration lookups use document-scoped point IDs, the pinned Qdrant `1.18.2` gate passes 19/19, focused Q7 tests pass 85/85, and the dedicated worktree/local branch are cleaned. The remote evidence branch remains.
 - E1 / `mc2-jz6y0.18` is accepted: immutable source manifests survive deletion-before-persist, guarded RPCs replace authenticated table writes, terminal coverage and user-only override direction are enforced, PostgreSQL 15.18 applied tests pass 9/9, and the dedicated worktree/local branch/container are cleaned. The remote evidence branch remains.
 - E2 / `mc2-jz6y0.19` is accepted: complete authoritative source enumeration, exact durable outcomes, structured per-document and cross-document hierarchy, atomic resume, claim-scoped verification, and exact `tiktoken 1.0.22` safety bounds are integrated. The final independent reviewer reported no findings (`Spec PASS`, `Quality APPROVED`).
 - E3 / `mc2-jz6y0.20` is accepted: persisted-card conflict detection, bounded RU/EN classification and Qdrant verification, explicit degraded/capacity questions, atomic manual/system decisions, full snapshots, guarded approval and recoverable multi-document retry lineage are integrated. Final independent review reported no findings (`Spec PASS`, `Quality APPROVED`).
 - E4 / `mc2-jz6y0.21`, E5 / `mc2-jz6y0.22`, and E6 / `mc2-jz6y0.23` are accepted and integrated.
-- E7 / `mc2-jz6y0.24` implementation, observability, reviewed docs and local cross-stage acceptance are integrated through `a5a657e3`. Stage 2/4/5/6 passed 330/330, shared contracts 23/23, web conflicts 20/20, PostgreSQL 16.14 migrations/recovery/isolation 64/64, observability 122/122, Prometheus 3.13.1 checks 14 rules, workspace type-check and independent code/docs reviews P0-P3 zero. Owner decision `.24.2` closed on 2026-07-12 with the exact local/development active gate and Stage 5 cohort `100`. Dev activation commits `c50d8420` plus `ba27d573` pass 5/5 files and 24/24 tests, including staging/production non-activation. Artifact `artifacts/mc2-jz6y0.24-acceptance.md` remains `blocked` only for Task 3 independent correctness/docs review; this worker does not claim orchestrator acceptance.
+- E7 / `mc2-jz6y0.24` is accepted locally. Stage 2/4/5/6 passed 330/330, shared contracts 23/23, web conflicts 20/20, PostgreSQL 16.14 migrations/recovery/isolation 64/64, observability 122/122, Prometheus 3.13.1 checks 14 rules, workspace type-check and independent code/docs reviews P0-P3 zero. Owner decision `.24.2` closed on 2026-07-12 with the exact local/development active gate and Stage 5 cohort `100`. The combined activation/docs branch at `d3417610` passed final independent review with no P0-P3 findings, merged as `ea183d83`, and the parent rerun passed 5/5 files and 24/24 tests, package type-check, process verification, and canonical closeout dry-run.
 - Q6 / `mc2-jz6y0.7` is accepted and integrated: Qdrant is pinned to `1.18.2` by index digest and `linux/amd64` child lock, file-backed secrets fail closed, ports remain loopback-only, Stage 7 stays isolated, and deploy gates verify readiness/auth/schema before RAG consumer recreation. Independent final review returned `PASS`; the integration rerun passed focused 8/8 plus artifact/process verification.
 - Decision `mc2-jz6y0.14` is owner-approved and closed: Prometheus `3.13.1` LTS, Grafana `12.4.5` extended support, node_exporter `1.12.0`, Alertmanager `0.33.1`, authenticated main-listener scrape, no Qdrant `metrics_port`, and file-backed fail-closed secret transport.
 - Q8 / `mc2-jz6y0.9` and Q9 / `mc2-jz6y0.10` are accepted and integrated as `da126a8a` and `5d4282ee`. The shared recovery/textfile contract is unified at `/var/lib/megacampus/qdrant-metrics`; both final independent reviews returned `PASS`.
@@ -134,12 +134,11 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 ## Explicit Defers
 
-- E7 final acceptance remains blocked only on the independent Task 3 correctness/docs review and parent acceptance rerun. Owner decision `.24.2` is closed and is not a defer; after review, Q10 is the next task.
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke: blocked pending explicit current-task authorization.
 - Capacity-triggered non-goals remain those listed in the approved design; they are not implementation debt.
 
-docs-reviewed: updated — operator and orchestration records now reflect the closed 100% local/development decision, exact Task 1 verification, pending Task 3 review, Q10 next, and unchanged Q12 authorization.
+docs-reviewed: updated — operator and orchestration records now reflect accepted 100% local/development activation, clean final review, parent rerun, Q10 next, and unchanged Q12 authorization.
 
-graph-reviewed: no-change-needed — the parent used the current local graph for this docs-only reconciliation, and the child was explicitly prohibited from refreshing it; Task 3 owns any post-acceptance refresh.
+graph-reviewed: no-change-needed — the parent used the current local graph; final local-only refresh remains part of stage closeout.
 
 project-index: reviewed-no-change — this checkpoint changes only orchestration truth and readiness evidence; Q10 still owns the required stable Qdrant/operations navigation update.
