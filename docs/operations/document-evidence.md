@@ -1,9 +1,10 @@
 # Document evidence operations
 
 This runbook covers the optional advisory document-evidence path across Stage 4,
-Stage 5, and Stage 6. It does not authorize deployment, live reindex, secret
-changes, service activation, or staging/production mutation. Those actions
-remain behind the repository's explicit Q12 authorization gate.
+Stage 5, and Stage 6. The owner has authorized the exact staging
+`true/active/100` state, but this document is not an activation command. The
+current CA, S3, and source-truth NO-GO inputs below must be resolved first; no
+remote mutation has occurred.
 
 ## Runtime contract
 
@@ -294,37 +295,72 @@ source tables, including the decision ledger, before it creates/seeds the
 singleton, installs the run/checkpoint, conflict, and decision triggers, and
 reconciles history. The nonblocking index proof does not apply to these locks.
 
-Use this forward order:
+### Complete guarded remote migration sequence
 
-1. quiesce decision writers and answer submission;
-2. run
-   `TMPDIR=${TMPDIR:-/tmp} SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-observability:apply`;
-3. deploy the matching consumer code;
-4. resume answer submission and decision writers.
+The accepted remote chain is exactly
+`20260711120000 -> 20260711130000 -> 20260711140000 -> 20260711150000 ->
+20260711151000`. A generic `db push`, an unrelated pending migration, a gap,
+unknown or later frontier, history/catalog mismatch, lock overrun, or TLS failure
+is a hard stop.
 
-Use this reverse order:
+The owner authorized the staging migration, but the project Server root
+certificate is still a required input. Use the official project CA with both
+`sslmode=verify-full` and `sslrootcert`; never use `rejectUnauthorized=false`,
+`sslmode=require`, or an unverified pooler connection.
 
-1. quiesce decision writers and answer submission, then disable or rollback the
-   consumer code;
-2. run
-   `TMPDIR=${TMPDIR:-/tmp} SUPABASE_DB_URL=... pnpm --filter @megacampus/course-gen-platform migration:document-evidence-observability:rollback`;
-3. resume answer submission and decision writers.
+1. Confirm backup/PITR and inventory the exact remote migration frontier in a
+   read-only session. Do not continue unless it is compatible with the five
+   allowlisted versions.
+2. Pause answer/decision writers and affected Stage 4, Stage 5, and Stage 6
+   queues. Record the bounded expected write pause and keep consumers from
+   starting between base and observability steps.
+3. Without printing the DSN, require its TLS parameters:
 
-Plan a bounded expected insert/answer pause around the totals transaction and
-consumer cutover. The nonblocking index proof does not apply to the totals
-migration: its write-conflicting ledger lock intentionally blocks concurrent
-decision inserts/answers until commit. Do not combine the concurrent index
-statements with that transaction. Local verification still does not authorize
-applying either migration or consumer change to staging or production.
+   ```bash
+   : "${SUPABASE_DB_URL:?set the owner-only PostgreSQL DSN}"
+   [[ $SUPABASE_DB_URL == *'sslmode=verify-full'* ]]
+   [[ $SUPABASE_DB_URL == *'sslrootcert='* ]]
+   export SUPABASE_DB_URL
+   ```
 
-The unified runner accepts loopback targets by default and rejects remote
-targets. Only a separately authorized future Q12 may use a DSN with
-`sslmode=verify-full` and append
-`-- --allow-remote --confirm 'APPLY REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711150000 20260711151000'`.
-Rollback requires the exact confirmation
-`ROLL BACK REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711151000 20260711150000`.
-Neither remote form, nor any Q12 migration execution, was invoked while preparing
-this runbook.
+4. Apply and verify the guarded base chain:
+
+   ```bash
+   TMPDIR=${TMPDIR:-/tmp} \
+   pnpm --filter @megacampus/course-gen-platform \
+     migration:document-evidence-approved:apply -- \
+     --allow-remote \
+     --confirm 'APPLY REMOTE DOCUMENT EVIDENCE BASE 20260711120000 20260711130000 20260711140000'
+   ```
+
+5. Apply and verify the observability chain:
+
+   ```bash
+   TMPDIR=${TMPDIR:-/tmp} \
+   pnpm --filter @megacampus/course-gen-platform \
+     migration:document-evidence-observability:apply -- \
+     --allow-remote \
+     --confirm 'APPLY REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711150000 20260711151000'
+   ```
+
+6. Require exact contiguous migration history and the runners' live catalog,
+   RLS, policy, RPC signature, trigger, extension, index definition/comment, and
+   side-identity checks. Deploy matching consumers before resuming writers and
+   queues.
+
+The totals transaction intentionally takes write-conflicting locks; the
+concurrent-index proof does not apply to it. Rollback ordering, when a planned
+pre-consumer rollback is explicitly approved, is observability first and base
+second with these exact confirmations:
+
+```text
+ROLL BACK REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711151000 20260711150000
+ROLL BACK REMOTE DOCUMENT EVIDENCE BASE 20260711140000 20260711130000 20260711120000
+```
+
+Never down-migrate evidence/audit tables as an incident shortcut, and never
+remove the base chain while `150/151` or matching consumers remain. No remote
+migration was run while preparing this documentation.
 
 ### Alerts and dashboard panels
 
@@ -345,29 +381,39 @@ The dashboard evidence section contains exactly these six panels:
 - Evidence conflicts and decisions;
 - Evidence Stage 5 / 6 retrieval.
 
-## Rollout sequence
+## Authorized staging decision and current NO-GO
 
-Any future staging/production rollout is ordered and must not skip a step:
+On 2026-07-12 the owner explicitly superseded gradual staging promotion and
+authorized these exact values for every eligible staging course:
 
-1. disabled, then the current integrated shadow evidence/conflict collection;
-2. active conflict questions for internal/manual courses;
-3. automatic system decisions only after manual conflict evidence is reviewed;
-4. Stage 5 advisory enrichment for an explicitly bounded deterministic course
-   cohort;
-5. broader promotion only after every owner decision below is recorded.
+```text
+DOCUMENT_EVIDENCE_ENABLED=true
+DOCUMENT_EVIDENCE_MODE=active
+DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
+```
 
-For local/development, the owner approved the exact active gate and a 100%
-Stage 5 cohort on 2026-07-12. Development has no cohort-promotion step: cost,
-latency, false-conflict, degradation/failure and enrichment-quality signals are
-advisory. Coverage and baseline preservation must remain 100%, tenant/course
-isolation violations and unresolved P0/P1 findings must remain zero.
-Staging/production activation is not implied and remains Q12-gated. The exact
-checked-in development decision and environment are recorded in
-[`Document Evidence: 100% Dev Activation Design`](../superpowers/specs/2026-07-12-document-evidence-dev-activation-design.md).
+This authorizes the intended final staging state; it does not waive hard gates.
+No remote mutation has occurred. Activation remains NO-GO until:
 
-The active development value is
-`DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100`. A nonzero value never replaces
-the exact global active gate.
+1. the project CA enables the guarded five-migration path with
+   `sslmode=verify-full` and `sslrootcert`;
+2. off-host S3 inputs and checksum-verified snapshot/isolated restore exist;
+3. authoritative sources have zero missing/invalid paths, or a separate audited
+   owner product-truth decision is recorded—never `--allow-gaps`;
+4. exact digests, private listeners, secret metadata, free metrics GID, Compose,
+   and systemd oneshots pass;
+5. deterministic reindex, RU/EN relevance, strict schema, parity, and negative
+   tenant/course isolation pass;
+6. immutable app/main-worker/Stage-6 rollback and evidence containment pass;
+7. coverage and baseline preservation are exactly 100%, with zero isolation
+   violations and unresolved P0/P1 findings;
+8. real firing/resolved notification, 60-minute observation, one complete
+   normal course cycle, cleanup, and retained rollback evidence pass.
+
+The local/development design remains recorded in
+[`Document Evidence: 100% Dev Activation Design`](../superpowers/specs/2026-07-12-document-evidence-dev-activation-design.md),
+but it is no longer the staging authorization source. A nonzero cohort never
+replaces the exact global active gate.
 
 Shadow mode is not an acceptance claim. Before advancing, compare exact coverage,
 conflict precision, degraded outcomes, model/cost/latency observations, and
@@ -375,15 +421,11 @@ baseline/enriched structure diffs. Preserve representative RU and EN evidence
 and include no-document, irrelevant-document, oversized-document, large-corpus,
 resume, Qdrant-unavailable, and tenant-isolation cases.
 
-## Development decision and future remote promotion
+## Decision evidence record
 
-The local/development decision treats the cost, latency, false-conflict,
-degradation/failure and enrichment-quality fields below as advisory observation,
-not numeric promotion gates. Its hard invariants are 100% coverage, 100%
-baseline preservation, zero tenant/course isolation violations and zero
-unresolved P0/P1 findings. Any future staging/production promotion must obtain
-its own Q12 authorization and record the applicable fields below; the
-local/development decision must not be reused as remote authorization.
+The staging decision is recorded. Cost, latency, false-conflict,
+degradation/failure, and enrichment-quality fields remain advisory observation
+for the required activation packet; they cannot replace the hard invariants.
 
 | Decision field     | Evidence to present                                                           | Required record                                                          |
 | ------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -416,7 +458,7 @@ Choose one rollback objective before changing configuration:
 Do not promise audit-only behavior and evidence-aware Stage 6 behavior in the
 same configuration; the shared active gate makes them mutually exclusive.
 
-The documented development containment action is
+The documented staging containment action is
 `DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100 -> 0`. Quiesce first and complete
 the coherent restart and verification sequence below; do not flip the value on
 an in-flight job. This containment keeps stored evidence and audit rows.
