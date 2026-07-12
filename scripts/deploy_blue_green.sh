@@ -44,6 +44,28 @@ upsert_env() {
     mv "$temp" "$path"
 }
 
+write_color_env() {
+    local color="$1"
+    local web_port="$2"
+    local api_port="$3"
+    local web_image="$4"
+    local api_image="$5"
+    local target="$BASE_PATH/.env.$color"
+    local temp
+    temp="$(mktemp "${target}.XXXXXX")"
+    cp "$BASE_PATH/.env.$ENV" "$temp"
+    {
+        printf 'COLOR=%s\n' "$color"
+        printf 'WEB_PORT=%s\n' "$web_port"
+        printf 'API_PORT=%s\n' "$api_port"
+        printf 'COMPOSE_PROJECT_NAME=megacampus-%s\n' "$color"
+        printf 'WEB_IMAGE=%s\n' "$web_image"
+        printf 'API_IMAGE=%s\n' "$api_image"
+    } >> "$temp"
+    chmod 0600 "$temp"
+    mv "$temp" "$target"
+}
+
 require_immutable_ref() {
     local value="$1"
     local repository="$2"
@@ -249,16 +271,6 @@ docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.
 echo "   Infrastructure ready."
 echo ""
 
-# 5. Prepare Environment Configuration
-echo "Preparing environment..."
-cp "$BASE_PATH/.env.$ENV" "$BASE_PATH/.env.$NEW_COLOR"
-{
-    echo "COLOR=$NEW_COLOR"
-    echo "WEB_PORT=$NEW_WEB_PORT"
-    echo "API_PORT=$NEW_API_PORT"
-    echo "COMPOSE_PROJECT_NAME=megacampus-$NEW_COLOR"
-} >> "$BASE_PATH/.env.$NEW_COLOR"
-
 # 6. Docker Login to GHCR (if GITHUB_TOKEN provided)
 if [ -n "$GITHUB_TOKEN" ]; then
     echo "Logging in to GHCR..."
@@ -283,8 +295,16 @@ if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     else
         NEW_API_IMAGE="$CURRENT_API_IMAGE"
     fi
-    upsert_env "$BASE_PATH/.env.$NEW_COLOR" WEB_IMAGE "$NEW_WEB_IMAGE"
-    upsert_env "$BASE_PATH/.env.$NEW_COLOR" API_IMAGE "$NEW_API_IMAGE"
+    if [ "$CURRENT_COLOR" = "blue" ]; then
+        CURRENT_WEB_PORT=3001
+        CURRENT_API_PORT=4001
+    else
+        CURRENT_WEB_PORT=3002
+        CURRENT_API_PORT=4002
+    fi
+    echo "Preparing immutable current and target color environments..."
+    write_color_env "$CURRENT_COLOR" "$CURRENT_WEB_PORT" "$CURRENT_API_PORT" "$CURRENT_WEB_IMAGE" "$CURRENT_API_IMAGE"
+    write_color_env "$NEW_COLOR" "$NEW_WEB_PORT" "$NEW_API_PORT" "$NEW_WEB_IMAGE" "$NEW_API_IMAGE"
 
     # 7. Deploy Application to New Color
     echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
@@ -385,8 +405,8 @@ fi
 WORKER_COMPOSE="$BASE_PATH/docker-compose.production.yml"
 INFRA_COMPOSE="$BASE_PATH/docker-compose.infra.yml"
 
-if [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
-    WORKER_COLOR="${NEW_COLOR:-$CURRENT_COLOR}"
+if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
+    WORKER_COLOR="$NEW_COLOR"
     WORKER_ENV_FILE="$BASE_PATH/.env.$WORKER_COLOR"
     PRODUCTION_ENV_FILE="$WORKER_ENV_FILE"
     export PRODUCTION_ENV_FILE

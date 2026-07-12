@@ -91,6 +91,13 @@ traffic actually switched. Rollback validates immutable target references,
 restores API/web plus the main and Stage 6 workers before nginx, and then records
 `rolled_back`.
 
+Before the first switch, both color environments are rebuilt from the new
+self-hosted production baseline while retaining the current color's exact image
+digests. This makes the prior binary rollback-renderable without ever restoring
+the retired Cloud URL. Bridge-only deploys do not touch either color snapshot,
+and every actual app switch (including web-only) recreates the main and Stage 6
+workers with the selected color environment.
+
 The workflow materializes the Qdrant admin key, read-only key, S3 keys, Grafana
 admin password, Alertmanager notification credentials, and the Prometheus copy
 of the read-only key from their exact GitHub secrets. Atomic `sudo install`
@@ -106,8 +113,11 @@ trigger deployment, and the three deploy-contract tests run in CI.
 The expanded contract suite first failed on the missing metrics GID and on
 `ops/qdrant` producing `should_deploy=false`. Subsequent RED checks covered the
 absent secret materialization, mutable image tag, missing transaction guard, and
-missing CI execution. The final focused suite passes all three scripts and both
-Compose renders without using a live server or secret value.
+missing CI execution. Independent follow-up RED scenarios covered an
+unrenderable first rollback, bridge-only snapshot loss, web-only worker drift,
+wrong-repository digests, and failed remote secret-upload cleanup. The final
+focused suite passes all three scripts and both Compose renders without using a
+live server or secret value.
 
 # Remote state
 

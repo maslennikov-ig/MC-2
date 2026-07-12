@@ -56,4 +56,11 @@ API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api:latest
 EOF
 expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
 
+DIGEST="$(printf 'a%.0s' {1..64})"
+cat > "$TEMP_DIR/.env.green" <<EOF
+WEB_IMAGE=ghcr.io/attacker/example/web@sha256:$DIGEST
+API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api@sha256:$DIGEST
+EOF
+expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production
+
 echo "blue/green fail-closed tests passed"

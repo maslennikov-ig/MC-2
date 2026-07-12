@@ -134,6 +134,10 @@ assert(
     createQdrantSecrets.includes('sudo install -o 472 -g 472 -m 0400'),
   'staging secret files must be owner-only for their exact container consumers'
 );
+assert(
+  createQdrantSecrets.includes("trap 'rm -rf") && createQdrantSecrets.includes("' EXIT"),
+  'remote secret upload directory must be removed on both success and failure'
+);
 for (const requiredFile of [
   'prometheus_qdrant_read_only_api_key',
   'grafana_admin_password',
@@ -186,17 +190,38 @@ for (const requiredGuard of [
   'API_IMAGE=',
   'write_deploy_state preparing',
   'write_deploy_state switched',
+  'write_color_env "$CURRENT_COLOR"',
+  'write_color_env "$NEW_COLOR"',
+  'if [ "$APP_DEPLOY_NEEDED" = "true" ]; then',
 ]) {
   assert(
     deployScript.includes(requiredGuard),
     `deploy script must include immutable rollback guard: ${requiredGuard}`
   );
 }
+const appSwitchSection = deployScript.slice(
+  deployScript.indexOf('# 6. Docker Login'),
+  deployScript.indexOf('# 12. Update Workers')
+);
+assert(
+  appSwitchSection.includes('if [ "$APP_DEPLOY_NEEDED" = "true" ]; then') &&
+    appSwitchSection.includes('write_color_env "$CURRENT_COLOR"') &&
+    appSwitchSection.includes('write_color_env "$NEW_COLOR"'),
+  'color environment snapshots must be rewritten only inside an actual app switch'
+);
+const workerSection = deployScript.slice(deployScript.indexOf('# 12. Update Workers'));
+assert(
+  workerSection.includes('if [ "$APP_DEPLOY_NEEDED" = "true" ]; then') &&
+    workerSection.includes('WORKER_ENV_FILE="$BASE_PATH/.env.$WORKER_COLOR"'),
+  'every app switch, including web-only, must recreate workers with the active color env'
+);
 for (const requiredGuard of [
   'status=switched',
   'active color does not match the switched deployment',
   'WEB_IMAGE',
   'API_IMAGE',
+  'ghcr.io/maslennikov-ig/mc-2/web',
+  'ghcr.io/maslennikov-ig/mc-2/api',
 ]) {
   assert(
     rollbackScript.includes(requiredGuard),

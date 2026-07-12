@@ -69,9 +69,13 @@ if [ ! -f "$BASE_PATH/.env.$TARGET_COLOR" ]; then
     echo "   This may mean there was no previous deployment to roll back to."
     exit 1
 fi
-for image_key in WEB_IMAGE API_IMAGE; do
+for image_spec in \
+    'WEB_IMAGE:ghcr.io/maslennikov-ig/mc-2/web' \
+    'API_IMAGE:ghcr.io/maslennikov-ig/mc-2/api'; do
+    image_key="${image_spec%%:*}"
+    image_repository="${image_spec#*:}"
     image_value="$(awk -v key="$image_key" 'index($0, key "=") == 1 { value=substr($0, length(key) + 2) } END { print value }' "$BASE_PATH/.env.$TARGET_COLOR")"
-    [[ "$image_value" =~ @sha256:[0-9a-f]{64}$ ]] || {
+    [[ "$image_value" =~ ^${image_repository}@sha256:[0-9a-f]{64}$ ]] || {
         echo "Error: $image_key is missing or mutable in rollback target configuration." >&2
         exit 1
     }
