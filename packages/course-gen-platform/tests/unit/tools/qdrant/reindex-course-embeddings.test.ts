@@ -26,11 +26,19 @@ import {
   type ReindexCommandOptions,
 } from '../../../../tools/qdrant/reindex-course-embeddings';
 import {
+  buildReindexPlan,
+  calculateReindexVerificationFingerprint,
   loadReindexSources,
+  type RecoveryReindexBinding,
   type IndexedDocumentIdentity,
   type ReindexRelevanceCheck,
   type ReindexSourceRow,
 } from '../../../../tools/qdrant/reindex-plan';
+import {
+  calculateRecoveryManifestSha256,
+  type RecoveryProgressJournal,
+  type SourceRecoveryManifest,
+} from '../../../../tools/qdrant/source-recovery-manifest';
 
 const RUN_ID = '50000000-0000-4000-8000-000000000005';
 const TARGET = 'course_embeddings_v2';
@@ -45,11 +53,100 @@ function source(id: string, locale: 'ru' | 'en' = 'ru'): ReindexSourceRow {
     storagePath: `uploads/org/course/${id}.pdf`,
     mimeType: 'application/pdf',
     priority: 'CORE',
+    hash: 'a'.repeat(64),
     vectorStatus: 'indexed',
+    errorMessage: null,
     chunkCount: 3,
     locale,
     alreadyEnqueued: false,
   };
+}
+
+function recoveryFixture(
+  rows: readonly ReindexSourceRow[],
+  phase: 'verified' | 'reindex_started' = 'verified'
+): {
+  rows: ReindexSourceRow[];
+  binding: RecoveryReindexBinding;
+  plan: ReturnType<typeof buildReindexPlan>;
+} {
+  const auditedRows = Array.from({ length: 6 }, (_, index) => {
+    const id = `e0000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+    return {
+      ...source(id),
+      storagePath: `uploads/org/course/audited-${index}.pdf`,
+      vectorStatus: 'failed',
+      errorMessage: `source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005`,
+    };
+  });
+  const manifest: SourceRecoveryManifest = {
+    schema_version: 'megacampus.qdrant.source-recovery/v1',
+    run_id: '51000000-0000-4000-8000-000000000005',
+    release_sha: 'b'.repeat(40),
+    generated_at: '2026-07-12T12:00:00.000Z',
+    operator_image_digest: `sha256:${'c'.repeat(64)}`,
+    source_audit_version: 'unit-reviewed-v1',
+    development_root: '/srv/megacampus/uploads-dev',
+    production_root: '/srv/megacampus/uploads',
+    pre_counts: {
+      total: rows.length + 6,
+      eligible: rows.length + 6,
+      recoverable: rows.length,
+      missing: 4,
+      invalid: 2,
+      unsupported: 0,
+    },
+    expected_post_counts: {
+      total: rows.length + 6,
+      eligible: rows.length + 6,
+      recoverable: rows.length,
+      missing: 4,
+      invalid: 2,
+      unsupported: 0,
+    },
+    copies: [],
+    dispositions: auditedRows.map((row, index) => ({
+      entry_id: `eligible-${index}`,
+      kind: 'eligible_unrecoverable',
+      file_catalog_id: row.id,
+      organization_id: row.organizationId,
+      course_id: row.courseId,
+      expected_hash: row.hash,
+      expected_storage_path: row.storagePath,
+      expected_vector_status: 'pending',
+      expected_file_error_message: null,
+      reason: 'source_file_unrecoverable',
+    })),
+  };
+  const manifestSha256 = calculateRecoveryManifestSha256(manifest);
+  const journal: RecoveryProgressJournal = {
+    schema_version: 'megacampus.qdrant.source-recovery-progress/v1',
+    run_id: manifest.run_id,
+    manifest_sha256: manifestSha256,
+    revision: phase === 'verified' ? 12 : 13,
+    phase,
+    copy_states: {},
+    disposition_kinds: Object.fromEntries(
+      manifest.dispositions.map(entry => [entry.entry_id, entry.kind])
+    ),
+    disposition_states: Object.fromEntries(
+      manifest.dispositions.map(entry => [entry.entry_id, 'disposition_verified'])
+    ),
+  };
+  const binding: RecoveryReindexBinding = {
+    manifest,
+    manifestSha256,
+    journal,
+    verifiedFailedCoverageFileIds: auditedRows.map(row => row.id),
+  };
+  const allRows = [...rows, ...auditedRows];
+  const invalidIds = new Set(auditedRows.slice(4).map(row => row.id));
+  const plan = buildReindexPlan(
+    allRows,
+    row => (invalidIds.has(row.id) ? 'invalid_source_path' : rows.includes(row)),
+    binding
+  );
+  return { rows: allRows, binding, plan };
 }
 
 function indexed(row: ReindexSourceRow): IndexedDocumentIdentity {
@@ -65,17 +162,22 @@ function dependencies(
   rows: ReindexSourceRow[],
   overrides: Partial<ReindexCommandDependencies> = {}
 ): ReindexCommandDependencies {
+  const recovery = recoveryFixture(rows);
+  const auditedIds = new Set(recovery.binding.verifiedFailedCoverageFileIds);
+  const invalidIds = new Set(recovery.binding.verifiedFailedCoverageFileIds.slice(4));
   const relevanceChecks: ReindexRelevanceCheck[] = [
     { language: 'ru', passed: true, nativeHybrid: true },
     { language: 'en', passed: true, nativeHybrid: true },
   ];
   return {
-    loadSources: vi.fn().mockResolvedValue(rows),
+    loadSources: vi.fn().mockResolvedValue(recovery.rows),
     probeSources: vi.fn().mockResolvedValue({
-      availableFileIds: new Set(rows.map(row => row.id)),
-      invalidPathFileIds: new Set(),
+      availableFileIds: new Set(rows.map(row => row.id).filter(id => !auditedIds.has(id))),
+      invalidPathFileIds: invalidIds,
       resolvedFilePaths: new Map(rows.map(row => [row.id, `/safe/uploads/${row.id}.pdf`] as const)),
     }),
+    loadRecoveryBinding: vi.fn().mockResolvedValue(recovery.binding),
+    persistRecoveryJournalTransition: vi.fn(({ next }) => Promise.resolve(next)),
     verifyPhysicalTarget: vi.fn().mockResolvedValue({ ok: true, mismatches: [] }),
     enqueueJob: vi.fn().mockResolvedValue({
       waitForTerminal: vi.fn().mockResolvedValue(undefined),
@@ -97,28 +199,36 @@ function executionLedger(
   rows: ReindexSourceRow[],
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> {
+  const recovery = recoveryFixture(rows, 'reindex_started');
   const plannedJobIds = rows.map(row => buildReindexJobId(RUN_ID, row.id));
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     mode: 'execute',
     runId: RUN_ID,
     targetCollection: TARGET,
+    recoveryRunId: recovery.binding.manifest.run_id,
+    recoveryManifestSha256: recovery.binding.manifestSha256,
+    verificationFingerprint: calculateReindexVerificationFingerprint(recovery.plan),
     status: 'running',
     createdAt: '2026-07-10T12:00:00.000Z',
     updatedAt: '2026-07-10T12:00:00.000Z',
     concurrency: 2,
     jobTimeoutMs: 7_200_000,
     counts: {
-      eligible: rows.length,
+      eligible: rows.length + 6,
       recoverable: rows.length,
+      auditedFailed: 6,
+      unresolvedMissing: 0,
+      unresolvedInvalid: 0,
+      expectedDocuments: rows.length,
       planned: rows.length,
       accepted: 0,
       completed: 0,
       failed: 0,
       pending: rows.length,
       alreadyEnqueued: 0,
-      missingSource: 0,
-      invalidSourcePath: 0,
+      missingSource: 4,
+      invalidSourcePath: 2,
       unsupported: 0,
       gaps: 0,
     },
@@ -190,6 +300,20 @@ describe('durable reindex ledger', () => {
 });
 
 describe('Qdrant reindex command', () => {
+  it.each([
+    [{ mode: 'plan' }],
+    [{ mode: 'execute', targetCollection: TARGET }],
+    [{ mode: 'verify', targetCollection: TARGET }],
+  ] as const)('fails closed when %s has no recovery binding', async options => {
+    const deps = dependencies([source('60000000-0000-4000-8000-000000000006')], {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(null),
+    });
+
+    await expect(runReindexCommand(options, deps)).rejects.toThrow(/recovery binding/iu);
+    expect(deps.enqueueJob).not.toHaveBeenCalled();
+    expect(deps.loadIndexedDocuments).not.toHaveBeenCalled();
+  });
+
   it('batches relevance fixture text lookup beyond 1000 source IDs', async () => {
     const rows = Array.from({ length: 1001 }, (_, index) =>
       source(
@@ -233,7 +357,9 @@ describe('Qdrant reindex command', () => {
         storage_path: `uploads/org/course/source-${suffix}.pdf`,
         mime_type: 'application/pdf',
         priority: 'CORE',
+        hash: 'a'.repeat(64),
         vector_status: 'indexed',
+        error_message: null,
         chunk_count: 1,
       };
     });
@@ -255,9 +381,17 @@ describe('Qdrant reindex command', () => {
       ]),
     };
     const rows = await loadReindexSources(database);
+    const recovery = recoveryFixture(rows);
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const auditedRows = recovery.rows.slice(rows.length);
+    const loadAllSources = async () => [...(await loadReindexSources(database)), ...auditedRows];
     const recordedJobIds = rows.slice(0, -1).map(row => buildReindexJobId(RUN_ID, row.id));
-    const deps = dependencies(rows, {
-      loadSources: () => loadReindexSources(database),
+    const planDeps = dependencies(rows, {
+      loadSources: loadAllSources,
+    });
+    const executeDeps = dependencies(rows, {
+      loadSources: loadAllSources,
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
       loadArtifact: vi.fn().mockResolvedValue(
         executionLedger(rows, {
           status: 'completed',
@@ -267,8 +401,14 @@ describe('Qdrant reindex command', () => {
       ),
       loadIndexedDocuments: vi.fn().mockResolvedValue(rows.map(indexed)),
     });
+    const verifyDeps = dependencies(rows, {
+      loadSources: loadAllSources,
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi.fn().mockResolvedValue(executionLedger(rows)),
+      loadIndexedDocuments: vi.fn().mockResolvedValue(rows.map(indexed)),
+    });
 
-    const plan = await runReindexCommand({ mode: 'plan', allowGaps: false }, deps);
+    const plan = await runReindexCommand({ mode: 'plan' }, planDeps);
     expect(plan.report).toMatchObject({ recoverable: 1001, expectedDocuments: 1001 });
 
     const execute = await runReindexCommand(
@@ -277,19 +417,18 @@ describe('Qdrant reindex command', () => {
         targetCollection: TARGET,
         runId: RUN_ID,
         artifactPath: '/tmp/q7-1001-ledger.json',
-        allowGaps: false,
       },
-      deps
+      executeDeps
     );
-    expect(deps.inspectJobs).toHaveBeenCalledWith(
+    expect(executeDeps.inspectJobs).toHaveBeenCalledWith(
       expect.arrayContaining(rows.map(row => buildReindexJobId(RUN_ID, row.id)))
     );
-    expect(deps.enqueueJob).toHaveBeenCalledOnce();
+    expect(executeDeps.enqueueJob).toHaveBeenCalledOnce();
     expect(execute.report).toMatchObject({ alreadyEnqueued: 1000, enqueued: 1 });
 
     const verify = await runReindexCommand(
-      { mode: 'verify', targetCollection: TARGET, allowGaps: false },
-      deps
+      { mode: 'verify', targetCollection: TARGET, runId: RUN_ID },
+      verifyDeps
     );
     expect(verify.exitCode).toBe(0);
     expect(verify.report).toMatchObject({
@@ -428,7 +567,7 @@ describe('Qdrant reindex command', () => {
     ).resolves.toEqual([{ ...indexed(row), pointCount: 3 }]);
   });
 
-  it('keeps plan mode structurally read-only and allow-gaps changes only exit status', async () => {
+  it('keeps plan mode structurally read-only and returns 2 for every unresolved gap', async () => {
     const rows = [source('60000000-0000-4000-8000-000000000006')];
     const deps = dependencies(rows, {
       probeSources: vi.fn().mockResolvedValue({
@@ -437,17 +576,80 @@ describe('Qdrant reindex command', () => {
         resolvedFilePaths: new Map(),
       }),
     });
-    const baseOptions: ReindexCommandOptions = { mode: 'plan', allowGaps: false };
+    const baseOptions: ReindexCommandOptions = { mode: 'plan' };
 
     const blocked = await runReindexCommand(baseOptions, deps);
-    const allowed = await runReindexCommand({ ...baseOptions, allowGaps: true }, deps);
 
     expect(blocked.exitCode).toBe(2);
-    expect(allowed.exitCode).toBe(0);
-    expect(blocked.report).toEqual(allowed.report);
     expect(deps.verifyPhysicalTarget).not.toHaveBeenCalled();
     expect(deps.enqueueJob).not.toHaveBeenCalled();
     expect(deps.persistArtifact).not.toHaveBeenCalled();
+    expect(deps.loadIndexedDocuments).not.toHaveBeenCalled();
+    expect(deps.runRelevanceChecks).not.toHaveBeenCalled();
+  });
+
+  it('rejects reindex_started plan state without the matching durable ledger', async () => {
+    const rows = [source('60000000-0000-4000-8000-000000000006')];
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const deps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+    });
+
+    await expect(runReindexCommand({ mode: 'plan' }, deps)).rejects.toThrow(
+      /reindex_started|artifact|ledger|recovery journal/iu
+    );
+    expect(deps.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it('blocks execute before journal transition or enqueue when an eligible gap is unresolved', async () => {
+    const rows = [
+      source('60000000-0000-4000-8000-000000000006'),
+      source('70000000-0000-4000-8000-000000000007'),
+    ];
+    const recovery = recoveryFixture(rows);
+    const invalidAuditedIds = new Set(recovery.binding.verifiedFailedCoverageFileIds.slice(4));
+    const deps = dependencies(rows, {
+      probeSources: vi.fn().mockResolvedValue({
+        availableFileIds: new Set([rows[0].id]),
+        invalidPathFileIds: invalidAuditedIds,
+        resolvedFilePaths: new Map([[rows[0].id, `/safe/uploads/${rows[0].id}.pdf`]]),
+      }),
+    });
+
+    const result = await runReindexCommand(
+      { mode: 'execute', targetCollection: TARGET, runId: RUN_ID },
+      deps
+    );
+
+    expect(result.exitCode).toBe(2);
+    expect(result.report).toMatchObject({ unresolvedMissing: 1, unresolvedInvalid: 0 });
+    expect(deps.persistRecoveryJournalTransition).not.toHaveBeenCalled();
+    expect(deps.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it('blocks verify before Qdrant reads when an eligible gap is unresolved', async () => {
+    const rows = [
+      source('60000000-0000-4000-8000-000000000006'),
+      source('70000000-0000-4000-8000-000000000007'),
+    ];
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const invalidAuditedIds = new Set(resumed.binding.verifiedFailedCoverageFileIds.slice(4));
+    const deps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi.fn().mockResolvedValue(executionLedger(rows)),
+      probeSources: vi.fn().mockResolvedValue({
+        availableFileIds: new Set([rows[0].id]),
+        invalidPathFileIds: invalidAuditedIds,
+        resolvedFilePaths: new Map([[rows[0].id, `/safe/uploads/${rows[0].id}.pdf`]]),
+      }),
+    });
+
+    const result = await runReindexCommand(
+      { mode: 'verify', targetCollection: TARGET, runId: RUN_ID },
+      deps
+    );
+
+    expect(result.exitCode).toBe(2);
     expect(deps.loadIndexedDocuments).not.toHaveBeenCalled();
     expect(deps.runRelevanceChecks).not.toHaveBeenCalled();
   });
@@ -456,10 +658,7 @@ describe('Qdrant reindex command', () => {
     const deps = dependencies([]);
 
     await expect(
-      runReindexCommand(
-        { mode: 'execute', targetCollection: 'course_embeddings', allowGaps: false },
-        deps
-      )
+      runReindexCommand({ mode: 'execute', targetCollection: 'course_embeddings' }, deps)
     ).rejects.toThrow('physical collection');
 
     expect(deps.loadSources).not.toHaveBeenCalled();
@@ -476,7 +675,6 @@ describe('Qdrant reindex command', () => {
           mode: 'execute',
           targetCollection: TARGET,
           runId: 'not-a-uuid',
-          allowGaps: false,
         },
         deps
       )
@@ -516,6 +714,10 @@ describe('Qdrant reindex command', () => {
         order.push('enqueue');
         return enqueueJob(jobId, data);
       }),
+      persistRecoveryJournalTransition: vi.fn(({ next }) => {
+        order.push('persist-reindex-started');
+        return Promise.resolve(next);
+      }),
     });
 
     const result = await runReindexCommand(
@@ -523,13 +725,19 @@ describe('Qdrant reindex command', () => {
         mode: 'execute',
         targetCollection: TARGET,
         runId: RUN_ID,
-        allowGaps: false,
       },
       deps
     );
 
     expect(result.exitCode).toBe(0);
-    expect(order[0]).toBe('verify');
+    expect(order.indexOf('persist-reindex-started')).toBeGreaterThan(order.indexOf('verify'));
+    expect(order.indexOf('persist-reindex-started')).toBeLessThan(order.indexOf('enqueue'));
+    expect(deps.persistRecoveryJournalTransition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedRevision: 12,
+        next: expect.objectContaining({ phase: 'reindex_started', revision: 13 }),
+      })
+    );
     expect(maxActive).toBe(2);
     expect(enqueued).toHaveLength(3);
     expect(enqueued[0]).toEqual({
@@ -544,10 +752,13 @@ describe('Qdrant reindex command', () => {
     expect(deps.persistArtifact).toHaveBeenCalled();
     const artifact = vi.mocked(deps.persistArtifact).mock.calls.at(-1)![0];
     expect(artifact).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       mode: 'execute',
       runId: RUN_ID,
       targetCollection: TARGET,
+      recoveryRunId: '51000000-0000-4000-8000-000000000005',
+      recoveryManifestSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      verificationFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
       status: 'completed',
       concurrency: 2,
       counts: { accepted: 3, completed: 3, failed: 0, pending: 0, gaps: 0 },
@@ -585,7 +796,6 @@ describe('Qdrant reindex command', () => {
         concurrency: 1,
         jobTimeoutMs: 1000,
         artifactPath: '/tmp/q7-partial-ledger.json',
-        allowGaps: false,
       },
       deps
     );
@@ -627,6 +837,9 @@ describe('Qdrant reindex command', () => {
     ];
     const retainedJobId = buildReindexJobId(RUN_ID, rows[0].id);
     const deps = dependencies(rows, {
+      loadRecoveryBinding: vi
+        .fn()
+        .mockResolvedValue(recoveryFixture(rows, 'reindex_started').binding),
       loadArtifact: vi.fn().mockResolvedValue(
         executionLedger(rows, {
           status: 'completed',
@@ -643,7 +856,6 @@ describe('Qdrant reindex command', () => {
         targetCollection: TARGET,
         runId: RUN_ID,
         artifactPath: '/tmp/q7-retained-ledger.json',
-        allowGaps: false,
       },
       deps
     );
@@ -661,6 +873,9 @@ describe('Qdrant reindex command', () => {
     const jobId = buildReindexJobId(RUN_ID, rows[0].id);
     const persisted: Array<Record<string, unknown>> = [];
     const deps = dependencies(rows, {
+      loadRecoveryBinding: vi
+        .fn()
+        .mockResolvedValue(recoveryFixture(rows, 'reindex_started').binding),
       loadArtifact: vi.fn().mockResolvedValue(
         executionLedger(rows, {
           status: 'running',
@@ -681,7 +896,6 @@ describe('Qdrant reindex command', () => {
         targetCollection: TARGET,
         runId: RUN_ID,
         artifactPath: '/tmp/q7-accepted-only.json',
-        allowGaps: false,
       },
       deps
     );
@@ -715,13 +929,53 @@ describe('Qdrant reindex command', () => {
           targetCollection: TARGET,
           runId: RUN_ID,
           artifactPath: '/tmp/q7-target-mismatch.json',
-          allowGaps: false,
         },
         deps
       )
     ).rejects.toThrow(/target/i);
 
     expect(deps.loadSources).not.toHaveBeenCalled();
+    expect(deps.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale recovery fingerprint before resuming or enqueueing', async () => {
+    const rows = [source('60000000-0000-4000-8000-000000000006')];
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const deps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi
+        .fn()
+        .mockResolvedValue(executionLedger(rows, { verificationFingerprint: 'f'.repeat(64) })),
+    });
+
+    await expect(
+      runReindexCommand(
+        {
+          mode: 'execute',
+          targetCollection: TARGET,
+          runId: RUN_ID,
+          artifactPath: '/tmp/q7-stale-recovery-ledger.json',
+        },
+        deps
+      )
+    ).rejects.toThrow(/fingerprint|recovery binding/iu);
+
+    expect(deps.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale audited counts in a schema-v3 resume ledger', async () => {
+    const rows = [source('60000000-0000-4000-8000-000000000006')];
+    const resumed = recoveryFixture(rows, 'reindex_started');
+    const stale = executionLedger(rows) as { counts: Record<string, number> };
+    stale.counts.auditedFailed = 5;
+    const deps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi.fn().mockResolvedValue(stale),
+    });
+
+    await expect(
+      runReindexCommand({ mode: 'execute', targetCollection: TARGET, runId: RUN_ID }, deps)
+    ).rejects.toThrow(/audited|counts|recovery binding/iu);
     expect(deps.enqueueJob).not.toHaveBeenCalled();
   });
 
@@ -754,7 +1008,6 @@ describe('Qdrant reindex command', () => {
         mode: 'execute',
         targetCollection: TARGET,
         runId: RUN_ID,
-        allowGaps: false,
       },
       deps
     );
@@ -787,7 +1040,6 @@ describe('Qdrant reindex command', () => {
         targetCollection: TARGET,
         runId: RUN_ID,
         jobTimeoutMs: 1000,
-        allowGaps: false,
       },
       deps
     );
@@ -830,7 +1082,6 @@ describe('Qdrant reindex command', () => {
         targetCollection: TARGET,
         runId: RUN_ID,
         concurrency: 2,
-        allowGaps: false,
       },
       deps
     );
@@ -878,7 +1129,6 @@ describe('Qdrant reindex command', () => {
         mode: 'execute',
         targetCollection: TARGET,
         runId: RUN_ID,
-        allowGaps: false,
       },
       deps
     );
@@ -896,7 +1146,10 @@ describe('Qdrant reindex command', () => {
       source('60000000-0000-4000-8000-000000000006', 'ru'),
       source('70000000-0000-4000-8000-000000000007', 'en'),
     ];
+    const resumed = recoveryFixture(rows, 'reindex_started');
     const deps = dependencies(rows, {
+      loadRecoveryBinding: vi.fn().mockResolvedValue(resumed.binding),
+      loadArtifact: vi.fn().mockResolvedValue(executionLedger(rows)),
       verifyPhysicalTarget: vi
         .fn()
         .mockResolvedValue({ ok: false, mismatches: ['payload_schema.course_id'] }),
@@ -908,7 +1161,7 @@ describe('Qdrant reindex command', () => {
     });
 
     const result = await runReindexCommand(
-      { mode: 'verify', targetCollection: TARGET, allowGaps: false },
+      { mode: 'verify', targetCollection: TARGET, runId: RUN_ID },
       deps
     );
 
@@ -951,7 +1204,6 @@ describe('reindex CLI parsing', () => {
         '/tmp/reindex-artifact.json',
         '--fixture',
         '/tmp/reindex-fixture.json',
-        '--allow-gaps',
       ])
     ).toEqual({
       mode: 'execute',
@@ -961,21 +1213,29 @@ describe('reindex CLI parsing', () => {
       runId: RUN_ID,
       artifactPath: '/tmp/reindex-artifact.json',
       fixturePath: '/tmp/reindex-fixture.json',
-      allowGaps: true,
       help: false,
     });
+    expect(() => parseReindexCliArgs(['plan', '--allow-gaps'])).toThrow('Unknown option');
   });
 
   it('loads and validates a complete dry fixture without live services', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'mc2-qdrant-reindex-'));
     const fixturePath = join(directory, 'fixture.json');
     const row = source('60000000-0000-4000-8000-000000000006');
+    const recovery = recoveryFixture([row]);
     await writeFile(
       fixturePath,
       JSON.stringify({
         runId: RUN_ID,
         now: '2026-07-10T12:00:00.000Z',
-        sources: [{ ...row, sourceAvailable: true }],
+        recoveryBinding: recovery.binding,
+        sources: recovery.rows.map(sourceRow => ({
+          ...sourceRow,
+          sourceAvailable: sourceRow.id === row.id,
+          invalidSourcePath: recovery.binding.verifiedFailedCoverageFileIds
+            .slice(4)
+            .includes(sourceRow.id),
+        })),
         schemaVerification: { ok: true, mismatches: [] },
         indexedDocuments: [indexed(row)],
         relevanceChecks: [
@@ -987,9 +1247,9 @@ describe('reindex CLI parsing', () => {
 
     try {
       const deps = await loadReindexFixtureDependencies(fixturePath);
-      const result = await runReindexCommand({ mode: 'plan', allowGaps: false }, deps);
+      const result = await runReindexCommand({ mode: 'plan' }, deps);
       expect(result.exitCode).toBe(0);
-      expect(result.report).toMatchObject({ recoverable: 1, gaps: [] });
+      expect(result.report).toMatchObject({ recoverable: 1, auditedFailed: 6 });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -1025,8 +1285,48 @@ describe('reindex CLI parsing', () => {
     expect(output).toContain('"dryFixture": true');
     expect(output).not.toContain('storagePath');
     expect(output).not.toContain('/uploads/');
-    expect(summary).toMatch(/^PLAN status=ok eligible=1 recoverable=1 gaps=0 action=none\n$/);
+    expect(summary).toMatch(
+      /^PLAN status=ok eligible=7 recoverable=1 audited_failed=6 unresolved=0 action=none\n$/
+    );
     expect(summary).not.toContain('/uploads/');
+    expect(deps.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it('reports an unresolved execute as blocked without undefined or sensitive fields', async () => {
+    const rows = [
+      source('60000000-0000-4000-8000-000000000006'),
+      source('70000000-0000-4000-8000-000000000007'),
+    ];
+    const recovery = recoveryFixture(rows);
+    const deps = dependencies(rows, {
+      probeSources: vi.fn().mockResolvedValue({
+        availableFileIds: new Set([rows[0].id]),
+        invalidPathFileIds: new Set(recovery.binding.verifiedFailedCoverageFileIds.slice(4)),
+        resolvedFilePaths: new Map([[rows[0].id, `/safe/uploads/${rows[0].id}.pdf`]]),
+      }),
+    });
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    const exitCode = await runReindexCli(
+      ['execute', '--target-collection', TARGET, '--run-id', RUN_ID],
+      {
+        stdout,
+        stderr,
+        createDefaultDependencies: () => deps,
+        loadFixtureDependencies: vi.fn(),
+      }
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stderr).toHaveBeenCalledWith(
+      'EXECUTE status=blocked eligible=8 audited_failed=6 unresolved=1 action=repair-sources\n'
+    );
+    expect(stderr.mock.calls[0][0]).not.toContain('undefined');
+    expect(stdout.mock.calls[0][0]).not.toContain('/safe/uploads/');
+    expect(stdout.mock.calls[0][0]).not.toContain(rows[0].id);
+    expect(stdout.mock.calls[0][0]).not.toContain(rows[1].id);
+    expect(stdout.mock.calls[0][0]).not.toContain(recovery.binding.manifestSha256);
     expect(deps.enqueueJob).not.toHaveBeenCalled();
   });
 });

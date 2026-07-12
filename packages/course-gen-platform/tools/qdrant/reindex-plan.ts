@@ -1,8 +1,16 @@
+import { createHash } from 'node:crypto';
 import { MIME_TYPES_BY_TIER } from '@megacampus/shared-types';
 import {
   getFileExtension,
   isSupportedFormat,
 } from '../../src/stages/stage2-document-processing/docling/types';
+import {
+  calculateRecoveryManifestSha256,
+  normalizeRecoveryManifest,
+  type RecoveryDispositionEntry,
+  type RecoveryProgressJournal,
+  type SourceRecoveryManifest,
+} from './source-recovery-manifest';
 
 export type ReindexLocale = 'ru' | 'en';
 
@@ -15,7 +23,9 @@ export interface ReindexSourceRow {
   storagePath: string;
   mimeType: string;
   priority: string | null;
+  hash: string;
   vectorStatus: string;
+  errorMessage: string | null;
   chunkCount: number | null;
   locale: ReindexLocale;
   alreadyEnqueued: boolean;
@@ -37,6 +47,9 @@ export interface ReindexGap {
 export interface ReindexPlan {
   eligible: number;
   recoverable: number;
+  auditedFailed: number;
+  unresolvedMissing: number;
+  unresolvedInvalid: number;
   missingSource: number;
   invalidSourcePath: number;
   unsupported: number;
@@ -51,10 +64,141 @@ export interface ReindexPlan {
   };
   candidateFileIds: string[];
   alreadyEnqueuedFileIds: string[];
+  auditedFailedFileIds: string[];
+  recoveryRunId?: string;
+  recoveryManifestSha256?: string;
+  verificationFingerprint?: string;
   gaps: ReindexGap[];
 }
 
+export interface RecoveryReindexBinding {
+  manifest: SourceRecoveryManifest;
+  manifestSha256: string;
+  journal: RecoveryProgressJournal;
+  verifiedFailedCoverageFileIds: readonly string[];
+}
+
 export type ReindexSourceProbe = (row: ReindexSourceRow) => boolean | 'invalid_source_path';
+
+const VERIFIED_RECOVERY_PHASES = new Set(['verified', 'reindex_started', 'complete']);
+
+function assertExactSet(
+  actual: readonly string[],
+  expected: readonly string[],
+  label: string
+): void {
+  const actualSorted = [...actual].sort();
+  const expectedSorted = [...expected].sort();
+  if (
+    new Set(actualSorted).size !== actualSorted.length ||
+    JSON.stringify(actualSorted) !== JSON.stringify(expectedSorted)
+  ) {
+    throw new Error(`${label} must exactly match the reviewed eligible disposition set`);
+  }
+}
+
+function validateRecoveryBinding(
+  binding: RecoveryReindexBinding,
+  sourceRows: readonly ReindexSourceRow[]
+): {
+  manifest: SourceRecoveryManifest;
+  eligibleByFileId: ReadonlyMap<string, RecoveryDispositionEntry>;
+} {
+  const manifest = normalizeRecoveryManifest(binding.manifest);
+  const canonicalSha256 = calculateRecoveryManifestSha256(manifest);
+  if (binding.manifestSha256 !== canonicalSha256) {
+    throw new Error('Recovery binding manifest SHA-256 is not canonical');
+  }
+  if (
+    binding.journal.run_id !== manifest.run_id ||
+    binding.journal.manifest_sha256 !== canonicalSha256
+  ) {
+    throw new Error('Recovery journal binding does not match the reviewed manifest');
+  }
+  if (!VERIFIED_RECOVERY_PHASES.has(binding.journal.phase)) {
+    throw new Error('Recovery journal must be verified before reindex planning');
+  }
+  if (!Object.values(binding.journal.copy_states).every(state => state === 'published')) {
+    throw new Error('Recovery journal copies must all be published before reindex planning');
+  }
+  if (
+    !manifest.dispositions.every(
+      entry =>
+        binding.journal.disposition_kinds[entry.entry_id] === entry.kind &&
+        binding.journal.disposition_states[entry.entry_id] === 'disposition_verified'
+    )
+  ) {
+    throw new Error('Recovery journal dispositions must exactly match verified manifest entries');
+  }
+  assertExactSet(
+    Object.keys(binding.journal.copy_states),
+    manifest.copies.map(entry => entry.entry_id),
+    'Recovery journal copy IDs'
+  );
+  assertExactSet(
+    Object.keys(binding.journal.disposition_states),
+    manifest.dispositions.map(entry => entry.entry_id),
+    'Recovery journal disposition state IDs'
+  );
+  assertExactSet(
+    Object.keys(binding.journal.disposition_kinds),
+    manifest.dispositions.map(entry => entry.entry_id),
+    'Recovery journal disposition kind IDs'
+  );
+
+  const eligible = manifest.dispositions.filter(entry => entry.kind === 'eligible_unrecoverable');
+  if (eligible.length !== 6) {
+    throw new Error('Recovery binding must contain exactly six eligible audited failures');
+  }
+  assertExactSet(
+    binding.verifiedFailedCoverageFileIds,
+    eligible.map(entry => entry.file_catalog_id),
+    'Verified failed coverage IDs'
+  );
+
+  const rowsById = new Map(sourceRows.map(row => [row.id, row]));
+  for (const entry of eligible) {
+    const row = rowsById.get(entry.file_catalog_id);
+    const expectedError = `source_file_unrecoverable; recovery_run=${manifest.run_id}`;
+    if (
+      !row ||
+      row.organizationId !== entry.organization_id ||
+      row.courseId !== entry.course_id ||
+      row.hash !== entry.expected_hash ||
+      row.storagePath !== entry.expected_storage_path ||
+      row.vectorStatus !== 'failed' ||
+      row.errorMessage !== expectedError
+    ) {
+      throw new Error(`Recovery audited failure row does not match reviewed predicates`);
+    }
+  }
+
+  return {
+    manifest,
+    eligibleByFileId: new Map(eligible.map(entry => [entry.file_catalog_id, entry])),
+  };
+}
+
+export function calculateReindexVerificationFingerprint(plan: ReindexPlan): string {
+  if (!plan.recoveryRunId || !plan.recoveryManifestSha256) {
+    throw new Error('A recovery binding is required for a verification fingerprint');
+  }
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        recoveryRunId: plan.recoveryRunId,
+        recoveryManifestSha256: plan.recoveryManifestSha256,
+        auditedFailedFileIds: [...plan.auditedFailedFileIds].sort(),
+        candidateFileIds: [...plan.candidateFileIds].sort(),
+        alreadyEnqueuedFileIds: [...plan.alreadyEnqueuedFileIds].sort(),
+        missingSource: plan.missingSource,
+        invalidSourcePath: plan.invalidSourcePath,
+        unresolvedMissing: plan.unresolvedMissing,
+        unresolvedInvalid: plan.unresolvedInvalid,
+      })
+    )
+    .digest('hex');
+}
 
 const UPLOAD_MIME_TYPES = new Set<string>(Object.values(MIME_TYPES_BY_TIER).flat());
 const PLAIN_TEXT_MIME_TYPES = new Set(['text/plain', 'text/markdown']);
@@ -71,10 +215,17 @@ function addGap(gaps: ReindexGap[], fileId: string, reason: ReindexGapReason): v
 
 export function buildReindexPlan(
   sourceRows: readonly ReindexSourceRow[],
-  sourceProbe: ReindexSourceProbe
+  sourceProbe: ReindexSourceProbe,
+  recoveryBinding?: RecoveryReindexBinding
 ): ReindexPlan {
+  const validatedBinding = recoveryBinding
+    ? validateRecoveryBinding(recoveryBinding, sourceRows)
+    : undefined;
   let eligible = 0;
   let recoverable = 0;
+  let auditedFailed = 0;
+  let unresolvedMissing = 0;
+  let unresolvedInvalid = 0;
   let missingSource = 0;
   let invalidSourcePath = 0;
   let unsupported = 0;
@@ -85,6 +236,7 @@ export function buildReindexPlan(
   let maximumJinaRequests = 0;
   const candidateFileIds: string[] = [];
   const alreadyEnqueuedFileIds: string[] = [];
+  const auditedFailedFileIds: string[] = [];
   const gaps: ReindexGap[] = [];
 
   const rows = [...sourceRows].sort((left, right) => left.id.localeCompare(right.id));
@@ -118,11 +270,23 @@ export function buildReindexPlan(
     const sourceStatus = sourceProbe(row);
     if (sourceStatus === 'invalid_source_path') {
       invalidSourcePath += 1;
+      if (validatedBinding?.eligibleByFileId.has(row.id)) {
+        auditedFailed += 1;
+        auditedFailedFileIds.push(row.id);
+        continue;
+      }
+      unresolvedInvalid += 1;
       addGap(gaps, row.id, 'invalid_source_path');
       continue;
     }
     if (!sourceStatus) {
       missingSource += 1;
+      if (validatedBinding?.eligibleByFileId.has(row.id)) {
+        auditedFailed += 1;
+        auditedFailedFileIds.push(row.id);
+        continue;
+      }
+      unresolvedMissing += 1;
       addGap(gaps, row.id, 'source_missing');
       continue;
     }
@@ -144,9 +308,12 @@ export function buildReindexPlan(
     }
   }
 
-  return {
+  const plan: ReindexPlan = {
     eligible,
     recoverable,
+    auditedFailed,
+    unresolvedMissing,
+    unresolvedInvalid,
     missingSource,
     invalidSourcePath,
     unsupported,
@@ -161,8 +328,34 @@ export function buildReindexPlan(
     },
     candidateFileIds,
     alreadyEnqueuedFileIds,
+    auditedFailedFileIds,
+    ...(validatedBinding
+      ? {
+          recoveryRunId: validatedBinding.manifest.run_id,
+          recoveryManifestSha256: recoveryBinding!.manifestSha256,
+        }
+      : {}),
     gaps,
   };
+  if (validatedBinding) {
+    if (auditedFailedFileIds.length !== validatedBinding.eligibleByFileId.size) {
+      throw new Error('Every reviewed eligible disposition must remain a raw source gap');
+    }
+    if (unresolvedMissing === 0 && unresolvedInvalid === 0) {
+      const expected = validatedBinding.manifest.expected_post_counts;
+      if (
+        eligible !== expected.eligible ||
+        recoverable + alreadyEnqueued !== expected.recoverable ||
+        missingSource !== expected.missing ||
+        invalidSourcePath !== expected.invalid ||
+        unsupported !== expected.unsupported
+      ) {
+        throw new Error('Reindex source truth does not match reviewed post-recovery counts');
+      }
+    }
+    plan.verificationFingerprint = calculateReindexVerificationFingerprint(plan);
+  }
+  return plan;
 }
 
 export interface DatabaseFileCatalogSourceRow {
@@ -172,12 +365,14 @@ export interface DatabaseFileCatalogSourceRow {
   storage_path: string;
   mime_type: string;
   priority: string | null;
+  hash: string;
   vector_status: string;
+  error_message: string | null;
   chunk_count: number | null;
 }
 
 export const FILE_CATALOG_REINDEX_COLUMNS =
-  'id, organization_id, course_id, storage_path, mime_type, priority, vector_status, chunk_count';
+  'id, organization_id, course_id, storage_path, mime_type, priority, hash, vector_status, error_message, chunk_count';
 export const COURSE_REINDEX_COLUMNS = 'id, organization_id, user_id, language';
 
 export interface DatabaseCourseSourceRow {
@@ -264,7 +459,9 @@ export function mapDatabaseReindexSources(
         storagePath: file.storage_path,
         mimeType: file.mime_type,
         priority: file.priority,
+        hash: file.hash,
         vectorStatus: file.vector_status,
+        errorMessage: file.error_message,
         chunkCount: file.chunk_count,
         locale: course?.language === 'en' ? 'en' : 'ru',
         alreadyEnqueued: false,
@@ -272,8 +469,8 @@ export function mapDatabaseReindexSources(
     });
 }
 
-export function getReindexPlanExitCode(plan: ReindexPlan, allowGaps: boolean): 0 | 2 {
-  return plan.gaps.length > 0 && !allowGaps ? 2 : 0;
+export function getReindexPlanExitCode(plan: ReindexPlan): 0 | 2 {
+  return plan.unresolvedMissing > 0 || plan.unresolvedInvalid > 0 ? 2 : 0;
 }
 
 export interface IndexedDocumentIdentity {

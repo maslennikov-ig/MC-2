@@ -25,6 +25,7 @@ import { verifyPhysicalCourseEmbeddingsCollection } from '../../src/shared/qdran
 import { hybridSearchNative } from '../../src/shared/qdrant/search-operations';
 import {
   buildReindexPlan,
+  calculateReindexVerificationFingerprint,
   COURSE_REINDEX_COLUMNS,
   FILE_CATALOG_REINDEX_COLUMNS,
   getReindexPlanExitCode,
@@ -34,12 +35,17 @@ import {
   type DatabaseFileCatalogSourceRow,
   type IndexedDocumentIdentity,
   type ReindexPlan,
+  type RecoveryReindexBinding,
   type ReindexRelevanceCheck,
   type ReindexSchemaVerification,
   type ReindexSourceDatabase,
   type ReindexSourceRow,
   type ReindexVerificationResult,
 } from './reindex-plan';
+import {
+  validateRecoveryJournalTransition,
+  type RecoveryProgressJournal,
+} from './source-recovery-manifest';
 
 export type ReindexCommandMode = 'plan' | 'execute' | 'verify';
 
@@ -51,7 +57,6 @@ export interface ReindexCommandOptions {
   courseId?: string;
   runId?: string;
   artifactPath?: string;
-  allowGaps: boolean;
 }
 
 export interface ReindexCliOptions extends ReindexCommandOptions {
@@ -67,10 +72,13 @@ export interface ReindexCliRuntime {
 }
 
 export interface ReindexExecutionArtifact {
-  schemaVersion: 2;
+  schemaVersion: 3;
   mode: 'execute';
   runId: string;
   targetCollection: string;
+  recoveryRunId: string;
+  recoveryManifestSha256: string;
+  verificationFingerprint: string;
   status: 'planned' | 'running' | 'completed' | 'failed';
   createdAt: string;
   updatedAt: string;
@@ -79,6 +87,10 @@ export interface ReindexExecutionArtifact {
   counts: {
     eligible: number;
     recoverable: number;
+    auditedFailed: number;
+    unresolvedMissing: number;
+    unresolvedInvalid: number;
+    expectedDocuments: number;
     planned: number;
     accepted: number;
     completed: number;
@@ -123,6 +135,11 @@ export interface ReindexRetainedJob {
 }
 
 export interface ReindexCommandDependencies {
+  loadRecoveryBinding: () => Promise<RecoveryReindexBinding | null>;
+  persistRecoveryJournalTransition: (input: {
+    expectedRevision: number;
+    next: RecoveryProgressJournal;
+  }) => Promise<RecoveryProgressJournal>;
   loadSources: (courseId?: string) => Promise<ReindexSourceRow[]>;
   probeSources: (rows: readonly ReindexSourceRow[]) => Promise<ReindexSourceProbeResult>;
   inspectJobs: (jobIds: readonly string[]) => Promise<ReindexRetainedJob[]>;
@@ -249,6 +266,7 @@ interface PreparedPlan {
   rows: ReindexSourceRow[];
   plan: ReindexPlan;
   sourceProbe: ReindexSourceProbeResult;
+  recoveryBinding: RecoveryReindexBinding;
 }
 
 const DEFAULT_CONCURRENCY = 2;
@@ -266,7 +284,6 @@ function readCliValue(args: string[], index: number, option: string): [string, n
 export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
   const options: ReindexCliOptions = {
     mode: 'plan',
-    allowGaps: false,
     help: false,
   };
   let modeSeen = false;
@@ -288,11 +305,6 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
       modeSeen = true;
       continue;
     }
-    if (argument === '--allow-gaps') {
-      options.allowGaps = true;
-      continue;
-    }
-
     const optionNames = [
       '--target-collection',
       '--concurrency',
@@ -381,6 +393,7 @@ function validateUuidOption(value: string | undefined, option: string): string |
 async function preparePlan(
   options: ReindexCommandOptions,
   dependencies: ReindexCommandDependencies,
+  recoveryBinding: RecoveryReindexBinding,
   alreadyEnqueuedFileIds: ReadonlySet<string> = new Set()
 ): Promise<PreparedPlan> {
   const sourceRows = await dependencies.loadSources(options.courseId);
@@ -391,12 +404,16 @@ async function preparePlan(
   }));
   return {
     rows,
-    plan: buildReindexPlan(rows, row =>
-      sourceProbe.invalidPathFileIds.has(row.id)
-        ? 'invalid_source_path'
-        : sourceProbe.availableFileIds.has(row.id)
+    plan: buildReindexPlan(
+      rows,
+      row =>
+        sourceProbe.invalidPathFileIds.has(row.id)
+          ? 'invalid_source_path'
+          : sourceProbe.availableFileIds.has(row.id),
+      recoveryBinding
     ),
     sourceProbe,
+    recoveryBinding,
   };
 }
 
@@ -411,12 +428,64 @@ function rebuildPreparedPlan(
   return {
     rows,
     sourceProbe: prepared.sourceProbe,
-    plan: buildReindexPlan(rows, row =>
-      prepared.sourceProbe.invalidPathFileIds.has(row.id)
-        ? 'invalid_source_path'
-        : prepared.sourceProbe.availableFileIds.has(row.id)
+    plan: buildReindexPlan(
+      rows,
+      row =>
+        prepared.sourceProbe.invalidPathFileIds.has(row.id)
+          ? 'invalid_source_path'
+          : prepared.sourceProbe.availableFileIds.has(row.id),
+      prepared.recoveryBinding
     ),
+    recoveryBinding: prepared.recoveryBinding,
   };
+}
+
+async function requireRecoveryBinding(
+  dependencies: ReindexCommandDependencies
+): Promise<RecoveryReindexBinding> {
+  const binding = await dependencies.loadRecoveryBinding();
+  if (!binding) throw new Error('A verified recovery binding is required');
+  return binding;
+}
+
+function assertArtifactRecoveryBinding(
+  artifact: ReindexExecutionArtifact,
+  plan: ReindexPlan
+): void {
+  if (
+    artifact.recoveryRunId !== plan.recoveryRunId ||
+    artifact.recoveryManifestSha256 !== plan.recoveryManifestSha256 ||
+    artifact.verificationFingerprint !== plan.verificationFingerprint
+  ) {
+    throw new Error('Run artifact recovery binding or verification fingerprint is stale');
+  }
+  if (
+    artifact.counts.eligible !== plan.eligible ||
+    artifact.counts.auditedFailed !== plan.auditedFailed ||
+    artifact.counts.unresolvedMissing !== plan.unresolvedMissing ||
+    artifact.counts.unresolvedInvalid !== plan.unresolvedInvalid ||
+    artifact.counts.expectedDocuments !== plan.expectedDocuments ||
+    artifact.counts.missingSource !== plan.missingSource ||
+    artifact.counts.invalidSourcePath !== plan.invalidSourcePath ||
+    artifact.counts.unsupported !== plan.unsupported
+  ) {
+    throw new Error('Run artifact audited recovery counts are stale');
+  }
+}
+
+function assertRecoveryPhase(
+  binding: RecoveryReindexBinding,
+  artifact: ReindexExecutionArtifact | null
+): void {
+  if (artifact) {
+    if (binding.journal.phase !== 'reindex_started') {
+      throw new Error('A resumed reindex requires a reindex_started recovery journal');
+    }
+    return;
+  }
+  if (binding.journal.phase !== 'verified') {
+    throw new Error('A fresh reindex requires a verified recovery journal');
+  }
 }
 
 async function mapWithConcurrency<T>(
@@ -448,7 +517,8 @@ function selectExpectedSources(prepared: PreparedPlan): ReindexSourceRow[] {
 async function executeReindex(
   options: ReindexCommandOptions,
   dependencies: ReindexCommandDependencies,
-  targetCollection: string
+  targetCollection: string,
+  recoveryBinding: RecoveryReindexBinding
 ): Promise<ReindexCommandResult> {
   const concurrency = resolveConcurrency(options.concurrency);
   const jobTimeoutMs = resolveJobTimeout(options.jobTimeoutMs);
@@ -466,7 +536,12 @@ async function executeReindex(
     );
   }
 
-  const basePrepared = await preparePlan(options, dependencies);
+  const basePrepared = await preparePlan(options, dependencies, recoveryBinding);
+  if (getReindexPlanExitCode(basePrepared.plan) === 2) {
+    return { exitCode: 2, report: basePrepared.plan };
+  }
+  assertRecoveryPhase(recoveryBinding, loadedArtifact);
+  if (loadedArtifact) assertArtifactRecoveryBinding(loadedArtifact, basePrepared.plan);
   const schema = await dependencies.verifyPhysicalTarget(targetCollection);
   if (!schema.ok) {
     return {
@@ -557,10 +632,13 @@ async function executeReindex(
   let prepared = rebuildPreparedPlan(basePrepared, skipFileIds);
   const plannedJobIds = new Set([...(loadedArtifact?.plannedJobIds ?? []), ...currentJobIds]);
   const artifact: ReindexExecutionArtifact = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     mode: 'execute',
     runId,
     targetCollection,
+    recoveryRunId: basePrepared.plan.recoveryRunId!,
+    recoveryManifestSha256: basePrepared.plan.recoveryManifestSha256!,
+    verificationFingerprint: calculateReindexVerificationFingerprint(basePrepared.plan),
     status: 'planned',
     createdAt,
     updatedAt: dependencies.now().toISOString(),
@@ -569,6 +647,10 @@ async function executeReindex(
     counts: {
       eligible: prepared.plan.eligible,
       recoverable: prepared.plan.recoverable,
+      auditedFailed: prepared.plan.auditedFailed,
+      unresolvedMissing: prepared.plan.unresolvedMissing,
+      unresolvedInvalid: prepared.plan.unresolvedInvalid,
+      expectedDocuments: prepared.plan.expectedDocuments,
       planned: plannedJobIds.size,
       accepted: 0,
       completed: 0,
@@ -610,6 +692,22 @@ async function executeReindex(
   };
 
   await checkpoint('planned');
+
+  if (!loadedArtifact) {
+    const nextJournal = validateRecoveryJournalTransition(recoveryBinding.journal, {
+      ...recoveryBinding.journal,
+      revision: recoveryBinding.journal.revision + 1,
+      phase: 'reindex_started',
+    });
+    const persisted = await dependencies.persistRecoveryJournalTransition({
+      expectedRevision: recoveryBinding.journal.revision,
+      next: nextJournal,
+    });
+    if (JSON.stringify(persisted) !== JSON.stringify(nextJournal)) {
+      throw new Error('Persisted reindex_started recovery journal was not confirmed');
+    }
+    recoveryBinding.journal = persisted;
+  }
 
   const freshCandidateIds = new Set(prepared.plan.candidateFileIds);
   const tasks = basePrepared.rows
@@ -686,8 +784,7 @@ async function executeReindex(
   const pending = artifact.counts.pending;
 
   return {
-    exitCode:
-      finalStatus === 'failed' ? 1 : getReindexPlanExitCode(prepared.plan, options.allowGaps),
+    exitCode: finalStatus === 'failed' ? 1 : getReindexPlanExitCode(prepared.plan),
     report: {
       ok: finalStatus === 'completed',
       runId,
@@ -709,9 +806,25 @@ async function executeReindex(
 async function verifyReindex(
   options: ReindexCommandOptions,
   dependencies: ReindexCommandDependencies,
-  targetCollection: string
+  targetCollection: string,
+  recoveryBinding: RecoveryReindexBinding
 ): Promise<ReindexCommandResult> {
-  const prepared = await preparePlan(options, dependencies);
+  if (!options.runId) throw new Error('--run-id is required for recovery-bound verify');
+  const artifactPath = options.artifactPath ?? `artifacts/qdrant-reindex/${options.runId}.json`;
+  const artifact = await dependencies.loadArtifact(artifactPath);
+  if (
+    !artifact ||
+    artifact.runId !== options.runId ||
+    artifact.targetCollection !== targetCollection
+  ) {
+    throw new Error('Recovery-bound verify requires its exact durable run artifact');
+  }
+  const prepared = await preparePlan(options, dependencies, recoveryBinding);
+  if (getReindexPlanExitCode(prepared.plan) === 2) {
+    return { exitCode: 2, report: prepared.plan };
+  }
+  assertRecoveryPhase(recoveryBinding, artifact);
+  assertArtifactRecoveryBinding(artifact, prepared.plan);
   const expectedSources = selectExpectedSources(prepared);
   const [schemaVerification, indexedDocuments, relevanceChecks] = await Promise.all([
     dependencies.verifyPhysicalTarget(targetCollection),
@@ -727,7 +840,7 @@ async function verifyReindex(
   const report = { ...verification, gaps: prepared.plan.gaps };
   if (!verification.ok) return { exitCode: 1, report };
   return {
-    exitCode: getReindexPlanExitCode(prepared.plan, options.allowGaps),
+    exitCode: getReindexPlanExitCode(prepared.plan),
     report,
   };
 }
@@ -739,7 +852,8 @@ export async function runReindexCommand(
   validateUuidOption(options.runId, '--run-id');
   validateUuidOption(options.courseId, '--course-id');
   if (options.mode === 'plan') {
-    let prepared = await preparePlan(options, dependencies);
+    const recoveryBinding = await requireRecoveryBinding(dependencies);
+    let prepared = await preparePlan(options, dependencies, recoveryBinding);
     if (options.runId) {
       const artifactPath = options.artifactPath ?? `artifacts/qdrant-reindex/${options.runId}.json`;
       const ledger = await dependencies.loadArtifact(artifactPath);
@@ -749,6 +863,8 @@ export async function runReindexCommand(
         );
       }
       if (ledger) {
+        assertRecoveryPhase(recoveryBinding, ledger);
+        assertArtifactRecoveryBinding(ledger, prepared.plan);
         const failedJobIds = new Set(ledger.failures.map(failure => failure.jobId));
         const acceptedFileIds = new Set(
           prepared.rows.flatMap(row => {
@@ -760,17 +876,21 @@ export async function runReindexCommand(
         );
         prepared = rebuildPreparedPlan(prepared, acceptedFileIds);
       }
+      assertRecoveryPhase(recoveryBinding, ledger);
+    } else {
+      assertRecoveryPhase(recoveryBinding, null);
     }
     return {
-      exitCode: getReindexPlanExitCode(prepared.plan, options.allowGaps),
+      exitCode: getReindexPlanExitCode(prepared.plan),
       report: prepared.plan,
     };
   }
 
   const targetCollection = validatePhysicalCollectionTarget(options.targetCollection);
+  const recoveryBinding = await requireRecoveryBinding(dependencies);
   return options.mode === 'execute'
-    ? executeReindex(options, dependencies, targetCollection)
-    : verifyReindex(options, dependencies, targetCollection);
+    ? executeReindex(options, dependencies, targetCollection, recoveryBinding)
+    : verifyReindex(options, dependencies, targetCollection, recoveryBinding);
 }
 
 export function createReindexRunId(): string {
@@ -786,11 +906,14 @@ const ReindexFixtureSourceSchema = z.object({
   storagePath: z.string().min(1),
   mimeType: z.string().min(1),
   priority: z.string().nullable(),
+  hash: z.string().regex(/^[a-f0-9]{64}$/u),
   vectorStatus: z.string().min(1),
+  errorMessage: z.string().nullable(),
   chunkCount: z.number().int().min(0).nullable(),
   locale: z.enum(['ru', 'en']),
   alreadyEnqueued: z.boolean(),
   sourceAvailable: z.boolean(),
+  invalidSourcePath: z.boolean().optional(),
 });
 
 const ReindexDryFixtureSchema = z.object({
@@ -816,13 +939,20 @@ const ReindexDryFixtureSchema = z.object({
       nativeHybrid: z.boolean(),
     })
   ),
+  recoveryBinding: z.custom<RecoveryReindexBinding>(
+    value => typeof value === 'object' && value !== null,
+    'recoveryBinding is required'
+  ),
 });
 
 const ReindexExecutionArtifactSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   mode: z.literal('execute'),
   runId: z.string().uuid(),
   targetCollection: z.string().min(1).max(255),
+  recoveryRunId: z.string().uuid(),
+  recoveryManifestSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+  verificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
   status: z.enum(['planned', 'running', 'completed', 'failed']),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -831,6 +961,10 @@ const ReindexExecutionArtifactSchema = z.object({
   counts: z.object({
     eligible: z.number().int().nonnegative(),
     recoverable: z.number().int().nonnegative(),
+    auditedFailed: z.number().int().nonnegative(),
+    unresolvedMissing: z.number().int().nonnegative(),
+    unresolvedInvalid: z.number().int().nonnegative(),
+    expectedDocuments: z.number().int().nonnegative(),
     planned: z.number().int().nonnegative(),
     accepted: z.number().int().nonnegative(),
     completed: z.number().int().nonnegative(),
@@ -901,9 +1035,17 @@ export async function loadReindexFixtureDependencies(
   const availableIds = new Set(
     fixture.sources.filter(source => source.sourceAvailable).map(source => source.id)
   );
-  const sources = fixture.sources.map(({ sourceAvailable: _sourceAvailable, ...source }) => source);
+  const invalidIds = new Set(
+    fixture.sources.filter(source => source.invalidSourcePath).map(source => source.id)
+  );
+  const sources = fixture.sources.map(
+    ({ sourceAvailable: _sourceAvailable, invalidSourcePath: _invalidSourcePath, ...source }) =>
+      source
+  );
 
   return {
+    loadRecoveryBinding: () => Promise.resolve(fixture.recoveryBinding),
+    persistRecoveryJournalTransition: ({ next }) => Promise.resolve(next),
     loadSources: courseId =>
       Promise.resolve(
         sources.filter(source => courseId === undefined || source.courseId === courseId)
@@ -911,7 +1053,7 @@ export async function loadReindexFixtureDependencies(
     probeSources: rows =>
       Promise.resolve({
         availableFileIds: new Set(rows.filter(row => availableIds.has(row.id)).map(row => row.id)),
-        invalidPathFileIds: new Set(),
+        invalidPathFileIds: new Set(rows.filter(row => invalidIds.has(row.id)).map(row => row.id)),
         resolvedFilePaths: new Map(
           rows.map(row => [row.id, resolveUploadStoragePath(row.storagePath)] as const)
         ),
@@ -1212,6 +1354,9 @@ async function runNativeRelevanceChecks(
 export function createDefaultReindexDependencies(): ReindexCommandDependencies {
   const queueAdapter = createDefaultReindexQueueAdapter();
   return {
+    loadRecoveryBinding: () => Promise.resolve(null),
+    persistRecoveryJournalTransition: () =>
+      Promise.reject(new Error('Recovery journal persistence adapter is not configured')),
     loadSources: courseId => loadReindexSources(createSourceDatabase(), courseId),
     probeSources: probeSourceFiles,
     ...queueAdapter,
@@ -1242,14 +1387,18 @@ Options:
   --run-id <uuid>             Reuse a durable run identity for idempotent execute
   --artifact <path>           Execute artifact output path
   --fixture <path>            Fully local dry fixture; no live adapters are constructed
-  --allow-gaps                Change only the gap-related exit code
   -h, --help                  Show this help
 `;
 
 function formatHumanSummary(options: ReindexCommandOptions, report: ReindexCommandReport): string {
+  if (options.mode !== 'plan' && 'candidateFileIds' in report) {
+    const unresolved = report.unresolvedMissing + report.unresolvedInvalid;
+    return `${options.mode.toUpperCase()} status=blocked eligible=${report.eligible} audited_failed=${report.auditedFailed} unresolved=${unresolved} action=repair-sources\n`;
+  }
   if (options.mode === 'plan') {
     const plan = report as ReindexPlan;
-    return `PLAN status=${plan.gaps.length === 0 ? 'ok' : 'gaps'} eligible=${plan.eligible} recoverable=${plan.recoverable} gaps=${plan.gaps.length} action=${plan.gaps.length === 0 ? 'none' : 'review-gaps'}\n`;
+    const unresolved = plan.unresolvedMissing + plan.unresolvedInvalid;
+    return `PLAN status=${unresolved === 0 ? 'ok' : 'gaps'} eligible=${plan.eligible} recoverable=${plan.recoverable} audited_failed=${plan.auditedFailed} unresolved=${unresolved} action=${unresolved === 0 ? 'none' : 'review-gaps'}\n`;
   }
   if (options.mode === 'execute') {
     const execution = report as Extract<ReindexCommandReport, { runId: string; enqueued: number }>;
@@ -1257,6 +1406,58 @@ function formatHumanSummary(options: ReindexCommandOptions, report: ReindexComma
   }
   const verification = report as ReindexVerificationResult & { gaps: ReindexPlan['gaps'] };
   return `VERIFY status=${verification.ok ? 'ok' : 'failed'} target=${options.targetCollection ?? 'missing'} expected_documents=${verification.expectedDocuments} indexed_documents=${verification.indexedDocuments} expected_points=${verification.expectedKnownPoints} indexed_points=${verification.indexedPoints} gaps=${verification.gaps.length} action=${verification.ok ? 'review-cutover' : 'repair'}\n`;
+}
+
+function countGapReasons(gaps: ReindexPlan['gaps']): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const gap of gaps) counts[gap.reason] = (counts[gap.reason] ?? 0) + 1;
+  return counts;
+}
+
+function redactReportForCli(report: ReindexCommandReport): Record<string, unknown> {
+  if ('candidateFileIds' in report) {
+    return {
+      eligible: report.eligible,
+      recoverable: report.recoverable,
+      auditedFailed: report.auditedFailed,
+      unresolvedMissing: report.unresolvedMissing,
+      unresolvedInvalid: report.unresolvedInvalid,
+      missingSource: report.missingSource,
+      invalidSourcePath: report.invalidSourcePath,
+      unsupported: report.unsupported,
+      alreadyEnqueued: report.alreadyEnqueued,
+      expectedDocuments: report.expectedDocuments,
+      gapReasons: countGapReasons(report.gaps),
+    };
+  }
+  if ('enqueued' in report) {
+    return {
+      ok: report.ok,
+      targetCollection: report.targetCollection,
+      enqueued: report.enqueued,
+      completed: report.completed,
+      failed: report.failed,
+      pending: report.pending,
+      alreadyEnqueued: report.alreadyEnqueued,
+      gapReasons: countGapReasons(report.gaps),
+      schemaMismatches: report.schemaMismatches,
+    };
+  }
+  return {
+    ok: report.ok,
+    expectedDocuments: report.expectedDocuments,
+    indexedDocuments: report.indexedDocuments,
+    expectedKnownPoints: report.expectedKnownPoints,
+    indexedPoints: report.indexedPoints,
+    missingDocuments: report.missingDocumentIds.length,
+    extraDocuments: report.extraDocumentIds.length,
+    contextMismatches: report.contextMismatches.length,
+    countMismatches: report.countMismatches.length,
+    pointCountMismatches: report.pointCountMismatches.length,
+    schemaMismatches: report.schemaMismatches,
+    relevanceFailures: report.relevanceFailures,
+    gapReasons: countGapReasons(report.gaps),
+  };
 }
 
 export async function runReindexCli(
@@ -1280,7 +1481,7 @@ export async function runReindexCli(
         {
           mode: options.mode,
           dryFixture: Boolean(options.fixturePath),
-          report: result.report,
+          report: redactReportForCli(result.report),
         },
         null,
         2

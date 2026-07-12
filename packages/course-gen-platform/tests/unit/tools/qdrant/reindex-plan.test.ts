@@ -6,8 +6,14 @@ import {
   loadReindexSources,
   mapDatabaseReindexSources,
   verifyReindexParity,
+  type RecoveryReindexBinding,
   type ReindexSourceRow,
 } from '../../../../tools/qdrant/reindex-plan';
+import {
+  calculateRecoveryManifestSha256,
+  type RecoveryProgressJournal,
+  type SourceRecoveryManifest,
+} from '../../../../tools/qdrant/source-recovery-manifest';
 
 const BASE_JOB = {
   jobType: JobType.DOCUMENT_PROCESSING,
@@ -55,7 +61,9 @@ const SOURCE_BASE: ReindexSourceRow = {
   storagePath: 'uploads/org/course/source.pdf',
   mimeType: 'application/pdf',
   priority: 'CORE',
+  hash: 'a'.repeat(64),
   vectorStatus: 'indexed',
+  errorMessage: null,
   chunkCount: 7,
   locale: 'ru',
   alreadyEnqueued: false,
@@ -112,13 +120,140 @@ describe('buildReindexPlan', () => {
     });
   });
 
-  it('lets allow-gaps change only the exit code', () => {
+  it('never allows unresolved source gaps to be bypassed', () => {
     const plan = buildReindexPlan([SOURCE_BASE], () => false);
     const snapshot = structuredClone(plan);
 
-    expect(getReindexPlanExitCode(plan, false)).toBe(2);
-    expect(getReindexPlanExitCode(plan, true)).toBe(0);
+    expect(getReindexPlanExitCode(plan)).toBe(2);
     expect(plan).toEqual(snapshot);
+  });
+
+  it('keeps a generic failed row unresolved without exact recovery evidence', () => {
+    const failed = {
+      ...SOURCE_BASE,
+      vectorStatus: 'failed',
+      errorMessage: 'source_file_unrecoverable; recovery_run=untrusted',
+    };
+
+    const plan = buildReindexPlan([failed], () => false);
+
+    expect(plan).toMatchObject({
+      eligible: 1,
+      recoverable: 0,
+      auditedFailed: 0,
+      unresolvedMissing: 1,
+      unresolvedInvalid: 0,
+      gaps: [{ fileId: failed.id, reason: 'source_missing' }],
+    });
+  });
+
+  it('classifies only the exact six verified eligible dispositions as audited failures', () => {
+    const rows = Array.from({ length: 261 }, (_, index): ReindexSourceRow => {
+      const id = `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+      if (index >= 240) return { ...SOURCE_BASE, id, courseId: null };
+      if (index < 234) return { ...SOURCE_BASE, id };
+      return {
+        ...SOURCE_BASE,
+        id,
+        storagePath: `uploads/org/course/${id}.pdf`,
+        vectorStatus: 'failed',
+        errorMessage: `source_file_unrecoverable; recovery_run=50000000-0000-4000-8000-000000000005`,
+      };
+    });
+    const auditedRows = rows.slice(234, 240);
+    const manifest: SourceRecoveryManifest = {
+      schema_version: 'megacampus.qdrant.source-recovery/v1',
+      run_id: '50000000-0000-4000-8000-000000000005',
+      release_sha: 'b'.repeat(40),
+      generated_at: '2026-07-12T12:00:00.000Z',
+      operator_image_digest: `sha256:${'c'.repeat(64)}`,
+      source_audit_version: 'q12-reviewed-v1',
+      development_root: '/srv/megacampus/uploads-dev',
+      production_root: '/srv/megacampus/uploads',
+      pre_counts: {
+        total: 261,
+        eligible: 240,
+        recoverable: 109,
+        missing: 129,
+        invalid: 2,
+        unsupported: 21,
+      },
+      expected_post_counts: {
+        total: 261,
+        eligible: 240,
+        recoverable: 234,
+        missing: 4,
+        invalid: 2,
+        unsupported: 21,
+      },
+      copies: Array.from({ length: 42 }, (_, index) => ({
+        entry_id: `copy-${String(index).padStart(2, '0')}`,
+        source_relative_path: `source/${index}.pdf`,
+        target_relative_path: `target/${index}.pdf`,
+        expected_size: 1,
+        expected_sha256: 'd'.repeat(64),
+        affected_file_catalog_rows: index === 41 ? 2 : 3,
+      })),
+      dispositions: auditedRows.map((row, index) => ({
+        entry_id: `eligible-${index}`,
+        kind: 'eligible_unrecoverable',
+        file_catalog_id: row.id,
+        organization_id: row.organizationId,
+        course_id: row.courseId,
+        expected_hash: row.hash,
+        expected_storage_path: row.storagePath,
+        expected_vector_status: 'pending',
+        expected_file_error_message: null,
+        reason: 'source_file_unrecoverable',
+      })),
+    };
+    const manifestSha256 = calculateRecoveryManifestSha256(manifest);
+    const journal: RecoveryProgressJournal = {
+      schema_version: 'megacampus.qdrant.source-recovery-progress/v1',
+      run_id: manifest.run_id,
+      manifest_sha256: manifestSha256,
+      revision: 48,
+      phase: 'verified',
+      copy_states: Object.fromEntries(manifest.copies.map(entry => [entry.entry_id, 'published'])),
+      disposition_kinds: Object.fromEntries(
+        manifest.dispositions.map(entry => [entry.entry_id, entry.kind])
+      ),
+      disposition_states: Object.fromEntries(
+        manifest.dispositions.map(entry => [entry.entry_id, 'disposition_verified'])
+      ),
+    };
+    const binding: RecoveryReindexBinding = {
+      manifest,
+      manifestSha256,
+      journal,
+      verifiedFailedCoverageFileIds: auditedRows.map(row => row.id),
+    };
+
+    const plan = buildReindexPlan(
+      rows,
+      row => {
+        const index = rows.indexOf(row);
+        if (index === 238 || index === 239) return 'invalid_source_path';
+        return index < 234;
+      },
+      binding
+    );
+
+    expect(plan).toMatchObject({
+      eligible: 240,
+      recoverable: 234,
+      auditedFailed: 6,
+      unresolvedMissing: 0,
+      unresolvedInvalid: 0,
+      missingSource: 4,
+      invalidSourcePath: 2,
+      expectedDocuments: 234,
+      auditedFailedFileIds: auditedRows.map(row => row.id),
+      gaps: expect.arrayContaining(
+        rows.slice(240).map(row => ({ fileId: row.id, reason: 'missing_course' }))
+      ),
+    });
+    expect(getReindexPlanExitCode(plan)).toBe(0);
   });
 
   it('reports unknown point/request estimates instead of inventing batch precision', () => {
@@ -171,7 +306,9 @@ describe('mapDatabaseReindexSources', () => {
           storage_path: SOURCE_BASE.storagePath,
           mime_type: SOURCE_BASE.mimeType,
           priority: SOURCE_BASE.priority,
+          hash: SOURCE_BASE.hash,
           vector_status: SOURCE_BASE.vectorStatus,
+          error_message: SOURCE_BASE.errorMessage,
           chunk_count: SOURCE_BASE.chunkCount,
         },
       ],
@@ -202,7 +339,9 @@ describe('mapDatabaseReindexSources', () => {
       storage_path: SOURCE_BASE.storagePath,
       mime_type: SOURCE_BASE.mimeType,
       priority: SOURCE_BASE.priority,
+      hash: SOURCE_BASE.hash,
       vector_status: SOURCE_BASE.vectorStatus,
+      error_message: SOURCE_BASE.errorMessage,
       chunk_count: SOURCE_BASE.chunkCount,
     };
     const course = {
@@ -239,7 +378,9 @@ describe('mapDatabaseReindexSources', () => {
         storage_path: `uploads/org/course/source-${suffix}.pdf`,
         mime_type: SOURCE_BASE.mimeType,
         priority: SOURCE_BASE.priority,
+        hash: SOURCE_BASE.hash,
         vector_status: SOURCE_BASE.vectorStatus,
+        error_message: SOURCE_BASE.errorMessage,
         chunk_count: 1,
       };
     });
