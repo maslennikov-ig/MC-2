@@ -3,7 +3,7 @@
 Updated: 2026-07-12
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 Integration branch: `codex/self-hosted-qdrant-platform`
-Remote base at docs reconciliation start: `6645708d`; resolve current
+Current pushed integration: `cfce2c1c`; resolve current
 `origin/codex/self-hosted-qdrant-platform` before continuation.
 
 ## Product Truth
@@ -36,7 +36,7 @@ Remote base at docs reconciliation start: `6645708d`; resolve current
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. Q11 passed the full local release matrix and independent review with P0-P3 zero: backend 1,869/1,869, shared 23/23, web 20/20, PostgreSQL 64/64, exact Qdrant 15/15 plus recovery 5/5, Compose 8/8, Prometheus 14 rules, Alertmanager config, type-check and build 75/75. Canonical real stage closeout also passed after supplying the documented synthetic local build environment.
 - Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
-- Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The crash-durable write-ahead mutation contract is accepted, but no copy has run; implementation bead `.13.4.1` and an owner product-truth disposition remain open.
+- Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. Source-recovery core is independently accepted at integration `cfce2c1c` with P0/P1 zero, focused 48/48 and package type-check. Workflow/CAS, audited reindex, and Stage 4 failed coverage run in three isolated streams; no copy or remote mutation has run.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and reaches the pooler with `verify-full`. Both locally/server-stored database URLs have stale credentials; the repo Actions secret is not extractable. A current Session pooler URL is still required for the guarded remote migration frontier/apply.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -58,13 +58,12 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: keep Q12 NO-GO while obtaining the current Supabase Session
-pooler URL. The owner approved the recovery design, written specification, and
-audited dispositions on 2026-07-12. The implementation plan is
-`docs/superpowers/plans/2026-07-12-q12-source-recovery.md`; execute it through
-isolated TDD/review streams under `.13.4.1`, publish only the 42 exact
-crash-durable copies after local acceptance, and then run the
-already authorized activation packet without `--allow-gaps` or partial cutover.
+Recommended action: finish and independently review the three active local
+`.13.4.1` streams, integrate the pinned operator/runtime contract, and close the
+tracked crash-order acceptance matrix `.13.4.1.1`. Keep Q12 remote execution
+NO-GO until all local gates pass and a current Supabase Session pooler URL is
+available. Then execute the already authorized exact-copy/disposition/reindex
+packet without `--allow-gaps` or partial cutover.
 
 ## Starter prompt for next orchestrator
 

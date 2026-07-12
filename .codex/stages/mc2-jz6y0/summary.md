@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: Q12 staging authorized; live activation remains NO-GO on current DB credentials and missing-source product truth
+Status: Q12 staging authorized; source-recovery implementation active; live activation remains NO-GO until local acceptance and current DB credentials
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration at docs reconciliation start: `6645708dcb1c0792ef293744ac921838f258cb4f`
+Current accepted integration: `cfce2c1c`
 Integration branch: `codex/self-hosted-qdrant-platform`
-Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback remediation are locally accepted; Q12 live execution/observation remains open.
+Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback/snapshot and source-recovery core are locally accepted; workflow/CAS, audited reindex, failed coverage, runtime wiring, and live execution remain open.
 
 ## Beads Mapping
 
@@ -64,6 +64,15 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 `mc2-jz6y0.16` is closed as superseded: acceptance requires grouping in genuinely production-reachable Stage 5 and Stage 6 callers, not an arbitrary count of dormant helpers.
 
 ## Current Recovery Point
+
+- Q12 source-recovery core is accepted at integration `cfce2c1c`. Its final
+  independent review reported `PASS` with P0/P1 zero; integration-root recovery
+  regression passed 48/48 plus package type-check. The immutable manifest now
+  binds canonical SHA, operator/audit/root identity and exact prior CAS state;
+  its separate journal enforces paired Career Playbook checkpoints and coherent
+  reindex gating. Workflow/CAS, audited reindex and Stage 4 failed coverage are
+  running in three isolated parallel worktrees. No source copy, database write,
+  reindex, deploy, service change, or live mutation has occurred.
 
 - Integration branch contains accepted Q1-Q9 and evidence E1-E7 with exact 100% local/development activation. The combined activation/docs branch passed final independent review at `d3417610`, merged as `ea183d83`, and passed its parent acceptance rerun.
 - Q12 local remediation now also includes accepted staging-local snapshot mode
