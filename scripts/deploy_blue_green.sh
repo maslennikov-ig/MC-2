@@ -154,7 +154,7 @@ echo ""
 # 4. Ensure Infrastructure is Running (shared by all colors)
 echo "Ensuring infrastructure is running..."
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.$ENV" \
-    up -d redis qdrant docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
+    up -d redis qdrant prometheus grafana docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
 echo "   Infrastructure ready."
 echo ""
 
@@ -292,16 +292,16 @@ if [ "$DEPLOY_API_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; 
         docker compose -f "$WORKER_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" up -d --force-recreate --no-deps "$SVC"
     done
     echo "   Updating worker-stage7..."
-    docker compose -f "$INFRA_COMPOSE" pull worker-stage7 2>/dev/null || true
-    docker compose -f "$INFRA_COMPOSE" up -d --force-recreate --no-deps worker-stage7
+    docker compose -f "$INFRA_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" pull worker-stage7 2>/dev/null || true
+    docker compose -f "$INFRA_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" up -d --force-recreate --no-deps worker-stage7
 else
     echo "API image unchanged; skipping API-backed worker restarts."
 fi
 
 if [ "$DEPLOY_BRIDGE_CHANGED" = "true" ] || [ "$DEPLOY_CONFIG_CHANGED" = "true" ]; then
     echo "Updating notebooklm-bridge..."
-    docker compose -f "$INFRA_COMPOSE" pull notebooklm-bridge 2>/dev/null || true
-    docker compose -f "$INFRA_COMPOSE" up -d --force-recreate notebooklm-bridge
+    docker compose -f "$INFRA_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" pull notebooklm-bridge 2>/dev/null || true
+    docker compose -f "$INFRA_COMPOSE" --env-file "$BASE_PATH/.env.$ENV" up -d --force-recreate notebooklm-bridge
 else
     echo "NotebookLM bridge unchanged; skipping bridge restart."
 fi

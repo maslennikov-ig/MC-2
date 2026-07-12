@@ -52,7 +52,7 @@ fi
 
 # 4. Ensure Infrastructure is Running
 echo "Ensuring infrastructure is running..."
-docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
+docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.$ENV" up -d
 echo "   Infrastructure ready."
 echo ""
 
@@ -100,6 +100,14 @@ if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
 fi
 
 echo ""
+
+# Restore background consumers with the same environment snapshot as the
+# rollback color before sending traffic back to it. This keeps Qdrant and
+# document-evidence gates coherent across API, main worker, and Stage 6.
+PRODUCTION_ENV_FILE="$BASE_PATH/.env.$TARGET_COLOR"
+export PRODUCTION_ENV_FILE
+docker compose -f "$BASE_PATH/docker-compose.production.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --force-recreate --no-deps worker worker-stage6
+unset PRODUCTION_ENV_FILE
 
 # 7. Switch Traffic
 echo "Switching Nginx to $TARGET_COLOR..."
