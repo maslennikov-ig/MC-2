@@ -114,10 +114,10 @@ read_secret_file() {
     if [[ "$path" != /* ]]; then
         path="$BASE_PATH/${path#./}"
     fi
-    [ -f "$path" ] && [ -r "$path" ] || { echo "ERROR: $label file is missing or unreadable" >&2; return 1; }
-    mode="$(stat -c '%a' "$path")"
+    sudo -n test -f "$path" && sudo -n test -r "$path" || { echo "ERROR: $label file is missing or unreadable" >&2; return 1; }
+    mode="$(sudo -n stat -c '%a' "$path")"
     (( (8#$mode & 077) == 0 )) || { echo "ERROR: $label file permissions are unsafe" >&2; return 1; }
-    value="$(cat -- "$path"; printf x)"
+    value="$(sudo -n cat -- "$path"; printf x)"
     value="${value%x}"
     if [[ "$value" == *$'\r\n' ]]; then
         value="${value%$'\r\n'}"

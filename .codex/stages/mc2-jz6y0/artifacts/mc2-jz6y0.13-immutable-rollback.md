@@ -93,9 +93,11 @@ restores API/web plus the main and Stage 6 workers before nginx, and then record
 
 The workflow materializes the Qdrant admin key, read-only key, S3 keys, Grafana
 admin password, Alertmanager notification credentials, and the Prometheus copy
-of the read-only key from their exact GitHub secrets, with host mode `0400`.
-`QDRANT_METRICS_GID` is now mandatory. Changes under `ops/qdrant/` trigger
-deployment, and the three deploy-contract tests run in CI.
+of the read-only key from their exact GitHub secrets. Atomic `sudo install`
+writes them with host mode `0400` and the exact consumer UID/GID (`root`,
+`65534`, or Grafana `472`), so repeated delivery neither leaks nor becomes
+unwritable. `QDRANT_METRICS_GID` is now mandatory. Changes under `ops/qdrant/`
+trigger deployment, and the three deploy-contract tests run in CI.
 
 # Verification
 

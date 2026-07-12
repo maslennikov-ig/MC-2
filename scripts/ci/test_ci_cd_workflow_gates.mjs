@@ -129,8 +129,10 @@ for (const sharedSecret of [
   );
 }
 assert(
-  createQdrantSecrets.includes('chmod 0400'),
-  'staging Qdrant secret files must be host-readable only'
+  createQdrantSecrets.includes('sudo install -o 0 -g 0 -m 0400') &&
+    createQdrantSecrets.includes('sudo install -o 65534 -g 65534 -m 0400') &&
+    createQdrantSecrets.includes('sudo install -o 472 -g 472 -m 0400'),
+  'staging secret files must be owner-only for their exact container consumers'
 );
 for (const requiredFile of [
   'prometheus_qdrant_read_only_api_key',
