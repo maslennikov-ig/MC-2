@@ -22,16 +22,36 @@ function serviceBlock(compose: string, service: string): string {
   return start < 0 ? '' : lines.slice(start, end < 0 ? undefined : end).join('\n');
 }
 
+function composeEnvironmentEntries(block: string): Set<string> {
+  return new Set(
+    block
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => /^- [A-Z][A-Z0-9_]*=/.test(line))
+      .map(line => line.slice(2))
+  );
+}
+
+function packageEnvironmentEntries(environment: string): Set<string> {
+  return new Set(
+    environment
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => /^[A-Z][A-Z0-9_]*=/.test(line))
+  );
+}
+
 describe('document evidence dev activation contract', () => {
   it('activates every eligible course coherently on both dev workers', () => {
     const dev = source('docker-compose.dev.yml');
     const packageEnvironment = source('packages/course-gen-platform/.env.example');
 
     for (const service of ['worker-dev', 'worker-stage6-dev']) {
-      const block = serviceBlock(dev, service);
-      for (const value of ACTIVE_VALUES) expect(block).toContain(`- ${value}`);
+      const entries = composeEnvironmentEntries(serviceBlock(dev, service));
+      for (const value of ACTIVE_VALUES) expect(entries.has(value)).toBe(true);
     }
-    for (const value of ACTIVE_VALUES) expect(packageEnvironment).toContain(value);
+    const packageEntries = packageEnvironmentEntries(packageEnvironment);
+    for (const value of ACTIVE_VALUES) expect(packageEntries.has(value)).toBe(true);
   });
 
   it('does not activate staging or production configuration', () => {
