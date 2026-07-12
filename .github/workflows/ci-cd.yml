@@ -768,6 +768,10 @@ jobs:
           QDRANT_S3_ENDPOINT_URL=${{ secrets.QDRANT_S3_ENDPOINT_URL }}
           QDRANT_S3_ACCESS_KEY_FILE=/opt/megacampus/secrets/qdrant_s3_access_key
           QDRANT_S3_SECRET_KEY_FILE=/opt/megacampus/secrets/qdrant_s3_secret_key
+          PROMETHEUS_QDRANT_READ_ONLY_API_KEY_FILE=/opt/megacampus/secrets/prometheus_qdrant_read_only_api_key
+          GRAFANA_ADMIN_PASSWORD_FILE=/opt/megacampus/secrets/grafana_admin_password
+          ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE=/opt/megacampus/secrets/alertmanager_telegram_bot_token
+          ALERTMANAGER_TELEGRAM_CHAT_ID_FILE=/opt/megacampus/secrets/alertmanager_telegram_chat_id
           QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics
           QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}
           DOCUMENT_EVIDENCE_ENABLED=true
@@ -799,18 +803,30 @@ jobs:
           QDRANT_READ_ONLY_API_KEY: ${{ secrets.QDRANT_READ_ONLY_API_KEY }}
           QDRANT_S3_ACCESS_KEY: ${{ secrets.QDRANT_S3_ACCESS_KEY }}
           QDRANT_S3_SECRET_KEY: ${{ secrets.QDRANT_S3_SECRET_KEY }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           set -euo pipefail
           umask 077
           secret_dir="$(mktemp -d)"
           trap 'rm -rf "$secret_dir"' EXIT
-          for name in QDRANT_API_KEY QDRANT_READ_ONLY_API_KEY QDRANT_S3_ACCESS_KEY QDRANT_S3_SECRET_KEY; do
+          for spec in \
+            QDRANT_API_KEY:qdrant_api_key \
+            QDRANT_READ_ONLY_API_KEY:qdrant_read_only_api_key \
+            QDRANT_S3_ACCESS_KEY:qdrant_s3_access_key \
+            QDRANT_S3_SECRET_KEY:qdrant_s3_secret_key \
+            GRAFANA_ADMIN_PASSWORD:grafana_admin_password \
+            TELEGRAM_BOT_TOKEN:alertmanager_telegram_bot_token \
+            TELEGRAM_CHAT_ID:alertmanager_telegram_chat_id; do
+            name="${spec%%:*}"
+            file_name="${spec#*:}"
             value="${!name:-}"
             test -n "$value" || { echo "::error::$name is required"; exit 1; }
             case "$value" in *$'\n'*|*$'\r'*) echo "::error::$name must be a single line"; exit 1;; esac
-            file_name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
             printf '%s' "$value" > "$secret_dir/$file_name"
           done
+          cp "$secret_dir/qdrant_read_only_api_key" "$secret_dir/prometheus_qdrant_read_only_api_key"
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
             "install -d -m 0700 ${{ env.DEPLOY_PATH }}/secrets"
@@ -818,7 +834,7 @@ jobs:
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/secrets/
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "chmod 0400 ${{ env.DEPLOY_PATH }}/secrets/qdrant_api_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_read_only_api_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_s3_access_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_s3_secret_key"
+            "chmod 0400 ${{ env.DEPLOY_PATH }}/secrets/qdrant_api_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_read_only_api_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_s3_access_key ${{ env.DEPLOY_PATH }}/secrets/qdrant_s3_secret_key ${{ env.DEPLOY_PATH }}/secrets/prometheus_qdrant_read_only_api_key ${{ env.DEPLOY_PATH }}/secrets/grafana_admin_password ${{ env.DEPLOY_PATH }}/secrets/alertmanager_telegram_bot_token ${{ env.DEPLOY_PATH }}/secrets/alertmanager_telegram_chat_id"
 
       - name: Deploy
         run: |

@@ -91,9 +91,10 @@ traffic actually switched. Rollback validates immutable target references,
 restores API/web plus the main and Stage 6 workers before nginx, and then records
 `rolled_back`.
 
-The workflow materializes the Qdrant admin key, read-only key, and S3 keys from
-the exact GitHub secrets used by application configuration, with host mode
-`0400`. `QDRANT_METRICS_GID` is now mandatory. Changes under `ops/qdrant/` trigger
+The workflow materializes the Qdrant admin key, read-only key, S3 keys, Grafana
+admin password, Alertmanager notification credentials, and the Prometheus copy
+of the read-only key from their exact GitHub secrets, with host mode `0400`.
+`QDRANT_METRICS_GID` is now mandatory. Changes under `ops/qdrant/` trigger
 deployment, and the three deploy-contract tests run in CI.
 
 # Verification

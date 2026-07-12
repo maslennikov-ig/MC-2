@@ -98,6 +98,10 @@ for (const requiredLine of [
   'QDRANT_S3_BUCKET=${{ secrets.QDRANT_S3_BUCKET }}',
   'QDRANT_S3_REGION=${{ secrets.QDRANT_S3_REGION }}',
   'QDRANT_S3_ENDPOINT_URL=${{ secrets.QDRANT_S3_ENDPOINT_URL }}',
+  'PROMETHEUS_QDRANT_READ_ONLY_API_KEY_FILE=/opt/megacampus/secrets/prometheus_qdrant_read_only_api_key',
+  'GRAFANA_ADMIN_PASSWORD_FILE=/opt/megacampus/secrets/grafana_admin_password',
+  'ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE=/opt/megacampus/secrets/alertmanager_telegram_bot_token',
+  'ALERTMANAGER_TELEGRAM_CHAT_ID_FILE=/opt/megacampus/secrets/alertmanager_telegram_chat_id',
   'QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics',
   'QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}',
   'DOCUMENT_EVIDENCE_ENABLED=true',
@@ -115,6 +119,9 @@ for (const sharedSecret of [
   'QDRANT_READ_ONLY_API_KEY',
   'QDRANT_S3_ACCESS_KEY',
   'QDRANT_S3_SECRET_KEY',
+  'GRAFANA_ADMIN_PASSWORD',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_CHAT_ID',
 ]) {
   assert(
     createQdrantSecretsStep?.env?.[sharedSecret] === `\${{ secrets.${sharedSecret} }}`,
@@ -125,6 +132,17 @@ assert(
   createQdrantSecrets.includes('chmod 0400'),
   'staging Qdrant secret files must be host-readable only'
 );
+for (const requiredFile of [
+  'prometheus_qdrant_read_only_api_key',
+  'grafana_admin_password',
+  'alertmanager_telegram_bot_token',
+  'alertmanager_telegram_chat_id',
+]) {
+  assert(
+    createQdrantSecrets.includes(requiredFile),
+    `staging monitoring secret materialization must include ${requiredFile}`
+  );
+}
 assert(
   rollbackCommand?.includes("grep -Eq '^status=(switched|accepted)$'") &&
     rollbackCommand.includes('rollback_blue_green.sh'),
