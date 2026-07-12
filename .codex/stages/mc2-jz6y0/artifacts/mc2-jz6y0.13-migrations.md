@@ -39,11 +39,11 @@ parallel_group: Q12-M alongside disjoint Q12 CI/deployment streams
 depends_on_streams:
   - accepted E1-E7 migrations and local evidence verification
 parallel_decision: parallel in a dedicated worktree with a strict migration-only write zone
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Worker dependency symlinks and disposable PostgreSQL container are removed before handoff; worktree remains for orchestrator review and merge.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Worker dependency symlinks and disposable PostgreSQL container were removed; commit 5c74869f and independent review 16d84cd9 were merged and rerun in integration.
 risk_level: high
 docs_impact: migration
 docs_reviewed: no-change-needed
@@ -72,7 +72,7 @@ changed_files:
   - packages/course-gen-platform/package.json
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-migrations.md
 explicit_defers:
-  - Independent correctness/security review, integration rerun, Beads close, Graphify refresh, and stage closeout remain orchestrator-owned.
+  - Graphify refresh and parent stage closeout remain orchestrator-owned.
   - No remote database, Supabase, staging, production, deploy, service, secret, or CI state was read or mutated.
 ---
 

@@ -9,11 +9,11 @@ branch: codex/q12-migrations
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: 5c74869f
 worktree: /home/me/code/mc2/.worktrees/q12-migrations
-status: returned
+status: accepted
 delivery_method: n/a
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Review-only branch remains for the orchestrator; temporary dependency links and disposable PostgreSQL are removed before handoff.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Temporary dependency links and disposable PostgreSQL were removed; review 16d84cd9 was merged and accepted after the integration type-check passed.
 risk_level: high
 docs_reviewed: no-change-needed
 docs_review_notes: This review changes no product or operator documentation; it verifies the final migration-gate remediation and records evidence for orchestrator acceptance.
@@ -30,7 +30,7 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-migrations-review.md
 explicit_defers:
-  - Orchestrator integration, integration-worktree rerun, Beads state, Graphify refresh, and stage closeout remain parent-owned.
+  - Graphify refresh and parent stage closeout remain parent-owned.
   - No remote database, staging, service, secret, deployment, or CI state was read or mutated.
 ---
 
@@ -39,11 +39,11 @@ explicit_defers:
 **Verdict: PASS / APPROVED FOR ORCHESTRATOR INTEGRATION.** Final remediation `5c74869f` closes both residual P1 findings. The review found 0 P0, 0 P1, 0 P2, and 0 P3 issues in the bounded migration gate.
 
 | Priority | Count | Approval impact |
-| --- | ---: | --- |
-| P0 | 0 | None |
-| P1 | 0 | None |
-| P2 | 0 | None |
-| P3 | 0 | None |
+| -------- | ----: | --------------- |
+| P0       |     0 | None            |
+| P1       |     0 | None            |
+| P2       |     0 | None            |
+| P3       |     0 | None            |
 
 ## Findings
 
