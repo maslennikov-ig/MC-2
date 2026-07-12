@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -26,6 +26,11 @@ const manifest = (overrides: Partial<SourceRecoveryManifest> = {}): SourceRecove
   schema_version: 'megacampus.qdrant.source-recovery/v1',
   run_id: 'ea25d26d-9dc3-4c2c-9e42-95ab8270cb6e',
   release_sha: 'a'.repeat(40),
+  generated_at: '2026-07-12T18:00:00.000Z',
+  operator_image_digest: `sha256:${'e'.repeat(64)}`,
+  source_audit_version: 'megacampus.q12-source-audit/v1',
+  development_root: '/opt/megacampus/data/uploads-development',
+  production_root: '/opt/megacampus/data/uploads',
   pre_counts: {
     total: 5,
     eligible: 4,
@@ -63,6 +68,14 @@ const manifest = (overrides: Partial<SourceRecoveryManifest> = {}): SourceRecove
       course_id: null,
       expected_hash: 'b'.repeat(64),
       expected_storage_path: 'career/b.pdf',
+      expected_vector_status: 'indexed',
+      expected_file_error_message: null,
+      expected_career_playbook: {
+        playbook_id: 'e49be5a4-519f-4ef7-9315-f9596ff911cf',
+        user_id: 'f303c89a-1567-4797-bd28-66bcd4b76425',
+        status: 'ready',
+        error_message: null,
+      },
       reason: 'retained-derived-only',
     },
     {
@@ -73,6 +86,8 @@ const manifest = (overrides: Partial<SourceRecoveryManifest> = {}): SourceRecove
       course_id: '5191a3cc-d417-4451-9bc6-240ac38e469c',
       expected_hash: 'a'.repeat(64),
       expected_storage_path: 'course/a.pdf',
+      expected_vector_status: 'indexed',
+      expected_file_error_message: null,
       reason: 'source_file_unrecoverable',
     },
   ],
@@ -96,6 +111,28 @@ describe('source recovery manifest', () => {
         })
       )
     ).toThrow(/duplicate target/iu);
+  });
+
+  it('binds execution roots and rejects duplicate database identities', () => {
+    expect(() =>
+      normalizeRecoveryManifest(
+        manifest({
+          production_root: '/opt/megacampus/data/uploads-development/nested',
+        })
+      )
+    ).toThrow(/root.*overlap/iu);
+
+    const entries = manifest().dispositions;
+    expect(() =>
+      normalizeRecoveryManifest(
+        manifest({
+          dispositions: [
+            entries[0],
+            { ...entries[1], file_catalog_id: entries[0].file_catalog_id },
+          ],
+        })
+      )
+    ).toThrow(/file catalog/iu);
   });
 
   it('rejects aggregate counts that do not match copy coverage', () => {
@@ -135,10 +172,25 @@ describe('source recovery manifest', () => {
     }
   });
 
-  it('fsyncs the file before rename and the parent directory after rename', async () => {
+  it('rejects an existing recovery state directory that is not mode 0700', async () => {
+    const directory = await mkdtemp('/tmp/mc2-source-recovery-state-mode-');
+    const state = join(directory, 'state');
+    await mkdir(state, { mode: 0o700 });
+    await chmod(state, 0o755);
+    try {
+      await expect(
+        writeImmutableManifest(join(state, 'manifest.json'), manifest())
+      ).rejects.toThrow(/mode 0700/iu);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('publishes the immutable manifest no-replace and fsyncs both directory changes', async () => {
     const calls: string[] = [];
     const operations: DurableWriteOperations = {
       async mkdir() {},
+      async assertSecureDirectory() {},
       async assertAbsent() {},
       async openTemporary() {
         calls.push('open-temp');
@@ -158,6 +210,9 @@ describe('source recovery manifest', () => {
       async rename() {
         calls.push('rename');
       },
+      async link() {
+        calls.push('link-no-replace');
+      },
       async openDirectory() {
         calls.push('open-parent');
         return {
@@ -169,7 +224,9 @@ describe('source recovery manifest', () => {
           },
         };
       },
-      async unlink() {},
+      async unlink() {
+        calls.push('unlink-temp');
+      },
     };
 
     await writeImmutableManifest('/state/manifest.json', manifest(), operations);
@@ -179,11 +236,50 @@ describe('source recovery manifest', () => {
       'write',
       'fsync-file',
       'close',
-      'rename',
+      'link-no-replace',
+      'open-parent',
+      'fsync-parent',
+      'close-parent',
+      'unlink-temp',
       'open-parent',
       'fsync-parent',
       'close-parent',
     ]);
+  });
+
+  it('does not replace a manifest that appears after the absence precheck', async () => {
+    const calls: string[] = [];
+    const operations: DurableWriteOperations = {
+      async mkdir() {},
+      async assertSecureDirectory() {},
+      async assertAbsent() {},
+      async openTemporary() {
+        return {
+          async writeFile() {},
+          async chmod() {},
+          async sync() {},
+          async close() {},
+        };
+      },
+      async rename() {
+        throw new Error('journal replacement should not be used');
+      },
+      async link() {
+        const error = Object.assign(new Error('target raced'), { code: 'EEXIST' });
+        throw error;
+      },
+      async openDirectory() {
+        return { async sync() {}, async close() {} };
+      },
+      async unlink() {
+        calls.push('cleanup-temp');
+      },
+    };
+
+    await expect(
+      writeImmutableManifest('/state/manifest.json', manifest(), operations)
+    ).rejects.toThrow(/already exists/iu);
+    expect(calls).toEqual(['cleanup-temp']);
   });
 
   it('rejects skipped phases and per-entry state transitions', () => {
@@ -207,6 +303,155 @@ describe('source recovery manifest', () => {
         copy_states: { ...current.copy_states, 'copy-a': 'rolled_back' },
       })
     ).toThrow(/copy state transition/iu);
+
+    const allPublished = {
+      ...current,
+      revision: 1,
+      phase: 'copying' as const,
+      copy_states: { 'copy-a': 'published' as const, 'copy-b': 'published' as const },
+    };
+    const copying = validateRecoveryJournalTransition(current, allPublished);
+    const copied = validateRecoveryJournalTransition(copying, {
+      ...copying,
+      revision: 2,
+      phase: 'copied',
+    });
+
+    expect(() =>
+      validateRecoveryJournalTransition(copied, {
+        ...copied,
+        revision: 3,
+        phase: 'dispositions_applied',
+      })
+    ).toThrow(/dispositions.*applied/iu);
+
+    expect(() =>
+      validateRecoveryJournalTransition(
+        {
+          ...copied,
+          revision: 3,
+          phase: 'verified',
+          disposition_states: {
+            'disposition-a': 'disposition_verified',
+            'disposition-b': 'disposition_verified',
+          },
+        },
+        {
+          ...copied,
+          revision: 4,
+          phase: 'reindex_started',
+          copy_states: { ...copied.copy_states, 'copy-a': 'rollback_planned' },
+          disposition_states: {
+            'disposition-a': 'disposition_verified',
+            'disposition-b': 'disposition_verified',
+          },
+        }
+      )
+    ).toThrow(/reindex_started|copy states.*frozen/iu);
+  });
+
+  it('supports a durable Career Playbook source-CAS checkpoint', () => {
+    const initial = createInitialProgressJournal(
+      normalizeRecoveryManifest(manifest()),
+      'f'.repeat(64)
+    );
+    const copying = validateRecoveryJournalTransition(initial, {
+      ...initial,
+      revision: 1,
+      phase: 'copying',
+      copy_states: { 'copy-a': 'published', 'copy-b': 'published' },
+    });
+    const copied = validateRecoveryJournalTransition(copying, {
+      ...copying,
+      revision: 2,
+      phase: 'copied',
+    });
+
+    expect(
+      validateRecoveryJournalTransition(copied, {
+        ...copied,
+        revision: 3,
+        disposition_states: {
+          ...copied.disposition_states,
+          'disposition-b': 'career_playbook_source_applied',
+        },
+      }).disposition_states['disposition-b']
+    ).toBe('career_playbook_source_applied');
+
+    expect(() =>
+      validateRecoveryJournalTransition(copied, {
+        ...copied,
+        revision: 3,
+        disposition_states: {
+          ...copied.disposition_states,
+          'disposition-a': 'career_playbook_source_applied',
+        },
+      })
+    ).toThrow(/eligible disposition/iu);
+  });
+
+  it('accepts the complete write-ahead phase and paired-disposition sequence', () => {
+    let journal = createInitialProgressJournal(
+      normalizeRecoveryManifest(manifest()),
+      '2'.repeat(64)
+    );
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 1,
+      phase: 'copying',
+      copy_states: { 'copy-a': 'published', 'copy-b': 'published' },
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 2,
+      phase: 'copied',
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 3,
+      disposition_states: {
+        'disposition-a': 'disposition_applied',
+        'disposition-b': 'career_playbook_source_applied',
+      },
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 4,
+      disposition_states: {
+        ...journal.disposition_states,
+        'disposition-b': 'disposition_applied',
+      },
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 5,
+      phase: 'dispositions_applied',
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 6,
+      disposition_states: {
+        'disposition-a': 'disposition_verified',
+        'disposition-b': 'disposition_verified',
+      },
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 7,
+      phase: 'verified',
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 8,
+      phase: 'reindex_started',
+    });
+    journal = validateRecoveryJournalTransition(journal, {
+      ...journal,
+      revision: 9,
+      phase: 'complete',
+    });
+
+    expect(journal).toMatchObject({ revision: 9, phase: 'complete' });
   });
 
   it('atomically replaces only the expected journal revision', async () => {
@@ -218,7 +463,7 @@ describe('source recovery manifest', () => {
     );
 
     try {
-      await replaceProgressJournal(target, -1, current);
+      await replaceProgressJournal(target, -1, current, normalizeRecoveryManifest(manifest()));
       await replaceProgressJournal(target, 0, {
         ...current,
         revision: 1,
@@ -235,6 +480,33 @@ describe('source recovery manifest', () => {
         revision: 1,
         phase: 'copying',
       });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a non-canonical initial journal even when its manifest hash matches', async () => {
+    const directory = await mkdtemp('/tmp/mc2-source-recovery-initial-journal-');
+    const target = join(directory, 'progress.json');
+    const normalized = normalizeRecoveryManifest(manifest());
+    const current = createInitialProgressJournal(normalized, '1'.repeat(64));
+
+    try {
+      await expect(
+        replaceProgressJournal(
+          target,
+          -1,
+          {
+            ...current,
+            copy_states: { ...current.copy_states, 'copy-a': 'rolled_back' },
+            disposition_states: {
+              ...current.disposition_states,
+              'disposition-a': 'disposition_verified',
+            },
+          },
+          normalized
+        )
+      ).rejects.toThrow(/canonical initial/iu);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -32,8 +32,13 @@ async function fixture(content = 'exact original bytes'): Promise<{
     source,
     target,
     input: {
+      runId: 'ea25d26d-9dc3-4c2c-9e42-95ab8270cb6e',
       developmentRoot,
       productionRoot,
+      rootBinding: {
+        development_root: developmentRoot,
+        production_root: productionRoot,
+      },
       entry: {
         entry_id: 'copy-1',
         source_relative_path: 'tenant/source.pdf',
@@ -82,11 +87,54 @@ describe('source recovery filesystem engine', () => {
       await expect(publishNoReplace(changed.input)).rejects.toThrow(
         /size mismatch|hash mismatch/iu
       );
+
+      await expect(
+        publishNoReplace({
+          ...changed.input,
+          rootBinding: {
+            ...changed.input.rootBinding,
+            production_root: changed.input.developmentRoot,
+          },
+        })
+      ).rejects.toThrow(/root binding|overlap/iu);
     } finally {
       await Promise.all(
         [traversal.root, linked.root, changed.root].map(root =>
           rm(root, { recursive: true, force: true })
         )
+      );
+    }
+  });
+
+  it('reconciles only the exact run-and-entry-bound crash temporary', async () => {
+    const exact = await fixture();
+    const mismatched = await fixture();
+    const temporaryName = (input: PublishInput): string =>
+      `.source-recovery.${input.runId}.${input.entry.entry_id}.tmp`;
+    try {
+      const exactTemporary = join(exact.input.productionRoot, 'tenant', temporaryName(exact.input));
+      await writeFile(exactTemporary, 'exact original bytes');
+      await publishNoReplace(exact.input);
+      expect((await readdir(join(exact.input.productionRoot, 'tenant'))).sort()).toEqual([
+        'target.pdf',
+      ]);
+
+      await writeFile(exactTemporary, 'exact original bytes');
+      await expect(reconcilePublishedTarget(exact.input, 'planned')).resolves.toBe('published');
+      expect((await readdir(join(exact.input.productionRoot, 'tenant'))).sort()).toEqual([
+        'target.pdf',
+      ]);
+
+      const mismatchedTemporary = join(
+        mismatched.input.productionRoot,
+        'tenant',
+        temporaryName(mismatched.input)
+      );
+      await writeFile(mismatchedTemporary, 'wrong bytes');
+      await expect(publishNoReplace(mismatched.input)).rejects.toThrow(/temporary.*mismatch/iu);
+    } finally {
+      await Promise.all(
+        [exact.root, mismatched.root].map(root => rm(root, { recursive: true, force: true }))
       );
     }
   });

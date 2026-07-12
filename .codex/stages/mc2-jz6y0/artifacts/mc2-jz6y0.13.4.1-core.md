@@ -59,14 +59,20 @@ verification:
   - focused recovery regression including snapshot and reindex plan: passed 40/40
   - package type-check: passed
   - focused Prettier and git diff check: passed
+  - independent review cf51722c: NEEDS_WORK with 0 P0, 4 P1, and 3 P2
+  - correction RED: passed with 13 reproduced contract failures
+  - correction GREEN and recovery regression: passed 47/47
+  - corrected package type-check and focused Prettier: passed
 changed_files:
   - packages/course-gen-platform/tools/qdrant/source-recovery-manifest.ts
   - packages/course-gen-platform/tools/qdrant/source-recovery-filesystem.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-manifest.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-filesystem.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1-core.md
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1-core-review.md
 explicit_defers:
   - planner, database CAS, reindex binding, Stage 4 evidence, and operator wiring remain in dependent plan tasks
+  - operator runtime must prove stable exclusively owned upload directory components across the host-locked recovery window
 ---
 
 # Summary
@@ -111,3 +117,37 @@ and whitespace checks passed.
   work must keep it mode 0600 and out of tracked artifacts and logs.
 - Independent review must resolve every P0/P1 finding before this stream is
   accepted or merged.
+
+# Correction after independent review
+
+Review commit `9796c3d1` reproduced four P1 contract gaps and three P2
+hardening gaps against implementation commit `cf51722c`. The correction adds
+the approved generation timestamp, pinned operator digest, audit version, and
+canonical development/production roots to the immutable manifest. Filesystem
+operations now compare their runtime roots with that reviewed binding and
+reject equal or nested roots.
+
+Every disposition now records exact prior `file_catalog` status/error values;
+Career Playbook entries additionally bind source ID, playbook ID, user ID,
+prior status, and prior error. Duplicate catalog/source identities are
+rejected. The journal records immutable disposition kinds and a dedicated
+`career_playbook_source_applied` checkpoint before the catalog CAS.
+
+Whole-journal validation now requires canonical initial keys/states, coherent
+copy/disposition completion before each forward phase, and fully published and
+verified entries before `reindex_started`. Copy states freeze at that boundary.
+The immutable manifest uses a no-replace hard link rather than a check followed
+by overwriting rename, and the state directory is required to be a real,
+current-UID-owned mode-0700 directory.
+
+Copy temporary names are deterministically bound to run ID and entry ID.
+Restart reuses or removes only an exact expected temporary, rejects mismatches,
+and fsyncs cleanup. Rollback revalidates target device/inode immediately before
+unlink. The remaining unavoidable path-operation race is delegated only to the
+already-required operator proof of stable, exclusively owned directory
+components while writers are stopped and the host-level lock is held.
+
+Correction RED reproduced 13 failures. The corrected suite passed 47/47 across
+12 manifest, 5 filesystem, 14 snapshot, and 16 reindex-plan tests. Full package
+type-check and focused formatting/whitespace checks passed. A second independent
+review is still required before acceptance.
