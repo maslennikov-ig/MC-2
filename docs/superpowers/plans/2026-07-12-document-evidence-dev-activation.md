@@ -198,7 +198,7 @@ Record `.24.2` closed, E7 accepted after the dev configuration review, Q10 as ne
 - [ ] **Step 4: Run stale-decision and artifact checks**
 
 ```bash
-rg -n "keep it at `0` until|No numeric product rollout thresholds have been accepted|only remaining E7 blocker|fail-closed Stage 5 cohort remains 0%" \
+rg -n 'keep it at `0` until|No numeric product rollout thresholds have been accepted|only remaining E7 blocker|fail-closed Stage 5 cohort remains 0%' \
   docs/operations/document-evidence.md \
   docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md \
   .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.24-stage5-rollout.md \
