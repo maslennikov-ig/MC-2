@@ -11,6 +11,7 @@ repo: mc2
 branch: codex/q12-source-recovery-acceptance
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: 25397d4cfc2af98a0cd84f56f26ae8fff056b2f5
+resolves_review: 2c861d34
 worktree: /home/me/code/mc2/.worktrees/q12-source-recovery-acceptance
 write_zone:
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-acceptance.test.ts
@@ -30,6 +31,7 @@ selected_docs:
   - docs/superpowers/plans/2026-07-12-q12-source-recovery.md
   - accepted source recovery core, workflow, crash, evidence, reindex, adapter, and runtime artifacts
 selected_skills:
+  - superpowers:receiving-code-review
   - superpowers:test-driven-development
   - systematic-debugging
   - senior-architect
@@ -63,16 +65,22 @@ verification:
   - self code-review: P0 0, P1 0, P2 0, P3 0
   - delegated artifact validation: passed
   - repository process verification: passed
+  - correction review 2c861d34 RED: adapter query log was empty and residue matcher detected only 1/5 sentinel classes
+  - correction focused acceptance GREEN: passed 3/3
+  - correction accepted recovery/crash/reindex integration plus acceptance: passed 456/456 across nine files
+  - correction course-gen-platform package type-check: passed
+  - correction focused Prettier, git diff, delegated artifact, and repository process verification: passed
+  - correction self-review: P0 0, P1 0, P2 0, P3 0
 changed_files:
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-acceptance.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1.5.md
 explicit_defers:
-  - independent acceptance review and orchestrator acceptance remain required before integration
+  - independent correction rereview and orchestrator acceptance remain required before integration
 ---
 
 # Source Recovery Acceptance Report: mc2-jz6y0.13.4.1.5
 
-**Generated**: 2026-07-13T01:35:06+03:00
+**Generated**: 2026-07-13T01:50:31+03:00
 **Status**: ✅ success
 **Version**: mc2-jz6y0.13.4.1.5
 
@@ -113,23 +121,50 @@ scopes and passed through `runDocumentEvidencePreflight()`. The resulting two
 accepted ledgers contain exactly six failed `metadata_only` cards with null
 summary, empty evidence collections, and zero allocation. Their canonical
 aggregate fingerprint binds the verified recovery journal to
-`buildReindexPlan()`, which returns 234 recoverable plus six audited failures,
-zero unresolved eligible gaps, a concrete verification fingerprint, and exit
-code zero without an allow-gaps path.
+`createSourceRecoveryReindexAdapters().loadRecoveryBinding()` over the real
+manifest/journal files and the same accepted in-memory repository. The adapter
+queries both accepted run scopes and their item ledgers, and its canonical
+binding equals a separately constructed literal oracle before it reaches
+`buildReindexPlan()`. The plan returns 234 recoverable plus six audited
+failures, zero unresolved eligible gaps, a concrete verification fingerprint,
+and exit code zero without an allow-gaps path.
 
 The separate rollback fixture runs before any reindex transition. Replacing
 the last target with a different inode and bytes causes guarded rollback to
 fail after persisting `rollback_planned`; the replacement remains. Restoring
 the original manifest-created inode and resuming rolls back all 42 targets,
 preserves the unrelated pre-existing production file byte-for-byte, restores
-the exact pre-copy source counts, and leaves zero bound temporary residue.
+the exact pre-copy source counts, and leaves zero owned residue. Before each
+fixture teardown, the harness requires an empty capability directory, exactly
+manifest plus journal in the state directory, and exactly 42 forward or zero
+rollback targets. A separate sentinel test proves detection of copy,
+manifest/journal temporary, capability-probe, and `.manifest-created` residue.
+
+## Correction for review 2c861d34
+
+The P1 seam finding was reproduced when two accepted Stage 4 scopes produced
+no concrete adapter repository queries. The acceptance repository now exposes
+the accepted-run and item-list contract used by production. Its exact query
+log proves both organization/course/run scopes, while the adapter reloads the
+owner-only real manifest and journal, validates the configured recovery
+identity and coverage fingerprint, and returns the only binding supplied to
+the reindex planner. The independent literal oracle remains an assertion, not
+the execution binding.
+
+The P2 cleanup finding was reproduced with five sentinel files: the old
+matcher returned only the copy temporary. The replacement recursively reports
+all `*.tmp`, `.source-recovery-capability.*`, and `.manifest-created` entries.
+Exact state, capability, and recovery directory assertions run before the
+recursive fixture cleanup, so teardown can no longer hide workflow residue.
+No production source, service, database, queue, Qdrant, Redis, container,
+port, secret, Beads record, or remote environment was read or mutated.
 
 # Verification
 
 ## Validation Results
 
-- Focused acceptance test: ✅ 2/2 passed.
-- Accepted recovery/crash/reindex suite plus acceptance: ✅ 455/455 passed
+- Focused acceptance test: ✅ 3/3 passed.
+- Accepted recovery/crash/reindex suite plus acceptance: ✅ 456/456 passed
   across nine files.
 - `@megacampus/course-gen-platform` type-check: ✅ passed.
 - Focused Prettier and `git diff --check`: ✅ passed.

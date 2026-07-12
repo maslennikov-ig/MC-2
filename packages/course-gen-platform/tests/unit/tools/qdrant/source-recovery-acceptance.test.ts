@@ -11,7 +11,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
 
@@ -43,8 +43,13 @@ import {
   calculateAcceptedFailedCoverageFingerprint,
   getReindexPlanExitCode,
   type AcceptedFailedCoverageBinding,
+  type RecoveryReindexBinding,
   type ReindexSourceRow,
 } from '../../../../tools/qdrant/reindex-plan.js';
+import {
+  createSourceRecoveryReindexAdapters,
+  type SourceRecoveryReindexEvidenceRepository,
+} from '../../../../tools/qdrant/source-recovery-reindex-adapters.js';
 import {
   applyDispositionEntry,
   createRecoveryDispositionDatabase,
@@ -99,6 +104,7 @@ interface AcceptanceFixture {
   catalogRows: Map<string, RecoveryCatalogRow>;
   playbookRows: Map<string, RecoveryPlaybookRow>;
   database: RecoveryDispositionDatabase;
+  adapterQueries: string[];
   publishCalls: number;
   crashAfterPublish?: number;
 }
@@ -143,7 +149,6 @@ describe('source recovery acceptance', () => {
       expect(fixture.publishCalls).toBe(42);
       expect((await lstat(reconciledPath)).ino).toBe(interruptedInode);
       expect(await countRecoveryTargets(fixture.productionRoot)).toBe(42);
-      expect(await findBoundRecoveryTemporaries(fixture.root)).toEqual([]);
       expect(readSourceCounts(fixture)).toEqual(POST_COUNTS);
 
       await proveCrossTenantCasRejectsWithoutPartialState(fixture);
@@ -164,14 +169,22 @@ describe('source recovery acceptance', () => {
       expect(Object.values(verified.journal.disposition_states)).toEqual(
         Array.from({ length: 24 }, () => 'disposition_verified')
       );
-      const acceptedFailedCoverage = await createAcceptedFailedCoverage(fixture);
+      const { binding: recoveryBinding, literalOracle } =
+        await loadAcceptedRecoveryBinding(fixture);
+      const acceptedFailedCoverage = recoveryBinding.acceptedFailedCoverage;
+      expect(fixture.adapterQueries).toEqual([
+        `accepted:${ORG_A}:${COURSE_A}:${acceptedFailedCoverage.ledgers[0].ledgerId}`,
+        `items:${acceptedFailedCoverage.ledgers[0].ledgerId}`,
+        `accepted:${ORG_B}:${COURSE_B}:${acceptedFailedCoverage.ledgers[1].ledgerId}`,
+        `items:${acceptedFailedCoverage.ledgers[1].ledgerId}`,
+      ]);
+      expect(acceptedFailedCoverage).toEqual(literalOracle);
       const boundRows = rowsWithDispositionTruth(fixture);
-      const reindexPlan = buildReindexPlan(boundRows, row => sourceProbe(fixture, row), {
-        manifest: fixture.manifest,
-        manifestSha256: verified.manifestSha256,
-        journal: verified.journal,
-        acceptedFailedCoverage,
-      });
+      const reindexPlan = buildReindexPlan(
+        boundRows,
+        row => sourceProbe(fixture, row),
+        recoveryBinding
+      );
       expect(reindexPlan).toMatchObject({
         eligible: 240,
         recoverable: 234,
@@ -190,6 +203,7 @@ describe('source recovery acceptance', () => {
       expect(reindexPlan.gaps.every(gap => gap.reason === 'missing_course')).toBe(true);
       expect(reindexPlan.verificationFingerprint).toMatch(/^[a-f0-9]{64}$/u);
       expect(getReindexPlanExitCode(reindexPlan)).toBe(0);
+      await assertRecoveryWorkspace(fixture, 42);
     } finally {
       await rm(fixture.root, { recursive: true, force: true });
     }
@@ -240,12 +254,29 @@ describe('source recovery acceptance', () => {
       await expect(
         readFile(join(fixture.productionRoot, 'existing', 'shared.pdf'), 'utf8')
       ).resolves.toBe('existing source bytes');
-      expect(await findBoundRecoveryTemporaries(fixture.root)).toEqual([]);
       expect(readSourceCounts(fixture)).toEqual(PRE_COUNTS);
+      await assertRecoveryWorkspace(fixture, 0);
     } finally {
       await rm(fixture.root, { recursive: true, force: true });
     }
     expect(existsSync(fixture.root)).toBe(false);
+  });
+
+  it('detects every owned recovery residue class before teardown', async () => {
+    const root = await mkdtemp('/tmp/mc2-source-recovery-residue-sentinels-');
+    const sentinels = [
+      join(root, `.source-recovery.${RUN_ID}.copy-00.tmp`),
+      join(root, 'manifest.json.deadbeef.tmp'),
+      join(root, 'journal.json.deadbeef.tmp'),
+      join(root, '.source-recovery-capability.sentinel'),
+      join(root, 'target-00.pdf.manifest-created'),
+    ];
+    try {
+      await Promise.all(sentinels.map(path => writeFile(path, 'sentinel')));
+      expect(await findOwnedRecoveryResidue(root)).toEqual([...sentinels].sort());
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -414,6 +445,7 @@ async function createAcceptanceFixture(label: string): Promise<AcceptanceFixture
     catalogRows,
     playbookRows,
     database: createMemoryDispositionDatabase(catalogRows, playbookRows),
+    adapterQueries: [],
     publishCalls: 0,
   };
 }
@@ -561,15 +593,16 @@ async function countRecoveryTargets(productionRoot: string): Promise<number> {
   return names.filter(name => name.startsWith('target-') && name.endsWith('.pdf')).length;
 }
 
-async function findBoundRecoveryTemporaries(root: string): Promise<string[]> {
+async function findOwnedRecoveryResidue(root: string): Promise<string[]> {
   const found: string[] = [];
   const visit = async (directory: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) await visit(path);
       else if (
-        entry.name.startsWith(`.source-recovery.${RUN_ID}.`) &&
-        entry.name.endsWith('.tmp')
+        entry.name.endsWith('.tmp') ||
+        entry.name.startsWith('.source-recovery-capability.') ||
+        entry.name.endsWith('.manifest-created')
       ) {
         found.push(path);
       }
@@ -577,6 +610,20 @@ async function findBoundRecoveryTemporaries(root: string): Promise<string[]> {
   };
   await visit(root);
   return found.sort();
+}
+
+async function assertRecoveryWorkspace(
+  fixture: AcceptanceFixture,
+  expectedTargetCount: 0 | 42
+): Promise<void> {
+  expect(await findOwnedRecoveryResidue(fixture.root)).toEqual([]);
+  expect((await readdir(fixture.capabilityRoot)).sort()).toEqual([]);
+  expect((await readdir(fixture.stateRoot)).sort()).toEqual(['journal.json', 'manifest.json']);
+  const expectedTargets =
+    expectedTargetCount === 42
+      ? fixture.manifest.copies.map(entry => basename(entry.target_relative_path)).sort()
+      : [];
+  expect((await readdir(join(fixture.productionRoot, 'recovery'))).sort()).toEqual(expectedTargets);
 }
 
 function createMemoryDispositionDatabase(
@@ -698,12 +745,16 @@ async function verifyExactDispositionTruth(
   }
 }
 
-class AcceptanceEvidenceRepository implements DocumentEvidencePreflightRepository {
+class AcceptanceEvidenceRepository
+  implements DocumentEvidencePreflightRepository, SourceRecoveryReindexEvidenceRepository
+{
   readonly runs = new Map<
     string,
     {
       id: string;
       status: 'processing' | 'accepted';
+      organizationId: string;
+      courseId: string;
       source_manifest: unknown[];
       batch_count: number;
       model_calls: number;
@@ -715,6 +766,8 @@ class AcceptanceEvidenceRepository implements DocumentEvidencePreflightRepositor
   readonly cards = new Map<string, DocumentEvidenceCard[]>();
   readonly checkpoints: Array<Record<string, unknown>> = [];
 
+  constructor(private readonly adapterQueries: string[]) {}
+
   async getOrCreateRun(
     input: Parameters<DocumentEvidencePreflightRepository['getOrCreateRun']>[0]
   ) {
@@ -724,6 +777,8 @@ class AcceptanceEvidenceRepository implements DocumentEvidencePreflightRepositor
     const run = {
       id: uuid(800 + this.runs.size),
       status: 'processing' as const,
+      organizationId: input.organizationId,
+      courseId: input.courseId,
       source_manifest: input.sourceManifest,
       batch_count: 0,
       model_calls: 0,
@@ -736,7 +791,24 @@ class AcceptanceEvidenceRepository implements DocumentEvidencePreflightRepositor
   }
 
   async listItems(runId: string) {
+    if ([...this.runs.values()].some(run => run.id === runId && run.status === 'accepted')) {
+      this.adapterQueries.push(`items:${runId}`);
+    }
     return structuredClone(this.cards.get(runId) ?? []);
+  }
+
+  async getAcceptedRun(runId: string, courseId: string, organizationId: string) {
+    this.adapterQueries.push(`accepted:${organizationId}:${courseId}:${runId}`);
+    const run = [...this.runs.values()].find(candidate => candidate.id === runId);
+    if (
+      !run ||
+      run.status !== 'accepted' ||
+      run.courseId !== courseId ||
+      run.organizationId !== organizationId
+    ) {
+      throw new Error('accepted acceptance run scope mismatch');
+    }
+    return { id: run.id, status: run.status };
   }
 
   async listBatchCheckpoints(runId: string) {
@@ -773,15 +845,19 @@ class AcceptanceEvidenceRepository implements DocumentEvidencePreflightRepositor
   async finalizeRun(input: Parameters<DocumentEvidencePreflightRepository['finalizeRun']>[0]) {
     const run = [...this.runs.values()].find(candidate => candidate.id === input.runId);
     if (!run) throw new Error('unknown acceptance evidence run');
+    if (run.courseId !== input.courseId || run.organizationId !== input.organizationId) {
+      throw new Error('acceptance evidence finalization scope mismatch');
+    }
     run.status = 'accepted';
     return { id: input.runId, status: input.status };
   }
 }
 
-async function createAcceptedFailedCoverage(
-  fixture: AcceptanceFixture
-): Promise<AcceptedFailedCoverageBinding> {
-  const repository = new AcceptanceEvidenceRepository();
+async function loadAcceptedRecoveryBinding(fixture: AcceptanceFixture): Promise<{
+  binding: RecoveryReindexBinding;
+  literalOracle: AcceptedFailedCoverageBinding;
+}> {
+  const repository = new AcceptanceEvidenceRepository(fixture.adapterQueries);
   const eligible = fixture.manifest.dispositions.filter(
     entry => entry.kind === 'eligible_unrecoverable'
   );
@@ -870,15 +946,37 @@ async function createAcceptedFailedCoverage(
   }
   expect(ledgers).toHaveLength(2);
   expect(ledgers.flatMap(ledger => ledger.entries)).toHaveLength(6);
-  const binding: AcceptedFailedCoverageBinding = {
+  const literalOracle: AcceptedFailedCoverageBinding = {
     status: 'accepted',
     recoveryRunId: fixture.manifest.run_id,
     recoveryManifestSha256: calculateRecoveryManifestSha256(fixture.manifest),
     fingerprint: '',
     ledgers,
   };
-  binding.fingerprint = calculateAcceptedFailedCoverageFingerprint(binding);
-  return binding;
+  literalOracle.fingerprint = calculateAcceptedFailedCoverageFingerprint(literalOracle);
+  const adapters = createSourceRecoveryReindexAdapters(
+    {
+      manifestPath: fixture.manifestPath,
+      journalPath: fixture.journalPath,
+      expectedRecoveryRunId: fixture.manifest.run_id,
+      expectedRecoveryManifestSha256: literalOracle.recoveryManifestSha256,
+      expectedCoverageFingerprint: literalOracle.fingerprint,
+      acceptedCoverageRuns: literalOracle.ledgers.map(ledger => ({
+        organizationId: ledger.organizationId,
+        courseId: ledger.courseId,
+        runId: ledger.ledgerId,
+      })),
+    },
+    {
+      loadReviewedRecoveryState,
+      persistRecoveryJournalTransition,
+      evidenceRepository: repository,
+    }
+  );
+  return {
+    binding: await adapters.loadRecoveryBinding(),
+    literalOracle,
+  };
 }
 
 function rowsWithDispositionTruth(fixture: AcceptanceFixture): ReindexSourceRow[] {
