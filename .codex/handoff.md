@@ -33,7 +33,7 @@ Remote base for continuation: resolve current SHA of `origin/codex/self-hosted-q
 
 - Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E7, and exact 100% local/development document-evidence activation. Final independent activation/docs review at `d3417610` reported no P0-P3 findings; integration merge `ea183d83` passed 24/24 focused tests, package type-check, process verification, and canonical closeout dry-run. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
-- Q6 `.7`, Q8 `.9`, Q9 `.10` and Q10 `.11` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero, parent scans/gates and cleanup. Q11 `.12` remains open. Q12 `.13` is the explicit remote-authorization gate.
+- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. Q11 passed the full local release matrix and independent review with P0-P3 zero: backend 1,869/1,869, shared 23/23, web 20/20, PostgreSQL 64/64, exact Qdrant 15/15 plus recovery 5/5, Compose 8/8, Prometheus 14 rules, Alertmanager config, type-check and build 75/75. Q12 `.13` is the only explicit remote-authorization gate.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
@@ -54,7 +54,7 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: run the complete Q11 local/dev acceptance matrix and canonical stage closeout. Stop before Q12 remote mutation.
+Recommended action: present the exact Q12 staging activation packet and obtain explicit current-task authorization before any remote mutation. Without that authorization, keep `.13` open and do not partially activate it.
 
 ## Starter prompt for next orchestrator
 
@@ -66,7 +66,7 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 - E1-E6 and Q7 are accepted and integrated.
 - Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
-- E7 and Q10 are accepted locally. Q11 is the remaining local acceptance/closeout gate before the Q12 authorization boundary.
+- E7, Q10 and Q11 are accepted locally. Q12 is the only remaining boundary and covers every staging/production or other remote mutation.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
@@ -92,5 +92,5 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: updated — Q10 reconciles setup, deployment, native retrieval, recovery, monitoring, rollback, historical Cloud classification and stable project navigation; final independent review and parent acceptance passed.
-graph-reviewed: updated — local-only Graphify 0.8.45 refresh after Q10 acceptance contains 50,371 nodes and 74,817 edges; the focused query found the canonical runbook retrieval, reindex, recovery, monitoring, systemd and rollback surfaces. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
+docs-reviewed: no-change-needed — Q10 already reconciled setup, deployment, native retrieval, recovery, monitoring, rollback, historical Cloud classification and stable project navigation; Q11 adds release evidence only.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh at Q11 accepted parent HEAD `3681afb9` contains 50,490 nodes and 75,065 edges and matched `GRAPH_REPORT.md` to HEAD. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
