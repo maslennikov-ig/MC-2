@@ -20,11 +20,11 @@ selected_agents:
   - deploy_specialist
 catalog_candidates:
   - none - the installed DevOps and verification assets cover this read-only audit
-status: blocked
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: dedicated worktree remains for orchestrator inspection and integration; all audit containers used --rm and zero remained afterward
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: sanitized audit artifact was inspected and integrated; its dedicated worktree/local branch were removed, the pushed evidence branch remains, and all audit containers used --rm with zero remaining
 risk_level: high
 verification:
   - exhaustive server search completed over the authorized source classes without remote writes
@@ -60,45 +60,45 @@ it was used only to read metadata/content and container/process configuration.
 The following classes were inspected. Only paths, metadata, variable names,
 counts, redacted endpoint shapes, and non-secret fingerprints were retained.
 
-| Source class | Read-only coverage | Result |
-| --- | --- | --- |
-| Runtime env/secrets | All `/opt/megacampus/.env*`, `/opt/megacampus/secrets`, backup inputs, release/deploy files and bounded repo tree | One old DB URI in `.env.backup`; active envs contain Supabase HTTP/API variables only |
-| Services | Systemd unit/drop-in files plus every `EnvironmentFile=` reference | Only OS `/etc/default/ssh` and `/etc/default/networking`; no application DB environment file |
-| Scheduled work | User/root cron files, `/etc/cron.d`, referenced backup/cleanup scripts and backup log | Daily legacy backup script references `.env.backup`; no second credential source |
-| Runtime processes | All readable `/proc/*/environ`; names only retained | 36 processes had Supabase/API-named variables; zero PostgreSQL URI values |
-| Containers | `docker inspect` for all 16 running/stopped containers; names only retained | 12 containers had Supabase/API-named variables; zero PostgreSQL URI values |
-| Supabase CLI | `/root`, `/home`, `.supabase`, `.config/supabase`, `.pgpass` and service-file candidates | No Supabase CLI cache/config directory and no libpq credential file |
-| Shell/profile | Root/user histories, profiles, bashrc and `/etc/environment` | One root history file existed; no DB URI or pooler match |
-| Root filesystem | Bounded filename search for env/libpq/DB credential files, including Docker layers | No new value; one image-layer `.env.example` duplicates repo fingerprint `0b88701a0d53` |
-| Repo/history | Current `/opt/megacampus/repo` plus all 6,290 Git commits | Only examples, local test URLs, historical pooler strings and historical direct-host strings |
+| Source class        | Read-only coverage                                                                                                | Result                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Runtime env/secrets | All `/opt/megacampus/.env*`, `/opt/megacampus/secrets`, backup inputs, release/deploy files and bounded repo tree | One old DB URI in `.env.backup`; active envs contain Supabase HTTP/API variables only        |
+| Services            | Systemd unit/drop-in files plus every `EnvironmentFile=` reference                                                | Only OS `/etc/default/ssh` and `/etc/default/networking`; no application DB environment file |
+| Scheduled work      | User/root cron files, `/etc/cron.d`, referenced backup/cleanup scripts and backup log                             | Daily legacy backup script references `.env.backup`; no second credential source             |
+| Runtime processes   | All readable `/proc/*/environ`; names only retained                                                               | 36 processes had Supabase/API-named variables; zero PostgreSQL URI values                    |
+| Containers          | `docker inspect` for all 16 running/stopped containers; names only retained                                       | 12 containers had Supabase/API-named variables; zero PostgreSQL URI values                   |
+| Supabase CLI        | `/root`, `/home`, `.supabase`, `.config/supabase`, `.pgpass` and service-file candidates                          | No Supabase CLI cache/config directory and no libpq credential file                          |
+| Shell/profile       | Root/user histories, profiles, bashrc and `/etc/environment`                                                      | One root history file existed; no DB URI or pooler match                                     |
+| Root filesystem     | Bounded filename search for env/libpq/DB credential files, including Docker layers                                | No new value; one image-layer `.env.example` duplicates repo fingerprint `0b88701a0d53`      |
+| Repo/history        | Current `/opt/megacampus/repo` plus all 6,290 Git commits                                                         | Only examples, local test URLs, historical pooler strings and historical direct-host strings |
 
 Current runtime env metadata:
 
-| Path | Owner | Mode | mtime UTC | DB result |
-| --- | --- | --- | --- | --- |
-| `/opt/megacampus/.env.backup` | `claude-deploy:claude-deploy` | `0600` | `2026-01-23T08:11:37Z` | fingerprint `e1e8079edbcd`, stale |
-| `/opt/megacampus/.env.blue` | `claude-deploy:claude-deploy` | `0600` | `2026-07-04T17:05:02Z` | no PostgreSQL URI |
-| `/opt/megacampus/.env.dev` | `claude-deploy:claude-deploy` | `0600` | `2026-07-04T15:16:07Z` | no PostgreSQL URI |
-| `/opt/megacampus/.env.dev.qdrantfix.20260412131020.bak` | `claude-deploy:claude-deploy` | `0600` | `2026-04-12T11:10:20Z` | no PostgreSQL URI |
-| `/opt/megacampus/.env.green` | `claude-deploy:claude-deploy` | `0600` | `2026-06-28T14:49:03Z` | no PostgreSQL URI |
-| `/opt/megacampus/.env.production` | `claude-deploy:claude-deploy` | `0600` | `2026-07-04T17:05:00Z` | no PostgreSQL URI |
-| `/opt/megacampus/scripts/backup_supabase.sh` | `claude-deploy:claude-deploy` | `0775` | `2026-01-23T08:05:21Z` | reads the old backup env |
-| `/var/spool/cron/crontabs/claude-deploy` | `claude-deploy:crontab` | `0600` | `2026-01-25T10:09:55Z` | invokes legacy backup daily |
-| `/root/.bash_history` | `root:root` | `0600` | `2025-12-16T18:11:44Z` | no credential match |
+| Path                                                    | Owner                         | Mode   | mtime UTC              | DB result                         |
+| ------------------------------------------------------- | ----------------------------- | ------ | ---------------------- | --------------------------------- |
+| `/opt/megacampus/.env.backup`                           | `claude-deploy:claude-deploy` | `0600` | `2026-01-23T08:11:37Z` | fingerprint `e1e8079edbcd`, stale |
+| `/opt/megacampus/.env.blue`                             | `claude-deploy:claude-deploy` | `0600` | `2026-07-04T17:05:02Z` | no PostgreSQL URI                 |
+| `/opt/megacampus/.env.dev`                              | `claude-deploy:claude-deploy` | `0600` | `2026-07-04T15:16:07Z` | no PostgreSQL URI                 |
+| `/opt/megacampus/.env.dev.qdrantfix.20260412131020.bak` | `claude-deploy:claude-deploy` | `0600` | `2026-04-12T11:10:20Z` | no PostgreSQL URI                 |
+| `/opt/megacampus/.env.green`                            | `claude-deploy:claude-deploy` | `0600` | `2026-06-28T14:49:03Z` | no PostgreSQL URI                 |
+| `/opt/megacampus/.env.production`                       | `claude-deploy:claude-deploy` | `0600` | `2026-07-04T17:05:00Z` | no PostgreSQL URI                 |
+| `/opt/megacampus/scripts/backup_supabase.sh`            | `claude-deploy:claude-deploy` | `0775` | `2026-01-23T08:05:21Z` | reads the old backup env          |
+| `/var/spool/cron/crontabs/claude-deploy`                | `claude-deploy:crontab`       | `0600` | `2026-01-25T10:09:55Z` | invokes legacy backup daily       |
+| `/root/.bash_history`                                   | `root:root`                   | `0600` | `2025-12-16T18:11:44Z` | no credential match               |
 
 Candidate-bearing non-runtime files were examples or documentation:
 
-| Path | Owner | Mode | mtime UTC | Class |
-| --- | --- | --- | --- | --- |
-| `/opt/megacampus/repo/packages/course-gen-platform/.env.example` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:12Z` | template |
-| `/opt/megacampus/repo/packages/course-gen-platform/supabase/tests/SETUP_GUIDE.md` | `claude-deploy:claude-deploy` | `0664` | `2025-12-18T10:01:21Z` | local/test documentation |
-| `/opt/megacampus/repo/packages/course-gen-platform/tests/README.md` | `claude-deploy:claude-deploy` | `0664` | `2025-12-18T10:01:21Z` | local/test documentation |
-| `/opt/megacampus/repo/docs/archive/T044.11-FIX-REMAINING-TEST-ISSUES.md` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:11Z` | historical documentation |
-| `/opt/megacampus/repo/docs/articles/ARTICLE-PROMPTS-FOR-DEVELOPERS.md` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:11Z` | malformed example |
-| `/opt/megacampus/repo/docs/deployment/CLEANUP-JOB-DEPLOYMENT.md` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:11Z` | historical documentation |
-| `/opt/megacampus/repo/specs/002-main-entry-orchestrator/T032-CLOUD-SUPABASE-MIGRATION.md` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:12Z` | template |
-| `/opt/megacampus/repo/specs/005-stage-3-create/quickstart.md` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:12Z` | malformed example |
-| `/var/lib/docker/overlay2/<layer>/diff/app/packages/course-gen-platform/.env.example` | `root:root` | `0664` | `2026-05-26T11:57:13Z` | duplicate template |
+| Path                                                                                      | Owner                         | Mode   | mtime UTC              | Class                    |
+| ----------------------------------------------------------------------------------------- | ----------------------------- | ------ | ---------------------- | ------------------------ |
+| `/opt/megacampus/repo/packages/course-gen-platform/.env.example`                          | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:12Z` | template                 |
+| `/opt/megacampus/repo/packages/course-gen-platform/supabase/tests/SETUP_GUIDE.md`         | `claude-deploy:claude-deploy` | `0664` | `2025-12-18T10:01:21Z` | local/test documentation |
+| `/opt/megacampus/repo/packages/course-gen-platform/tests/README.md`                       | `claude-deploy:claude-deploy` | `0664` | `2025-12-18T10:01:21Z` | local/test documentation |
+| `/opt/megacampus/repo/docs/archive/T044.11-FIX-REMAINING-TEST-ISSUES.md`                  | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:11Z` | historical documentation |
+| `/opt/megacampus/repo/docs/articles/ARTICLE-PROMPTS-FOR-DEVELOPERS.md`                    | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:11Z` | malformed example        |
+| `/opt/megacampus/repo/docs/deployment/CLEANUP-JOB-DEPLOYMENT.md`                          | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:11Z` | historical documentation |
+| `/opt/megacampus/repo/specs/002-main-entry-orchestrator/T032-CLOUD-SUPABASE-MIGRATION.md` | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:12Z` | template                 |
+| `/opt/megacampus/repo/specs/005-stage-3-create/quickstart.md`                             | `claude-deploy:claude-deploy` | `0664` | `2026-03-20T17:43:12Z` | malformed example        |
+| `/var/lib/docker/overlay2/<layer>/diff/app/packages/course-gen-platform/.env.example`     | `root:root`                   | `0664` | `2026-05-26T11:57:13Z` | duplicate template       |
 
 ## Candidate disposition
 
@@ -109,15 +109,15 @@ remaining ten were malformed, explicit templates, localhost URLs, or an
 internal Compose service URL and were not possible current Session pooler
 credentials.
 
-| Fingerprint | Redacted endpoint | Source class | Result |
-| --- | --- | --- | --- |
-| `e1e8079edbcd` | `aws-1-us-east-2.pooler.supabase.com:5432/postgres` | current backup env | `stale-credential` |
-| `2c74e219e9d4` | same pooler shape | Git history only | `stale-credential` |
-| `7cf6add60e23` | same pooler shape | Git history only | `stale-credential` |
-| `0b88701a0d53` | same pooler shape | current example plus Git history | template; endpoint rejected it, not a credential |
-| `f3a1ca3e355b` | `db.<project-ref>.supabase.co:5432/postgres` | documentation plus Git history | direct endpoint unavailable from local host; not a Session pooler credential |
-| `f7e0e95a63a6` | `db.<project-ref>.supabase.co:5432/postgres` | documentation plus Git history | direct endpoint unavailable from local host; not a Session pooler credential |
-| ten other digests | malformed/local/internal | examples and Git history | `malformed-or-template` |
+| Fingerprint       | Redacted endpoint                                   | Source class                     | Result                                                                       |
+| ----------------- | --------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------- |
+| `e1e8079edbcd`    | `aws-1-us-east-2.pooler.supabase.com:5432/postgres` | current backup env               | `stale-credential`                                                           |
+| `2c74e219e9d4`    | same pooler shape                                   | Git history only                 | `stale-credential`                                                           |
+| `7cf6add60e23`    | same pooler shape                                   | Git history only                 | `stale-credential`                                                           |
+| `0b88701a0d53`    | same pooler shape                                   | current example plus Git history | template; endpoint rejected it, not a credential                             |
+| `f3a1ca3e355b`    | `db.<project-ref>.supabase.co:5432/postgres`        | documentation plus Git history   | direct endpoint unavailable from local host; not a Session pooler credential |
+| `f7e0e95a63a6`    | `db.<project-ref>.supabase.co:5432/postgres`        | documentation plus Git history   | direct endpoint unavailable from local host; not a Session pooler credential |
+| ten other digests | malformed/local/internal                            | examples and Git history         | `malformed-or-template`                                                      |
 
 Totals: `working=0`, `stale-credential=3`, `template/other endpoint rejection=1`,
 `network/direct-endpoint unavailable=2`, `tls-or-hostname=0`, and

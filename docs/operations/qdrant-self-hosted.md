@@ -361,10 +361,11 @@ The ordinary blue/green deploy intentionally runs verify-only before starting
 the inactive app color. It cannot bootstrap an empty first installation. The
 owner authorization does not waive these current hard stops:
 
-1. the downloaded Supabase Root 2021 CA is valid, but the locally and
-   server-stored Session pooler credentials are stale. A current URL must pass
-   the required `sslmode=verify-full` and `sslrootcert` remote migration
-   preflight;
+1. the downloaded Supabase Root 2021 CA is valid, but exhaustive read-only
+   discovery found zero working credentials among 16 unique candidates and six
+   complete external URIs. The only plausible server file, `.env.backup`, is
+   stale. An authorized Supabase owner must supply or rotate a current URL that
+   passes the required `sslmode=verify-full` and `sslrootcert` preflight;
 2. the accepted read-only source audit found 261 catalog rows: 240 are
    Qdrant-eligible and 21 are `missing_course`. Forty-two exact no-replace
    copies can raise recoverable eligible sources from 109 to 234; exact

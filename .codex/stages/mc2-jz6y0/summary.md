@@ -51,12 +51,14 @@ authorizes no staging or production mutation.
 | ------ | ---------------- | ----------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------- | --------------------------------------------------- |
 | B      | `mc2-jz6y0.13.7` | fail-closed atomic local-disk Supabase/PostgreSQL backup operator | deploy specialist using `senior-devops` | tracked backup shell, synthetic ops tests, delegated artifact | current local integration; no live URL | accepted local 18/18 plus shell/CI/type/process | complete locally; remote install/live proof pending |
 | BR     | `mc2-jz6y0.13.7` | independent correctness review after immutable implementation     | non-author correctness/DevOps reviewer  | review artifact only                                          | B                                      | final rereview P0-P3 zero                       | complete; worktrees/local branches cleaned          |
+| D      | `mc2-jz6y0.13.7` | exhaustive read-only Session pooler credential discovery          | deploy specialist                       | sanitized discovery artifact only                             | accepted CA and server SSH access      | 16 unique / 6 complete / 0 working              | complete; external owner rotation remains           |
 
 The reviewed implementation is accepted locally and remains uninstalled. It consulted only first-party
-PostgreSQL documentation for `pg_dump`/`pg_restore` behavior and does not
-authorize copying the CA, changing the server script or crontab, reading secret
-values, taking a live dump, or deleting any historical backup. Remote use still
-requires a current Session pooler URL, parent-directory mode correction from
+PostgreSQL documentation for `pg_dump`/`pg_restore` behavior. The follow-up
+read-only audit exhausted server/runtime/history sources without exposing
+values: all six complete external candidates failed, including the stale
+`.env.backup` value. Remote use still requires an authorized owner to supply or
+rotate a current Session pooler URL, parent-directory mode correction from
 observed `0775`, and a fresh isolated restore drill.
 
 ## Parallel Decomposition

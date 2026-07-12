@@ -306,8 +306,10 @@ unknown or later frontier, history/catalog mismatch, lock overrun, or TLS failur
 is a hard stop.
 
 The owner authorized the staging migration and the downloaded Supabase Root
-2021 CA has been validated. The remaining input is a current Session pooler URL;
-the retrievable local/server URLs have stale credentials. Use the validated CA
+2021 CA has been validated. Exhaustive read-only discovery found zero working
+credentials among 16 unique candidates and six complete external URIs; the
+plausible server `.env.backup` value is stale. The remaining input is an
+owner-supplied or rotated current Session pooler URL. Use the validated CA
 with both `sslmode=verify-full` and `sslrootcert`; never use
 `rejectUnauthorized=false`, `sslmode=require`, or an unverified pooler
 connection.
