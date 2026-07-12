@@ -2,7 +2,7 @@
 
 > Current implementation note. T072 originally targeted a hosted proof-of-concept; that runtime guidance is superseded by private self-hosted Qdrant `1.18.2`.
 
-The backend uses exact `@qdrant/js-client-rest` `1.18.0`. `src/shared/qdrant/client.ts` owns the singleton client; environment parsing rejects public/external Qdrant URLs in supported Compose deployments. Runtime secrets are injected from untracked files and must never be committed or printed.
+The backend uses exact `@qdrant/js-client-rest` `1.18.0`. `src/shared/qdrant/client.ts` owns the singleton client and only presence-checks the raw `QDRANT_URL` and `QDRANT_API_KEY` variables before constructing it; it does not validate URL locality or read a key file. Supported Compose topology keeps the target private, while deployment/entrypoint wrappers materialize raw runtime credentials from untracked files. Secrets must never be committed or printed.
 
 ## Names and schema
 

@@ -8,7 +8,8 @@ Q12 approval gate.
 
 ## Immutable runtime
 
-The approved runtime and monitoring images are pinned in `ops/qdrant/image-lock.json`:
+The Qdrant server image is pinned in `deploy/qdrant/image-lock.json`; monitoring
+images are pinned separately in `ops/qdrant/image-lock.json`:
 
 - Qdrant 1.18.2;
 - Prometheus 3.13.1 LTS;

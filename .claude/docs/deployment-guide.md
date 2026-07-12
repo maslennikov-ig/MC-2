@@ -297,9 +297,9 @@ cutover, sending real notifications, or any other remote mutation.
 
 Before an authorized activation, require:
 
-1. Qdrant/monitoring images match `ops/qdrant/image-lock.json`: Qdrant 1.18.2,
-   Prometheus 3.13.1 LTS, Grafana 12.4.5, node_exporter 1.12.0, and Alertmanager
-   0.33.1.
+1. Qdrant 1.18.2 matches `deploy/qdrant/image-lock.json`; Prometheus 3.13.1
+   LTS, Grafana 12.4.5, node_exporter 1.12.0, and Alertmanager 0.33.1 match the
+   separate monitoring ledger `ops/qdrant/image-lock.json`.
 2. Target systemd is at least 247 (`LoadCredential`); verify the packaged
    absolute `/usr/bin/pnpm` path and all secret/state/metrics ownership.
 3. Qdrant, dashboard, Prometheus, Grafana, Alertmanager, and node_exporter are

@@ -22,13 +22,19 @@ docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: Reconciled current setup, deployment, retrieval, recovery, monitoring and rollback guidance; explicitly bannered retained historical research/specification material. Independent docs review remains parent-owned.
 graph_reviewed: used
-graph_review_notes: Read `/home/me/code/mc2/graphify-out/GRAPH_REPORT.md` (local graph built from 1233be56) for orientation. Child did not refresh shared ignored graph state; parent closeout owns the safe final refresh.
+graph_review_notes: Read the primary checkout report `/home/me/code/mc2/graphify-out/GRAPH_REPORT.md` (local graph built from 1233be56) only for orientation. Child did not refresh shared ignored graph state; parent owns the safe post-integration refresh.
 verification:
+  - Initial independent docs review returned Ready NO with six Important findings (I1-I6) and one Minor finding (M1); orchestrator acceptance remained no.
   - Initial broad non-archive Cloud/cluster/custom-BM25 scan recorded 108 matching lines; exact Cloud scan after edits retains 49 historical/retirement lines across 20 classified files.
   - Current-guidance exact Cloud scan found one explicit retirement sentence and zero actionable hosted setup, endpoint, account, dashboard or key instructions.
   - Active old-pin scan for Prometheus 3.11.3 and Grafana 12.4.0 found zero; current operator/deployment docs contain 21 positive pin references.
   - Current Qdrant setup/module/operator docs contain 71 positive retrieval, strict-schema, reindex, snapshot/restore, systemd, rollback and Q12 references before the final exact-truth wording pass.
   - Prettier check, git diff --check, artifact validation and process verification passed after the complete docs write.
+  - Review remediation reconciled the indexed arithmetic-only Formula, accepted 4h11 snapshot timing/systemd units, executable host CLI credentials, actual client behavior, immutable promtool digest, split image-lock ledgers, and concise upload public API/status/error semantics.
+  - Remediation stale-claim scan found zero matches across six focused groups; positive evidence counted 4 Formula, 6 recovery, 6 host-CLI, 2 digest-pinned promtool, 3 dual-ledger-file and 4 upload-contract references, plus 8 existing upload-guide link targets.
+  - Full base-to-head scope contains 31 files, all Markdown; the remediation delta contains 10 Markdown files and no runtime/config changes.
+  - Remediation Prettier check, base/current git diff checks, artifact validator and process verification passed before commit; post-commit git-show and clean-push evidence remains part of worker delivery.
+  - Independent re-review remains parent-owned and pending; this artifact does not claim acceptance.
 changed_files:
   - .claude/docs/deployment-guide.md
   - .codex/project-index.md
@@ -98,7 +104,9 @@ The 16 current-guidance surfaces contain no hosted endpoint, hosted dashboard/ac
 
 # Verification and delivery
 
-Final formatting, artifact validation, process verification, diff checks, commit and push evidence are appended by the worker after fresh execution. Independent docs review and orchestrator acceptance intentionally remain pending.
+The initial independent review returned Ready NO: I1-I6 identified incorrect design/recovery/setup/client/pin/ledger claims, while M1 identified an over-reduced upload guide. The remediation corrects each item against `collection-schema.ts`, `search-operations.ts`, accepted systemd units/timers, `client.ts`, both image-lock ledgers, `upload.ts`, `upload-types.ts`, the Stage 2 caller, and focused tests.
+
+Final formatting, focused stale-claim scans, artifact validation, process verification, base-to-head diff inspection, commit and push evidence are recorded by the worker after fresh execution. Independent re-review and orchestrator acceptance intentionally remain pending.
 
 # Rollback and cleanup
 

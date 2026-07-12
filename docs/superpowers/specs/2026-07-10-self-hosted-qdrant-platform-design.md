@@ -220,8 +220,9 @@ All fields used by current filters, filtered updates, hierarchy lookups, or grou
 | `has_formulas`    | bool                       | content filter                           |
 | `has_tables`      | bool                       | content filter                           |
 | `has_images`      | bool                       | content filter                           |
+| `document_weight` | float                      | Formula Query payload lookup             |
 
-`document_weight` remains a numeric payload value for Formula Query. It is not a filter and does not need an index.
+`document_weight` is a float payload index because Formula Query reads it during ranking. `toQdrantPoint()` validates every stored value as a finite number in `[0.5, 1.0]` before upload.
 
 ### Strict mode
 
@@ -276,10 +277,10 @@ Dense-only search remains available for explicit callers and as the current oper
 When `enable_priority_boost` is true, Qdrant applies the existing product formula on the server:
 
 ```text
-finalScore = $score * (1 + (clamp(document_weight, 0.5, 1.0) - 0.5) * boostFactor)
+finalScore = $score * (1 + (document_weight - 0.5) * boostFactor)
 ```
 
-The default `boostFactor` remains `0.4`: CORE receives at most +20%, IMPORTANT +12%, and SUPPLEMENTARY no boost. A missing or invalid `document_weight` defaults to `0.5`. Client-side score mutation and sorting are removed.
+Qdrant 1.18.2 has no supported clamp/min/max Formula expression, so range enforcement belongs upstream. The default `boostFactor` remains `0.4`: CORE receives at most +20%, IMPORTANT +12%, and SUPPLEMENTARY no boost. Formula `defaults` supplies `document_weight: 0.5` only when the payload field is missing; an invalid present value is rejected before upload. Client-side score mutation and sorting are removed.
 
 ### Document diversity
 
@@ -333,11 +334,12 @@ Create `course_embeddings_vN`, backfill and verify it, then swap alias actions a
 ## Backups And Recovery
 
 - Recovery objective: RPO 6 hours, RTO 60 minutes for the derived index.
-- Create a collection snapshot every 6 hours.
+- Schedule snapshots with `OnCalendar=*-*-* 00/4:15:00`, `RandomizedDelaySec=10m`, and `AccuracySec=1m`. The accepted timing proof bounds the maximum interval at 4h11m, within the 6-hour RPO.
 - Configure staging Qdrant's native `storage.snapshots_config` with `snapshots_storage: s3`; a MinIO volume on the same server does not satisfy off-host recovery.
 - Keep snapshots for 30 days using bucket lifecycle policy. Dev may use local snapshot storage for integration drills.
 - Record snapshot name, collection, point count, size, SHA-256 checksum, creation time, and remote URI in a manifest.
 - Run an automated monthly restore drill into an isolated temporary collection.
+- Snapshot and monthly restore services use `LoadCredential`, explicit non-secret `Environment=` entries, and one shared nonblocking recovery lock; they do not load a broad environment file.
 - A restore drill passes only when counts, payload indexes, strict mode, one dense query, one RU BM25 query, one EN BM25 query, and one priority Formula Query pass.
 - The drill deletes only its temporary collection after recording evidence.
 

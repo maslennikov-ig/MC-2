@@ -267,11 +267,26 @@ Create an untracked API-key file and use the paths/variables documented in
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d qdrant-dev
-pnpm --dir packages/course-gen-platform qdrant:bootstrap
-pnpm --dir packages/course-gen-platform qdrant:verify
+
+# Host CLI uses loopback and client.ts requires the raw QDRANT_API_KEY.
+# Read it without printing it; the EXIT trap removes both exported values.
+(
+  set -eu
+  key_file=${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  test -r "$key_file"
+  QDRANT_API_KEY=''
+  IFS= read -r QDRANT_API_KEY <"$key_file" || test -n "$QDRANT_API_KEY"
+  test -n "$QDRANT_API_KEY"
+  export QDRANT_URL=http://127.0.0.1:6333 QDRANT_API_KEY
+  trap 'unset QDRANT_API_KEY QDRANT_URL' EXIT
+  pnpm --dir packages/course-gen-platform qdrant:bootstrap
+  pnpm --dir packages/course-gen-platform qdrant:verify
+)
 ```
 
 Compose supplies `QDRANT_URL=http://qdrant-dev:6333` to application services.
+That Docker DNS name is not reachable from a host CLI. `client.ts` reads raw
+`QDRANT_URL` and `QDRANT_API_KEY`; it does not read `QDRANT_API_KEY_FILE`.
 Keep Qdrant on the private bridge/loopback and never expose its API, dashboard,
 or authenticated `/metrics` endpoint through nginx.
 
@@ -412,12 +427,16 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
 
 ### 1. Create Qdrant Collection
 
-Initialize the vector database collection:
+The setup block above initializes and verifies the collection. To repeat only
+the bootstrap from the host, use the same loopback/key subshell and replace its
+two package commands with:
 
 ```bash
-# From packages/course-gen-platform/
-pnpm run qdrant:create-collection
+pnpm --dir packages/course-gen-platform qdrant:bootstrap
 ```
+
+Do not run a host CLI with `QDRANT_URL=http://qdrant-dev:6333`; that name is
+available only to services attached to the Compose network.
 
 **Expected outcome:**
 
@@ -1025,8 +1044,12 @@ REDIS_URL=redis://localhost:6379
 # ============================================
 # Qdrant Configuration (Vector Database)
 # ============================================
-# Private self-hosted development service; use an untracked secret file.
+# Application values inside the Compose network.
 QDRANT_URL=http://qdrant-dev:6333
+# client.ts requires this raw value; a deployment wrapper must materialize it
+# from an untracked file. Never commit the real value.
+QDRANT_API_KEY=<runtime-only-admin-key>
+# Wrapper/Qdrant-service input only; client.ts does not read this variable.
 QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
 QDRANT_COLLECTION_NAME=course_embeddings
 QDRANT_PHYSICAL_COLLECTION_NAME=course_embeddings_v1

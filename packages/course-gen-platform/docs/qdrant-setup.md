@@ -10,11 +10,22 @@ From the repository root, create a local secret file outside Git, set the variab
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d qdrant-dev
-pnpm --dir packages/course-gen-platform qdrant:bootstrap
-pnpm --dir packages/course-gen-platform qdrant:verify
+
+(
+  set -eu
+  key_file=${QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}
+  test -r "$key_file"
+  QDRANT_API_KEY=''
+  IFS= read -r QDRANT_API_KEY <"$key_file" || test -n "$QDRANT_API_KEY"
+  test -n "$QDRANT_API_KEY"
+  export QDRANT_URL=http://127.0.0.1:6333 QDRANT_API_KEY
+  trap 'unset QDRANT_API_KEY QDRANT_URL' EXIT
+  pnpm --dir packages/course-gen-platform qdrant:bootstrap
+  pnpm --dir packages/course-gen-platform qdrant:verify
+)
 ```
 
-Use `QDRANT_URL=http://qdrant-dev:6333` inside the Compose network. The loopback host port is for local/operator access only. Never expose Qdrant through nginx or bind its API, Web UI, or metrics to a public interface.
+Use `QDRANT_URL=http://qdrant-dev:6333` inside the Compose network and `http://127.0.0.1:6333` from the host. `client.ts` presence-checks raw `QDRANT_URL` and `QDRANT_API_KEY`; it does not read `QDRANT_API_KEY_FILE`. The subshell above loads the raw key without printing it and removes the exported values on exit. The loopback host port is for local/operator access only. Never expose Qdrant through nginx or bind its API, Web UI, or metrics to a public interface.
 
 ## Collection and retrieval contract
 

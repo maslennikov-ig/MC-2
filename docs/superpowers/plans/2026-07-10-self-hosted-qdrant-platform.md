@@ -726,7 +726,7 @@ git commit -m "feat(qdrant): add source-driven reindex workflow"
 
 **Interfaces:**
 
-- Produces: `qdrant:snapshot` and `qdrant:restore-drill` commands and a six-hour timer.
+- Produces: `qdrant:snapshot` and `qdrant:restore-drill` commands, a four-hour snapshot schedule that stays within the six-hour RPO, and a monthly restore-drill timer.
 - Consumes: Qdrant-native S3 snapshot configuration from Task 6.
 
 - [ ] **Step 1: Write snapshot manifest and retention tests**
@@ -743,7 +743,7 @@ Create target `qdrant_restore_drill_<UTC timestamp>`, recover with priority `sna
 
 - [ ] **Step 4: Add systemd unit templates**
 
-The service runs from `/opt/megacampus/packages/course-gen-platform`, loads `/opt/megacampus/.env.production`, and invokes `pnpm qdrant:snapshot`. The timer uses `OnCalendar=*-*-* 00/6:15:00`, `Persistent=true`, and randomized delay up to 10 minutes. Installation/enabling is documented but not executed without deploy authorization.
+The snapshot and restore services run from `/opt/megacampus/packages/course-gen-platform`, load credentials with systemd `LoadCredential`, set only the required non-secret values through explicit `Environment=` entries, and invoke the package commands through one shared nonblocking `flock`. They do not load `/opt/megacampus/.env.production` or another broad environment file. The snapshot timer uses `OnCalendar=*-*-* 00/4:15:00`, `RandomizedDelaySec=10m`, `AccuracySec=1m`, and `Persistent=true`; the accepted proof bounds the maximum interval at 4h11m, within the six-hour RPO. The restore drill uses a monthly timer and the same lock. Installation/enabling is documented but not executed without deploy authorization.
 
 - [ ] **Step 5: Run unit and local restore tests**
 
@@ -805,8 +805,8 @@ Document Web UI `/dashboard`, read-only key use, bootstrap, verify, snapshot, re
 - [ ] **Step 5: Validate configurations**
 
 ```bash
-docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.13.1 check config /etc/prometheus/prometheus.yml
-docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.13.1 check rules /etc/prometheus/alerts.yml
+docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893 check config /etc/prometheus/prometheus.yml
+docker run --rm --entrypoint /bin/promtool -v "$PWD/ops/qdrant/prometheus:/etc/prometheus:ro" prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893 check rules /etc/prometheus/alerts.yml
 docker compose -f docker-compose.infra.yml --env-file .env.production.example config --quiet
 ```
 
@@ -951,7 +951,7 @@ Recreate staging API, main worker, and Stage 6 worker with `QDRANT_URL=http://qd
 
 - [ ] **Step 5: Activate backup timer and observe**
 
-Create an off-host snapshot, run restore drill, enable the six-hour timer, verify Prometheus targets/alerts/Grafana, and observe errors/fallbacks for at least one normal smoke cycle.
+Create an off-host snapshot, run the isolated restore drill, enable the four-hour snapshot timer and monthly restore timer, verify the shared nonblocking lock plus Prometheus targets/alerts/Grafana, and observe errors/fallbacks for at least one normal smoke cycle. The 4h11m proven maximum remains inside the six-hour RPO.
 
 - [ ] **Step 6: Roll back on any failed gate**
 
