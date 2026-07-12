@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { link, lstat, open, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
@@ -19,6 +19,19 @@ export interface PublishInput {
 export interface RollbackInput extends PublishInput {
   phase: RecoveryRunPhase;
   journalState: 'published' | 'rollback_planned';
+}
+
+export interface RecoveryCopiesPreflightInput extends Omit<PublishInput, 'entry'> {
+  entries: readonly RecoveryCopyEntry[];
+  capabilityDirectory: string;
+}
+
+export interface RecoveryExecutionPreflightInput extends Omit<PublishInput, 'entry'> {
+  entries: readonly RecoveryCopyEntry[];
+  copyStates: Readonly<
+    Record<string, 'planned' | 'published' | 'rollback_planned' | 'rolled_back'>
+  >;
+  phase: 'planned' | 'copying';
 }
 
 export type RecoveryTargetInspection = 'absent' | 'exact' | 'mismatch';
@@ -179,6 +192,99 @@ async function assertTargetAbsent(targetPath: string): Promise<void> {
   }
 }
 
+async function assertOwnerOnlyCapabilityDirectory(
+  input: RecoveryCopiesPreflightInput,
+  targetDirectories: readonly string[]
+): Promise<string> {
+  if (!isAbsolute(input.capabilityDirectory)) {
+    throw new Error('Recovery capability directory must be absolute');
+  }
+  const requested = resolve(input.capabilityDirectory);
+  const metadata = await lstat(requested);
+  if (metadata.isSymbolicLink() || !metadata.isDirectory() || (metadata.mode & 0o777) !== 0o700) {
+    throw new Error('Recovery capability directory must be a real mode-0700 owner-only directory');
+  }
+  if (process.getuid && metadata.uid !== process.getuid()) {
+    throw new Error('Recovery capability directory must be owned by the current UID');
+  }
+  const physical = await realpath(requested);
+  if (physical !== requested) {
+    throw new Error('Recovery capability directory must not traverse a symbolic link');
+  }
+
+  const developmentRoot = await realpath(input.developmentRoot);
+  const productionRoot = await realpath(input.productionRoot);
+  if (
+    isWithin(developmentRoot, physical) ||
+    isWithin(physical, developmentRoot) ||
+    isWithin(productionRoot, physical) ||
+    isWithin(physical, productionRoot)
+  ) {
+    throw new Error('Recovery capability directory must be separate from both upload roots');
+  }
+
+  for (const targetDirectory of new Set(targetDirectories)) {
+    const targetMetadata = await lstat(targetDirectory);
+    if (!targetMetadata.isDirectory() || targetMetadata.dev !== metadata.dev) {
+      throw new Error('Recovery capability directory is not on every target filesystem');
+    }
+  }
+  return physical;
+}
+
+async function proveFilesystemCapabilities(
+  input: RecoveryCopiesPreflightInput,
+  capabilityDirectory: string
+): Promise<void> {
+  const token = `${input.runId}.${randomUUID()}`;
+  const temporaryPath = resolve(capabilityDirectory, `.source-recovery-capability.${token}.tmp`);
+  const linkedPath = resolve(capabilityDirectory, `.source-recovery-capability.${token}.linked`);
+  let temporaryExists = false;
+  let linkedExists = false;
+  try {
+    const temporary = await open(
+      temporaryPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
+      0o600
+    );
+    temporaryExists = true;
+    try {
+      await temporary.writeFile('source-recovery-capability', 'utf8');
+      await temporary.sync();
+    } finally {
+      await temporary.close();
+    }
+
+    await link(temporaryPath, linkedPath);
+    linkedExists = true;
+    try {
+      await link(temporaryPath, linkedPath);
+      throw new Error(
+        'Recovery filesystem no-replace capability probe unexpectedly replaced a link'
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+
+    const linked = await open(linkedPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      await linked.sync();
+    } finally {
+      await linked.close();
+    }
+    await fsyncDirectory(capabilityDirectory);
+    await unlink(linkedPath);
+    linkedExists = false;
+    await unlink(temporaryPath);
+    temporaryExists = false;
+    await fsyncDirectory(capabilityDirectory);
+  } finally {
+    if (linkedExists) await unlink(linkedPath).catch(() => undefined);
+    if (temporaryExists) await unlink(temporaryPath).catch(() => undefined);
+    await fsyncDirectory(capabilityDirectory).catch(() => undefined);
+  }
+}
+
 function recoveryTemporaryPath(input: PublishInput, targetPath: string): string {
   return `${dirname(targetPath)}/.source-recovery.${input.runId}.${input.entry.entry_id}.tmp`;
 }
@@ -292,6 +398,77 @@ export async function inspectRecoveryTarget(
     : 'mismatch';
 }
 
+export async function preflightRecoveryCopies(input: RecoveryCopiesPreflightInput): Promise<void> {
+  if (input.entries.length === 0) throw new Error('Recovery preflight requires copy entries');
+  const targetDirectories: string[] = [];
+  for (const entry of input.entries) {
+    const publishInput: PublishInput = { ...input, entry };
+    const { sourcePath, targetPath, targetDirectory } = await resolveRoots(publishInput);
+    assertExpectedIdentity(entry, await hashOpenFile(sourcePath), 'Recovery preflight source');
+    await assertTargetAbsent(targetPath);
+    const temporaryPath = recoveryTemporaryPath(publishInput, targetPath);
+    if ((await inspectTemporary(publishInput, temporaryPath)) !== 'absent') {
+      throw new Error('Recovery preflight found pre-existing execution temporary state');
+    }
+    targetDirectories.push(targetDirectory);
+  }
+  const capabilityDirectory = await assertOwnerOnlyCapabilityDirectory(input, targetDirectories);
+  await proveFilesystemCapabilities(input, capabilityDirectory);
+}
+
+export async function preflightRecoveryExecution(
+  input: RecoveryExecutionPreflightInput
+): Promise<void> {
+  const entryIds = input.entries.map(entry => entry.entry_id).sort();
+  const stateIds = Object.keys(input.copyStates).sort();
+  if (
+    entryIds.length !== stateIds.length ||
+    entryIds.some((entryId, index) => entryId !== stateIds[index])
+  ) {
+    throw new Error('Recovery execution copy states do not exactly match the reviewed entries');
+  }
+
+  for (const entry of input.entries) {
+    const publishInput: PublishInput = { ...input, entry };
+    const state = input.copyStates[entry.entry_id];
+    if (state !== 'planned' && state !== 'published') {
+      throw new Error('Recovery execution encountered a rollback copy state');
+    }
+
+    const { sourcePath, targetPath } = await resolveRoots(publishInput, {
+      requireSource: state === 'planned',
+    });
+    if (state === 'planned') {
+      assertExpectedIdentity(entry, await hashOpenFile(sourcePath), 'Recovery execution source');
+    }
+
+    const targetInspection = await inspectRecoveryTarget(publishInput);
+    const temporaryInspection = await inspectTemporary(
+      publishInput,
+      recoveryTemporaryPath(publishInput, targetPath)
+    );
+    if (temporaryInspection === 'mismatch') {
+      throw new Error('Recovery execution temporary mismatch requires operator investigation');
+    }
+
+    if (state === 'published') {
+      if (targetInspection !== 'exact') {
+        throw new Error('Published recovery target is not exact');
+      }
+      continue;
+    }
+    if (targetInspection === 'mismatch') {
+      throw new Error('Planned recovery target mismatch');
+    }
+    if (input.phase === 'planned' && targetInspection === 'exact') {
+      throw new Error('Exact planned target is pre-existing before durable execution start');
+    }
+    if (input.phase === 'planned' && temporaryInspection === 'exact') {
+      throw new Error('Exact recovery temporary is pre-existing before durable execution start');
+    }
+  }
+}
+
 export async function publishNoReplace(input: PublishInput): Promise<void> {
   const { sourcePath, targetPath, targetDirectory } = await resolveRoots(input);
   await assertTargetAbsent(targetPath);
@@ -339,7 +516,8 @@ export async function publishNoReplace(input: PublishInput): Promise<void> {
 
 export async function reconcilePublishedTarget(
   input: PublishInput,
-  journalState: 'planned' | 'published'
+  journalState: 'planned' | 'published',
+  options: { executionStarted?: boolean } = {}
 ): Promise<'ready_to_publish' | 'published'> {
   const { targetPath, targetDirectory } = await resolveRoots(input, { requireSource: false });
   const temporaryPath = recoveryTemporaryPath(input, targetPath);
@@ -353,6 +531,11 @@ export async function reconcilePublishedTarget(
       return 'ready_to_publish';
     }
     if (inspection === 'exact') {
+      if (!options.executionStarted) {
+        throw new Error(
+          'Exact planned target is pre-existing until durable execution start is confirmed'
+        );
+      }
       const targetHandle = await open(targetPath, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
         await targetHandle.sync();

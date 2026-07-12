@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { link, lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { link, lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 
@@ -311,6 +312,9 @@ const defaultDurableWriteOperations: DurableWriteOperations = {
     if (expectedUid !== undefined && metadata.uid !== expectedUid) {
       throw new Error(`Recovery state directory must be owned by uid ${expectedUid}: ${directory}`);
     }
+    if ((await realpath(directory)) !== resolve(directory)) {
+      throw new Error(`Recovery state directory must use a real directory boundary: ${directory}`);
+    }
   },
   async assertAbsent(targetPath) {
     try {
@@ -448,6 +452,17 @@ function assertSameKeys(
   }
 }
 
+function assertSameValues(
+  current: Record<string, string>,
+  next: Record<string, string>,
+  label: string
+): void {
+  assertSameKeys(current, next, label);
+  for (const [key, value] of Object.entries(current)) {
+    if (next[key] !== value) throw new Error(`${label} values cannot change`);
+  }
+}
+
 function allStatesAre(states: Record<string, string>, allowed: readonly string[]): boolean {
   return Object.values(states).every(state => allowed.includes(state));
 }
@@ -494,6 +509,37 @@ function assertJournalPhaseCoherence(journal: RecoveryProgressJournal): void {
   }
 }
 
+export function validateRecoveryProgressJournalBinding(
+  manifestInput: SourceRecoveryManifest,
+  manifestSha256: string,
+  journalInput: RecoveryProgressJournal
+): RecoveryProgressJournal {
+  const manifest = normalizeRecoveryManifest(manifestInput);
+  const canonicalSha256 = calculateRecoveryManifestSha256(manifest);
+  if (manifestSha256 !== canonicalSha256) {
+    throw new Error('Progress journal manifest SHA-256 is not canonical');
+  }
+  const journal = RecoveryProgressJournalSchema.parse(journalInput);
+  if (journal.run_id !== manifest.run_id || journal.manifest_sha256 !== canonicalSha256) {
+    throw new Error('Progress journal binding does not match the canonical manifest identity');
+  }
+
+  const canonical = createInitialProgressJournal(manifest, canonicalSha256);
+  assertSameKeys(canonical.copy_states, journal.copy_states, 'Manifest copy state');
+  assertSameKeys(
+    canonical.disposition_states,
+    journal.disposition_states,
+    'Manifest disposition state'
+  );
+  assertSameValues(
+    canonical.disposition_kinds,
+    journal.disposition_kinds,
+    'Manifest disposition kind'
+  );
+  assertJournalPhaseCoherence(journal);
+  return journal;
+}
+
 export function validateRecoveryJournalTransition(
   currentInput: RecoveryProgressJournal,
   nextInput: RecoveryProgressJournal
@@ -513,11 +559,8 @@ export function validateRecoveryJournalTransition(
   }
 
   assertSameKeys(current.copy_states, next.copy_states, 'Copy state');
-  assertSameKeys(current.disposition_kinds, next.disposition_kinds, 'Disposition kind');
+  assertSameValues(current.disposition_kinds, next.disposition_kinds, 'Disposition kind');
   assertSameKeys(current.disposition_states, next.disposition_states, 'Disposition state');
-  if (serialize(current.disposition_kinds) !== serialize(next.disposition_kinds)) {
-    throw new Error('Disposition kinds cannot change');
-  }
 
   if (
     current.phase === 'copying' &&
@@ -602,7 +645,33 @@ export async function replaceProgressJournal(
   const next = RecoveryProgressJournalSchema.parse(nextInput);
   let current: RecoveryProgressJournal | undefined;
   try {
-    current = RecoveryProgressJournalSchema.parse(JSON.parse(await readFile(targetPath, 'utf8')));
+    const metadata = await lstat(targetPath);
+    if (metadata.isSymbolicLink() || !metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+      throw new Error('Progress journal must be a non-symlink mode-0600 regular file');
+    }
+    const expectedUid = process.getuid?.();
+    if (expectedUid !== undefined && metadata.uid !== expectedUid) {
+      throw new Error(`Progress journal must be owned by uid ${expectedUid}`);
+    }
+    await defaultDurableWriteOperations.assertSecureDirectory(dirname(targetPath));
+    const handle = await open(targetPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const opened = await handle.stat();
+      if (
+        !opened.isFile() ||
+        (opened.mode & 0o777) !== 0o600 ||
+        opened.dev !== metadata.dev ||
+        opened.ino !== metadata.ino
+      ) {
+        throw new Error('Progress journal changed during protected CAS open');
+      }
+      if (expectedUid !== undefined && opened.uid !== expectedUid) {
+        throw new Error(`Progress journal must be owned by uid ${expectedUid}`);
+      }
+      current = RecoveryProgressJournalSchema.parse(JSON.parse(await handle.readFile('utf8')));
+    } finally {
+      await handle.close();
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
@@ -612,6 +681,12 @@ export async function replaceProgressJournal(
     throw new Error(
       `Progress journal revision mismatch: expected ${expectedRevision}, found ${actualRevision}`
     );
+  }
+  if (manifest) {
+    if (current) {
+      validateRecoveryProgressJournalBinding(manifest, current.manifest_sha256, current);
+    }
+    validateRecoveryProgressJournalBinding(manifest, next.manifest_sha256, next);
   }
   if (current) validateRecoveryJournalTransition(current, next);
   else {

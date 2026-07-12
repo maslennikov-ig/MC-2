@@ -1,6 +1,6 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   loadReviewedRecoveryState,
   parseSourceRecoveryCliArgs,
@@ -103,6 +103,8 @@ function dependencies(
   const journal = journalFor(value);
   return {
     createPlan: () => Promise.resolve(value),
+    preflightCopies: () => Promise.resolve(),
+    preflightExecution: () => Promise.resolve(),
     writePlan: () =>
       Promise.resolve({
         manifest: value,
@@ -144,6 +146,16 @@ describe('source recovery workflow', () => {
     expect(() => parseSourceRecoveryCliArgs(['execute', '--allow-gaps'])).toThrow(
       /unknown option/iu
     );
+    expect(
+      parseSourceRecoveryCliArgs([
+        'plan',
+        '--capability-probe-directory',
+        '/opt/megacampus/recovery-capability',
+      ])
+    ).toMatchObject({
+      mode: 'plan',
+      capabilityProbeDirectory: '/opt/megacampus/recovery-capability',
+    });
   });
 
   it('accepts only the exact audited plan totals and emits aggregate-only data', async () => {
@@ -189,6 +201,34 @@ describe('source recovery workflow', () => {
     ).rejects.toThrow(/exact audited recovery totals/iu);
   });
 
+  it.each([
+    ['late source drift', 'source identity mismatch'],
+    ['pre-existing exact target', 'target already exists'],
+  ])('writes no immutable plan when all-copy preflight finds %s', async (_label, failure) => {
+    const order: string[] = [];
+    const deps = dependencies({
+      createPlan: () => {
+        order.push('create');
+        return Promise.resolve(manifest());
+      },
+      readSourceCounts: () => {
+        order.push('counts');
+        return Promise.resolve(manifest().pre_counts);
+      },
+      preflightCopies: () => {
+        order.push('preflight');
+        return Promise.reject(new Error(failure));
+      },
+      writePlan: () => {
+        order.push('write');
+        return Promise.reject(new Error('immutable plan must not be written'));
+      },
+    } as Partial<RecoveryWorkflowDependencies>);
+
+    await expect(runSourceRecoveryCommand({ mode: 'plan' }, deps)).rejects.toThrow(failure);
+    expect(order).toEqual(['create', 'counts', 'preflight']);
+  });
+
   it('loads strict reviewed JSON, recomputes canonical SHA, and rejects journal drift', async () => {
     const directory = await mkdtemp('/tmp/mc2-source-recovery-state-');
     const manifestPath = join(directory, 'manifest.json');
@@ -222,6 +262,154 @@ describe('source recovery workflow', () => {
       );
     } finally {
       await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('binds every loaded journal identity and disposition kind to the reviewed manifest', async () => {
+    const directory = await mkdtemp('/tmp/mc2-source-recovery-binding-');
+    const manifestPath = join(directory, 'manifest.json');
+    const journalPath = join(directory, 'journal.json');
+    const value = manifest();
+    const canonical = journalFor(value);
+    const eligibleId = value.dispositions.find(
+      entry => entry.kind === 'eligible_unrecoverable'
+    )!.entry_id;
+    const playbookId = value.dispositions.find(
+      entry => entry.kind === 'career_playbook_retained_derived'
+    )!.entry_id;
+    const cases: Array<{ label: string; journal: RecoveryProgressJournal }> = [
+      {
+        label: 'extra copy identity',
+        journal: {
+          ...canonical,
+          copy_states: { ...canonical.copy_states, 'copy-unreviewed': 'planned' },
+        },
+      },
+      {
+        label: 'missing disposition identity',
+        journal: {
+          ...canonical,
+          disposition_states: Object.fromEntries(
+            Object.entries(canonical.disposition_states).filter(
+              ([entryId]) => entryId !== eligibleId
+            )
+          ),
+        },
+      },
+      {
+        label: 'swapped copy identity',
+        journal: {
+          ...canonical,
+          copy_states: {
+            ...Object.fromEntries(
+              Object.entries(canonical.copy_states).filter(([entryId]) => entryId !== 'copy-00')
+            ),
+            'copy-unreviewed': 'planned',
+          },
+        },
+      },
+      {
+        label: 'swapped disposition kinds',
+        journal: {
+          ...canonical,
+          disposition_kinds: {
+            ...canonical.disposition_kinds,
+            [eligibleId]: canonical.disposition_kinds[playbookId],
+            [playbookId]: canonical.disposition_kinds[eligibleId],
+          },
+        },
+      },
+      {
+        label: 'altered disposition kind',
+        journal: {
+          ...canonical,
+          disposition_kinds: {
+            ...canonical.disposition_kinds,
+            [eligibleId]: 'career_playbook_retained_derived',
+          },
+        },
+      },
+    ];
+
+    try {
+      await chmod(directory, 0o700);
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+      for (const testCase of cases) {
+        await writeFile(journalPath, `${JSON.stringify(testCase.journal, null, 2)}\n`, {
+          mode: 0o600,
+        });
+        await expect(
+          loadReviewedRecoveryState({ manifestPath, journalPath }),
+          testCase.label
+        ).rejects.toThrow(/manifest|journal|identity|keys|kind/iu);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('requires protected files and their real state directory to be owner-only', async () => {
+    const root = await mkdtemp('/tmp/mc2-source-recovery-protected-');
+    const stateDirectory = join(root, 'state');
+    const linkedStateDirectory = join(root, 'linked-state');
+    const manifestPath = join(stateDirectory, 'manifest.json');
+    const journalPath = join(stateDirectory, 'journal.json');
+    const manifestLinkPath = join(stateDirectory, 'manifest-link.json');
+    const value = manifest();
+    const journal = journalFor(value);
+    const writeCanonicalState = async (): Promise<void> => {
+      await chmod(stateDirectory, 0o700);
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+      await chmod(manifestPath, 0o600);
+      await writeFile(journalPath, `${JSON.stringify(journal, null, 2)}\n`, { mode: 0o600 });
+      await chmod(journalPath, 0o600);
+    };
+
+    try {
+      await mkdir(stateDirectory, { mode: 0o700 });
+      await writeCanonicalState();
+
+      await symlink('manifest.json', manifestLinkPath);
+      await expect(
+        loadReviewedRecoveryState({ manifestPath: manifestLinkPath, journalPath })
+      ).rejects.toThrow(/symbolic link|symlink|owner-only/iu);
+
+      await chmod(manifestPath, 0o640);
+      await expect(loadReviewedRecoveryState({ manifestPath, journalPath })).rejects.toThrow(
+        /0600|owner-only/iu
+      );
+      await writeCanonicalState();
+
+      await expect(
+        loadReviewedRecoveryState({ manifestPath: stateDirectory, journalPath })
+      ).rejects.toThrow(/regular file|owner-only/iu);
+
+      await chmod(stateDirectory, 0o755);
+      await expect(loadReviewedRecoveryState({ manifestPath, journalPath })).rejects.toThrow(
+        /0700|state directory|owner-only/iu
+      );
+      await writeCanonicalState();
+
+      await symlink(stateDirectory, linkedStateDirectory, 'dir');
+      await expect(
+        loadReviewedRecoveryState({
+          manifestPath: join(linkedStateDirectory, 'manifest.json'),
+          journalPath: join(linkedStateDirectory, 'journal.json'),
+        })
+      ).rejects.toThrow(/real state directory|symbolic link|owner-only/iu);
+
+      if (process.getuid) {
+        const getuid = vi.spyOn(process, 'getuid').mockReturnValue(process.getuid() + 1);
+        try {
+          await expect(loadReviewedRecoveryState({ manifestPath, journalPath })).rejects.toThrow(
+            /owner|uid/iu
+          );
+        } finally {
+          getuid.mockRestore();
+        }
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -261,6 +449,44 @@ describe('source recovery workflow', () => {
     ).toHaveLength(43);
     expect(persisted.at(-1)?.phase).toBe('copied');
   });
+
+  it.each([
+    ['fresh execute', 'planned' as const, false],
+    ['copying resume', 'copying' as const, true],
+  ])(
+    'runs an all-remaining execution preflight before any new publication for %s',
+    async (_label, phase, firstPublished) => {
+      const value = manifest();
+      const journal = journalFor(value);
+      journal.phase = phase;
+      if (firstPublished) journal.copy_states[value.copies[0].entry_id] = 'published';
+      let persisted = 0;
+      let published = 0;
+      const deps = dependencies({
+        loadReviewedState: () =>
+          Promise.resolve({
+            manifest: value,
+            manifestSha256: calculateRecoveryManifestSha256(value),
+            journal,
+          }),
+        preflightExecution: () => Promise.reject(new Error('remaining source identity mismatch')),
+        persistJournal: () => {
+          persisted += 1;
+          return Promise.resolve();
+        },
+        publishCopy: () => {
+          published += 1;
+          return Promise.resolve();
+        },
+      } as Partial<RecoveryWorkflowDependencies>);
+
+      await expect(
+        runSourceRecoveryCommand({ mode: 'execute', confirmRunId: RUN_ID }, deps)
+      ).rejects.toThrow(/remaining source identity mismatch/iu);
+      expect(persisted).toBe(0);
+      expect(published).toBe(0);
+    }
+  );
 
   it('persists disposition substates and verifies all 24 exact outcomes before verified', async () => {
     const value = manifest();

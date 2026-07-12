@@ -1,9 +1,21 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   inspectRecoveryTarget,
+  preflightRecoveryCopies,
+  preflightRecoveryExecution,
   publishNoReplace,
   reconcilePublishedTarget,
   reconcileRollbackTarget,
@@ -106,6 +118,139 @@ describe('source recovery filesystem engine', () => {
     }
   });
 
+  it('preflights every source and absent target before a safe same-filesystem capability probe', async () => {
+    const first = await fixture('first exact bytes');
+    const capabilityDirectory = join(first.root, 'capability');
+    const secondSource = join(first.input.developmentRoot, 'tenant', 'source-2.pdf');
+    const secondTarget = join(first.input.productionRoot, 'tenant', 'target-2.pdf');
+    const secondContent = 'second exact bytes';
+    const secondEntry = {
+      ...first.input.entry,
+      entry_id: 'copy-2',
+      source_relative_path: 'tenant/source-2.pdf',
+      target_relative_path: 'tenant/target-2.pdf',
+      expected_size: Buffer.byteLength(secondContent),
+      expected_sha256: sha256(secondContent),
+    };
+    await mkdir(capabilityDirectory, { mode: 0o700 });
+    await writeFile(secondSource, secondContent);
+
+    const preflight = () =>
+      preflightRecoveryCopies({
+        runId: first.input.runId,
+        developmentRoot: first.input.developmentRoot,
+        productionRoot: first.input.productionRoot,
+        rootBinding: first.input.rootBinding,
+        entries: [first.input.entry, secondEntry],
+        capabilityDirectory,
+      });
+
+    try {
+      await expect(preflight()).resolves.toBeUndefined();
+      await expect(readFile(first.target)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readFile(secondTarget)).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(await readdir(capabilityDirectory)).toEqual([]);
+
+      await writeFile(secondSource, 'late drift');
+      await expect(preflight()).rejects.toThrow(/size mismatch|hash mismatch/iu);
+      await expect(readFile(first.target)).rejects.toMatchObject({ code: 'ENOENT' });
+      await writeFile(secondSource, secondContent);
+
+      await writeFile(secondTarget, secondContent);
+      await expect(preflight()).rejects.toThrow(/target already exists/iu);
+      await expect(readFile(first.target)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(first.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a non-owner-only or upload-root capability directory', async () => {
+    const value = await fixture();
+    const capabilityDirectory = join(value.root, 'capability');
+    const input = {
+      runId: value.input.runId,
+      developmentRoot: value.input.developmentRoot,
+      productionRoot: value.input.productionRoot,
+      rootBinding: value.input.rootBinding,
+      entries: [value.input.entry],
+      capabilityDirectory,
+    };
+    try {
+      await mkdir(capabilityDirectory, { mode: 0o700 });
+      await chmod(capabilityDirectory, 0o755);
+      await expect(preflightRecoveryCopies(input)).rejects.toThrow(/0700|owner-only/iu);
+
+      await chmod(join(value.input.productionRoot, 'tenant'), 0o700);
+      await expect(
+        preflightRecoveryCopies({
+          ...input,
+          capabilityDirectory: join(value.input.productionRoot, 'tenant'),
+        })
+      ).rejects.toThrow(/upload root|separate|capability/iu);
+    } finally {
+      await rm(value.root, { recursive: true, force: true });
+    }
+  });
+
+  it('preflights every remaining source and target before fresh or resumed execution', async () => {
+    const value = await fixture('first exact bytes');
+    const secondContent = 'second exact bytes';
+    const secondSource = join(value.input.developmentRoot, 'tenant', 'source-2.pdf');
+    const secondTarget = join(value.input.productionRoot, 'tenant', 'target-2.pdf');
+    const secondEntry = {
+      ...value.input.entry,
+      entry_id: 'copy-2',
+      source_relative_path: 'tenant/source-2.pdf',
+      target_relative_path: 'tenant/target-2.pdf',
+      expected_size: Buffer.byteLength(secondContent),
+      expected_sha256: sha256(secondContent),
+    };
+    await writeFile(secondSource, secondContent);
+    const preflight = (
+      phase: 'planned' | 'copying',
+      copyStates: Record<string, 'planned' | 'published'>
+    ) =>
+      preflightRecoveryExecution({
+        runId: value.input.runId,
+        developmentRoot: value.input.developmentRoot,
+        productionRoot: value.input.productionRoot,
+        rootBinding: value.input.rootBinding,
+        entries: [value.input.entry, secondEntry],
+        copyStates,
+        phase,
+      });
+
+    try {
+      await publishNoReplace(value.input);
+      await expect(
+        preflight('planned', {
+          [value.input.entry.entry_id]: 'planned',
+          [secondEntry.entry_id]: 'planned',
+        })
+      ).rejects.toThrow(/pre-existing|execution.*start/iu);
+
+      await writeFile(secondSource, 'late resume drift');
+      await expect(
+        preflight('copying', {
+          [value.input.entry.entry_id]: 'published',
+          [secondEntry.entry_id]: 'planned',
+        })
+      ).rejects.toThrow(/size mismatch|hash mismatch/iu);
+      await expect(readFile(secondTarget)).rejects.toMatchObject({ code: 'ENOENT' });
+
+      await writeFile(secondSource, secondContent);
+      await publishNoReplace({ ...value.input, entry: secondEntry });
+      await expect(
+        preflight('copying', {
+          [value.input.entry.entry_id]: 'published',
+          [secondEntry.entry_id]: 'planned',
+        })
+      ).resolves.toBeUndefined();
+    } finally {
+      await rm(value.root, { recursive: true, force: true });
+    }
+  });
+
   it('reconciles only the exact run-and-entry-bound crash temporary', async () => {
     const exact = await fixture();
     const mismatched = await fixture();
@@ -120,7 +265,9 @@ describe('source recovery filesystem engine', () => {
       ]);
 
       await writeFile(exactTemporary, 'exact original bytes');
-      await expect(reconcilePublishedTarget(exact.input, 'planned')).resolves.toBe('published');
+      await expect(
+        reconcilePublishedTarget(exact.input, 'planned', { executionStarted: true })
+      ).resolves.toBe('published');
       expect((await readdir(join(exact.input.productionRoot, 'tenant'))).sort()).toEqual([
         'target.pdf',
       ]);
@@ -144,7 +291,12 @@ describe('source recovery filesystem engine', () => {
     try {
       await expect(reconcilePublishedTarget(input, 'planned')).resolves.toBe('ready_to_publish');
       await publishNoReplace(input);
-      await expect(reconcilePublishedTarget(input, 'planned')).resolves.toBe('published');
+      await expect(reconcilePublishedTarget(input, 'planned')).rejects.toThrow(
+        /execution.*start|pre-existing/iu
+      );
+      await expect(
+        reconcilePublishedTarget(input, 'planned', { executionStarted: true })
+      ).resolves.toBe('published');
       await expect(reconcilePublishedTarget(input, 'published')).resolves.toBe('published');
 
       await writeFile(target, 'mismatch');

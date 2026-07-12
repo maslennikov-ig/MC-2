@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { createHash } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
-import { isAbsolute, resolve } from 'node:path';
+import { constants } from 'node:fs';
+import { lstat, open, realpath } from 'node:fs/promises';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
@@ -17,6 +18,8 @@ import {
   type RecoverySupabaseClient,
 } from './source-recovery-database.js';
 import {
+  preflightRecoveryCopies,
+  preflightRecoveryExecution,
   publishNoReplace,
   reconcilePublishedTarget,
   reconcileRollbackTarget,
@@ -29,6 +32,7 @@ import {
   normalizeRecoveryManifest,
   replaceProgressJournal,
   validateRecoveryJournalTransition,
+  validateRecoveryProgressJournalBinding,
   writeImmutableManifest,
   type RecoveryCopyEntry,
   type RecoveryCounts,
@@ -51,6 +55,7 @@ export interface SourceRecoveryCliOptions {
   manifestPath?: string;
   journalPath?: string;
   planInputPath?: string;
+  capabilityProbeDirectory?: string;
   help: boolean;
 }
 
@@ -64,6 +69,11 @@ export type RecoveryCopyInspection = 'absent' | 'exact' | 'mismatch';
 
 export interface RecoveryWorkflowDependencies {
   createPlan(): Promise<SourceRecoveryManifest>;
+  preflightCopies(manifest: SourceRecoveryManifest): Promise<void>;
+  preflightExecution(
+    manifest: SourceRecoveryManifest,
+    journal: RecoveryProgressJournal
+  ): Promise<void>;
   writePlan(manifest: SourceRecoveryManifest): Promise<ReviewedRecoveryState>;
   loadReviewedState(): Promise<ReviewedRecoveryState>;
   persistJournal(
@@ -248,20 +258,62 @@ function assertExactRecoveryContract(input: SourceRecoveryManifest): SourceRecov
   return normalizeRecoveryManifest(input);
 }
 
-function validateLoadedJournal(journal: RecoveryProgressJournal): RecoveryProgressJournal {
-  return validateRecoveryJournalTransition(journal, {
-    ...journal,
-    revision: journal.revision + 1,
-    copy_states: { ...journal.copy_states },
-    disposition_kinds: { ...journal.disposition_kinds },
-    disposition_states: { ...journal.disposition_states },
+function validateLoadedJournal(
+  manifest: SourceRecoveryManifest,
+  manifestSha256: string,
+  journal: RecoveryProgressJournal
+): RecoveryProgressJournal {
+  const validated = validateRecoveryProgressJournalBinding(manifest, manifestSha256, journal);
+  return validateRecoveryJournalTransition(validated, {
+    ...validated,
+    revision: validated.revision + 1,
+    copy_states: { ...validated.copy_states },
+    disposition_kinds: { ...validated.disposition_kinds },
+    disposition_states: { ...validated.disposition_states },
   });
 }
 
-async function assertOwnerOnlyFile(path: string, label: string): Promise<void> {
-  const metadata = await stat(path);
-  if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-    throw new Error(`${label} must be a mode-0600 regular file`);
+function assertCurrentOwner(uid: number, label: string): void {
+  if (process.getuid && uid !== process.getuid()) {
+    throw new Error(`${label} must be owned by the current UID`);
+  }
+}
+
+async function assertOwnerOnlyStateDirectory(path: string, label: string): Promise<void> {
+  const directory = dirname(path);
+  const metadata = await lstat(directory);
+  if (metadata.isSymbolicLink() || !metadata.isDirectory() || (metadata.mode & 0o777) !== 0o700) {
+    throw new Error(`${label} state directory must be a real mode-0700 owner-only directory`);
+  }
+  assertCurrentOwner(metadata.uid, `${label} state directory`);
+  if ((await realpath(directory)) !== resolve(directory)) {
+    throw new Error(`${label} state directory must not traverse a symbolic link`);
+  }
+}
+
+async function readOwnerOnlyFile(path: string, label: string): Promise<string> {
+  await assertOwnerOnlyStateDirectory(path, label);
+  const metadata = await lstat(path);
+  if (metadata.isSymbolicLink() || !metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+    throw new Error(`${label} must be a non-symlink mode-0600 regular file`);
+  }
+  assertCurrentOwner(metadata.uid, label);
+
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat();
+    if (
+      !opened.isFile() ||
+      (opened.mode & 0o777) !== 0o600 ||
+      opened.dev !== metadata.dev ||
+      opened.ino !== metadata.ino
+    ) {
+      throw new Error(`${label} changed during protected open`);
+    }
+    assertCurrentOwner(opened.uid, label);
+    return await handle.readFile('utf8');
+  } finally {
+    await handle.close();
   }
 }
 
@@ -269,13 +321,9 @@ export async function loadReviewedRecoveryState(input: {
   manifestPath: string;
   journalPath: string;
 }): Promise<ReviewedRecoveryState> {
-  await Promise.all([
-    assertOwnerOnlyFile(input.manifestPath, 'Recovery manifest'),
-    assertOwnerOnlyFile(input.journalPath, 'Recovery journal'),
-  ]);
   const [manifestJson, journalJson] = await Promise.all([
-    readFile(input.manifestPath, 'utf8'),
-    readFile(input.journalPath, 'utf8'),
+    readOwnerOnlyFile(input.manifestPath, 'Recovery manifest'),
+    readOwnerOnlyFile(input.journalPath, 'Recovery journal'),
   ]);
   const manifest = assertExactRecoveryContract(ManifestSchema.parse(JSON.parse(manifestJson)));
   const manifestSha256 = calculateRecoveryManifestSha256(manifest);
@@ -284,7 +332,7 @@ export async function loadReviewedRecoveryState(input: {
     throw new Error('Reviewed file does not contain canonical manifest bytes');
   }
   const journal = JournalSchema.parse(JSON.parse(journalJson));
-  validateLoadedJournal(journal);
+  validateLoadedJournal(manifest, manifestSha256, journal);
   if (journal.run_id !== manifest.run_id || journal.manifest_sha256 !== manifestSha256) {
     throw new Error('Recovery journal binding does not match canonical reviewed manifest identity');
   }
@@ -298,11 +346,11 @@ export async function persistRecoveryJournalTransition(input: {
   next: RecoveryProgressJournal;
 }): Promise<void> {
   const manifest = assertExactRecoveryContract(input.manifest);
+  const manifestSha256 = calculateRecoveryManifestSha256(manifest);
+  validateRecoveryProgressJournalBinding(manifest, manifestSha256, input.current);
   const next = validateRecoveryJournalTransition(input.current, input.next);
-  if (
-    next.run_id !== manifest.run_id ||
-    next.manifest_sha256 !== calculateRecoveryManifestSha256(manifest)
-  ) {
+  validateRecoveryProgressJournalBinding(manifest, manifestSha256, next);
+  if (next.run_id !== manifest.run_id || next.manifest_sha256 !== manifestSha256) {
     throw new Error('Recovery journal transition is not bound to the canonical manifest');
   }
   await replaceProgressJournal(input.journalPath, input.current.revision, next, manifest);
@@ -347,7 +395,8 @@ export function parseSourceRecoveryCliArgs(args: readonly string[]): SourceRecov
       argument !== '--confirm-run-id' &&
       argument !== '--manifest-path' &&
       argument !== '--journal-path' &&
-      argument !== '--plan-input-path'
+      argument !== '--plan-input-path' &&
+      argument !== '--capability-probe-directory'
     ) {
       throw new Error(`Unknown option: ${argument}`);
     }
@@ -357,6 +406,9 @@ export function parseSourceRecoveryCliArgs(args: readonly string[]): SourceRecov
     else if (argument === '--manifest-path') options.manifestPath = value;
     else if (argument === '--journal-path') options.journalPath = value;
     else if (argument === '--plan-input-path') options.planInputPath = value;
+    else if (argument === '--capability-probe-directory') {
+      options.capabilityProbeDirectory = value;
+    }
   }
   return options;
 }
@@ -422,6 +474,7 @@ export async function runSourceRecoveryCommand(
     if (!sameCounts(counts, EXACT_PRE_COUNTS)) {
       throw new Error('Planner inventory does not match exact audited pre-copy totals');
     }
+    await dependencies.preflightCopies(manifest);
     const written = await dependencies.writePlan(manifest);
     if (
       written.manifestSha256 !== calculateRecoveryManifestSha256(manifest) ||
@@ -439,7 +492,7 @@ export async function runSourceRecoveryCommand(
     throw new Error('Reviewed manifest SHA-256 is not canonical');
   }
   let journal = loaded.journal;
-  validateLoadedJournal(journal);
+  validateLoadedJournal(manifest, loaded.manifestSha256, journal);
 
   const persist = async (next: RecoveryProgressJournal): Promise<void> => {
     validateRecoveryJournalTransition(journal, next);
@@ -468,6 +521,7 @@ export async function runSourceRecoveryCommand(
     if (journal.phase !== 'planned' && journal.phase !== 'copying') {
       throw new Error(`Execute requires planned or copying phase, received ${journal.phase}`);
     }
+    await dependencies.preflightExecution(manifest, journal);
     if (journal.phase === 'planned') await persist(nextJournal(journal, { phase: 'copying' }));
     for (const entry of manifest.copies) {
       const state = journal.copy_states[entry.entry_id];
@@ -695,6 +749,8 @@ export function createDefaultRecoveryDependencies(
     'Recovery journal path'
   );
   const planInputPath = options.planInputPath ?? process.env.SOURCE_RECOVERY_PLAN_INPUT_PATH;
+  const capabilityProbeDirectory =
+    options.capabilityProbeDirectory ?? process.env.SOURCE_RECOVERY_CAPABILITY_PROBE_DIRECTORY;
   let database: RecoveryDispositionDatabase | undefined;
   const getDatabase = (): RecoveryDispositionDatabase => {
     database ??= createRecoveryDispositionDatabase(
@@ -711,6 +767,10 @@ export function createDefaultRecoveryDependencies(
     if (!active) throw new Error('Recovery state must be loaded first');
     return active.manifest;
   };
+  const currentJournal = (): RecoveryProgressJournal => {
+    if (!active) throw new Error('Recovery state must be loaded first');
+    return active.journal;
+  };
   const publishInput = (entry: RecoveryCopyEntry) => ({
     runId: currentManifest().run_id,
     developmentRoot: currentManifest().development_root,
@@ -725,12 +785,46 @@ export function createDefaultRecoveryDependencies(
   return {
     createPlan: async () => {
       const path = requirePath(planInputPath, 'Recovery protected plan input path');
-      await assertOwnerOnlyFile(path, 'Recovery protected plan input');
       const manifest = assertExactRecoveryContract(
-        ManifestSchema.parse(JSON.parse(await readFile(path, 'utf8')))
+        ManifestSchema.parse(
+          JSON.parse(await readOwnerOnlyFile(path, 'Recovery protected plan input'))
+        )
       );
       await verifyReviewedPriorPredicates(getDatabase(), manifest);
       return manifest;
+    },
+    preflightCopies: async manifest => {
+      const normalized = assertExactRecoveryContract(manifest);
+      const directory = requirePath(
+        capabilityProbeDirectory,
+        'Recovery capability probe directory'
+      );
+      await preflightRecoveryCopies({
+        runId: normalized.run_id,
+        developmentRoot: normalized.development_root,
+        productionRoot: normalized.production_root,
+        rootBinding: {
+          development_root: normalized.development_root,
+          production_root: normalized.production_root,
+        },
+        entries: normalized.copies,
+        capabilityDirectory: directory,
+      });
+    },
+    preflightExecution: async (manifest, journal) => {
+      const normalized = assertExactRecoveryContract(manifest);
+      await preflightRecoveryExecution({
+        runId: normalized.run_id,
+        developmentRoot: normalized.development_root,
+        productionRoot: normalized.production_root,
+        rootBinding: {
+          development_root: normalized.development_root,
+          production_root: normalized.production_root,
+        },
+        entries: normalized.copies,
+        copyStates: journal.copy_states,
+        phase: journal.phase === 'planned' ? 'planned' : 'copying',
+      });
     },
     writePlan: async manifest => {
       const normalized = assertExactRecoveryContract(manifest);
@@ -771,7 +865,9 @@ export function createDefaultRecoveryDependencies(
         const result = await reconcileRollbackTarget(publishInput(entry), 'rollback_planned');
         return result === 'rolled_back' ? 'absent' : 'exact';
       }
-      const result = await reconcilePublishedTarget(publishInput(entry), state);
+      const result = await reconcilePublishedTarget(publishInput(entry), state, {
+        executionStarted: currentJournal().phase === 'copying',
+      });
       return result === 'ready_to_publish' ? 'absent' : 'exact';
     },
     publishCopy: entry => publishNoReplace(publishInput(entry)),
@@ -803,6 +899,7 @@ function usage(): string {
     '  --manifest-path <absolute path>',
     '  --journal-path <absolute path>',
     '  --plan-input-path <absolute path>  (plan only)',
+    '  --capability-probe-directory <absolute path>  (plan only)',
     '  --confirm-run-id <uuid>            (mutating modes)',
   ].join('\n');
 }

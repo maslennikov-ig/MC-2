@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -178,12 +178,28 @@ describe('source recovery manifest', () => {
   it('rejects an existing recovery state directory that is not mode 0700', async () => {
     const directory = await mkdtemp('/tmp/mc2-source-recovery-state-mode-');
     const state = join(directory, 'state');
-    await mkdir(state, { mode: 0o700 });
+    await mkdir(state, { recursive: true, mode: 0o700 });
     await chmod(state, 0o755);
     try {
       await expect(
         writeImmutableManifest(join(state, 'manifest.json'), manifest())
       ).rejects.toThrow(/mode 0700/iu);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a mode-0700 state directory reached through a symbolic-link boundary', async () => {
+    const directory = await mkdtemp('/tmp/mc2-source-recovery-state-link-');
+    const actualRoot = join(directory, 'actual');
+    const linkedRoot = join(directory, 'linked-root');
+    const state = join(actualRoot, 'state');
+    await mkdir(state, { recursive: true, mode: 0o700 });
+    await symlink(actualRoot, linkedRoot, 'dir');
+    try {
+      await expect(
+        writeImmutableManifest(join(linkedRoot, 'state', 'manifest.json'), manifest())
+      ).rejects.toThrow(/real directory|symbolic link/iu);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -494,6 +510,23 @@ describe('source recovery manifest', () => {
         revision: 1,
         phase: 'copying',
       });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a progress journal replaced by a symbolic link before CAS load', async () => {
+    const directory = await mkdtemp('/tmp/mc2-source-recovery-journal-link-');
+    const target = join(directory, 'progress.json');
+    const external = join(directory, 'external.json');
+    const normalized = normalizeRecoveryManifest(manifest());
+    const current = createInitialProgressJournal(normalized, canonicalManifestSha256());
+    try {
+      await writeFile(external, `${JSON.stringify(current, null, 2)}\n`, { mode: 0o600 });
+      await symlink(external, target);
+      await expect(
+        replaceProgressJournal(target, 0, { ...current, revision: 1, phase: 'copying' }, normalized)
+      ).rejects.toThrow(/symbolic link|non-symlink|regular file/iu);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

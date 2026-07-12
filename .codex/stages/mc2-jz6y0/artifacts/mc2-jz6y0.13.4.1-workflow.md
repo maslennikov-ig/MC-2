@@ -10,12 +10,17 @@ model_reasoning_rationale: exact tenant-aware CAS, resumability, reviewed identi
 repo: mc2
 branch: codex/q12-source-recovery-workflow
 base_branch: codex/self-hosted-qdrant-platform
-base_commit: cfce2c1c3d927e1ba1537a81d959302a166162c3
+base_commit: f4a23c593acccff2fad50f62a1a99427c93f9a77
+resolves_review: b54ba667
 worktree: /home/me/code/mc2/.worktrees/q12-source-recovery-workflow
 write_zone:
   - packages/course-gen-platform/tools/qdrant/source-recovery-database.ts
+  - packages/course-gen-platform/tools/qdrant/source-recovery-filesystem.ts
+  - packages/course-gen-platform/tools/qdrant/source-recovery-manifest.ts
   - packages/course-gen-platform/tools/qdrant/source-recovery.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-database.test.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-filesystem.test.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-manifest.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery.test.ts
   - packages/course-gen-platform/package.json
   - this artifact
@@ -50,7 +55,7 @@ depends_on_streams:
   - mc2-jz6y0.13.4.1-core
 parallel_decision: parallel - Task 2 has a disjoint write zone from reindex and Stage 4 streams
 status: returned
-delivery_method: merge
+delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: pending
 cleanup_notes: temporary dependency symlinks were removed before commit; worktree/branch remain for orchestrator review
@@ -73,9 +78,18 @@ verification:
   - focused Prettier and git diff check: passed
   - artifact schema validation: passed
   - process verification: passed
+  - review b54ba667 journal-binding RED: extra, missing, swapped, and altered identities were accepted before correction
+  - review b54ba667 protected-state RED: symlink, permissive mode, nonregular file, insecure state directory, and replaced CAS target were accepted before correction
+  - review b54ba667 plan-preflight RED: late source drift and pre-existing exact target reached immutable-plan publication before correction
+  - review b54ba667 execution-preflight RED: fresh and resumed execution could reach publication before an all-entry freshness pass
+  - review b54ba667 focused GREEN: passed 41/41 manifest, filesystem, database, and workflow tests
 changed_files:
+  - packages/course-gen-platform/tools/qdrant/source-recovery-filesystem.ts
+  - packages/course-gen-platform/tools/qdrant/source-recovery-manifest.ts
   - packages/course-gen-platform/tools/qdrant/source-recovery-database.ts
   - packages/course-gen-platform/tools/qdrant/source-recovery.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-filesystem.test.ts
+  - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-manifest.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery-database.test.ts
   - packages/course-gen-platform/tests/unit/tools/qdrant/source-recovery.test.ts
   - packages/course-gen-platform/package.json
@@ -84,6 +98,7 @@ explicit_defers:
   - Task 3 owns reindex recovery-binding consumption and verified-to-reindex_started persistence before enqueue
   - Task 4 owns exact failed-coverage card verification IDs; this stream does not invent them
   - operator/Compose integration and any protected host execution remain later reviewed tasks; no remote mutation was performed
+  - runtime integration must supply a narrow owner-only mode-0700 capability directory on the same filesystem as every target directory; this correction does not broaden scope into operator/Compose wiring
 ---
 
 # Summary
@@ -152,6 +167,28 @@ The stream is returned for independent orchestrator review. No staging host,
 database, upload root, Qdrant service, queue, secret, deployment, or live
 runtime was accessed or mutated. Temporary dependency symlinks are local-only
 and are removed before the implementation commit.
+
+# Correction for review b54ba667
+
+This returned revision resolves all three P1 findings from review `b54ba667`.
+Every journal load and compare-and-swap now binds the exact copy and disposition
+identity sets plus every immutable disposition kind to the canonical manifest.
+Manifest, journal, and protected-plan reads require a real owner-only mode-0700
+state directory and real current-UID mode-0600 regular files, with no symlink
+traversal or descriptor replacement.
+
+Planning now validates all reviewed sources and absent targets before publishing
+the immutable plan, then proves the required same-filesystem hard-link,
+no-replace, file-fsync, and directory-fsync capabilities in a separate
+current-UID mode-0700 directory. Execute repeats a read-only all-entry freshness
+pass before durably entering `copying`; resume repeats it for every remaining
+entry before any new publication. Thus a pre-existing exact target is rejected
+while phase is `planned`, while an exact target or run-bound temporary created
+after the durable execution marker remains valid crash residue during `copying`.
+
+The correction was developed through four observed RED cases and a final
+focused GREEN run of 41/41 tests. It remains `not accepted` with cleanup pending
+until the orchestrator independently reviews this branch.
 
 # Risks / Follow-ups / Explicit Defers
 
