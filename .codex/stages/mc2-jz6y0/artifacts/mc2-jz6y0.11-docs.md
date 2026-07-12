@@ -21,8 +21,8 @@ risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: Reconciled current setup, deployment, retrieval, recovery, monitoring and rollback guidance; explicitly bannered retained historical research/specification material. The final independent review at 42ed1322 reported Ready to merge Yes with P0-P3 zero.
-graph_reviewed: used
-graph_review_notes: Read the primary checkout report `/home/me/code/mc2/graphify-out/GRAPH_REPORT.md` (local graph built from 1233be56) only for orientation. Child did not refresh shared ignored graph state; parent owns the safe post-integration refresh.
+graph_reviewed: updated
+graph_review_notes: Parent refreshed local-only Graphify 0.8.45 after Q10 acceptance with 50371 nodes, 74817 edges and 3206 communities. The focused query found the canonical runbook retrieval, bootstrap/reindex, snapshot/restore, systemd, monitoring and rollback surfaces. The intentional documentation reduction required `graphify update . --force`; no external model/API mode or Git hook was used.
 verification:
   - Initial independent docs review returned Ready NO with six Important findings (I1-I6) and one Minor finding (M1); orchestrator acceptance remained no.
   - Second independent docs review returned Ready NO with one remaining Important finding (I3): fresh-network setup, host reindex credentials, and snapshot/restore contracts were not yet jointly reproducible.
@@ -43,6 +43,7 @@ verification:
   - Independent third re-review at 42ed1322 passed with Critical/Important/Minor all zero; all three Bash snippets passed bash -n and the reviewer reported Ready to merge Yes.
   - Reviewed head 42ed1322 merged as 3c9dd641. Parent integration acceptance passed Prettier on 31 Markdown files, diff checks, artifact validation, process verification and canonical stage closeout dry-run.
   - Parent scans found 0 actionable Cloud instructions, 0 stale Prometheus/Grafana pins, 0 stale Formula/recovery claims and 86 positive current-contract references.
+  - Parent Graphify refresh passed with `graphify update . --force` after the intentional removal of obsolete docs, followed by `graphify cluster-only . --no-viz`; report commit matched bf89f22e before this graph-evidence record and is refreshed again after its commit.
 changed_files:
   - .claude/docs/deployment-guide.md
   - .codex/project-index.md
@@ -122,7 +123,7 @@ This stream changes Markdown only. Rollback is the branch revert; no runtime rol
 
 docs-reviewed: updated — durable developer/operator/retrieval/recovery guidance and historical classification are reconciled; independent review pending.
 
-graph-reviewed: used — local report read for architecture orientation; final shared local-only refresh is parent-owned after integration.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh and focused runbook query passed; no external semantic/model/API mode or Git hook was used.
 
 # Risks / Follow-ups
 

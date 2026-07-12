@@ -93,4 +93,4 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — Q10 reconciles setup, deployment, native retrieval, recovery, monitoring, rollback, historical Cloud classification and stable project navigation; final independent review and parent acceptance passed.
-graph-reviewed: updated — local-only Graphify 0.8.45 refresh completed after E7 acceptance with 50,469 nodes, 74,909 edges and 3,199 communities; the focused query found the evidence design and Stage 4/5/6 observability surfaces. No external model/API mode or Git hook was used.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh after Q10 acceptance contains 50,371 nodes, 74,817 edges and 3,206 communities; the focused query found the canonical runbook retrieval, reindex, recovery, monitoring, systemd and rollback surfaces. No external model/API mode or Git hook was used.
