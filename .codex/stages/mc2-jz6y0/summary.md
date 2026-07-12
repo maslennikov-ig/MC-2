@@ -29,6 +29,20 @@ Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback/snapsh
 - E6 `mc2-jz6y0.23` — decision-aware Stage 6 retrieval/grouping
 - E7 `mc2-jz6y0.24` — evidence acceptance, observability and rollout
 
+### Q12 Task 5 Parallel Decomposition (2026-07-12)
+
+| Stream | Beads                | Goal                                                                               | Agent                                   | Write zone                                                        | Dependencies                                 | Verification                                               | Decision/reason                                                           |
+| ------ | -------------------- | ---------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| R      | `mc2-jz6y0.13.4.1.3` | isolated three-service operator, narrow capability bind, host flock/writer restore | deploy specialist using `senior-devops` | Compose, Dockerfile, entrypoint, host wrapper, ops tests/artifact | accepted workflow/reindex CLIs               | rendered Compose, runtime Vitest, shell/CI gates           | parallel; disjoint infrastructure files                                   |
+| A      | `mc2-jz6y0.13.4.1.4` | concrete manifest/journal and accepted evidence adapters                           | search/data correctness worker          | Qdrant adapter/reindex seams, focused tests/artifact              | accepted workflow/reindex/evidence contracts | adapter+123 recovery/reindex, repository tests, type-check | parallel; disjoint TypeScript seam                                        |
+| C      | `mc2-jz6y0.13.4.1.1` | crash-order, temp reconciliation and replacement-inode matrix                      | correctness/QA worker                   | recovery crash tests/support/artifact                             | accepted core/workflow                       | injected matrix, combined 123, zero residue                | parallel test stream; production defects return for coordinated ownership |
+
+All three inherit the orchestrator model with high reasoning because they cover
+filesystem durability, destructive rollback, tenant-bound evidence, secrets,
+and service isolation. Catalog candidates are none; installed skills and local
+approved contracts cover the work. All runtime work is local/synthetic and
+authorizes no staging or production mutation.
+
 ## Parallel Decomposition
 
 | Stream | Goal                                 | Agent                                        | Write zone                                         | Dependencies          | Verification                                         | Decision                                                          |
