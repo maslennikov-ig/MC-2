@@ -57,6 +57,8 @@
     "migration:document-evidence-index:rollback": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/migrations/document-evidence-observability-index.ts rollback",
     "migration:document-evidence-observability:apply": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/migrations/document-evidence-observability-index.ts apply-all",
     "migration:document-evidence-observability:rollback": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/migrations/document-evidence-observability-index.ts rollback-all",
+    "migration:document-evidence-approved:apply": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/migrations/document-evidence-approved.ts apply",
+    "migration:document-evidence-approved:rollback": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/migrations/document-evidence-approved.ts rollback",
     "lint": "eslint src --max-warnings=95",
     "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc --noEmit",
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
