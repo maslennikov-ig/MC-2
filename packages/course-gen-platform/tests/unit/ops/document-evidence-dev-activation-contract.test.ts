@@ -10,6 +10,7 @@ const ACTIVE_VALUES = [
   'DOCUMENT_EVIDENCE_MODE=active',
   'DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100',
 ] as const;
+const ACTIVE_VARIABLES = ACTIVE_VALUES.map(value => value.slice(0, value.indexOf('=')));
 
 function source(path: string): string {
   return readFileSync(resolve(REPO_ROOT, path), 'utf8');
@@ -54,16 +55,23 @@ describe('document evidence dev activation contract', () => {
     for (const value of ACTIVE_VALUES) expect(packageEntries.has(value)).toBe(true);
   });
 
-  it('does not activate staging or production configuration', () => {
-    const nonDev = [
+  it('declares the approved staging target without hard-coding it in Compose', () => {
+    const productionExampleEntries = source('.env.production.example')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => ACTIVE_VARIABLES.some(variable => line.startsWith(`${variable}=`)));
+
+    expect(productionExampleEntries).toEqual(ACTIVE_VALUES);
+
+    for (const path of [
       'docker-compose.infra.yml',
       'docker-compose.app.yml',
       'docker-compose.production.yml',
-      '.env.production.example',
-    ]
-      .map(source)
-      .join('\n');
+    ]) {
+      const compose = source(path);
 
-    for (const value of ACTIVE_VALUES) expect(nonDev).not.toContain(value);
+      expect(compose).toContain('${PRODUCTION_ENV_FILE:-.env.production}');
+      for (const value of ACTIVE_VALUES) expect(compose).not.toContain(value);
+    }
   });
 });
