@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DocumentProcessingJobDataSchema, JobType } from '@megacampus/shared-types';
 import {
   buildReindexPlan,
+  calculateAcceptedFailedCoverageFingerprint,
   getReindexPlanExitCode,
   loadReindexSources,
   mapDatabaseReindexSources,
@@ -226,8 +227,29 @@ describe('buildReindexPlan', () => {
       manifest,
       manifestSha256,
       journal,
-      verifiedFailedCoverageFileIds: auditedRows.map(row => row.id),
+      acceptedFailedCoverage: {
+        ledgerId: '52000000-0000-4000-8000-000000000005',
+        recoveryRunId: manifest.run_id,
+        recoveryManifestSha256: manifestSha256,
+        fingerprint: '',
+        entries: auditedRows.map(row => ({
+          documentId: row.id,
+          organizationId: row.organizationId,
+          courseId: row.courseId!,
+          coverageStatus: 'failed',
+          coverageReason: 'source_file_unrecoverable',
+          processingMode: 'metadata_only',
+          summary: null,
+          claims: [],
+          terminology: [],
+          constraints: [],
+          allocatedTokens: 0,
+        })),
+      },
     };
+    binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
+      binding.acceptedFailedCoverage
+    );
 
     const plan = buildReindexPlan(
       rows,
@@ -254,6 +276,105 @@ describe('buildReindexPlan', () => {
       ),
     });
     expect(getReindexPlanExitCode(plan)).toBe(0);
+  });
+
+  it('rejects stale or non-zero accepted failed coverage evidence', () => {
+    const rows = Array.from({ length: 6 }, (_, index) => ({
+      ...SOURCE_BASE,
+      id: `e0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      storagePath: `uploads/org/course/audited-${index}.pdf`,
+      vectorStatus: 'failed',
+      errorMessage: 'source_file_unrecoverable; recovery_run=50000000-0000-4000-8000-000000000005',
+    }));
+    const manifest: SourceRecoveryManifest = {
+      schema_version: 'megacampus.qdrant.source-recovery/v1',
+      run_id: '50000000-0000-4000-8000-000000000005',
+      release_sha: 'b'.repeat(40),
+      generated_at: '2026-07-12T12:00:00.000Z',
+      operator_image_digest: `sha256:${'c'.repeat(64)}`,
+      source_audit_version: 'q12-reviewed-v1',
+      development_root: '/srv/megacampus/uploads-dev',
+      production_root: '/srv/megacampus/uploads',
+      pre_counts: { total: 6, eligible: 6, recoverable: 0, missing: 4, invalid: 2, unsupported: 0 },
+      expected_post_counts: {
+        total: 6,
+        eligible: 6,
+        recoverable: 0,
+        missing: 4,
+        invalid: 2,
+        unsupported: 0,
+      },
+      copies: [],
+      dispositions: rows.map((row, index) => ({
+        entry_id: `eligible-${index}`,
+        kind: 'eligible_unrecoverable',
+        file_catalog_id: row.id,
+        organization_id: row.organizationId,
+        course_id: row.courseId,
+        expected_hash: row.hash,
+        expected_storage_path: row.storagePath,
+        expected_vector_status: 'pending',
+        expected_file_error_message: null,
+        reason: 'source_file_unrecoverable',
+      })),
+    };
+    const manifestSha256 = calculateRecoveryManifestSha256(manifest);
+    const binding: RecoveryReindexBinding = {
+      manifest,
+      manifestSha256,
+      journal: {
+        schema_version: 'megacampus.qdrant.source-recovery-progress/v1',
+        run_id: manifest.run_id,
+        manifest_sha256: manifestSha256,
+        revision: 1,
+        phase: 'verified',
+        copy_states: {},
+        disposition_kinds: Object.fromEntries(
+          manifest.dispositions.map(entry => [entry.entry_id, entry.kind])
+        ),
+        disposition_states: Object.fromEntries(
+          manifest.dispositions.map(entry => [entry.entry_id, 'disposition_verified'])
+        ),
+      },
+      acceptedFailedCoverage: {
+        ledgerId: '52000000-0000-4000-8000-000000000005',
+        recoveryRunId: manifest.run_id,
+        recoveryManifestSha256: manifestSha256,
+        fingerprint: '',
+        entries: rows.map(row => ({
+          documentId: row.id,
+          organizationId: row.organizationId,
+          courseId: row.courseId!,
+          coverageStatus: 'failed',
+          coverageReason: 'source_file_unrecoverable',
+          processingMode: 'metadata_only',
+          summary: null,
+          claims: [],
+          terminology: [],
+          constraints: [],
+          allocatedTokens: 0,
+        })),
+      },
+    };
+    binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
+      binding.acceptedFailedCoverage
+    );
+
+    const staleRun = structuredClone(binding);
+    staleRun.acceptedFailedCoverage.recoveryRunId = '53000000-0000-4000-8000-000000000005';
+    staleRun.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
+      staleRun.acceptedFailedCoverage
+    );
+    expect(() => buildReindexPlan(rows, () => false, staleRun)).toThrow(
+      /coverage.*run|run.*coverage/iu
+    );
+
+    const nonZero = structuredClone(binding);
+    nonZero.acceptedFailedCoverage.entries[0].claims = ['not-empty'];
+    nonZero.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
+      nonZero.acceptedFailedCoverage
+    );
+    expect(() => buildReindexPlan(rows, () => false, nonZero)).toThrow(/zero|claims|evidence/iu);
   });
 
   it('reports unknown point/request estimates instead of inventing batch precision', () => {

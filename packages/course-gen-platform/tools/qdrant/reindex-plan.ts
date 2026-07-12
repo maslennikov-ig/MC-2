@@ -67,20 +67,75 @@ export interface ReindexPlan {
   auditedFailedFileIds: string[];
   recoveryRunId?: string;
   recoveryManifestSha256?: string;
+  acceptedCoverageLedgerId?: string;
+  acceptedCoverageFingerprint?: string;
   verificationFingerprint?: string;
   gaps: ReindexGap[];
+}
+
+export interface AcceptedFailedCoverageEntry {
+  documentId: string;
+  organizationId: string;
+  courseId: string;
+  coverageStatus: 'failed';
+  coverageReason: 'source_file_unrecoverable';
+  processingMode: 'metadata_only';
+  summary: null;
+  claims: readonly string[];
+  terminology: readonly string[];
+  constraints: readonly string[];
+  allocatedTokens: 0;
+}
+
+export interface AcceptedFailedCoverageBinding {
+  ledgerId: string;
+  recoveryRunId: string;
+  recoveryManifestSha256: string;
+  fingerprint: string;
+  entries: readonly AcceptedFailedCoverageEntry[];
 }
 
 export interface RecoveryReindexBinding {
   manifest: SourceRecoveryManifest;
   manifestSha256: string;
   journal: RecoveryProgressJournal;
-  verifiedFailedCoverageFileIds: readonly string[];
+  acceptedFailedCoverage: AcceptedFailedCoverageBinding;
 }
 
 export type ReindexSourceProbe = (row: ReindexSourceRow) => boolean | 'invalid_source_path';
 
 const VERIFIED_RECOVERY_PHASES = new Set(['verified', 'reindex_started', 'complete']);
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+
+export function calculateAcceptedFailedCoverageFingerprint(
+  binding: AcceptedFailedCoverageBinding
+): string {
+  const entries = [...binding.entries]
+    .sort((left, right) => left.documentId.localeCompare(right.documentId))
+    .map(entry => ({
+      documentId: entry.documentId,
+      organizationId: entry.organizationId,
+      courseId: entry.courseId,
+      coverageStatus: entry.coverageStatus,
+      coverageReason: entry.coverageReason,
+      processingMode: entry.processingMode,
+      summary: entry.summary,
+      claims: [...entry.claims],
+      terminology: [...entry.terminology],
+      constraints: [...entry.constraints],
+      allocatedTokens: entry.allocatedTokens,
+    }));
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        ledgerId: binding.ledgerId,
+        recoveryRunId: binding.recoveryRunId,
+        recoveryManifestSha256: binding.recoveryManifestSha256,
+        entries,
+      })
+    )
+    .digest('hex');
+}
 
 function assertExactSet(
   actual: readonly string[],
@@ -150,11 +205,43 @@ function validateRecoveryBinding(
   if (eligible.length !== 6) {
     throw new Error('Recovery binding must contain exactly six eligible audited failures');
   }
+  const coverage = binding.acceptedFailedCoverage;
+  if (!coverage || !UUID_V4_PATTERN.test(coverage.ledgerId)) {
+    throw new Error('Accepted failed coverage ledger ID must be a lowercase UUIDv4');
+  }
+  if (
+    coverage.recoveryRunId !== manifest.run_id ||
+    coverage.recoveryManifestSha256 !== canonicalSha256
+  ) {
+    throw new Error('Accepted failed coverage run binding does not match recovery truth');
+  }
+  if (coverage.fingerprint !== calculateAcceptedFailedCoverageFingerprint(coverage)) {
+    throw new Error('Accepted failed coverage fingerprint is not canonical');
+  }
   assertExactSet(
-    binding.verifiedFailedCoverageFileIds,
+    coverage.entries.map(entry => entry.documentId),
     eligible.map(entry => entry.file_catalog_id),
-    'Verified failed coverage IDs'
+    'Accepted failed coverage IDs'
   );
+  const eligibleById = new Map(eligible.map(entry => [entry.file_catalog_id, entry]));
+  for (const entry of coverage.entries) {
+    const disposition = eligibleById.get(entry.documentId);
+    if (
+      !disposition ||
+      entry.organizationId !== disposition.organization_id ||
+      entry.courseId !== disposition.course_id ||
+      entry.coverageStatus !== 'failed' ||
+      entry.coverageReason !== 'source_file_unrecoverable' ||
+      entry.processingMode !== 'metadata_only' ||
+      entry.summary !== null ||
+      entry.claims.length !== 0 ||
+      entry.terminology.length !== 0 ||
+      entry.constraints.length !== 0 ||
+      entry.allocatedTokens !== 0
+    ) {
+      throw new Error('Accepted failed coverage must contain exact zero-evidence tenant truth');
+    }
+  }
 
   const rowsById = new Map(sourceRows.map(row => [row.id, row]));
   for (const entry of eligible) {
@@ -188,6 +275,8 @@ export function calculateReindexVerificationFingerprint(plan: ReindexPlan): stri
       JSON.stringify({
         recoveryRunId: plan.recoveryRunId,
         recoveryManifestSha256: plan.recoveryManifestSha256,
+        acceptedCoverageLedgerId: plan.acceptedCoverageLedgerId,
+        acceptedCoverageFingerprint: plan.acceptedCoverageFingerprint,
         auditedFailedFileIds: [...plan.auditedFailedFileIds].sort(),
         candidateFileIds: [...plan.candidateFileIds].sort(),
         alreadyEnqueuedFileIds: [...plan.alreadyEnqueuedFileIds].sort(),
@@ -333,6 +422,8 @@ export function buildReindexPlan(
       ? {
           recoveryRunId: validatedBinding.manifest.run_id,
           recoveryManifestSha256: recoveryBinding!.manifestSha256,
+          acceptedCoverageLedgerId: recoveryBinding!.acceptedFailedCoverage.ledgerId,
+          acceptedCoverageFingerprint: recoveryBinding!.acceptedFailedCoverage.fingerprint,
         }
       : {}),
     gaps,

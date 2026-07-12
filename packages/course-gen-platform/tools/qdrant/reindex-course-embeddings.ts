@@ -1,6 +1,17 @@
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import { access, constants, mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
+import {
+  access,
+  constants,
+  link,
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  realpath,
+  rename,
+  unlink,
+} from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,7 +65,6 @@ export interface ReindexCommandOptions {
   targetCollection?: string;
   concurrency?: number;
   jobTimeoutMs?: number;
-  courseId?: string;
   runId?: string;
   artifactPath?: string;
 }
@@ -78,6 +88,8 @@ export interface ReindexExecutionArtifact {
   targetCollection: string;
   recoveryRunId: string;
   recoveryManifestSha256: string;
+  acceptedCoverageLedgerId: string;
+  acceptedCoverageFingerprint: string;
   verificationFingerprint: string;
   status: 'planned' | 'running' | 'completed' | 'failed';
   createdAt: string;
@@ -139,19 +151,20 @@ export interface ReindexCommandDependencies {
   persistRecoveryJournalTransition: (input: {
     expectedRevision: number;
     next: RecoveryProgressJournal;
-  }) => Promise<RecoveryProgressJournal>;
-  loadSources: (courseId?: string) => Promise<ReindexSourceRow[]>;
+  }) => Promise<void>;
+  loadSources: () => Promise<ReindexSourceRow[]>;
   probeSources: (rows: readonly ReindexSourceRow[]) => Promise<ReindexSourceProbeResult>;
   inspectJobs: (jobIds: readonly string[]) => Promise<ReindexRetainedJob[]>;
   verifyPhysicalTarget: (targetCollection: string) => Promise<ReindexSchemaVerification>;
   enqueueJob: (jobId: string, data: DocumentProcessingJobData) => Promise<ReindexJobHandle>;
   removeJob: (jobId: string) => Promise<void>;
   loadArtifact: (artifactPath: string) => Promise<ReindexExecutionArtifact | null>;
-  persistArtifact: (artifact: ReindexExecutionArtifact, artifactPath: string) => Promise<void>;
-  loadIndexedDocuments: (
-    targetCollection: string,
-    courseId?: string
-  ) => Promise<IndexedDocumentIdentity[]>;
+  persistArtifact: (
+    artifact: ReindexExecutionArtifact,
+    artifactPath: string,
+    options: { publication: 'initial' | 'replace' }
+  ) => Promise<void>;
+  loadIndexedDocuments: (targetCollection: string) => Promise<IndexedDocumentIdentity[]>;
   runRelevanceChecks: (
     targetCollection: string,
     expectedSources: readonly ReindexSourceRow[]
@@ -274,6 +287,8 @@ const MAX_CONCURRENCY = 16;
 const DEFAULT_JOB_TIMEOUT_MS = 7_200_000;
 const MIN_JOB_TIMEOUT_MS = 1_000;
 const MAX_JOB_TIMEOUT_MS = 86_400_000;
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const UUID_V4_SCHEMA = z.string().regex(UUID_V4_PATTERN, 'must be a lowercase UUIDv4');
 
 function readCliValue(args: string[], index: number, option: string): [string, number] {
   const value = args[index + 1];
@@ -309,7 +324,6 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
       '--target-collection',
       '--concurrency',
       '--job-timeout-ms',
-      '--course-id',
       '--run-id',
       '--artifact',
       '--fixture',
@@ -327,7 +341,6 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
     if (option === '--target-collection') options.targetCollection = value;
     if (option === '--concurrency') options.concurrency = Number(value);
     if (option === '--job-timeout-ms') options.jobTimeoutMs = Number(value);
-    if (option === '--course-id') options.courseId = value;
     if (option === '--run-id') options.runId = value;
     if (option === '--artifact') options.artifactPath = value;
     if (option === '--fixture') options.fixturePath = value;
@@ -384,8 +397,8 @@ function resolveJobTimeout(value: number | undefined): number {
 
 function validateUuidOption(value: string | undefined, option: string): string | undefined {
   if (value === undefined) return undefined;
-  if (!z.string().uuid().safeParse(value).success) {
-    throw new Error(`${option} must be a UUID`);
+  if (!UUID_V4_PATTERN.test(value)) {
+    throw new Error(`${option} must be a lowercase UUIDv4`);
   }
   return value;
 }
@@ -396,7 +409,7 @@ async function preparePlan(
   recoveryBinding: RecoveryReindexBinding,
   alreadyEnqueuedFileIds: ReadonlySet<string> = new Set()
 ): Promise<PreparedPlan> {
-  const sourceRows = await dependencies.loadSources(options.courseId);
+  const sourceRows = await dependencies.loadSources();
   const sourceProbe = await dependencies.probeSources(sourceRows);
   const rows = sourceRows.map(row => ({
     ...row,
@@ -452,9 +465,12 @@ function assertArtifactRecoveryBinding(
   artifact: ReindexExecutionArtifact,
   plan: ReindexPlan
 ): void {
+  ReindexExecutionArtifactSchema.parse(artifact);
   if (
     artifact.recoveryRunId !== plan.recoveryRunId ||
     artifact.recoveryManifestSha256 !== plan.recoveryManifestSha256 ||
+    artifact.acceptedCoverageLedgerId !== plan.acceptedCoverageLedgerId ||
+    artifact.acceptedCoverageFingerprint !== plan.acceptedCoverageFingerprint ||
     artifact.verificationFingerprint !== plan.verificationFingerprint
   ) {
     throw new Error('Run artifact recovery binding or verification fingerprint is stale');
@@ -471,21 +487,86 @@ function assertArtifactRecoveryBinding(
   ) {
     throw new Error('Run artifact audited recovery counts are stale');
   }
+  const expectedPlannedJobIds = plan.candidateFileIds
+    .map(fileId => buildReindexJobId(artifact.runId, fileId))
+    .sort();
+  if (JSON.stringify(artifact.plannedJobIds) !== JSON.stringify(expectedPlannedJobIds)) {
+    throw new Error('Run artifact planned ledger IDs do not match the current fingerprint');
+  }
 }
 
 function assertRecoveryPhase(
   binding: RecoveryReindexBinding,
-  artifact: ReindexExecutionArtifact | null
+  artifact: ReindexExecutionArtifact | null,
+  mode: ReindexCommandMode
 ): void {
-  if (artifact) {
-    if (binding.journal.phase !== 'reindex_started') {
-      throw new Error('A resumed reindex requires a reindex_started recovery journal');
+  if (mode === 'plan') {
+    if (!artifact && binding.journal.phase !== 'verified') {
+      throw new Error('A fresh plan requires a verified recovery journal');
+    }
+    if (
+      artifact &&
+      binding.journal.phase !== 'reindex_started' &&
+      binding.journal.phase !== 'complete'
+    ) {
+      throw new Error('A resumed plan requires reindex_started or complete recovery state');
     }
     return;
   }
-  if (binding.journal.phase !== 'verified') {
-    throw new Error('A fresh reindex requires a verified recovery journal');
+  if (mode === 'execute') {
+    if (!artifact && binding.journal.phase === 'verified') return;
+    if (artifact?.status === 'planned' && binding.journal.phase === 'verified') return;
+    if (artifact && binding.journal.phase === 'reindex_started') return;
+    if (binding.journal.phase === 'complete') {
+      throw new Error('Execute is forbidden after the recovery run is complete');
+    }
+    throw new Error('Execute recovery phase does not match its durable ledger');
   }
+  if (!artifact || artifact.status !== 'completed') {
+    throw new Error('Verify requires an exact terminal-success ledger');
+  }
+  if (binding.journal.phase !== 'reindex_started' && binding.journal.phase !== 'complete') {
+    throw new Error('Verify requires reindex_started or complete recovery state');
+  }
+}
+
+function canonicalJournal(journal: RecoveryProgressJournal): string {
+  const sortRecord = (record: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right)));
+  return JSON.stringify({
+    ...journal,
+    copy_states: sortRecord(journal.copy_states),
+    disposition_kinds: sortRecord(journal.disposition_kinds),
+    disposition_states: sortRecord(journal.disposition_states),
+  });
+}
+
+async function persistAndReloadRecoveryJournal(
+  dependencies: ReindexCommandDependencies,
+  prepared: PreparedPlan,
+  current: RecoveryReindexBinding,
+  next: RecoveryProgressJournal
+): Promise<RecoveryReindexBinding> {
+  await dependencies.persistRecoveryJournalTransition({
+    expectedRevision: current.journal.revision,
+    next,
+  });
+  const reloaded = await dependencies.loadRecoveryBinding();
+  if (!reloaded || canonicalJournal(reloaded.journal) !== canonicalJournal(next)) {
+    throw new Error('Persisted recovery journal reload did not confirm the exact transition');
+  }
+  const confirmedPlan = buildReindexPlan(
+    prepared.rows,
+    row =>
+      prepared.sourceProbe.invalidPathFileIds.has(row.id)
+        ? 'invalid_source_path'
+        : prepared.sourceProbe.availableFileIds.has(row.id),
+    reloaded
+  );
+  if (confirmedPlan.verificationFingerprint !== prepared.plan.verificationFingerprint) {
+    throw new Error('Persisted recovery journal reload changed the verified recovery binding');
+  }
+  return reloaded;
 }
 
 async function mapWithConcurrency<T>(
@@ -540,7 +621,7 @@ async function executeReindex(
   if (getReindexPlanExitCode(basePrepared.plan) === 2) {
     return { exitCode: 2, report: basePrepared.plan };
   }
-  assertRecoveryPhase(recoveryBinding, loadedArtifact);
+  assertRecoveryPhase(recoveryBinding, loadedArtifact, 'execute');
   if (loadedArtifact) assertArtifactRecoveryBinding(loadedArtifact, basePrepared.plan);
   const schema = await dependencies.verifyPhysicalTarget(targetCollection);
   if (!schema.ok) {
@@ -638,8 +719,10 @@ async function executeReindex(
     targetCollection,
     recoveryRunId: basePrepared.plan.recoveryRunId!,
     recoveryManifestSha256: basePrepared.plan.recoveryManifestSha256!,
+    acceptedCoverageLedgerId: basePrepared.plan.acceptedCoverageLedgerId!,
+    acceptedCoverageFingerprint: basePrepared.plan.acceptedCoverageFingerprint!,
     verificationFingerprint: calculateReindexVerificationFingerprint(basePrepared.plan),
-    status: 'planned',
+    status: loadedArtifact?.status ?? 'planned',
     createdAt,
     updatedAt: dependencies.now().toISOString(),
     concurrency,
@@ -670,8 +753,9 @@ async function executeReindex(
   };
 
   let checkpointChain = Promise.resolve();
+  let artifactPublished = loadedArtifact !== null;
   const checkpoint = async (status: ReindexExecutionArtifact['status']): Promise<void> => {
-    artifact.status = artifact.status === 'failed' || status === 'failed' ? 'failed' : status;
+    artifact.status = failures.size > 0 || status === 'failed' ? 'failed' : status;
     artifact.updatedAt = dependencies.now().toISOString();
     artifact.acceptedJobIds = [...acceptedJobIds].sort();
     artifact.completedJobIds = [...completedJobIds].sort();
@@ -685,28 +769,29 @@ async function executeReindex(
       jobId => !completedJobIds.has(jobId) && !failures.has(jobId)
     ).length;
     const snapshot = structuredClone(artifact);
-    checkpointChain = checkpointChain.then(() =>
-      dependencies.persistArtifact(snapshot, artifactPath)
-    );
+    checkpointChain = checkpointChain.then(async () => {
+      await dependencies.persistArtifact(snapshot, artifactPath, {
+        publication: artifactPublished ? 'replace' : 'initial',
+      });
+      artifactPublished = true;
+    });
     await checkpointChain;
   };
 
-  await checkpoint('planned');
+  await checkpoint(loadedArtifact?.status ?? 'planned');
 
-  if (!loadedArtifact) {
+  if (recoveryBinding.journal.phase === 'verified') {
     const nextJournal = validateRecoveryJournalTransition(recoveryBinding.journal, {
       ...recoveryBinding.journal,
       revision: recoveryBinding.journal.revision + 1,
       phase: 'reindex_started',
     });
-    const persisted = await dependencies.persistRecoveryJournalTransition({
-      expectedRevision: recoveryBinding.journal.revision,
-      next: nextJournal,
-    });
-    if (JSON.stringify(persisted) !== JSON.stringify(nextJournal)) {
-      throw new Error('Persisted reindex_started recovery journal was not confirmed');
-    }
-    recoveryBinding.journal = persisted;
+    recoveryBinding = await persistAndReloadRecoveryJournal(
+      dependencies,
+      basePrepared,
+      recoveryBinding,
+      nextJournal
+    );
   }
 
   const freshCandidateIds = new Set(prepared.plan.candidateFileIds);
@@ -823,12 +908,12 @@ async function verifyReindex(
   if (getReindexPlanExitCode(prepared.plan) === 2) {
     return { exitCode: 2, report: prepared.plan };
   }
-  assertRecoveryPhase(recoveryBinding, artifact);
+  assertRecoveryPhase(recoveryBinding, artifact, 'verify');
   assertArtifactRecoveryBinding(artifact, prepared.plan);
   const expectedSources = selectExpectedSources(prepared);
   const [schemaVerification, indexedDocuments, relevanceChecks] = await Promise.all([
     dependencies.verifyPhysicalTarget(targetCollection),
-    dependencies.loadIndexedDocuments(targetCollection, options.courseId),
+    dependencies.loadIndexedDocuments(targetCollection),
     dependencies.runRelevanceChecks(targetCollection, expectedSources),
   ]);
   const verification = verifyReindexParity({
@@ -839,6 +924,14 @@ async function verifyReindex(
   });
   const report = { ...verification, gaps: prepared.plan.gaps };
   if (!verification.ok) return { exitCode: 1, report };
+  if (recoveryBinding.journal.phase === 'reindex_started') {
+    const completeJournal = validateRecoveryJournalTransition(recoveryBinding.journal, {
+      ...recoveryBinding.journal,
+      revision: recoveryBinding.journal.revision + 1,
+      phase: 'complete',
+    });
+    await persistAndReloadRecoveryJournal(dependencies, prepared, recoveryBinding, completeJournal);
+  }
   return {
     exitCode: getReindexPlanExitCode(prepared.plan),
     report,
@@ -850,7 +943,6 @@ export async function runReindexCommand(
   dependencies: ReindexCommandDependencies
 ): Promise<ReindexCommandResult> {
   validateUuidOption(options.runId, '--run-id');
-  validateUuidOption(options.courseId, '--course-id');
   if (options.mode === 'plan') {
     const recoveryBinding = await requireRecoveryBinding(dependencies);
     let prepared = await preparePlan(options, dependencies, recoveryBinding);
@@ -863,7 +955,7 @@ export async function runReindexCommand(
         );
       }
       if (ledger) {
-        assertRecoveryPhase(recoveryBinding, ledger);
+        assertRecoveryPhase(recoveryBinding, ledger, 'plan');
         assertArtifactRecoveryBinding(ledger, prepared.plan);
         const failedJobIds = new Set(ledger.failures.map(failure => failure.jobId));
         const acceptedFileIds = new Set(
@@ -876,9 +968,9 @@ export async function runReindexCommand(
         );
         prepared = rebuildPreparedPlan(prepared, acceptedFileIds);
       }
-      assertRecoveryPhase(recoveryBinding, ledger);
+      assertRecoveryPhase(recoveryBinding, ledger, 'plan');
     } else {
-      assertRecoveryPhase(recoveryBinding, null);
+      assertRecoveryPhase(recoveryBinding, null, 'plan');
     }
     return {
       exitCode: getReindexPlanExitCode(prepared.plan),
@@ -917,7 +1009,7 @@ const ReindexFixtureSourceSchema = z.object({
 });
 
 const ReindexDryFixtureSchema = z.object({
-  runId: z.string().uuid().optional(),
+  runId: UUID_V4_SCHEMA.optional(),
   now: z.string().datetime().optional(),
   sources: z.array(ReindexFixtureSourceSchema),
   schemaVerification: z.object({
@@ -945,73 +1037,248 @@ const ReindexDryFixtureSchema = z.object({
   ),
 });
 
-const ReindexExecutionArtifactSchema = z.object({
-  schemaVersion: z.literal(3),
-  mode: z.literal('execute'),
-  runId: z.string().uuid(),
-  targetCollection: z.string().min(1).max(255),
-  recoveryRunId: z.string().uuid(),
-  recoveryManifestSha256: z.string().regex(/^[a-f0-9]{64}$/u),
-  verificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
-  status: z.enum(['planned', 'running', 'completed', 'failed']),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  concurrency: z.number().int().min(1).max(MAX_CONCURRENCY),
-  jobTimeoutMs: z.number().int().min(MIN_JOB_TIMEOUT_MS).max(MAX_JOB_TIMEOUT_MS),
-  counts: z.object({
-    eligible: z.number().int().nonnegative(),
-    recoverable: z.number().int().nonnegative(),
-    auditedFailed: z.number().int().nonnegative(),
-    unresolvedMissing: z.number().int().nonnegative(),
-    unresolvedInvalid: z.number().int().nonnegative(),
-    expectedDocuments: z.number().int().nonnegative(),
-    planned: z.number().int().nonnegative(),
-    accepted: z.number().int().nonnegative(),
-    completed: z.number().int().nonnegative(),
-    failed: z.number().int().nonnegative(),
-    pending: z.number().int().nonnegative(),
-    alreadyEnqueued: z.number().int().nonnegative(),
-    missingSource: z.number().int().nonnegative(),
-    invalidSourcePath: z.number().int().nonnegative(),
-    unsupported: z.number().int().nonnegative(),
-    gaps: z.number().int().nonnegative(),
-  }),
-  plannedJobIds: z.array(z.string().min(1)),
-  acceptedJobIds: z.array(z.string().min(1)),
-  completedJobIds: z.array(z.string().min(1)),
-  failures: z.array(
-    z.object({
-      jobId: z.string().min(1),
-      fileId: z.string().min(1),
-      phase: z.enum(['enqueue', 'terminal', 'timeout']),
-    })
-  ),
-  gaps: z.array(
-    z.object({
-      fileId: z.string().min(1),
-      reason: z.enum([
-        'missing_course',
-        'missing_user',
-        'organization_mismatch',
-        'invalid_source_path',
-        'source_missing',
-        'unsupported_mime',
-      ]),
-    })
-  ),
-});
+function isUniqueSorted(values: readonly string[]): boolean {
+  return (
+    new Set(values).size === values.length &&
+    values.every((value, index) => index === 0 || values[index - 1] < value)
+  );
+}
+
+const ReindexExecutionArtifactSchema = z
+  .object({
+    schemaVersion: z.literal(3),
+    mode: z.literal('execute'),
+    runId: UUID_V4_SCHEMA,
+    targetCollection: z.string().min(1).max(255),
+    recoveryRunId: UUID_V4_SCHEMA,
+    recoveryManifestSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    acceptedCoverageLedgerId: UUID_V4_SCHEMA,
+    acceptedCoverageFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    verificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    status: z.enum(['planned', 'running', 'completed', 'failed']),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    concurrency: z.number().int().min(1).max(MAX_CONCURRENCY),
+    jobTimeoutMs: z.number().int().min(MIN_JOB_TIMEOUT_MS).max(MAX_JOB_TIMEOUT_MS),
+    counts: z
+      .object({
+        eligible: z.number().int().nonnegative(),
+        recoverable: z.number().int().nonnegative(),
+        auditedFailed: z.number().int().nonnegative(),
+        unresolvedMissing: z.number().int().nonnegative(),
+        unresolvedInvalid: z.number().int().nonnegative(),
+        expectedDocuments: z.number().int().nonnegative(),
+        planned: z.number().int().nonnegative(),
+        accepted: z.number().int().nonnegative(),
+        completed: z.number().int().nonnegative(),
+        failed: z.number().int().nonnegative(),
+        pending: z.number().int().nonnegative(),
+        alreadyEnqueued: z.number().int().nonnegative(),
+        missingSource: z.number().int().nonnegative(),
+        invalidSourcePath: z.number().int().nonnegative(),
+        unsupported: z.number().int().nonnegative(),
+        gaps: z.number().int().nonnegative(),
+      })
+      .strict(),
+    plannedJobIds: z.array(z.string().min(1)),
+    acceptedJobIds: z.array(z.string().min(1)),
+    completedJobIds: z.array(z.string().min(1)),
+    failures: z.array(
+      z
+        .object({
+          jobId: z.string().min(1),
+          fileId: z.string().min(1),
+          phase: z.enum(['enqueue', 'terminal', 'timeout']),
+        })
+        .strict()
+    ),
+    gaps: z.array(
+      z
+        .object({
+          fileId: z.string().min(1),
+          reason: z.enum([
+            'missing_course',
+            'missing_user',
+            'organization_mismatch',
+            'invalid_source_path',
+            'source_missing',
+            'unsupported_mime',
+          ]),
+        })
+        .strict()
+    ),
+  })
+  .strict()
+  .superRefine((artifact, context) => {
+    const issue = (message: string): void => {
+      context.addIssue({ code: 'custom', message });
+    };
+    if (!isUniqueSorted(artifact.plannedJobIds))
+      issue('planned ledger IDs must be unique and sorted');
+    if (!isUniqueSorted(artifact.acceptedJobIds))
+      issue('accepted ledger IDs must be unique and sorted');
+    if (!isUniqueSorted(artifact.completedJobIds))
+      issue('completed ledger IDs must be unique and sorted');
+    const planned = new Set(artifact.plannedJobIds);
+    const accepted = new Set(artifact.acceptedJobIds);
+    const completed = new Set(artifact.completedJobIds);
+    if ([...accepted].some(jobId => !planned.has(jobId)))
+      issue('accepted ledger IDs must be planned');
+    if ([...completed].some(jobId => !accepted.has(jobId)))
+      issue('completed ledger IDs must be accepted');
+    const failureIds = artifact.failures.map(failure => failure.jobId);
+    if (!isUniqueSorted(failureIds)) issue('failure ledger IDs must be unique and sorted');
+    if (failureIds.some(jobId => !planned.has(jobId))) issue('failure ledger IDs must be planned');
+    if (failureIds.some(jobId => completed.has(jobId)))
+      issue('completed and failed ledger IDs must be disjoint');
+    for (const failure of artifact.failures) {
+      if (failure.phase === 'enqueue' && accepted.has(failure.jobId)) {
+        issue('enqueue failures cannot be accepted');
+      }
+      if (failure.phase !== 'enqueue' && !accepted.has(failure.jobId)) {
+        issue('terminal failures must have been accepted');
+      }
+    }
+    const pending = artifact.plannedJobIds.filter(
+      jobId => !completed.has(jobId) && !failureIds.includes(jobId)
+    ).length;
+    if (
+      artifact.counts.planned !== artifact.plannedJobIds.length ||
+      artifact.counts.accepted !== artifact.acceptedJobIds.length ||
+      artifact.counts.completed !== artifact.completedJobIds.length ||
+      artifact.counts.failed !== artifact.failures.length ||
+      artifact.counts.pending !== pending ||
+      artifact.counts.gaps !== artifact.gaps.length
+    ) {
+      issue('ledger counts must exactly match durable arrays');
+    }
+    if (
+      artifact.status === 'planned' &&
+      (artifact.counts.accepted !== 0 ||
+        artifact.counts.completed !== 0 ||
+        artifact.counts.failed !== 0)
+    ) {
+      issue('planned ledger status requires untouched jobs');
+    }
+    if (artifact.status === 'running' && artifact.counts.failed !== 0) {
+      issue('running ledger status cannot contain failures');
+    }
+    if (
+      artifact.status === 'completed' &&
+      (artifact.counts.failed !== 0 ||
+        artifact.counts.pending !== 0 ||
+        artifact.counts.completed !== artifact.counts.planned)
+    ) {
+      issue('completed ledger status requires exact terminal success');
+    }
+    if (
+      artifact.status === 'failed' &&
+      artifact.counts.failed === 0 &&
+      artifact.counts.pending === 0
+    ) {
+      issue('failed ledger status requires a failure or pending work');
+    }
+  });
+
+export interface ReindexArtifactWriteHandle {
+  writeFile(content: string, encoding: 'utf8'): Promise<void>;
+  chmod(mode: number): Promise<void>;
+  sync(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface ReindexArtifactDirectoryHandle {
+  sync(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface ReindexArtifactWriteOperations {
+  mkdir(directory: string): Promise<unknown>;
+  assertSecureDirectory(directory: string): Promise<void>;
+  openTemporary(path: string, mode: number): Promise<ReindexArtifactWriteHandle>;
+  link(from: string, to: string): Promise<unknown>;
+  rename(from: string, to: string): Promise<unknown>;
+  openDirectory(directory: string): Promise<ReindexArtifactDirectoryHandle>;
+  unlink(path: string): Promise<unknown>;
+}
+
+const defaultArtifactWriteOperations: ReindexArtifactWriteOperations = {
+  mkdir: directory => mkdir(directory, { recursive: true, mode: 0o700 }),
+  async assertSecureDirectory(directory) {
+    const metadata = await lstat(directory);
+    const expectedUid = process.getuid?.();
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new Error('Reindex state directory must be a secure real directory');
+    }
+    if ((metadata.mode & 0o777) !== 0o700) {
+      throw new Error('Reindex state directory must have mode 0700');
+    }
+    if (expectedUid !== undefined && metadata.uid !== expectedUid) {
+      throw new Error('Reindex state directory must be owned by the current executor');
+    }
+  },
+  openTemporary: (path, mode) => open(path, 'wx', mode),
+  link,
+  rename,
+  openDirectory: directory => open(directory, 'r'),
+  unlink,
+};
+
+async function fsyncArtifactDirectory(
+  directory: string,
+  operations: ReindexArtifactWriteOperations
+): Promise<void> {
+  const handle = await operations.openDirectory(directory);
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
 
 export async function persistExecutionArtifact(
   artifact: ReindexExecutionArtifact,
-  artifactPath: string
+  artifactPath: string,
+  options: {
+    publication: 'initial' | 'replace';
+    operations?: ReindexArtifactWriteOperations;
+  }
 ): Promise<void> {
-  await mkdir(dirname(artifactPath), { recursive: true });
-  const temporaryPath = `${artifactPath}.${process.pid}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify(artifact, null, 2)}\n`, {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
-  await rename(temporaryPath, artifactPath);
+  const normalized = ReindexExecutionArtifactSchema.parse(artifact);
+  const operations = options.operations ?? defaultArtifactWriteOperations;
+  const directory = dirname(artifactPath);
+  await operations.mkdir(directory);
+  await operations.assertSecureDirectory(directory);
+  const temporaryPath = `${artifactPath}.${process.pid}.${randomUUID()}.tmp`;
+  const handle = await operations.openTemporary(temporaryPath, 0o600);
+  let closed = false;
+  try {
+    await handle.writeFile(`${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+    await handle.chmod(0o600);
+    await handle.sync();
+    await handle.close();
+    closed = true;
+    if (options.publication === 'initial') {
+      try {
+        await operations.link(temporaryPath, artifactPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          throw new Error('Reindex run ledger already exists', { cause: error });
+        }
+        throw error;
+      }
+      await fsyncArtifactDirectory(directory, operations);
+      await operations.unlink(temporaryPath);
+      await fsyncArtifactDirectory(directory, operations);
+    } else {
+      await operations.rename(temporaryPath, artifactPath);
+      await fsyncArtifactDirectory(directory, operations);
+    }
+  } catch (error) {
+    if (!closed) await handle.close().catch(() => undefined);
+    await operations.unlink(temporaryPath).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function loadExecutionArtifact(
@@ -1032,6 +1299,7 @@ export async function loadReindexFixtureDependencies(
   const fixture = ReindexDryFixtureSchema.parse(
     JSON.parse(await readFile(fixturePath, 'utf8')) as unknown
   );
+  let currentRecoveryBinding = structuredClone(fixture.recoveryBinding);
   const availableIds = new Set(
     fixture.sources.filter(source => source.sourceAvailable).map(source => source.id)
   );
@@ -1044,12 +1312,12 @@ export async function loadReindexFixtureDependencies(
   );
 
   return {
-    loadRecoveryBinding: () => Promise.resolve(fixture.recoveryBinding),
-    persistRecoveryJournalTransition: ({ next }) => Promise.resolve(next),
-    loadSources: courseId =>
-      Promise.resolve(
-        sources.filter(source => courseId === undefined || source.courseId === courseId)
-      ),
+    loadRecoveryBinding: () => Promise.resolve(structuredClone(currentRecoveryBinding)),
+    persistRecoveryJournalTransition: ({ next }) => {
+      currentRecoveryBinding = { ...currentRecoveryBinding, journal: structuredClone(next) };
+      return Promise.resolve();
+    },
+    loadSources: () => Promise.resolve(sources),
     probeSources: rows =>
       Promise.resolve({
         availableFileIds: new Set(rows.filter(row => availableIds.has(row.id)).map(row => row.id)),
@@ -1067,12 +1335,7 @@ export async function loadReindexFixtureDependencies(
     removeJob: () => Promise.resolve(),
     loadArtifact: loadExecutionArtifact,
     persistArtifact: persistExecutionArtifact,
-    loadIndexedDocuments: (_targetCollection, courseId) =>
-      Promise.resolve(
-        fixture.indexedDocuments.filter(
-          document => courseId === undefined || document.courseId === courseId
-        )
-      ),
+    loadIndexedDocuments: () => Promise.resolve(fixture.indexedDocuments),
     runRelevanceChecks: () => Promise.resolve([...fixture.relevanceChecks]),
     now: () => new Date(fixture.now ?? '2026-01-01T00:00:00.000Z'),
     createRunId: () => fixture.runId ?? randomUUID(),
@@ -1205,7 +1468,6 @@ type ScrollOptions = NonNullable<Parameters<typeof qdrantClient.scroll>[1]>;
 
 export async function loadIndexedDocumentIdentities(
   targetCollection: string,
-  courseId?: string,
   client: Pick<typeof qdrantClient, 'scroll'> = qdrantClient
 ): Promise<IndexedDocumentIdentity[]> {
   const documents = new Map<string, IndexedDocumentIdentity>();
@@ -1217,7 +1479,6 @@ export async function loadIndexedDocumentIdentities(
       offset,
       with_payload: ['document_id', 'course_id', 'organization_id'],
       with_vector: false,
-      ...(courseId ? { filter: { must: [{ key: 'course_id', match: { value: courseId } }] } } : {}),
     });
 
     for (const point of response.points) {
@@ -1357,7 +1618,7 @@ export function createDefaultReindexDependencies(): ReindexCommandDependencies {
     loadRecoveryBinding: () => Promise.resolve(null),
     persistRecoveryJournalTransition: () =>
       Promise.reject(new Error('Recovery journal persistence adapter is not configured')),
-    loadSources: courseId => loadReindexSources(createSourceDatabase(), courseId),
+    loadSources: () => loadReindexSources(createSourceDatabase()),
     probeSources: probeSourceFiles,
     ...queueAdapter,
     verifyPhysicalTarget: async targetCollection => {
@@ -1383,7 +1644,6 @@ Options:
   --target-collection <name>  Required physical collection for execute/verify
   --concurrency <count>       Bounded in-flight Stage 2 jobs (default: 2, max: 16)
   --job-timeout-ms <ms>       Per-job terminal wait (default: 7200000, max: 86400000)
-  --course-id <uuid>          Limit source and parity checks to one course
   --run-id <uuid>             Reuse a durable run identity for idempotent execute
   --artifact <path>           Execute artifact output path
   --fixture <path>            Fully local dry fixture; no live adapters are constructed
@@ -1402,10 +1662,41 @@ function formatHumanSummary(options: ReindexCommandOptions, report: ReindexComma
   }
   if (options.mode === 'execute') {
     const execution = report as Extract<ReindexCommandReport, { runId: string; enqueued: number }>;
-    return `EXECUTE status=${execution.ok ? 'ok' : 'failed'} target=${execution.targetCollection} run=${execution.runId} enqueued=${execution.enqueued} completed=${execution.completed} failed=${execution.failed} pending=${execution.pending} gaps=${execution.gaps.length} action=${execution.ok ? 'verify' : 'resume-run'}\n`;
+    return `EXECUTE status=${execution.ok ? 'ok' : 'failed'} target=${execution.targetCollection} enqueued=${execution.enqueued} completed=${execution.completed} failed=${execution.failed} pending=${execution.pending} gaps=${execution.gaps.length} action=${execution.ok ? 'verify' : 'resume-run'}\n`;
   }
   const verification = report as ReindexVerificationResult & { gaps: ReindexPlan['gaps'] };
   return `VERIFY status=${verification.ok ? 'ok' : 'failed'} target=${options.targetCollection ?? 'missing'} expected_documents=${verification.expectedDocuments} indexed_documents=${verification.indexedDocuments} expected_points=${verification.expectedKnownPoints} indexed_points=${verification.indexedPoints} gaps=${verification.gaps.length} action=${verification.ok ? 'review-cutover' : 'repair'}\n`;
+}
+
+function classifyCliError(error: unknown): string {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  if (message.includes('retained bullmq job')) return 'retained_job_mismatch';
+  if (message.includes('run artifact') || message.includes('ledger')) {
+    return 'artifact_binding_mismatch';
+  }
+  if (
+    message.includes('file_catalog') ||
+    message.includes('source count') ||
+    message.includes('source inventory')
+  ) {
+    return 'source_inventory_invalid';
+  }
+  if (message.includes('fixture') || error instanceof z.ZodError) return 'fixture_invalid';
+  if (message.includes('recovery journal') || message.includes('persisted')) {
+    return 'journal_persistence_failed';
+  }
+  if (message.includes('recovery binding') || message.includes('coverage')) {
+    return 'recovery_binding_invalid';
+  }
+  if (
+    message.includes('unknown option') ||
+    message.includes('mode') ||
+    message.includes('run-id') ||
+    message.includes('target-collection')
+  ) {
+    return 'invalid_arguments';
+  }
+  return 'internal';
 }
 
 function countGapReasons(gaps: ReindexPlan['gaps']): Record<string, number> {
@@ -1464,16 +1755,18 @@ export async function runReindexCli(
   args: string[],
   runtime: ReindexCliRuntime
 ): Promise<0 | 1 | 2> {
-  const options = parseReindexCliArgs(args);
-  if (options.help) {
-    runtime.stdout(REINDEX_HELP);
-    return 0;
-  }
-
-  const dependencies = options.fixturePath
-    ? await runtime.loadFixtureDependencies(options.fixturePath)
-    : runtime.createDefaultDependencies();
+  let dependencies: ReindexCommandDependencies | undefined;
+  let exitCode: 0 | 1 | 2 = 1;
+  let errorReported = false;
   try {
+    const options = parseReindexCliArgs(args);
+    if (options.help) {
+      runtime.stdout(REINDEX_HELP);
+      return 0;
+    }
+    dependencies = options.fixturePath
+      ? await runtime.loadFixtureDependencies(options.fixturePath)
+      : runtime.createDefaultDependencies();
     const result = await runReindexCommand(options, dependencies);
     runtime.stderr(formatHumanSummary(options, result.report));
     runtime.stdout(
@@ -1487,10 +1780,18 @@ export async function runReindexCli(
         2
       )}\n`
     );
-    return result.exitCode;
-  } finally {
-    await dependencies.close?.();
+    exitCode = result.exitCode;
+  } catch (error) {
+    runtime.stderr(`REINDEX_ERROR code=${classifyCliError(error)}\n`);
+    errorReported = true;
   }
+  try {
+    await dependencies?.close?.();
+  } catch {
+    if (!errorReported) runtime.stderr('REINDEX_ERROR code=internal\n');
+    exitCode = 1;
+  }
+  return exitCode;
 }
 
 function isDirectExecution(metaUrl: string, argvPath = process.argv[1]): boolean {
@@ -1509,9 +1810,7 @@ if (isDirectExecution(import.meta.url)) {
       process.exitCode = exitCode;
     })
     .catch(error => {
-      process.stderr.write(
-        `Qdrant reindex command failed: ${error instanceof Error ? error.message : String(error)}\n`
-      );
+      process.stderr.write(`REINDEX_ERROR code=${classifyCliError(error)}\n`);
       process.exitCode = 1;
     })
     .finally(async () => closeQueue());

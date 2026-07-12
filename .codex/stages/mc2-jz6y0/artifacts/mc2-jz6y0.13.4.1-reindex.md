@@ -45,8 +45,9 @@ parallel_decision: sequential within stream - plan and execution share one recov
 status: returned
 delivery_method: merge
 accepted_by_orchestrator: no
-cleanup_status: cleaned
-cleanup_notes: all temporary dependency symlinks were removed before commit; tracked write zone only remains
+resolves_review: b82a09f8
+cleanup_status: pending
+cleanup_notes: local dependency symlinks are removed before commit; branch/worktree cleanup waits for root acceptance
 risk_level: high
 docs_impact: api-contract
 docs_reviewed: no-change-needed
@@ -54,18 +55,21 @@ docs_review_notes: behavior implements the already approved Q12 design; durable 
 graph_reviewed: blocked
 graph_review_notes: Graphify data is absent in this isolated worktree and parent integration owns the safe post-merge graph refresh
 verification:
-  - baseline focused reindex tests: passed 41/41
-  - plan RED: passed with 4 expected contract failures
-  - plan GREEN: passed 18/18
-  - schema-v3 and binding RED: passed with expected binding, schema, ordering, and resume failures
-  - schema-v3 and binding GREEN: passed 47/47
-  - stop-rule RED: passed with 4 expected side-effect and stale-ledger failures
-  - aggregate-only CLI RED: passed by reproducing full identity and hash exposure
-  - focused reindex GREEN after corrections: passed 52/52
-  - core plus reindex regression: passed 70/70
-  - package type-check: passed
+  - durability and ledger-coherence RED: 6 expected failures
+  - durability and ledger-coherence GREEN: passed 7/7
+  - journal reload, crash-state, and terminal-phase RED: 3 expected failures
+  - journal reload, crash-state, and terminal-phase GREEN: passed 3/3
+  - accepted failed-coverage binding RED: 2 expected failures
+  - accepted failed-coverage binding GREEN: passed 2/2
+  - lowercase UUIDv4 and course-scope removal RED: 4 expected failures
+  - lowercase UUIDv4 and course-scope removal GREEN: passed 4/4
+  - bounded CLI output and errors RED: 5 expected failures
+  - bounded CLI output and errors GREEN: passed 5/5
+  - focused reindex command regression after review corrections: passed 56/56
+  - core plus reindex regression: passed 93/93
+  - package type-check: passed via direct equivalent Node tsc after pnpm shim EACCES
   - focused Prettier and git diff check: passed
-  - self code-review: passed with P0/P1/P2/P3 zero after aggregate-only CLI correction
+  - self code-review: passed after correcting failed-ledger retry and cleanup-error bounding
 changed_files:
   - packages/course-gen-platform/tools/qdrant/reindex-plan.ts
   - packages/course-gen-platform/tools/qdrant/reindex-course-embeddings.ts
@@ -86,26 +90,31 @@ zero. Generic failed status or error text never qualifies by itself.
 
 Every command mode requires an injected recovery binding. The planner
 recomputes the canonical immutable-manifest digest and checks the progress
-journal binding, exact verified disposition and failed-coverage sets, and exact
-row owner/course/hash/path/status/error predicates. Candidate and parity IDs
-contain only recoverable documents. CLI output is aggregate-only and excludes
-source paths, full identities, manifest hashes, and verification fingerprints.
+journal binding, exact verified dispositions, and a typed accepted Stage 4
+failed-coverage ledger bound to its lowercase UUIDv4, recovery run, manifest
+SHA, canonical fingerprint, tenant/course identities, and zero-evidence fields.
+Candidate and parity IDs contain only recoverable documents. CLI output and all
+error paths are bounded and exclude source paths, full identities, job IDs,
+manifest hashes, and verification fingerprints.
 
-Execution artifacts use schema v3 and persist the recovery run binding, audited
-counts, and deterministic verification fingerprint. Fresh execution accepts
-only a coherent verified journal. Resume accepts reindex_started only when the
-durable artifact has the same binding, fingerprint, and stable audited counts.
-Unresolved gaps block execute and verify before external reads or writes. Fresh
-execution validates and confirms the verified-to-reindex_started journal
-transition before the first queue enqueue.
+Execution artifacts use strict schema v3 and persist recovery and accepted
+coverage bindings, audited counts, exact deterministic job IDs, and a coherent
+status/count/subset ledger. Publication writes a mode-0600 same-directory temp,
+fsyncs it, uses no-replace initial publication, and fsyncs the mode-0700
+current-user-owned state directory. Journal transitions are accepted only after
+an independent reload returns the exact persisted revision and contents. Crash
+states between initial ledger and `reindex_started` are resumable, while stale
+or incoherent ledgers stop before enqueue. Successful parity verification moves
+the journal to unambiguous `complete`; complete plan/verify are idempotent and
+execute is rejected.
 
 # Scope / Routing
 
 No Qdrant API shape changed, so version-sensitive first-party documentation was
 not needed. No database, Stage 4, recovery-core, package, Compose, operator,
 documentation, Beads, or remote runtime state was modified. The accepted Stage
-4 seam remains the injected exact failed-coverage identity set; integration
-will source it from the accepted evidence run and items repository.
+4 seam is a typed failed-coverage binding in the reindex files; integration
+will source it from the accepted evidence run and item repositories.
 
 # Verification
 
@@ -120,7 +129,8 @@ checks pass.
 
 The branch is prepared for parent review and merge. No live database, Qdrant,
 queue, filesystem recovery, reindex, deploy, or staging operation was invoked.
-All temporary dependency links were removed before commit.
+Temporary dependency links are removed before commit; branch/worktree cleanup
+remains pending until root acceptance.
 
 # Risks / Follow-ups / Explicit Defers
 
