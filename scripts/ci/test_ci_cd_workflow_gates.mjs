@@ -98,9 +98,7 @@ for (const requiredLine of [
   'QDRANT_URL=http://qdrant:6333',
   'QDRANT_API_KEY_FILE=/opt/megacampus/secrets/qdrant_api_key',
   'QDRANT_READ_ONLY_API_KEY_FILE=/opt/megacampus/secrets/qdrant_read_only_api_key',
-  'QDRANT_S3_BUCKET=${{ secrets.QDRANT_S3_BUCKET }}',
-  'QDRANT_S3_REGION=${{ secrets.QDRANT_S3_REGION }}',
-  'QDRANT_S3_ENDPOINT_URL=${{ secrets.QDRANT_S3_ENDPOINT_URL }}',
+  'QDRANT_SNAPSHOT_STORAGE_MODE=local',
   'PROMETHEUS_QDRANT_READ_ONLY_API_KEY_FILE=/opt/megacampus/secrets/prometheus_qdrant_read_only_api_key',
   'GRAFANA_ADMIN_PASSWORD_FILE=/opt/megacampus/secrets/grafana_admin_password',
   'ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE=/opt/megacampus/secrets/alertmanager_telegram_bot_token',
@@ -120,8 +118,6 @@ assert(createQdrantSecrets, 'staging deploy must materialize Qdrant secret files
 for (const sharedSecret of [
   'QDRANT_API_KEY',
   'QDRANT_READ_ONLY_API_KEY',
-  'QDRANT_S3_ACCESS_KEY',
-  'QDRANT_S3_SECRET_KEY',
   'GRAFANA_ADMIN_PASSWORD',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_CHAT_ID',
@@ -129,6 +125,19 @@ for (const sharedSecret of [
   assert(
     createQdrantSecretsStep?.env?.[sharedSecret] === `\${{ secrets.${sharedSecret} }}`,
     `staging secret materialization must use GitHub ${sharedSecret}`
+  );
+}
+for (const forbiddenS3Input of [
+  'QDRANT_S3_BUCKET',
+  'QDRANT_S3_REGION',
+  'QDRANT_S3_ENDPOINT_URL',
+  'QDRANT_S3_ACCESS_KEY',
+  'QDRANT_S3_SECRET_KEY',
+]) {
+  assert(
+    !createProductionEnv.includes(forbiddenS3Input) &&
+      !createQdrantSecrets.includes(forbiddenS3Input),
+    `local staging snapshot mode must not require ${forbiddenS3Input}`
   );
 }
 assert(
