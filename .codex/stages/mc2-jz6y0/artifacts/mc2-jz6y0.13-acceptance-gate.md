@@ -581,3 +581,158 @@ three Compose renders using the literal generated production environment.
 Previous Q12 blockers for exact remote evidence migrations, protected live
 smoke/recovery probe, and durable staging rollout decision remain outside this
 commit and are not resolved by it.
+
+# Remediation review e7130b3e
+
+**Scope:** independent read-only review of `bcfc6b71..e7130b3e`. Line numbers
+below refer to tree `e7130b3e`. The approved Qdrant design, operator runbook and
+`authoritative-docs.md` were reread; no external web source was used. **Verdict:
+Ready — no.** P0: 0, P1: 3, P2: 2, P3: 0. Full-SHA publication, registry
+digest resolution, pre-switch transaction refusal, monitoring change detection,
+and exact-consumer secret ownership are materially improved, but the rollback
+snapshot remains destructible and the first cutover cannot execute its promised
+post-switch rollback.
+
+## Findings
+
+### P1 — the first Q12 rollback snapshot cannot render the new Compose contract
+
+- **Confidence:** high.
+- **Evidence:** forward deployment backfills only `WEB_IMAGE` and `API_IMAGE`
+  into the current color (`scripts/deploy_blue_green.sh:268-274`). It never
+  copies the newly mandatory metrics path/GID or the selected local-Qdrant
+  contract into that previous-color snapshot. Rollback then renders that old
+  file directly (`scripts/rollback_blue_green.sh:64-88,131-137`), while the API
+  Compose now requires `QDRANT_METRICS_GID` and
+  `QDRANT_METRICS_TEXTFILE_HOST_DIR` (`docker-compose.app.yml:54-78`). The
+  generated production environment contains those values only in the new base
+  file (`.github/workflows/ci-cd.yml:747-798`).
+- **Fresh reproduction:** rendering the target app Compose with an otherwise
+  valid legacy color file plus exact web/API digests exits `1` before container
+  creation: `required variable QDRANT_METRICS_GID is missing a value` (the same
+  run can stop first at the required metrics path depending on interpolation
+  order). All three renders with the complete new synthetic environment pass.
+- **Impact:** the first post-switch failure cannot restore web/API/main worker/
+  Stage 6. In the actual first self-hosted cutover, the legacy color may also
+  retain the lost Cloud endpoint, so merely making it render would still risk
+  promoting a known unusable RAG configuration.
+- **Required fix:** before traffic switch, construct and validate a complete
+  previous-color rollback snapshot: prior immutable images plus an explicitly
+  approved, usable Q12 runtime contract. Render both app and worker Compose from
+  it and reject a retired Cloud hostname. If no usable prior Qdrant target exists,
+  encode that as a fail-closed paused recovery state rather than advertising
+  automatic rollback as available.
+
+### P1 — a bridge-only deployment destroys the accepted rollback target
+
+- **Confidence:** high.
+- **Evidence:** `.env.$NEW_COLOR` is unconditionally replaced from
+  `.env.production` before `APP_DEPLOY_NEEDED` is checked
+  (`scripts/deploy_blue_green.sh:252-260`). A bridge-only change deliberately
+  skips the app block (`:268-380`), so it never restores `WEB_IMAGE` or
+  `API_IMAGE`; it also leaves the previous accepted `deploy_state` unchanged.
+  Rollback later requires those exact keys in the previous color
+  (`scripts/rollback_blue_green.sh:31-78`).
+- **Fresh reproduction:** with active blue, an accepted transaction pointing
+  back to green, and a green snapshot containing both repository digests plus a
+  sentinel, a mocked bridge-only run returned success while retaining
+  `status=accepted` and erasing the sentinel and both image references.
+- **Impact:** a successful, unrelated NotebookLM bridge deployment silently
+  converts a previously available rollback into a guaranteed fail-closed error.
+- **Required fix:** prepare/replace the inactive color file only inside an app
+  deployment transaction, or write a separate attempted-color snapshot and
+  atomically promote it only with the traffic state. Add an executable
+  bridge-only test proving byte-for-byte preservation of both color snapshots
+  and `deploy_state`.
+
+### P1 — web-only deployment can split API and worker runtime contracts
+
+- **Confidence:** high.
+- **Evidence:** any web change enters the app path, copies the current generated
+  production environment and recreates both web and API
+  (`scripts/deploy_blue_green.sh:181-183,252-302`). Main and Stage 6 workers are
+  restarted only when API or deploy-config files changed (`:388-404`). GitHub
+  secret/environment changes are not Git paths and therefore cannot make either
+  detector output true.
+- **Impact:** on a web-only commit that coincides with a key, endpoint, evidence
+  flag or other environment change, the new API consumes the new snapshot while
+  both generation consumers retain the old one. This violates the required
+  API/main-worker/Stage-6 coherence and can split authentication or accepted
+  document-decision behavior after traffic switch.
+- **Required fix:** if both app services are recreated from a new environment
+  snapshot, bind main and Stage 6 to that same snapshot before switch regardless
+  of which image changed, or cryptographically/structurally prove the relevant
+  environment is unchanged. Add web-only, API-only and config-only executable
+  assertions for image identity, environment identity and worker restart order.
+
+### P2 — rollback accepts an immutable digest from an arbitrary repository
+
+- **Confidence:** high.
+- **Evidence:** forward resolution requires the exact fixed web/API repository
+  (`scripts/deploy_blue_green.sh:47-75`), but rollback checks only the suffix
+  `@sha256:<64 hex>` (`scripts/rollback_blue_green.sh:72-78`).
+- **Impact:** a malformed or tampered color snapshot can pass the rollback guard
+  with an unrelated registry repository and be pulled/recreated before nginx
+  switch. The digest is immutable, but its provenance is not the approved image.
+- **Required fix:** use the same exact repository-plus-digest validator in
+  rollback for both keys and test wrong-repository rejection.
+
+### P2 — failed remote secret installation can retain plaintext upload copies
+
+- **Confidence:** high.
+- **Evidence:** local temporary cleanup has a trap, but the remote upload is a
+  separate directory created and populated in two earlier commands. The final
+  remote command uses `set -e` and removes it only after every privileged install
+  succeeds (`.github/workflows/ci-cd.yml:809-838`). Any failed `sudo install`, SSH
+  disconnect or job cancellation after SCP bypasses that removal.
+- **Impact:** the canonical owner-only destination remains protected, but one or
+  more `.qdrant-secrets-<run-id>` plaintext copies can persist under the deploy
+  account and accumulate outside the documented secret inventory.
+- **Required fix:** add failure/cancellation cleanup that is independent of the
+  install command's success, preflight stale upload directories without exposing
+  contents, and test the mid-install failure path. Preserve the corrected final
+  owners `0`, `65534`, `472` and mode `0400`.
+
+## Verified positive surfaces
+
+- CI publishes the exact 40-character `${{ github.sha }}` tag and passes that
+  same tag to deployment; the host resolves changed web/API tags to exact
+  repository digests and reuses the current digest for unchanged images.
+- `preparing` cannot be rolled back or promoted: the workflow and host script
+  require `switched|accepted`, and the host also proves `active_color` equals the
+  recorded target before selecting the recorded previous color.
+- The Qdrant verifier and application admin key now originate from the same
+  GitHub secret. The Prometheus file is copied from the exact server read-only
+  value. The final secret files have the runbook-required owner UID and mode
+  (`root`, `65534`, or `472`; `0400`), and the verifier reads the root-owned key
+  through noninteractive sudo without printing it.
+- Config-only deployment reuses both current immutable application digests and
+  recreates API, web, main worker and Stage 6 from the new snapshot. API-only
+  deployment resolves the new API digest and reuses the current web digest.
+- `ops/qdrant/*` is deploy-relevant, and all three deploy-contract scripts are
+  invoked by the blocking lint job.
+
+## Fresh verification
+
+- Target-tree focused tests: `test_ci_cd_workflow_gates.mjs` passed;
+  `test_detect_deploy_changes.sh` passed; `test_blue_green_fail_closed.sh`
+  passed; deploy, rollback and fail-closed test scripts passed `bash -n`.
+- Synthetic Compose: complete infra, app and production renders passed `3/3`;
+  the legacy previous-color render failed as described above.
+- Target-tree bridge-only mock reproduced accepted-state retention plus deletion
+  of both rollback image refs.
+- `git diff --check bcfc6b71..e7130b3e` passed.
+
+The current CI tests are useful static/fail-closed guards, but they contain no
+successful post-switch rollback, first-deploy legacy snapshot, bridge-only
+preservation or partial-deploy consumer-coherence execution. Their green result
+therefore does not resolve the three P1 findings.
+
+## Ready / residual blockers
+
+**Ready: no.** Do not perform staging mutation from `e7130b3e`. Resolve the three
+P1 findings, rerun the focused suite plus complete/legacy Compose renders, and
+exercise pre-switch failure, successful post-switch rollback, bridge-only,
+web-only, API-only and config-only state transitions. The previously recorded
+remote migration, protected live smoke/recovery-probe and durable rollout gates
+also remain required.
