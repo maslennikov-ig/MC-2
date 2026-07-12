@@ -42,11 +42,11 @@ depends_on_streams:
   - mc2-jz6y0.13.2
   - mc2-jz6y0.13.3
 parallel_decision: parallel read-only audit with a disjoint artifact-only write zone
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Review created no runtime resource and performed no remote action; the dedicated artifact worktree remains for orchestrator inspection.
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Review created no runtime resource or remote action; zero-finding review 9bcca13a was merged and accepted.
 risk_level: high
 docs_impact: ops-deploy-migration-handoff
 docs_reviewed: updated

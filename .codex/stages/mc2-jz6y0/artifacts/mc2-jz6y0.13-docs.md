@@ -48,17 +48,17 @@ depends_on_streams:
   - mc2-jz6y0.13.2
   - mc2-jz6y0.13.3
 parallel_decision: sequential because all findings cross-reference the same runbook and current-state contract
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: branch and worktree remain for orchestrator review and integration; no runtime resource was created
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation 9e840349 and zero-finding review 9bcca13a were merged; no runtime resource was created
 risk_level: high
 docs_impact: ops-deploy-migration-handoff
 docs_reviewed: updated
 docs_review_notes: six blocking and three closeout findings were reconciled against accepted Q12 runtime truth
 graph_reviewed: blocked
-graph_review_notes: parent closeout owns local no-API Graphify refresh after durable docs merge; no external model/API mode or hook is authorized
+graph_review_notes: parent integration owns the immediate local no-API Graphify refresh after this durable docs merge; no external model/API mode or hook is authorized
 verification:
   - documented command/package/script mapping scan: passed
   - stale host-pnpm/authorization/latest/rollback scan: passed with local-only host pnpm as the sole intentional match
