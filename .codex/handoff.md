@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-12
+Updated: 2026-07-13
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 Integration branch: `codex/self-hosted-qdrant-platform`
 Resolve the current SHA of `origin/codex/self-hosted-qdrant-platform` before

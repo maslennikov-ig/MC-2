@@ -114,5 +114,9 @@ residue-sentinel test. The corrected evidence is therefore 3/3 focused and
 No in-scope defect or justified implementation defer remains. The acceptance
 harness deliberately proves public injected seams and does not substitute for
 the separate live/runtime drills owned by adjacent accepted streams. The
-orchestrator still owns acceptance of this review artifact, integration into
-the stage branch, and safe removal of the dedicated review worktree.
+rereview was accepted and integrated as `7a808fc2`; the corrected implementation
+was integrated as `30d28ef2`. Fresh joined integration passed 3/3 focused and
+456/456 recovery/reindex tests. The implementation, negative-review, and
+rereview worktrees plus their local branches are cleaned, while pushed evidence
+branches remain. Review `2c861d34` stays immutable with its original returned
+decision; this accepted rereview records the linked resolution.

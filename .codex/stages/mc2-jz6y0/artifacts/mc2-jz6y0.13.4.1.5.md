@@ -181,8 +181,12 @@ tenant-aware database gateway and evidence repository. It does not claim a
 live database, queue, Qdrant, Redis, container, deploy, or operator-service
 test. Those runtime contracts are already owned by accepted adjacent streams.
 
-## Next Steps
+## Integrated State
 
-1. Run independent P0-P3 acceptance review against this returned artifact.
-2. Integrate only after orchestrator acceptance.
-3. Remove the dedicated worktree during stage closeout after delivery.
+The correction was independently accepted by rereview `7a808fc2` with P0-P3
+zero and integrated as `30d28ef2`. The joined integration evidence is 3/3
+focused and 456/456 recovery/reindex tests. The implementation, negative-review,
+and rereview worktrees plus their local branches were removed after acceptance;
+the pushed evidence branches remain. The immutable negative review decision at
+`2c861d34` remains returned and is resolved only through the linked correction
+and rereview history.

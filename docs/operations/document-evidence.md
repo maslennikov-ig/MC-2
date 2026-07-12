@@ -314,13 +314,33 @@ with both `sslmode=verify-full` and `sslrootcert`; never use
 `rejectUnauthorized=false`, `sslmode=require`, or an unverified pooler
 connection.
 
-1. Confirm backup/PITR and inventory the exact remote migration frontier in a
-   read-only session. Do not continue unless it is compatible with the five
+1. Obtain the current Session pooler URL and prove it in a read-only session
+   with the validated CA, `sslmode=verify-full`, and the explicit
+   `sslrootcert` path.
+2. Before pausing writers or applying a migration, complete backup gate
+   `mc2-jz6y0.13.7` in this exact order:
+   - correct the observed `/opt/megacampus/backups` parent from mode `0775` to
+     the approved root/current-owned, non-group/world-writable ownership and
+     mode;
+   - install the reviewed `deploy/postgres/backup-supabase.sh` operator plus
+     owner-only `/opt/megacampus/secrets/supabase_db_url` and validated CA
+     inputs;
+   - create a fresh custom-format dump and require the operator's size, TOC,
+     complete offline archive traversal, fsync, and atomic publication checks;
+   - restore that exact fresh archive into the approved isolated disposable
+     target with `--exit-on-error` and `--single-transaction`.
+
+   Every 20-byte file produced since 2026-06-28 is a fail-open empty stream,
+   not backup or rollback evidence. Do not use the last substantive 2026-06-27
+   dump as a substitute for the required fresh restore-validated archive.
+
+3. Confirm PITR separately and inventory the exact remote migration frontier in
+   a read-only session. Do not continue unless it is compatible with the five
    allowlisted versions.
-2. Pause answer/decision writers and affected Stage 4, Stage 5, and Stage 6
+4. Pause answer/decision writers and affected Stage 4, Stage 5, and Stage 6
    queues. Record the bounded expected write pause and keep consumers from
    starting between base and observability steps.
-3. Without printing the DSN, require its TLS parameters:
+5. Without printing the DSN, require its TLS parameters:
 
    ```bash
    : "${SUPABASE_DB_URL:?set the owner-only PostgreSQL DSN}"
@@ -329,7 +349,7 @@ connection.
    export SUPABASE_DB_URL
    ```
 
-4. Apply and verify the guarded base chain:
+6. Apply and verify the guarded base chain:
 
    ```bash
    TMPDIR=${TMPDIR:-/tmp} \
@@ -339,7 +359,7 @@ connection.
      --confirm 'APPLY REMOTE DOCUMENT EVIDENCE BASE 20260711120000 20260711130000 20260711140000'
    ```
 
-5. Apply and verify the observability chain:
+7. Apply and verify the observability chain:
 
    ```bash
    TMPDIR=${TMPDIR:-/tmp} \
@@ -349,7 +369,7 @@ connection.
      --confirm 'APPLY REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711150000 20260711151000'
    ```
 
-6. Require exact contiguous migration history and the runners' live catalog,
+8. Require exact contiguous migration history and the runners' live catalog,
    RLS, policy, RPC signature, trigger, extension, index definition/comment, and
    side-identity checks. Deploy matching consumers before resuming writers and
    queues.
@@ -403,24 +423,29 @@ No remote mutation has occurred. Activation remains NO-GO until:
 
 1. a current Session pooler URL enables the guarded five-migration path with the
    validated CA, `sslmode=verify-full`, and `sslrootcert`;
-2. the accepted checksum-verified local-volume snapshot and isolated restore
+2. database-backup gate `mc2-jz6y0.13.7` passes: correct the observed
+   `/opt/megacampus/backups` parent from `0775`, install the reviewed backup
+   operator and owner-only URL/CA inputs, publish a fresh fully validated custom
+   dump, and restore that exact archive into the approved isolated target. The
+   20-byte files produced since 2026-06-28 are invalid evidence;
+3. the accepted checksum-verified local-volume snapshot and isolated restore
    remain green; this is staging evidence only, while production S3 stays gated
    by `mc2-jz6y0.13.6`;
-3. implementation/review bead `.13.4.1` is locally accepted at 3/3 focused and
+4. implementation/review bead `.13.4.1` is locally accepted at 3/3 focused and
    456/456 joined recovery/reindex tests; the authorized window must then run
    the 42 exact source copies through the crash-durable recovery contract. The
    six absent eligible originals receive an explicit audited owner disposition—never
    `--allow-gaps` or derived substitution—and the separate eighteen-row
    Career Playbook retention/data-hygiene disposition is recorded without
    counting those non-eligible rows in the 240-document Qdrant denominator;
-4. exact digests, private listeners, secret metadata, free metrics GID, Compose,
+5. exact digests, private listeners, secret metadata, free metrics GID, Compose,
    and systemd oneshots pass;
-5. deterministic reindex, RU/EN relevance, strict schema, parity, and negative
+6. deterministic reindex, RU/EN relevance, strict schema, parity, and negative
    tenant/course isolation pass;
-6. immutable app/main-worker/Stage-6 rollback and evidence containment pass;
-7. coverage and baseline preservation are exactly 100%, with zero isolation
+7. immutable app/main-worker/Stage-6 rollback and evidence containment pass;
+8. coverage and baseline preservation are exactly 100%, with zero isolation
    violations and unresolved P0/P1 findings;
-8. real firing/resolved notification, 60-minute observation, one complete
+9. real firing/resolved notification, 60-minute observation, one complete
    normal course cycle, cleanup, and retained rollback evidence pass.
 
 The local/development design remains recorded in

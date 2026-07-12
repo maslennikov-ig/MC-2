@@ -8,8 +8,9 @@ approved local-disk snapshots for development staging on 2026-07-12 and deferred
 off-host S3 to the production gate `mc2-jz6y0.13.6`. This runbook is not a second
 authorization source. The downloaded Supabase Root 2021 CA is validated for
 `verify-full`; activation remains **NO-GO** until a current Session pooler URL
-passes with that CA and the authoritative source truth listed under “Initial
-activation” is resolved. No remote mutation has occurred yet.
+passes with that CA, database-backup gate `mc2-jz6y0.13.7` produces a fresh
+restore-validated archive, and the authoritative source truth listed under
+“Initial activation” is resolved. No remote mutation has occurred yet.
 
 ## Immutable runtime
 
@@ -366,12 +367,19 @@ owner authorization does not waive these current hard stops:
    complete external URIs. The only plausible server file, `.env.backup`, is
    stale. An authorized Supabase owner must supply or rotate a current URL that
    passes the required `sslmode=verify-full` and `sslrootcert` preflight;
-2. the accepted read-only source audit found 261 catalog rows: 240 are
+2. database-backup gate `mc2-jz6y0.13.7` remains open. The observed
+   `/opt/megacampus/backups` parent is mode `0775`, and every scheduled file
+   produced since 2026-06-28 is a 20-byte fail-open empty stream, not valid
+   backup evidence. Before any migration, correct the parent ownership/mode,
+   install the reviewed `deploy/postgres/backup-supabase.sh` operator and its
+   owner-only URL/CA inputs, publish a fresh fully validated custom-format dump,
+   and restore that exact archive into the approved isolated target;
+3. the accepted read-only source audit found 261 catalog rows: 240 are
    Qdrant-eligible and 21 are `missing_course`. Forty-two exact no-replace
    copies can raise recoverable eligible sources from 109 to 234; exact
    originals for the remaining four missing and two invalid eligible rows were
    not found. Eighteen non-eligible Career Playbook originals are also absent;
-3. source-recovery implementation `.13.4.1` and its independent local acceptance
+4. source-recovery implementation `.13.4.1` and its independent local acceptance
    are complete; the authorized window must still execute the 42 crash-durable
    copies and all 24 audited dispositions before reindex. `--allow-gaps` and
    derived-content substitution are forbidden.
@@ -379,24 +387,42 @@ owner authorization does not waive these current hard stops:
 After these gates are resolved, execute this order as one observed activation
 window:
 
-1. confirm backup/PITR and apply/verify the complete document-evidence
+1. obtain the current Session pooler URL and prove read-only connectivity with
+   the project CA, `sslmode=verify-full`, and explicit `sslrootcert`;
+2. complete `mc2-jz6y0.13.7`: correct the observed `0775` backup parent to the
+   approved root/current-owned non-group/world-writable mode, install the
+   reviewed backup operator and owner-only URL/CA inputs, publish a fresh custom
+   dump after full archive validation, and restore that archive into the
+   approved isolated target. Reject every 20-byte file since 2026-06-28 as
+   evidence;
+3. confirm PITR and apply/verify the complete document-evidence
    `120 -> 130 -> 140 -> 150 -> 151` migration chain using the project CA;
-2. copy the reviewed Compose, `deploy/qdrant`, `deploy/systemd`, and
+4. copy the reviewed Compose, `deploy/qdrant`, `deploy/systemd`, and
    `ops/qdrant` assets; provision exact secret metadata, UID 1001, free metrics
    GID, recovery state, metrics, upload, and probe paths;
-3. publish the release-SHA `qdrant-operator`, resolve and persist only its
+5. publish the release-SHA `qdrant-operator`, resolve and persist only its
    registry digest, and pre-pull every exact image;
-4. start only `qdrant`, `prometheus`, `node_exporter`, `alertmanager`, and
+6. start only `qdrant`, `prometheus`, `node_exporter`, `alertmanager`, and
    `grafana` from `docker-compose.infra.yml`; keep app traffic and RAG workers on
    the previous environment;
-5. run operator `self-check` and `metrics-check`, then bootstrap the physical
+7. run operator `self-check` and `metrics-check`, then bootstrap the physical
    collection before any deploy verify gate;
-6. run the gap-free deterministic plan/worker/execute/verify procedure above;
-7. prove a checksum-verified local-volume snapshot and isolated restore, both
-   firing and resolved notification, private listeners, and rollback evidence;
-8. only then invoke the normal release-bound blue/green deploy and observe the
-   accepted app/worker environment for at least 60 minutes plus one complete
-   normal course cycle.
+8. run the documented `source-recovery-run.sh --stop-writers --operation
+forward` wrapper before reindex, using the same reviewed run ID, owner-only
+   manifest/journal paths, and all common arguments shown above. Require exactly
+   42 no-replace publications restoring 125 eligible rows, all 24 dispositions
+   verified, `240 = 234 recoverable + 6 audited failed`, zero unresolved
+   eligible gaps, and zero owned temporary residue;
+9. keep the source-copy rollback boundary explicitly before reindex. If any
+   source/disposition gate fails, invoke the documented `--operation rollback`
+   contract with the same run ID and immutable state; do not start the reindex
+   worker. Once the source gate passes and no rollback is required, run the
+   gap-free deterministic reindex plan/worker/execute/verify procedure above;
+10. prove a checksum-verified local-volume snapshot and isolated restore, both
+    firing and resolved notification, private listeners, and rollback evidence;
+11. only then invoke the normal release-bound blue/green deploy and observe the
+    accepted app/worker environment for at least 60 minutes plus one complete
+    normal course cycle.
 
 `/deploy`, `/deploy --force`, mutable tags, the retired Cloud endpoint, and an
 alias switch without the preceding evidence are not activation alternatives.
