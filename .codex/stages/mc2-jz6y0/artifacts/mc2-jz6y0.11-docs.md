@@ -22,7 +22,7 @@ docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: Reconciled current setup, deployment, retrieval, recovery, monitoring and rollback guidance; explicitly bannered retained historical research/specification material. The final independent review at 42ed1322 reported Ready to merge Yes with P0-P3 zero.
 graph_reviewed: updated
-graph_review_notes: Parent refreshed local-only Graphify 0.8.45 after Q10 acceptance with 50371 nodes, 74817 edges and 3206 communities. The focused query found the canonical runbook retrieval, bootstrap/reindex, snapshot/restore, systemd, monitoring and rollback surfaces. The intentional documentation reduction required `graphify update . --force`; no external model/API mode or Git hook was used.
+graph_review_notes: Parent refreshed local-only Graphify 0.8.45 after Q10 acceptance with 50371 nodes and 74817 edges. The focused query found the canonical runbook retrieval, bootstrap/reindex, snapshot/restore, systemd, monitoring and rollback surfaces. The intentional documentation reduction required `graphify update . --force`; community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
 verification:
   - Initial independent docs review returned Ready NO with six Important findings (I1-I6) and one Minor finding (M1); orchestrator acceptance remained no.
   - Second independent docs review returned Ready NO with one remaining Important finding (I3): fresh-network setup, host reindex credentials, and snapshot/restore contracts were not yet jointly reproducible.

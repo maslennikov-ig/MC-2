@@ -140,6 +140,6 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 docs-reviewed: updated — operator and orchestration records now reflect accepted 100% local/development activation, clean final review, parent rerun, Q10 next, and unchanged Q12 authorization.
 
-graph-reviewed: updated — local-only Graphify 0.8.45 refresh after Q10 acceptance contains 50,371 nodes, 74,817 edges and 3,206 communities; the focused query found the canonical runbook retrieval, reindex, recovery, monitoring, systemd and rollback surfaces. No external model/API mode or Git hook was used.
+graph-reviewed: updated — local-only Graphify 0.8.45 refresh after Q10 acceptance contains 50,371 nodes and 74,817 edges; the focused query found the canonical runbook retrieval, reindex, recovery, monitoring, systemd and rollback surfaces. Community totals are omitted because reclustering may repartition an unchanged graph. No external model/API mode or Git hook was used.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.
