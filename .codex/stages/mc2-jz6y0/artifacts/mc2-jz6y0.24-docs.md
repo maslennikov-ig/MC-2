@@ -56,11 +56,11 @@ depends_on_streams:
   - mc2-jz6y0.24.4 - accepted and integrated in b5262f4e, accepted/pushed through c7a51996; targeted Stage 4/5/6 evidence-log privacy boundary is current
   - mc2-jz6y0.24.5 - accepted and integrated: final code SHA 7a7d54ae passed independent review, was integrated as b5262f4e, and was accepted/pushed through c7a51996
 parallel_decision: parallel with the disjoint E7 observability stream; documentation is sequentially truth-reviewed because the cross-stage contract and rollout procedure share one durable narrative
-status: returned
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Dedicated worktree remains for parent review and integration.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: Independent docs review passed at 82831b6f, the stream was integrated as 756406a4 and pushed, and the dedicated worktree/local branch were removed. The remote evidence-docs branch was retained.
 risk_level: medium
 docs_impact: docs-only
 docs_reviewed: updated
@@ -68,6 +68,7 @@ docs_review_notes: Durable Stage 4/5/6 and operator docs describe accepted evide
 graph_reviewed: used
 graph_review_notes: Read and queried the integration worktree's parent Graphify report read-only at base 7b542c8d (50,252 nodes, 74,520 edges, zero model/API tokens). The report oriented the evidence design and Stage 5 enrichment community; accepted artifacts and focused current-source reads supplied exact runtime names. No graph files or hooks were changed; root owns the post-integration refresh.
 verification:
+  - Orchestrator acceptance: independent final docs review PASS at 82831b6f with P0-P3=0; integrated as 756406a4 and pushed to origin/codex/self-hosted-qdrant-platform
   - docs-review RED scan: failed on missing quiesce/in-flight sequencing, mutually exclusive rollback modes, post-gate Stage 6 truth, privacy boundaries, rollout dependencies, integration-order wording, and the full Stage 5 rollout path
   - mc2-jz6y0.24.4 dependency RED scan: failed on the missing integration gate and targeted privacy-remediation scope
   - mc2-jz6y0.24.5 observability-docs RED scan: failed on the missing dependency gate and corrected counter, totals, lock, retrieval-attempt, and migration semantics
