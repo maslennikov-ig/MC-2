@@ -54,11 +54,11 @@ parallel_group: q12-source-recovery-dependent-streams
 depends_on_streams:
   - mc2-jz6y0.13.4.1-core
 parallel_decision: parallel - Task 2 has a disjoint write zone from reindex and Stage 4 streams
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: temporary dependency symlinks were removed before commit; worktree/branch remain for orchestrator review
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation and review worktrees plus local branches were removed after integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: behavior
 docs_reviewed: no-change-needed

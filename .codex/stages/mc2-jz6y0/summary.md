@@ -3,9 +3,9 @@
 Status: Q12 staging authorized; source-recovery implementation active; live activation remains NO-GO until local acceptance and current DB credentials
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: `fe692b1f` (accepted core plus immutable blocking reviews; workflow/evidence/reindex implementations remain unaccepted)
+Current accepted integration evidence: `00808ca0` (accepted core and workflow/CAS plus immutable blocking evidence/reindex reviews)
 Integration branch: `codex/self-hosted-qdrant-platform`
-Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback/snapshot and source-recovery core are locally accepted; workflow/CAS, failed-coverage, and audited-reindex corrections, runtime wiring, and live execution remain open. Workflow review found three P1, evidence review found two P1 plus one P2, and reindex review found five P1 plus three P2; immutable review artifacts are integrated and no affected implementation is accepted yet.
+Implementation scope: Q1-Q11 plus Q12 guarded migration/operator/rollback/snapshot, source-recovery core, and reviewed workflow/CAS are locally accepted. Failed-coverage SQL/RPC and audited-reindex corrections, runtime wiring, and live execution remain open. Workflow correction passed P0-P3 zero with focused 41/41 and package type-check on integration; evidence retains one SQL P1 and reindex retains three P1 plus one P2 from correction re-review.
 
 ## Beads Mapping
 

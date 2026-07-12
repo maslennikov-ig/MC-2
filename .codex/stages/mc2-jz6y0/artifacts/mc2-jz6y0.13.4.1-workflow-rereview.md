@@ -40,11 +40,11 @@ parallel_group: q12-source-recovery-workflow-correction-gate
 depends_on_streams:
   - mc2-jz6y0.13.4.1-workflow-correction
 parallel_decision: sequential - independent re-review follows the completed correction and gates root acceptance
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: temporary dependency symlinks are removed before commit; review branch/worktree cleanup waits for root acceptance
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: implementation and review worktrees plus local branches were removed after root integration verification; pushed remote evidence branches remain
 risk_level: high
 docs_impact: none
 docs_reviewed: no-change-needed
@@ -74,11 +74,11 @@ findings remain in the bounded correction. All three P1 findings from immutable
 review `b54ba667` are resolved, so the workflow correction is eligible for root
 orchestrator acceptance and dependency-ordered integration.
 
-| Prior finding | Disposition | Evidence |
-| ------------- | ----------- | -------- |
-| Q12-WR1: journal identities/kinds not manifest-bound | Fixed | `validateRecoveryProgressJournalBinding()` derives the canonical journal from the normalized manifest, requires exact copy/disposition key sets and exact disposition kind values, and is called on load and persistence (`source-recovery-manifest.ts:512-539`, `source-recovery.ts:258-274,321-358`). |
-| Q12-WR2: protected state follows symlinks/foreign ownership | Fixed | Protected reads require a real current-UID mode-0700 parent and a real current-UID mode-0600 file, then open with `O_NOFOLLOW` and compare device/inode before descriptor reads (`source-recovery.ts:275-318`). Journal CAS repeats the same boundary (`source-recovery-manifest.ts:645-689`). |
-| Q12-WR3: no all-copy plan preflight | Fixed | Exact 42-copy/125-row truth is enforced before `preflightCopies`; all sources are rehashed, every target and deterministic temp must be absent, and capability proof completes before immutable `writePlan` (`source-recovery.ts:233-258,465-486`; `source-recovery-filesystem.ts:401-416`). |
+| Prior finding                                               | Disposition | Evidence                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q12-WR1: journal identities/kinds not manifest-bound        | Fixed       | `validateRecoveryProgressJournalBinding()` derives the canonical journal from the normalized manifest, requires exact copy/disposition key sets and exact disposition kind values, and is called on load and persistence (`source-recovery-manifest.ts:512-539`, `source-recovery.ts:258-274,321-358`). |
+| Q12-WR2: protected state follows symlinks/foreign ownership | Fixed       | Protected reads require a real current-UID mode-0700 parent and a real current-UID mode-0600 file, then open with `O_NOFOLLOW` and compare device/inode before descriptor reads (`source-recovery.ts:275-318`). Journal CAS repeats the same boundary (`source-recovery-manifest.ts:645-689`).          |
+| Q12-WR3: no all-copy plan preflight                         | Fixed       | Exact 42-copy/125-row truth is enforced before `preflightCopies`; all sources are rehashed, every target and deterministic temp must be absent, and capability proof completes before immutable `writePlan` (`source-recovery.ts:233-258,465-486`; `source-recovery-filesystem.ts:401-416`).            |
 
 # Corrected invariant evidence
 
