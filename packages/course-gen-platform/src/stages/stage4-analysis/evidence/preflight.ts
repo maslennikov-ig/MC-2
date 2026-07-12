@@ -31,6 +31,7 @@ import {
   buildDownstreamEvidenceRepresentation,
   type DownstreamEvidenceRepresentation,
 } from './downstream-context';
+import { parseLowerCaseUuidV4 } from './source-failure';
 
 export interface DocumentEvidencePreflightSource {
   documentId: string;
@@ -173,8 +174,6 @@ export interface DocumentEvidencePreflightResult {
 
 const DEFAULT_VERIFICATION_BATCH_SIZE = 100;
 const DOWNSTREAM_PHASE_DOCUMENT_TOKEN_LIMIT = 24_000;
-const RECOVERY_RUN_ID_PATTERN =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/u;
 
 function sha256(value: string): string {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -188,7 +187,7 @@ function sortedSources(
       if (!source.sourceFailure) return source;
       if (
         source.sourceFailure.reason !== 'source_file_unrecoverable' ||
-        !RECOVERY_RUN_ID_PATTERN.test(source.sourceFailure.recoveryRunId) ||
+        parseLowerCaseUuidV4(source.sourceFailure.recoveryRunId) === undefined ||
         JSON.stringify(Object.keys(source.sourceFailure).sort()) !==
           JSON.stringify(['reason', 'recoveryRunId'].sort())
       ) {
@@ -198,7 +197,7 @@ function sortedSources(
         ...source,
         sourceFailure: {
           reason: source.sourceFailure.reason,
-          recoveryRunId: source.sourceFailure.recoveryRunId.toLowerCase(),
+          recoveryRunId: source.sourceFailure.recoveryRunId,
         },
       };
       delete sanitized.fullText;

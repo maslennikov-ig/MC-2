@@ -11,9 +11,12 @@ repo: mc2
 branch: codex/q12-source-recovery-evidence
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: cfce2c1c3d927e1ba1537a81d959302a166162c3
+resolves_review: 254a8b83
 worktree: /home/me/code/mc2/.worktrees/q12-source-recovery-evidence
 write_zone:
+  - packages/course-gen-platform/src/stages/stage4-analysis/evidence/source-failure.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-phase-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/preflight.ts
   - focused Stage 4/5/6 evidence tests
@@ -21,6 +24,7 @@ write_zone:
 success_criteria:
   - accept only exact audited source_file_unrecoverable file status and recovery UUID
   - persist exactly one metadata-only zero-content failed coverage card before derivative or budget use
+  - make source_file_unrecoverable terminal in automatic mode without retry directives or replacement runs
   - keep failed evidence out of Stage 5 retrieval and Stage 6 source refs
   - preserve byte-equivalent no-document baselines
 selected_docs:
@@ -43,7 +47,7 @@ depends_on_streams:
   - mc2-jz6y0.13.4.1-core
 parallel_decision: parallel with reindex/operator streams after accepted core
 status: returned
-delivery_method: merge
+delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: pending
 cleanup_notes: worktree remains for independent review; temporary dependency symlinks are removed before commit
@@ -62,13 +66,26 @@ verification:
   - focused Prettier and git diff check: passed
   - artifact validation: passed
   - process verification: passed
+  - correction RED shared parser: expected module-not-found before implementation
+  - correction GREEN shared parser/preflight: passed 39/39
+  - correction RED derivative boundary: audited ID observed in Redis processed-content request
+  - correction GREEN enumeration: passed 7/7 before the later full-text regression
+  - correction RED semantic boundary: stale full-text allocation included the audited ID and the semantic selector was absent
+  - correction GREEN enumeration/live wiring: passed 31/31
+  - correction RED automatic decision: source_file_unrecoverable created a second retry run
+  - correction GREEN automatic decision: passed live wiring 24/24 with one terminal run and no retry calls
+  - correction combined Stage 4/5/6 gate: passed 115/115 across six files
+  - correction package type-check: passed after the isolated worktree dependency view was restored
 changed_files:
+  - packages/course-gen-platform/src/stages/stage4-analysis/evidence/source-failure.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
+  - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-phase-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/preflight.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/preflight.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/source-failure.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage5-generation/advisory-enrichment.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage6/rag/evidence-context.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.4.1-evidence.md
@@ -81,7 +98,7 @@ explicit_defers:
 
 Stage 4 now projects `vector_status,error_message` for every enumerated course
 source and recognizes only the exact lower-case
-`source_file_unrecoverable; recovery_run=<UUID>` disposition on a failed row.
+`source_file_unrecoverable; recovery_run=<UUIDv4>` disposition on a failed row.
 Pending/indexed rows, generic failures, malformed run IDs, and near matches remain
 ordinary sources and cannot acquire an audited outcome.
 
@@ -119,6 +136,53 @@ followed by `listItems(runId)`. The durable source is
 document, coverage status/reason, processing mode, claims, and token counts.
 Reindex/integration may filter the schema-validated cards for the exact failed
 shape without adding any Stage 4 API.
+
+# Correction for review `254a8b83`
+
+All two P1 and one P2 findings from the independent evidence review are
+corrected through three explicit RED/GREEN cycles.
+
+## Exact recovery identity
+
+One shared parser in `evidence/source-failure.ts` now accepts only an exact
+lower-case UUIDv4 with variant `8|9|a|b`. Handler enumeration and preflight both
+use that parser. Uppercase, UUIDv1, UUIDv8, wrong variant, whitespace, suffixes,
+malformed values, and nonfailed vector states remain ordinary non-audited
+inputs; no normalization can promote them.
+
+## Pre-derivative and pre-semantic partition
+
+Immediately after the twice-verified metadata snapshot, handler enumeration
+parses and partitions audited failures. Their IDs are absent from the Redis
+`processed_content` batch and every bounded Supabase content fallback. They
+retain exactly one metadata-only `DocumentSummaryResult` with empty content and
+the structured recovery identity.
+
+The orchestration initialization keeps that complete original source set only
+for the durable evidence ledger, while a separate semantic set excludes audited
+failures before legacy budget allocation and full-text resolution. The Phase 1
+input builder also filters the terminal outcome defensively. A stale allocation
+cannot force an audited ID into the markdown cache/database loader. The existing
+preflight then persists exactly one metadata-only failed card with no summary,
+claims, terminology, constraints, source loading, verification, or allocated
+tokens.
+
+## Terminal automatic outcome
+
+The automatic retry loop now excludes cards whose exact coverage reason is
+`source_file_unrecoverable`. The focused regression proves one accepted run,
+zero degraded-state lookup, zero retry decision, zero retry consumption, and
+one terminal system decision on the original run. Retry behavior for all other
+recoverable degraded/failed outcomes remains unchanged.
+
+## Correction verification
+
+The final combined command passed six files and 115/115 tests: Stage 4 source
+enumeration 8, strict source-failure identity 12, preflight 27, live wiring 24,
+Stage 5 advisory exclusion 30, and Stage 6 evidence-context exclusion 14. The
+course-gen-platform package type-check passed. Final artifact, process,
+formatting, and diff checks are recorded at delivery after temporary dependency
+links are removed.
 
 # Risks / Follow-ups
 

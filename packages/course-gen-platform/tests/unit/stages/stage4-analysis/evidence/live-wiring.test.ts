@@ -2,10 +2,14 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { runDocumentEvidencePhase } from '@/stages/stage4-analysis/orchestrator-phase-helpers';
+import {
+  buildPhase1DocumentSummaries,
+  runDocumentEvidencePhase,
+} from '@/stages/stage4-analysis/orchestrator-phase-helpers';
 import { ConflictDetectionExecutionError } from '@/stages/stage4-analysis/evidence/conflict-detector';
 import {
   attachDocumentEvidenceSnapshot,
+  selectSemanticDocumentSummaries,
   type AnalysisContext,
   validateLegacyBudgetForEvidencePreflight,
 } from '@/stages/stage4-analysis/orchestrator-helpers';
@@ -267,6 +271,37 @@ describe('Stage 4 document evidence live wiring', () => {
     });
 
     expect(runPreflight).toHaveBeenCalledTimes(1);
+  });
+
+  it('excludes audited failures from legacy budget and pre-preflight Phase 1 input', () => {
+    const failed = {
+      ...summary,
+      document_id: documentId(2),
+      file_name: 'Lost.pdf',
+      processed_content: '',
+      sourceFailure: {
+        reason: 'source_file_unrecoverable' as const,
+        recoveryRunId: '90000000-0000-4000-8000-000000000009',
+      },
+    };
+
+    expect(selectSemanticDocumentSummaries([failed, summary])).toEqual([summary]);
+    expect(buildPhase1DocumentSummaries([failed, summary])).toEqual([
+      {
+        document_id: summary.document_id,
+        file_name: summary.file_name,
+        processed_content: summary.processed_content,
+      },
+    ]);
+
+    const initializationSource = readFileSync(
+      resolve(process.cwd(), 'src/stages/stage4-analysis/orchestrator-helpers.ts'),
+      'utf8'
+    );
+    expect(initializationSource).toContain(
+      'selectSemanticDocumentSummaries(originalDocumentSummaries)'
+    );
+    expect(initializationSource).toContain('prepareDocumentInfos(semanticDocumentSummaries)');
   });
 
   it('persists shadow evidence without changing downstream summaries or answers', async () => {
@@ -848,6 +883,93 @@ describe('Stage 4 document evidence live wiring', () => {
       expect.objectContaining({ attempt: 1 }),
     ]);
     expect(resolveDecisions).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes source_file_unrecoverable terminal in automatic mode without a retry run', async () => {
+    const analysisContext = context([
+      {
+        ...summary,
+        processed_content: '',
+        sourceFailure: {
+          reason: 'source_file_unrecoverable' as const,
+          recoveryRunId: '90000000-0000-4000-8000-000000000009',
+        },
+      },
+    ]);
+    const failedCard = {
+      document_id: summary.document_id,
+      coverage_status: 'failed',
+      coverage_reason: 'source_file_unrecoverable',
+      processing_mode: 'metadata_only',
+    } as never;
+    const firstRunId = '10000000-0000-4000-8000-000000000001';
+    const retryDecisionId = '70000000-0000-4000-8000-000000000001';
+    const retryDirective = {
+      decisionId: retryDecisionId,
+      documentId: summary.document_id,
+      attempt: 1,
+      maxAttempts: 2,
+    };
+    const runPreflight = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...skippedResult,
+        status: 'accepted',
+        runId: firstRunId,
+        coverage: { source_count: 1, assessed_count: 0, degraded_count: 0, failed_count: 1 },
+        cards: [failedCard],
+      })
+      .mockResolvedValueOnce({
+        ...skippedResult,
+        status: 'accepted',
+        runId: '10000000-0000-4000-8000-000000000002',
+        cards: [],
+      });
+    const getDegradedRetryState = vi.fn(async () => ({ attempt: 0, maxAttempts: 2 }));
+    const recordAutomaticRetry = vi.fn(async () => retryDirective);
+    const getPendingRetryDirectives = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([retryDirective]);
+    const consumeRetryDirectives = vi.fn(async () => undefined);
+    const resolveDecisions = vi.fn(async input => {
+      expect(input.runId).toBe(firstRunId);
+      return {
+        pauseRequired: false,
+        requiredQuestionIds: [],
+        currentDecisionIds: ['80000000-0000-4000-8000-000000000001'],
+        unresolvedInformationalConflictIds: [],
+        decisionSummary: { user: 0, system: 1, degradedAutomatic: 1 },
+      };
+    });
+
+    await runDocumentEvidencePhase(analysisContext, {
+      enabled: true,
+      mode: 'active',
+      decisionMode: 'automatic',
+      runPreflight,
+      preflightDependencies: {} as never,
+      retryCoordinator: {
+        getDegradedRetryState,
+        recordAutomaticRetry,
+        getPendingRetryDirectives,
+        consumeRetryDirectives,
+      } as never,
+      detectConflicts: vi.fn(async () => ({ conflicts: [], issues: [] })) as never,
+      conflictDependencies: {} as never,
+      resolveDecisions,
+      decisionDependencies: {} as never,
+    });
+
+    expect(runPreflight).toHaveBeenCalledTimes(1);
+    expect(getDegradedRetryState).not.toHaveBeenCalled();
+    expect(recordAutomaticRetry).not.toHaveBeenCalled();
+    expect(consumeRetryDirectives).not.toHaveBeenCalled();
+    expect(resolveDecisions).toHaveBeenCalledTimes(1);
+    expect(analysisContext.documentEvidencePreflight?.runId).toBe(firstRunId);
+    expect(analysisContext.documentEvidenceDecisions?.currentDecisionIds).toEqual([
+      '80000000-0000-4000-8000-000000000001',
+    ]);
   });
 
   it('recovers every durable pending retry after a crash before preflight and links the accepted run', async () => {

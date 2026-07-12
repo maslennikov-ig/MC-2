@@ -123,6 +123,12 @@ export function validateLegacyBudgetForEvidencePreflight(
   }
 }
 
+export function selectSemanticDocumentSummaries(
+  documents: DocumentSummaryResult[]
+): DocumentSummaryResult[] {
+  return documents.filter(document => document.sourceFailure === undefined);
+}
+
 /**
  * Initialize analysis context and validate prerequisites
  * Phase 0: Pre-flight validation (0-10%)
@@ -193,11 +199,16 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
   // Extract DocumentSummaryResult[] early — has stage3_priority from fetchDocumentSummaries
   const originalDocumentSummaries =
     (input.document_summaries as unknown as DocumentSummaryResult[]) || [];
+  const semanticDocumentSummaries = selectSemanticDocumentSummaries(originalDocumentSummaries);
 
-  if (originalDocumentSummaries.length > 0) {
-    const withStage3 = originalDocumentSummaries.filter(d => d.stage3_priority != null).length;
+  if (semanticDocumentSummaries.length > 0) {
+    const withStage3 = semanticDocumentSummaries.filter(d => d.stage3_priority != null).length;
     orchestrationLogger.info(
-      { documentCount: originalDocumentSummaries.length, withStage3Priority: withStage3 },
+      {
+        documentCount: semanticDocumentSummaries.length,
+        auditedFailureCount: originalDocumentSummaries.length - semanticDocumentSummaries.length,
+        withStage3Priority: withStage3,
+      },
       'Starting budget allocation'
     );
 
@@ -212,7 +223,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
       );
     }
 
-    const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(originalDocumentSummaries);
+    const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(semanticDocumentSummaries);
 
     try {
       budgetAllocation = allocateStage4Budget(
@@ -263,7 +274,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
       phase: 'budget_allocation',
       stepName: 'allocate_budget',
       inputData: {
-        documentCount: originalDocumentSummaries.length,
+        documentCount: semanticDocumentSummaries.length,
         language: input.language,
       },
       outputData: {
@@ -275,18 +286,18 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
   }
 
   // Resolve document content: replace processed_content with markdown_content for full_text documents
-  let resolvedDocumentSummaries = originalDocumentSummaries;
+  let resolvedDocumentSummaries = semanticDocumentSummaries;
 
   if (budgetAllocation) {
     const { resolveDocumentContent } = await import('./handler-helpers');
     resolvedDocumentSummaries = await resolveDocumentContent(
       budgetAllocation,
-      originalDocumentSummaries,
+      semanticDocumentSummaries,
       courseId
     );
     orchestrationLogger.info(
       {
-        totalDocs: originalDocumentSummaries.length,
+        totalDocs: semanticDocumentSummaries.length,
         fullTextDocs: budgetAllocation.documents.filter(d => d.mode === 'full_text').length,
       },
       'Document content resolved with budget allocator decisions'

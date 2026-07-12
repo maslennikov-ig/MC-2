@@ -27,6 +27,97 @@ const documentId = (value: number) =>
 describe('Stage 4 document source enumeration', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('partitions audited failures before every processed-content cache or database request', async () => {
+    const failedId = documentId(1);
+    const recoverableId = documentId(2);
+    const rows = [
+      {
+        id: failedId,
+        original_name: 'Lost.pdf',
+        filename: 'lost.pdf',
+        hash: 'sha256:lost',
+        summary_metadata: {
+          original_tokens: 9_000,
+          summary_tokens: 900,
+          compression_ratio: 0.1,
+          quality_score: 0.4,
+        },
+        priority: 'CORE',
+        vector_status: 'failed',
+        error_message:
+          'source_file_unrecoverable; recovery_run=90000000-0000-4000-8000-000000000009',
+      },
+      {
+        id: recoverableId,
+        original_name: 'Available.pdf',
+        filename: 'available.pdf',
+        hash: 'sha256:available',
+        summary_metadata: {
+          original_tokens: 1_000,
+          summary_tokens: 100,
+          compression_ratio: 0.1,
+          quality_score: 0.9,
+        },
+        priority: 'IMPORTANT',
+        vector_status: 'indexed',
+        error_message: null,
+      },
+    ];
+    const contentRequests: string[][] = [];
+    const from = vi.fn(() => {
+      let selected = '';
+      const builder = {
+        select(columns: string) {
+          selected = columns;
+          return builder;
+        },
+        eq() {
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        gt() {
+          return builder;
+        },
+        async range() {
+          return { data: rows, error: null, count: rows.length };
+        },
+        async in(_column: string, ids: string[]) {
+          expect(selected).toContain('processed_content');
+          contentRequests.push(ids);
+          return {
+            data: ids.map(id => ({ id, processed_content: `Stored derivative ${id}` })),
+            error: null,
+          };
+        },
+      };
+      return builder;
+    });
+    mocks.getSupabaseAdmin.mockReturnValue({ from });
+    mocks.getCachedFileProcessedContentBatch.mockResolvedValue(new Map());
+
+    const result = await fetchDocumentSummaries('20000000-0000-4000-8000-000000000001');
+
+    expect(mocks.getCachedFileProcessedContentBatch).toHaveBeenCalledWith(
+      '20000000-0000-4000-8000-000000000001',
+      [recoverableId]
+    );
+    expect(contentRequests).toEqual([[recoverableId]]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        document_id: failedId,
+        processed_content: '',
+        sourceFailure: {
+          reason: 'source_file_unrecoverable',
+          recoveryRunId: '90000000-0000-4000-8000-000000000009',
+        },
+      })
+    );
+    expect(result[1].processed_content).toBe(`Stored derivative ${recoverableId}`);
+  });
+
   it('enumerates processed and missing-content sources regardless of Qdrant vector status', async () => {
     const rows = ['indexed', 'pending', 'failed', 'failed', 'failed'].map(
       (vectorStatus, index) => ({
@@ -409,5 +500,82 @@ describe('Stage 4 document source enumeration', () => {
       Array.from({ length: 7 }, () => '20000000-0000-4000-8000-000000000001')
     );
     expect(result.every(item => item.processed_content.startsWith('Full '))).toBe(true);
+  });
+
+  it('never resolves full text for an audited source failure even if allocation is stale', async () => {
+    const failedId = documentId(1);
+    const recoverableId = documentId(2);
+    const summaries = [
+      {
+        document_id: failedId,
+        file_name: 'Lost.pdf',
+        source_version_hash: 'sha256:lost',
+        processed_content: '',
+        processing_method: 'balanced' as const,
+        summary_metadata: {
+          original_tokens: 9_000,
+          summary_tokens: 900,
+          compression_ratio: 0.1,
+          quality_score: 0.4,
+        },
+        stage3_priority: 'CORE' as const,
+        stage3_importance_score: 0.4,
+        sourceFailure: {
+          reason: 'source_file_unrecoverable' as const,
+          recoveryRunId: '90000000-0000-4000-8000-000000000009',
+        },
+      },
+      {
+        document_id: recoverableId,
+        file_name: 'Available.pdf',
+        source_version_hash: 'sha256:available',
+        processed_content: 'Available summary',
+        processing_method: 'balanced' as const,
+        summary_metadata: {
+          original_tokens: 1_000,
+          summary_tokens: 100,
+          compression_ratio: 0.1,
+          quality_score: 0.9,
+        },
+        stage3_priority: 'IMPORTANT' as const,
+        stage3_importance_score: 0.9,
+      },
+    ];
+    mocks.getCachedFileMarkdownBatch.mockImplementation(
+      async (_courseId, ids: string[]) => new Map(ids.map(id => [id, `Full ${id}`]))
+    );
+    const allocation = {
+      modelSelection: {
+        modelId: 'test',
+        fallbackModelId: 'test',
+        tier: 'standard' as const,
+        maxContext: 260_000,
+      },
+      documents: summaries.map(document => ({
+        file_id: document.document_id,
+        mode: 'full_text' as const,
+        tokens: document.summary_metadata.original_tokens,
+        priority: document.stage3_priority,
+      })),
+      totalTokens: 10_000,
+      breakdown: {
+        core: { count: 1, tokens: 9_000, mode: 'full_text' as const },
+        important: { count: 1, fullTextCount: 1, summaryCount: 0, tokens: 1_000 },
+        supplementary: { count: 0, tokens: 0, mode: 'summary' as const },
+      },
+    };
+
+    const result = await resolveDocumentContent(
+      allocation,
+      summaries,
+      '20000000-0000-4000-8000-000000000001'
+    );
+
+    expect(mocks.getCachedFileMarkdownBatch).toHaveBeenCalledWith(
+      '20000000-0000-4000-8000-000000000001',
+      [recoverableId]
+    );
+    expect(result[0].processed_content).toBe('');
+    expect(result[1].processed_content).toBe(`Full ${recoverableId}`);
   });
 });

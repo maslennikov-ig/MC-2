@@ -35,6 +35,10 @@ import {
   getCachedFileMarkdownBatch,
 } from '../../shared/cache/file-content-cache';
 import { resolveCourseStructureProfile } from '../../shared/course-structure-policy';
+import {
+  parseAuditedSourceFailure,
+  type AuditedDocumentSourceFailure,
+} from './evidence/source-failure';
 
 // ============================================================================
 // TYPES
@@ -289,11 +293,6 @@ type SummaryMetadata = {
 };
 
 /** Document summary shape returned from buildAnalysisInput */
-export interface AuditedDocumentSourceFailure {
-  reason: 'source_file_unrecoverable';
-  recoveryRunId: string;
-}
-
 export type DocumentSummaryResult = {
   document_id: string;
   file_name: string;
@@ -347,18 +346,6 @@ async function fetchCourseMetadata(courseId: string): Promise<{
 /** Fetch and transform document summaries from file_catalog */
 const DOCUMENT_METADATA_PAGE_SIZE = 1_000;
 const DOCUMENT_CONTENT_BATCH_SIZE = 200;
-const AUDITED_SOURCE_FAILURE_PATTERN =
-  /^source_file_unrecoverable; recovery_run=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$/u;
-
-function parseAuditedSourceFailure(
-  vectorStatus: string,
-  errorMessage: string | null
-): AuditedDocumentSourceFailure | undefined {
-  if (vectorStatus !== 'failed' || errorMessage === null) return undefined;
-  const match = AUDITED_SOURCE_FAILURE_PATTERN.exec(errorMessage);
-  if (!match) return undefined;
-  return { reason: 'source_file_unrecoverable', recoveryRunId: match[1].toLowerCase() };
-}
 
 export async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
   const supabase = getSupabaseAdmin();
@@ -427,17 +414,32 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
 
   if (documents.length === 0) return [];
 
+  const sourceFailuresById = new Map<string, AuditedDocumentSourceFailure>();
+  for (const document of documents) {
+    const sourceFailure = parseAuditedSourceFailure(document.vector_status, document.error_message);
+    if (sourceFailure) sourceFailuresById.set(document.id, sourceFailure);
+  }
+  const contentEligibleDocuments = documents.filter(
+    document => !sourceFailuresById.has(document.id)
+  );
+
   // Step 2: Get processed_content from Redis cache (single mget round-trip)
-  const docIds = documents.map(d => d.id);
-  const contentMap = await getCachedFileProcessedContentBatch(courseId, docIds);
+  const docIds = contentEligibleDocuments.map(document => document.id);
+  const contentMap =
+    docIds.length === 0
+      ? new Map<string, string>()
+      : await getCachedFileProcessedContentBatch(courseId, docIds);
 
   // Step 3: For cache misses, batch-fetch content from Supabase
-  const missedIds = documents.filter(d => !contentMap.has(d.id)).map(d => d.id);
+  const missedIds = contentEligibleDocuments
+    .filter(document => !contentMap.has(document.id))
+    .map(document => document.id);
 
   logger.debug(
     {
       courseId,
       documentCount: documents.length,
+      auditedFailureCount: sourceFailuresById.size,
       cacheHits: contentMap.size,
       cacheMisses: missedIds.length,
     },
@@ -469,7 +471,7 @@ export async function fetchDocumentSummaries(courseId: string): Promise<Document
     const metadata = doc.summary_metadata as SummaryMetadata | null;
     const stage3Priority = doc.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | null;
     const stage3ImportanceScore = metadata?.classification?.importance_score ?? null;
-    const sourceFailure = parseAuditedSourceFailure(doc.vector_status, doc.error_message);
+    const sourceFailure = sourceFailuresById.get(doc.id);
 
     return {
       document_id: doc.id,
@@ -543,13 +545,21 @@ export async function resolveDocumentContent(
   documents: DocumentSummaryResult[],
   courseId: string
 ): Promise<DocumentSummaryResult[]> {
-  const fullTextIds = allocation.documents.filter(d => d.mode === 'full_text').map(d => d.file_id);
+  const semanticDocumentIds = new Set(
+    documents
+      .filter(document => document.sourceFailure === undefined)
+      .map(document => document.document_id)
+  );
+  const fullTextIds = allocation.documents
+    .filter(document => document.mode === 'full_text' && semanticDocumentIds.has(document.file_id))
+    .map(document => document.file_id);
 
   if (fullTextIds.length === 0) return documents;
 
   const fullTextMap = await fetchFullTextDocuments(fullTextIds, courseId);
 
   return documents.map(doc => {
+    if (doc.sourceFailure) return doc;
     const fullText = fullTextMap.get(doc.document_id);
     if (fullText) {
       return { ...doc, processed_content: fullText };

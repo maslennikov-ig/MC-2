@@ -54,7 +54,7 @@ import {
   createDocumentEvidenceRepository,
   type DocumentEvidenceDatabaseClient,
 } from './evidence/repository';
-import { fetchFullTextDocuments } from './handler-helpers';
+import { fetchFullTextDocuments, type DocumentSummaryResult } from './handler-helpers';
 import {
   createProductionEvidenceExtractor,
   createProductionStructuredEvidencePort,
@@ -113,6 +113,20 @@ export interface DocumentEvidencePhaseOverrides {
     degradedAutomatic: number;
   }>;
   loadDurableTotals?: () => Promise<Stage4DurableTotals>;
+}
+
+export function buildPhase1DocumentSummaries(documents: DocumentSummaryResult[]): Array<{
+  document_id: string;
+  file_name: string;
+  processed_content: string;
+}> {
+  return documents
+    .filter(document => document.sourceFailure === undefined)
+    .map(document => ({
+      document_id: document.document_id,
+      file_name: document.file_name,
+      processed_content: document.processed_content,
+    }));
 }
 
 function stableUuidV8(value: string): string {
@@ -406,7 +420,11 @@ async function runDocumentEvidencePhaseCore(
       if (result.status !== 'accepted' || !result.runId) break;
       const directives: NonNullable<DocumentEvidencePreflightInput['retryDirectives']> = [];
       for (const card of result.cards
-        .filter(card => card.coverage_status === 'degraded' || card.coverage_status === 'failed')
+        .filter(
+          card =>
+            (card.coverage_status === 'degraded' || card.coverage_status === 'failed') &&
+            card.coverage_reason !== 'source_file_unrecoverable'
+        )
         .sort((left, right) => left.document_id.localeCompare(right.document_id))) {
         const state = await retryCoordinator.getDegradedRetryState({
           runId: result.runId,
@@ -664,7 +682,7 @@ async function completePhaseWithTrace<
  * Phase 1: Basic Classification (12-25%)
  */
 export async function runClassificationPhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger, originalDocumentSummaries } = context;
+  const { courseId, input, supabase, orchestrationLogger, resolvedDocumentSummaries } = context;
   const phase1CacheKey = `phase1_cache:${courseId}`;
   const redis = getRedisClient();
 
@@ -709,6 +727,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
 
   if (!usedCache) {
     await startPhase(1, courseId, supabase, orchestrationLogger);
+    const phase1DocumentSummaries = buildPhase1DocumentSummaries(resolvedDocumentSummaries);
 
     phase1Output = await executePhaseWithRetry(
       'phase1_classification',
@@ -717,12 +736,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
           course_id: courseId,
           language: input.language,
           topic: input.topic,
-          document_summaries:
-            originalDocumentSummaries?.map(ds => ({
-              document_id: ds.document_id,
-              file_name: ds.file_name,
-              processed_content: ds.processed_content,
-            })) || null,
+          document_summaries: phase1DocumentSummaries.length > 0 ? phase1DocumentSummaries : null,
           target_audience: input.target_audience,
           lesson_duration_minutes: input.lesson_duration_minutes,
           course_description: input.course_description,
