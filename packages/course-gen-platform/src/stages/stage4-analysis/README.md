@@ -2,10 +2,10 @@
 
 ## Overview
 
-Stage 4 performs deep content analysis to extract pedagogical insights, course structure recommendations, and generation guidance. It runs a multi-phase LLM pipeline that transforms document summaries into actionable course blueprints for Stage 5 Generation.
+Stage 4 performs deep content analysis to extract pedagogical insights, course structure recommendations, and generation guidance. Documents are optional advisory evidence: a course without documents remains fully supported, while every uploaded document in an enabled evidence run is durably accounted for before clarifying questions.
 
-**Input:** Course topic, language, user requirements, document summaries (from Stage 3)
-**Output:** Complete `AnalysisResult` stored in `courses.analysis_result` JSONB column
+**Input:** Course topic, language, user requirements, and optional document summaries (from Stage 3)
+**Output:** Complete `AnalysisResult`, including an optional compact document-evidence snapshot, stored in `courses.analysis_result`
 
 ## Architecture
 
@@ -30,9 +30,16 @@ Budget Allocation (Token Budget for Documents)
 Phase 1: Classifier (Course Category + Topic Analysis + Missing Elements)
     |
     v
+Document Evidence Preflight (optional, after Phase 1)
+    |   -> exact per-document coverage ledger
+    |   -> bounded hierarchy + targeted source verification
+    |   -> material conflict/degraded-evidence decision subjects
+    |
+    v
 Phase 0.5: Clarifying Questions (Data-Driven, Enriched with Phase 1 Output)
     |          |
-    |     [PAUSE if semi-automatic mode -> user answers -> RESUME]
+    |     [PAUSE in manual mode while required questions are unresolved]
+    |     [automatic mode atomically persists recommended system decisions]
     |
     v
 Phase 2: Scope (Course Structure + Lessons Distribution)
@@ -49,6 +56,82 @@ Phase 5: Assembly (Pure Logic - Combine All Outputs)
     v
 AnalysisResult -> courses.analysis_result
 ```
+
+---
+
+## Optional document evidence
+
+The production entrypoint is `runDocumentEvidencePhase()` in
+`orchestrator-phase-helpers.ts`. It runs after Phase 1 and before the existing
+Phase 0.5 boundary.
+
+- `DOCUMENT_EVIDENCE_ENABLED` must be `true` to run the preflight.
+- `DOCUMENT_EVIDENCE_MODE` is `shadow` unless its value is exactly `active`.
+- Disabled and zero-document courses skip the preflight. Shadow mode persists
+  evidence and may attach its compact audit pointer, but it does not create
+  conflict decisions or replace Phase 2-4 document inputs with the bounded
+  advisory representation. Active mode can supply that representation and the
+  decision ledger to later phases.
+- Shadow conflict detection is an integration dependency on tracked task
+  `mc2-jz6y0.24.3`. After its GREEN change is integrated, shadow detects and
+  persists conflicts but still creates no questions/decisions and has no
+  downstream influence. Do not claim shadow conflict evidence from this docs
+  branch alone.
+- Downstream evidence consumption uses the same exact active gate: both
+  `DOCUMENT_EVIDENCE_ENABLED=true` and `DOCUMENT_EVIDENCE_MODE=active` are
+  required. A shadow snapshot is not consumed by the Stage 5 evidence pass or
+  the Stage 6 evidence loader.
+- Documents supplement the baseline. Explicit user decisions and requirements
+  take precedence; persisted automatic decisions, scoped authoritative evidence,
+  course-source evidence, and the baseline follow in that order. Low-confidence
+  or unknown-authority claims remain leads, not silent facts.
+
+### Complete coverage and large corpora
+
+`evidence/preflight.ts` enumerates the authoritative course source set and
+persists one card per source. An accepted run requires exact set equality: every
+source document has exactly one `assessed`, `degraded`, or `failed` outcome.
+Coverage below 100% is an invariant failure, not an acceptable rollout level.
+
+Large inputs are processed in deterministic token-bounded batches. Oversized
+documents use per-card hierarchy before cross-document reduction; checkpoints
+include source/version identity, model and tokenizer safety metadata. Resume
+reuses committed map/reduce and targeted-verification work without replaying it,
+while a changed source set/version or semantic input fingerprint creates a new
+run. Context overflow never authorizes silent tail truncation.
+
+Qdrant is used only for targeted claim/source verification in this preflight.
+Every query is filtered by `organization_id`, `course_id`, and the required
+document set, uses document grouping, and rejects foreign or stale refs. A
+Qdrant outage may degrade verification but cannot erase cards or conflicts
+already derived from source summaries.
+
+### Conflicts, degraded evidence, and audit
+
+Critical and important document conflicts are distinct required
+`document_conflicts` questions. Manual courses stop at the existing
+`stage_4_clarifying` Phase 0.5 boundary. Automatic courses atomically select the
+persisted recommendation and append both `answer_source: system` and
+`resolved_by: system`, including rationale, recommendation identity, run and
+conflict provenance. Informational differences remain non-blocking.
+
+Degraded/failed evidence uses the same durable decision workflow. Manual mode
+offers the supported retry/continue-limited/remove choices. Automatic mode uses
+bounded retry and records its system choice. Decisions are append-only; a later
+user override appends a superseding event instead of rewriting history.
+
+Durable rows live in `document_evidence_runs`, `document_evidence_items`,
+`document_evidence_conflicts`, and `document_evidence_decisions`, with batch,
+conflict, and retry checkpoints beside them. `AnalysisResult.document_evidence`
+contains only the accepted run ID, coverage totals, current decision IDs,
+unresolved informational conflicts, and Stage 5 enrichment status. Source and
+answer bodies remain in durable storage. Metrics/dashboards/alerts and ordinary
+new evidence-specific logs contain no product IDs, runtime hashes, content, raw
+errors, or model names; engineering task/commit IDs in Beads and orchestration
+artifacts are not product data.
+
+Operational rollout, recovery, and rollback are documented in
+[`docs/operations/document-evidence.md`](../../../../../docs/operations/document-evidence.md).
 
 ---
 
@@ -220,6 +303,25 @@ interface AnalysisResult {
   // Phase 4
   generation_guidance: GenerationGuidance;
 
+  // Optional compact pointer to durable document-evidence state
+  document_evidence?: {
+    accepted_run_id: string;
+    coverage: {
+      source_count: number;
+      assessed_count: number;
+      degraded_count: number;
+      failed_count: number;
+    };
+    current_decision_ids: string[];
+    unresolved_informational_conflict_ids: string[];
+    enrichment_status:
+      | 'not_applicable'
+      | 'applied'
+      | 'no_relevant_evidence'
+      | 'degraded'
+      | 'failed_open_with_decision';
+  };
+
   // Metadata
   metadata: {
     analysis_version: string;
@@ -304,7 +406,7 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 
 ### Unit Tests
 
-**Location:** `tests/unit/stages/stage4/`
+**Location:** `tests/unit/stages/stage4-analysis/`
 
 **Coverage:**
 
@@ -317,7 +419,9 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 **Run:**
 
 ```bash
-pnpm test tests/unit/stages/stage4/
+pnpm --filter @megacampus/course-gen-platform exec vitest run \
+  --config vitest.config.unit.ts \
+  tests/unit/stages/stage4-analysis
 ```
 
 ### Integration Tests
@@ -334,7 +438,10 @@ pnpm test tests/unit/stages/stage4/
 **Run:**
 
 ```bash
-pnpm test tests/integration/stage4-*
+pnpm --filter @megacampus/course-gen-platform exec vitest run \
+  --config ../../vitest.shared.ts --root . \
+  tests/integration/document-evidence-rls.test.ts \
+  tests/integration/document-conflict-auto-decisions.test.ts
 ```
 
 ---
@@ -385,14 +492,11 @@ Tracks phase execution metrics:
 
 ## Cost Tracking
 
-### Average Analysis Costs
-
-| Document Count | Total Cost  |
-| -------------- | ----------- |
-| 0 docs         | ~$0.02-0.05 |
-| 1-2 docs       | ~$0.05-0.10 |
-| 3-10 docs      | ~$0.10-0.25 |
-| 10+ docs       | ~$0.25-0.50 |
+Evidence runs persist batch/model/token/cost totals for observation. Large
+corpora may intentionally use additional model calls to preserve complete
+coverage. No cost, latency, or false-conflict rollout threshold is accepted yet;
+operators must use the owner-decision fields in the document-evidence runbook
+rather than treating historical averages as gates.
 
 ---
 
@@ -406,6 +510,6 @@ On successful completion:
 
 ---
 
-**Last Updated:** 2026-02-07
-**Version:** 1.0.0
+**Last Updated:** 2026-07-11
+**Version:** 1.1.0
 **Owner:** course-gen-platform team
