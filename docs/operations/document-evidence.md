@@ -223,9 +223,11 @@ retention.
 ## Evidence observability integration gate
 
 The semantics in this section belong to tracked remediation `mc2-jz6y0.24.5`;
-they are not a claim about the current integration tree. Treat them as rollout
-guarantees only after `.24.5` code independent PASS and integration. Until both
-conditions hold, evidence observability remains a rollout blocker.
+final code `7a7d54ae` received an independent PASS, was integrated as
+`b5262f4e`, and was accepted/pushed through `c7a51996`. That satisfies the
+`.24.5` code/integration dependency. It does not authorize rollout, remote
+migration, or Q12 execution; the owner decisions and authorization gates below
+still apply.
 
 The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 `12.4.5`, node_exporter `1.12.0`, and Alertmanager `0.33.1`.
@@ -274,7 +276,7 @@ The owner-confirmed pins remain unchanged: Prometheus `3.13.1` LTS, Grafana
 Database rollout is deliberately split. The partial unresolved-critical index
 uses live-write-safe `CREATE INDEX CONCURRENTLY` and its rollback uses
 `DROP INDEX CONCURRENTLY`; execute each statement in autocommit mode, never
-inside a transaction. Final code SHA `59dc6cad` provides one fixed-purpose
+inside a transaction. Final code SHA `7a7d54ae` provides one fixed-purpose
 unified repo runner at
 `packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts`;
 it accepts no arbitrary SQL or migration path and uses one `SUPABASE_DB_URL` for
