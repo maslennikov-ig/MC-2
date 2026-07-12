@@ -280,6 +280,7 @@ describe('Q6 self-hosted Qdrant runtime contract', () => {
         'QDRANT_S3_ENDPOINT_URL=https://s3.example.invalid',
         `QDRANT_METRICS_TEXTFILE_HOST_DIR=${directory}`,
         'QDRANT_METRICS_GID=2001',
+        'QDRANT_OPERATOR_IMAGE=ghcr.io/maslennikov-ig/mc-2/qdrant-operator:master-0123456789abcdef0123456789abcdef01234567',
         'COLOR=blue',
         'WEB_PORT=3001',
         'API_PORT=4001',

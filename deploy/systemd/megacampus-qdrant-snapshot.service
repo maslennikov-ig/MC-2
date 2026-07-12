@@ -5,13 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=megacampus
-Group=megacampus
-WorkingDirectory=/opt/megacampus/packages/course-gen-platform
 UMask=0077
 LoadCredential=qdrant_api_key:/opt/megacampus/secrets/qdrant_api_key
-Environment=QDRANT_URL=http://127.0.0.1:6335
-Environment=QDRANT_API_KEY_FILE=%d/qdrant_api_key
+Environment=QDRANT_URL=http://qdrant:6333
+Environment=QDRANT_API_KEY_FILE=/var/lib/megacampus-qdrant-recovery/runtime/snapshot/qdrant_api_key
 Environment=QDRANT_COLLECTION_NAME=course_embeddings
 Environment=QDRANT_SNAPSHOT_STORAGE_MODE=s3
 Environment=QDRANT_SNAPSHOT_OBJECT_PREFIX=megacampus/qdrant
@@ -19,8 +16,11 @@ Environment=QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
 Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
 Environment=QDRANT_RECOVERY_LOCK_PATH=/run/megacampus-qdrant-recovery/recovery.lock
 Environment=QDRANT_RECOVERY_LOCK_HELD=1
+ExecStartPre=/usr/bin/chown 1001:1001 /var/lib/megacampus-qdrant-recovery
+ExecStartPre=/usr/bin/install -D -o 0 -g 0 -m 0400 %d/qdrant_api_key /var/lib/megacampus-qdrant-recovery/runtime/snapshot/qdrant_api_key
 ExecStartPre=/usr/bin/bash -eu -c 'test -d "$1" && test ! -L "$1" && test -w "$1" && test "$(/usr/bin/stat -c %%a -- "$1")" = 2775' -- /var/lib/megacampus/qdrant-metrics
-ExecStart=/usr/bin/flock --nonblock /run/megacampus-qdrant-recovery/recovery.lock /usr/bin/pnpm --dir /opt/megacampus/packages/course-gen-platform qdrant:snapshot
+ExecStart=/usr/bin/flock --nonblock /run/megacampus-qdrant-recovery/recovery.lock /usr/bin/docker compose --project-directory /opt/megacampus -f /opt/megacampus/docker-compose.infra.yml --env-file /opt/megacampus/.env.production --profile operator run --rm --no-deps -T qdrant-recovery-operator snapshot
+ExecStopPost=/usr/bin/rm -rf /var/lib/megacampus-qdrant-recovery/runtime/snapshot
 TimeoutStartSec=55m
 StateDirectory=megacampus-qdrant-recovery
 StateDirectoryMode=0700
