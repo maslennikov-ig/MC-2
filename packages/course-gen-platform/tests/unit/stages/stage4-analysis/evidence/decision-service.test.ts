@@ -80,6 +80,21 @@ function card(status: 'assessed' | 'degraded' = 'assessed'): DocumentEvidenceCar
   };
 }
 
+function unrecoverableCard(): DocumentEvidenceCard {
+  return {
+    ...card('degraded'),
+    processing_mode: 'metadata_only',
+    summary: null,
+    key_claims: [],
+    terminology: [],
+    constraints: [],
+    limitations: [],
+    coverage_status: 'failed',
+    coverage_reason: 'source_file_unrecoverable',
+    token_counts: { original: 100, summary: 0, allocated: 0 },
+  };
+}
+
 function repository(): DocumentDecisionRepository {
   return {
     getAcceptedRun: vi.fn(async () => ({ id: id.run, status: 'accepted' as const })),
@@ -276,6 +291,53 @@ describe('document evidence decision service', () => {
     await expect(
       resolveDocumentEvidenceDecisions({ ...input, mode: 'automatic' }, { repository: db })
     ).rejects.toThrow(/retry.*not exhausted/i);
+  });
+
+  it('materializes an automatic unrecoverable decision immediately at retry state 0/2', async () => {
+    const db = repository();
+    vi.mocked(db.listConflicts).mockResolvedValueOnce([]);
+    vi.mocked(db.listItems).mockResolvedValueOnce([unrecoverableCard()]);
+    vi.mocked(db.getDegradedRetryState).mockResolvedValueOnce({ attempt: 0, maxAttempts: 2 });
+
+    const result = await resolveDocumentEvidenceDecisions(
+      { ...input, mode: 'automatic' },
+      { repository: db }
+    );
+
+    expect(db.getDegradedRetryState).toHaveBeenCalledOnce();
+    expect(db.materializeDecisionGateAtomic).toHaveBeenCalledOnce();
+    const gate = vi.mocked(db.materializeDecisionGateAtomic).mock.calls[0][0];
+    expect(gate.runId).toBe(id.run);
+    expect(gate.questions).toHaveLength(1);
+    expect(gate.questions[0]).toEqual(
+      expect.objectContaining({ subjectKind: 'degraded_evidence' })
+    );
+    expect(gate.questions[0].suggestedAnswers.map(answer => answer.value)).toEqual([
+      'continue_limited',
+      'remove_document',
+    ]);
+    expect(gate.questions[0].suggestedAnswers.find(answer => answer.is_recommended)?.value).toBe(
+      'continue_limited'
+    );
+    expect(result.currentDecisionIds).toEqual([id.decision]);
+    expect(result.decisionSummary).toEqual({ user: 0, system: 1, degradedAutomatic: 1 });
+  });
+
+  it('still forbids automatic decisions for every other failed reason before retry exhaustion', async () => {
+    const db = repository();
+    vi.mocked(db.listConflicts).mockResolvedValueOnce([]);
+    vi.mocked(db.listItems).mockResolvedValueOnce([
+      {
+        ...unrecoverableCard(),
+        coverage_reason: 'structured_evidence_generation_failed_after_retries',
+      },
+    ]);
+    vi.mocked(db.getDegradedRetryState).mockResolvedValueOnce({ attempt: 0, maxAttempts: 2 });
+
+    await expect(
+      resolveDocumentEvidenceDecisions({ ...input, mode: 'automatic' }, { repository: db })
+    ).rejects.toThrow(/retry.*not exhausted/i);
+    expect(db.materializeDecisionGateAtomic).not.toHaveBeenCalled();
   });
 
   it('materializes a distinct required detector-capacity subject without fake document provenance', async () => {

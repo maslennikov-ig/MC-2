@@ -280,6 +280,10 @@ const degradedCopy = {
   },
 } as const;
 
+function isTerminalUnrecoverableSource(card: DocumentEvidenceCard): boolean {
+  return card.coverage_status === 'failed' && card.coverage_reason === 'source_file_unrecoverable';
+}
+
 function degradedQuestion(input: {
   runId: string;
   language: 'ru' | 'en';
@@ -288,7 +292,7 @@ function degradedQuestion(input: {
   attempt: number;
   maxAttempts: number;
 }): Omit<DocumentEvidenceQuestion, 'questionId' | 'subjectKey' | 'subjectKind'> {
-  const canRetry = input.attempt < input.maxAttempts;
+  const canRetry = !isTerminalUnrecoverableSource(input.card) && input.attempt < input.maxAttempts;
   const choices = canRetry
     ? (['retry', 'continue_limited', 'remove_document'] as const)
     : (['continue_limited', 'remove_document'] as const);
@@ -483,7 +487,11 @@ export async function resolveDocumentEvidenceDecisions(
       documentId: evidenceCard.document_id,
       configuredMaxAttempts: input.maxEvidenceRetryAttempts,
     });
-    if (input.mode === 'automatic' && retry.attempt < retry.maxAttempts) {
+    if (
+      input.mode === 'automatic' &&
+      !isTerminalUnrecoverableSource(evidenceCard) &&
+      retry.attempt < retry.maxAttempts
+    ) {
       throw new Error('Evidence retry is not exhausted; automatic degraded decision is forbidden');
     }
     const subject: DocumentEvidenceDecisionSubject = {

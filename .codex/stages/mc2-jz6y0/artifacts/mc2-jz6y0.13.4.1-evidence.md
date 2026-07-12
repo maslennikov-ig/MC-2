@@ -11,9 +11,12 @@ repo: mc2
 branch: codex/q12-source-recovery-evidence
 base_branch: codex/self-hosted-qdrant-platform
 base_commit: cfce2c1c3d927e1ba1537a81d959302a166162c3
-resolves_review: 254a8b83
+resolves_review:
+  - 254a8b83
+  - ad6ce784
 worktree: /home/me/code/mc2/.worktrees/q12-source-recovery-evidence
 write_zone:
+  - packages/course-gen-platform/src/stages/stage4-analysis/evidence/decision-service.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/source-failure.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
@@ -73,16 +76,22 @@ verification:
   - correction RED semantic boundary: stale full-text allocation included the audited ID and the semantic selector was absent
   - correction GREEN enumeration/live wiring: passed 31/31
   - correction RED automatic decision: source_file_unrecoverable created a second retry run
-  - correction GREEN automatic decision: passed live wiring 24/24 with one terminal run and no retry calls
+  - correction GREEN automatic retry-loop: passed live wiring 24/24 with one run and no retry calls, but the mocked decision boundary left review ad6ce784 open
   - correction combined Stage 4/5/6 gate: passed 115/115 across six files
   - correction package type-check: passed after the isolated worktree dependency view was restored
+  - ad6ce784 RED real decision path: expected 2 failures and 34 passes because automatic retry state 0/2 blocked materialization
+  - ad6ce784 GREEN real decision path: passed 37/37 across decision-service and live-wiring tests
+  - ad6ce784 prior combined Stage 4/5/6 gate: passed 115/115 unchanged
+  - ad6ce784 package type-check: passed
 changed_files:
+  - packages/course-gen-platform/src/stages/stage4-analysis/evidence/decision-service.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/source-failure.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/orchestrator-phase-helpers.ts
   - packages/course-gen-platform/src/stages/stage4-analysis/evidence/preflight.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/document-source-enumeration.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/decision-service.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/live-wiring.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/preflight.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage4-analysis/evidence/source-failure.test.ts
@@ -171,9 +180,31 @@ tokens.
 
 The automatic retry loop now excludes cards whose exact coverage reason is
 `source_file_unrecoverable`. The focused regression proves one accepted run,
-zero degraded-state lookup, zero retry decision, zero retry consumption, and
-one terminal system decision on the original run. Retry behavior for all other
-recoverable degraded/failed outcomes remains unchanged.
+zero automatic retry-state lookup, zero retry decision, zero retry consumption,
+and no replacement evidence run.
+
+## Real decision-service terminal correction for review `ad6ce784`
+
+The immutable re-review correctly found that the first correction mocked the
+downstream decision boundary. The real `resolveDocumentEvidenceDecisions()`
+still read durable retry state `0/2` and rejected the automatic decision before
+atomic materialization.
+
+The decision service now treats only the exact combination
+`coverage_status='failed'` and
+`coverage_reason='source_file_unrecoverable'` as terminal and non-retryable. It
+does not pretend that retries were exhausted: the persisted `0/2` state remains
+visible in the decision subject, but the automatic exhaustion guard does not
+apply and the question contains only `continue_limited` and `remove_document`.
+The recommendation remains `continue_limited`, so the existing atomic gate
+appends one idempotent system decision on the original accepted evidence run.
+
+The live-wiring regression now invokes the real decision service with a
+repository double rather than mocking `resolveDecisions`. It proves one
+preflight run, no automatic retry lookup/record/consume, one atomic terminal
+decision, and the unchanged metadata-only card with null summary, no claims,
+and zero allocated tokens. A separate negative control proves every other
+degraded or failed reason still throws before materialization at `0/2`.
 
 ## Correction verification
 
@@ -183,6 +214,11 @@ Stage 5 advisory exclusion 30, and Stage 6 evidence-context exclusion 14. The
 course-gen-platform package type-check passed. Final artifact, process,
 formatting, and diff checks are recorded at delivery after temporary dependency
 links are removed.
+
+For the `ad6ce784` correction, the real-path RED produced exactly two expected
+failures with 34 passes. The GREEN targeted command passed 37/37 across
+decision-service and live wiring. The unchanged prior Stage 4/5/6 gate passed
+115/115, and package type-check passed.
 
 # Risks / Follow-ups
 

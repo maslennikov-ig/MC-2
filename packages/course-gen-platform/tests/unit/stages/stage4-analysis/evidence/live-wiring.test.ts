@@ -14,6 +14,7 @@ import {
   validateLegacyBudgetForEvidencePreflight,
 } from '@/stages/stage4-analysis/orchestrator-helpers';
 import { resolveDownstreamDocumentSummaries } from '@/stages/stage4-analysis/evidence/downstream-context';
+import type { DocumentDecisionRepository } from '@/stages/stage4-analysis/evidence/decision-service';
 import { allocateStage4Budget } from '@/stages/stage4-analysis/phases/stage4-budget-allocator';
 import { validateJobInput } from '@/stages/stage4-analysis/utils/validators';
 
@@ -898,11 +899,23 @@ describe('Stage 4 document evidence live wiring', () => {
     ]);
     const failedCard = {
       document_id: summary.document_id,
+      document_name: summary.file_name,
+      priority: summary.stage3_priority,
+      authority_scope: 'course_source',
+      content_quality: summary.summary_metadata.quality_score,
+      course_relevance: 0,
       coverage_status: 'failed',
       coverage_reason: 'source_file_unrecoverable',
       processing_mode: 'metadata_only',
-    } as never;
+      summary: null,
+      key_claims: [],
+      terminology: [],
+      constraints: [],
+      limitations: [],
+      token_counts: { original: 5_000, summary: 0, allocated: 0 },
+    } as const;
     const firstRunId = '10000000-0000-4000-8000-000000000001';
+    const terminalDecisionId = '80000000-0000-4000-8000-000000000001';
     const retryDecisionId = '70000000-0000-4000-8000-000000000001';
     const retryDirective = {
       decisionId: retryDecisionId,
@@ -932,16 +945,19 @@ describe('Stage 4 document evidence live wiring', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([retryDirective]);
     const consumeRetryDirectives = vi.fn(async () => undefined);
-    const resolveDecisions = vi.fn(async input => {
-      expect(input.runId).toBe(firstRunId);
-      return {
-        pauseRequired: false,
-        requiredQuestionIds: [],
-        currentDecisionIds: ['80000000-0000-4000-8000-000000000001'],
-        unresolvedInformationalConflictIds: [],
-        decisionSummary: { user: 0, system: 1, degradedAutomatic: 1 },
-      };
-    });
+    const decisionRepository: DocumentDecisionRepository = {
+      getAcceptedRun: vi.fn(async () => ({ id: firstRunId, status: 'accepted' })),
+      listConflicts: vi.fn(async () => []),
+      listItems: vi.fn(async () => [failedCard]),
+      listDetectorCapacityIssues: vi.fn(async () => []),
+      listCurrentDecisions: vi.fn(async () => []),
+      getDegradedRetryState: vi.fn(async () => ({ attempt: 0, maxAttempts: 2 })),
+      materializeDecisionGateAtomic: vi.fn(async input => ({
+        question_ids: input.questions.map(question => question.questionId),
+        decision_ids: [terminalDecisionId],
+        reused: false,
+      })),
+    };
 
     await runDocumentEvidencePhase(analysisContext, {
       enabled: true,
@@ -957,18 +973,27 @@ describe('Stage 4 document evidence live wiring', () => {
       } as never,
       detectConflicts: vi.fn(async () => ({ conflicts: [], issues: [] })) as never,
       conflictDependencies: {} as never,
-      resolveDecisions,
-      decisionDependencies: {} as never,
+      decisionDependencies: { repository: decisionRepository },
     });
 
     expect(runPreflight).toHaveBeenCalledTimes(1);
     expect(getDegradedRetryState).not.toHaveBeenCalled();
     expect(recordAutomaticRetry).not.toHaveBeenCalled();
     expect(consumeRetryDirectives).not.toHaveBeenCalled();
-    expect(resolveDecisions).toHaveBeenCalledTimes(1);
+    expect(decisionRepository.getDegradedRetryState).toHaveBeenCalledOnce();
+    expect(decisionRepository.materializeDecisionGateAtomic).toHaveBeenCalledOnce();
     expect(analysisContext.documentEvidencePreflight?.runId).toBe(firstRunId);
+    expect(analysisContext.documentEvidencePreflight?.cards).toEqual([failedCard]);
+    expect(failedCard).toEqual(
+      expect.objectContaining({
+        processing_mode: 'metadata_only',
+        summary: null,
+        key_claims: [],
+        token_counts: { original: 5_000, summary: 0, allocated: 0 },
+      })
+    );
     expect(analysisContext.documentEvidenceDecisions?.currentDecisionIds).toEqual([
-      '80000000-0000-4000-8000-000000000001',
+      terminalDecisionId,
     ]);
   });
 
