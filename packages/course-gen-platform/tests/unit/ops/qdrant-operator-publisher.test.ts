@@ -1,0 +1,490 @@
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { afterEach, describe, expect, it } from 'vitest';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
+const PUBLISHER = resolve(REPO_ROOT, 'deploy/qdrant/publish-qdrant-operator.sh');
+const COMMIT = '0123456789abcdef0123456789abcdef01234567';
+const CONFIRMATION = `PUBLISH qdrant-operator ${COMMIT}`;
+const REPOSITORY = 'ghcr.io/maslennikov-ig/mc-2/qdrant-operator';
+const DIGEST = `sha256:${'a'.repeat(64)}`;
+const OTHER_DIGEST = `sha256:${'b'.repeat(64)}`;
+const TOKEN = 'ghp_q12SyntheticTokenNeverPersisted_123456789';
+const roots: string[] = [];
+
+interface Fixture {
+  root: string;
+  bin: string;
+  home: string;
+  runTemp: string;
+  commandLog: string;
+  gitMode: string;
+  dockerMode: string;
+  utilityMode: string;
+  env: NodeJS.ProcessEnv;
+}
+
+function executable(path: string, contents: string): void {
+  writeFileSync(path, contents, { mode: 0o700 });
+  chmodSync(path, 0o700);
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function fixture(): Fixture {
+  const root = mkdtempSync('/tmp/mc2-qdrant-publisher-test-');
+  roots.push(root);
+  chmodSync(root, 0o700);
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  const runTemp = join(root, 'run-temp');
+  for (const directory of [bin, home, runTemp]) {
+    mkdirSync(directory, { mode: 0o700 });
+    chmodSync(directory, 0o700);
+  }
+
+  const commandLog = join(root, 'commands.log');
+  const gitMode = join(root, 'git-mode');
+  const dockerMode = join(root, 'docker-mode');
+  const utilityMode = join(root, 'utility-mode');
+  writeFileSync(gitMode, 'success\n', { mode: 0o600 });
+  writeFileSync(dockerMode, 'success\n', { mode: 0o600 });
+  writeFileSync(utilityMode, 'success\n', { mode: 0o600 });
+
+  const utilityPaths: Record<string, string> = {
+    chmod: '/usr/bin/chmod',
+    env: '/usr/bin/env',
+    mkdir: '/usr/bin/mkdir',
+    mktemp: '/usr/bin/mktemp',
+    rm: '/usr/bin/rm',
+    stat: '/usr/bin/stat',
+  };
+  for (const [name, realPath] of Object.entries(utilityPaths)) {
+    executable(
+      join(bin, name),
+      `#!/usr/bin/bash
+set -eu
+printf 'external\\t${name}' >> ${shellQuote(commandLog)}
+printf '\\t%q' "$@" >> ${shellQuote(commandLog)}
+printf '\\n' >> ${shellQuote(commandLog)}
+[[ "$(<${shellQuote(utilityMode)})" != ${shellQuote(`fail-${name}`)} ]] || exit 73
+exec ${shellQuote(realPath)} "$@"
+`
+    );
+  }
+
+  executable(
+    join(bin, 'git'),
+    `#!/usr/bin/bash
+set -eu
+printf 'git' >> ${shellQuote(commandLog)}
+printf '\\t%q' "$@" >> ${shellQuote(commandLog)}
+printf '\\n' >> ${shellQuote(commandLog)}
+mode="$(<${shellQuote(gitMode)})"
+if [[ "$*" == 'rev-parse --show-toplevel' ]]; then
+  printf '%s\\n' ${shellQuote(REPO_ROOT)}
+elif [[ "\${1:-}" == cat-file && "\${2:-}" == -e ]]; then
+  [[ "$mode" != unreachable ]]
+elif [[ "\${1:-}" == remote && "\${2:-}" == get-url && "\${3:-}" == origin ]]; then
+  printf '%s\\n' 'https://github.com/maslennikov-ig/MC-2.git'
+elif [[ "\${1:-}" == fetch && "\${5:-}" == origin ]]; then
+  :
+elif [[ "\${1:-}" == for-each-ref ]]; then
+  [[ "$mode" == unpushed ]] || printf '%s\\n' 'refs/remotes/origin/codex/accepted'
+elif [[ "\${1:-}" == worktree && "\${2:-}" == add ]]; then
+  worktree="\${4:?missing worktree path}"
+  /usr/bin/mkdir -p "$worktree/packages/course-gen-platform"
+  printf '%s\\n' 'gitdir: synthetic' > "$worktree/.git"
+  printf '%s\\n' 'FROM runner AS qdrant-operator' > "$worktree/packages/course-gen-platform/Dockerfile"
+elif [[ "\${1:-}" == -C && "\${3:-}" == rev-parse && "\${4:-}" == HEAD ]]; then
+  printf '%s\\n' ${shellQuote(COMMIT)}
+elif [[ "\${1:-}" == -C && "\${3:-}" == status ]]; then
+  [[ "$mode" == dirty ]] && printf '%s\\n' '?? synthetic-residue' || true
+elif [[ "\${1:-}" == worktree && "\${2:-}" == remove ]]; then
+  [[ "$mode" != worktree-remove-failure ]] || exit 72
+  /usr/bin/rm -rf -- "\${4:?missing worktree path}"
+else
+  printf '%s\\n' 'unexpected synthetic git command' >&2
+  exit 97
+fi
+`
+  );
+
+  executable(
+    join(bin, 'docker'),
+    `#!/usr/bin/bash
+set -eu
+printf 'docker\\tdocker_config=%s\\thome=%s\\tinherited=%s' "\${DOCKER_CONFIG:-}" "\${HOME:-}" "\${UNRELATED_SECRET:-}" >> ${shellQuote(commandLog)}
+printf '\\t%q' "$@" >> ${shellQuote(commandLog)}
+printf '\\n' >> ${shellQuote(commandLog)}
+mode="$(<${shellQuote(dockerMode)})"
+case "\${1:-} \${2:-}" in
+  'login ghcr.io')
+    [[ "\${3:-}" == --username ]]
+    [[ "\${4:-}" == maslennikov-ig ]]
+    [[ "\${5:-}" == --password-stdin ]]
+    [[ "$#" -eq 5 ]]
+    IFS= read -r token || true
+    [[ -n "\${token:-}" ]] || exit 41
+    printf 'docker-check\\tconfig-dir-mode=%s\\tconfig-file-mode=%s\\tstdin-bytes=%s\\n' \
+      "$(/usr/bin/stat -c %a "$DOCKER_CONFIG")" \
+      "$(/usr/bin/stat -c %a "$DOCKER_CONFIG/config.json")" \
+      "\${#token}" >> ${shellQuote(commandLog)}
+    if [[ "$mode" == helper-injection ]]; then
+      printf '%s\\n' '{"credsStore":"pass","auths":{}}' > "$DOCKER_CONFIG/config.json"
+    else
+      printf '%s\\n' '{"auths":{"ghcr.io":{"auth":"synthetic-redacted"}}}' > "$DOCKER_CONFIG/config.json"
+    fi
+    /usr/bin/chmod 0600 "$DOCKER_CONFIG/config.json"
+    ;;
+  'buildx build')
+    [[ "$mode" != build-failure ]] || exit 42
+    if [[ "$mode" == signal ]]; then
+      /usr/bin/kill -TERM "$PPID"
+      /usr/bin/sleep 0.05
+      exit 143
+    fi
+    metadata=''
+    previous=''
+    for argument in "$@"; do
+      if [[ "$previous" == --metadata-file ]]; then metadata="$argument"; fi
+      case "$argument" in --metadata-file=*) metadata="\${argument#--metadata-file=}" ;; esac
+      previous="$argument"
+    done
+    [[ -n "$metadata" ]] || exit 43
+    printf '%s\\n' ${shellQuote(`{"containerimage.digest":"${DIGEST}","buildx.build.provenance":{"mode":"max"}}`)} > "$metadata"
+    /usr/bin/chmod 0600 "$metadata"
+    ;;
+  'buildx imagetools')
+    [[ "\${3:-}" == inspect ]]
+    [[ "\${5:-}" == --format ]]
+    [[ "\${6:-}" == '{{json .Manifest.Digest}}' ]]
+    if [[ "$mode" == digest-mismatch ]]; then
+      printf '"%s"\\n' ${shellQuote(OTHER_DIGEST)}
+    else
+      printf '"%s"\\n' ${shellQuote(DIGEST)}
+    fi
+    ;;
+  'logout ghcr.io')
+    [[ "$mode" != logout-failure ]] || exit 71
+    printf '%s\\n' '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
+    /usr/bin/chmod 0600 "$DOCKER_CONFIG/config.json"
+    ;;
+  *)
+    printf '%s\\n' 'unexpected synthetic docker command' >&2
+    exit 98
+    ;;
+esac
+`
+  );
+
+  return {
+    root,
+    bin,
+    home,
+    runTemp,
+    commandLog,
+    gitMode,
+    dockerMode,
+    utilityMode,
+    env: {
+      PATH: bin,
+      HOME: home,
+      TMPDIR: runTemp,
+      LC_ALL: 'C',
+      UNRELATED_SECRET: 'must-not-reach-docker',
+    },
+  };
+}
+
+function args(commit = COMMIT, confirmation = CONFIRMATION, username = 'maslennikov-ig'): string[] {
+  return [PUBLISHER, '--commit', commit, '--github-user', username, '--confirm', confirmation];
+}
+
+function run(
+  item: Fixture,
+  options: {
+    commit?: string;
+    confirmation?: string;
+    username?: string;
+    input?: string;
+    env?: NodeJS.ProcessEnv;
+    trace?: boolean;
+  } = {}
+): ReturnType<typeof spawnSync> {
+  return spawnSync(
+    '/usr/bin/bash',
+    [
+      ...(options.trace === true ? ['-x'] : []),
+      ...args(options.commit, options.confirmation, options.username),
+    ],
+    {
+      env: { ...item.env, ...options.env },
+      input: options.input ?? `${TOKEN}\n`,
+      encoding: 'utf8',
+    }
+  );
+}
+
+function commands(item: Fixture): string {
+  return existsSync(item.commandLog) ? readFileSync(item.commandLog, 'utf8') : '';
+}
+
+function treeText(path: string): string {
+  if (!existsSync(path)) return '';
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink()) return '';
+  if (stat.isFile()) return readFileSync(path, 'utf8');
+  if (!stat.isDirectory()) return '';
+  return readdirSync(path)
+    .map(name => treeText(join(path, name)))
+    .join('\n');
+}
+
+function expectNoToken(item: Fixture, result: ReturnType<typeof spawnSync>): void {
+  const captured = `${result.stdout}${result.stderr}${commands(item)}${treeText(item.root)}`;
+  expect(captured).not.toContain(TOKEN);
+}
+
+function expectNoRunResidue(item: Fixture): void {
+  expect(readdirSync(item.runTemp)).toEqual([]);
+}
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+describe('Q12 build-only qdrant-operator publisher', () => {
+  it('fails closed for malformed, unreachable, unpushed, and dirty commits', () => {
+    const malformed = fixture();
+    const malformedResult = run(malformed, {
+      commit: 'short-sha',
+      confirmation: 'PUBLISH qdrant-operator short-sha',
+    });
+    expect(malformedResult.status).not.toBe(0);
+    expect(malformedResult.stderr).toContain('commit must be exactly 40 lowercase hexadecimal');
+    expect(commands(malformed)).not.toContain('docker\t');
+
+    for (const mode of ['unreachable', 'unpushed', 'dirty']) {
+      const item = fixture();
+      writeFileSync(item.gitMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+      expect(result.status).not.toBe(0);
+      if (mode === 'dirty') {
+        expect(commands(item)).not.toContain('\tlogin\tghcr.io');
+        expect(commands(item)).not.toContain('\tbuildx\tbuild\t');
+        expect(commands(item)).toContain('\tlogout\tghcr.io');
+      } else {
+        expect(commands(item)).not.toContain('docker\t');
+      }
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('rejects incorrect confirmation and invalid GitHub usernames before reading credentials', () => {
+    const confirmation = fixture();
+    const confirmationResult = run(confirmation, {
+      confirmation: `PUBLISH qdrant-operator ${'f'.repeat(40)}`,
+    });
+    expect(confirmationResult.status).not.toBe(0);
+    expect(confirmationResult.stderr).toContain('confirmation must exactly equal');
+    expect(commands(confirmation)).toBe('');
+
+    const username = fixture();
+    const usernameResult = run(username, { username: 'invalid/user' });
+    expect(usernameResult.status).not.toBe(0);
+    expect(usernameResult.stderr).toContain('GitHub username is invalid');
+    expect(commands(username)).toBe('');
+  });
+
+  it('requires the token on stdin and refuses inherited Docker authentication', () => {
+    const missing = fixture();
+    const missingResult = run(missing, { input: '' });
+    expect(missingResult.status).not.toBe(0);
+    expect(missingResult.stderr).toContain('registry token must be supplied on stdin');
+    expect(commands(missing)).not.toContain('docker\t');
+
+    const configured = fixture();
+    const configuredResult = run(configured, {
+      env: { DOCKER_CONFIG: join(configured.root, 'inherited-docker') },
+    });
+    expect(configuredResult.status).not.toBe(0);
+    expect(configuredResult.stderr).toContain('inherited Docker authentication is forbidden');
+    expect(commands(configured)).not.toContain('docker\t');
+
+    const dirtyHome = fixture();
+    const inheritedConfig = join(dirtyHome.home, '.docker');
+    mkdirSync(inheritedConfig, { mode: 0o700 });
+    writeFileSync(
+      join(inheritedConfig, 'config.json'),
+      '{"auths":{"ghcr.io":{"auth":"redacted"}},"credsStore":"pass"}\n',
+      { mode: 0o600 }
+    );
+    const dirtyResult = run(dirtyHome);
+    expect(dirtyResult.status).not.toBe(0);
+    expect(dirtyResult.stderr).toContain('inherited Docker authentication is forbidden');
+    expect(commands(dirtyHome)).not.toContain('docker\t');
+  });
+
+  it('publishes exactly one linux/amd64 full-SHA operator target with maximum provenance', () => {
+    const item = fixture();
+    const result = run(item);
+    const log = commands(item);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`${REPOSITORY}@${DIGEST}`);
+    expect(log).toContain('git\tcat-file\t-e');
+    expect(log).toContain('git\tremote\tget-url\torigin');
+    expect(log).toContain('git\tfetch\t--quiet\t--prune\t--no-tags\torigin');
+    expect(log).toContain('git\tfor-each-ref');
+    expect(log).toContain('git\tworktree\tadd\t--detach');
+    const builds = log
+      .split('\n')
+      .filter(line => line.startsWith('docker\t') && line.includes('\tbuildx\tbuild\t'));
+    expect(builds).toHaveLength(1);
+    const build = builds[0];
+    expect(build).toContain('\t--target\tqdrant-operator');
+    expect(build).toContain('\t--platform\tlinux/amd64');
+    expect(build).toContain(`\t--tag\t${REPOSITORY}:${COMMIT}`);
+    expect(build).toContain('\t--provenance=mode=max');
+    expect(build).toContain('\t--metadata-file\t');
+    expect(build).toContain('\t--push\t');
+    expect(build).toContain(`\t--label\torg.opencontainers.image.revision=${COMMIT}`);
+    expect(
+      log
+        .split('\n')
+        .filter(
+          line => line.startsWith('docker\t') && line.includes('\tbuildx\timagetools\tinspect\t')
+        )
+    ).toHaveLength(1);
+    expect(log).not.toMatch(/\t(?:ssh|scp|compose|service|deploy|migration|push)\t/iu);
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('uses stdin-only login and a minimal environment with unique owner-only Docker configs', () => {
+    const item = fixture();
+    const first = run(item);
+    const second = run(item);
+    const log = commands(item);
+
+    expect(first.status).toBe(0);
+    expect(second.status).toBe(0);
+    const logins = log
+      .split('\n')
+      .filter(line => line.startsWith('docker\t') && line.includes('\tlogin\tghcr.io\t'));
+    expect(logins).toHaveLength(2);
+    for (const login of logins) {
+      expect(login).toContain('\t--username\tmaslennikov-ig\t--password-stdin');
+      expect(login).not.toContain(TOKEN);
+      expect(login).toContain('\tinherited=');
+      expect(login).not.toContain('must-not-reach-docker');
+    }
+    const checks = log.split('\n').filter(line => line.startsWith('docker-check\t'));
+    expect(checks).toHaveLength(2);
+    for (const check of checks) {
+      expect(check).toContain('config-dir-mode=700');
+      expect(check).toContain('config-file-mode=600');
+      expect(check).toMatch(/stdin-bytes=[1-9][0-9]*/u);
+    }
+    const configPaths = logins.map(line => /docker_config=([^\t]+)/u.exec(line)?.[1]);
+    expect(new Set(configPaths).size).toBe(2);
+    expectNoRunResidue(item);
+    expectNoToken(item, first);
+    expectNoToken(item, second);
+  });
+
+  it('keeps the stdin token out of xtrace, argv, output, and captured state', () => {
+    const item = fixture();
+    const result = run(item, { trace: true });
+
+    expect(result.status).toBe(0);
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('rejects a credential helper injected into the isolated Docker config', () => {
+    const item = fixture();
+    writeFileSync(item.dockerMode, 'helper-injection\n', { mode: 0o600 });
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('isolated Docker config contains a credential helper or store');
+    expect(commands(item)).not.toContain('\tbuildx\tbuild\t');
+    expect(commands(item)).toContain('\tlogout\tghcr.io');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('removes unique state when setup fails after mktemp', () => {
+    const item = fixture();
+    writeFileSync(item.utilityMode, 'fail-chmod\n', { mode: 0o600 });
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(commands(item)).toContain('external\tmktemp\t-d');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('fails when the independently inspected digest differs from Buildx metadata', () => {
+    const item = fixture();
+    writeFileSync(item.dockerMode, 'digest-mismatch\n', { mode: 0o600 });
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('remote digest does not match Buildx metadata');
+    expect(commands(item)).toContain('\tbuildx\timagetools\tinspect\t');
+    expect(commands(item)).toContain('\tlogout\tghcr.io');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('removes credentials, metadata, and worktrees after ordinary failure and signal', () => {
+    for (const mode of ['build-failure', 'signal']) {
+      const item = fixture();
+      writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(commands(item)).toContain('\tlogin\tghcr.io');
+      expect(commands(item)).toContain('\tlogout\tghcr.io');
+      expect(commands(item)).toContain('git\tworktree\tremove\t--force');
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('makes cleanup failure override an otherwise successful publication', () => {
+    for (const [kind, mode] of [
+      ['Docker logout', 'logout-failure'],
+      ['Git worktree removal', 'worktree-remove-failure'],
+    ] as const) {
+      const item = fixture();
+      const modeFile = kind === 'Docker logout' ? item.dockerMode : item.gitMode;
+      writeFileSync(modeFile, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('publisher cleanup failed');
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+});
