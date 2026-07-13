@@ -20,10 +20,46 @@ const PUBLISHER = resolve(REPO_ROOT, 'deploy/qdrant/publish-qdrant-operator.sh')
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
 const CONFIRMATION = `PUBLISH qdrant-operator ${COMMIT}`;
 const REPOSITORY = 'ghcr.io/maslennikov-ig/mc-2/qdrant-operator';
+const SOURCE_REPOSITORY = 'https://github.com/maslennikov-ig/MC-2.git';
 const DIGEST = `sha256:${'a'.repeat(64)}`;
 const OTHER_DIGEST = `sha256:${'b'.repeat(64)}`;
 const TOKEN = 'ghp_q12SyntheticTokenNeverPersisted_123456789';
+const BUILDKIT_METADATA_KEY = 'https://mobyproject.org/buildkit@v1#metadata';
 const roots: string[] = [];
+
+function provenance(
+  revision = COMMIT,
+  source = SOURCE_REPOSITORY,
+  includeMaxEvidence = true
+): Record<string, unknown> {
+  return {
+    buildType: 'https://mobyproject.org/buildkit@v1',
+    metadata: {
+      [BUILDKIT_METADATA_KEY]: {
+        vcs: { revision, source },
+        ...(includeMaxEvidence
+          ? {
+              source: {
+                infos: [
+                  {
+                    filename: 'packages/course-gen-platform/Dockerfile',
+                    data: 'FROM runner AS qdrant-operator',
+                  },
+                ],
+              },
+            }
+          : {}),
+      },
+    },
+  };
+}
+
+function buildMetadata(buildProvenance: unknown = provenance(), digest = DIGEST): string {
+  return JSON.stringify({
+    'containerimage.digest': digest,
+    'buildx.build.provenance': buildProvenance,
+  });
+}
 
 interface Fixture {
   root: string;
@@ -34,6 +70,7 @@ interface Fixture {
   gitMode: string;
   dockerMode: string;
   utilityMode: string;
+  statePath: string;
   env: NodeJS.ProcessEnv;
 }
 
@@ -62,6 +99,7 @@ function fixture(): Fixture {
   const gitMode = join(root, 'git-mode');
   const dockerMode = join(root, 'docker-mode');
   const utilityMode = join(root, 'utility-mode');
+  const statePath = join(root, 'state-path');
   writeFileSync(gitMode, 'success\n', { mode: 0o600 });
   writeFileSync(dockerMode, 'success\n', { mode: 0o600 });
   writeFileSync(utilityMode, 'success\n', { mode: 0o600 });
@@ -71,10 +109,29 @@ function fixture(): Fixture {
     env: '/usr/bin/env',
     mkdir: '/usr/bin/mkdir',
     mktemp: '/usr/bin/mktemp',
+    python3: '/usr/bin/python3',
     rm: '/usr/bin/rm',
     stat: '/usr/bin/stat',
   };
   for (const [name, realPath] of Object.entries(utilityPaths)) {
+    let specialBehavior = '';
+    if (name === 'mktemp') {
+      specialBehavior = `if [[ "$(<${shellQuote(utilityMode)})" == signal-mktemp ]]; then
+  state_path="$(${shellQuote(realPath)} "$@")"
+  printf '%s\\n' "$state_path" > ${shellQuote(statePath)}
+  /usr/bin/kill -TERM "$PPID"
+  /usr/bin/sleep 0.05
+  exit 143
+fi`;
+    } else if (name === 'mkdir') {
+      specialBehavior = `if [[ "$(<${shellQuote(utilityMode)})" == signal-mkdir && "\${!#}" == */mc2-qdrant-publisher.* ]]; then
+  ${shellQuote(realPath)} "$@"
+  printf '%s\\n' "\${!#}" > ${shellQuote(statePath)}
+  /usr/bin/kill -TERM "$PPID"
+  /usr/bin/sleep 0.05
+  exit 0
+fi`;
+    }
     executable(
       join(bin, name),
       `#!/usr/bin/bash
@@ -83,6 +140,7 @@ printf 'external\\t${name}' >> ${shellQuote(commandLog)}
 printf '\\t%q' "$@" >> ${shellQuote(commandLog)}
 printf '\\n' >> ${shellQuote(commandLog)}
 [[ "$(<${shellQuote(utilityMode)})" != ${shellQuote(`fail-${name}`)} ]] || exit 73
+${specialBehavior}
 exec ${shellQuote(realPath)} "$@"
 `
     );
@@ -133,10 +191,11 @@ printf 'docker\\tdocker_config=%s\\thome=%s\\tinherited=%s' "\${DOCKER_CONFIG:-}
 printf '\\t%q' "$@" >> ${shellQuote(commandLog)}
 printf '\\n' >> ${shellQuote(commandLog)}
 mode="$(<${shellQuote(dockerMode)})"
+build_state="\${DOCKER_CONFIG%/docker-config}/synthetic-built"
 case "\${1:-} \${2:-}" in
   'login ghcr.io')
     [[ "\${3:-}" == --username ]]
-    [[ "\${4:-}" == maslennikov-ig ]]
+    [[ -n "\${4:-}" ]]
     [[ "\${5:-}" == --password-stdin ]]
     [[ "$#" -eq 5 ]]
     IFS= read -r token || true
@@ -167,17 +226,50 @@ case "\${1:-} \${2:-}" in
       previous="$argument"
     done
     [[ -n "$metadata" ]] || exit 43
-    printf '%s\\n' ${shellQuote(`{"containerimage.digest":"${DIGEST}","buildx.build.provenance":{"mode":"max"}}`)} > "$metadata"
+    case "$mode" in
+      malformed-metadata) printf '%s\\n' '{' > "$metadata" ;;
+      null-provenance) printf '%s\\n' ${shellQuote(buildMetadata(null))} > "$metadata" ;;
+      wrong-revision) printf '%s\\n' ${shellQuote(buildMetadata(provenance('f'.repeat(40))))} > "$metadata" ;;
+      wrong-source) printf '%s\\n' ${shellQuote(buildMetadata(provenance(COMMIT, 'https://github.com/example/wrong.git')))} > "$metadata" ;;
+      missing-max) printf '%s\\n' ${shellQuote(buildMetadata(provenance(COMMIT, SOURCE_REPOSITORY, false)))} > "$metadata" ;;
+      *) printf '%s\\n' ${shellQuote(buildMetadata())} > "$metadata" ;;
+    esac
     /usr/bin/chmod 0600 "$metadata"
+    : > "$build_state"
     ;;
   'buildx imagetools')
     [[ "\${3:-}" == inspect ]]
     [[ "\${5:-}" == --format ]]
-    [[ "\${6:-}" == '{{json .Manifest.Digest}}' ]]
-    if [[ "$mode" == digest-mismatch ]]; then
-      printf '"%s"\\n' ${shellQuote(OTHER_DIGEST)}
+    reference="\${4:?missing reference}"
+    format="\${6:?missing format}"
+    if [[ "$format" == '{{ json .Manifest.Digest }}' ]]; then
+      if [[ ! -e "$build_state" ]]; then
+        case "$mode" in
+          tag-exists) printf '"%s"\\n' ${shellQuote(DIGEST)} ;;
+          preflight-auth) printf 'ERROR: denied: denied to package\\n' >&2; exit 44 ;;
+          preflight-network) printf 'ERROR: failed to do request: network unavailable\\n' >&2; exit 44 ;;
+          preflight-ambiguous) printf 'ERROR: unexpected registry response\\n' >&2; exit 44 ;;
+          preflight-not-found) printf 'ERROR: %s: not found\\n' "$reference" >&2; exit 44 ;;
+          *) printf 'ERROR: %s: manifest unknown\\n' "$reference" >&2; exit 44 ;;
+        esac
+      elif [[ "$mode" == digest-mismatch ]]; then
+        printf '"%s"\\n' ${shellQuote(OTHER_DIGEST)}
+      else
+        printf '"%s"\\n' ${shellQuote(DIGEST)}
+      fi
+    elif [[ "$format" == '{{ json .Provenance.SLSA }}' ]]; then
+      [[ -e "$build_state" ]] || exit 45
+      case "$mode" in
+        malformed-remote-provenance) printf '%s\\n' '{' ;;
+        null-remote-provenance) printf '%s\\n' 'null' ;;
+        wrong-remote-revision) printf '%s\\n' ${shellQuote(JSON.stringify(provenance('e'.repeat(40))))} ;;
+        wrong-remote-source) printf '%s\\n' ${shellQuote(JSON.stringify(provenance(COMMIT, 'https://github.com/example/wrong.git')))} ;;
+        missing-remote-max) printf '%s\\n' ${shellQuote(JSON.stringify(provenance(COMMIT, SOURCE_REPOSITORY, false)))} ;;
+        *) printf '%s\\n' ${shellQuote(JSON.stringify(provenance()))} ;;
+      esac
     else
-      printf '"%s"\\n' ${shellQuote(DIGEST)}
+      printf '%s\\n' 'unexpected synthetic inspect format' >&2
+      exit 46
     fi
     ;;
   'logout ghcr.io')
@@ -202,6 +294,7 @@ esac
     gitMode,
     dockerMode,
     utilityMode,
+    statePath,
     env: {
       PATH: bin,
       HOME: home,
@@ -256,9 +349,13 @@ function treeText(path: string): string {
     .join('\n');
 }
 
-function expectNoToken(item: Fixture, result: ReturnType<typeof spawnSync>): void {
+function expectNoSecret(item: Fixture, result: ReturnType<typeof spawnSync>, secret: string): void {
   const captured = `${result.stdout}${result.stderr}${commands(item)}${treeText(item.root)}`;
-  expect(captured).not.toContain(TOKEN);
+  expect(captured).not.toContain(secret);
+}
+
+function expectNoToken(item: Fixture, result: ReturnType<typeof spawnSync>): void {
+  expectNoSecret(item, result, TOKEN);
 }
 
 function expectNoRunResidue(item: Fixture): void {
@@ -342,6 +439,41 @@ describe('Q12 build-only qdrant-operator publisher', () => {
     expect(commands(dirtyHome)).not.toContain('docker\t');
   });
 
+  it('accepts only classic ghp_ PATs without imposing a fixed token length', () => {
+    for (const invalidToken of [
+      'github_pat_syntheticFineGrainedToken',
+      'ghs_syntheticInstallationToken',
+      'ghu_syntheticAppUserToken',
+      'syntheticUnknownCredential',
+    ]) {
+      const item = fixture();
+      const result = run(item, { input: `${invalidToken}\n` });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('classic PAT beginning with ghp_');
+      expect(commands(item)).not.toContain('\tlogin\tghcr.io');
+      expectNoRunResidue(item);
+      expectNoSecret(item, result, invalidToken);
+    }
+
+    const shortClassicPat = 'ghp_x';
+    const accepted = fixture();
+    const acceptedResult = run(accepted, { input: `${shortClassicPat}\n` });
+    expect(acceptedResult.status).toBe(0);
+    expectNoSecret(accepted, acceptedResult, shortClassicPat);
+  });
+
+  it('rejects an unterminated nonempty second stdin line', () => {
+    const item = fixture();
+    const result = run(item, { input: `${TOKEN}\nunexpected-second-line` });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('stdin must contain exactly one line');
+    expect(commands(item)).not.toContain('\tlogin\tghcr.io');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
   it('publishes exactly one linux/amd64 full-SHA operator target with maximum provenance', () => {
     const item = fixture();
     const result = run(item);
@@ -366,16 +498,104 @@ describe('Q12 build-only qdrant-operator publisher', () => {
     expect(build).toContain('\t--metadata-file\t');
     expect(build).toContain('\t--push\t');
     expect(build).toContain(`\t--label\torg.opencontainers.image.revision=${COMMIT}`);
-    expect(
-      log
-        .split('\n')
-        .filter(
-          line => line.startsWith('docker\t') && line.includes('\tbuildx\timagetools\tinspect\t')
-        )
-    ).toHaveLength(1);
+    const inspections = log
+      .split('\n')
+      .filter(
+        line => line.startsWith('docker\t') && line.includes('\tbuildx\timagetools\tinspect\t')
+      );
+    expect(inspections).toHaveLength(3);
+    expect(inspections.filter(line => line.includes('Manifest.Digest'))).toHaveLength(2);
+    expect(inspections.filter(line => line.includes('Provenance.SLSA'))).toHaveLength(1);
+    expect(inspections[0]).toContain(`\t${REPOSITORY}:${COMMIT}\t--format\t`);
+    expect(inspections[2]).toContain(`\t${REPOSITORY}@${DIGEST}\t--format\t`);
+    expect(log.indexOf('\tlogin\tghcr.io\t')).toBeLessThan(log.indexOf(inspections[0]));
+    expect(log.indexOf(inspections[0])).toBeLessThan(log.indexOf(build));
+    expect(log.split('\n').filter(line => line.startsWith('external\tpython3\t'))).toHaveLength(2);
     expect(log).not.toMatch(/\t(?:ssh|scp|compose|service|deploy|migration|push)\t/iu);
     expectNoRunResidue(item);
     expectNoToken(item, result);
+  });
+
+  it('keeps the canonical repository independent from the authenticated GitHub user', () => {
+    const item = fixture();
+    writeFileSync(item.dockerMode, 'preflight-not-found\n', { mode: 0o600 });
+    const result = run(item, { username: 'release-bot' });
+    const log = commands(item);
+
+    expect(result.status).toBe(0);
+    expect(log).toContain('\tlogin\tghcr.io\t--username\trelease-bot\t--password-stdin');
+    expect(log).toContain(`\t--tag\t${REPOSITORY}:${COMMIT}`);
+    expect(log).not.toContain('ghcr.io/release-bot/');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('refuses an existing immutable-input tag before build and push', () => {
+    const item = fixture();
+    writeFileSync(item.dockerMode, 'tag-exists\n', { mode: 0o600 });
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('already exists');
+    expect(commands(item)).toContain(`\tbuildx\timagetools\tinspect\t${REPOSITORY}:${COMMIT}`);
+    expect(commands(item)).not.toContain('\tbuildx\tbuild\t');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('fails closed when authenticated tag preflight is not an exact absence result', () => {
+    for (const mode of ['preflight-auth', 'preflight-network', 'preflight-ambiguous']) {
+      const item = fixture();
+      writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('unable to prove that the publication tag is absent');
+      expect(commands(item)).not.toContain('\tbuildx\tbuild\t');
+      expect(commands(item)).toContain('\tlogout\tghcr.io');
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('requires well-formed full local Buildx provenance for the accepted source revision', () => {
+    for (const mode of [
+      'malformed-metadata',
+      'null-provenance',
+      'wrong-revision',
+      'wrong-source',
+      'missing-max',
+    ]) {
+      const item = fixture();
+      writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Buildx metadata provenance validation failed');
+      expect(commands(item)).not.toContain('Provenance.SLSA');
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('requires well-formed full remote provenance for the verified pushed digest', () => {
+    for (const mode of [
+      'malformed-remote-provenance',
+      'null-remote-provenance',
+      'wrong-remote-revision',
+      'wrong-remote-source',
+      'missing-remote-max',
+    ]) {
+      const item = fixture();
+      writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('remote provenance validation failed');
+      expect(commands(item)).toContain(`\tbuildx\timagetools\tinspect\t${REPOSITORY}@${DIGEST}`);
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
   });
 
   it('uses stdin-only login and a minimal environment with unique owner-only Docker configs', () => {
@@ -438,9 +658,25 @@ describe('Q12 build-only qdrant-operator publisher', () => {
     const result = run(item);
 
     expect(result.status).not.toBe(0);
-    expect(commands(item)).toContain('external\tmktemp\t-d');
+    expect(commands(item)).toContain('external\tmktemp\t-u');
     expectNoRunResidue(item);
     expectNoToken(item, result);
+  });
+
+  it('leaves no state when signaled across the state-creation boundary', () => {
+    for (const mode of ['signal-mktemp', 'signal-mkdir']) {
+      const item = fixture();
+      writeFileSync(item.utilityMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(existsSync(item.statePath)).toBe(true);
+      const attemptedPath = readFileSync(item.statePath, 'utf8').trim();
+      expect(attemptedPath).not.toBe('');
+      expect(existsSync(attemptedPath)).toBe(false);
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
   });
 
   it('fails when the independently inspected digest differs from Buildx metadata', () => {

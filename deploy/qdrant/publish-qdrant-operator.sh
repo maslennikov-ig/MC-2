@@ -17,12 +17,15 @@ COMMIT=''
 GITHUB_USER=''
 CONFIRMATION=''
 STATE_ROOT=''
+STATE_OWNED=0
+STATE_CREATION_SIGNAL=0
 WORKTREE=''
 DOCKER_CONFIG_DIR=''
 DOCKER_HOME=''
 GIT_BIN=''
 DOCKER_BIN=''
 ENV_BIN=''
+PYTHON_BIN=''
 CLEANUP_DONE=0
 CLEANUP_STATUS=0
 
@@ -112,9 +115,11 @@ resolve_commands() {
   GIT_BIN="$(command -v git)" || fail 'git executable is required'
   DOCKER_BIN="$(command -v docker)" || fail 'docker executable is required'
   ENV_BIN="$(command -v env)" || fail 'env executable is required'
+  PYTHON_BIN="$(command -v python3)" || fail 'python3 executable is required'
   [[ "$GIT_BIN" == /* && -x "$GIT_BIN" ]] || fail 'git executable resolution is unsafe'
   [[ "$DOCKER_BIN" == /* && -x "$DOCKER_BIN" ]] || fail 'docker executable resolution is unsafe'
   [[ "$ENV_BIN" == /* && -x "$ENV_BIN" ]] || fail 'env executable resolution is unsafe'
+  [[ "$PYTHON_BIN" == /* && -x "$PYTHON_BIN" ]] || fail 'python3 executable resolution is unsafe'
 }
 
 validate_commit_identity() {
@@ -140,8 +145,11 @@ run_docker() {
   "$ENV_BIN" -i \
     "HOME=$DOCKER_HOME" \
     "PATH=$MINIMAL_PATH" \
+    'LC_ALL=C' \
     "DOCKER_CONFIG=$DOCKER_CONFIG_DIR" \
     'BUILDX_METADATA_PROVENANCE=max' \
+    'BUILDX_GIT_INFO=true' \
+    'BUILDX_GIT_LABELS=full' \
     "$DOCKER_BIN" "$@"
 }
 
@@ -162,7 +170,7 @@ cleanup_resources() {
       failed=1
     fi
   fi
-  if [[ -n "$STATE_ROOT" ]]; then
+  if (( STATE_OWNED != 0 )) && [[ -n "$STATE_ROOT" ]]; then
     if ! rm -rf -- "$STATE_ROOT"; then
       failed=1
     fi
@@ -193,10 +201,28 @@ install_cleanup_traps() {
 }
 
 create_isolated_state() {
-  STATE_ROOT="$(mktemp -d -- "${TMPDIR:-/tmp}/mc2-qdrant-publisher.XXXXXXXXXX")" ||
-    fail 'unable to create unique publisher state'
-  install_cleanup_traps
+  STATE_CREATION_SIGNAL=0
+  trap 'STATE_CREATION_SIGNAL=129' HUP
+  trap 'STATE_CREATION_SIGNAL=130' INT
+  trap 'STATE_CREATION_SIGNAL=143' TERM
+
+  STATE_ROOT="$(mktemp -u -- "${TMPDIR:-/tmp}/mc2-qdrant-publisher.XXXXXXXXXX")" ||
+    fail 'unable to reserve a unique publisher state path'
   [[ "$STATE_ROOT" == /* ]] || fail 'publisher state path must be absolute'
+  if (( STATE_CREATION_SIGNAL != 0 )); then
+    install_cleanup_traps
+    exit "$STATE_CREATION_SIGNAL"
+  fi
+  if ! mkdir -m 0700 -- "$STATE_ROOT"; then
+    STATE_ROOT=''
+    install_cleanup_traps
+    fail 'unable to create unique publisher state'
+  fi
+  STATE_OWNED=1
+  install_cleanup_traps
+  if (( STATE_CREATION_SIGNAL != 0 )); then
+    exit "$STATE_CREATION_SIGNAL"
+  fi
   chmod 0700 "$STATE_ROOT"
   WORKTREE="$STATE_ROOT/worktree"
   DOCKER_CONFIG_DIR="$STATE_ROOT/docker-config"
@@ -234,8 +260,12 @@ read_registry_token() {
   fi
   if IFS= read -r unexpected; then
     fail 'registry token stdin must contain exactly one line'
+  elif [[ -n "$unexpected" ]]; then
+    fail 'registry token stdin must contain exactly one line'
   fi
   [[ "$token" != *[[:space:]]* ]] || fail 'registry token stdin contains whitespace'
+  [[ "$token" == ghp_* && "$token" != ghp_ ]] ||
+    fail 'registry token must be a classic PAT beginning with ghp_'
   printf -v REGISTRY_TOKEN '%s' "$token"
 }
 
@@ -258,15 +288,135 @@ login_registry() {
   fi
 }
 
+validate_provenance_file() {
+  local input_file="$1"
+  local input_kind="$2"
+  "$ENV_BIN" -i \
+    "PATH=$MINIMAL_PATH" \
+    'LC_ALL=C' \
+    "$PYTHON_BIN" - \
+    "$input_file" \
+    "$input_kind" \
+    "$EXPECTED_ORIGIN" \
+    "$COMMIT" \
+    "$DOCKERFILE_RELATIVE" <<'PY'
+import json
+import re
+import sys
+
+BUILDKIT_METADATA_KEY = "https://mobyproject.org/buildkit@v1#metadata"
+BUILDKIT_BUILD_TYPE = "https://mobyproject.org/buildkit@v1"
+
+
+def invalid():
+    raise ValueError("invalid provenance")
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            invalid()
+        result[key] = value
+    return result
+
+
+try:
+    input_file, input_kind, expected_source, expected_revision, dockerfile = sys.argv[1:]
+    with open(input_file, encoding="utf-8") as handle:
+        document = json.load(handle, object_pairs_hook=unique_object)
+
+    digest = None
+    if input_kind == "metadata":
+        if not isinstance(document, dict):
+            invalid()
+        digest = document.get("containerimage.digest")
+        if not isinstance(digest, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None:
+            invalid()
+        statement = document.get("buildx.build.provenance")
+    elif input_kind == "remote":
+        statement = document
+    else:
+        invalid()
+
+    if not isinstance(statement, dict):
+        invalid()
+    if statement.get("buildType") != BUILDKIT_BUILD_TYPE:
+        invalid()
+    metadata = statement.get("metadata")
+    if not isinstance(metadata, dict):
+        invalid()
+    buildkit_metadata = metadata.get(BUILDKIT_METADATA_KEY)
+    if not isinstance(buildkit_metadata, dict):
+        invalid()
+    vcs = buildkit_metadata.get("vcs")
+    if not isinstance(vcs, dict):
+        invalid()
+    if vcs.get("source") != expected_source or vcs.get("revision") != expected_revision:
+        invalid()
+
+    source = buildkit_metadata.get("source")
+    if not isinstance(source, dict):
+        invalid()
+    infos = source.get("infos")
+    if not isinstance(infos, list) or not infos:
+        invalid()
+    dockerfile_name = dockerfile.rsplit("/", 1)[-1]
+    has_dockerfile_evidence = any(
+        isinstance(info, dict)
+        and isinstance(info.get("filename"), str)
+        and (
+            info["filename"] == dockerfile
+            or info["filename"] == dockerfile_name
+            or info["filename"].endswith("/" + dockerfile)
+        )
+        and isinstance(info.get("data"), str)
+        and bool(info["data"])
+        for info in infos
+    )
+    if not has_dockerfile_evidence:
+        invalid()
+
+    if input_kind == "metadata":
+        print(digest)
+except (OSError, UnicodeError, ValueError, json.JSONDecodeError):
+    sys.exit(1)
+PY
+}
+
+require_publication_tag_absent() {
+  local tag="$1"
+  local stdout_file="$STATE_ROOT/tag-preflight.stdout"
+  local stderr_file="$STATE_ROOT/tag-preflight.stderr"
+  local stderr_contents
+  local expected_manifest_unknown="ERROR: $tag: manifest unknown"
+  local expected_not_found="ERROR: $tag: not found"
+
+  if run_docker buildx imagetools inspect "$tag" \
+    --format '{{ json .Manifest.Digest }}' >"$stdout_file" 2>"$stderr_file"; then
+    fail 'publication tag already exists; refusing to replace an immutable-input tag'
+  fi
+  [[ -f "$stdout_file" && ! -L "$stdout_file" && ! -s "$stdout_file" ]] ||
+    fail 'unable to prove that the publication tag is absent'
+  [[ -f "$stderr_file" && ! -L "$stderr_file" ]] ||
+    fail 'unable to prove that the publication tag is absent'
+  stderr_contents="$(<"$stderr_file")"
+  if [[ "$stderr_contents" != "$expected_manifest_unknown" &&
+        "$stderr_contents" != "$expected_not_found" ]]; then
+    fail 'unable to prove that the publication tag is absent'
+  fi
+}
+
 publish_and_verify() {
   local tag="$REPOSITORY:$COMMIT"
   local metadata_file="$STATE_ROOT/buildx-metadata.json"
-  local metadata_contents
   local metadata_digest
   local remote_digest_json
   local remote_digest
-  local digest_key_regex='"containerimage\.digest"[[:space:]]*:[[:space:]]*"(sha256:[0-9a-f]{64})"'
+  local remote_provenance_file="$STATE_ROOT/remote-provenance.json"
   local remote_digest_regex='^"(sha256:[0-9a-f]{64})"$'
+
+  require_publication_tag_absent "$tag"
 
   run_docker buildx build \
     --file "$WORKTREE/$DOCKERFILE_RELATIVE" \
@@ -283,17 +433,11 @@ publish_and_verify() {
     fail 'Buildx did not produce a regular metadata file'
   [[ "$(stat -c '%a' "$metadata_file")" == 600 ]] ||
     fail 'Buildx metadata file must be mode 0600'
-  metadata_contents="$(<"$metadata_file")"
-  [[ "$metadata_contents" == *'"buildx.build.provenance"'* ]] ||
-    fail 'Buildx metadata does not record provenance'
-  if [[ "$metadata_contents" =~ $digest_key_regex ]]; then
-    metadata_digest="${BASH_REMATCH[1]}"
-  else
-    fail 'Buildx metadata does not contain one valid registry digest'
-  fi
+  metadata_digest="$(validate_provenance_file "$metadata_file" metadata)" ||
+    fail 'Buildx metadata provenance validation failed'
 
   remote_digest_json="$(
-    run_docker buildx imagetools inspect "$tag" --format '{{json .Manifest.Digest}}'
+    run_docker buildx imagetools inspect "$tag" --format '{{ json .Manifest.Digest }}'
   )" ||
     fail 'independent remote digest inspection failed'
   if [[ "$remote_digest_json" =~ $remote_digest_regex ]]; then
@@ -303,6 +447,18 @@ publish_and_verify() {
   fi
   [[ "$remote_digest" == "$metadata_digest" ]] ||
     fail 'remote digest does not match Buildx metadata'
+
+  if ! run_docker buildx imagetools inspect "$REPOSITORY@$remote_digest" \
+    --format '{{ json .Provenance.SLSA }}' >"$remote_provenance_file"; then
+    fail 'remote provenance inspection failed'
+  fi
+  [[ -f "$remote_provenance_file" && ! -L "$remote_provenance_file" ]] ||
+    fail 'remote provenance inspection did not produce a regular file'
+  chmod 0600 "$remote_provenance_file"
+  [[ "$(stat -c '%a' "$remote_provenance_file")" == 600 ]] ||
+    fail 'remote provenance file must be mode 0600'
+  validate_provenance_file "$remote_provenance_file" remote ||
+    fail 'remote provenance validation failed'
   printf -v PUBLISHED_REFERENCE '%s@%s' "$REPOSITORY" "$remote_digest"
 }
 
@@ -313,6 +469,7 @@ main() {
   resolve_commands
   validate_commit_identity
   read_registry_token
+  install_cleanup_traps
   create_isolated_state
   create_clean_worktree
   login_registry
