@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { chmodSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyDispositionEntry,
+  createQ12CapabilityFetch,
   createRecoveryDispositionDatabase,
   createSupabaseRecoveryGateway,
+  requireQ12CapabilityFetchInstalled,
   type RecoveryCatalogRow,
   type RecoveryDatabaseGateway,
   type RecoveryPlaybookRow,
@@ -16,6 +21,24 @@ const ORGANIZATION_ID = 'caacdf41-6267-471b-9331-02a45611a8a7';
 const COURSE_ID = '5191a3cc-d417-4451-9bc6-240ac38e469c';
 const PLAYBOOK_ID = 'e49be5a4-519f-4ef7-9315-f9596ff911cf';
 const USER_ID = 'f303c89a-1567-4797-bd28-66bcd4b76425';
+const Q12_CAPABILITY = 'q12-capability-sentinel';
+
+const temporaryDirectories: string[] = [];
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+function capabilityFixture(mode = 0o400): string {
+  const directory = mkdtempSync('/tmp/q12-db-capability-');
+  temporaryDirectories.push(directory);
+  const capabilityPath = join(directory, 'q12_db_capability');
+  writeFileSync(capabilityPath, `${Q12_CAPABILITY}\n`, { mode });
+  chmodSync(capabilityPath, mode);
+  return capabilityPath;
+}
 
 const catalogRow = (overrides: Partial<RecoveryCatalogRow> = {}): RecoveryCatalogRow => ({
   id: FILE_ID,
@@ -339,5 +362,164 @@ describe('source recovery disposition database', () => {
       'catalog-cas',
       'checkpoint:disposition_applied',
     ]);
+  });
+});
+
+describe('Q12 Supabase REST capability binding', () => {
+  it('consumes the staged file once and adds the capability only to the exact REST origin', async () => {
+    const capabilityPath = capabilityFixture();
+    const calls: Array<{ url: string; headers: Headers }> = [];
+    const underlyingFetch: typeof fetch = (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      calls.push({ url: request.url, headers: request.headers });
+      return Promise.resolve(new Response(null, { status: 204 }));
+    };
+
+    const capabilityFetch = createQ12CapabilityFetch({
+      environment: {
+        SUPABASE_URL: 'https://db.example.test',
+        Q12_DB_CAPABILITY_BOUND: '1',
+        Q12_DB_CAPABILITY_FILE: capabilityPath,
+      },
+      expectedPath: capabilityPath,
+      expectedUid: process.getuid?.(),
+      expectedGid: process.getgid?.(),
+      expectedSupabaseOrigin: 'https://db.example.test',
+      fetch: underlyingFetch,
+    });
+
+    expect(existsSync(capabilityPath)).toBe(false);
+    await capabilityFetch('https://db.example.test/rest/v1/file_catalog?id=eq.1');
+    await capabilityFetch('https://db.example.test/auth/v1/user');
+    await capabilityFetch('https://db.example.test/storage/v1/object');
+    await capabilityFetch('https://qdrant.example.test/collections');
+    await capabilityFetch('https://db.example.test.evil/rest/v1/file_catalog');
+
+    expect(calls[0]?.headers.get('x-q12-capability')).toBe(Q12_CAPABILITY);
+    expect(calls.slice(1).every(call => !call.headers.has('x-q12-capability'))).toBe(true);
+  });
+
+  it('rejects a malicious configured origin before consuming the capability', () => {
+    const capabilityPath = capabilityFixture();
+    expect(() =>
+      createQ12CapabilityFetch({
+        environment: {
+          SUPABASE_URL: 'https://attacker.example/rest/v1',
+          Q12_DB_CAPABILITY_BOUND: '1',
+          Q12_DB_CAPABILITY_FILE: capabilityPath,
+        },
+        expectedPath: capabilityPath,
+        expectedUid: process.getuid?.(),
+        expectedGid: process.getgid?.(),
+        fetch,
+      })
+    ).toThrow(/capability binding rejected/iu);
+    expect(existsSync(capabilityPath)).toBe(true);
+  });
+
+  it('fails cross-origin REST redirects without forwarding the capability to a second request', async () => {
+    const capabilityPath = capabilityFixture();
+    const calls: Request[] = [];
+    const redirectingFetch: typeof fetch = (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      calls.push(request);
+      if (request.redirect !== 'error') {
+        calls.push(
+          new Request('https://attacker.example/collect', {
+            headers: request.headers,
+          })
+        );
+      }
+      return Promise.resolve(
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://attacker.example/collect' },
+        })
+      );
+    };
+    const capabilityFetch = createQ12CapabilityFetch({
+      environment: {
+        SUPABASE_URL: 'https://db.example.test',
+        Q12_DB_CAPABILITY_BOUND: '1',
+        Q12_DB_CAPABILITY_FILE: capabilityPath,
+      },
+      expectedPath: capabilityPath,
+      expectedUid: process.getuid?.(),
+      expectedGid: process.getgid?.(),
+      expectedSupabaseOrigin: 'https://db.example.test',
+      fetch: redirectingFetch,
+    });
+
+    await capabilityFetch('https://db.example.test/rest/v1/file_catalog');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.redirect).toBe('error');
+    expect(calls[0]?.headers.get('x-q12-capability')).toBe(Q12_CAPABILITY);
+    expect(calls.some(call => call.url.startsWith('https://attacker.example/'))).toBe(false);
+  });
+
+  it('leaves ordinary fetches unchanged and does not consume an unbound path', async () => {
+    const capabilityPath = capabilityFixture();
+    const calls: Headers[] = [];
+    const underlyingFetch: typeof fetch = (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      calls.push(request.headers);
+      return Promise.resolve(new Response(null, { status: 204 }));
+    };
+
+    const ordinaryFetch = createQ12CapabilityFetch({
+      environment: { SUPABASE_URL: 'https://db.example.test' },
+      expectedPath: capabilityPath,
+      expectedUid: process.getuid?.(),
+      expectedGid: process.getgid?.(),
+      fetch: underlyingFetch,
+    });
+    await ordinaryFetch('https://db.example.test/rest/v1/file_catalog');
+
+    expect(calls[0]?.has('x-q12-capability')).toBe(false);
+    expect(existsSync(capabilityPath)).toBe(true);
+  });
+
+  it('rejects permissive or symlinked capability files without exposing their contents', () => {
+    const assertRejected = (capabilityPath: string): void => {
+      let thrown: unknown;
+      try {
+        createQ12CapabilityFetch({
+          environment: {
+            SUPABASE_URL: 'https://db.example.test',
+            Q12_DB_CAPABILITY_BOUND: '1',
+            Q12_DB_CAPABILITY_FILE: capabilityPath,
+          },
+          expectedPath: capabilityPath,
+          expectedUid: process.getuid?.(),
+          expectedGid: process.getgid?.(),
+          expectedSupabaseOrigin: 'https://db.example.test',
+          fetch: fetch,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(String(thrown)).toMatch(/capability binding rejected/iu);
+      expect(String(thrown)).not.toContain(Q12_CAPABILITY);
+    };
+
+    assertRejected(capabilityFixture(0o440));
+
+    const target = capabilityFixture();
+    const link = `${target}.link`;
+    symlinkSync(target, link);
+    assertRejected(link);
+  });
+
+  it('fails closed when a Q12 default dependency is created before the binding is installed', () => {
+    expect(() =>
+      requireQ12CapabilityFetchInstalled(
+        {
+          Q12_DB_CAPABILITY_BOUND: '1',
+          Q12_DB_CAPABILITY_FILE: '/run/qdrant-operator/q12_db_capability',
+        },
+        false
+      )
+    ).toThrow(/capability binding rejected/iu);
+    expect(() => requireQ12CapabilityFetchInstalled({}, false)).not.toThrow();
   });
 });

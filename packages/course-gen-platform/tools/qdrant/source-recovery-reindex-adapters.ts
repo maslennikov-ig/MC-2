@@ -6,6 +6,7 @@ import {
   type DocumentEvidenceDatabaseClient,
 } from '../../src/stages/stage4-analysis/evidence/repository';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
+import { requireQ12CapabilityFetchInstalled } from './source-recovery-database';
 import {
   calculateAcceptedFailedCoverageFingerprint,
   type AcceptedFailedCoverageBinding,
@@ -304,6 +305,7 @@ export function createSourceRecoveryReindexAdapters(
 export function createDefaultSourceRecoveryReindexAdapters(
   config: SourceRecoveryReindexAdapterConfig
 ): ReturnType<typeof createSourceRecoveryReindexAdapters> {
+  requireQ12CapabilityFetchInstalled();
   const evidenceRepository = new DocumentEvidenceRepository(
     getSupabaseAdmin() as unknown as DocumentEvidenceDatabaseClient
   );

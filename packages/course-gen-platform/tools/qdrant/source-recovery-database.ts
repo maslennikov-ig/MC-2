@@ -1,4 +1,235 @@
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+} from 'node:fs';
+import { dirname } from 'node:path';
+
 import type { RecoveryDispositionEntry } from './source-recovery-manifest.js';
+
+const Q12_STAGED_CAPABILITY_PATH = '/run/qdrant-operator/q12_db_capability';
+const Q12_SUPABASE_ORIGIN = 'https://diqooqbuchsliypgwksu.supabase.co';
+const Q12_CAPABILITY_HEADER = 'x-q12-capability';
+const Q12_CAPABILITY_MAX_BYTES = 512;
+const Q12_CAPABILITY_REJECTED = 'Q12 database capability binding rejected';
+
+interface Q12CapabilityEnvironment {
+  SUPABASE_URL?: string;
+  Q12_DB_CAPABILITY_BOUND?: string;
+  Q12_DB_CAPABILITY_FILE?: string;
+}
+
+export interface Q12CapabilityFetchOptions {
+  environment: Q12CapabilityEnvironment;
+  fetch: typeof fetch;
+  expectedPath?: string;
+  expectedUid?: number;
+  expectedGid?: number;
+  /** Test-only origin seam; production installation never supplies this. */
+  expectedSupabaseOrigin?: string;
+}
+
+function rejectCapabilityBinding(): never {
+  throw new Error(Q12_CAPABILITY_REJECTED);
+}
+
+function readAndConsumeCapability(
+  capabilityPath: string,
+  expectedUid: number | undefined,
+  expectedGid: number | undefined
+): string {
+  let fd: number | undefined;
+  let parentFd: number | undefined;
+  try {
+    const parent = dirname(capabilityPath);
+    const parentStat = lstatSync(parent);
+    if (
+      !parentStat.isDirectory() ||
+      parentStat.isSymbolicLink() ||
+      (parentStat.mode & 0o077) !== 0 ||
+      (expectedUid !== undefined && parentStat.uid !== expectedUid) ||
+      (expectedGid !== undefined && parentStat.gid !== expectedGid)
+    ) {
+      rejectCapabilityBinding();
+    }
+
+    const pathStat = lstatSync(capabilityPath);
+    if (
+      !pathStat.isFile() ||
+      pathStat.isSymbolicLink() ||
+      (pathStat.mode & 0o777) !== 0o400 ||
+      pathStat.size < 2 ||
+      pathStat.size > Q12_CAPABILITY_MAX_BYTES ||
+      (expectedUid !== undefined && pathStat.uid !== expectedUid) ||
+      (expectedGid !== undefined && pathStat.gid !== expectedGid) ||
+      realpathSync(capabilityPath) !== capabilityPath
+    ) {
+      rejectCapabilityBinding();
+    }
+
+    fd = openSync(capabilityPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const before = fstatSync(fd);
+    if (before.dev !== pathStat.dev || before.ino !== pathStat.ino) {
+      rejectCapabilityBinding();
+    }
+    const raw = readFileSync(fd, { encoding: 'utf8' });
+    const after = fstatSync(fd);
+    const current = lstatSync(capabilityPath);
+    if (
+      after.dev !== before.dev ||
+      after.ino !== before.ino ||
+      after.size !== before.size ||
+      current.dev !== before.dev ||
+      current.ino !== before.ino
+    ) {
+      rejectCapabilityBinding();
+    }
+    const capability = raw.endsWith('\n') ? raw.slice(0, -1) : raw;
+    if (
+      capability.length === 0 ||
+      capability.includes('\n') ||
+      capability.includes('\r') ||
+      capability.trim() !== capability
+    ) {
+      rejectCapabilityBinding();
+    }
+
+    unlinkSync(capabilityPath);
+    parentFd = openSync(parent, constants.O_RDONLY | constants.O_DIRECTORY);
+    fsyncSync(parentFd);
+    return capability;
+  } catch (error) {
+    if (error instanceof Error && error.message === Q12_CAPABILITY_REJECTED) throw error;
+    rejectCapabilityBinding();
+  } finally {
+    if (parentFd !== undefined) closeSync(parentFd);
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+function exactRestPrefix(
+  supabaseUrl: string,
+  expectedOrigin = Q12_SUPABASE_ORIGIN
+): { origin: string; prefix: string } {
+  let base: URL;
+  let expected: URL;
+  try {
+    base = new URL(supabaseUrl);
+    expected = new URL(expectedOrigin);
+  } catch {
+    rejectCapabilityBinding();
+  }
+  if (
+    !['http:', 'https:'].includes(expected.protocol) ||
+    expected.username !== '' ||
+    expected.password !== '' ||
+    expected.pathname !== '/' ||
+    expected.search !== '' ||
+    expected.hash !== '' ||
+    expected.origin !== expectedOrigin ||
+    base.origin !== expected.origin ||
+    base.username !== '' ||
+    base.password !== '' ||
+    base.pathname !== '/' ||
+    base.search !== '' ||
+    base.hash !== ''
+  ) {
+    rejectCapabilityBinding();
+  }
+  return { origin: expected.origin, prefix: '/rest/v1' };
+}
+
+/**
+ * Consumes the tmpfs-staged Q12 capability once and keeps it in this closure only.
+ * The wrapper attaches it solely to the exact configured Supabase REST origin/path.
+ */
+export function createQ12CapabilityFetch(options: Q12CapabilityFetchOptions): typeof fetch {
+  const { environment } = options;
+  const marker = environment.Q12_DB_CAPABILITY_BOUND;
+  const configuredPath = environment.Q12_DB_CAPABILITY_FILE;
+  if (marker === undefined && configuredPath === undefined) return options.fetch;
+  if (marker !== '1' || configuredPath === undefined) rejectCapabilityBinding();
+
+  const expectedPath = options.expectedPath ?? Q12_STAGED_CAPABILITY_PATH;
+  if (configuredPath !== expectedPath) rejectCapabilityBinding();
+  const supabaseUrl = environment.SUPABASE_URL;
+  if (!supabaseUrl) rejectCapabilityBinding();
+  const target = exactRestPrefix(supabaseUrl, options.expectedSupabaseOrigin);
+  const capability = readAndConsumeCapability(
+    configuredPath,
+    options.expectedUid,
+    options.expectedGid
+  );
+
+  return async (input, init) => {
+    const request = input instanceof Request ? new Request(input, init) : new Request(input, init);
+    const requestedUrl = new URL(request.url);
+    const isSupabaseRest =
+      requestedUrl.origin === target.origin &&
+      (requestedUrl.pathname === target.prefix ||
+        requestedUrl.pathname.startsWith(`${target.prefix}/`));
+    if (!isSupabaseRest) return options.fetch(request);
+    const headers = new Headers(request.headers);
+    headers.set(Q12_CAPABILITY_HEADER, capability);
+    return options.fetch(new Request(request, { headers, redirect: 'error' }));
+  };
+}
+
+let q12CapabilityFetchInstalled = false;
+
+export function installQ12CapabilityFetch(): boolean {
+  if (q12CapabilityFetchInstalled) return true;
+  const originalFetch = globalThis.fetch;
+  if (typeof originalFetch !== 'function') {
+    if (
+      process.env.Q12_DB_CAPABILITY_BOUND === undefined &&
+      process.env.Q12_DB_CAPABILITY_FILE === undefined
+    ) {
+      return false;
+    }
+    rejectCapabilityBinding();
+  }
+  const wrapped = createQ12CapabilityFetch({
+    environment: process.env,
+    fetch: originalFetch,
+    expectedUid: process.getuid?.(),
+    expectedGid: process.getgid?.(),
+  });
+  if (wrapped === originalFetch) return false;
+  globalThis.fetch = wrapped;
+  q12CapabilityFetchInstalled = true;
+  return true;
+}
+
+export function isQ12CapabilityFetchInstalled(): boolean {
+  return q12CapabilityFetchInstalled;
+}
+
+export function requireQ12CapabilityFetchInstalled(
+  environment: Q12CapabilityEnvironment = process.env,
+  installed = q12CapabilityFetchInstalled
+): void {
+  const requested =
+    environment.Q12_DB_CAPABILITY_BOUND !== undefined ||
+    environment.Q12_DB_CAPABILITY_FILE !== undefined;
+  if (
+    requested &&
+    (environment.Q12_DB_CAPABILITY_BOUND !== '1' ||
+      environment.Q12_DB_CAPABILITY_FILE !== Q12_STAGED_CAPABILITY_PATH ||
+      !installed)
+  ) {
+    rejectCapabilityBinding();
+  }
+}
+
+// This module is imported before either recovery command constructs its Supabase client.
+installQ12CapabilityFetch();
 
 export type RecoveryVectorStatus = 'pending' | 'indexing' | 'indexed' | 'failed';
 export type RecoveryPlaybookStatus = 'uploaded' | 'processing' | 'ready' | 'failed' | 'removed';

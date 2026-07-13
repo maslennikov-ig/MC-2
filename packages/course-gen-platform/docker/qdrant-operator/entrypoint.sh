@@ -5,12 +5,18 @@ umask 077
 
 readonly OPERATOR_NAME='qdrant operator'
 readonly TSX_BIN='/usr/local/bin/tsx'
+readonly NODE_BIN='/usr/local/bin/node'
 readonly NODE_UID='1001'
 readonly NODE_GID='1001'
+readonly CONTROLLER_UID='1000'
+readonly CONTROLLER_GID='1000'
 readonly REQUIRED_QDRANT_URL='http://qdrant:6333'
 readonly REQUIRED_UPLOAD_BASE='/opt/megacampus/data'
 readonly DEFAULT_API_KEY_FILE='/run/secrets/qdrant_api_key'
 readonly STAGED_API_KEY_FILE='/run/qdrant-operator/qdrant_api_key'
+readonly DEFAULT_Q12_DB_CAPABILITY_FILE='/run/secrets/q12_db_capability'
+readonly STAGED_Q12_DB_CAPABILITY_FILE='/run/qdrant-operator/q12_db_capability'
+readonly DEFAULT_Q12_PROBE_RECEIPT_FILE='/run/secrets/q12_database_barrier_probe_receipt'
 readonly STAGED_MANIFEST_FILE='/run/qdrant-operator/snapshot_manifest'
 readonly STAGED_PROBE_FILE='/run/qdrant-operator/recovery_probe'
 readonly REINDEX_ARTIFACT_ROOT='/var/lib/megacampus-qdrant-recovery/reindex'
@@ -256,6 +262,65 @@ stage_owner_only_file() {
   install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- "$source" "$target"
 }
 
+stage_q12_database_capability_if_requested() {
+  local source identity probe_receipt probe_identity
+  source="${Q12_DB_CAPABILITY_FILE:-}"
+  if [[ -z $source ]]; then
+    [[ -z ${Q12_DB_CAPABILITY_BOUND:-}${Q12_DATABASE_BARRIER_PROBE_RECEIPT_FILE:-}${Q12_RUN_ID:-}${Q12_EXPECTED_CATALOG_SHA256:-} ]] ||
+      fail 'Q12 database capability binding marker is not operator-owned'
+    return 0
+  fi
+  [[ -z ${Q12_DB_CAPABILITY_BOUND:-} ]] ||
+    fail 'Q12 database capability binding marker is not operator-owned'
+  [[ $source == "$DEFAULT_Q12_DB_CAPABILITY_FILE" ]] ||
+    fail "Q12 database capability file must equal $DEFAULT_Q12_DB_CAPABILITY_FILE"
+  [[ -f $source && ! -L $source && -r $source ]] ||
+    fail 'Q12 database capability file is missing or unreadable'
+  [[ $(realpath -e -- "$source") == "$source" ]] ||
+    fail 'Q12 database capability file must be canonical'
+  identity="$(stat -c '%u:%g:%a' -- "$source")"
+  [[ $identity == "$CONTROLLER_UID:$CONTROLLER_GID:400" ]] ||
+    fail 'Q12 database capability host bind must be owned by the fixed controller UID:GID with mode 0400'
+
+  probe_receipt="${Q12_DATABASE_BARRIER_PROBE_RECEIPT_FILE:-}"
+  [[ $probe_receipt == "$DEFAULT_Q12_PROBE_RECEIPT_FILE" ]] ||
+    fail "Q12 database probe receipt must equal $DEFAULT_Q12_PROBE_RECEIPT_FILE"
+  [[ ${Q12_RUN_ID:-} =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
+    fail 'Q12 run identity is missing or invalid'
+  [[ ${Q12_EXPECTED_CATALOG_SHA256:-} =~ ^[a-f0-9]{64}$ ]] ||
+    fail 'Q12 expected catalog identity is missing or invalid'
+  [[ -f $probe_receipt && ! -L $probe_receipt && -r $probe_receipt && $(realpath -e -- "$probe_receipt") == "$probe_receipt" ]] ||
+    fail 'Q12 database probe receipt is missing or unsafe'
+  probe_identity="$(stat -c '%u:%g:%a' -- "$probe_receipt")"
+  [[ $probe_identity == "$CONTROLLER_UID:$CONTROLLER_GID:400" ]] ||
+    fail 'Q12 database probe receipt host bind must be owned by the fixed controller UID:GID with mode 0400'
+  "$NODE_BIN" -e '
+    const fs=require("node:fs");
+    const [path,run,catalog]=process.argv.slice(1);
+    const canonical=value=>value&&typeof value==="object"&&!Array.isArray(value)
+      ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+    try {
+      const value=JSON.parse(fs.readFileSync(path,"utf8"));
+      const expectedProbes={auth_profile:"rejected_zero_residue",cron_rpc:"rejected_exact_jobs_unchanged",direct_supervisor:"rolled_back",pg_net_rpc:"rejected_zero_queue_zero_external_request",postgrest_anon:"rejected",postgrest_authenticated:"rejected",postgrest_preference_applied:"tx=rollback",postgrest_service_role_with_capability:"rolled_back",postgrest_service_role_without_capability:"rejected",storage_object:"rejected_zero_metadata_zero_bytes"};
+      const expectedResidue={auth_rows:0,cron_job_set_unchanged:true,external_requests:0,guard_probe_rows:0,pg_net_queue_rows:0,storage_metadata_rows:0,storage_object_bytes:0};
+      const exact=(left,right)=>JSON.stringify(canonical(left))===JSON.stringify(canonical(right));
+      if(!exact(Object.keys(value).sort(),["completed_at","expected_catalog_sha256","probes","residue","run_id","schema_version"])||
+        value.schema_version!=="megacampus.q12.database-barrier-probes/v1"||value.run_id!==run||
+        value.expected_catalog_sha256!==catalog||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/u.test(value.completed_at)||
+        !exact(value.probes,expectedProbes)||!exact(value.residue,expectedResidue))process.exit(1);
+    } catch { process.exit(1); }
+  ' "$probe_receipt" "$Q12_RUN_ID" "$Q12_EXPECTED_CATALOG_SHA256" ||
+    fail 'Q12 database probe receipt is incomplete or cross-wired'
+
+  install -d -o "$NODE_UID" -g "$NODE_GID" -m 0700 "$(dirname "$STAGED_Q12_DB_CAPABILITY_FILE")"
+  install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- \
+    "$source" "$STAGED_Q12_DB_CAPABILITY_FILE"
+  [[ $(stat -c '%u:%g:%a' -- "$STAGED_Q12_DB_CAPABILITY_FILE") == "$NODE_UID:$NODE_GID:400" ]] ||
+    fail 'staged Q12 database capability must be owned by the fixed operator UID:GID with mode 0400'
+  export Q12_DB_CAPABILITY_FILE="$STAGED_Q12_DB_CAPABILITY_FILE"
+  export Q12_DB_CAPABILITY_BOUND=1
+}
+
 run_self_check() {
   exec_as_node "$TSX_BIN" -e '
     const modules = [
@@ -323,6 +388,7 @@ case "$command_name" in
         fail 'reindex mode must be plan, execute, or verify'
         ;;
     esac
+    stage_q12_database_capability_if_requested
     load_raw_api_key
     exec_as_node "$TSX_BIN" tools/qdrant/reindex-course-embeddings.ts "$@" "${REINDEX_ARTIFACT_ARGS[@]}"
     ;;
@@ -332,7 +398,12 @@ case "$command_name" in
     require_reindex_queue
     require_reindex_worker_target
     [[ ${STAGE6_WORKER:-false} != 'true' ]] || fail 'reindex worker cannot run in Stage 6 mode'
+    stage_q12_database_capability_if_requested
     load_raw_api_key
+    if [[ ${Q12_DB_CAPABILITY_BOUND:-} == 1 ]]; then
+      exec_as_node "$TSX_BIN" -e \
+        'import("./tools/qdrant/source-recovery-database.ts").then(() => import("./dist/orchestrator/worker-entrypoint.js"))'
+    fi
     exec_as_node "$TSX_BIN" dist/orchestrator/worker-entrypoint.js
     ;;
   source-recovery)
@@ -341,6 +412,7 @@ case "$command_name" in
       exec_as_node "$TSX_BIN" tools/qdrant/source-recovery.ts "$@"
     fi
     require_source_recovery_arguments "$@"
+    stage_q12_database_capability_if_requested
     exec_as_node "$TSX_BIN" tools/qdrant/source-recovery.ts "$@"
     ;;
   snapshot)

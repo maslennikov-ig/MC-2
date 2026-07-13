@@ -63,6 +63,7 @@ import {
   type AcceptedCoverageRunConfig,
   type SourceRecoveryReindexAdapterConfig,
 } from './source-recovery-reindex-adapters';
+import { requireQ12CapabilityFetchInstalled } from './source-recovery-database';
 
 export type ReindexCommandMode = 'plan' | 'execute' | 'verify';
 
@@ -1715,6 +1716,7 @@ async function runNativeRelevanceChecks(
 export function createDefaultReindexDependencies(
   recoveryAdapterConfig?: SourceRecoveryReindexAdapterConfig
 ): ReindexCommandDependencies {
+  requireQ12CapabilityFetchInstalled();
   if (!recoveryAdapterConfig) {
     throw new Error('Exact source recovery adapter configuration is required');
   }
