@@ -55,8 +55,8 @@ parallel_decision: parallel
 status: accepted
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: dedicated worktree and branch are intentionally retained for independent correctness review and parent integration
+cleanup_status: cleaned
+cleanup_notes: accepted dedicated worktree and local branch removed after integration push; remote evidence branch retained
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
