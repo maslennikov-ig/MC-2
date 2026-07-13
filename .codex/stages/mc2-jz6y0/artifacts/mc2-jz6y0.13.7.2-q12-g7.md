@@ -29,7 +29,8 @@ selected_docs:
   - owner-approved Q12 corrections design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15
   - owner-approved Q12 recoverable lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
   - superseded independently accepted G7 addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
-  - final independently accepted canonicalization/G7 addendum SHA-256 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743
+  - superseded independently accepted canonicalization/G7 addendum SHA-256 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743
+  - final independently accepted canonicalization/phase-mapping/G7 addendum SHA-256 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27
   - PostgreSQL 17 pg_dump https://www.postgresql.org/docs/17/app-pgdump.html
   - PostgreSQL 17 pg_dumpall https://www.postgresql.org/docs/17/app-pg-dumpall.html
   - PostgreSQL 17 pg_restore https://www.postgresql.org/docs/17/app-pgrestore.html
@@ -59,7 +60,7 @@ cleanup_notes: dedicated worktree and branch are intentionally retained for inde
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: final independent review of normative addendum 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743 passed with P0=P1=P2=P3=0; qdrant-self-hosted records exact physical source-cutover OIDs, OID-independent restore-only equality, elapsed-epoch retention, and inline authoritative lifecycle trust without authorizing live execution
+docs_review_notes: final independent review of normative addendum 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27 passed with P0=P1=P2=P3=0; qdrant-self-hosted records exact physical source-cutover OIDs, OID-independent restore-only equality, elapsed-epoch retention, and inline authoritative lifecycle trust without authorizing live execution; 9171fa12 and de493383 are historical superseded addenda
 graph_reviewed: used
 graph_review_notes: local Graphify report and focused backup/restore/scheduler queries were consulted read-only from the canonical primary graph; it is stale at commit 1233be56 and uses pre-1504 IDs, so refresh belongs to safe integration closeout
 verification:
@@ -83,7 +84,7 @@ verification:
   - rereview elapsed-retention RED/GREEN: failed 2/2 then passed 2/2 fixed Amsterdam spring/fall DST anchors at exactly 20160 minutes
   - rereview protected retention clock: passed refusal outside the exact synthetic test token
   - fresh rereview backup/restore/schedule aggregate: passed 99/99
-  - final normative addendum docs review: PASS with P0=P1=P2=P3=0; SHA-256 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743 supersedes de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - final normative addendum docs review: PASS with P0=P1=P2=P3=0; SHA-256 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27 supersedes historical 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743 and de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
   - workspace pnpm type-check: passed all five projects
   - bash syntax: passed for deploy/postgres/*.sh
   - Prettier check: passed for every changed TypeScript, test, Markdown, and artifact file
@@ -140,9 +141,10 @@ database, service, cron, secret, or historical backup was read or mutated.
 # Accepted independent-review addendum
 
 The final accepted addendum
+`7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`
+supersedes historical
 `9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743`
-supersedes
-`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
+and `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
 Its G7 findings are implemented finding by finding:
 
 1. Physical source OIDs remain in `guarded_relations` for live `q12_guard`
@@ -252,7 +254,8 @@ Final rereview evidence:
 - scoped ESLint: zero errors and only the two pre-existing manifest
   complexity/file-size warnings;
 - final normative docs review: PASS with P0=P1=P2=P3=0 for SHA-256
-  `9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743`.
+  `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`;
+  historical `9171fa12` and `de493383` are superseded.
 
 Tracked hashes before commit:
 
