@@ -123,8 +123,10 @@ docs-reviewed: updated — the Q12 operator, sole PG17 execution packet, both
 runbooks, migration/activation order, rollback, authorization, and sanitized
 environment contracts are reconciled; final rereview reported P0-P3 zero.
 graph-reviewed: updated — local Graphify `0.9.13` ran `graphify update .` and
-`graphify cluster-only . --no-viz`: 52,662 nodes, 79,924 edges, 3,415
-communities, zero model/API tokens, zero forbidden runtime/noise source paths,
-and no Git hooks. The final post-metadata rerun must report the delivered HEAD.
+`graphify cluster-only . --no-viz`: 52,662 nodes, 79,924 edges, zero model/API
+tokens, zero forbidden runtime/noise source paths, and no Git hooks. The exact
+community total is read from the ignored final report because reclustering may
+repartition an unchanged graph; that report is refreshed after the last tracked
+metadata commit and must report the delivered HEAD.
 Optional SQL AST enrichment is deferred: 283 SQL files require the uninstalled
 `tree_sitter_sql` extra; this docs-only slice did not install global tooling.
