@@ -35,7 +35,12 @@ interface Fixture {
   readyFile: string;
   releaseFile: string;
   pgDump: string;
+  pgDumpall: string;
   pgRestore: string;
+  manifestGenerator: string;
+  rolesArgsLog: string;
+  rolesCounter: string;
+  manifestArgsLog: string;
   env: NodeJS.ProcessEnv;
 }
 
@@ -59,6 +64,8 @@ function fixture(): Fixture {
 
   const caFile = join(secretDir, 'prod-ca-2021.crt');
   const urlFile = join(secretDir, 'supabase-db-url');
+  const baselineFile = join(secretDir, 'baseline.json');
+  const expectedCatalogFile = join(secretDir, 'expected-post-migration-catalog.json');
   const password = 'synthetic-password-never-log';
   const databaseUrl =
     `postgresql://postgres.test:${password}@db.example.test:5432/postgres` +
@@ -67,6 +74,14 @@ function fixture(): Fixture {
   writeFileSync(urlFile, `${databaseUrl}\n`, { mode: 0o600 });
   chmodSync(caFile, 0o400);
   chmodSync(urlFile, 0o600);
+  writeFileSync(baselineFile, '{"baseline":{}}\n', { mode: 0o600 });
+  writeFileSync(
+    expectedCatalogFile,
+    '{"schema_version":"megacampus.q12.expected-post-migration-catalog/v1"}\n',
+    { mode: 0o400 }
+  );
+  chmodSync(baselineFile, 0o600);
+  chmodSync(expectedCatalogFile, 0o400);
 
   const argsLog = join(root, 'pg-dump-args');
   const restoreArgsLog = join(root, 'pg-restore-args');
@@ -74,8 +89,13 @@ function fixture(): Fixture {
   const readyFile = join(root, 'dump-ready');
   const releaseFile = join(root, 'dump-release');
   const pgDump = join(binDir, 'pg_dump');
+  const pgDumpall = join(binDir, 'pg_dumpall');
   const pgRestore = join(binDir, 'pg_restore');
+  const manifestGenerator = join(binDir, 'q12-source-manifest');
   const substituteHook = join(binDir, 'substitute-input');
+  const rolesArgsLog = join(root, 'roles-args');
+  const rolesCounter = join(root, 'roles-counter');
+  const manifestArgsLog = join(root, 'manifest-args');
 
   executable(
     pgDump,
@@ -86,10 +106,14 @@ if [[ "\${1:-}" == --version && "$#" -eq 1 ]]; then
   exit 0
 fi
 printf '%s\\n' "$*" > "$FAKE_ARGS_LOG"
+[[ -z "\${FAKE_DUMP_STDERR:-}" ]] || printf '%s\\n' "$FAKE_DUMP_STDERR" >&2
 [[ "\${PGSSLROOTCERT:-}" == /proc/self/fd/* ]] || exit 94
 [[ -r "$PGSSLROOTCERT" ]] || exit 95
-[[ "$PGDATABASE" == *"sslrootcert=$PGSSLROOTCERT"* ]] || exit 96
-[[ "$PGDATABASE" != *"$FAKE_ORIGINAL_CA_PATH"* ]] || exit 97
+[[ -z "\${PGDATABASE:-}" ]] || exit 96
+[[ "\${PGSERVICE:-}" == mc2_supabase_backup ]] || exit 97
+[[ -r "\${PGSERVICEFILE:-}" ]] || exit 99
+/usr/bin/grep -Fq "sslrootcert=$PGSSLROOTCERT" "$PGSERVICEFILE" || exit 100
+! /usr/bin/grep -Fq "$FAKE_ORIGINAL_CA_PATH" "$PGSERVICEFILE" || exit 101
 printf 'ca_fd=yes\\nurl_ca_fd=yes\\nca_content=%s\\n' "$(/usr/bin/cat "$PGSSLROOTCERT")" > "$FAKE_IDENTITY_LOG"
 output=''
 for argument in "$@"; do
@@ -100,7 +124,7 @@ done
 [[ -n "$output" ]] || exit 91
 case "\${FAKE_DUMP_MODE:-success}" in
   failure)
-    printf 'synthetic pg_dump failure for %s\\n' "$PGDATABASE" >&2
+    printf 'synthetic pg_dump failure\\n' >&2
     printf 'masked-partial' > "$output"
     exit 17
     ;;
@@ -115,7 +139,7 @@ case "\${FAKE_DUMP_MODE:-success}" in
     while [[ ! -e "$FAKE_RELEASE_FILE" ]]; do /usr/bin/sleep 0.02; done
     ;;
   crash)
-    printf 'synthetic abrupt diagnostic for %s\\n' "$PGDATABASE" >&2
+    printf 'synthetic abrupt diagnostic\\n' >&2
     printf 'PGDMP-partial' > "$output"
     /usr/bin/kill -KILL "$PPID"
     ;;
@@ -125,6 +149,57 @@ case "\${FAKE_DUMP_MODE:-success}" in
     ;;
   *) exit 92 ;;
 esac
+`
+  );
+
+  executable(
+    pgDumpall,
+    `#!/usr/bin/env bash
+set -eu
+if [[ "\${1:-}" == --version && "$#" -eq 1 ]]; then
+  printf 'pg_dumpall (PostgreSQL) %s\\n' "\${FAKE_PG_DUMPALL_VERSION:-17.7}"
+  exit 0
+fi
+printf '%s\\n' "$*" >> "$FAKE_ROLES_ARGS_LOG"
+count=0
+[[ ! -f "$FAKE_ROLES_COUNTER" ]] || count="$(/usr/bin/cat "$FAKE_ROLES_COUNTER")"
+count=$((count + 1))
+printf '%s' "$count" > "$FAKE_ROLES_COUNTER"
+if [[ "\${FAKE_ROLES_LAYOUT:-synthetic}" == realistic ]]; then
+  printf '%s\\n' '--' '-- PostgreSQL database cluster dump' '--'
+  printf '\\n'
+fi
+printf '%s\\n' '\\restrict mc2nonce'
+printf '%s\\n' 'CREATE ROLE admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN;'
+if [[ "\${FAKE_ROLES_LAYOUT:-synthetic}" == realistic ]]; then
+  printf '\\n%s\\n' '-- Roles' '--'
+fi
+if [[ "\${FAKE_ROLES_DRIFT:-0}" == 1 && "$count" -eq 2 ]]; then
+  printf '%s\\n' 'ALTER ROLE admin CONNECTION LIMIT 7;'
+fi
+printf '%s\\n' '\\unrestrict mc2nonce'
+if [[ "\${FAKE_ROLES_LAYOUT:-synthetic}" == realistic ]]; then
+  printf '\\n%s\\n' '--' '-- PostgreSQL database cluster dump complete' '--' ''
+fi
+`
+  );
+
+  executable(
+    manifestGenerator,
+    `#!/usr/bin/env bash
+set -eu
+printf '%s\\n' "$*" > "$FAKE_MANIFEST_ARGS_LOG"
+output=''
+snapshot=''
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --output) output="$2"; shift 2 ;;
+    --snapshot) snapshot="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -n "$output" && -n "$snapshot" ]] || exit 91
+printf '{"schema":"megacampus.supabase-source-manifest/v1","snapshot_id":"%s","baseline":{},"cutover_snapshot":{}}\\n' "$snapshot" > "$output"
 `
   );
 
@@ -149,6 +224,12 @@ if [[ "\${FAKE_RESTORE_MODE:-success}" == traversal-failure && "$*" == *--file=/
   printf 'synthetic full traversal failure\\n' >&2
   exit 42
 fi
+if [[ "\${FAKE_RESTORE_MODE:-success}" == list-stderr && "$*" == *--list* ]]; then
+  printf 'synthetic list warning\\n' >&2
+fi
+if [[ "\${FAKE_RESTORE_MODE:-success}" == traversal-stderr && "$*" == *--file=/dev/null* ]]; then
+  printf 'synthetic traversal warning\\n' >&2
+fi
 if [[ "$*" == *--list* ]]; then
   printf '; Archive created by synthetic test\\n'
   printf '1; 1259 16384 TABLE public synthetic postgres\\n'
@@ -165,6 +246,8 @@ set -eu
 /usr/bin/mv -- "$FAKE_SUBSTITUTE_PATH" "$FAKE_SUBSTITUTE_PATH.opened"
 if [[ "\${FAKE_SUBSTITUTE_KIND:-file}" == directory ]]; then
   /usr/bin/mkdir -m "$FAKE_SUBSTITUTE_MODE" "$FAKE_SUBSTITUTE_PATH"
+elif [[ "\${FAKE_SUBSTITUTE_KIND:-file}" == symlink ]]; then
+  /usr/bin/ln -s "$FAKE_SUBSTITUTE_PATH.opened" "$FAKE_SUBSTITUTE_PATH"
 else
   printf '%s\\n' 'synthetic substituted input' > "$FAKE_SUBSTITUTE_PATH"
   /usr/bin/chmod "$FAKE_SUBSTITUTE_MODE" "$FAKE_SUBSTITUTE_PATH"
@@ -185,7 +268,12 @@ fi
     readyFile,
     releaseFile,
     pgDump,
+    pgDumpall,
     pgRestore,
+    manifestGenerator,
+    rolesArgsLog,
+    rolesCounter,
+    manifestArgsLog,
     env: {
       PATH: '/usr/bin:/bin',
       SUPABASE_BACKUP_URL_FILE: urlFile,
@@ -195,26 +283,68 @@ fi
       MC2_SUPABASE_BACKUP_TEST_MODE: TEST_MODE,
       MC2_SUPABASE_BACKUP_TEST_ROOT: root,
       MC2_SUPABASE_BACKUP_TEST_PG_DUMP: pgDump,
+      MC2_SUPABASE_BACKUP_TEST_PG_DUMPALL: pgDumpall,
       MC2_SUPABASE_BACKUP_TEST_PG_RESTORE: pgRestore,
+      MC2_SUPABASE_BACKUP_TEST_MANIFEST_GENERATOR: manifestGenerator,
+      MC2_SUPABASE_BACKUP_TEST_BASELINE_FILE: baselineFile,
+      MC2_SUPABASE_BACKUP_TEST_EXPECTED_CATALOG_FILE: expectedCatalogFile,
       FAKE_ARGS_LOG: argsLog,
       FAKE_RESTORE_ARGS_LOG: restoreArgsLog,
       FAKE_IDENTITY_LOG: identityLog,
       FAKE_ORIGINAL_CA_PATH: caFile,
       FAKE_READY_FILE: readyFile,
       FAKE_RELEASE_FILE: releaseFile,
+      FAKE_ROLES_ARGS_LOG: rolesArgsLog,
+      FAKE_ROLES_COUNTER: rolesCounter,
+      FAKE_MANIFEST_ARGS_LOG: manifestArgsLog,
     },
   };
 }
 
 function run(item: Fixture, extra: NodeJS.ProcessEnv = {}): ReturnType<typeof spawnSync> {
-  return spawnSync('/usr/bin/bash', [OPERATOR], {
-    env: { ...item.env, ...extra },
-    encoding: 'utf8',
-  });
+  return spawnSync(
+    '/usr/bin/bash',
+    [
+      OPERATOR,
+      '--q12-run-id',
+      '11111111-2222-4333-8444-555555555555',
+      '--snapshot',
+      '00000003-0000001B-1',
+    ],
+    {
+      env: { ...item.env, ...extra },
+      encoding: 'utf8',
+    }
+  );
 }
 
 function published(directory: string): string[] {
-  return readdirSync(directory).filter(name => /^supabase-\d{8}T\d{6}Z-\d+\.dump$/.test(name));
+  return generationNames(directory);
+}
+
+function generationNames(directory: string): string[] {
+  return readdirSync(directory).filter(name =>
+    /^generation-\d{8}T\d{6}Z-[0-9a-f-]{36}$/.test(name)
+  );
+}
+
+function generationRun(
+  item: Fixture,
+  extra: NodeJS.ProcessEnv = {},
+  args: string[] = [
+    '--q12-run-id',
+    '11111111-2222-4333-8444-555555555555',
+    '--snapshot',
+    '00000003-0000001B-1',
+  ]
+): ReturnType<typeof spawnSync> {
+  return spawnSync('/usr/bin/bash', [OPERATOR, ...args], {
+    env: {
+      ...item.env,
+      ...extra,
+    },
+    encoding: 'utf8',
+  });
 }
 
 async function waitFor(path: string): Promise<void> {
@@ -387,17 +517,31 @@ describe('fail-closed Supabase backup operator', () => {
     expect(published(item.backupDir)).toEqual([]);
   });
 
+  it.each([
+    ['list-stderr', 'pg_restore validation emitted stderr'],
+    ['traversal-stderr', 'pg_restore full traversal emitted stderr'],
+  ])('rejects successful archive validation with nonempty %s', (mode, message) => {
+    const item = fixture();
+    const result = run(item, { FAKE_RESTORE_MODE: mode });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(message);
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
   it('publishes one validated custom archive with owner-only permissions', () => {
     const item = fixture();
     const result = run(item);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/^Supabase backup published: supabase-/m);
+    expect(result.stdout).toMatch(/^Supabase backup published: generation-/m);
     expect(`${result.stdout}${result.stderr}`).not.toContain('synthetic-password-never-log');
     const files = published(item.backupDir);
     expect(files).toHaveLength(1);
-    expect(lstatSync(join(item.backupDir, files[0]!)).mode & 0o777).toBe(0o600);
-    expect(lstatSync(join(item.backupDir, files[0]!)).size).toBeGreaterThan(1024);
+    const generation = join(item.backupDir, files[0]);
+    expect(lstatSync(generation).mode & 0o777).toBe(0o700);
+    expect(lstatSync(join(generation, 'database.dump')).mode & 0o777).toBe(0o600);
+    expect(lstatSync(join(generation, 'database.dump')).size).toBeGreaterThan(1024);
     const dumpArgs = readFileSync(item.argsLog, 'utf8');
     expect(dumpArgs).toContain('--format=custom');
     expect(dumpArgs).toContain('--file=');
@@ -412,10 +556,20 @@ describe('fail-closed Supabase backup operator', () => {
 
   it('takes one nonblocking lock across the complete dump window', async () => {
     const item = fixture();
-    const first = spawn('/usr/bin/bash', [OPERATOR], {
-      env: { ...item.env, FAKE_DUMP_MODE: 'wait' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const first = spawn(
+      '/usr/bin/bash',
+      [
+        OPERATOR,
+        '--q12-run-id',
+        '11111111-2222-4333-8444-555555555555',
+        '--snapshot',
+        '00000003-0000001B-1',
+      ],
+      {
+        env: { ...item.env, FAKE_DUMP_MODE: 'wait' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
     await waitFor(item.readyFile);
 
     const second = run(item);
@@ -504,6 +658,21 @@ describe('fail-closed Supabase backup operator', () => {
     expect(published(item.backupDir)).toEqual([]);
   });
 
+  it('rejects a same-inode URL symlink swap after no-follow descriptor adoption', () => {
+    const item = fixture();
+    const result = run(item, {
+      MC2_SUPABASE_BACKUP_TEST_PRE_DUMP_HOOK: item.substituteHook,
+      FAKE_SUBSTITUTE_PATH: item.urlFile,
+      FAKE_SUBSTITUTE_MODE: '600',
+      FAKE_SUBSTITUTE_KIND: 'symlink',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('URL credential file must be a regular non-symlink file');
+    expect(existsSync(item.argsLog)).toBe(false);
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
   it('fails closed when the locked backup directory pathname is substituted', () => {
     const item = fixture();
     const result = run(item, {
@@ -525,21 +694,34 @@ describe('fail-closed Supabase backup operator', () => {
 
     expect(crashed.signal).toBe('SIGKILL');
     expect(published(item.backupDir)).toEqual([]);
-    const residue = readdirSync(item.backupDir);
-    expect(residue.every(name => name.startsWith('.supabase-backup.tmp.'))).toBe(true);
+    const residue = readdirSync(item.backupDir).filter(name => name !== '.committed');
+    expect(residue.every(name => name.startsWith('.generation.'))).toBe(true);
     expect(residue.some(name => name.includes('.stderr.'))).toBe(false);
-    for (const name of residue) {
-      expect(readFileSync(join(item.backupDir, name), 'utf8')).not.toContain(
-        'synthetic-password-never-log'
-      );
-    }
+    expect(residue.join('\n')).not.toContain('synthetic-password-never-log');
 
     const recovered = run(item);
     expect(recovered.status).toBe(0);
-    expect(
-      readdirSync(item.backupDir).filter(name => name.startsWith('.supabase-backup.tmp.'))
-    ).toEqual([]);
+    expect(readdirSync(item.backupDir).filter(name => name.startsWith('.generation.'))).toEqual([]);
   });
+
+  it.each([
+    ['directory', false],
+    ['file', true],
+  ] as const)(
+    'leaves no unowned temporary when the %s helper is signalled at create-assignment boundary',
+    (kind, generationCommitted) => {
+      const item = fixture();
+      const result = run(item, { MC2_PRIVATE_TEMP_TEST_SIGNAL_AFTER_CREATE: kind });
+
+      expect(result.status).not.toBe(0);
+      expect(readdirSync(item.backupDir).filter(name => name.startsWith('.generation.'))).toEqual(
+        []
+      );
+      expect(readdirSync(item.backupDir).filter(name => name.includes('.tmp.'))).toEqual([]);
+      expect(published(item.backupDir)).toHaveLength(generationCommitted ? 1 : 0);
+      expect(existsSync(join(item.backupDir, 'latest.json'))).toBe(false);
+    }
+  );
 
   it('startup cleanup removes only exact owned mode-0600 non-symlink temporaries', () => {
     const item = fixture();
@@ -562,20 +744,20 @@ describe('fail-closed Supabase backup operator', () => {
 
   it('publishes with atomic no-replace semantics and preserves collision content', () => {
     const item = fixture();
-    const finalName = 'supabase-20300101T000000Z-777.dump';
+    const finalName = 'generation-20300101T000000Z-11111111-2222-4333-8444-555555555555';
     const existing = join(item.backupDir, finalName);
     writeFileSync(existing, 'racer-content-must-survive', { mode: 0o600 });
 
     const result = run(item, { MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: finalName });
     expect(result.status).toBe(73);
-    expect(result.stderr).toContain('refusing to replace an existing backup path');
+    expect(result.stderr).toContain('refusing to replace an existing generation path');
     expect(readFileSync(existing, 'utf8')).toBe('racer-content-must-survive');
     expect(result.stdout).not.toContain('published');
   });
 
   it('treats a colliding symlink-to-directory as the final name, not a target directory', () => {
     const item = fixture();
-    const finalName = 'supabase-20300101T000000Z-778.dump';
+    const finalName = 'generation-20300101T000000Z-11111111-2222-4333-8444-555555555555';
     const collisionDirectory = join(item.root, 'collision-directory');
     mkdirSync(collisionDirectory, { mode: 0o700 });
     symlinkSync(collisionDirectory, join(item.backupDir, finalName));
@@ -606,7 +788,175 @@ describe('fail-closed Supabase backup operator', () => {
 
     const success = run(item);
     expect(success.status).toBe(0);
-    expect(existsSync(oldOwned)).toBe(false);
+    expect(existsSync(oldOwned)).toBe(true);
     for (const path of [unrelated, historical, linked]) expect(existsSync(path)).toBe(true);
+  });
+});
+
+describe('Q12 immutable Supabase backup generations', () => {
+  it('binds pg_dump and the source manifest to one exported snapshot and publishes four files', () => {
+    const item = fixture();
+
+    const result = generationRun(item);
+
+    expect(result.status).toBe(0);
+    const generations = generationNames(item.backupDir);
+    expect(generations).toHaveLength(1);
+    const generation = join(item.backupDir, generations[0]);
+    expect(readdirSync(generation).sort()).toEqual([
+      'checksums.json',
+      'database.dump',
+      'roles.sql',
+      'source-manifest.json',
+    ]);
+    expect(readFileSync(item.argsLog, 'utf8')).toContain('--snapshot=00000003-0000001B-1');
+    expect(readFileSync(join(item.root, 'manifest-args'), 'utf8')).toContain(
+      '--snapshot 00000003-0000001B-1'
+    );
+    expect(readFileSync(join(item.root, 'roles-args'), 'utf8').trim().split('\n')).toEqual([
+      '--roles-only --no-role-passwords --no-password',
+      '--roles-only --no-role-passwords --no-password',
+    ]);
+    for (const name of readdirSync(generation)) {
+      expect(lstatSync(join(generation, name)).mode & 0o777).toBe(0o600);
+    }
+    expect(lstatSync(generation).mode & 0o777).toBe(0o700);
+  });
+
+  it('fails closed when normalized password-free role exports drift', () => {
+    const item = fixture();
+
+    const result = generationRun(item, { FAKE_ROLES_DRIFT: '1' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('normalized role exports changed across the shared snapshot');
+    expect(generationNames(item.backupDir)).toEqual([]);
+    expect(existsSync(join(item.backupDir, 'latest.json'))).toBe(false);
+  });
+
+  it('accepts the real PostgreSQL 17 roles header/footer without deleting audit text', () => {
+    const item = fixture();
+
+    const result = generationRun(item, { FAKE_ROLES_LAYOUT: 'realistic' });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    const generation = join(item.backupDir, generationNames(item.backupDir)[0]);
+    const roles = readFileSync(join(generation, 'roles.sql'), 'utf8');
+    expect(roles).toContain('-- PostgreSQL database cluster dump');
+    expect(roles).toContain('-- PostgreSQL database cluster dump complete');
+    expect(roles).toContain('\\restrict mc2nonce');
+    expect(roles).toContain('\\unrestrict mc2nonce');
+  });
+
+  it('rejects every pg_dump stderr byte because the initial warning allowlist is empty', () => {
+    const item = fixture();
+
+    const result = generationRun(item, { FAKE_DUMP_STDERR: 'synthetic warning' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('pg_dump stderr is not allowlisted');
+    expect(`${result.stdout}${result.stderr}`).not.toContain('synthetic-password-never-log');
+    expect(generationNames(item.backupDir)).toEqual([]);
+  });
+
+  it('uses no-replace generation publication and retains post-publication incident evidence', () => {
+    const item = fixture();
+    const hook = join(item.root, 'bin', 'fail-before-pointer');
+    executable(hook, '#!/usr/bin/env bash\nexit 61\n');
+
+    const result = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_POST_GENERATION_HOOK: hook,
+    });
+
+    expect(result.status).toBe(61);
+    expect(result.stderr).toContain('post-generation hook failed before latest pointer commit');
+    expect(generationNames(item.backupDir)).toHaveLength(1);
+    expect(existsSync(join(item.backupDir, 'latest.json'))).toBe(false);
+    expect(readdirSync(item.backupDir).filter(name => name.startsWith('.generation.'))).toEqual([]);
+  });
+
+  it('commits latest.json only after the immutable generation and binds its checksum manifest', () => {
+    const item = fixture();
+
+    const result = generationRun(item);
+
+    expect(result.status).toBe(0);
+    const pointerPath = join(item.backupDir, 'latest.json');
+    expect(existsSync(pointerPath)).toBe(true);
+    if (!existsSync(pointerPath)) return;
+    const pointer = JSON.parse(readFileSync(pointerPath, 'utf8')) as {
+      generation: string;
+      checksums_sha256: string;
+    };
+    expect(pointer.generation).toBe(generationNames(item.backupDir)[0]);
+    expect(pointer.generation).not.toContain('/');
+    expect(pointer.checksums_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(readdirSync(item.backupDir).some(name => name.startsWith('latest.json.'))).toBe(false);
+
+    const operator = readFileSync(OPERATOR, 'utf8');
+    expect(operator).toContain('RENAME_NOREPLACE');
+    expect(operator).toContain('generation_committed=1');
+    expect(operator).not.toContain('"$BACKUP_DIR"/supabase-*.dump');
+  });
+
+  it('rejects a latest pointer whose referenced four-file generation is no longer complete', () => {
+    const item = fixture();
+    const firstName = 'generation-20300101T000000Z-11111111-2222-4333-8444-555555555555';
+    const secondName = 'generation-20300102T000000Z-11111111-2222-4333-8444-555555555555';
+    const first = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: firstName,
+    });
+    expect(first.status, `${first.stdout}\n${first.stderr}`).toBe(0);
+    rmSync(join(item.backupDir, firstName, 'database.dump'));
+
+    const second = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: secondName,
+    });
+
+    expect(second.status).not.toBe(0);
+    expect(second.stderr).toContain('latest pointer generation completeness validation failed');
+    expect(generationNames(item.backupDir)).toEqual([firstName]);
+  });
+
+  it('rejects a latest pointer with fields beyond the exact immutable reference contract', () => {
+    const item = fixture();
+    const firstName = 'generation-20300101T000000Z-11111111-2222-4333-8444-555555555555';
+    const secondName = 'generation-20300102T000000Z-11111111-2222-4333-8444-555555555555';
+    const first = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: firstName,
+    });
+    expect(first.status, `${first.stdout}\n${first.stderr}`).toBe(0);
+    const pointerPath = join(item.backupDir, 'latest.json');
+    const pointer = JSON.parse(readFileSync(pointerPath, 'utf8')) as Record<string, unknown>;
+    writeFileSync(pointerPath, `${JSON.stringify({ ...pointer, path: '/unexpected' })}\n`, {
+      mode: 0o600,
+    });
+
+    const second = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: secondName,
+    });
+
+    expect(second.status).not.toBe(0);
+    expect(second.stderr).toContain('latest pointer exact field set mismatch');
+    expect(generationNames(item.backupDir)).toEqual([firstName]);
+  });
+
+  it('does not publish a generation or pointer containing a synthetic credential', () => {
+    const item = fixture();
+
+    const result = generationRun(item);
+
+    expect(result.status).toBe(0);
+    const pointerPath = join(item.backupDir, 'latest.json');
+    expect(existsSync(pointerPath)).toBe(true);
+    if (!existsSync(pointerPath)) return;
+    const trackedOutput = `${result.stdout}${result.stderr}${readFileSync(pointerPath, 'utf8')}`;
+    expect(trackedOutput).not.toContain('synthetic-password-never-log');
+    const generation = join(item.backupDir, generationNames(item.backupDir)[0]);
+    for (const name of readdirSync(generation)) {
+      expect(readFileSync(join(generation, name), 'utf8')).not.toContain(
+        'synthetic-password-never-log'
+      );
+    }
   });
 });
