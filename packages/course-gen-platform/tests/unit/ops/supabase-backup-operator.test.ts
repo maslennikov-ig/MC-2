@@ -293,6 +293,53 @@ describe('fail-closed Supabase backup operator', () => {
     expect(existsSync(item.argsLog)).toBe(false);
   });
 
+  it('rejects multiline pg_dump version output before credential handling or pg_dump', () => {
+    const item = fixture();
+    rmSync(item.urlFile);
+    rmSync(item.caFile);
+
+    const result = run(item, {
+      FAKE_PG_DUMP_VERSION: '17.7\nunexpected second line',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('pg_dump version output is invalid');
+    expect(result.stderr).not.toContain('URL credential file');
+    expect(result.stderr).not.toContain('CA file');
+    expect(existsSync(item.argsLog)).toBe(false);
+    expect(existsSync(item.restoreArgsLog)).toBe(false);
+  });
+
+  it('rejects multiline pg_restore version output before credential handling or pg_dump', () => {
+    const item = fixture();
+    rmSync(item.urlFile);
+    rmSync(item.caFile);
+
+    const result = run(item, {
+      FAKE_PG_RESTORE_VERSION: '17.7\r\nunexpected second line',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('pg_restore version output is invalid');
+    expect(result.stderr).not.toContain('URL credential file');
+    expect(result.stderr).not.toContain('CA file');
+    expect(existsSync(item.argsLog)).toBe(false);
+    expect(existsSync(item.restoreArgsLog)).toBe(false);
+  });
+
+  it('accepts canonical PostgreSQL 17 versions with a same-line packaging suffix', () => {
+    const item = fixture();
+    const version = '17.7 (Ubuntu 17.7-1.pgdg24.04+1)';
+
+    const result = run(item, {
+      FAKE_PG_DUMP_VERSION: version,
+      FAKE_PG_RESTORE_VERSION: version,
+    });
+
+    expect(result.status).toBe(0);
+    expect(published(item.backupDir)).toHaveLength(1);
+  });
+
   it('reproduces the masked gzip pipeline bug and refuses to publish a failed pg_dump', () => {
     const item = fixture();
     const legacy = join(item.root, 'legacy.sql.gz');

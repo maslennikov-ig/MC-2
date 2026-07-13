@@ -107,10 +107,11 @@ read_postgresql_command_major() {
   if ! version_output=$("$path" --version 2>/dev/null); then
     fail "$label --version failed"
   fi
+  [[ "$version_output" != *$'\n'* && "$version_output" != *$'\r'* ]] || fail "$label version output is invalid"
   local prefix="$label (PostgreSQL) "
   [[ "$version_output" == "$prefix"* ]] || fail "$label version output is invalid"
   version_value=${version_output#"$prefix"}
-  [[ "$version_value" =~ ^([0-9]+)(\.[0-9]+)*([[:space:]].*)?$ ]] || fail "$label version output is invalid"
+  [[ "$version_value" =~ ^([0-9]+)(\.[0-9]+)*([[:blank:]].*)?$ ]] || fail "$label version output is invalid"
   major_result=${BASH_REMATCH[1]}
 }
 
