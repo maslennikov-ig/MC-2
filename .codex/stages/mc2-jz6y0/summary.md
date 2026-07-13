@@ -56,6 +56,8 @@ authorizes no staging or production mutation.
 | P      | `mc2-jz6y0.27`     | pin and fail-close the explicit PostgreSQL 17 dump/restore pair         | deploy specialist using TDD             | operator, focused test, worker/correction artifacts           | A + S                      | RED 2/24; GREEN 24/24 plus shell/type/process     | accepted and integrated                               |
 | PR     | `mc2-jz6y0.27`     | independent finding review and corrected rereview                       | correctness/DevOps reviewer             | immutable review/rereview artifacts                           | P                          | initial P2 linked to correction; final P0-P3 zero | accepted; dedicated worktrees cleaned                 |
 | T      | `mc2-jz6y0.13.7.1` | pin the isolated PostgreSQL 17 restore target and zero-residue contract | docs/deploy researcher plus reviewer    | immutable research/finding/correction/rereview artifacts      | P                          | four matching digest reads; P1 fixed; P0-P3 zero  | accepted; no image pulled or runtime resource created |
+| DR     | `mc2-jz6y0.13.7`   | review the joined PG17 packet, runbooks, and acceptance trail           | docs reviewer                           | immutable docs-review artifact                                | P + T                      | initial P1/P2 findings                            | accepted finding evidence; correction required        |
+| D2     | `mc2-jz6y0.13.7`   | independently rereview the corrected sole execution packet              | docs reviewer                           | immutable docs-rereview artifact                              | DR + correction            | P0-P3 zero                                        | accepted; both review worktrees cleaned               |
 
 The corrected implementation is accepted locally and remains uninstalled. It
 uses only the explicit `/usr/lib/postgresql/17/bin/{pg_dump,pg_restore}` pair,
@@ -73,6 +75,11 @@ at exact `linux/amd64` manifest
 its accepted contract pins `/var/lib/postgresql/data`, a read-only secret bind,
 loopback-only access, pre-restore mount inspection, and blocking zero-residue
 cleanup. No image or layer has been pulled.
+
+The sole executable packet is
+`mc2-jz6y0.13.7-server-execution-packet-pg17.md`; every older `.13.7`
+`/usr/bin` command snippet is immutable historical evidence only. Correction
+`7b446d7d` and rereview `0b7ffe67` close the joined documentation findings.
 
 ## Parallel Decomposition
 
@@ -199,7 +206,8 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 ## Closeout Evidence
 
-- `docs-reviewed: updated` — final independent rereview found P0-P3 zero after the backup/restore and activation-order corrections.
+- `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
+- `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
 - `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .` and `graphify cluster-only . --no-viz`: 51,658 nodes, 76,782 edges, zero model/API tokens, and no Git hooks. Community totals are omitted because reclustering may repartition an unchanged graph; the required post-metadata rerun reports the delivered HEAD.
 - Q12 remains open until every live gate and observation passes; authorization

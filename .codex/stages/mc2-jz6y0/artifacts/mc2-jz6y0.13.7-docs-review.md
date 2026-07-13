@@ -37,15 +37,15 @@ selected_agents:
 catalog_candidates:
   - none - installed review assets and accepted first-party evidence cover the bounded review
 parallel_decision: sequential - this is one joined independent review of the integrated operations packet
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: no runtime or remote residue was created; the dedicated review worktree and branch remain for orchestrator integration or correction follow-up
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: The immutable P1/P2 finding artifact is accepted as review evidence; correction 7b446d7d and zero-finding rereview 0b7ffe67 close it. The dedicated worktree was removed, while its pushed evidence branch remains because normal closeout does not force-delete cherry-picked history.
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: review-complete-with-findings
-docs_review_notes: current durable runbooks are correct, but accepted historical artifacts expose stale executable PG18-wrapper examples and accepted-stream metadata retains contradictory pending state
+docs_reviewed: updated
+docs_review_notes: the immutable findings remain in the body; correction 7b446d7d makes one PG17 packet solely executable, updates both durable runbooks, and reconciles accepted-stream metadata before zero-finding rereview 0b7ffe67
 graph_reviewed: no-change-needed
 graph_review_notes: the ignored GRAPH_REPORT is absent from this dedicated worktree; this read-only review changes no durable architecture, and graph refresh remains integration-owned after correction acceptance
 verification:
@@ -56,7 +56,6 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7-docs-review.md
 explicit_defers:
-  - correct and independently rereview both findings before accepting the execution packet
   - the permanent verify-full Session pooler DSN remains external; password rotation requires separate explicit confirmation
   - every SSH, Supabase, credential, database, dump, restore, Docker, server, service, cron, migration, Qdrant, staging, production, and deploy action remains deferred
 ---

@@ -37,11 +37,11 @@ selected_agents:
 catalog_candidates:
   - none - installed review assets and accepted repository evidence cover the bounded rereview
 parallel_decision: sequential - one joined review must reconcile the sole execution packet with its durable runbooks and acceptance trail
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: no runtime or remote residue was created; the dedicated rereview worktree and branch remain for orchestrator acceptance and integration
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: The P0-P3-zero rereview is accepted and integrated as a0c12554. Its dedicated worktree was removed, while the pushed evidence branch remains because normal closeout does not force-delete cherry-picked history; no runtime or remote residue was created.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -56,7 +56,7 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7-docs-rereview.md
 explicit_defers:
-  - root-orchestrator acceptance and integration of this immutable rereview remain pending
+  - final integration-owned Graphify refresh and delivery verification remain closeout work
   - the permanent verify-full Session pooler DSN remains external and database-password rotation requires separate explicit confirmation
   - every SSH, Supabase, credential, database, dump, restore, Docker, server, service, cron, migration, Qdrant, staging, production, and deploy action remains deferred
 ---
@@ -158,8 +158,9 @@ so another graph refresh would add no relevant graph truth.
 
 # Risks / Follow-ups / Explicit Defers
 
-Root-orchestrator acceptance and integration of this immutable rereview remain
-pending. The permanent verify-full Session pooler DSN remains an external owner
-input, and password rotation remains a separately authorized impact decision.
-All live backup, restore, server, database, migration, Qdrant, staging,
-production, and deploy actions remain deferred to an observed authorized window.
+Root-orchestrator acceptance and integration are complete; final Graphify and
+delivery verification remain closeout work. The permanent verify-full Session
+pooler DSN remains an external owner input, and password rotation remains a
+separately authorized impact decision. All live backup, restore, server,
+database, migration, Qdrant, staging, production, and deploy actions remain
+deferred to an observed authorized window.

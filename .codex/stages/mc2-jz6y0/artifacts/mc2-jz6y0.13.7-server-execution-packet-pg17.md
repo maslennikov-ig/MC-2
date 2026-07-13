@@ -21,15 +21,15 @@ selected_agents:
   - root orchestrator - joins accepted backup, preflight, image-pin, correction, and rereview evidence
 catalog_candidates:
   - none - accepted repo operators, runbooks, first-party pins, and current host evidence fully define the packet
-status: returned
+status: accepted
 delivery_method: manual integration
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: packet creation changed documentation only; no SSH, Supabase, secret, image, container, volume, network, port, database, service, cron, Qdrant, staging, or production operation was performed
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: pending
-docs_review_notes: requires targeted independent docs review against both operations runbooks before acceptance
+docs_reviewed: updated
+docs_review_notes: immutable review 6f80e87f found P1/P2; correction 7b446d7d and independent rereview 0b7ffe67 close both with P0-P3 zero while preserving the live NO-GO boundary
 graph_reviewed: blocked
 graph_review_notes: durable operations truth changed; integration closeout must refresh the local graph after docs acceptance
 verification:
