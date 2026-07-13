@@ -34,6 +34,8 @@ interface Fixture {
   substituteHook: string;
   readyFile: string;
   releaseFile: string;
+  pgDump: string;
+  pgRestore: string;
   env: NodeJS.ProcessEnv;
 }
 
@@ -79,6 +81,10 @@ function fixture(): Fixture {
     pgDump,
     `#!/usr/bin/env bash
 set -eu
+if [[ "\${1:-}" == --version && "$#" -eq 1 ]]; then
+  printf 'pg_dump (PostgreSQL) %s\\n' "\${FAKE_PG_DUMP_VERSION:-17.7}"
+  exit 0
+fi
 printf '%s\\n' "$*" > "$FAKE_ARGS_LOG"
 [[ "\${PGSSLROOTCERT:-}" == /proc/self/fd/* ]] || exit 94
 [[ -r "$PGSSLROOTCERT" ]] || exit 95
@@ -126,6 +132,10 @@ esac
     pgRestore,
     `#!/usr/bin/env bash
 set -eu
+if [[ "\${1:-}" == --version && "$#" -eq 1 ]]; then
+  printf 'pg_restore (PostgreSQL) %s\\n' "\${FAKE_PG_RESTORE_VERSION:-17.7}"
+  exit 0
+fi
 if [[ -n "\${PGDATABASE:-}" ]]; then
   printf 'pg_restore list must not receive database credentials\\n' >&2
   exit 93
@@ -174,6 +184,8 @@ fi
     substituteHook,
     readyFile,
     releaseFile,
+    pgDump,
+    pgRestore,
     env: {
       PATH: '/usr/bin:/bin',
       SUPABASE_BACKUP_URL_FILE: urlFile,
@@ -218,16 +230,67 @@ afterEach(() => {
 });
 
 describe('fail-closed Supabase backup operator', () => {
-  it('uses fixed distro PostgreSQL commands while confining only test overrides', () => {
+  it('pins the production pair to explicit PostgreSQL 17 commands while confining test overrides', () => {
     const operator = readFileSync(OPERATOR, 'utf8');
 
     expect(operator.startsWith('#!/usr/bin/bash\n')).toBe(true);
     expect(operator).toContain('export LC_ALL=C');
-    expect(operator).toContain("PG_DUMP='/usr/bin/pg_dump'");
-    expect(operator).toContain("PG_RESTORE='/usr/bin/pg_restore'");
+    expect(operator).toContain("readonly REQUIRED_PG_MAJOR='17'");
+    expect(operator).toContain("PG_DUMP='/usr/lib/postgresql/17/bin/pg_dump'");
+    expect(operator).toContain("PG_RESTORE='/usr/lib/postgresql/17/bin/pg_restore'");
     expect(operator).toContain("require_test_command 'pg_dump'");
-    expect(operator).not.toContain('[[ -x "$PG_DUMP" && ! -L "$PG_DUMP" ]]');
-    expect(operator).not.toContain('[[ -x "$PG_RESTORE" && ! -L "$PG_RESTORE" ]]');
+    expect(operator).toContain('[[ -x "$PG_DUMP" ]]');
+    expect(operator).toContain('[[ -x "$PG_RESTORE" ]]');
+    const main = operator.slice(operator.indexOf('main() {'));
+    expect(main.indexOf('configure_commands')).toBeLessThan(
+      main.indexOf("open_validated_input 'URL credential'")
+    );
+    expect(main.indexOf('configure_commands')).toBeLessThan(
+      main.indexOf("open_validated_input 'CA'")
+    );
+  });
+
+  it('fails before credential handling when a protected client command is absent', () => {
+    const item = fixture();
+    rmSync(item.pgRestore);
+    rmSync(item.urlFile);
+
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('pg_restore test override must be a regular non-symlink file');
+    expect(result.stderr).not.toContain('URL credential file');
+    expect(existsSync(item.argsLog)).toBe(false);
+  });
+
+  it('rejects a same-major PostgreSQL 18 pair before credential handling or pg_dump', () => {
+    const item = fixture();
+    rmSync(item.urlFile);
+
+    const result = run(item, {
+      FAKE_PG_DUMP_VERSION: '18.1',
+      FAKE_PG_RESTORE_VERSION: '18.1',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('pg_dump must report required PostgreSQL major 17');
+    expect(result.stderr).not.toContain('URL credential file');
+    expect(existsSync(item.argsLog)).toBe(false);
+  });
+
+  it('rejects mismatched PostgreSQL client majors before credential handling or pg_dump', () => {
+    const item = fixture();
+    rmSync(item.urlFile);
+
+    const result = run(item, {
+      FAKE_PG_DUMP_VERSION: '17.7',
+      FAKE_PG_RESTORE_VERSION: '18.1',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('pg_dump and pg_restore must report the same PostgreSQL major');
+    expect(result.stderr).not.toContain('URL credential file');
+    expect(existsSync(item.argsLog)).toBe(false);
   });
 
   it('reproduces the masked gzip pipeline bug and refuses to publish a failed pg_dump', () => {

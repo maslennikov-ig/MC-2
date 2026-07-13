@@ -9,13 +9,14 @@ readonly DEFAULT_URL_FILE='/opt/megacampus/secrets/supabase_db_url'
 readonly DEFAULT_CA_FILE='/opt/megacampus/secrets/prod-ca-2021.crt'
 readonly DEFAULT_BACKUP_DIR='/opt/megacampus/backups/supabase'
 readonly MINIMUM_ARCHIVE_BYTES=1024
+readonly REQUIRED_PG_MAJOR='17'
 
 URL_FILE="${SUPABASE_BACKUP_URL_FILE:-$DEFAULT_URL_FILE}"
 CA_FILE="${SUPABASE_BACKUP_CA_FILE:-$DEFAULT_CA_FILE}"
 BACKUP_DIR="${SUPABASE_BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
 RETENTION_DAYS="${SUPABASE_BACKUP_RETENTION_DAYS:-14}"
-PG_DUMP='/usr/bin/pg_dump'
-PG_RESTORE='/usr/bin/pg_restore'
+PG_DUMP='/usr/lib/postgresql/17/bin/pg_dump'
+PG_RESTORE='/usr/lib/postgresql/17/bin/pg_restore'
 TEST_MODE_ACTIVE=0
 TRUST_BOUNDARY='/'
 PRE_DUMP_HOOK=''
@@ -97,6 +98,22 @@ require_test_command() {
   [[ "$identity" == "$expected" ]] || fail "$label test override must be owned by the current user and mode 0700"
 }
 
+read_postgresql_command_major() {
+  local label=$1
+  local path=$2
+  local -n major_result=$3
+  local version_output version_value
+
+  if ! version_output=$("$path" --version 2>/dev/null); then
+    fail "$label --version failed"
+  fi
+  local prefix="$label (PostgreSQL) "
+  [[ "$version_output" == "$prefix"* ]] || fail "$label version output is invalid"
+  version_value=${version_output#"$prefix"}
+  [[ "$version_value" =~ ^([0-9]+)(\.[0-9]+)*([[:space:]].*)?$ ]] || fail "$label version output is invalid"
+  major_result=${BASH_REMATCH[1]}
+}
+
 configure_commands() {
   local test_mode=${MC2_SUPABASE_BACKUP_TEST_MODE:-}
   if [[ -z "$test_mode" ]]; then
@@ -136,6 +153,16 @@ configure_commands() {
 
   [[ -x "$PG_DUMP" ]] || fail 'absolute pg_dump command is unavailable'
   [[ -x "$PG_RESTORE" ]] || fail 'absolute pg_restore command is unavailable'
+
+  local pg_dump_major pg_restore_major
+  read_postgresql_command_major 'pg_dump' "$PG_DUMP" pg_dump_major
+  read_postgresql_command_major 'pg_restore' "$PG_RESTORE" pg_restore_major
+  [[ "$pg_dump_major" == "$pg_restore_major" ]] || \
+    fail 'pg_dump and pg_restore must report the same PostgreSQL major'
+  [[ "$pg_dump_major" == "$REQUIRED_PG_MAJOR" ]] || \
+    fail "pg_dump must report required PostgreSQL major $REQUIRED_PG_MAJOR"
+  [[ "$pg_restore_major" == "$REQUIRED_PG_MAJOR" ]] || \
+    fail "pg_restore must report required PostgreSQL major $REQUIRED_PG_MAJOR"
 }
 
 require_safe_parent_chain() {
