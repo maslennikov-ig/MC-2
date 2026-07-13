@@ -206,6 +206,21 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 ## Closeout Evidence
 
+### Q12 correction implementation start (2026-07-13)
+
+- Owner approved the immutable correction specification at SHA-256
+  `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` after
+  two independent P0/P1/P2-zero reviews.
+- Local execution is tracked by G7 `.13.7.2`, publisher `.13.9`, writer/barrier
+  `.13.10`, migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
+- The accepted plan is
+  `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; wave 1 is
+  G7/P/W in isolated worktrees, wave 2 is M/H after the W interface is frozen,
+  and root owns only the sequential integration/supervisor join.
+- No GHCR, SSH, server, Supabase, migration, database, container, Qdrant,
+  source-copy, reindex, service, cron, staging, or production mutation occurred
+  while approving/planning this correction wave.
+
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
