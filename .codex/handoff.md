@@ -2,9 +2,9 @@
 
 Updated: 2026-07-13
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: pushed `codex/self-hosted-qdrant-platform`; current remote
-baseline commit `099fc44b`, including the independently accepted normative
-addendum SHA. Resolve the remote SHA before any
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; normative
+addendum package commit `099fc44b`, followed only by current-state metadata.
+Resolve the remote branch SHA before any
 later continuation. The dedicated integration worktree remains authoritative
 for Q12.
 
