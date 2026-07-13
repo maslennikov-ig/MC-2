@@ -731,7 +731,8 @@ PY
 }
 
 run_retention() {
-  local latest_name candidate name identity
+  local latest_name candidate name identity retention_boundary
+  retention_boundary="$RETENTION_DAYS days ago"
   latest_name=$(/usr/bin/python3 - "$BACKUP_DIR/latest.json" <<'PY'
 import json, pathlib, sys
 print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["generation"])
@@ -748,7 +749,9 @@ PY
     # An unpointed post-rename incident has no durable pointer-commit receipt and is retained.
     [[ -f "$BACKUP_DIR/.committed/$name" && ! -L "$BACKUP_DIR/.committed/$name" ]] || continue
     validate_complete_generation "$candidate" "$name" || continue
-    if [[ -n "$(/usr/bin/find "$candidate" -maxdepth 0 -type d -mtime "+$RETENTION_DAYS" -print -quit)" ]]; then
+    # GNU find -newermt compares the actual timestamp rather than -mtime's
+    # completed-day buckets, so this is the exact 14*1440-minute boundary.
+    if [[ -n "$(/usr/bin/find "$candidate" -maxdepth 0 -type d ! -newermt "$retention_boundary" -print -quit)" ]]; then
       /usr/bin/rm -rf --one-file-system -- "$candidate"
       /usr/bin/rm -- "$BACKUP_DIR/.committed/$name"
     fi
@@ -818,7 +821,7 @@ main() {
   parse_arguments "$@"
   configure_commands
   [[ "$RETENTION_DAYS" == '14' || $TEST_MODE_ACTIVE -eq 1 ]] || fail 'scheduled retention must remain exactly 14 days'
-  [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || fail 'retention days must be a non-negative integer'
+  [[ "$RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]] || fail 'retention days must be a positive integer'
 
   local lock_fd lock_identity
   open_locked_backup_directory lock_fd lock_identity

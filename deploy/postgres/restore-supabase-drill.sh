@@ -18,6 +18,7 @@ readonly ROLE_TOOL="$SCRIPT_DIR/generate-role-bootstrap.ts"
 readonly CLEANUP_HELPER="$SCRIPT_DIR/run-restore-cleanup.ts"
 readonly TEMP_DIRECTORY_HELPER="$SCRIPT_DIR/create-private-temp-dir.py"
 readonly PGTLE_ARCHIVE_SCANNER="$SCRIPT_DIR/scan-pgtle-archive.py"
+readonly DOCKER_LIFECYCLE="$SCRIPT_DIR/restore-docker-lifecycle.sh"
 
 GENERATION=''
 RUN_ID=''
@@ -30,6 +31,9 @@ NETWORK_ID=''
 VOLUME_NAME=''
 CLEANUP_STARTED=0
 
+# shellcheck source=restore-docker-lifecycle.sh
+source "$DOCKER_LIFECYCLE"
+
 fail() {
   printf 'Supabase restore drill failed: %s\n' "$1" >&2
   exit "${2:-1}"
@@ -38,27 +42,7 @@ fail() {
 cleanup_resources() {
   local status=0
   CLEANUP_STARTED=1
-  if [[ -n "$CONTAINER_ID" ]]; then
-    if resource_label_matches container "$CONTAINER_ID"; then
-      "$DOCKER" rm -f -- "$CONTAINER_ID" >/dev/null 2>&1 || status=1
-    else
-      status=1
-    fi
-  fi
-  if [[ -n "$NETWORK_ID" ]]; then
-    if resource_label_matches network "$NETWORK_ID"; then
-      "$DOCKER" network rm -- "$NETWORK_ID" >/dev/null 2>&1 || status=1
-    else
-      status=1
-    fi
-  fi
-  if [[ -n "$VOLUME_NAME" ]]; then
-    if resource_label_matches volume "$VOLUME_NAME"; then
-      "$DOCKER" volume rm --force -- "$VOLUME_NAME" >/dev/null 2>&1 || status=1
-    else
-      status=1
-    fi
-  fi
+  cleanup_restore_docker_resources || status=1
   if [[ -n "$TEMP_ROOT" ]]; then
     case "$TEMP_ROOT" in
       /tmp/mc2-supabase-restore-*) /usr/bin/rm -rf --one-file-system -- "$TEMP_ROOT" || status=1 ;;
@@ -66,23 +50,6 @@ cleanup_resources() {
     esac
   fi
   return "$status"
-}
-
-resource_label_matches() {
-  local kind=$1 identity=$2 labels=''
-  case "$kind" in
-    container)
-      labels=$("$DOCKER" inspect --format '{{index .Config.Labels "com.megacampus.q12.restore-run"}}|{{index .Config.Labels "com.megacampus.q12.restore-resource"}}' "$identity" 2>/dev/null) || return 1
-      ;;
-    network)
-      labels=$("$DOCKER" network inspect --format '{{index .Labels "com.megacampus.q12.restore-run"}}|{{index .Labels "com.megacampus.q12.restore-resource"}}' "$identity" 2>/dev/null) || return 1
-      ;;
-    volume)
-      labels=$("$DOCKER" volume inspect --format '{{index .Labels "com.megacampus.q12.restore-run"}}|{{index .Labels "com.megacampus.q12.restore-resource"}}' "$identity" 2>/dev/null) || return 1
-      ;;
-    *) return 1 ;;
-  esac
-  [[ "$labels" == "$RUN_ID|$kind" ]]
 }
 
 on_exit() {
@@ -146,7 +113,7 @@ parse_arguments() {
     [[ -z "$CAPABILITY_FILE" ]] || fail 'scheduled restore must not receive a Q12 capability' 64
   fi
   [[ -x "$DOCKER" && -x "$PSQL" && -x "$PG_RESTORE" ]] || fail 'required Docker or PostgreSQL 17 command is unavailable'
-  [[ -f "$MANIFEST_TOOL" && ! -L "$MANIFEST_TOOL" && -f "$ROLE_TOOL" && ! -L "$ROLE_TOOL" && -f "$CLEANUP_HELPER" && ! -L "$CLEANUP_HELPER" && -f "$TEMP_DIRECTORY_HELPER" && ! -L "$TEMP_DIRECTORY_HELPER" && -f "$PGTLE_ARCHIVE_SCANNER" && ! -L "$PGTLE_ARCHIVE_SCANNER" ]] || fail 'tracked restore helper is unavailable'
+  [[ -f "$MANIFEST_TOOL" && ! -L "$MANIFEST_TOOL" && -f "$ROLE_TOOL" && ! -L "$ROLE_TOOL" && -f "$CLEANUP_HELPER" && ! -L "$CLEANUP_HELPER" && -f "$TEMP_DIRECTORY_HELPER" && ! -L "$TEMP_DIRECTORY_HELPER" && -f "$PGTLE_ARCHIVE_SCANNER" && ! -L "$PGTLE_ARCHIVE_SCANNER" && -f "$DOCKER_LIFECYCLE" && ! -L "$DOCKER_LIFECYCLE" ]] || fail 'tracked restore helper is unavailable'
 }
 
 create_temp_root() {
@@ -440,28 +407,9 @@ main() {
   write_secret "$TEMP_ROOT/restore-password" "$restore_password"
   write_secret "$TEMP_ROOT/cleanup-password" "$cleanup_password"
 
-  local container_name="mc2-supabase-restore-$RUN_ID"
-  local network_name="mc2-supabase-restore-net-$RUN_ID"
-  local volume_name="mc2-supabase-restore-data-$RUN_ID"
-  NETWORK_ID=$("$DOCKER" network create --internal \
-    --label "com.megacampus.q12.restore-run=$RUN_ID" \
-    --label 'com.megacampus.q12.restore-resource=network' "$network_name")
-  [[ "$NETWORK_ID" =~ ^[0-9a-f]{64}$ ]] || fail 'isolated network identity is invalid'
-  VOLUME_NAME=$("$DOCKER" volume create \
-    --label "com.megacampus.q12.restore-run=$RUN_ID" \
-    --label 'com.megacampus.q12.restore-resource=volume' "$volume_name")
-  [[ "$VOLUME_NAME" == "$volume_name" ]] || fail 'isolated volume identity is invalid'
   # Exact isolation contract: docker network create --internal, 127.0.0.1::5432,
   # POSTGRES_PASSWORD_FILE=/run/secrets/initial-password, and one data mount.
-  CONTAINER_ID=$("$DOCKER" run --detach --name "$container_name" --platform linux/amd64 \
-    --label "com.megacampus.q12.restore-run=$RUN_ID" \
-    --label 'com.megacampus.q12.restore-resource=container' --network "$NETWORK_ID" \
-    --publish 127.0.0.1::5432 \
-    --mount "type=volume,src=$VOLUME_NAME,dst=/var/lib/postgresql/data" \
-    --mount "type=bind,src=$TEMP_ROOT/initial-password,dst=/run/secrets/initial-password,readonly" \
-    --env POSTGRES_PASSWORD_FILE=/run/secrets/initial-password \
-    "$RESTORE_IMAGE")
-  [[ "$CONTAINER_ID" =~ ^[0-9a-f]{64}$ ]] || fail 'isolated container identity is invalid'
+  create_restore_docker_resources || fail 'isolated Docker resource creation failed'
   wait_ready
 
   local port

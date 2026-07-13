@@ -3,17 +3,45 @@ set -Eeuo pipefail
 export LC_ALL=C
 umask 077
 
-readonly BACKUP_ROOT='/opt/megacampus/backups/supabase'
-readonly Q12_LOCK='/opt/megacampus/backups/q12/cutover.lock'
-readonly Q12_ACTIVE_RUN='/opt/megacampus/backups/q12/active-run'
-readonly SCHEDULE_LOCK='/opt/megacampus/backups/supabase/schedule.lock'
-readonly BACKUP_LOCK='/opt/megacampus/backups/supabase/backup.lock'
-readonly JOURNAL='/opt/megacampus/backups/supabase/scheduler-journal.jsonl'
-readonly BACKUP_COMMAND='/opt/megacampus/deploy/postgres/backup-supabase.sh'
+readonly TEST_MODE_TOKEN='mc2-synthetic-schedule-test-only'
+BACKUP_ROOT='/opt/megacampus/backups/supabase'
+Q12_LOCK='/opt/megacampus/backups/q12/cutover.lock'
+Q12_ACTIVE_RUN='/opt/megacampus/backups/q12/active-run'
+SCHEDULE_LOCK='/opt/megacampus/backups/supabase/schedule.lock'
+BACKUP_LOCK='/opt/megacampus/backups/supabase/backup.lock'
+JOURNAL='/opt/megacampus/backups/supabase/scheduler-journal.jsonl'
+BACKUP_COMMAND='/opt/megacampus/deploy/postgres/backup-supabase.sh'
+UUID_SOURCE='/proc/sys/kernel/random/uuid'
 
 fail() {
   printf 'Scheduled Supabase backup failed: %s\n' "$1" >&2
   exit "${2:-1}"
+}
+
+configure_test_mode() {
+  local mode=${MC2_SUPABASE_SCHEDULE_TEST_MODE:-}
+  if [[ -z "$mode" ]]; then
+    [[ -z "${MC2_SUPABASE_SCHEDULE_TEST_ROOT:-}" && -z "${MC2_SUPABASE_SCHEDULE_TEST_BACKUP_COMMAND:-}" && -z "${MC2_SUPABASE_SCHEDULE_TEST_UUID_FILE:-}" ]] || \
+      fail 'scheduler test overrides require the exact protected test mode' 64
+    return
+  fi
+  [[ "$mode" == "$TEST_MODE_TOKEN" ]] || fail 'invalid protected scheduler test mode token' 64
+  local root=${MC2_SUPABASE_SCHEDULE_TEST_ROOT:-}
+  [[ "$root" == /tmp/mc2-supabase-schedule-* && -d "$root" && ! -L "$root" ]] || \
+    fail 'protected scheduler test root is invalid' 64
+  [[ "$root" == "$(/usr/bin/readlink -f -- "$root")" ]] || fail 'scheduler test root path drift' 64
+  BACKUP_ROOT="$root/supabase"
+  Q12_LOCK="$root/q12/cutover.lock"
+  Q12_ACTIVE_RUN="$root/q12/active-run"
+  SCHEDULE_LOCK="$BACKUP_ROOT/schedule.lock"
+  BACKUP_LOCK="$BACKUP_ROOT/backup.lock"
+  JOURNAL="$BACKUP_ROOT/scheduler-journal.jsonl"
+  BACKUP_COMMAND=${MC2_SUPABASE_SCHEDULE_TEST_BACKUP_COMMAND:-}
+  UUID_SOURCE=${MC2_SUPABASE_SCHEDULE_TEST_UUID_FILE:-}
+  [[ "$BACKUP_COMMAND" == "$root"/* && -x "$BACKUP_COMMAND" && ! -L "$BACKUP_COMMAND" ]] || \
+    fail 'protected scheduler backup command is invalid' 64
+  [[ "$UUID_SOURCE" == "$root"/* && -f "$UUID_SOURCE" && ! -L "$UUID_SOURCE" ]] || \
+    fail 'protected scheduler UUID source is invalid' 64
 }
 
 require_owned_lock() {
@@ -48,6 +76,7 @@ with os.fdopen(fd, "a", encoding="utf-8") as stream:
 PY
 }
 
+configure_test_mode
 [[ $# -eq 0 ]] || fail 'operator arguments are not accepted' 64
 [[ -d "$BACKUP_ROOT" && ! -L "$BACKUP_ROOT" ]] || fail 'backup root is unavailable'
 [[ "$(/usr/bin/stat -c '%u:%g:%a' -- "$BACKUP_ROOT")" == "$(/usr/bin/id -u):$(/usr/bin/id -g):700" ]] || \
@@ -67,7 +96,7 @@ exec {schedule_lock_fd}<>"$SCHEDULE_LOCK"
 exec {backup_lock_fd}<>"$BACKUP_LOCK"
 /usr/bin/flock --nonblock --exclusive "$backup_lock_fd" || fail 'another backup process is active' 75
 
-RUN_ID=$(/usr/bin/cat /proc/sys/kernel/random/uuid)
+RUN_ID=$(/usr/bin/cat "$UUID_SOURCE")
 [[ "$RUN_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] || \
   fail 'kernel UUID source returned an invalid identifier'
 

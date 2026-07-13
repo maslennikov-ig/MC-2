@@ -329,6 +329,48 @@ function exactFieldSet(value: JsonObject, fields: string[], label: string): void
   }
 }
 
+function relationsWithoutPhysicalOids(rawRelations: unknown[], label: string): JsonObject[] {
+  const relations = rawRelations.map((raw, index) =>
+    object(structuredClone(raw), `${label}[${index}]`)
+  );
+  const identities = new Map<number, { schema: string; name: string }>();
+  for (const relation of relations) {
+    if (
+      typeof relation.schema !== 'string' ||
+      typeof relation.name !== 'string' ||
+      typeof relation.oid !== 'number' ||
+      !Number.isSafeInteger(relation.oid) ||
+      relation.oid <= 0 ||
+      (relation.parent_oid !== null &&
+        (typeof relation.parent_oid !== 'number' || !Number.isSafeInteger(relation.parent_oid)))
+    )
+      fail(`${label} physical relation shape mismatch`);
+    if (identities.has(relation.oid)) fail(`${label} physical relation OID duplicates`);
+    identities.set(relation.oid, { schema: relation.schema, name: relation.name });
+  }
+  return relations.map(relation => {
+    const parent =
+      relation.parent_oid === null ? null : identities.get(relation.parent_oid as number);
+    if (relation.parent_oid !== null && parent === undefined)
+      fail(`${label} partition parent OID is absent from relation inventory`);
+    delete relation.oid;
+    delete relation.parent_oid;
+    relation.parent_schema = parent?.schema ?? null;
+    relation.parent_name = parent?.name ?? null;
+    return relation;
+  });
+}
+
+function normalizePhysicalRelationOids(view: JsonObject, label: string): void {
+  if (view.relations === undefined) return;
+  const relations = relationsWithoutPhysicalOids(
+    array(view.relations, `${label}.relations`),
+    label
+  );
+  view.relations = relations;
+  if (view.relations_sha256 !== undefined) view.relations_sha256 = sha256(relations);
+}
+
 function validateExpectedCatalog(
   flags: Map<string, string>,
   snapshot: string,
@@ -505,20 +547,39 @@ function validateExpectedCatalog(
       expectedRelations.length
   )
     fail('expected guarded relation duplicates');
-  const actualRelations = array(cutover.relations, 'cutover.relations')
-    .map(raw => object(raw, 'cutover relation'))
+  const stableExpectedRelations = relationsWithoutPhysicalOids(
+    expectedRelations,
+    'expected guarded_relations'
+  ).map(relation => ({
+    schema: relation.schema,
+    name: relation.name,
+    relkind: relation.relkind,
+    parent_schema: relation.parent_schema,
+    parent_name: relation.parent_name,
+    owner: relation.owner,
+  }));
+  const actualRelations = relationsWithoutPhysicalOids(
+    array(cutover.relations, 'cutover.relations'),
+    'cutover.relations'
+  )
     .filter(relation => relation.classification === 'authoritative')
     .map(relation => ({
       schema: relation.schema,
       name: relation.name,
-      oid: relation.oid,
       relkind: relation.kind,
-      parent_oid: relation.parent_oid,
+      parent_schema: relation.parent_schema,
+      parent_name: relation.parent_name,
       owner: relation.owner,
     }));
   const sortRelations = (values: JsonObject[]) =>
-    values.sort((left, right) => Number(left.oid) - Number(right.oid));
-  if (canonical(sortRelations(expectedRelations)) !== canonical(sortRelations(actualRelations))) {
+    values.sort((left, right) => {
+      const leftIdentity = `${String(left.schema)}.${String(left.name)}`;
+      const rightIdentity = `${String(right.schema)}.${String(right.name)}`;
+      return leftIdentity.localeCompare(rightIdentity);
+    });
+  if (
+    canonical(sortRelations(stableExpectedRelations)) !== canonical(sortRelations(actualRelations))
+  ) {
     fail('authoritative guarded relation set differs from frozen expected catalog');
   }
 
@@ -585,6 +646,7 @@ function normalizeForTarget(value: JsonObject, targetDatabase: string): JsonObje
       return item[0] !== 'cron.database_name' && item[0] !== 'cron.launch_active_jobs';
     });
   }
+  normalizePhysicalRelationOids(normalized, 'target');
   return normalized;
 }
 
@@ -592,6 +654,7 @@ function normalizeSource(value: JsonObject): JsonObject {
   const normalized = structuredClone(value);
   const database = object(normalized.database, 'database');
   delete database.size_bytes;
+  normalizePhysicalRelationOids(normalized, 'source');
   return normalized;
 }
 

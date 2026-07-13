@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -16,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RESTORE = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
+const DOCKER_LIFECYCLE = resolve(REPO_ROOT, 'deploy/postgres/restore-docker-lifecycle.sh');
 const MANIFEST = resolve(REPO_ROOT, 'deploy/postgres/q12-source-manifest.ts');
 const ROLE_BOOTSTRAP = resolve(REPO_ROOT, 'deploy/postgres/generate-role-bootstrap.ts');
 const CLEANUP_HELPER = resolve(REPO_ROOT, 'deploy/postgres/run-restore-cleanup.ts');
@@ -41,6 +43,11 @@ function runTs(script: string, args: string[]): ReturnType<typeof spawnSync> {
 function restoreScript(): string {
   expect(existsSync(RESTORE)).toBe(true);
   return existsSync(RESTORE) ? readFileSync(RESTORE, 'utf8') : '';
+}
+
+function trackedDockerLifecycle(): string {
+  expect(existsSync(DOCKER_LIFECYCLE)).toBe(true);
+  return existsSync(DOCKER_LIFECYCLE) ? readFileSync(DOCKER_LIFECYCLE, 'utf8') : '';
 }
 
 function role(
@@ -787,6 +794,77 @@ describe('source manifest exact comparison', () => {
     expect(drift.stderr).toContain('manifest mismatch');
   });
 
+  it('compares restored partition ancestry by stable identity while preserving source physical OIDs', () => {
+    const root = tempRoot();
+    const sourcePath = join(root, 'source-partitions.json');
+    const targetPath = join(root, 'target-partitions.json');
+    const source = sourceManifest();
+    const sourceCutover = source.cutover_snapshot as Record<string, unknown>;
+    sourceCutover.relations = [
+      {
+        schema: 'public',
+        name: 'events',
+        oid: 100,
+        kind: 'p',
+        parent_oid: null,
+        owner: 'postgres',
+        classification: 'authoritative',
+      },
+      {
+        schema: 'public',
+        name: 'events_2026',
+        oid: 101,
+        kind: 'r',
+        parent_oid: 100,
+        owner: 'postgres',
+        classification: 'authoritative',
+      },
+    ];
+    sourceCutover.relations_sha256 = 'source-physical-oid-hash';
+    const target = structuredClone(source);
+    const targetCutover = target.cutover_snapshot as {
+      database: Record<string, unknown>;
+      relations: Array<Record<string, unknown>>;
+      relations_sha256: string;
+    };
+    targetCutover.database.name = 'restore_test';
+    targetCutover.relations[0].oid = 900;
+    targetCutover.relations[1].oid = 901;
+    targetCutover.relations[1].parent_oid = 900;
+    targetCutover.relations_sha256 = 'target-physical-oid-hash';
+    writeJson(sourcePath, source);
+    writeJson(targetPath, target);
+
+    const accepted = runTs(MANIFEST, [
+      'compare',
+      '--source',
+      sourcePath,
+      '--target',
+      targetPath,
+      '--view',
+      'cutover_snapshot',
+      '--target-database',
+      'restore_test',
+    ]);
+    expect(accepted.status, accepted.stderr).toBe(0);
+
+    targetCutover.relations[1].parent_oid = null;
+    writeJson(targetPath, target);
+    const ancestryDrift = runTs(MANIFEST, [
+      'compare',
+      '--source',
+      sourcePath,
+      '--target',
+      targetPath,
+      '--view',
+      'cutover_snapshot',
+      '--target-database',
+      'restore_test',
+    ]);
+    expect(ancestryDrift.status).not.toBe(0);
+    expect(ancestryDrift.stderr).toContain('manifest mismatch');
+  });
+
   it('rejects column ACL/comment/label and index-owner drift by stable identity', () => {
     const root = tempRoot();
     const sourcePath = join(root, 'source-catalog.json');
@@ -987,16 +1065,135 @@ describe('Supabase-compatible isolated restore entrypoint', () => {
 
   it('adopts only returned Docker resource identities before cleanup can remove them', () => {
     const script = restoreScript();
+    const lifecycle = trackedDockerLifecycle();
 
-    expect(script).toContain('NETWORK_ID=$("$DOCKER" network create --internal');
-    expect(script).toContain('VOLUME_NAME=$("$DOCKER" volume create');
-    expect(script).toContain('CONTAINER_ID=$("$DOCKER" run --detach');
-    expect(script).toContain('"$DOCKER" rm -f -- "$CONTAINER_ID"');
-    expect(script).toContain('"$DOCKER" network rm -- "$NETWORK_ID"');
-    expect(script).toContain('"$DOCKER" volume rm --force -- "$VOLUME_NAME"');
-    expect(script).not.toContain('CONTAINER="mc2-supabase-restore-$RUN_ID"');
-    expect(script).not.toContain('NETWORK="mc2-supabase-restore-net-$RUN_ID"');
-    expect(script).not.toContain('VOLUME="mc2-supabase-restore-data-$RUN_ID"');
+    expect(script).toContain('source "$DOCKER_LIFECYCLE"');
+    expect(script).toContain('create_restore_docker_resources');
+    expect(lifecycle).toContain('>"$TEMP_ROOT/network-create.identity"');
+    expect(lifecycle).toContain('>"$TEMP_ROOT/volume-create.identity"');
+    expect(lifecycle).toContain('>"$TEMP_ROOT/container-create.identity"');
+    expect(lifecycle.indexOf('restore_docker_fault_after_create network')).toBeLessThan(
+      lifecycle.indexOf('IFS= read -r output <"$TEMP_ROOT/network-create.identity"')
+    );
+    expect(lifecycle).toContain('restore_docker_discover container');
+    expect(lifecycle).toContain('restore_docker_resource_matches network');
+    expect(lifecycle).toContain('"$DOCKER" volume rm --force -- "$identity"');
+  });
+
+  it.each(['network', 'volume', 'container'])(
+    'cleans exact-label resources when interrupted after daemon %s create and retries safely',
+    faultKind => {
+      expect(existsSync(DOCKER_LIFECYCLE)).toBe(true);
+      if (!existsSync(DOCKER_LIFECYCLE)) return;
+      const root = tempRoot();
+      const state = join(root, 'docker-state');
+      const fakeDocker = join(root, 'docker');
+      mkdirSync(state, { mode: 0o700 });
+      writeFileSync(
+        fakeDocker,
+        `#!${process.execPath}
+const fs = require('node:fs');
+const path = require('node:path');
+const state = process.env.FAKE_DOCKER_STATE;
+const argv = process.argv.slice(2);
+const records = () => fs.readdirSync(state).map(name => JSON.parse(fs.readFileSync(path.join(state, name), 'utf8')));
+const labels = () => argv.flatMap((value, index) => value === '--label' ? [argv[index + 1]] : []).reduce((all, item) => { const split = item.indexOf('='); all[item.slice(0, split)] = item.slice(split + 1); return all; }, {});
+const save = (kind, id, name) => fs.writeFileSync(path.join(state, kind + '-' + id), JSON.stringify({ kind, id, name, labels: labels() }));
+const collision = name => records().some(item => item.name === name);
+const create = (kind, id, name, output = id) => { if (collision(name)) process.exit(1); save(kind, id, name); process.stdout.write(output + '\\n'); };
+const remove = (kind, id) => { const record = records().find(item => item.kind === kind && item.id === id); if (!record) process.exit(1); fs.unlinkSync(path.join(state, kind + '-' + id)); };
+const filtered = kind => records().filter(item => item.kind === kind && argv.filter(value => value.startsWith('label=com.megacampus.q12.restore-')).every(filter => { const label = filter.slice(6); const split = label.indexOf('='); return item.labels[label.slice(0, split)] === label.slice(split + 1); }));
+if (argv[0] === 'network' && argv[1] === 'create') create('network', 'a'.repeat(64), argv.at(-1));
+else if (argv[0] === 'volume' && argv[1] === 'create') create('volume', argv.at(-1), argv.at(-1));
+else if (argv[0] === 'run') create('container', 'c'.repeat(64), argv[argv.indexOf('--name') + 1]);
+else if (argv[0] === 'ps') process.stdout.write(filtered('container').map(item => item.id).join('\\n') + (filtered('container').length ? '\\n' : ''));
+else if (argv[0] === 'network' && argv[1] === 'ls') process.stdout.write(filtered('network').map(item => item.id).join('\\n') + (filtered('network').length ? '\\n' : ''));
+else if (argv[0] === 'volume' && argv[1] === 'ls') process.stdout.write(filtered('volume').map(item => item.id).join('\\n') + (filtered('volume').length ? '\\n' : ''));
+else if (argv[0] === 'inspect' || (argv[0] === 'network' && argv[1] === 'inspect') || (argv[0] === 'volume' && argv[1] === 'inspect')) { const id = argv.at(-1); const item = records().find(value => value.id === id); if (!item) process.exit(1); const name = item.kind === 'container' ? '/' + item.name : item.name; process.stdout.write(item.labels['com.megacampus.q12.restore-run'] + '|' + item.labels['com.megacampus.q12.restore-resource'] + '|' + name + '\\n'); }
+else if (argv[0] === 'rm') remove('container', argv.at(-1));
+else if (argv[0] === 'network' && argv[1] === 'rm') remove('network', argv.at(-1));
+else if (argv[0] === 'volume' && argv[1] === 'rm') remove('volume', argv.at(-1));
+else process.exit(2);
+`,
+        { mode: 0o700 }
+      );
+      chmodSync(fakeDocker, 0o700);
+      const runId = '11111111-2222-4333-8444-555555555555';
+      const harness = `set -Eeuo pipefail
+DOCKER=$1
+RUN_ID=$2
+RESTORE_IMAGE=synthetic-image
+TEMP_ROOT=$3
+CONTAINER_ID=''
+NETWORK_ID=''
+VOLUME_NAME=''
+source $4
+trap 'cleanup_restore_docker_resources' EXIT HUP INT TERM
+create_restore_docker_resources
+trap - EXIT HUP INT TERM
+cleanup_restore_docker_resources`;
+      const interrupted = spawnSync(
+        '/usr/bin/bash',
+        ['-c', harness, 'g7-docker-harness', fakeDocker, runId, root, DOCKER_LIFECYCLE],
+        {
+          env: {
+            PATH: '/usr/bin:/bin',
+            FAKE_DOCKER_STATE: state,
+            MC2_RESTORE_FAULT_AFTER_CREATE: faultKind,
+          },
+          encoding: 'utf8',
+        }
+      );
+      expect(interrupted.status).not.toBe(0);
+      expect(readdirSync(state), interrupted.stderr).toEqual([]);
+
+      const retry = spawnSync(
+        '/usr/bin/bash',
+        ['-c', harness, 'g7-docker-harness', fakeDocker, runId, root, DOCKER_LIFECYCLE],
+        { env: { PATH: '/usr/bin:/bin', FAKE_DOCKER_STATE: state }, encoding: 'utf8' }
+      );
+      expect(retry.status, retry.stderr).toBe(0);
+      expect(readdirSync(state)).toEqual([]);
+    }
+  );
+
+  it('preserves an unlabeled foreign Docker resource that collides with the deterministic name', () => {
+    expect(existsSync(DOCKER_LIFECYCLE)).toBe(true);
+    if (!existsSync(DOCKER_LIFECYCLE)) return;
+    const root = tempRoot();
+    const state = join(root, 'docker-state');
+    mkdirSync(state, { mode: 0o700 });
+    const runId = '11111111-2222-4333-8444-555555555555';
+    const foreignId = 'f'.repeat(64);
+    writeJson(join(state, `network-${foreignId}`), {
+      kind: 'network',
+      id: foreignId,
+      name: `mc2-supabase-restore-net-${runId}`,
+      labels: {},
+    });
+    const fakeDocker = join(root, 'docker');
+    writeFileSync(
+      fakeDocker,
+      `#!${process.execPath}
+const fs=require('node:fs'); const path=require('node:path'); const state=process.env.FAKE_DOCKER_STATE; const argv=process.argv.slice(2); const records=()=>fs.readdirSync(state).map(name=>JSON.parse(fs.readFileSync(path.join(state,name),'utf8'))); if(argv[0]==='network'&&argv[1]==='create') process.exit(1); if(argv[0]==='network'&&argv[1]==='ls') process.exit(0); process.exit(2);`,
+      { mode: 0o700 }
+    );
+    chmodSync(fakeDocker, 0o700);
+    const result = spawnSync(
+      '/usr/bin/bash',
+      [
+        '-c',
+        `set -Eeuo pipefail; DOCKER=$1; RUN_ID=$2; RESTORE_IMAGE=x; TEMP_ROOT=$3; CONTAINER_ID=''; NETWORK_ID=''; VOLUME_NAME=''; source $4; trap 'cleanup_restore_docker_resources' EXIT; create_restore_docker_resources`,
+        'g7-foreign-harness',
+        fakeDocker,
+        runId,
+        root,
+        DOCKER_LIFECYCLE,
+      ],
+      { env: { PATH: '/usr/bin:/bin', FAKE_DOCKER_STATE: state }, encoding: 'utf8' }
+    );
+    expect(result.status).not.toBe(0);
+    expect(readdirSync(state)).toEqual([`network-${foreignId}`]);
   });
 
   it('restores in one strict transaction as direct supabase_admin without owner or ACL suppression', () => {

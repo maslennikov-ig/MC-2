@@ -13,6 +13,9 @@ readonly SCHEDULE_LOCK='/opt/megacampus/backups/supabase/schedule.lock'
 readonly INSTALL_LOCK='/opt/megacampus/backups/supabase/install.lock'
 readonly BACKUP_ROOT='/opt/megacampus/backups/supabase'
 readonly RESTORE_COMMAND='/opt/megacampus/deploy/postgres/restore-supabase-drill.sh'
+readonly LIFECYCLE_HELPER='/opt/megacampus/deploy/postgres/install-supabase-backup-schedule-lifecycle.sh'
+readonly SYSTEMCTL='/usr/bin/systemctl'
+readonly RUNUSER='/usr/sbin/runuser'
 readonly CONFIRMATION='INSTALL MC2 SUPABASE BACKUP SCHEDULE'
 
 RUN_ID=''
@@ -20,6 +23,9 @@ SERVICE_SHA256=''
 TIMER_SHA256=''
 CONFIRM=''
 installation_proven=0
+
+# shellcheck source=install-supabase-backup-schedule-lifecycle.sh
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/install-supabase-backup-schedule-lifecycle.sh"
 
 fail() {
   printf 'Supabase backup schedule installation failed: %s\n' "$1" >&2
@@ -66,16 +72,6 @@ print(name)
 PY
 }
 
-disable_unproven_timer() {
-  local status=$?
-  trap - EXIT
-  if [[ $installation_proven -eq 0 ]]; then
-    /usr/bin/systemctl stop "$TIMER_NAME" >/dev/null 2>&1 || true
-    /usr/bin/systemctl disable "$TIMER_NAME" >/dev/null 2>&1 || true
-  fi
-  exit "$status"
-}
-
 main() {
   parse_arguments "$@"
   [[ "$(/usr/bin/id -u)" == 0 ]] || fail 'installer must run as root' 77
@@ -115,37 +111,9 @@ main() {
   /usr/bin/flock --unlock "$schedule_lock_fd"
   exec {schedule_lock_fd}>&-
 
-  local before_generation='' before_invocation after_invocation generation
-  before_generation=$(read_pointer_generation "$BACKUP_ROOT/latest.json" 2>/dev/null || true)
-  before_invocation=$(/usr/bin/systemctl show "$SERVICE_NAME" --property=InvocationID --value)
-  /usr/bin/systemctl start megacampus-supabase-backup.timer
-  for _ in $(/usr/bin/seq 1 15); do
-    after_invocation=$(/usr/bin/systemctl show "$SERVICE_NAME" --property=InvocationID --value)
-    [[ -n "$after_invocation" && "$after_invocation" != "$before_invocation" ]] && break
-    /usr/bin/sleep 1
-  done
-  if [[ -z "${after_invocation:-}" || "$after_invocation" == "$before_invocation" ]]; then
-    /usr/bin/systemctl start megacampus-supabase-backup.service
-  else
-    while /usr/bin/systemctl is-active --quiet "$SERVICE_NAME"; do
-      /usr/bin/sleep 1
-    done
-  fi
-  [[ "$(/usr/bin/systemctl show "$SERVICE_NAME" --property=Result --value)" == success ]] || fail 'scheduled backup service proof failed'
-  generation=$(read_pointer_generation "$BACKUP_ROOT/latest.json") || fail 'scheduled backup did not publish a valid pointer'
-  [[ "$generation" != "$before_generation" ]] || fail 'scheduled backup did not publish a fresh generation'
-  [[ -d "$BACKUP_ROOT/$generation" && ! -L "$BACKUP_ROOT/$generation" ]] || fail 'scheduled generation path is invalid'
-
-  /usr/sbin/runuser --user claude-deploy -- "$RESTORE_COMMAND" \
-    --generation "$BACKUP_ROOT/$generation" --scheduled-run-id "$RUN_ID"
-
   # The broken legacy cron remains disabled; only this proven timer is enabled.
-  /usr/bin/systemctl enable megacampus-supabase-backup.timer
-  /usr/bin/systemctl is-active --quiet "$TIMER_NAME" || fail 'proven backup timer is not active'
-  /usr/bin/systemctl is-enabled --quiet "$TIMER_NAME" || fail 'proven backup timer is not enabled'
-  installation_proven=1
+  prove_supabase_backup_schedule
   trap - EXIT
-  printf 'Supabase backup schedule installed and proven: %s\n' "$generation"
 }
 
 main "$@"

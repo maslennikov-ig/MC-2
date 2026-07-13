@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -326,6 +327,29 @@ function generationNames(directory: string): string[] {
   return readdirSync(directory).filter(name =>
     /^generation-\d{8}T\d{6}Z-[0-9a-f-]{36}$/.test(name)
   );
+}
+
+function cloneCompleteGeneration(
+  item: Fixture,
+  sourceName: string,
+  targetName: string,
+  committed: boolean
+): string {
+  const target = join(item.backupDir, targetName);
+  cpSync(join(item.backupDir, sourceName), target, { recursive: true });
+  chmodSync(target, 0o700);
+  for (const name of readdirSync(target)) chmodSync(join(target, name), 0o600);
+  const checksumsPath = join(target, 'checksums.json');
+  const checksums = JSON.parse(readFileSync(checksumsPath, 'utf8')) as Record<string, unknown>;
+  checksums.generation = targetName;
+  writeFileSync(checksumsPath, `${JSON.stringify(checksums)}\n`, { mode: 0o600 });
+  chmodSync(checksumsPath, 0o600);
+  if (committed) {
+    const receipt = join(item.backupDir, '.committed', targetName);
+    writeFileSync(receipt, `${targetName}\n`, { mode: 0o600 });
+    chmodSync(receipt, 0o600);
+  }
+  return target;
 }
 
 function generationRun(
@@ -897,6 +921,65 @@ describe('Q12 immutable Supabase backup generations', () => {
     expect(operator).toContain('RENAME_NOREPLACE');
     expect(operator).toContain('generation_committed=1');
     expect(operator).not.toContain('"$BACKUP_DIR"/supabase-*.dump');
+  });
+
+  it('applies the exact 14-day minute boundary only to committed complete non-latest generations', () => {
+    const item = fixture();
+    const seedName = 'generation-20300101T000000Z-11111111-2222-4333-8444-555555555555';
+    const seed = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: seedName,
+      SUPABASE_BACKUP_RETENTION_DAYS: '14',
+    });
+    expect(seed.status, `${seed.stdout}\n${seed.stderr}`).toBe(0);
+
+    const expiredName = 'generation-20300102T000000Z-11111111-2222-4333-8444-555555555555';
+    const boundaryName = 'generation-20300103T000000Z-11111111-2222-4333-8444-555555555555';
+    const incompleteName = 'generation-20300104T000000Z-11111111-2222-4333-8444-555555555555';
+    const incidentName = 'generation-20300105T000000Z-11111111-2222-4333-8444-555555555555';
+    const expired = cloneCompleteGeneration(item, seedName, expiredName, true);
+    const belowBoundary = cloneCompleteGeneration(item, seedName, boundaryName, true);
+    const incomplete = cloneCompleteGeneration(item, seedName, incompleteName, true);
+    const incident = cloneCompleteGeneration(item, seedName, incidentName, false);
+    rmSync(join(incomplete, 'database.dump'));
+    const now = Date.now();
+    const minute = 60_000;
+    const threshold = 14 * 1440 * minute;
+    const expiredAt = new Date(now - threshold - 30_000);
+    const belowBoundaryAt = new Date(now - threshold + 30_000);
+    const oldIncidentAt = new Date(now - threshold - minute);
+    utimesSync(expired, expiredAt, expiredAt);
+    utimesSync(belowBoundary, belowBoundaryAt, belowBoundaryAt);
+    utimesSync(incomplete, oldIncidentAt, oldIncidentAt);
+    utimesSync(incident, oldIncidentAt, oldIncidentAt);
+    expect(
+      spawnSync(
+        '/usr/bin/find',
+        [expired, '-maxdepth', '0', '-type', 'd', '!', '-newermt', '14 days ago'],
+        { encoding: 'utf8' }
+      ).stdout.trim()
+    ).toBe(expired);
+    expect(lstatSync(expired).mode & 0o777).toBe(0o700);
+    expect(existsSync(join(item.backupDir, '.committed', expiredName))).toBe(true);
+
+    const latestName = 'generation-20300106T000000Z-11111111-2222-4333-8444-555555555555';
+    const ageLatestHook = join(item.root, 'bin', 'age-latest-generation');
+    executable(
+      ageLatestHook,
+      `#!/usr/bin/env bash\n/usr/bin/touch -d '16 days ago' '${join(item.backupDir, latestName)}'\n`
+    );
+    const retainedLatest = generationRun(item, {
+      MC2_SUPABASE_BACKUP_TEST_FINAL_NAME: latestName,
+      MC2_SUPABASE_BACKUP_TEST_POST_GENERATION_HOOK: ageLatestHook,
+      SUPABASE_BACKUP_RETENTION_DAYS: '14',
+    });
+    expect(retainedLatest.status, `${retainedLatest.stdout}\n${retainedLatest.stderr}`).toBe(0);
+
+    expect(existsSync(expired)).toBe(false);
+    expect(existsSync(join(item.backupDir, '.committed', expiredName))).toBe(false);
+    expect(existsSync(belowBoundary)).toBe(true);
+    expect(existsSync(incomplete)).toBe(true);
+    expect(existsSync(incident)).toBe(true);
+    expect(existsSync(join(item.backupDir, latestName))).toBe(true);
   });
 
   it('rejects a latest pointer whose referenced four-file generation is no longer complete', () => {

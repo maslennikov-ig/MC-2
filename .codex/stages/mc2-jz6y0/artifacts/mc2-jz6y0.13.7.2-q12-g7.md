@@ -28,6 +28,7 @@ success_criteria:
 selected_docs:
   - owner-approved Q12 corrections design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15
   - owner-approved Q12 recoverable lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
+  - accepted G7 independent-review addendum SHA-256 becaea5a23f91016cbf2c1980b2ac07f4e1411882cea770bd7cd443a08aa785a
   - PostgreSQL 17 pg_dump https://www.postgresql.org/docs/17/app-pgdump.html
   - PostgreSQL 17 pg_dumpall https://www.postgresql.org/docs/17/app-pg-dumpall.html
   - PostgreSQL 17 pg_restore https://www.postgresql.org/docs/17/app-pgrestore.html
@@ -57,9 +58,9 @@ cleanup_notes: dedicated worktree and branch are intentionally retained for inde
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: qdrant-self-hosted now records the sole four-file backup, exact isolated restore, and replacement schedule contracts without authorizing live execution
+docs_review_notes: qdrant-self-hosted now records stable OID-independent restore equality, exact-label Docker crash cleanup, the sole four-file backup, and replacement schedule without authorizing live execution
 graph_reviewed: used
-graph_review_notes: local Graphify report and a focused backup/restore query were consulted read-only; graph is stale at commit 1233be56 and uses pre-1504 IDs, so refresh belongs to safe integration closeout
+graph_review_notes: local Graphify report and focused backup/restore/scheduler queries were consulted read-only from the canonical primary graph; it is stale at commit 1233be56 and uses pre-1504 IDs, so refresh belongs to safe integration closeout
 verification:
   - preserved candidate baseline focused suites: passed 79/79
   - continuation TDD RED backup pointer integrity: failed 2/38 for the expected missing validation
@@ -69,6 +70,12 @@ verification:
   - continuation GREEN scheduler: passed 10/10
   - fresh separate backup restore schedule: passed 38/38, 35/35, and 10/10
   - fresh joined G7 aggregate: passed 83/83
+  - accepted-review OID projection RED/GREEN: failed then passed the focused different-source/target-OID partition test
+  - accepted-review Docker adoption RED/GREEN: failed 4/4 then passed 4/4 exact post-create fault, retry, and foreign-resource tests
+  - accepted-review retention RED/GREEN: failed then passed the exact 14*1440-minute committed/latest/incomplete/incident boundary test
+  - accepted-review scheduler RED/GREEN: failed 5/5 then passed 5/5 executed active-Q12, real-flock, failure-disable, Persistent catch-up, and no-duplicate tests
+  - fresh post-review joined G7 aggregate: passed 94/94
+  - post-review ESLint scope: passed with two non-blocking manifest complexity/file-size warnings and zero errors
   - workspace pnpm type-check: passed all five projects
   - bash syntax: passed for deploy/postgres/*.sh
   - Prettier check: passed for every changed TypeScript, test, Markdown, and artifact file
@@ -86,9 +93,11 @@ changed_files:
   - deploy/postgres/q12-source-manifest.ts
   - deploy/postgres/rename-noreplace.py
   - deploy/postgres/restore-supabase-drill.sh
+  - deploy/postgres/restore-docker-lifecycle.sh
   - deploy/postgres/run-restore-cleanup.ts
   - deploy/postgres/scan-pgtle-archive.py
   - deploy/postgres/scheduled-backup-run.sh
+  - deploy/postgres/install-supabase-backup-schedule-lifecycle.sh
   - deploy/systemd/megacampus-supabase-backup.service
   - deploy/systemd/megacampus-supabase-backup.timer
   - packages/course-gen-platform/tests/unit/ops/supabase-backup-operator.test.ts
@@ -98,9 +107,6 @@ changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7.2-q12-g7.md
 explicit_defers:
   - mc2-jz6y0.13.6 - off-host S3 remains deferred to production readiness and is not a staging dependency
-  - the owner-only diagnostic real archive and roles fixture were not present at their recorded sizes, so the opt-in real-archive drill was not run in this local worker
-  - accepted W shared lifecycle and structural SQL parity must be consumed and rerun by parent integration before G7 acceptance; this branch does not inspect or consume the dirty W worktree
-  - systemd-analyze verify could not create /run/systemd in the unprivileged local environment; the installer runs the same command as root before any unit installation or enablement
 ---
 
 # Summary
@@ -122,6 +128,30 @@ owner/mode/non-symlink lock metadata.
 
 No server, hosted Supabase, GHCR, Qdrant Cloud, staging, production, live
 database, service, cron, secret, or historical backup was read or mutated.
+
+# Accepted independent-review addendum
+
+The accepted addendum
+`becaea5a23f91016cbf2c1980b2ac07f4e1411882cea770bd7cd443a08aa785a`
+is implemented finding by finding:
+
+1. Physical source OIDs remain in `guarded_relations` for live `q12_guard`
+   binding. Restore comparison now resolves both source and target partition
+   parents through their own OID inventories and compares the stable
+   `schema/name`, kind, owner, and parent `schema/name` projection.
+2. Docker daemon output is written before identity adoption. An EXIT cleanup
+   with an empty in-memory ID rediscovers only an exact run label, resource
+   label, and deterministic name. Fault injection after network, volume, and
+   container creation proves cleanup and safe retry; an unlabelled colliding
+   resource survives.
+3. Retention uses GNU find's timestamp comparison against the exact
+   `14*1440`-minute boundary instead of completed-day `-mtime` buckets. Only a
+   complete committed non-latest generation expires; latest, incomplete, and
+   uncommitted incident evidence remain.
+4. Scheduler tests now execute protected synthetic roots and the shared
+   installer lifecycle. They prove active-Q12 refusal, actual kernel flock
+   contention, one concurrent launch, Persistent catch-up without a duplicate
+   manual service start, and timer stop/disable after backup or restore failure.
 
 # Scope / Routing
 
@@ -191,13 +221,17 @@ Fresh completion evidence:
 Tracked hashes before commit:
 
 - `backup-supabase.sh`:
-  `a722c5110087cc86f6cea4970b022f5b78e220256fe511ca4a18ae0320dbcf89`
+  `bd2dc6d99dea8f7324060d394cba3d698d643ba09a684eedc813f5660082ef50`
 - `restore-supabase-drill.sh`:
-  `712858cba1e99be7029a3e5b85bc20ce79c5d6d822923a03cb4a1b64b9b42dc3`
+  `d36fcf2f109955136caa639b795cbc9db8daa38296d11613bd92a2bcd96166da`
+- `restore-docker-lifecycle.sh`:
+  `4157fc94aff1f7e90f76c081a42b30a8f7af20dcd89584f133181adf1e49459d`
 - `scheduled-backup-run.sh`:
-  `f595198cbc2aacbf575f1369f7296afba089dac1c08dc577474261018fc23744`
+  `21df48b5475721c4ff6754d9ce3da53d600368cd95cd6c3d423ddcc94813a828`
 - `install-supabase-backup-schedule.sh`:
-  `162764ec6192687f65fb77388c37b44391c5580d6245099e29586d37826a9db8`
+  `1e1b43d89379e5f21dfc15bb8d2785a253d66c643087e075dd8f2039f1c553a2`
+- `install-supabase-backup-schedule-lifecycle.sh`:
+  `8fe2253a5489224a9655c3d2ca79b6b1fd47fbb8418424ba46ae65d809766354`
 - service/timer:
   `b897991ffaf9c6d2a6d0ad8ce9172cc7ffd46ecdfd7b8d384976680a209bab6f` /
   `4d3779bb7a96a8aaeaa0d9538ca8e557760afc5def5bbc4b2de0fb48d94a53f3`
@@ -211,7 +245,7 @@ The worker returns a dedicated pushed branch for independent correctness review.
 It does not close Beads. The parent owns integration, joined W parity, Beads
 status, stage closeout, and any later separately authorized live packet.
 
-# Risks / Follow-ups / Explicit Defers
+# Risks / Follow-ups
 
 The real diagnostic archive recorded in the approved design (`66,706,978`
 bytes, SHA-256
@@ -219,7 +253,10 @@ bytes, SHA-256
 and its `8,030`-byte roles export were not present under `/home/me` or `/tmp`.
 Therefore no test copied or fabricated that evidence and the opt-in real-archive
 drill remains for an environment where the owner-only fixture is safely
-available. This does not authorize access to a live database as a substitute.
+available. This is a pre-existing fixture limitation, not a new G7 defer, and
+does not authorize access to a live database as a substitute. Parent
+integration still owns the joined W lifecycle/parity rerun and privileged
+`systemd-analyze verify` gate.
 
 External S3 remains deliberately deferred. Local/staging generations persist on
 the server disk; the runbook does not claim host/disk/datacenter-loss protection.

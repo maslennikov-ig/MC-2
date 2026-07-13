@@ -463,9 +463,12 @@ The Q12 source manifest consumes the fixed owner-only
 `/opt/megacampus/backups/q12/<run-id>/baseline.json` and
 `expected-post-migration-catalog.json` through adopted no-follow file
 descriptors. It binds the catalog file SHA-256 to the committed `q12_guard`
-run, requires the exact frozen authoritative relation/OID/owner/partition set,
-and rejects any missing or extra guard object, owner ACL, or row/TRUNCATE
-trigger before publication.
+run and preserves the exact frozen physical OIDs used to install the live
+guards. Restore equality intentionally projects source and target OIDs to the
+stable relation and parent `schema/name` identities, so a correct isolated
+restore is not rejected merely because PostgreSQL assigned different physical
+OIDs. Missing or extra guard objects, owners, ACLs, partition ancestry, or
+row/TRUNCATE triggers are still rejected before publication.
 
 For Q12, the live supervisor invokes only:
 
@@ -488,7 +491,10 @@ the target. Role SQL is generated only from the reviewed allowlist; the raw
 `roles.sql` file is audit evidence and is never executed. Acceptance requires
 exact cutover-state equality, capability-authorized cleanup to exact baseline
 equality, a restored-size ratio between 25% and 200%, and zero disposable
-resource residue. Cleanup failure overrides restore success.
+resource residue. Docker resources created immediately before a signal are
+rediscovered only by the exact run/resource labels plus deterministic name;
+unlabelled name collisions are never removed. Cleanup failure overrides
+restore success.
 The offline archive scan and the restored database both prove the exact pgTLE
 control/SQL function pairs `basejump-supabase_test_helpers=0.0.6` and
 `supabase-dbdev=0.0.5`. This representation is pinned to AWS `pg_tle` v1.4.0
