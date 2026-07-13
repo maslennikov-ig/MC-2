@@ -473,6 +473,32 @@ These values participate in the existing canonical `entry_hash` computation.
 The checkpoint accepted-object fields MUST equal its accepted journal head's
 two values; a mismatch fails before publication or recovery.
 
+The canonical journal hash rule is exact. Its preimage is the complete exact
+journal object with only `entry_hash` omitted; `previous_hash`, both accepted-
+object fields, and every unchanged base field remain present. Serialize that
+preimage as compact RFC 8259 JSON with object keys recursively sorted by Unicode
+code point, array order preserved, no insignificant whitespace, and no trailing
+newline. JSON numbers are permitted only for integers from `0` through
+`9007199254740991` and are encoded as the shortest ASCII decimal matching
+`0|[1-9][0-9]*`; fractions, exponents, leading zeroes, `-0`, and negative or
+larger integers are forbidden.
+
+Every string and key is a valid sequence of Unicode scalar values; lone
+surrogates are forbidden and no Unicode normalization is performed. Encode
+quotation mark and reverse solidus as `\"` and `\\`; encode U+0008, U+0009,
+U+000A, U+000C, and U+000D as `\b`, `\t`, `\n`, `\f`, and `\r`; encode every
+other U+0000 through U+001F control as `\u00xx` with lower-case hexadecimal.
+Solidus is unescaped. Every other scalar is its literal UTF-8 byte sequence,
+never a `\u` escape.
+
+`entry_hash` is the lower-case hexadecimal SHA-256 of those preimage bytes. The
+durable JSONL record is the same exact object with `entry_hash` inserted,
+serialized by the same rule, followed by exactly one LF byte. Readers reject
+duplicate object keys, an invalid scalar, any forbidden number or escape, a
+missing or extra field, or a hash that does not recompute. They also reserialize
+the parsed complete record and require byte-for-byte equality with the original
+line including its sole LF before accepting the entry.
+
 Every checkpoint has exactly these keys:
 
 ```text
@@ -577,6 +603,36 @@ The supervisor accepts their hash only after their own controller-specific
 atomic publication, exact schema/identity validation, and an acceptance journal
 entry carrying that kind and hash. They are immutable predecessor evidence for
 the five new objects, not outputs of the five-step back-reference protocol.
+
+For the first four new object schemas, the publication-intent and object-
+acceptance journal entries use the same exact target `phase`; their `outcome`
+values are respectively the literals `intent` and `accepted`. The mapping is:
+
+| New object                | Mode     | Exact target phase                |
+| ------------------------- | -------- | --------------------------------- |
+| `final-writer-manifest`   | forward  | `prepared_quiesced`               |
+| `final-writer-manifest`   | rollback | `rollback_preparing`              |
+| `writer-handoff-state`    | forward  | `handoff_ready_writers_quiesced`  |
+| `writer-rollback-state`   | rollback | `rollback_ready_writers_quiesced` |
+| `writer-resume-authority` | forward  | `resume_authority_forward`        |
+| `writer-resume-authority` | rollback | `resume_authority_rollback`       |
+
+Each object references only its own `intent` entry and the accepted checkpoint
+that immediately preceded that entry. These hashes are not equal across
+sequential objects. The terminal `writer-resume-state` is the sole special
+projection: its own intent uses `resume_committing_forward` or
+`resume_committing_rollback` with `outcome=intent`; root publishes the matching
+no-object checkpoint, the child references that checkpoint, and the terminal
+acceptance entry uses `writers_resumed_forward` or `writers_resumed_rollback`
+with `outcome=accepted`. An intent has
+`accepted_object_kind=none` and a null object hash; its paired acceptance names
+the exact object kind/hash. Any cross-object intent reference, wrong mode/phase,
+non-increasing journal sequence, or skipped paired acceptance is an incident.
+For the first four schemas, the required adjacent `intent`/`accepted` journal
+pair is one phase transition; only its acceptance publishes the phase
+checkpoint. The repeated-phase prohibition rejects a second pair or checkpoint
+for that phase, not these two required records. Terminal resume instead has the
+two explicitly named transitions and checkpoints above.
 
 For resume, root first publishes the mode-bound `resume_committing_*` journal
 entry and its exact checkpoint; that checkpoint contains the authority hash but

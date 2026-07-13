@@ -3,7 +3,7 @@
 Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 correction implementation active, with remote/live activation still NO-GO until every local hard gate passes
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: normative package commit `099fc44b`, including addendum SHA `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`, followed only by current-state metadata
+Current accepted integration evidence: earlier normative package commit `099fc44b` plus independently accepted canonical-journal and object-publication clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` in the current documentation delta
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
 Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
 
@@ -219,11 +219,12 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - The normative addendum is
   `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
   at SHA-256
-  `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`;
+  `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`;
   its exact command/receipt/checkpoint/journal/CAS/epoch and mode-DAG contract
   passed independent rereview with P0-P3 zero and supersedes the initial
-  decision record at `c8d22c2a`; the final normative package is pushed at
-  `099fc44b`.
+  decision record at `c8d22c2a` and the earlier package at `099fc44b`; the only
+  later normative change freezes cross-language canonical journal bytes and
+  exact object-publication phases/outcomes.
 - Local execution is tracked by G7 `.13.7.2`, publisher `.13.9`, writer/barrier
   `.13.10`, migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
 - The inherited base plan is

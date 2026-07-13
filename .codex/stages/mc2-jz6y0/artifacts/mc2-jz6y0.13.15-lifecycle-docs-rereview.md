@@ -48,7 +48,7 @@ graph_reviewed: no-change-needed
 graph_review_notes: This was a focused read-only normative-document review; the configured graph remains stale and will be refreshed once the accepted code and durable workflow changes are integrated safely.
 verification:
   - base Q12 correction design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15 remained byte-for-byte unchanged
-  - final recoverable-lifecycle addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - final recoverable-lifecycle addendum SHA-256 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27
   - final addendum plan SHA-256 316c8b20812ae23f2c367282b742d25277acff3557fe38a7515d843360d719db
   - prompt-check passed for the independent Codex gpt-5.6 review prompt
   - repeated findings-first review closed every checkpoint projection, cyclic-hash, CAS, epoch-domain, DAG, journal acceptance, legacy-schema, and genesis finding
@@ -65,7 +65,7 @@ explicit_defers:
 ## Findings-first verdict
 
 **PASS. P0: 0, P1: 0, P2: 0, P3: 0.** The accepted normative addendum is
-`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
+`7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`.
 The owner-approved base design remains unchanged at
 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15`.
 
@@ -77,6 +77,14 @@ credential-rotation continuation, a predecessor-free genesis projection, and
 accepted-object fields in the primary journal. Finally, it limited the
 back-reference publication protocol to the five new schemas so the exact
 legacy barrier, probe, quiesce, and recovery projections remain unchanged.
+An implementation pre-review then exposed one final cross-language ambiguity
+in `entry_hash`. The addendum now freezes the exact preimage, safe integer
+lexemes, Unicode scalar/escape rules, compact serialization, and sole LF, and a
+fresh independent rereview again passed with P0-P3 zero.
+The same review then froze each new object's own intent/acceptance phase and
+outcome, scoped same-phase pairs to one checkpoint transition, and kept terminal
+resume as two explicit transitions/checkpoints; the final fresh verdict again
+reported P0-P3 zero.
 
 ## Accepted contract
 

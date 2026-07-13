@@ -58,7 +58,7 @@ verification:
   - canonical structural query returned one 64-hex hash and identical results under two fixed search paths in BEGIN READ ONLY and rolled back
   - owner accepted recommended option 1 in the current task on 2026-07-13
   - Supautils v3.2.2 tag commit 64792e14681bba81c9adccdcfd598715cd052eb5 rechecked from the first-party repository
-  - recoverable-lifecycle addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - recoverable-lifecycle addendum SHA-256 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27
   - independent lifecycle docs rereview passed with P0=P1=P2=P3=0
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.14-managed-supabase-boundary.md
@@ -130,7 +130,7 @@ precise wording and must not claim control of the provider superuser.
 The normative record is
 `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
 at SHA-256
-`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
+`7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`.
 
 The alternative `ALLOW_CONNECTIONS=false` plus a separate control database,
 recovery login, ownership transfer, secret, and systemd recovery unit is not
