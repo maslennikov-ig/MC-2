@@ -21,15 +21,15 @@ selected_agents:
   - deploy_specialist perspective
 catalog_candidates:
   - none - installed assets and primary PostgreSQL, Docker Official Image, and registry sources cover this bounded pin
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: all registry and documentation checks were read-only; no image, layer, container, volume, network, port, credential, database session, or temporary runtime resource was created
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: needs-update
-docs_review_notes: both operations runbooks and the replacement server execution packet must use the exact linux/amd64 manifest digest below
+docs_reviewed: updated
+docs_review_notes: both operations runbooks and the replacement server execution packet use the accepted linux/amd64 digest plus the corrected PG17 mount contract
 graph_reviewed: used
 graph_review_notes: existing local report was read for orientation; this research-only branch does not refresh the graph
 verification:

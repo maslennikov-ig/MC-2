@@ -34,17 +34,17 @@ selected_agents:
 catalog_candidates:
   - none - installed assets and the assigned first-party compatibility rule fully cover the bounded correction
 parallel_decision: isolated stream - this correction can be implemented and verified independently from the credential and documentation gates
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: temporary dependency symlinks were removed; the dedicated worker worktree remains until independent review and orchestrator acceptance
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: temporary dependency symlinks and the dedicated worker worktree were removed after immutable finding, correction, and zero-finding rereview integration; the non-protected evidence branch remains because normal closeout does not force-delete cherry-picked history
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: needs-update
-docs_review_notes: operator semantics changed; the separately owned runbook and server execution packet must use the explicit verified PostgreSQL 17 restore path
+docs_reviewed: updated
+docs_review_notes: integration-owned Qdrant and document-evidence runbooks now require the explicit verified PostgreSQL 17 dump and restore pair
 graph_reviewed: blocked
-graph_review_notes: source behavior changed in an isolated worker branch; the integration owner must refresh the local graph after acceptance
+graph_review_notes: source behavior changed in an isolated worker branch; the integration owner refreshes the local graph after final durable documentation and metadata updates
 verification:
   - TDD RED passed as a regression proof with 21 tests executed, 3 expected failures, and 18 existing tests passing
   - focused GREEN passed 1 file and 21 of 21 tests with zero skips

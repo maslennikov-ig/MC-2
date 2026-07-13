@@ -37,17 +37,17 @@ selected_agents:
 catalog_candidates:
   - none - installed assets and the immutable review fully define the bounded correction
 parallel_decision: sequential correction - the regression must reproduce against f85c0e20 before the one-line parser boundary changes
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: temporary dependency symlinks were removed before commit; worktree cleanup remains pending independent rereview and orchestrator acceptance
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: correction is accepted by zero-finding rereview; temporary dependency symlinks and the dedicated worker worktree were removed, while the non-protected evidence branch remains because normal closeout does not force-delete cherry-picked history
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: needs-update
-docs_review_notes: durable runbook and server-packet path corrections remain orchestrator-owned after a zero-finding rereview
+docs_reviewed: updated
+docs_review_notes: integration-owned Qdrant and document-evidence runbooks now carry the explicit PostgreSQL 17 client paths; the historical server packet remains immutable and superseded
 graph_reviewed: blocked
-graph_review_notes: runtime behavior changed on an isolated correction branch; integration closeout owns the safe local graph refresh
+graph_review_notes: runtime behavior changed on an isolated correction branch; integration closeout refreshes the graph after final durable documentation and metadata updates
 verification:
   - TDD RED executed 24 tests with exactly 2 malformed multiline failures and 22 passes; all existing 21 tests remained green
   - focused GREEN passed 1 file and 24 of 24 tests with zero skips

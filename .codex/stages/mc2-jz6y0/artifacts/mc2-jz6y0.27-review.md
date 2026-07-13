@@ -38,11 +38,11 @@ parallel_group: q12-backup-pg17-review
 depends_on_streams:
   - mc2-jz6y0.27
 parallel_decision: sequential - this review depends on the completed implementation commit
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Temporary dependency symlinks are removed before commit; review worktree and branch cleanup remain orchestrator-owned.
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: The immutable P2 finding is accepted and linked to correction a25f01a0 plus zero-finding rereview dee0b426; temporary symlinks and the review worktree were removed, while the non-protected evidence branch is retained because force deletion of cherry-picked history is forbidden.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed

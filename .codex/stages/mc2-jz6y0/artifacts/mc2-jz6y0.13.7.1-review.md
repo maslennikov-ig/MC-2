@@ -39,11 +39,11 @@ selected_agents:
 catalog_candidates:
   - none - installed review and DevOps skills plus primary PostgreSQL, Docker Official Image, and OCI registry sources cover this bounded review
 parallel_decision: sequential - independent review follows immutable research commit cd20a129
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: All checks were read-only; no image layer, container, network, volume, port, secret, database session, temporary runtime resource, or remote state was created.
+cleanup_notes: The immutable P1 finding is accepted and linked to correction 1da2a448 plus zero-finding rereview 0bbc50d2; its dedicated worktree is removed and no image layer, container, network, volume, port, secret, database session, or remote state was created.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed

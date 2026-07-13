@@ -22,15 +22,15 @@ selected_agents:
   - root orchestrator - bounded correction after independent finding
 catalog_candidates:
   - none - immutable review and Docker Official PostgreSQL 17 source define the correction
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: documentation-only correction created no image, container, volume, network, port, secret, database session, or temporary runtime resource
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: needs-update
-docs_review_notes: future runbooks and replacement execution packet must consume this exact mount, inspection, trap, and zero-residue contract after independent rereview
+docs_reviewed: updated
+docs_review_notes: both operations runbooks and the replacement execution packet consume the exact mount, inspection, trap, and zero-residue contract after independent zero-finding rereview
 graph_reviewed: used
 graph_review_notes: existing report was read; integration refresh follows accepted durable documentation changes
 verification:

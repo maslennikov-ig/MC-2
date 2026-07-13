@@ -37,7 +37,7 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. The final local release matrix passed backend 1,893/1,893 with zero skips, shared 23/23, web 20/20, PostgreSQL 78/78 with zero skips, exact Qdrant 15/15, applicable local snapshot/restore 5/5, Compose/runtime 8/8, Prometheus 14 rules, Alertmanager config, `pnpm type-check`, and build 75/75. The stale activation-contract test was corrected under `.26`; implementation and independent review are integrated with P0-P3 zero.
 - Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
-- The downloaded Supabase Root 2021 CA is valid through 2031 and reaches the pooler with `verify-full`. Exhaustive read-only discovery inspected 16 unique DSN candidates across server files, processes, containers, systemd, cron, CLI caches, histories, Docker layers, repo and all 6,290 Git commits; all six complete external URIs failed strict read-only validation and working count is zero. The only plausible current server file, `/opt/megacampus/.env.backup`, is stale; the repo Actions secret is intentionally non-extractable. A current owner-supplied or rotated Session pooler URL is still required. The daily database-backup job has been fail-open since 2026-06-28: `pg_dump` authentication fails, but gzip masks it; resulting files are 20-byte empty streams, with only the 2026-06-27 dump substantive. The corrected tracked operator is locally accepted after P0-P3-zero rereview and fresh 18/18 integration. `mc2-jz6y0.13.7` remains open until a current verify-full URL exists, `/opt/megacampus/backups` is corrected from observed mode `0775`, and a fresh isolated restore-validated backup succeeds. The audit changed no remote state.
+- The downloaded Supabase Root 2021 CA is valid through 2031 and reaches the pooler with `verify-full`. Browser login for the repo-pinned Supabase CLI `2.106.0` succeeded and linked the active `MegaCampusAI` project; Management API inventory reports PostgreSQL `17.6`, a 249 MB database, 108 user tables, and no migration applied by this task. Linked inventory uses automatically expiring `cli_login_postgres` roles and does not expose a durable database password or Session pooler DSN. Exhaustive discovery still has zero working durable URLs: the only plausible server file, `/opt/megacampus/.env.backup`, is stale and the Actions secret is intentionally non-extractable. The server now retains 12/12 20-byte fail-open streams and zero usable backups; the previous substantive 2026-06-27 file has aged out. The tracked operator is pinned to `/usr/lib/postgresql/17/bin/{pg_dump,pg_restore}`, rejects missing/malformed/wrong/mismatched clients before credentials, and is accepted after TDD 24/24 plus independent P0-P3-zero rereview. The isolated restore target is also locally accepted: PostgreSQL `17.10` bookworm (a supported major/minor, not an LTS label), exact `linux/amd64` manifest `sha256:9cc09bb9a1b9da469658a6fab7bbced9ece6ca99174e1b93c1c4cc1a12f741cf`, explicit `/var/lib/postgresql/data` named volume, read-only password bind, loopback isolation, and blocking zero-residue cleanup. `mc2-jz6y0.13.7` remains open until a current verify-full Session pooler URL exists, the observed `0775` backup paths are corrected, the validated CA/operator and pinned restore target are installed, and a fresh restore-validated backup succeeds. No migration, dump, service, cron, server-file, permission, Qdrant, or application change ran; only the short-lived CLI login roles were created by linked inspection.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
 - E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
@@ -60,11 +60,15 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 Next stage id: `mc2-jz6y0`
 
 Recommended action: obtain a current Supabase Session pooler DSN from an
-authorized owner or rotate it. Keep Q12 remote execution NO-GO until that URL
-passes `verify-full` and the reviewed `.13.7` operator produces a fresh custom
-dump that successfully restores in isolation. Then execute the already
-authorized exact-copy/disposition/reindex and cutover packet without
-`--allow-gaps` or partial activation.
+authorized owner through Dashboard **Connect -> Session pooler**. Browser CLI
+login is already complete but cannot reveal that password-bearing URI. Do not
+rotate the database password without a separate explicit confirmation because
+existing application connections may depend on it. Keep Q12 remote execution
+NO-GO until the supplied URL passes `verify-full` and the reviewed `.13.7`
+operator produces a fresh custom dump that successfully restores in isolated
+PostgreSQL 17. Then execute the already authorized
+exact-copy/disposition/reindex and cutover packet without `--allow-gaps` or
+partial activation.
 
 ## Starter prompt for next orchestrator
 
@@ -101,9 +105,11 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 - Q12 staging mutation is owner-authorized, but remains NO-GO until a current
   verify-full Session pooler URL, a truthful fresh validated database backup,
-  and every documented hard gate pass. Missing-source product truth is resolved
-  by the approved six failed plus eighteen retained-derived-only dispositions.
-  Do not partially activate.
+  and every documented hard gate pass. Browser Supabase CLI login is present but
+  is not a substitute for the permanent Session pooler credential. Password
+  rotation remains a separate explicit-impact decision. Missing-source product
+  truth is resolved by the approved six failed plus eighteen
+  retained-derived-only dispositions. Do not partially activate.
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer

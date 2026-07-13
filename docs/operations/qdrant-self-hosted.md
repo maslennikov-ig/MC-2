@@ -370,10 +370,13 @@ owner authorization does not waive these current hard stops:
 2. database-backup gate `mc2-jz6y0.13.7` remains open. The observed
    `/opt/megacampus/backups` parent is mode `0775`, and every scheduled file
    produced since 2026-06-28 is a 20-byte fail-open empty stream, not valid
-   backup evidence. Before any migration, correct the parent ownership/mode,
-   install the reviewed `deploy/postgres/backup-supabase.sh` operator and its
-   owner-only URL/CA inputs, publish a fresh fully validated custom-format dump,
-   and restore that exact archive into the approved isolated target;
+   backup evidence. The previous substantive 2026-06-27 file has aged out, so
+   retained usable backups are zero. Before any migration, correct the parent
+   ownership/mode, install the reviewed `deploy/postgres/backup-supabase.sh`
+   operator and its owner-only URL/CA inputs, require its explicit matching
+   PostgreSQL 17 client preflight, publish a fresh fully validated custom-format
+   dump, and restore that exact archive with the explicit PostgreSQL 17
+   `pg_restore` into the approved isolated target;
 3. the accepted read-only source audit found 261 catalog rows: 240 are
    Qdrant-eligible and 21 are `missing_course`. Forty-two exact no-replace
    copies can raise recoverable eligible sources from 109 to 234; exact
@@ -391,10 +394,19 @@ window:
    the project CA, `sslmode=verify-full`, and explicit `sslrootcert`;
 2. complete `mc2-jz6y0.13.7`: correct the observed `0775` backup parent to the
    approved root/current-owned non-group/world-writable mode, install the
-   reviewed backup operator and owner-only URL/CA inputs, publish a fresh custom
-   dump after full archive validation, and restore that archive into the
-   approved isolated target. Reject every 20-byte file since 2026-06-28 as
-   evidence;
+   reviewed backup operator and owner-only URL/CA inputs, and require its
+   pre-credential check to select the matching
+   `/usr/lib/postgresql/17/bin/pg_dump` and
+   `/usr/lib/postgresql/17/bin/pg_restore` pair. Publish a fresh custom dump
+   only after full archive validation, then restore that exact archive into the
+   approved isolated PostgreSQL 17 target with
+   `/usr/lib/postgresql/17/bin/pg_restore`. The `linux/amd64` target is
+   `postgres@sha256:9cc09bb9a1b9da469658a6fab7bbced9ece6ca99174e1b93c1c4cc1a12f741cf`
+   (PostgreSQL `17.10`, bookworm); use the tag only for drift detection. Mount
+   exactly one named data volume at `/var/lib/postgresql/data`, bind the
+   mode-0600 password file read-only, inspect both mounts before restore, and
+   make zero-residue cleanup a blocking result. Reject every 20-byte file since
+   2026-06-28 as evidence;
 3. confirm PITR and apply/verify the complete document-evidence
    `120 -> 130 -> 140 -> 150 -> 151` migration chain using the project CA;
 4. copy the reviewed Compose, `deploy/qdrant`, `deploy/systemd`, and

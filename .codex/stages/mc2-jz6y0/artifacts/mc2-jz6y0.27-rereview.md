@@ -39,11 +39,11 @@ parallel_group: q12-backup-pg17-rereview
 depends_on_streams:
   - mc2-jz6y0.27-correction
 parallel_decision: sequential - the rereview depends on the completed correction commit
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Temporary dependency symlinks are removed before commit; review worktree and branch cleanup remain orchestrator-owned.
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: The zero-finding rereview is accepted; temporary dependency symlinks and the rereview worktree were removed, while the non-protected evidence branch is retained because force deletion of cherry-picked history is forbidden.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed

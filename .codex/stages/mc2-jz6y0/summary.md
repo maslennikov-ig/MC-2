@@ -3,7 +3,7 @@
 Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 staging authorized but live activation remains NO-GO until current DB credentials and truthful backup evidence
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: through `a869bcb4`, including Task 6 source recovery, final activation-contract correction/review, and final documentation correction/rereview; final closeout metadata is delivered at the branch HEAD
+Current accepted integration evidence: through local PostgreSQL 17 backup correction/rereview integration `1e41adc2`, in addition to Task 6 source recovery and final activation-contract correction/review; final closeout metadata is delivered at the branch HEAD
 Integration branch: `codex/self-hosted-qdrant-platform`
 Implementation scope: Q1-Q11, E1-E7, Q12 guarded migration/operator/rollback/local snapshots, and the complete source-recovery operator are locally accepted. Exact-count Task 6 proves 42 physical/125 logical recovery, 24 dispositions, 234+6 parity, crash resume, guarded rollback, tenant isolation, and zero residue. Final root verification passed backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, exact Qdrant 15/15, applicable local recovery 5/5, Compose 8/8, type-check, and build 75/75. Local closeout is in progress; live execution remains fail-closed.
 
@@ -47,19 +47,32 @@ authorizes no staging or production mutation.
 
 ### Q12 Database Backup Gate Decomposition (2026-07-13)
 
-| Stream | Beads            | Goal                                                              | Agent                                   | Write zone                                                    | Dependencies                           | Verification                                    | Decision/reason                                     |
-| ------ | ---------------- | ----------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------- | --------------------------------------------------- |
-| B      | `mc2-jz6y0.13.7` | fail-closed atomic local-disk Supabase/PostgreSQL backup operator | deploy specialist using `senior-devops` | tracked backup shell, synthetic ops tests, delegated artifact | current local integration; no live URL | accepted local 18/18 plus shell/CI/type/process | complete locally; remote install/live proof pending |
-| BR     | `mc2-jz6y0.13.7` | independent correctness review after immutable implementation     | non-author correctness/DevOps reviewer  | review artifact only                                          | B                                      | final rereview P0-P3 zero                       | complete; worktrees/local branches cleaned          |
-| D      | `mc2-jz6y0.13.7` | exhaustive read-only Session pooler credential discovery          | deploy specialist                       | sanitized discovery artifact only                             | accepted CA and server SSH access      | 16 unique / 6 complete / 0 working              | complete; external owner rotation remains           |
+| Stream | Beads              | Goal                                                                    | Agent                                   | Write zone                                                    | Dependencies               | Verification                                      | Decision/reason                                       |
+| ------ | ------------------ | ----------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------- | -------------------------- | ------------------------------------------------- | ----------------------------------------------------- |
+| B      | `mc2-jz6y0.13.7`   | fail-closed atomic local-disk Supabase/PostgreSQL backup operator       | deploy specialist using `senior-devops` | tracked backup shell, synthetic ops tests, delegated artifact | current local integration  | accepted initial 18/18 plus shell/CI/type/process | complete locally; remote install/live proof pending   |
+| D      | `mc2-jz6y0.13.7`   | exhaustive durable Session pooler credential discovery                  | deploy specialist                       | sanitized discovery artifact only                             | accepted CA and server SSH | 16 unique / 6 complete / 0 working                | complete; durable credential remains external         |
+| A      | `mc2-jz6y0.13.7`   | browser CLI login and first-party temporary-role contract               | docs researcher                         | login-role research artifact                                  | owner browser approval     | CLI 2.106.0 link plus primary-source review       | accepted; login does not yield permanent DSN          |
+| S      | `mc2-jz6y0.13.7`   | current read-only server backup/client preflight                        | deploy specialist                       | server-preflight artifact                                     | SSH access                 | 12 files / 0 usable; PG18 wrapper and PG17 pair   | accepted inventory; execution packet remains NO-GO    |
+| P      | `mc2-jz6y0.27`     | pin and fail-close the explicit PostgreSQL 17 dump/restore pair         | deploy specialist using TDD             | operator, focused test, worker/correction artifacts           | A + S                      | RED 2/24; GREEN 24/24 plus shell/type/process     | accepted and integrated                               |
+| PR     | `mc2-jz6y0.27`     | independent finding review and corrected rereview                       | correctness/DevOps reviewer             | immutable review/rereview artifacts                           | P                          | initial P2 linked to correction; final P0-P3 zero | accepted; dedicated worktrees cleaned                 |
+| T      | `mc2-jz6y0.13.7.1` | pin the isolated PostgreSQL 17 restore target and zero-residue contract | docs/deploy researcher plus reviewer    | immutable research/finding/correction/rereview artifacts      | P                          | four matching digest reads; P1 fixed; P0-P3 zero  | accepted; no image pulled or runtime resource created |
 
-The reviewed implementation is accepted locally and remains uninstalled. It consulted only first-party
-PostgreSQL documentation for `pg_dump`/`pg_restore` behavior. The follow-up
-read-only audit exhausted server/runtime/history sources without exposing
-values: all six complete external candidates failed, including the stale
-`.env.backup` value. Remote use still requires an authorized owner to supply or
-rotate a current Session pooler URL, parent-directory mode correction from
-observed `0775`, and a fresh isolated restore drill.
+The corrected implementation is accepted locally and remains uninstalled. It
+uses only the explicit `/usr/lib/postgresql/17/bin/{pg_dump,pg_restore}` pair,
+rejects missing, malformed, wrong-major and mismatched clients before opening
+credentials, and preserves every prior archive/atomicity invariant. Browser
+login linked the active Supabase project and read PostgreSQL `17.6` inventory,
+but its short-lived `cli_login_postgres` roles do not yield the permanent
+Session pooler DSN required by the operator. The 2026-07-13 server audit found
+12 retained 20-byte files and zero usable backups; the previous substantive
+file has aged out. Remote use still requires an owner-supplied current Session
+pooler URL, correction of observed `0775` backup paths, and a fresh successful
+dump/restore drill. The prepared restore target is PostgreSQL `17.10` bookworm
+at exact `linux/amd64` manifest
+`sha256:9cc09bb9a1b9da469658a6fab7bbced9ece6ca99174e1b93c1c4cc1a12f741cf`;
+its accepted contract pins `/var/lib/postgresql/data`, a read-only secret bind,
+loopback-only access, pre-restore mount inspection, and blocking zero-residue
+cleanup. No image or layer has been pulled.
 
 ## Parallel Decomposition
 
@@ -197,12 +210,13 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke
   are authorized but NO-GO until current DB credentials, a truthful fresh
-  validated database backup, and all hard gates pass. Read-only inspection on
-  2026-07-12 found that the server backup pipeline masks `pg_dump` authentication
-  failures as gzip success: files since 2026-06-28 are 20-byte empty streams,
-  while the last substantive retained dump is 2026-06-27. Beads
-  `mc2-jz6y0.13.7` tracks the required fail-closed atomic repair and validation;
-  no server file was changed or deleted.
+  validated database backup, and all hard gates pass. The 2026-07-13 preflight
+  found that all 12 retained files are 20-byte empty streams and usable backups
+  are zero; the previous substantive 2026-06-27 dump has aged out. The accepted
+  local operator repair does not substitute for the missing permanent Session
+  pooler DSN or a real isolated PostgreSQL 17 restore. Beads `mc2-jz6y0.13.7`
+  remains open; no migration, dump, service, cron, server file, permission, or
+  Qdrant change ran.
 - Production off-host S3 remains bounded defer `mc2-jz6y0.13.6`; owner-approved
   local staging snapshots do not satisfy that future production gate.
 - Prometheus retention YAML migration remains bounded defer `mc2-jz6y0.25`

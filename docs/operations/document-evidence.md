@@ -325,14 +325,25 @@ connection.
    - install the reviewed `deploy/postgres/backup-supabase.sh` operator plus
      owner-only `/opt/megacampus/secrets/supabase_db_url` and validated CA
      inputs;
+   - before either credential is opened, require the operator to verify the
+     matching `/usr/lib/postgresql/17/bin/pg_dump` and
+     `/usr/lib/postgresql/17/bin/pg_restore` pair and reject missing,
+     malformed, cross-major, or non-17 client output;
    - create a fresh custom-format dump and require the operator's size, TOC,
      complete offline archive traversal, fsync, and atomic publication checks;
    - restore that exact fresh archive into the approved isolated disposable
-     target with `--exit-on-error` and `--single-transaction`.
+     PostgreSQL 17 target using `/usr/lib/postgresql/17/bin/pg_restore` with
+     `--exit-on-error` and `--single-transaction`. Run only `linux/amd64`
+     `postgres@sha256:9cc09bb9a1b9da469658a6fab7bbced9ece6ca99174e1b93c1c4cc1a12f741cf`
+     (PostgreSQL `17.10`, bookworm). Require the run-owned named volume at
+     `/var/lib/postgresql/data`, the canonical password file bound read-only,
+     pre-restore mount-identity checks, loopback-only connectivity, cleanup
+     traps installed before create, and zero matching residue after teardown.
 
    Every 20-byte file produced since 2026-06-28 is a fail-open empty stream,
-   not backup or rollback evidence. Do not use the last substantive 2026-06-27
-   dump as a substitute for the required fresh restore-validated archive.
+   not backup or rollback evidence. The historical substantive 2026-06-27 file
+   is no longer retained, so the current usable-backup count is zero. Only the
+   required fresh restore-validated archive can reopen this gate.
 
 3. Confirm PITR separately and inventory the exact remote migration frontier in
    a read-only session. Do not continue unless it is compatible with the five

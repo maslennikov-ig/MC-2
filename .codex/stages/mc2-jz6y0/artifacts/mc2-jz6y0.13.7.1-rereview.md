@@ -39,11 +39,11 @@ selected_agents:
 catalog_candidates:
   - none - installed review and DevOps skills plus the immutable primary-source evidence cover this bounded rereview
 parallel_decision: sequential - rereview follows immutable correction commit 1da2a448
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: All checks were read-only; no image, layer, container, volume, network, port, secret, database session, temporary runtime resource, or remote/live state was created.
+cleanup_notes: The zero-finding rereview is accepted and its dedicated worktree is removed; no image, layer, container, volume, network, port, secret, database session, temporary runtime resource, or remote/live state was created.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
