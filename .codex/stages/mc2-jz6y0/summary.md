@@ -3,7 +3,7 @@
 Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 correction implementation active, with remote/live activation still NO-GO until every local hard gate passes
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: earlier normative package commit `099fc44b` plus independently accepted canonical-journal and object-publication clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` in the current documentation delta
+Current accepted integration evidence: normative clarification package commit `0717366f`, including independently accepted canonical-journal and object-publication clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
 Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
 
