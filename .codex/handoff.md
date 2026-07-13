@@ -2,9 +2,10 @@
 
 Updated: 2026-07-13
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: `codex/self-hosted-qdrant-platform`
-Resolve the current SHA of `origin/codex/self-hosted-qdrant-platform` before
-continuation; the dedicated integration worktree remains authoritative for Q12.
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; decision/addendum
+baseline commit `c8d22c2a`. Resolve the current remote SHA again before any
+later continuation. The dedicated integration worktree remains authoritative
+for Q12.
 
 ## Product Truth
 
@@ -28,6 +29,10 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 - `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`
 - `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`
 - `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`
+- `docs/superpowers/specs/2026-07-13-q12-live-cutover-corrections-design.md`
+- `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`
+- `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
+- `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`
 - `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md`
 
 ## Accepted and Open Work
@@ -38,7 +43,8 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 - Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and a current owner-supplied Session pooler URI passed PostgreSQL `17.6` `verify-full` read-only inventory. The credential exists only in the owner-only local session file and is never copied into Git, artifacts, argv, environment, logs, or worker prompts. The owner authorized its temporary use for this staging window; terminal rotation remains a separate mutation under `.13.8`. The server still has 12/12 invalid 20-byte legacy backups and zero usable generations, so `.13.7` remains open until the new fail-closed operator creates a fresh four-file generation and its Supabase-compatible isolated restore succeeds. No live mutation has occurred.
-- The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. Its implementation plan is `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; wave 1 is G7 `.13.7.2`, publisher `.13.9`, and writer/barrier `.13.10`, followed by migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`. The first five streams receive no live credential and perform no remote mutation.
+- The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. Normative addendum SHA-256 is `4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79`, published at integration commit `c8d22c2a`. This permits safe local implementation only; remote/live mutation remains separately gated.
+- Publisher `.13.9` is accepted, integrated and pushed. Writer/barrier `.13.10` retains its reviewed dirty candidate in `/home/me/code/mc2/.worktrees/q12-w-writer-barrier`; a visible W worker is implementing the accepted lifecycle delta with RED-first tests. G7 `.13.7.2`, migration `.13.11`, handoff `.13.12`, and root `.13.13` remain dependency-ordered and local-only.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -61,13 +67,14 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: implement and independently accept the approved Q12
-correction plan in two isolated local waves. Then run the joined local release
-matrix and present the separate GHCR publication and live-cutover packets.
-Keep Q12 remote execution NO-GO until the frozen supervisor, truthful four-file
-backup, Supabase-compatible isolated restore, ten-writer barrier, migrations,
-handoff and recovery tests all pass. Do not rotate the database password
-without the separate `.13.8` effects/rollback packet and current authorization.
+Recommended action: finish and independently accept W `.13.10`; then integrate
+G7, run M/H in parallel, and finish the root supervisor/journal join. Run the
+joined local release matrix before presenting the separate GHCR publication and
+live-cutover packet. Keep Q12 remote execution NO-GO until the frozen
+supervisor, truthful four-file backup, Supabase-compatible isolated restore,
+ten-writer barrier, migrations, handoff and recovery tests all pass. Do not
+rotate the database password without the separate `.13.8` effects/rollback
+packet and current authorization.
 
 ## Starter prompt for next orchestrator
 
@@ -119,11 +126,10 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 docs-reviewed: updated — the Q12 operator, sole PG17 execution packet, both
 runbooks, migration/activation order, rollback, authorization, and sanitized
 environment contracts are reconciled; final rereview reported P0-P3 zero.
-graph-reviewed: updated — local Graphify `0.9.13` ran `graphify update .` and
-`graphify cluster-only . --no-viz`: 52,662 nodes, 79,924 edges, zero model/API
-tokens, zero forbidden runtime/noise source paths, and no Git hooks. The exact
-community total is read from the ignored final report because reclustering may
-repartition an unchanged graph; that report is refreshed after the last tracked
-metadata commit and must report the delivered HEAD.
+graph-reviewed: used — the existing report and a focused local query were
+consulted, but the graph predates the new Q12 shell lifecycle. Refresh is
+deferred until the active dirty isolated streams are integrated; closeout must
+run the safe local Graphify refresh with zero model/API modes and no Git hooks,
+then record the delivered HEAD.
 Optional SQL AST enrichment is deferred: 283 SQL files require the uninstalled
 `tree_sitter_sql` extra; this docs-only slice did not install global tooling.
