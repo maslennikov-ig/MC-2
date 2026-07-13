@@ -28,7 +28,7 @@ success_criteria:
 selected_docs:
   - owner-approved Q12 corrections design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15
   - owner-approved Q12 recoverable lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
-  - accepted G7 independent-review addendum SHA-256 becaea5a23f91016cbf2c1980b2ac07f4e1411882cea770bd7cd443a08aa785a
+  - final independently accepted G7 addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
   - PostgreSQL 17 pg_dump https://www.postgresql.org/docs/17/app-pgdump.html
   - PostgreSQL 17 pg_dumpall https://www.postgresql.org/docs/17/app-pg-dumpall.html
   - PostgreSQL 17 pg_restore https://www.postgresql.org/docs/17/app-pgrestore.html
@@ -58,7 +58,7 @@ cleanup_notes: dedicated worktree and branch are intentionally retained for inde
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: qdrant-self-hosted now records stable OID-independent restore equality, exact-label Docker crash cleanup, the sole four-file backup, and replacement schedule without authorizing live execution
+docs_review_notes: final independent docs review PASS with P0=P1=P2=P3=0; qdrant-self-hosted records stable OID-independent restore equality, exact-label Docker crash cleanup, the sole four-file backup, and replacement schedule without authorizing live execution
 graph_reviewed: used
 graph_review_notes: local Graphify report and focused backup/restore/scheduler queries were consulted read-only from the canonical primary graph; it is stale at commit 1233be56 and uses pre-1504 IDs, so refresh belongs to safe integration closeout
 verification:
@@ -76,6 +76,7 @@ verification:
   - accepted-review scheduler RED/GREEN: failed 5/5 then passed 5/5 executed active-Q12, real-flock, failure-disable, Persistent catch-up, and no-duplicate tests
   - fresh post-review joined G7 aggregate: passed 94/94
   - post-review ESLint scope: passed with two non-blocking manifest complexity/file-size warnings and zero errors
+  - final independent docs review: PASS with P0=P1=P2=P3=0
   - workspace pnpm type-check: passed all five projects
   - bash syntax: passed for deploy/postgres/*.sh
   - Prettier check: passed for every changed TypeScript, test, Markdown, and artifact file
@@ -132,7 +133,7 @@ database, service, cron, secret, or historical backup was read or mutated.
 # Accepted independent-review addendum
 
 The accepted addendum
-`becaea5a23f91016cbf2c1980b2ac07f4e1411882cea770bd7cd443a08aa785a`
+`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`
 is implemented finding by finding:
 
 1. Physical source OIDs remain in `guarded_relations` for live `q12_guard`
