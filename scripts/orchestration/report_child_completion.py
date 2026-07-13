@@ -59,6 +59,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--reasoning-effort", default="")
     parser.add_argument("--write-zone", action="append", default=[])
     parser.add_argument("--selected-asset", action="append", default=[])
+    parser.add_argument("--resolves-review", action="append", default=[])
     args = parser.parse_args(argv[1:])
 
     repo_root = pathlib.Path.cwd()
@@ -92,6 +93,7 @@ def main(argv: list[str]) -> int:
         "reasoning_effort": args.reasoning_effort,
         "write_zone": args.write_zone,
         "selected_assets": args.selected_asset,
+        "resolves_review": args.resolves_review,
     }
 
     with events_file.open("a", encoding="utf-8") as handle:

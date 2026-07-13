@@ -12,7 +12,7 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.14"
+profile = "balanced-v2.16"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -117,7 +117,11 @@ direct_push_to_protected_branches_forbidden = true
 launcher = "codex_subagents"
 subagent_visibility = "separate_spawned_threads"
 inline_subagents_allowed = false
-requires_explicit_user_spawn_request = true
+subagents_preauthorized_for_complex = true
+medium_execution_default = "local_owner"
+simple_checks_owner = "orchestrator"
+delegation_gate = "complex_and_material_benefit"
+independence_alone_sufficient = false
 require_base_branch_and_commit = true
 require_dedicated_worktree = true
 require_strict_write_zone = true
@@ -137,9 +141,12 @@ artifact_fields = [
 write_heavy_requires_dedicated_worktree = true
 worker_isolation = "dedicated_branch_worktree"
 
-parallel_decomposition_matrix = "required_for_medium_complex"
-parallel_execution_default = "spawn_all_independent_streams"
+parallel_decomposition_matrix = "required_for_complex"
+parallel_execution_default = "spawn_eligible_complex_streams"
 sequential_requires_reason = true
+max_concurrent_subagents = 4
+max_parallel_write_streams = 3
+critical_path_priority = true
 
 [subagent_model_policy]
 default_model = "inherit_orchestrator"
@@ -189,6 +196,50 @@ code_change_commands = [
 stage_level_optional_commands = [
   "pnpm test",
 ]
+
+[verification_policy]
+mode = "risk_adaptive"
+default_tier = "integration"
+
+[verification_policy.tier_groups]
+inner = ["code_change_commands"]
+delta = ["code_change_commands"]
+integration = ["code_change_commands"]
+release = ["code_change_commands", "stage_level_optional_commands"]
+
+[verification_policy.risk_tag_groups]
+migration = ["code_change_commands"]
+rls = ["code_change_commands"]
+authorization = ["code_change_commands"]
+security = ["code_change_commands"]
+concurrency = ["code_change_commands"]
+atomicity = ["code_change_commands"]
+retry = ["code_change_commands"]
+tenancy = ["code_change_commands"]
+state-transition = ["code_change_commands"]
+idempotency = ["code_change_commands"]
+rollback = ["code_change_commands"]
+public-api = ["code_change_commands"]
+data = ["code_change_commands"]
+ui = ["code_change_commands"]
+user-flow = ["code_change_commands"]
+api = ["code_change_commands"]
+
+[verification_policy.surface_groups]
+database = ["code_change_commands"]
+ui = ["code_change_commands"]
+user-flow = ["code_change_commands"]
+api = ["code_change_commands"]
+backend = ["code_change_commands"]
+data = ["code_change_commands"]
+
+[stage_limits]
+epic_scope = "roadmap_only"
+stage_unit = "accepted_integration_slice"
+automatic_advance_after_acceptance = true
+replan_on_material_boundary = true
+max_correction_loops = 2
+p0_p1_block_acceptance = true
 
 [session_completion]
 required_steps = [

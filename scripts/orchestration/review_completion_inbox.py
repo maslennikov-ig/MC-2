@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -18,6 +21,7 @@ ALLOWED_DECISIONS = {
     "blocked",
     "invalid_return",
 }
+ALLOWED_SEVERITIES = {"P0", "P1", "P2", "P3"}
 
 
 def load_contract() -> dict:
@@ -61,12 +65,54 @@ def load_events(path: pathlib.Path) -> list[dict]:
 def load_state(path: pathlib.Path) -> dict:
     if not path.exists():
         return {"reviewed": {}}
-    return json.loads(path.read_text())
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read review state {path}: {exc}") from exc
+    if not isinstance(state, dict) or not isinstance(state.get("reviewed"), dict):
+        raise SystemExit(f"review state {path} must contain a reviewed object")
+    return state
 
 
 def save_state(path: pathlib.Path, state: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2, ensure_ascii=True) + "\n")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(json.dumps(state, indent=2, ensure_ascii=True) + "\n")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+@contextmanager
+def state_lock(path: pathlib.Path):
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def correction_limit(contract: dict) -> int | None:
+    limits = contract.get("stage_limits")
+    if not isinstance(limits, dict):
+        return None
+    value = limits.get("max_correction_loops")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def prior_p2_corrections(reviewed: dict[str, dict], event: dict) -> int:
+    return sum(
+        1
+        for entry in reviewed.values()
+        if entry.get("task_id") == event.get("task_id")
+        and entry.get("stage_id") == event.get("stage_id")
+        and entry.get("decision") == "needs_rework_same_stream"
+        and entry.get("severity", "P2") not in {"P0", "P1"}
+    )
 
 
 def print_text(events: list[dict], reviewed: dict[str, dict]) -> None:
@@ -91,6 +137,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--task")
     parser.add_argument("--mark-reviewed")
     parser.add_argument("--decision", choices=sorted(ALLOWED_DECISIONS))
+    parser.add_argument("--severity", choices=sorted(ALLOWED_SEVERITIES))
+    parser.add_argument("--resolves-review", action="append", default=[])
     parser.add_argument("--note", default="")
     args = parser.parse_args(argv[1:])
 
@@ -107,23 +155,66 @@ def main(argv: list[str]) -> int:
     if args.task:
         events = [event for event in events if event.get("task_id") == args.task]
 
-    state = load_state(state_file)
-    reviewed = state.setdefault("reviewed", {})
-
     if args.mark_reviewed:
-        if not args.decision:
-            raise SystemExit("--decision is required with --mark-reviewed")
-        matching = [event for event in events if event.get("event_id") == args.mark_reviewed]
-        if not matching:
-            raise SystemExit(f"event not found: {args.mark_reviewed}")
-        reviewed[args.mark_reviewed] = {
-            "decision": args.decision,
-            "reviewed_at": datetime.now(timezone.utc).isoformat(),
-            "note": args.note,
-            "task_id": matching[0].get("task_id"),
-            "stage_id": matching[0].get("stage_id"),
-        }
-        save_state(state_file, state)
+        with state_lock(state_file):
+            state = load_state(state_file)
+            reviewed = state["reviewed"]
+            if not args.decision:
+                raise SystemExit("--decision is required with --mark-reviewed")
+            matching = [event for event in events if event.get("event_id") == args.mark_reviewed]
+            if not matching:
+                raise SystemExit(f"event not found: {args.mark_reviewed}")
+            if args.mark_reviewed in reviewed:
+                raise SystemExit(f"event already reviewed and immutable: {args.mark_reviewed}")
+            if args.decision == "accepted" and args.severity:
+                raise SystemExit("accepted correction events must omit --severity and link resolved findings")
+            if args.decision == "accepted" and (
+                matching[0].get("status") != "returned" or matching[0].get("verify") != "passed"
+            ):
+                raise SystemExit("accepted correction events require returned status and passed verification")
+
+            event_links = matching[0].get("resolves_review", [])
+            if not isinstance(event_links, list) or not all(isinstance(link, str) and link for link in event_links):
+                raise SystemExit("event resolves_review must be a list of non-empty event ids")
+            resolution_links = list(dict.fromkeys([*event_links, *args.resolves_review]))
+            if args.decision != "accepted" and resolution_links:
+                raise SystemExit("--resolves-review is allowed only with --decision accepted")
+            for finding_id in resolution_links:
+                finding = reviewed.get(finding_id)
+                if not isinstance(finding, dict):
+                    raise SystemExit(f"resolved review finding is not reviewed: {finding_id}")
+                if finding.get("stage_id") != matching[0].get("stage_id"):
+                    raise SystemExit(f"resolved review finding is outside this stage: {finding_id}")
+
+            severity = args.severity or ("P2" if args.decision == "needs_rework_same_stream" else "")
+            limit = correction_limit(contract)
+            if (
+                args.decision == "needs_rework_same_stream"
+                and severity not in {"P0", "P1"}
+                and limit is not None
+                and prior_p2_corrections(reviewed, matching[0]) >= limit
+            ):
+                raise SystemExit(
+                    "P2+ correction loop cap reached; use needs_new_stream and replan the next stage"
+                )
+            reviewed[args.mark_reviewed] = {
+                "decision": args.decision,
+                "severity": severity,
+                "resolves_review": resolution_links,
+                "correction_round": prior_p2_corrections(reviewed, matching[0]) + 1
+                if args.decision == "needs_rework_same_stream" and severity not in {"P0", "P1"}
+                else 0,
+                "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                "note": args.note,
+                "task_id": matching[0].get("task_id"),
+                "stage_id": matching[0].get("stage_id"),
+                "artifact_path": matching[0].get("artifact_path"),
+                "verify": matching[0].get("verify"),
+            }
+            save_state(state_file, state)
+    else:
+        state = load_state(state_file)
+        reviewed = state["reviewed"]
 
     payload = {
         "events": events,

@@ -23,7 +23,7 @@ Model/Reasoning Rationale: <why this level is appropriate>
 
 ## Documentation
 
-- <Docs L1/L2 source: @neuledge/context package@version first; Context7/first-party fallback only if L1 miss/stale/insufficient; or: No dependency documentation lookup needed.>
+- <Docs L1/L2 source: @neuledge/context first with lockfile-routed package/version; Context7 MCP or first-party docs as fallback only for L1 miss/stale/insufficient; or: No dependency documentation lookup needed.>
 
 ## Asset Routing
 

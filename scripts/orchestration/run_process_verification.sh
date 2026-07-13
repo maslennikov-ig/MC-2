@@ -30,7 +30,7 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.14"
+EXPECTED_PROFILE = "balanced-v2.16"
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
@@ -48,6 +48,7 @@ required = [
     pathlib.Path(".codex/subagent-task-contract.md"),
     pathlib.Path(".codex/subagent-spawn-template.md"),
     pathlib.Path("scripts/orchestration/run_stage_closeout.py"),
+    pathlib.Path("scripts/orchestration/record_stage_telemetry.py"),
     pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
     pathlib.Path("scripts/orchestration/report_child_completion.py"),
     pathlib.Path("scripts/orchestration/review_completion_inbox.py"),
@@ -76,22 +77,36 @@ if launcher == "codex_subagents":
         raise SystemExit(
             "delegation.inline_subagents_allowed must be false for codex_subagents"
         )
-    if delegation.get("requires_explicit_user_spawn_request") is not True:
+    expected_delegation = {
+        "subagents_preauthorized_for_complex": True,
+        "medium_execution_default": "local_owner",
+        "simple_checks_owner": "orchestrator",
+        "delegation_gate": "complex_and_material_benefit",
+        "independence_alone_sufficient": False,
+        "parallel_decomposition_matrix": "required_for_complex",
+        "parallel_execution_default": "spawn_eligible_complex_streams",
+    }
+    actual_delegation = {key: delegation.get(key) for key in expected_delegation}
+    if actual_delegation != expected_delegation:
+        raise SystemExit(f"delegation benefit-gate policy is stale: {actual_delegation!r}")
+    if "subagents_preauthorized_for_medium_complex" in delegation:
         raise SystemExit(
-            "delegation.requires_explicit_user_spawn_request must be true for codex_subagents"
+            "delegation.subagents_preauthorized_for_medium_complex is stale; use complex-only authorization"
         )
-    if delegation.get("parallel_decomposition_matrix") != "required_for_medium_complex":
+    if "requires_explicit_user_spawn_request" in delegation:
         raise SystemExit(
-            "delegation.parallel_decomposition_matrix must be 'required_for_medium_complex'"
-        )
-    if delegation.get("parallel_execution_default") != "spawn_all_independent_streams":
-        raise SystemExit(
-            "delegation.parallel_execution_default must be 'spawn_all_independent_streams'"
+            "delegation.requires_explicit_user_spawn_request is stale; use the complex material-benefit gate"
         )
     if delegation.get("sequential_requires_reason") is not True:
         raise SystemExit(
             "delegation.sequential_requires_reason must be true"
         )
+    if delegation.get("max_concurrent_subagents") != 4:
+        raise SystemExit("delegation.max_concurrent_subagents must be 4")
+    if delegation.get("max_parallel_write_streams") != 3:
+        raise SystemExit("delegation.max_parallel_write_streams must be 3")
+    if delegation.get("critical_path_priority") is not True:
+        raise SystemExit("delegation.critical_path_priority must be true")
 
 if launcher == "manual_user_launch":
     manual_prompt_template = pathlib.Path(
@@ -137,6 +152,32 @@ if profile != EXPECTED_PROFILE or source_skill != EXPECTED_SOURCE_SKILL:
 
 if contract.get("role") != "orchestrator-stage":
     raise SystemExit("orchestrator role must be 'orchestrator-stage'")
+
+stage_limits = contract.get("stage_limits")
+if not isinstance(stage_limits, dict):
+    raise SystemExit("Missing [stage_limits] section")
+if stage_limits.get("epic_scope") != "roadmap_only":
+    raise SystemExit("stage_limits.epic_scope must be 'roadmap_only'")
+if stage_limits.get("stage_unit") != "accepted_integration_slice":
+    raise SystemExit("stage_limits.stage_unit must be 'accepted_integration_slice'")
+if stage_limits.get("automatic_advance_after_acceptance") is not True:
+    raise SystemExit("stage_limits.automatic_advance_after_acceptance must be true")
+if stage_limits.get("replan_on_material_boundary") is not True:
+    raise SystemExit("stage_limits.replan_on_material_boundary must be true")
+max_correction_loops = stage_limits.get("max_correction_loops")
+if isinstance(max_correction_loops, bool) or not isinstance(max_correction_loops, int) or max_correction_loops < 0:
+    raise SystemExit("stage_limits.max_correction_loops must be a non-negative non-bool integer")
+if stage_limits.get("p0_p1_block_acceptance") is not True:
+    raise SystemExit("stage_limits.p0_p1_block_acceptance must be true")
+
+verification_policy = contract.get("verification_policy")
+if not isinstance(verification_policy, dict) or verification_policy.get("mode") != "risk_adaptive":
+    raise SystemExit("verification_policy.mode must be 'risk_adaptive'")
+if verification_policy.get("default_tier") != "integration":
+    raise SystemExit("verification_policy.default_tier must be 'integration'")
+for key in ("tier_groups", "risk_tag_groups", "surface_groups"):
+    if not isinstance(verification_policy.get(key), dict):
+        raise SystemExit(f"verification_policy.{key} must be a table")
 
 completion_inbox = contract.get("completion_inbox")
 if not isinstance(completion_inbox, dict):
