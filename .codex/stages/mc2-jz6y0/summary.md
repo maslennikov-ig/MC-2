@@ -209,7 +209,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
-- `graph-reviewed: updated` — local Graphify `0.8.45` ran `graphify update .` and `graphify cluster-only . --no-viz`: 51,658 nodes, 76,782 edges, zero model/API tokens, and no Git hooks. Community totals are omitted because reclustering may repartition an unchanged graph; the required post-metadata rerun reports the delivered HEAD.
+- `graph-reviewed: updated` — local Graphify `0.9.13` ran `graphify update .` and `graphify cluster-only . --no-viz`: 52,662 nodes, 79,924 edges, 3,415 communities, zero model/API tokens, zero forbidden runtime/noise source paths, and no Git hooks. The final post-metadata rerun must report the delivered HEAD. Optional SQL AST enrichment remains deferred because 283 SQL files require the uninstalled `tree_sitter_sql` extra; this docs-only slice did not change global tooling.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while current verify-full DB credentials and source truth are
   hard stops.
@@ -237,6 +237,7 @@ authorization, and sanitized environment contracts are reconciled.
 
 graph-reviewed: updated — local `graphify update .` and
 `graphify cluster-only . --no-viz` completed with zero model/API tokens and no
-hooks; the final post-metadata rerun must match the delivered HEAD.
+Git hooks; Graphify `0.9.13` reported 52,662 nodes, 79,924 edges, and 3,415
+communities. The final post-metadata rerun must match the delivered HEAD.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.

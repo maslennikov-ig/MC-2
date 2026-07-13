@@ -31,8 +31,8 @@ risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: both operations runbooks and the replacement execution packet consume the exact mount, inspection, trap, and zero-residue contract after independent zero-finding rereview
-graph_reviewed: used
-graph_review_notes: existing report was read; integration refresh follows accepted durable documentation changes
+graph_reviewed: updated
+graph_review_notes: integration Graphify 0.9.13 refreshed the local graph after accepted durable documentation and metadata updates with zero model/API tokens and no Git hooks
 verification:
   - immutable review 2e736067 and Docker Official PostgreSQL 17 bookworm VOLUME path were checked before writing the correction
   - correction pins the only PostgreSQL data mount and the read-only secret bind to exact destinations
@@ -41,7 +41,6 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7.1-correction.md
 explicit_defers:
-  - integration Graphify refresh remains closeout-owned after accepted durable documentation changes
   - the permanent Session pooler DSN and every live backup/restore/server action remain external gates
 ---
 

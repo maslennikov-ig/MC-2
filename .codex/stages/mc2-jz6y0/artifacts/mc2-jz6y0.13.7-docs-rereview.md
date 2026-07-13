@@ -56,7 +56,6 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7-docs-rereview.md
 explicit_defers:
-  - final integration-owned Graphify refresh and delivery verification remain closeout work
   - the permanent verify-full Session pooler DSN remains external and database-password rotation requires separate explicit confirmation
   - every SSH, Supabase, credential, database, dump, restore, Docker, server, service, cron, migration, Qdrant, staging, production, and deploy action remains deferred
 ---
@@ -158,8 +157,9 @@ so another graph refresh would add no relevant graph truth.
 
 # Risks / Follow-ups / Explicit Defers
 
-Root-orchestrator acceptance and integration are complete; final Graphify and
-delivery verification remain closeout work. The permanent verify-full Session
+Root-orchestrator acceptance, integration, review-worktree cleanup, and the
+local Graphify refresh are complete; the post-metadata freshness check is part
+of delivery verification, not a live gate. The permanent verify-full Session
 pooler DSN remains an external owner input, and password rotation remains a
 separately authorized impact decision. All live backup, restore, server,
 database, migration, Qdrant, staging, production, and deploy actions remain

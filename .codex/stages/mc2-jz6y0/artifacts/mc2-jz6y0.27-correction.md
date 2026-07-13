@@ -46,8 +46,8 @@ risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: integration-owned Qdrant and document-evidence runbooks now carry the explicit PostgreSQL 17 client paths; the historical server packet remains immutable and superseded
-graph_reviewed: blocked
-graph_review_notes: runtime behavior changed on an isolated correction branch; integration closeout refreshes the graph after final durable documentation and metadata updates
+graph_reviewed: updated
+graph_review_notes: integration Graphify 0.9.13 refreshed the local graph after accepted runtime, durable documentation, and metadata updates with zero model/API tokens and no Git hooks
 verification:
   - TDD RED executed 24 tests with exactly 2 malformed multiline failures and 22 passes; all existing 21 tests remained green
   - focused GREEN passed 1 file and 24 of 24 tests with zero skips
@@ -58,7 +58,6 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/supabase-backup-operator.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.27-correction.md
 explicit_defers:
-  - integration Graphify refresh remains closeout-owned after accepted durable documentation changes
   - a current verify-full Session pooler DSN, fresh dump, isolated PostgreSQL 17 restore, and every remote action remain deferred
   - no Supabase, SSH, server, credential, database, package installation, service, container, Qdrant, staging, or production mutation was performed
 ---
@@ -96,6 +95,6 @@ It also does not turn offline archive traversal into rollback proof: the exact
 fresh archive must still restore into an isolated, pinned PostgreSQL 17 target.
 
 Independent rereview returned zero findings; the correction is integrated, and
-both durable runbooks plus the sole PG17 execution packet consume it. Graphify
-refresh remains integration-closeout work. The current Session pooler DSN and
+both durable runbooks plus the sole PG17 execution packet consume it. The local
+integration Graphify refresh is complete. The current Session pooler DSN and
 every remote action remain explicitly deferred.

@@ -43,8 +43,8 @@ risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: integration-owned Qdrant and document-evidence runbooks now require the explicit verified PostgreSQL 17 dump and restore pair
-graph_reviewed: blocked
-graph_review_notes: source behavior changed in an isolated worker branch; the integration owner refreshes the local graph after final durable documentation and metadata updates
+graph_reviewed: updated
+graph_review_notes: integration Graphify 0.9.13 refreshed the local graph after accepted source, durable documentation, and metadata updates with zero model/API tokens and no Git hooks
 verification:
   - TDD RED passed as a regression proof with 21 tests executed, 3 expected failures, and 18 existing tests passing
   - focused GREEN passed 1 file and 21 of 21 tests with zero skips

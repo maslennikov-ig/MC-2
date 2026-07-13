@@ -30,8 +30,8 @@ risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
 docs_review_notes: immutable review 6f80e87f found P1/P2; correction 7b446d7d and independent rereview 0b7ffe67 close both with P0-P3 zero while preserving the live NO-GO boundary
-graph_reviewed: blocked
-graph_review_notes: durable operations truth changed; integration closeout must refresh the local graph after docs acceptance
+graph_reviewed: updated
+graph_review_notes: integration Graphify 0.9.13 ran local update and cluster-only after docs acceptance with zero model/API tokens and no Git hooks; final post-metadata freshness is delivery-owned
 verification:
   - current server inventory, browser-login contract, PostgreSQL 17 client correction, image-pin finding/correction/rereview, both operations runbooks, and immutable hashes were reconciled
   - operator and certificate SHA-256 values were recomputed locally
