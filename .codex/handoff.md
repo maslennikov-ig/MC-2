@@ -1,10 +1,10 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-13
+Updated: 2026-07-14
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: pushed `codex/self-hosted-qdrant-platform`; normative
-addendum clarification package commit `0717366f` (SHA-256 `7188d792…`). Resolve
-the remote branch SHA before any
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; accepted head
+before this current-state metadata is `9d3f3a1c`, and the normative addendum
+SHA-256 is `7188d792…`. Resolve the remote branch SHA before any
 later continuation. The dedicated integration worktree remains authoritative
 for Q12.
 
@@ -45,7 +45,7 @@ for Q12.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and a current owner-supplied Session pooler URI passed PostgreSQL `17.6` `verify-full` read-only inventory. The credential exists only in the owner-only local session file and is never copied into Git, artifacts, argv, environment, logs, or worker prompts. The owner authorized its temporary use for this staging window; terminal rotation remains a separate mutation under `.13.8`. The server still has 12/12 invalid 20-byte legacy backups and zero usable generations, so `.13.7` remains open until the new fail-closed operator creates a fresh four-file generation and its Supabase-compatible isolated restore succeeds. No live mutation has occurred.
 - The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
-- Publisher `.13.9` is accepted, integrated and pushed. G7 `.13.7.2` passed independent rereview with P0-P3 zero, then passed 99/99 plus five-project type-check on the integration tree and is accepted at merge `cb00fd9b`; its accepted local worktree/branch are cleaned. Writer/barrier `.13.10` retains its reviewed dirty candidate in `/home/me/code/mc2/.worktrees/q12-w-writer-barrier`; a visible W worker is implementing the accepted lifecycle delta with RED-first tests. Migration `.13.11`, handoff `.13.12`, and root `.13.13` remain dependency-ordered and local-only.
+- Publisher `.13.9` is accepted, integrated and pushed. G7 `.13.7.2` passed independent rereview with P0-P3 zero, then passed 99/99 plus five-project type-check on the integration tree and is accepted at merge `cb00fd9b`; its accepted local worktree/branch are cleaned. W candidate `5390a2f6` passed its original 241/241 and PG17 34/34 gates but independent review returned NO-GO (P0=0, P1=4, P2=3, P3=0). Its preserved dirty worktree `/home/me/code/mc2/.worktrees/q12-w-writer-barrier` now has 120/120 nonblocked runtime tests GREEN plus 8 journal-graph and 1 immutable-publication RED tests. Decision `.13.16` is in progress: candidate v1 `3354379f…` returned correctness P1=4/P2=1 and docs P1=7; corrected v2 `90fcd3ee…` closed those findings but fresh rereview returned correctness P1=3 and docs P1=6/P2=1. The remaining exact deltas are claim-move lock-loss handling, immutable quiesce recovery-prefix binding, existing-result epoch sequences, DB capability checkpoints/rollback literal/baseline anchor, orphan supersession, tracked structural-catalog truth, and `config_files` canonicalization. No speculative W implementation, normative approval, or remote/live mutation crossed that boundary. Migration `.13.11`, handoff `.13.12`, and root `.13.13` remain dependency-ordered and local-only.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -68,8 +68,9 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: finish and independently accept W `.13.10`; then integrate
-G7, run M/H in parallel, and finish the root supervisor/journal join. Run the
+Recommended action: obtain explicit owner approval and independent P0-P3-zero
+rereview for decision `.13.16`, finish and independently accept W `.13.10`,
+then run M/H in parallel and finish the root supervisor/journal join. Run the
 joined local release matrix before presenting the separate GHCR publication and
 live-cutover packet. Keep Q12 remote execution NO-GO until the frozen
 supervisor, truthful four-file backup, Supabase-compatible isolated restore,

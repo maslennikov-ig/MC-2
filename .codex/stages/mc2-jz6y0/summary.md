@@ -1,9 +1,9 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 correction implementation active, with remote/live activation still NO-GO until every local hard gate passes
+Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 W correction is locally NO-GO pending decision `.13.16`, and remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: normative clarification package commit `0717366f`, including independently accepted canonical-journal and object-publication clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`
+Current accepted integration evidence: pushed head `9d3f3a1c` plus normative clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
 Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
 
@@ -227,7 +227,15 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   exact object-publication phases/outcomes.
 - G7 `.13.7.2` and publisher `.13.9` are accepted and integrated; G7 passed
   independent P0-P3-zero rereview plus fresh integration 99/99 and five-project
-  type-check. Remaining local execution is tracked by writer/barrier `.13.10`,
+  type-check. W `.13.10` candidate `5390a2f6` is not accepted: independent
+  review found P1=4/P2=3. Safe TDD correction has 120/120 nonblocked tests GREEN
+  while 8 exact-journal and 1 immutable-publication tests remain deliberately
+  RED behind decision `.13.16`. D4 candidate v1 `3354379f…` and corrected v2
+  `90fcd3ee…` were both independently returned; v2 reduced the remaining
+  contract gaps to claim-move lock-loss, immutable quiesce recovery-prefix
+  binding, existing-result epoch sequences, DB checkpoint/command/baseline
+  anchors, orphan supersession, structural-catalog source truth, and nested
+  `config_files` canonicalization. Remaining local execution is tracked by W,
   migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
 - The inherited base plan is
   `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; the current
