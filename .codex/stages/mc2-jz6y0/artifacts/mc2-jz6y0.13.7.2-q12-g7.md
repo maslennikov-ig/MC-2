@@ -52,9 +52,9 @@ parallel_group: G7
 depends_on_streams:
   - mc2-jz6y0.13.10 - final integration must rerun shared lifecycle/structural parity against the independently accepted W commit
 parallel_decision: parallel
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
 cleanup_status: pending
 cleanup_notes: dedicated worktree and branch are intentionally retained for independent correctness review and parent integration
 risk_level: high
@@ -85,6 +85,11 @@ verification:
   - rereview protected retention clock: passed refusal outside the exact synthetic test token
   - fresh rereview backup/restore/schedule aggregate: passed 99/99
   - final normative addendum docs review: PASS with P0=P1=P2=P3=0; SHA-256 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27 supersedes historical 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743 and de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - independent final correctness rereview: PASS with P0=P1=P2=P3=0 at 31b9e6eb17e75e1680c3d53f817f1952ead47cd0
+  - merged into codex/self-hosted-qdrant-platform at cb00fd9bcbd2476a9fafd096beb3554e442180f1
+  - fresh integration G7 aggregate after merge: passed 99/99
+  - fresh integration pnpm type-check: passed all five projects
+  - fresh integration bash syntax, artifact validation, and git diff check: passed
   - workspace pnpm type-check: passed all five projects
   - bash syntax: passed for deploy/postgres/*.sh
   - Prettier check: passed for every changed TypeScript, test, Markdown, and artifact file

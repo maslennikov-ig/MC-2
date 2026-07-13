@@ -225,8 +225,10 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   decision record at `c8d22c2a` and the earlier package at `099fc44b`; the only
   later normative change freezes cross-language canonical journal bytes and
   exact object-publication phases/outcomes.
-- Local execution is tracked by G7 `.13.7.2`, publisher `.13.9`, writer/barrier
-  `.13.10`, migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
+- G7 `.13.7.2` and publisher `.13.9` are accepted and integrated; G7 passed
+  independent P0-P3-zero rereview plus fresh integration 99/99 and five-project
+  type-check. Remaining local execution is tracked by writer/barrier `.13.10`,
+  migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
 - The inherited base plan is
   `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; the current
   conflict-superseding execution plan is
