@@ -231,11 +231,11 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   review found P1=4/P2=3. Safe TDD correction has 120/120 nonblocked tests GREEN
   while 8 exact-journal and 1 immutable-publication tests remain deliberately
   RED behind decision `.13.16`. D4 candidate v1 `3354379f…` and corrected v2
-  `90fcd3ee…` were both independently returned. Candidate v3 `6ff751c8…`
-  closed all prior docs findings and passed docs rereview P0-P3 zero; correctness
-  retained only two P1 findings for the quiesce overlay's `issued/` mapping and
-  crash after overlay publication but before acceptance. Remaining local
-  execution is tracked by W,
+  `90fcd3ee…` were both independently returned. Candidate v4 `e6ac9c5e…`
+  closed all remaining findings and now has independent correctness and docs
+  PASS, both P0=P1=P2=P3=0. Exact owner approval and normative incorporation
+  remain pending before W can turn the nine preserved RED cases GREEN.
+  Remaining local execution is tracked by W,
   migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
 - The inherited base plan is
   `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; the current
