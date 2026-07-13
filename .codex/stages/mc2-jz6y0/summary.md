@@ -3,8 +3,8 @@
 Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 correction implementation active, with remote/live activation still NO-GO until every local hard gate passes
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: through pushed integration commit `c8d22c2a`, including the immutable base correction specification, accepted publisher stream, managed-provider trust-boundary decision, and recoverable-lifecycle addendum
-Integration branch: pushed `codex/self-hosted-qdrant-platform`; decision/addendum baseline `c8d22c2a`
+Current accepted integration evidence: pushed integration commit `835ca195` plus the independently accepted normative addendum SHA `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c` in the current documentation delta
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; current remote baseline `835ca195`
 Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
 
 ## Beads Mapping
@@ -117,13 +117,12 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 
 ## Current Recovery Point
 
-- Q12 source-recovery core is accepted at integration `cfce2c1c`. Its final
-  independent review reported `PASS` with P0/P1 zero; integration-root recovery
-  regression passed 48/48 plus package type-check. The immutable manifest now
-  binds canonical SHA, operator/audit/root identity and exact prior CAS state;
-  its separate journal enforces paired Career Playbook checkpoints and coherent
-  reindex gating. Workflow/CAS, audited reindex and Stage 4 failed coverage are
-  running in three isolated parallel worktrees. No source copy, database write,
+- Q12 source recovery is fully accepted locally through Task 6. Its immutable
+  manifest, workflow/CAS, audited reindex, Stage 4 failed coverage, concrete
+  multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact
+  count acceptance passed final P0-P3-zero rereview. Fresh integration evidence
+  is 3/3 focused and 456/456 combined plus type-check/artifact/process gates;
+  every Task 6 worktree/local branch is cleaned. No source copy, database write,
   reindex, deploy, service change, or live mutation has occurred.
 
 - Integration branch contains accepted Q1-Q9 and evidence E1-E7 with exact 100% local/development activation. The combined activation/docs branch passed final independent review at `d3417610`, merged as `ea183d83`, and passed its parent acceptance rerun.
@@ -132,8 +131,9 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
   `/qdrant/storage/snapshots`, survive container replacement with the named
   volume, pass 7/7 exact restore/isolation checks, and fail durably after volume
   deletion. This is not host/disk/off-host DR; production S3 is tracked by
-  `.13.6`. The Supabase CA is valid, but all retrievable database URLs have
-  stale credentials. Source audit `.13.4` proves 42 exact copies can restore
+  `.13.6`. The Supabase CA is valid, and the current owner-only Session pooler
+  URI passed PostgreSQL 17.6 verify-full read-only probes without disclosure.
+  Source audit `.13.4` proves 42 exact copies can restore
   125 eligible rows (109 -> 234/240); six eligible originals and eighteen
   non-eligible Career Playbook originals are absent. No remote mutation or copy
   has occurred.
@@ -219,14 +219,18 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - The normative addendum is
   `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
   at SHA-256
-  `4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79`;
-  its plan and accepted decision artifacts were pushed at `c8d22c2a`.
+  `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`;
+  its exact command/receipt/checkpoint/journal/CAS/epoch and mode-DAG contract
+  passed independent rereview with P0-P3 zero and supersedes the initial
+  decision record pushed at `c8d22c2a`.
 - Local execution is tracked by G7 `.13.7.2`, publisher `.13.9`, writer/barrier
   `.13.10`, migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
-- The accepted plan is
-  `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; wave 1 is
-  G7/P/W in isolated worktrees, wave 2 is M/H after the W interface is frozen,
-  and root owns only the sequential integration/supervisor join.
+- The inherited base plan is
+  `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; the current
+  conflict-superseding execution plan is
+  `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`.
+  Wave 1 is G7/P/W in isolated worktrees, wave 2 is M/H after the W interface is
+  frozen, and root owns only the sequential integration/supervisor join.
 - No GHCR, SSH, server, Supabase, migration, database, container, Qdrant,
   source-copy, reindex, service, cron, staging, or production mutation occurred
   while approving/planning this correction wave.

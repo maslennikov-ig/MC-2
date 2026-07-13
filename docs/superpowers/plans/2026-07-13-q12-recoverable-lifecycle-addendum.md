@@ -65,13 +65,18 @@ defines the shared receipt/command surface consumed by every remaining stream.
 ## Task 3: W TDD — `resume-writers-only`
 
 1. Add RED tests for its deliberately narrow argv/environment surface, exact
-   run root, immutable manifest, cleanup receipt, and inherited lease.
+   run root, original plus immutable final-writer manifests, cleanup receipt,
+   journal/checkpoint, and inherited lease.
 2. Add RED tests for workers→API→Web ordering, per-class readiness, exact prior
-   restart-policy restore, idempotent terminal retry, and rejection of every
-   non-cleanup state.
+   or intended restart-policy restore, forward final10+held5, rollback
+   final10+held0..5, unrecorded target rejection, idempotent terminal retry, and
+   rejection of every non-authoritative state.
 3. Add RED fault/signal tests at each class start, readiness check, policy
-   restore, and terminal receipt boundary; every failure must compensate to all
-   stopped/restart `no` and never start a later class.
+   restore, and terminal receipt boundary. Add SIGKILL/reboot recovery tests for
+   durable `resume_committing`, exact-terminal receipt recovery, compensation,
+   ambiguity refusal, and supervisor lock reacquisition. Every nonterminal
+   failure must compensate the final ten to stopped/restart `no`, preserve the
+   exact mode-bound held set stopped/no, and never start a later class.
 4. Implement the minimum dedicated mode. It must not read or accept DB URL, CA,
    DB capability, recovery plan, or upload-root authority.
 5. Run W focused and ordinary regression aggregates, `bash -n`, package
@@ -83,8 +88,10 @@ defines the shared receipt/command surface consumed by every remaining stream.
 1. Give the reviewer the normative addendum, accepted decision artifacts, W
    commit, pre-existing accepted W evidence, and exact delta verification.
 2. Require an evidence-backed PASS or actionable findings for receipt
-   authority, file/FD identity, lease proof, crash recovery, class ordering,
-   compensation, capability minimization, and test realism.
+   authority, forward/rollback promotion, original/final manifest identity,
+   complete or partial target inventories, file/FD identity,
+   lease/reacquisition proof, crash recovery, class ordering, compensation,
+   capability minimization, and test realism.
 3. Return findings to W through TDD, rerun focused and affected aggregates, and
    repeat review until PASS.
 4. Inspect the accepted diff and evidence, integrate the exact W commit, rerun
@@ -93,13 +100,21 @@ defines the shared receipt/command surface consumed by every remaining stream.
 
 ## Task 5: Resume the base Q12 dependency graph
 
-1. Run G7 against the accepted W shared lifecycle and structural SQL.
-2. After G7 acceptance, run M and H in parallel in their disjoint worktrees.
+1. Finish and accept G7 in its independent backup/restore write zone.
+2. After W acceptance, run M and H in parallel in their disjoint worktrees. H
+   must supersede base pre-activation/finalize starts: create target containers
+   stopped/no, fsync the forward or rollback final-writer manifest before
+   activation, promote the same hash after activation without discovery/start,
+   and keep the nonselected production set held stopped/no. Early rollback must
+   capture every created target incrementally and support an exact held set of
+   zero through five without inventing missing identities.
 3. Integrate each exact accepted commit only after independent review and
    focused verification.
 4. Implement Root's frozen supervisor with the addendum order and durable
-   COMMIT-to-receipt recovery. No child process may manufacture supervisor
-   state.
+   COMMIT-to-receipt recovery, `resume_committing`, recoverable lease epochs,
+   mode-specific `rollback_ready_writers_quiesced`, `writers_resumed`, and full
+   observation only after forward `handoff_complete`. No child process may
+   manufacture supervisor state.
 
 ## Task 6: Local release-confidence gates
 
@@ -134,7 +149,13 @@ activation.
 - The managed-provider residual boundary is explicit and cannot be reported as
   tenant-controlled.
 - Recovery readiness is guarded and verification-only.
-- Writer restart occurs only after cleanup, under the same supervisor lease.
+- Writer restart occurs only after cleanup, under the same supervisor lease or
+  explicitly journaled recovery-reacquired lease epoch.
+- Resume consumes an immutable final-writer manifest, starts the selected final
+  ten only, and keeps the exact nonselected old/new production held set
+  stopped/no; rollback supports safely captured partial target sets.
+- Full 60-minute/live-cycle observation starts only after `writers_resumed` and
+  `handoff_complete`.
 - The deleted DB capability is neither required nor accepted by resume-only.
 - Every failure path is fail-closed and independently reviewable.
 - The plan does not authorize remote mutation or reintroduce external S3.

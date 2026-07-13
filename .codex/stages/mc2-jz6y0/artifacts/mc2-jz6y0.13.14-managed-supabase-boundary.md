@@ -21,7 +21,7 @@ success_criteria:
 selected_docs:
   - docs/superpowers/specs/2026-07-13-q12-live-cutover-corrections-design.md
   - https://supabase.com/docs/guides/database/postgres/event-triggers
-  - https://github.com/supabase/supautils#non-superuser-event-triggers
+  - https://github.com/supabase/supautils/tree/v3.2.2
   - https://www.postgresql.org/docs/17/event-trigger-definition.html
   - https://www.postgresql.org/docs/17/event-trigger-matrix.html
   - https://www.postgresql.org/docs/17/functions-admin.html
@@ -57,7 +57,9 @@ verification:
   - source Supautils privileged and reserved role settings read in BEGIN READ ONLY and rolled back
   - canonical structural query returned one 64-hex hash and identical results under two fixed search paths in BEGIN READ ONLY and rolled back
   - owner accepted recommended option 1 in the current task on 2026-07-13
-  - recoverable-lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
+  - Supautils v3.2.2 tag commit 64792e14681bba81c9adccdcfd598715cd052eb5 rechecked from the first-party repository
+  - recoverable-lifecycle addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - independent lifecycle docs rereview passed with P0=P1=P2=P3=0
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.14-managed-supabase-boundary.md
   - docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md
@@ -113,8 +115,8 @@ The strongest in-scope W candidate is therefore:
 4. an idempotent same-command resume proves exact stored/file-backed truth
    before any termination or setting mutation;
 5. activation retains immutable run truth and the event trigger through the
-   observation window; cleanup or rollback removes it only under the same
-   capability.
+   no-start handoff verification; cleanup or rollback removes it only under the
+   same capability before writer resume and the full live observation.
 
 ## Owner decision
 
@@ -128,7 +130,7 @@ precise wording and must not claim control of the provider superuser.
 The normative record is
 `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
 at SHA-256
-`4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79`.
+`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
 
 The alternative `ALLOW_CONNECTIONS=false` plus a separate control database,
 recovery login, ownership transfer, secret, and systemd recovery unit is not

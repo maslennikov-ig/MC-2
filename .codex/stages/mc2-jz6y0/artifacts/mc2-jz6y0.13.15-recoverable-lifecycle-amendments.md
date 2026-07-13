@@ -24,7 +24,8 @@ selected_docs:
   - https://www.postgresql.org/docs/17/runtime-config-client.html
   - https://www.postgresql.org/docs/17/sql-start-transaction.html
   - https://www.postgresql.org/docs/17/manage-ag-config.html
-  - https://docs.postgrest.org/en/v12/references/transactions.html
+  - https://docs.postgrest.org/en/v14/references/transactions.html
+  - https://docs.postgrest.org/en/v14/references/api/preferences.html#transaction-end-preference
 selected_skills:
   - senior-devops
   - senior-architect
@@ -51,11 +52,12 @@ verification:
   - approved design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15 rechecked unchanged
   - current W wrapper and database-barrier command/receipt lifecycles inspected read-only
   - PostgreSQL 17 transaction-default and explicit READ WRITE behavior reviewed
-  - PostgREST 12.2 per-method transaction access modes reviewed
+  - PostgREST 14 transaction modes and transaction-end preference reviewed; equivalent 12.2 access-mode behavior was checked during the earlier decision research
   - exact source-recovery REST CAS path and capability-header adapter inspected read-only
   - independent architecture reviewer confirmed the unsafe early-resume and early-activation effects
   - owner accepted the recommended two-part lifecycle in the current task on 2026-07-13
-  - recoverable-lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
+  - recoverable-lifecycle addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - independent lifecycle docs rereview passed with P0=P1=P2=P3=0 after exact command, receipt, checkpoint, journal, CAS, epoch, and forward/rollback DAG corrections
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.15-recoverable-lifecycle-amendments.md
   - docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md
@@ -108,15 +110,20 @@ On 2026-07-13 the owner explicitly accepted the recommended two-part narrow
 addendum in the current task as one lifecycle correction:
 
 1. Standalone recovery publishes
-   `recovery_complete_writers_quiesced`, proves all ten exact containers remain
-   stopped with restart policy `no`, and exits successfully without starting a
-   writer. After the same supervisor proves `guard_cleanup_complete` and zero
-   guard residue, a new explicit `resume-writers-only` invocation consumes the
-   immutable quiesce manifest, cleanup receipt, and inherited supervisor lease.
-   It does not require the already deleted database capability. It starts only
-   previously running containers in workers, API, Web order; verifies each
-   class; restores exact restart policies; and compensates any failure back to
-   all-stopped/restart-`no`.
+   `recovery_complete_writers_quiesced`, proves the original ten exact
+   containers remain stopped with restart policy `no`, and exits without
+   starting a writer. Before activation, handoff creates but does not start the
+   target five and fsync-publishes a mode-bound final-writer manifest: forward
+   selects new production plus development as final ten and holds old
+   production five; rollback selects original production plus development and
+   holds the captured target zero through five. After the supervisor proves
+   the matching handoff/rollback authority and exact zero-residue cleanup, an
+   explicit lease-bound `resume-writers-only` consumes the immutable original
+   and final manifests, exact journal/checkpoint, cleanup receipt, and
+   mode-specific authority. It receives no database capability, starts only
+   the selected final identities in workers, API, Web order, keeps the held set
+   stopped/no, and publishes `writers_resumed`. Crash/reboot recovery is
+   journal/CAS-bound and any ambiguous inventory fails closed.
 2. Add one fixed `barrier.prepare-recovery` command and receipt state
    `recovery_ready_guarded` after the final migration verification. It does not
    alter the database default, guards, cron, pg_net, or data. It verifies the
@@ -131,7 +138,7 @@ addendum in the current task as one lifecycle correction:
 The normative record is
 `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
 at SHA-256
-`4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79`.
+`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
 
 # Verification contract
 
@@ -140,9 +147,10 @@ at SHA-256
 - Fault or signal at every stop/recovery/resume boundary leaves all exact
   writers stopped with restart=`no`; a resume failure runs compensating
   re-quiesce and never starts a later class after an earlier-class failure.
-- Resume-only rejects every receipt state except exact
-  `guard_cleanup_complete/zero_guard_residue=true`, rejects a missing/wrong
-  supervisor lease, and does not consume a DB URL, CA, or DB capability.
+- Resume-only requires the exact mode-bound final manifest and authority,
+  `guard_cleanup_complete/zero_guard_residue=true`, the inherited or explicitly
+  recovery-reacquired supervisor lease epoch, and the exact 12-key checkpoint;
+  it rejects any DB URL, CA, DB capability, or unrecorded container identity.
 - `prepare-recovery` rejects every phase except the final verified migration,
   any run/catalog/probe mismatch, missing/extra guard, active cron, nonempty
   pg_net, activated run, or database-default drift.
@@ -154,8 +162,10 @@ at SHA-256
 - Source-recovery CAS integration under the retained read-only default proves
   only the exact capability-bound expected-row update succeeds.
 - The supervisor command/phase order is final-verify, prepare-recovery,
-  source-recovery, reindex, handoff/smoke/observation, activate, cleanup; no
-  source/reindex capability may be issued before readiness or after activation.
+  source-recovery, reindex, no-start handoff/static smoke, activate,
+  finalize-quiesced, cleanup, mode-bound authority, resume, handoff-complete,
+  then forward-only full observation. No source/reindex capability may be
+  issued before readiness or after activation; no writer starts before cleanup.
 
 # Risks / Follow-ups
 
