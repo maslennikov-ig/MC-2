@@ -37,15 +37,15 @@ parallel_group: W-source-truth
 depends_on_streams:
   - mc2-jz6y0.13.10 local candidate implementation and independent review
 parallel_decision: sequential
-status: blocked
+status: accepted
 delivery_method: n/a
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: not_applicable
 cleanup_notes: Read-only research produced no worktree, remote state, database mutation, or disposable runtime.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: This tracked decision packet preserves the approved specification unchanged and records the newly discovered provider trust boundary.
+docs_review_notes: The approved base specification remains unchanged; the owner-approved trust boundary is normative in the recoverable-lifecycle addendum.
 graph_reviewed: no-change-needed
 graph_review_notes: The decision is based on version-sensitive first-party behavior and read-only source capability probes, not repository architecture discovery.
 verification:
@@ -56,11 +56,14 @@ verification:
   - source PostgreSQL 17.6 capability and session inventory read in BEGIN READ ONLY and rolled back
   - source Supautils privileged and reserved role settings read in BEGIN READ ONLY and rolled back
   - canonical structural query returned one 64-hex hash and identical results under two fixed search paths in BEGIN READ ONLY and rolled back
+  - owner accepted recommended option 1 in the current task on 2026-07-13
+  - recoverable-lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.14-managed-supabase-boundary.md
+  - docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md
+  - docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md
 explicit_defers:
-  - mc2-jz6y0.13.14 remains open until the owner chooses the managed-provider trust boundary or supplies a supported provider maintenance mechanism.
-  - No GHCR, server, Supabase, Qdrant, service, secret, schema, role, event-trigger, or deployment mutation is authorized by this artifact.
+  - GHCR, server, Supabase, Qdrant, service, secret, schema, role, event-trigger, and deployment mutations remain governed by the existing Q12 remote gate; this decision authorizes none of them by itself.
 ---
 
 # Summary
@@ -113,18 +116,19 @@ The strongest in-scope W candidate is therefore:
    observation window; cleanup or rollback removes it only under the same
    capability.
 
-## Owner decision required
+## Owner decision
 
-Choose exactly one:
+On 2026-07-13 the owner explicitly accepted the recommended first option in the
+current task. The Q12 barrier is therefore complete for the tenant/client plane,
+while the Supabase internal superuser, reserved-role, and background-worker
+plane is an accepted trusted provider boundary that will not perform structural
+DDL during the controlled Q12 window. Documentation and receipts must use this
+precise wording and must not claim control of the provider superuser.
 
-1. Accept that the Q12 barrier is complete for the tenant/client plane and that
-   the Supabase internal superuser, reserved-role, and background-worker plane
-   is a trusted provider boundary that will not perform structural DDL during
-   the controlled Q12 window. Documentation and receipts will use this precise
-   wording and will not claim control of the provider superuser.
-2. Do not accept that boundary. Q12 remains blocked until Supabase supplies a
-   supported maintenance/support mechanism that also freezes the provider
-   plane and whose recovery path can be specified and tested locally.
+The normative record is
+`docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
+at SHA-256
+`4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79`.
 
 The alternative `ALLOW_CONNECTIONS=false` plus a separate control database,
 recovery login, ownership transfer, secret, and systemd recovery unit is not
@@ -154,8 +158,8 @@ superusers or bypass-capable background workers.
 The residual risk is a provider-controlled or deliberately bypassing
 administrator changing shared or local structure during the migration window.
 No tenant-side SQL mechanism can truthfully eliminate a provider superuser
-boundary. Acceptance option 1 treats that plane as trusted and still requires
+boundary. The accepted option treats that plane as trusted and still requires
 exact before/after structural hashes, idle managed-session proof, local
 event-trigger enforcement, table locks, migration-history locks, and a hard
-stop on any observed drift. Acceptance option 2 leaves Q12 remote activation
-blocked with no partial guard, migration, service, or deployment activation.
+stop on any observed drift. Remote activation remains separately gated; this
+decision permits safe local implementation but no partial live activation.

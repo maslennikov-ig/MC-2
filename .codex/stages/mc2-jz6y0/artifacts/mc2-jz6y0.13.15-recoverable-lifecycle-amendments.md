@@ -36,15 +36,15 @@ parallel_group: W-lifecycle-source-truth
 depends_on_streams:
   - mc2-jz6y0.13.10 safe local candidate excluding the public lifecycle amendment
 parallel_decision: sequential
-status: blocked
+status: accepted
 delivery_method: n/a
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: not_applicable
 cleanup_notes: Read-only lifecycle research produced no worktree, runtime, database, registry, or server mutation.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: The approved specification remains byte-for-byte unchanged; this packet records a narrow safety addendum requiring owner approval.
+docs_review_notes: The approved base specification remains byte-for-byte unchanged; the owner-approved safety correction is normative in the recoverable-lifecycle addendum.
 graph_reviewed: used
 graph_review_notes: The configured graph report and a focused query were consulted, but the graph predates the new Q12 shell lifecycle and added no current-code evidence.
 verification:
@@ -54,11 +54,14 @@ verification:
   - PostgREST 12.2 per-method transaction access modes reviewed
   - exact source-recovery REST CAS path and capability-header adapter inspected read-only
   - independent architecture reviewer confirmed the unsafe early-resume and early-activation effects
+  - owner accepted the recommended two-part lifecycle in the current task on 2026-07-13
+  - recoverable-lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.15-recoverable-lifecycle-amendments.md
+  - docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md
+  - docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md
 explicit_defers:
-  - mc2-jz6y0.13.15 remains open until the owner approves or rejects the exact two-part addendum.
-  - No GHCR, server, Supabase, Qdrant, service, secret, schema, writer, scheduler, or deployment mutation is authorized by this artifact.
+  - GHCR, server, Supabase, Qdrant, service, secret, schema, writer, scheduler, and deployment mutations remain governed by the existing Q12 remote gate; this decision authorizes none of them by itself.
 ---
 
 # Summary
@@ -99,9 +102,10 @@ approved hosted PostgREST capability plus `Prefer: tx=rollback` probe remains a
 mandatory empirical hard gate; documentation alone is not accepted as the live
 proof.
 
-## Owner decision required
+## Owner decision
 
-Approve or reject this two-part narrow addendum as one lifecycle correction:
+On 2026-07-13 the owner explicitly accepted the recommended two-part narrow
+addendum in the current task as one lifecycle correction:
 
 1. Standalone recovery publishes
    `recovery_complete_writers_quiesced`, proves all ten exact containers remain
@@ -123,6 +127,11 @@ Approve or reject this two-part narrow addendum as one lifecycle correction:
    only this run/catalog/probe-bound receipt. Final `barrier.activate` remains
    the sole later transaction that restores the baseline default/cron and
    removes application guards.
+
+The normative record is
+`docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
+at SHA-256
+`4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79`.
 
 # Verification contract
 
@@ -152,7 +161,7 @@ Approve or reject this two-part narrow addendum as one lifecycle correction:
 
 The live PostgREST build/version has not yet been observed. The local contract
 must use a version-aligned disposable fixture, while the approved hosted
-rollback probe remains the non-negotiable staging proof. If the owner rejects
-the addendum, W and the root supervisor remain open and remote activation stays
-blocked; no partial writer resume, early activation, or silent default
-restoration is permitted.
+rollback probe remains the non-negotiable staging proof. W and the root
+supervisor may now implement the approved local contract. Remote activation
+remains separately gated; no partial writer resume, early activation, or silent
+default restoration is permitted.
