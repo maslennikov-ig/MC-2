@@ -3,8 +3,8 @@
 Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 correction implementation active, with remote/live activation still NO-GO until every local hard gate passes
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: pushed integration commit `835ca195` plus the independently accepted normative addendum SHA `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c` in the current documentation delta
-Integration branch: pushed `codex/self-hosted-qdrant-platform`; current remote baseline `835ca195`
+Current accepted integration evidence: pushed integration commit `099fc44b`, including the independently accepted normative addendum SHA `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; current remote baseline `099fc44b`
 Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
 
 ## Beads Mapping
@@ -222,7 +222,8 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   `de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`;
   its exact command/receipt/checkpoint/journal/CAS/epoch and mode-DAG contract
   passed independent rereview with P0-P3 zero and supersedes the initial
-  decision record pushed at `c8d22c2a`.
+  decision record at `c8d22c2a`; the final normative package is pushed at
+  `099fc44b`.
 - Local execution is tracked by G7 `.13.7.2`, publisher `.13.9`, writer/barrier
   `.13.10`, migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
 - The inherited base plan is
