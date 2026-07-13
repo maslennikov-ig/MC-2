@@ -17,7 +17,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RESTORE = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
-const DOCKER_LIFECYCLE = resolve(REPO_ROOT, 'deploy/postgres/restore-docker-lifecycle.sh');
 const MANIFEST = resolve(REPO_ROOT, 'deploy/postgres/q12-source-manifest.ts');
 const ROLE_BOOTSTRAP = resolve(REPO_ROOT, 'deploy/postgres/generate-role-bootstrap.ts');
 const CLEANUP_HELPER = resolve(REPO_ROOT, 'deploy/postgres/run-restore-cleanup.ts');
@@ -46,8 +45,14 @@ function restoreScript(): string {
 }
 
 function trackedDockerLifecycle(): string {
-  expect(existsSync(DOCKER_LIFECYCLE)).toBe(true);
-  return existsSync(DOCKER_LIFECYCLE) ? readFileSync(DOCKER_LIFECYCLE, 'utf8') : '';
+  const script = restoreScript();
+  const begin = '# BEGIN authoritative Docker lifecycle';
+  const end = '# END authoritative Docker lifecycle';
+  const start = script.indexOf(begin);
+  const finish = script.indexOf(end);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(finish).toBeGreaterThan(start);
+  return `${script.slice(start + begin.length, finish)}\n`;
 }
 
 function role(
@@ -865,6 +870,57 @@ describe('source manifest exact comparison', () => {
     expect(ancestryDrift.stderr).toContain('manifest mismatch');
   });
 
+  it('rejects stale frozen physical OIDs even when guarded relation identities still match', async () => {
+    const manifest = (await import(pathToFileURL(MANIFEST).href)) as {
+      assertFrozenGuardedRelations: (
+        expected: Array<Record<string, unknown>>,
+        actual: Array<Record<string, unknown>>
+      ) => void;
+    };
+    const expected = [
+      {
+        schema: 'public',
+        name: 'events',
+        oid: 100,
+        relkind: 'p',
+        parent_oid: null,
+        owner: 'postgres',
+      },
+      {
+        schema: 'public',
+        name: 'events_2026',
+        oid: 101,
+        relkind: 'r',
+        parent_oid: 100,
+        owner: 'postgres',
+      },
+    ];
+    const stalePhysicalOids = [
+      {
+        schema: 'public',
+        name: 'events',
+        oid: 900,
+        kind: 'p',
+        parent_oid: null,
+        owner: 'postgres',
+        classification: 'authoritative',
+      },
+      {
+        schema: 'public',
+        name: 'events_2026',
+        oid: 901,
+        kind: 'r',
+        parent_oid: 900,
+        owner: 'postgres',
+        classification: 'authoritative',
+      },
+    ];
+
+    expect(() => manifest.assertFrozenGuardedRelations(expected, stalePhysicalOids)).toThrow(
+      'authoritative guarded relation set differs from frozen expected catalog'
+    );
+  });
+
   it('rejects column ACL/comment/label and index-owner drift by stable identity', () => {
     const root = tempRoot();
     const sourcePath = join(root, 'source-catalog.json');
@@ -1048,6 +1104,26 @@ describe('source manifest exact comparison', () => {
 });
 
 describe('Supabase-compatible isolated restore entrypoint', () => {
+  it('never executes mutable sibling Docker lifecycle bytes before invalid-argv refusal', () => {
+    const root = tempRoot();
+    const restore = join(root, 'restore-supabase-drill.sh');
+    const sibling = join(root, 'restore-docker-lifecycle.sh');
+    const marker = join(root, 'executed-before-preflight');
+    writeFileSync(restore, restoreScript(), { mode: 0o700 });
+    chmodSync(restore, 0o700);
+    writeFileSync(sibling, '#!/usr/bin/bash\n: >"$MC2_TAMPER_MARKER"\n', { mode: 0o700 });
+    chmodSync(sibling, 0o700);
+
+    const result = spawnSync('/usr/bin/bash', [restore, '--unsupported', 'value'], {
+      env: { PATH: '/usr/bin:/bin', MC2_TAMPER_MARKER: marker },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unsupported restore argument');
+    expect(existsSync(marker)).toBe(false);
+  });
+
   it('pins the approved linux/amd64 child image and exact isolated resource shape', () => {
     const script = restoreScript();
 
@@ -1067,7 +1143,7 @@ describe('Supabase-compatible isolated restore entrypoint', () => {
     const script = restoreScript();
     const lifecycle = trackedDockerLifecycle();
 
-    expect(script).toContain('source "$DOCKER_LIFECYCLE"');
+    expect(script).not.toContain('source "$DOCKER_LIFECYCLE"');
     expect(script).toContain('create_restore_docker_resources');
     expect(lifecycle).toContain('>"$TEMP_ROOT/network-create.identity"');
     expect(lifecycle).toContain('>"$TEMP_ROOT/volume-create.identity"');
@@ -1083,9 +1159,9 @@ describe('Supabase-compatible isolated restore entrypoint', () => {
   it.each(['network', 'volume', 'container'])(
     'cleans exact-label resources when interrupted after daemon %s create and retries safely',
     faultKind => {
-      expect(existsSync(DOCKER_LIFECYCLE)).toBe(true);
-      if (!existsSync(DOCKER_LIFECYCLE)) return;
       const root = tempRoot();
+      const lifecycle = join(root, 'restore-docker-lifecycle-inline.sh');
+      writeFileSync(lifecycle, trackedDockerLifecycle(), { mode: 0o600 });
       const state = join(root, 'docker-state');
       const fakeDocker = join(root, 'docker');
       mkdirSync(state, { mode: 0o700 });
@@ -1134,7 +1210,7 @@ trap - EXIT HUP INT TERM
 cleanup_restore_docker_resources`;
       const interrupted = spawnSync(
         '/usr/bin/bash',
-        ['-c', harness, 'g7-docker-harness', fakeDocker, runId, root, DOCKER_LIFECYCLE],
+        ['-c', harness, 'g7-docker-harness', fakeDocker, runId, root, lifecycle],
         {
           env: {
             PATH: '/usr/bin:/bin',
@@ -1149,7 +1225,7 @@ cleanup_restore_docker_resources`;
 
       const retry = spawnSync(
         '/usr/bin/bash',
-        ['-c', harness, 'g7-docker-harness', fakeDocker, runId, root, DOCKER_LIFECYCLE],
+        ['-c', harness, 'g7-docker-harness', fakeDocker, runId, root, lifecycle],
         { env: { PATH: '/usr/bin:/bin', FAKE_DOCKER_STATE: state }, encoding: 'utf8' }
       );
       expect(retry.status, retry.stderr).toBe(0);
@@ -1158,9 +1234,9 @@ cleanup_restore_docker_resources`;
   );
 
   it('preserves an unlabeled foreign Docker resource that collides with the deterministic name', () => {
-    expect(existsSync(DOCKER_LIFECYCLE)).toBe(true);
-    if (!existsSync(DOCKER_LIFECYCLE)) return;
     const root = tempRoot();
+    const lifecycle = join(root, 'restore-docker-lifecycle-inline.sh');
+    writeFileSync(lifecycle, trackedDockerLifecycle(), { mode: 0o600 });
     const state = join(root, 'docker-state');
     mkdirSync(state, { mode: 0o700 });
     const runId = '11111111-2222-4333-8444-555555555555';
@@ -1188,7 +1264,7 @@ const fs=require('node:fs'); const path=require('node:path'); const state=proces
         fakeDocker,
         runId,
         root,
-        DOCKER_LIFECYCLE,
+        lifecycle,
       ],
       { env: { PATH: '/usr/bin:/bin', FAKE_DOCKER_STATE: state }, encoding: 'utf8' }
     );

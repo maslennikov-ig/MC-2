@@ -32,6 +32,7 @@ TRUST_BOUNDARY='/'
 PRE_DUMP_HOOK=''
 POST_GENERATION_HOOK=''
 TEST_FINAL_NAME=''
+RETENTION_NOW_EPOCH=''
 
 TEMP_GENERATION=''
 TEMP_POINTER=''
@@ -158,6 +159,7 @@ configure_commands() {
     [[ -z "${MC2_SUPABASE_BACKUP_TEST_FINAL_NAME:-}" ]] || fail 'test final name requires the exact protected test mode'
     [[ -z "${MC2_SUPABASE_BACKUP_TEST_BASELINE_FILE:-}" ]] || fail 'test baseline override requires the exact protected test mode'
     [[ -z "${MC2_SUPABASE_BACKUP_TEST_EXPECTED_CATALOG_FILE:-}" ]] || fail 'test expected catalog override requires the exact protected test mode'
+    [[ -z "${MC2_SUPABASE_BACKUP_TEST_NOW_EPOCH:-}" ]] || fail 'test retention clock requires the exact protected test mode'
   else
     [[ "$test_mode" == "$TEST_MODE_TOKEN" ]] || fail 'invalid protected test mode token'
     TEST_MODE_ACTIVE=1
@@ -192,6 +194,10 @@ configure_commands() {
     TEST_FINAL_NAME=${MC2_SUPABASE_BACKUP_TEST_FINAL_NAME:-}
     if [[ -n "$TEST_FINAL_NAME" ]]; then
       [[ "$TEST_FINAL_NAME" =~ ^generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}$ ]] || fail 'protected test final name is invalid'
+    fi
+    RETENTION_NOW_EPOCH=${MC2_SUPABASE_BACKUP_TEST_NOW_EPOCH:-}
+    if [[ -n "$RETENTION_NOW_EPOCH" ]]; then
+      [[ "$RETENTION_NOW_EPOCH" =~ ^[1-9][0-9]{0,10}$ ]] || fail 'protected test retention epoch is invalid'
     fi
   fi
 
@@ -731,8 +737,15 @@ PY
 }
 
 run_retention() {
-  local latest_name candidate name identity retention_boundary
-  retention_boundary="$RETENTION_DAYS days ago"
+  local latest_name candidate name identity now_epoch retention_cutoff_epoch
+  if [[ -n "$RETENTION_NOW_EPOCH" ]]; then
+    now_epoch=$RETENTION_NOW_EPOCH
+  else
+    now_epoch=$(/usr/bin/date +%s)
+  fi
+  [[ "$now_epoch" =~ ^[1-9][0-9]{0,10}$ ]] || fail 'retention clock epoch is invalid'
+  retention_cutoff_epoch=$((now_epoch - RETENTION_DAYS * 86400))
+  [[ $retention_cutoff_epoch -gt 0 ]] || fail 'retention cutoff epoch is invalid'
   latest_name=$(/usr/bin/python3 - "$BACKUP_DIR/latest.json" <<'PY'
 import json, pathlib, sys
 print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["generation"])
@@ -749,9 +762,9 @@ PY
     # An unpointed post-rename incident has no durable pointer-commit receipt and is retained.
     [[ -f "$BACKUP_DIR/.committed/$name" && ! -L "$BACKUP_DIR/.committed/$name" ]] || continue
     validate_complete_generation "$candidate" "$name" || continue
-    # GNU find -newermt compares the actual timestamp rather than -mtime's
-    # completed-day buckets, so this is the exact 14*1440-minute boundary.
-    if [[ -n "$(/usr/bin/find "$candidate" -maxdepth 0 -type d ! -newermt "$retention_boundary" -print -quit)" ]]; then
+    # An integer epoch avoids calendar-day and DST shifts: retention is exactly
+    # RETENTION_DAYS * 86400 elapsed seconds.
+    if [[ -n "$(/usr/bin/find "$candidate" -maxdepth 0 -type d ! -newermt "@$retention_cutoff_epoch" -print -quit)" ]]; then
       /usr/bin/rm -rf --one-file-system -- "$candidate"
       /usr/bin/rm -- "$BACKUP_DIR/.committed/$name"
     fi

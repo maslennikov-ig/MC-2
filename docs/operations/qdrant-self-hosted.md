@@ -454,21 +454,24 @@ same exported PostgreSQL snapshot. Normalized password-free role exports taken
 before and after those consumers must be byte-identical. Publication uses
 same-filesystem `RENAME_NOREPLACE`; only a fully validated generation can be
 named by the atomically replaced `latest.json`. A generation published before
-a pointer failure remains incident evidence. Retention is exactly 14 days and
-removes only expired, complete, previously committed, non-latest generations;
-it never touches historical file backups, incomplete evidence, or unpointed
-incident generations.
+a pointer failure remains incident evidence. Retention is exactly 14 elapsed
+days (`14 * 1440` minutes, computed as an integer epoch), so Amsterdam calendar
+and DST transitions cannot shorten or extend it. It removes only expired,
+complete, previously committed, non-latest generations; it never touches
+historical file backups, incomplete evidence, or unpointed incident generations.
 
 The Q12 source manifest consumes the fixed owner-only
 `/opt/megacampus/backups/q12/<run-id>/baseline.json` and
 `expected-post-migration-catalog.json` through adopted no-follow file
 descriptors. It binds the catalog file SHA-256 to the committed `q12_guard`
 run and preserves the exact frozen physical OIDs used to install the live
-guards. Restore equality intentionally projects source and target OIDs to the
-stable relation and parent `schema/name` identities, so a correct isolated
-restore is not rejected merely because PostgreSQL assigned different physical
-OIDs. Missing or extra guard objects, owners, ACLs, partition ancestry, or
-row/TRUNCATE triggers are still rejected before publication.
+guards. Source cutover validation requires those physical relation and parent
+OIDs to match the frozen catalog exactly; stable names cannot hide a stale OID
+inventory. Only the later source-versus-restored-target equality projects each
+side's OIDs to stable relation and parent `schema/name` identities, so a correct
+isolated restore is not rejected merely because PostgreSQL assigned different
+physical OIDs. Missing or extra guard objects, owners, ACLs, partition ancestry,
+or row/TRUNCATE triggers are still rejected before publication.
 
 For Q12, the live supervisor invokes only:
 
@@ -494,7 +497,9 @@ equality, a restored-size ratio between 25% and 200%, and zero disposable
 resource residue. Docker resources created immediately before a signal are
 rediscovered only by the exact run/resource labels plus deterministic name;
 unlabelled name collisions are never removed. Cleanup failure overrides
-restore success.
+restore success. The authoritative Docker lifecycle is defined inside the
+restore entrypoint itself; it never sources mutable sibling shell code before
+argument, capability, or tracked-byte validation.
 The offline archive scan and the restored database both prove the exact pgTLE
 control/SQL function pairs `basejump-supabase_test_helpers=0.0.6` and
 `supabase-dbdev=0.0.5`. This representation is pinned to AWS `pg_tle` v1.4.0
@@ -514,7 +519,8 @@ installer starts the still-disabled timer, observes a persistent catch-up or
 starts the service exactly once, runs the isolated restore against that fresh
 scheduled generation, and only then enables the timer. Any backup or restore
 failure leaves the timer disabled; there is no cron fallback or `enable --now`
-duplicate.
+duplicate. Its authoritative proof lifecycle is likewise defined inside the
+fixed-hash installer and cannot be replaced through a mutable sibling helper.
 
 ## Snapshot and restore command contracts
 

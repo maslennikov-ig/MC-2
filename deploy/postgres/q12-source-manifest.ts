@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { closeSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 type JsonObject = Record<string, unknown>;
 
@@ -371,6 +372,37 @@ function normalizePhysicalRelationOids(view: JsonObject, label: string): void {
   if (view.relations_sha256 !== undefined) view.relations_sha256 = sha256(relations);
 }
 
+export function assertFrozenGuardedRelations(
+  expectedRelations: JsonObject[],
+  cutoverRelations: unknown[]
+): void {
+  relationsWithoutPhysicalOids(expectedRelations, 'expected guarded_relations');
+  relationsWithoutPhysicalOids(cutoverRelations, 'cutover.relations');
+  const actualRelations = cutoverRelations
+    .map((raw, index) => object(raw, `cutover.relations[${index}]`))
+    .filter(relation => relation.classification === 'authoritative')
+    .map(relation => ({
+      schema: relation.schema,
+      name: relation.name,
+      oid: relation.oid,
+      relkind: relation.kind,
+      parent_oid: relation.parent_oid,
+      owner: relation.owner,
+    }));
+  const sortRelations = (values: JsonObject[]) =>
+    values.sort((left, right) => {
+      const leftIdentity = `${String(left.schema)}.${String(left.name)}`;
+      const rightIdentity = `${String(right.schema)}.${String(right.name)}`;
+      return leftIdentity.localeCompare(rightIdentity);
+    });
+  if (
+    canonical(sortRelations(structuredClone(expectedRelations))) !==
+    canonical(sortRelations(actualRelations))
+  ) {
+    fail('authoritative guarded relation set differs from frozen expected catalog');
+  }
+}
+
 function validateExpectedCatalog(
   flags: Map<string, string>,
   snapshot: string,
@@ -547,41 +579,7 @@ function validateExpectedCatalog(
       expectedRelations.length
   )
     fail('expected guarded relation duplicates');
-  const stableExpectedRelations = relationsWithoutPhysicalOids(
-    expectedRelations,
-    'expected guarded_relations'
-  ).map(relation => ({
-    schema: relation.schema,
-    name: relation.name,
-    relkind: relation.relkind,
-    parent_schema: relation.parent_schema,
-    parent_name: relation.parent_name,
-    owner: relation.owner,
-  }));
-  const actualRelations = relationsWithoutPhysicalOids(
-    array(cutover.relations, 'cutover.relations'),
-    'cutover.relations'
-  )
-    .filter(relation => relation.classification === 'authoritative')
-    .map(relation => ({
-      schema: relation.schema,
-      name: relation.name,
-      relkind: relation.kind,
-      parent_schema: relation.parent_schema,
-      parent_name: relation.parent_name,
-      owner: relation.owner,
-    }));
-  const sortRelations = (values: JsonObject[]) =>
-    values.sort((left, right) => {
-      const leftIdentity = `${String(left.schema)}.${String(left.name)}`;
-      const rightIdentity = `${String(right.schema)}.${String(right.name)}`;
-      return leftIdentity.localeCompare(rightIdentity);
-    });
-  if (
-    canonical(sortRelations(stableExpectedRelations)) !== canonical(sortRelations(actualRelations))
-  ) {
-    fail('authoritative guarded relation set differs from frozen expected catalog');
-  }
+  assertFrozenGuardedRelations(expectedRelations, array(cutover.relations, 'cutover.relations'));
 
   const begin = `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)};`;
   const barrier = object(
@@ -1264,10 +1262,13 @@ function main(): void {
   );
 }
 
-try {
-  main();
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`source manifest failed: ${message}\n`);
-  process.exitCode = 1;
+const invokedPath = process.argv[1];
+if (invokedPath && pathToFileURL(invokedPath).href === import.meta.url) {
+  try {
+    main();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`source manifest failed: ${message}\n`);
+    process.exitCode = 1;
+  }
 }

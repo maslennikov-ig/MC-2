@@ -28,7 +28,8 @@ success_criteria:
 selected_docs:
   - owner-approved Q12 corrections design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15
   - owner-approved Q12 recoverable lifecycle addendum SHA-256 4fb36266b8ae127fd1952e59d565792cb2883255143f5d1d6d88d99c1033ed79
-  - final independently accepted G7 addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - superseded independently accepted G7 addendum SHA-256 de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
+  - final independently accepted canonicalization/G7 addendum SHA-256 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743
   - PostgreSQL 17 pg_dump https://www.postgresql.org/docs/17/app-pgdump.html
   - PostgreSQL 17 pg_dumpall https://www.postgresql.org/docs/17/app-pg-dumpall.html
   - PostgreSQL 17 pg_restore https://www.postgresql.org/docs/17/app-pgrestore.html
@@ -58,7 +59,7 @@ cleanup_notes: dedicated worktree and branch are intentionally retained for inde
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: final independent docs review PASS with P0=P1=P2=P3=0; qdrant-self-hosted records stable OID-independent restore equality, exact-label Docker crash cleanup, the sole four-file backup, and replacement schedule without authorizing live execution
+docs_review_notes: final independent review of normative addendum 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743 passed with P0=P1=P2=P3=0; qdrant-self-hosted records exact physical source-cutover OIDs, OID-independent restore-only equality, elapsed-epoch retention, and inline authoritative lifecycle trust without authorizing live execution
 graph_reviewed: used
 graph_review_notes: local Graphify report and focused backup/restore/scheduler queries were consulted read-only from the canonical primary graph; it is stale at commit 1233be56 and uses pre-1504 IDs, so refresh belongs to safe integration closeout
 verification:
@@ -77,6 +78,12 @@ verification:
   - fresh post-review joined G7 aggregate: passed 94/94
   - post-review ESLint scope: passed with two non-blocking manifest complexity/file-size warnings and zero errors
   - final independent docs review: PASS with P0=P1=P2=P3=0
+  - rereview helper-trust RED/GREEN: failed then passed 2/2 malicious sibling pre-refusal tests
+  - rereview source physical-OID RED/GREEN: failed then passed the adversarial stale physical OID test while restore-side OID-independent equality still passed
+  - rereview elapsed-retention RED/GREEN: failed 2/2 then passed 2/2 fixed Amsterdam spring/fall DST anchors at exactly 20160 minutes
+  - rereview protected retention clock: passed refusal outside the exact synthetic test token
+  - fresh rereview backup/restore/schedule aggregate: passed 99/99
+  - final normative addendum docs review: PASS with P0=P1=P2=P3=0; SHA-256 9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743 supersedes de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c
   - workspace pnpm type-check: passed all five projects
   - bash syntax: passed for deploy/postgres/*.sh
   - Prettier check: passed for every changed TypeScript, test, Markdown, and artifact file
@@ -132,27 +139,35 @@ database, service, cron, secret, or historical backup was read or mutated.
 
 # Accepted independent-review addendum
 
-The accepted addendum
-`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`
-is implemented finding by finding:
+The final accepted addendum
+`9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743`
+supersedes
+`de493383f0daa585174b81457e3150139cb1ab3988421655bf24a53437d3c28c`.
+Its G7 findings are implemented finding by finding:
 
 1. Physical source OIDs remain in `guarded_relations` for live `q12_guard`
-   binding. Restore comparison now resolves both source and target partition
-   parents through their own OID inventories and compares the stable
-   `schema/name`, kind, owner, and parent `schema/name` projection.
+   binding. The fresh live source cutover must match those frozen relation and
+   parent OIDs exactly; matching stable names cannot conceal stale physical
+   identities. Only restore comparison resolves source and target parents
+   through their own OID inventories and compares the stable `schema/name`,
+   kind, owner, and parent `schema/name` projection.
 2. Docker daemon output is written before identity adoption. An EXIT cleanup
    with an empty in-memory ID rediscovers only an exact run label, resource
    label, and deterministic name. Fault injection after network, volume, and
    container creation proves cleanup and safe retry; an unlabelled colliding
    resource survives.
-3. Retention uses GNU find's timestamp comparison against the exact
-   `14*1440`-minute boundary instead of completed-day `-mtime` buckets. Only a
-   complete committed non-latest generation expires; latest, incomplete, and
-   uncommitted incident evidence remain.
+3. Retention computes `now - RETENTION_DAYS*86400` as an integer epoch and uses
+   GNU find against that exact elapsed-time boundary. It is therefore immune to
+   Amsterdam spring/fall calendar shifts as well as completed-day `-mtime`
+   buckets. Only a complete committed non-latest generation expires; latest,
+   incomplete, and uncommitted incident evidence remain.
 4. Scheduler tests now execute protected synthetic roots and the shared
    installer lifecycle. They prove active-Q12 refusal, actual kernel flock
    contention, one concurrent launch, Persistent catch-up without a duplicate
    manual service start, and timer stop/disable after backup or restore failure.
+5. Restore and installer lifecycle functions are authoritative inline bytes in
+   their respective entrypoints. Both malicious-sibling regressions prove that
+   invalid argv is refused without executing a mutable adjacent shell file.
 
 # Scope / Routing
 
@@ -219,20 +234,38 @@ Fresh completion evidence:
   orchestration contract, diff check, dirty-stream status inspection, and
   process gate.
 
+Final rereview evidence:
+
+- malicious installer/restore sibling helpers: RED 2/2, GREEN 2/2;
+- stale frozen source physical OIDs with otherwise identical stable identities:
+  RED 1/1, GREEN 1/1; the restore-side different-OID comparison also remained
+  GREEN;
+- fixed Amsterdam spring/fall anchors: RED 2/2, GREEN 2/2 at exactly
+  `14 * 1440 = 20160` elapsed minutes;
+- protected synthetic retention clock outside the exact test token: refused;
+- complete backup/restore/schedule aggregate: 99/99 passed;
+- `pnpm type-check`: passed all five workspace projects;
+- `pnpm build`: the first environment-free invocation correctly stopped at the
+  web environment schema; the canonical rerun with synthetic non-secret
+  `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, and
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` passed all five workspace builds;
+- scoped ESLint: zero errors and only the two pre-existing manifest
+  complexity/file-size warnings;
+- final normative docs review: PASS with P0=P1=P2=P3=0 for SHA-256
+  `9171fa12a46ec5ffe3add4d0bf7ff4c847520489d650ed22483014248bca5743`.
+
 Tracked hashes before commit:
 
 - `backup-supabase.sh`:
-  `bd2dc6d99dea8f7324060d394cba3d698d643ba09a684eedc813f5660082ef50`
+  `9e43e7908566953d9109de03fca4a3a8ae9d6a87f01b68ee2ed634d1d4e789f4`
 - `restore-supabase-drill.sh`:
-  `d36fcf2f109955136caa639b795cbc9db8daa38296d11613bd92a2bcd96166da`
-- `restore-docker-lifecycle.sh`:
-  `4157fc94aff1f7e90f76c081a42b30a8f7af20dcd89584f133181adf1e49459d`
+  `7d4b046637864f91e06c0cf47f27dee84fcca6fdbb4815de60c4947efdee963e`
+- `q12-source-manifest.ts`:
+  `ec1bb8747329941cd027237a122b7c218d0d62a6024a7ac432771896175c0a94`
 - `scheduled-backup-run.sh`:
   `21df48b5475721c4ff6754d9ce3da53d600368cd95cd6c3d423ddcc94813a828`
 - `install-supabase-backup-schedule.sh`:
-  `1e1b43d89379e5f21dfc15bb8d2785a253d66c643087e075dd8f2039f1c553a2`
-- `install-supabase-backup-schedule-lifecycle.sh`:
-  `8fe2253a5489224a9655c3d2ca79b6b1fd47fbb8418424ba46ae65d809766354`
+  `612287d1c2b60ed4926707a3ce651a163b21b778e8e243c9f96c73d71ba07099`
 - service/timer:
   `b897991ffaf9c6d2a6d0ad8ce9172cc7ffd46ecdfd7b8d384976680a209bab6f` /
   `4d3779bb7a96a8aaeaa0d9538ca8e557760afc5def5bbc4b2de0fb48d94a53f3`

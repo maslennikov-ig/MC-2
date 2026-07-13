@@ -19,16 +19,23 @@ const SERVICE = resolve(REPO_ROOT, 'deploy/systemd/megacampus-supabase-backup.se
 const TIMER = resolve(REPO_ROOT, 'deploy/systemd/megacampus-supabase-backup.timer');
 const WRAPPER = resolve(REPO_ROOT, 'deploy/postgres/scheduled-backup-run.sh');
 const INSTALLER = resolve(REPO_ROOT, 'deploy/postgres/install-supabase-backup-schedule.sh');
-const INSTALL_LIFECYCLE = resolve(
-  REPO_ROOT,
-  'deploy/postgres/install-supabase-backup-schedule-lifecycle.sh'
-);
 const TEST_MODE = 'mc2-synthetic-schedule-test-only';
 const roots: string[] = [];
 
 function tracked(path: string): string {
   expect(existsSync(path)).toBe(true);
   return existsSync(path) ? readFileSync(path, 'utf8') : '';
+}
+
+function trackedInstallerLifecycle(): string {
+  const script = tracked(INSTALLER);
+  const begin = '# BEGIN authoritative schedule proof lifecycle';
+  const end = '# END authoritative schedule proof lifecycle';
+  const start = script.indexOf(begin);
+  const finish = script.indexOf(end);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(finish).toBeGreaterThan(start);
+  return `${script.slice(start + begin.length, finish)}\n`;
 }
 
 function executable(path: string, contents: string): void {
@@ -236,6 +243,26 @@ describe('scheduler-only backup wrapper', () => {
 });
 
 describe('fixed-hash backup schedule installer', () => {
+  it('never executes mutable sibling lifecycle bytes before invalid-argv refusal', () => {
+    const root = mkdtempSync('/tmp/mc2-supabase-installer-preflight-');
+    roots.push(root);
+    chmodSync(root, 0o700);
+    const installer = join(root, 'install-supabase-backup-schedule.sh');
+    const sibling = join(root, 'install-supabase-backup-schedule-lifecycle.sh');
+    const marker = join(root, 'executed-before-preflight');
+    executable(installer, tracked(INSTALLER));
+    executable(sibling, '#!/usr/bin/bash\n: >"$MC2_TAMPER_MARKER"\n');
+
+    const result = spawnSync('/usr/bin/bash', [installer, '--unsupported', 'value'], {
+      env: { PATH: '/usr/bin:/bin', MC2_TAMPER_MARKER: marker },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unsupported installer argument');
+    expect(existsSync(marker)).toBe(false);
+  });
+
   it('accepts only run id, two tracked hashes, and the exact confirmation phrase', () => {
     const installer = tracked(INSTALLER);
 
@@ -262,7 +289,7 @@ describe('fixed-hash backup schedule installer', () => {
 
   it('observes persistent catch-up without --now and enables only after backup plus restore pass', () => {
     const installer = tracked(INSTALLER);
-    const lifecycle = tracked(INSTALL_LIFECYCLE);
+    const lifecycle = trackedInstallerLifecycle();
     const combined = `${installer}\n${lifecycle}`;
 
     expect(lifecycle).toContain('"$SYSTEMCTL" start "$TIMER_NAME"');
@@ -359,6 +386,8 @@ exit 2
   );
   const restore = join(root, 'restore');
   executable(restore, '#!/usr/bin/bash\nexit 0\n');
+  const lifecycle = join(root, 'install-supabase-backup-schedule-lifecycle-inline.sh');
+  writeFileSync(lifecycle, trackedInstallerLifecycle(), { mode: 0o600 });
   const harness = `set -Eeuo pipefail
 SYSTEMCTL=$1; RUNUSER=$2; BACKUP_ROOT=$3; RESTORE_COMMAND=$4; RUN_ID=11111111-2222-4333-8444-555555555555
 SERVICE_NAME=megacampus-supabase-backup.service; TIMER_NAME=megacampus-supabase-backup.timer; installation_proven=0
@@ -374,16 +403,7 @@ prove_supabase_backup_schedule
 trap - EXIT`;
   const result = spawnSync(
     '/usr/bin/bash',
-    [
-      '-c',
-      harness,
-      'g7-installer-harness',
-      systemctl,
-      runuser,
-      backupRoot,
-      restore,
-      INSTALL_LIFECYCLE,
-    ],
+    ['-c', harness, 'g7-installer-harness', systemctl, runuser, backupRoot, restore, lifecycle],
     { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }
   );
   return { status: result.status, stderr: result.stderr, log, launches };
