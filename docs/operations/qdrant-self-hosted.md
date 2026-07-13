@@ -378,10 +378,11 @@ older `.13.7` stage artifacts are historical evidence and must not be run.
    backup evidence. The previous substantive 2026-06-27 file has aged out, so
    retained usable backups are zero. Before any migration, correct the parent
    ownership/mode, install the reviewed `deploy/postgres/backup-supabase.sh`
-   operator and its owner-only URL/CA inputs, require its explicit matching
-   PostgreSQL 17 client preflight, publish a fresh fully validated custom-format
-   dump, and restore that exact archive with the explicit PostgreSQL 17
-   `pg_restore` into the approved isolated target;
+   operator and its owner-only URL/CA inputs, and publish a complete immutable
+   four-file generation bound to one exported snapshot. The generation is
+   accepted only after its custom archive, password-free roles export, source
+   verification manifest, checksum manifest, and exact pinned-image isolated
+   restore all pass;
 3. the accepted read-only source audit found 261 catalog rows: 240 are
    Qdrant-eligible and 21 are `missing_course`. Forty-two exact no-replace
    copies can raise recoverable eligible sources from 109 to 234; exact
@@ -399,19 +400,18 @@ window:
    the project CA, `sslmode=verify-full`, and explicit `sslrootcert`;
 2. complete `mc2-jz6y0.13.7`: correct the observed `0775` backup parent to the
    approved root/current-owned non-group/world-writable mode, install the
-   reviewed backup operator and owner-only URL/CA inputs, and require its
-   pre-credential check to select the matching
-   `/usr/lib/postgresql/17/bin/pg_dump` and
-   `/usr/lib/postgresql/17/bin/pg_restore` pair. Publish a fresh custom dump
-   only after full archive validation, then restore that exact archive into the
-   approved isolated PostgreSQL 17 target with
-   `/usr/lib/postgresql/17/bin/pg_restore`. The `linux/amd64` target is
-   `postgres@sha256:9cc09bb9a1b9da469658a6fab7bbced9ece6ca99174e1b93c1c4cc1a12f741cf`
-   (PostgreSQL `17.10`, bookworm); use the tag only for drift detection. Mount
-   exactly one named data volume at `/var/lib/postgresql/data`, bind the
-   mode-0600 password file read-only, inspect both mounts before restore, and
-   make zero-residue cleanup a blocking result. Reject every 20-byte file since
-   2026-06-28 as evidence;
+   reviewed backup operator and owner-only URL/CA inputs, and require the fixed
+   PostgreSQL 17 `pg_dump`, `pg_dumpall`, `pg_restore`, and `psql` clients.
+   Publish one atomic four-file generation only after full offline archive and
+   checksum validation. Restore it through the sole reviewed drill into
+   `public.ecr.aws/supabase/postgres:17.6.1.064`, after verifying OCI index
+   `sha256:4c6d67181e482549bab276e8ae933f807be59ea1c371c225d85c189b0c14b9de`
+   and exact `linux/amd64` child
+   `sha256:d00c45c73f9c3d130ea4f379d8ae7748b0711d628eea690d27d03198ed609f2f`.
+   Mount exactly one named data volume at `/var/lib/postgresql/data`, bind only
+   synthetic mode-0600 initialization credentials read-only, and make
+   container/network/volume/secret cleanup a blocking result. Reject every
+   historical 20-byte file as evidence;
 3. confirm PITR and apply/verify the complete document-evidence
    `120 -> 130 -> 140 -> 150 -> 151` migration chain using the project CA;
 4. copy the reviewed Compose, `deploy/qdrant`, `deploy/systemd`, and
@@ -443,6 +443,84 @@ forward` wrapper before reindex, using the same reviewed run ID, owner-only
 
 `/deploy`, `/deploy --force`, mutable tags, the retired Cloud endpoint, and an
 alias switch without the preceding evidence are not activation alternatives.
+
+### PostgreSQL backup, restore, and replacement schedule
+
+An accepted PostgreSQL backup is the immutable directory
+`/opt/megacampus/backups/supabase/generation-<UTC>-<run-id>`, mode `0700`, with
+exactly four mode-`0600` files: `database.dump`, `roles.sql`,
+`source-manifest.json`, and `checksums.json`. The dump and manifest consume the
+same exported PostgreSQL snapshot. Normalized password-free role exports taken
+before and after those consumers must be byte-identical. Publication uses
+same-filesystem `RENAME_NOREPLACE`; only a fully validated generation can be
+named by the atomically replaced `latest.json`. A generation published before
+a pointer failure remains incident evidence. Retention is exactly 14 elapsed
+days (`14 * 1440` minutes, computed as an integer epoch), so Amsterdam calendar
+and DST transitions cannot shorten or extend it. It removes only expired,
+complete, previously committed, non-latest generations; it never touches
+historical file backups, incomplete evidence, or unpointed incident generations.
+
+The Q12 source manifest consumes the fixed owner-only
+`/opt/megacampus/backups/q12/<run-id>/baseline.json` and
+`expected-post-migration-catalog.json` through adopted no-follow file
+descriptors. It binds the catalog file SHA-256 to the committed `q12_guard`
+run and preserves the exact frozen physical OIDs used to install the live
+guards. Source cutover validation requires those physical relation and parent
+OIDs to match the frozen catalog exactly; stable names cannot hide a stale OID
+inventory. Only the later source-versus-restored-target equality projects each
+side's OIDs to stable relation and parent `schema/name` identities, so a correct
+isolated restore is not rejected merely because PostgreSQL assigned different
+physical OIDs. Missing or extra guard objects, owners, ACLs, partition ancestry,
+or row/TRUNCATE triggers are still rejected before publication.
+
+For Q12, the live supervisor invokes only:
+
+```bash
+/opt/megacampus/deploy/postgres/backup-supabase.sh \
+  --q12-run-id <run-id> \
+  --snapshot <exported-snapshot-id>
+
+/opt/megacampus/deploy/postgres/restore-supabase-drill.sh \
+  --generation /opt/megacampus/backups/supabase/<generation> \
+  --run-id <run-id> \
+  --q12-db-capability-file /opt/megacampus/backups/q12/<run-id>/secrets/db-capability
+```
+
+The restore validates all four files and the pinned Supabase OCI index/child,
+uses a unique internal Docker network, a kernel-selected loopback port, and one
+named data volume, then restores with the host PostgreSQL 17 `pg_restore`
+`--exit-on-error --single-transaction`. Source credentials are never copied to
+the target. Role SQL is generated only from the reviewed allowlist; the raw
+`roles.sql` file is audit evidence and is never executed. Acceptance requires
+exact cutover-state equality, capability-authorized cleanup to exact baseline
+equality, a restored-size ratio between 25% and 200%, and zero disposable
+resource residue. Docker resources created immediately before a signal are
+rediscovered only by the exact run/resource labels plus deterministic name;
+unlabelled name collisions are never removed. Cleanup failure overrides
+restore success. The authoritative Docker lifecycle is defined inside the
+restore entrypoint itself; it never sources mutable sibling shell code before
+argument, capability, or tracked-byte validation.
+The offline archive scan and the restored database both prove the exact pgTLE
+control/SQL function pairs `basejump-supabase_test_helpers=0.0.6` and
+`supabase-dbdev=0.0.5`. This representation is pinned to AWS `pg_tle` v1.4.0
+(released 2025-03-19), whose extension implementation stores packages as
+`<name>.control` and `<name>--<version>.sql` functions; reviewed sources:
+`https://github.com/aws/pg_tle/releases/tag/v1.4.0` and
+`https://github.com/aws/pg_tle/blob/v1.4.0/src/tleextension.c#L4508-L4589`.
+
+The broken cron line remains disabled. Its only replacement is the tracked
+`megacampus-supabase-backup.service` and `.timer`: execution identity
+`claude-deploy:claude-deploy`, `UMask=0077`, schedule
+`00:30 Europe/Amsterdam`, `Persistent=true`, and append-only output/error log.
+The scheduler-only wrapper accepts no operator overrides, refuses an active Q12
+lock/journal, uses separate nonblocking schedule and backup locks, generates
+its own UUID, and writes an owner-only scheduler journal. The fixed-hash
+installer starts the still-disabled timer, observes a persistent catch-up or
+starts the service exactly once, runs the isolated restore against that fresh
+scheduled generation, and only then enables the timer. Any backup or restore
+failure leaves the timer disabled; there is no cron fallback or `enable --now`
+duplicate. Its authoritative proof lifecycle is likewise defined inside the
+fixed-hash installer and cannot be replaced through a mutable sibling helper.
 
 ## Snapshot and restore command contracts
 
