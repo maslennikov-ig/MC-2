@@ -131,6 +131,14 @@ fi`;
   /usr/bin/sleep 0.05
   exit 0
 fi`;
+    } else if (name === 'rm') {
+      specialBehavior = `if [[ "$(<${shellQuote(utilityMode)})" == signal-cleanup-rm && "\${!#}" == */mc2-qdrant-publisher.* ]]; then
+  parent="$PPID"
+  /usr/bin/kill -TERM "$parent"
+  /usr/bin/sleep 0.05
+  /usr/bin/kill -0 "$parent" 2>/dev/null || exit 143
+  exec ${shellQuote(realPath)} "$@"
+fi`;
     }
     executable(
       join(bin, name),
@@ -174,6 +182,12 @@ elif [[ "\${1:-}" == -C && "\${3:-}" == rev-parse && "\${4:-}" == HEAD ]]; then
 elif [[ "\${1:-}" == -C && "\${3:-}" == status ]]; then
   [[ "$mode" == dirty ]] && printf '%s\\n' '?? synthetic-residue' || true
 elif [[ "\${1:-}" == worktree && "\${2:-}" == remove ]]; then
+  if [[ "$mode" == signal-cleanup-worktree ]]; then
+    parent="$PPID"
+    /usr/bin/kill -TERM "$parent"
+    /usr/bin/sleep 0.05
+    /usr/bin/kill -0 "$parent" 2>/dev/null || exit 143
+  fi
   [[ "$mode" != worktree-remove-failure ]] || exit 72
   /usr/bin/rm -rf -- "\${4:?missing worktree path}"
 else
@@ -273,7 +287,19 @@ case "\${1:-} \${2:-}" in
     fi
     ;;
   'logout ghcr.io')
-    [[ "$mode" != logout-failure ]] || exit 71
+    cleanup_signal=''
+    case "$mode" in
+      signal-cleanup-logout-hup) cleanup_signal=HUP ;;
+      signal-cleanup-logout-int) cleanup_signal=INT ;;
+      signal-cleanup-logout|signal-cleanup-logout-failure) cleanup_signal=TERM ;;
+    esac
+    if [[ -n "$cleanup_signal" ]]; then
+      parent="$PPID"
+      /usr/bin/kill -"$cleanup_signal" "$parent"
+      /usr/bin/sleep 0.05
+      /usr/bin/kill -0 "$parent" 2>/dev/null || exit 143
+    fi
+    [[ "$mode" != logout-failure && "$mode" != signal-cleanup-logout-failure ]] || exit 71
     printf '%s\\n' '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
     /usr/bin/chmod 0600 "$DOCKER_CONFIG/config.json"
     ;;
@@ -705,6 +731,74 @@ describe('Q12 build-only qdrant-operator publisher', () => {
       expectNoRunResidue(item);
       expectNoToken(item, result);
     }
+  });
+
+  it('defers HUP, INT, and TERM through every cleanup phase', () => {
+    for (const [phase, expectedStatus, configure] of [
+      [
+        'Docker logout HUP',
+        129,
+        (item: Fixture) =>
+          writeFileSync(item.dockerMode, 'signal-cleanup-logout-hup\n', { mode: 0o600 }),
+      ],
+      [
+        'Docker logout INT',
+        130,
+        (item: Fixture) =>
+          writeFileSync(item.dockerMode, 'signal-cleanup-logout-int\n', { mode: 0o600 }),
+      ],
+      [
+        'Docker logout TERM',
+        143,
+        (item: Fixture) =>
+          writeFileSync(item.dockerMode, 'signal-cleanup-logout\n', { mode: 0o600 }),
+      ],
+      [
+        'Git worktree removal',
+        143,
+        (item: Fixture) =>
+          writeFileSync(item.gitMode, 'signal-cleanup-worktree\n', { mode: 0o600 }),
+      ],
+      [
+        'state-root removal',
+        143,
+        (item: Fixture) => {
+          writeFileSync(item.dockerMode, 'build-failure\n', { mode: 0o600 });
+          writeFileSync(item.utilityMode, 'signal-cleanup-rm\n', { mode: 0o600 });
+        },
+      ],
+    ] as const) {
+      const item = fixture();
+      configure(item);
+      const result = run(item);
+      const log = commands(item);
+
+      expect(result.status, phase).toBe(expectedStatus);
+      expect(result.signal, phase).toBeNull();
+      expect(result.stdout, phase).not.toContain('Published qdrant-operator');
+      expect(log, phase).toContain('\tlogout\tghcr.io');
+      expect(log, phase).toContain('git\tworktree\tremove\t--force');
+      expect(log, phase).toContain('external\trm\t-rf\t--\t');
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('makes cleanup failure status 90 outrank a deferred cleanup signal', () => {
+    const item = fixture();
+    writeFileSync(item.dockerMode, 'signal-cleanup-logout-failure\n', { mode: 0o600 });
+    const result = run(item);
+    const log = commands(item);
+
+    expect(result.status).toBe(90);
+    expect(result.signal).toBeNull();
+    expect(result.stderr).toContain('publisher cleanup failed');
+    expect(result.stdout).not.toContain('Published qdrant-operator');
+    expect(log).toContain('\tlogout\tghcr.io');
+    expect(log).toContain('git\tworktree\tremove\t--force');
+    expect(log).toContain('external\trm\t-rf\t--\t');
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
   });
 
   it('makes cleanup failure override an otherwise successful publication', () => {

@@ -57,7 +57,7 @@ docs_impact: ops-deploy
 docs_reviewed: no-change-needed
 docs_review_notes: Durable operator instructions are outside the worker write zone and remain owned by the root docs review after integration.
 verification:
-  - 'focused Vitest publisher contract: passed (19/19)'
+  - 'focused Vitest publisher contract: passed (21/21) with synthetic Supabase env, NODE_ENV=test, unit config, and exact target file'
   - 'bash -n deploy/qdrant/publish-qdrant-operator.sh: passed'
   - 'pnpm --filter @megacampus/course-gen-platform type-check: passed'
   - 'synthetic token argv/stdout/stderr/temp-state scan: passed'
@@ -81,7 +81,9 @@ After isolated login, the publisher inspects the exact full-SHA tag before build
 
 The publisher binds the full SHA as tag and OCI revision, requests `--provenance=mode=max`, and parses Buildx metadata as JSON. Both local `buildx.build.provenance` and remote `docker buildx imagetools inspect <repository>@<digest> --format '{{ json .Provenance.SLSA }}'` must be non-null BuildKit SLSA objects with the exact canonical source and accepted revision plus max-mode Dockerfile source evidence. The independently inspected tag digest must equal the metadata digest before remote provenance is accepted.
 
-Initial RED was observed with the publisher absent: 8/8 focused tests failed for the expected missing-file reason. The independent-review RED cycle then produced 13 expected failures while 6 prior contracts remained green. It closed tag replacement, ambiguous preflight, token-class, unterminated-stdin, structured provenance, canonical package/login-actor separation, and state-creation signal gaps. Final GREEN is 19/19.
+Cleanup is a signal-resistant state machine. `CLEANUP_RUNNING` remains set through logout, worktree removal, state removal, and final residue proofs; `CLEANUP_DONE` is set only after those steps finish. HUP/INT/TERM received while cleanup is running are recorded and deferred. Both explicit-success and EXIT cleanup resolve through the same finalizer: cleanup failure returns `90`, otherwise the first deferred signal status is preserved, otherwise the caller's original status is retained.
+
+Initial RED was observed with the publisher absent: 8/8 focused tests failed for the expected missing-file reason. The first independent-review RED cycle then produced 13 expected failures while 6 prior contracts remained green. It closed tag replacement, ambiguous preflight, token-class, unterminated-stdin, structured provenance, canonical package/login-actor separation, and state-creation signal gaps. The cleanup rereview RED preserved those 19 contracts and added 2 expected failures: logout signals stopped before Git/state removal, and signal-plus-cleanup-failure returned `143` instead of `90`. Final GREEN is 21/21.
 
 # Scope / Routing
 
@@ -93,8 +95,16 @@ Graphify was reviewed with the integration graph report and a focused query for 
 
 # Verification
 
-- Focused Vitest: 1 file, 19/19 tests passed. Every publisher external executable was routed through synthetic command capture; no real Docker login, build, push, registry inspection, or Git fetch occurred.
+- Focused Vitest: 1 file, 21/21 tests passed. Exact runnable command:
+
+  ```bash
+  SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=ci-placeholder NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/ops/qdrant-operator-publisher.test.ts
+  ```
+
+  The synthetic Supabase environment and `vitest.config.unit.ts` are required repository test setup. A plain Vitest invocation enters global integration setup and is not valid evidence for this focused contract. Every publisher external executable was routed through synthetic command capture; no real Docker login, build, push, registry inspection, or Git fetch occurred.
+
 - Leak and residue coverage scanned classic and rejected synthetic credentials across captured argv, stdout, stderr, logs, and fixture trees after success, preflight failures, provenance failures, ordinary failure, signals on both sides of state creation, helper injection, digest mismatch, and cleanup failure; zero matches and zero run-state residue.
+- Cleanup-phase fixtures deterministically sent HUP/INT/TERM during Docker logout and TERM during Git worktree/state-root removal. Each completed all remaining actions, proved zero residue, suppressed success output, and preserved status `129`, `130`, or `143`; injected logout failure completed later cleanup and returned the higher-priority status `90`.
 - Bash syntax passed.
 - Course platform type-check passed, including required shared package builds.
 - Artifact validation passed with `artifact validation OK`.

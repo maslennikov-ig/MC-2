@@ -26,8 +26,12 @@ GIT_BIN=''
 DOCKER_BIN=''
 ENV_BIN=''
 PYTHON_BIN=''
+CLEANUP_RUNNING=0
 CLEANUP_DONE=0
 CLEANUP_STATUS=0
+CLEANUP_PENDING_SIGNAL=0
+CLEANUP_FAILURE_REPORTED=0
+FINAL_STATUS=0
 
 usage() {
   printf '%s\n' \
@@ -157,7 +161,10 @@ cleanup_resources() {
   if (( CLEANUP_DONE != 0 )); then
     return "$CLEANUP_STATUS"
   fi
-  CLEANUP_DONE=1
+  if (( CLEANUP_RUNNING != 0 )); then
+    return 1
+  fi
+  CLEANUP_RUNNING=1
   local failed=0
 
   if [[ -n "$DOCKER_CONFIG_DIR" && -d "$DOCKER_CONFIG_DIR" ]]; then
@@ -179,25 +186,75 @@ cleanup_resources() {
     fi
   fi
 
+  if [[ -n "$DOCKER_CONFIG_DIR" && ( -e "$DOCKER_CONFIG_DIR" || -L "$DOCKER_CONFIG_DIR" ) ]]; then
+    failed=1
+  fi
+  if [[ -n "$WORKTREE" && ( -e "$WORKTREE" || -L "$WORKTREE" ) ]]; then
+    failed=1
+  fi
+  if (( STATE_OWNED != 0 )) &&
+    [[ -n "$STATE_ROOT" && ( -e "$STATE_ROOT" || -L "$STATE_ROOT" ) ]]; then
+    failed=1
+  fi
+
   CLEANUP_STATUS=$failed
+  CLEANUP_DONE=1
+  CLEANUP_RUNNING=0
   return "$failed"
+}
+
+remember_cleanup_signal() {
+  local signal_status="$1"
+  if (( CLEANUP_PENDING_SIGNAL == 0 )); then
+    CLEANUP_PENDING_SIGNAL=$signal_status
+  fi
+}
+
+handle_signal() {
+  local signal_status="$1"
+  if (( CLEANUP_RUNNING != 0 )); then
+    remember_cleanup_signal "$signal_status"
+    return 0
+  fi
+  if (( CLEANUP_DONE != 0 && CLEANUP_STATUS != 0 )); then
+    exit 90
+  fi
+  exit "$signal_status"
+}
+
+finalize_process() {
+  local requested_status="$1"
+  local cleanup_failed=0
+  if ! cleanup_resources; then
+    cleanup_failed=1
+  fi
+
+  if (( cleanup_failed != 0 )); then
+    if (( CLEANUP_FAILURE_REPORTED == 0 )); then
+      printf '%s\n' 'ERROR: publisher cleanup failed; publication result must not be accepted' >&2
+      CLEANUP_FAILURE_REPORTED=1
+    fi
+    FINAL_STATUS=90
+  elif (( CLEANUP_PENDING_SIGNAL != 0 )); then
+    FINAL_STATUS=$CLEANUP_PENDING_SIGNAL
+  else
+    FINAL_STATUS=$requested_status
+  fi
 }
 
 on_exit() {
   local original_status=$?
-  trap - EXIT HUP INT TERM
-  if ! cleanup_resources; then
-    printf '%s\n' 'ERROR: publisher cleanup failed; publication result must not be accepted' >&2
-    exit 90
-  fi
-  exit "$original_status"
+  trap - EXIT
+  finalize_process "$original_status"
+  trap - HUP INT TERM
+  exit "$FINAL_STATUS"
 }
 
 install_cleanup_traps() {
   trap on_exit EXIT
-  trap 'exit 129' HUP
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
+  trap 'handle_signal 129' HUP
+  trap 'handle_signal 130' INT
+  trap 'handle_signal 143' TERM
 }
 
 create_isolated_state() {
@@ -475,11 +532,11 @@ main() {
   login_registry
   publish_and_verify
 
-  if ! cleanup_resources; then
-    printf '%s\n' 'ERROR: publisher cleanup failed; publication result must not be accepted' >&2
-    exit 90
-  fi
+  finalize_process 0
   trap - EXIT HUP INT TERM
+  if (( FINAL_STATUS != 0 )); then
+    exit "$FINAL_STATUS"
+  fi
   printf 'Published qdrant-operator: %s\n' "$PUBLISHED_REFERENCE"
 }
 
