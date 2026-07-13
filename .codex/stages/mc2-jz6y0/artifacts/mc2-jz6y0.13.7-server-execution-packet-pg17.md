@@ -46,11 +46,19 @@ explicit_defers:
 
 # Summary
 
-This packet supersedes only the proposed command section of
-`mc2-jz6y0.13.7-server-preflight-20260713.md`. That artifact's read-only host
-inventory remains historical evidence; its `/usr/bin` PostgreSQL 18 wrappers,
-old operator hash, and incomplete restore-target instructions must not be
-executed.
+This file is the sole executable `.13.7` backup/restore packet. It explicitly
+supersedes the executable restore snippet in `mc2-jz6y0.13.7.md`, the fixed
+`/usr/bin` client claims and restore example in
+`mc2-jz6y0.13.7-supabase-cli-login-role.md`, and the proposed command section of
+`mc2-jz6y0.13.7-server-preflight-20260713.md`. Those files remain immutable
+historical implementation, research, and host-observation evidence only. None
+of their `/usr/bin/pg_dump` or `/usr/bin/pg_restore` instructions is executable.
+
+Every dump, TOC validation, full offline archive traversal, and real isolated
+restore in this packet must use only
+`/usr/lib/postgresql/17/bin/pg_dump` or
+`/usr/lib/postgresql/17/bin/pg_restore`, as applicable. No PATH or `/usr/bin`
+fallback is allowed.
 
 The packet is locally prepared but **NO-GO**. The missing input is one current,
 password-bearing Supabase **Session pooler** URI that passes `verify-full` with

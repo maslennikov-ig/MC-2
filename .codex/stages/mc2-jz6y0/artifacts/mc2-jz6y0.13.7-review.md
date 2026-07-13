@@ -37,11 +37,11 @@ parallel_group: Q12-backup-gate-review
 depends_on_streams:
   - mc2-jz6y0.13.7
 parallel_decision: sequential
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: Disposable synthetic directories and worktree dependency symlinks were removed; no network, server, database, real secret, live backup, cron, or remote state was accessed or changed.
+cleanup_notes: The immutable NO-GO finding artifact is accepted as review evidence and linked to correction ba207282 plus zero-finding rereview 0276607b; disposable synthetic directories, dependency symlinks, and its dedicated worktree were removed without network, server, database, real secret, live backup, cron, or remote mutation.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -164,13 +164,13 @@ no network, server, database, real configuration, or live backup was touched.
 
 ## Bounded matrix
 
-| Tier | Risk / surface | Result |
-| --- | --- | --- |
-| inner | existing backup operator contract | PASS, 1 file / 9 tests |
-| delta | shell parse and artifact schema | PASS |
+| Tier              | Risk / surface                                         | Result                       |
+| ----------------- | ------------------------------------------------------ | ---------------------------- |
+| inner             | existing backup operator contract                      | PASS, 1 file / 9 tests       |
+| delta             | shell parse and artifact schema                        | PASS                         |
 | adversarial local | crash residue, rename race, inode swap, full traversal | reproduced all four findings |
-| process | orchestration contract and diff checks | PASS |
-| live/remote | server, database, secrets, backup, cron | not run by instruction |
+| process           | orchestration contract and diff checks                 | PASS                         |
+| live/remote       | server, database, secrets, backup, cron                | not run by instruction       |
 
 Commands and results:
 

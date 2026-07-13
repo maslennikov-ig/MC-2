@@ -362,6 +362,11 @@ The ordinary blue/green deploy intentionally runs verify-only before starting
 the inactive app color. It cannot bootstrap an empty first installation. The
 owner authorization does not waive these current hard stops:
 
+Only
+`.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7-server-execution-packet-pg17.md`
+is executable for the `.13.7` database backup/restore gate. Command snippets in
+older `.13.7` stage artifacts are historical evidence and must not be run.
+
 1. the downloaded Supabase Root 2021 CA is valid, but exhaustive read-only
    discovery found zero working credentials among 16 unique candidates and six
    complete external URIs. The only plausible server file, `.env.backup`, is

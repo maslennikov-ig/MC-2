@@ -39,11 +39,11 @@ depends_on_streams:
   - mc2-jz6y0.13.7
   - mc2-jz6y0.13.7-review
 parallel_decision: sequential
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
-cleanup_notes: Synthetic test roots and temporary dependency symlinks were removed; no network, server, database, real configuration, backup, cron, certificate, or remote state was accessed or changed.
+cleanup_notes: The zero-finding rereview is accepted and integrated; synthetic test roots, dependency symlinks, and its dedicated worktree were removed without network, server, database, real configuration, backup, cron, certificate, or remote mutation.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
@@ -125,14 +125,14 @@ writable. This rereview performed no server inspection or mutation.
 
 # Verification
 
-| Tier | Surface | Result |
-| --- | --- | --- |
-| inner | backup operator correction | PASS, 1 file / 18 tests |
-| delta | shell, locale, collision, retention | PASS |
-| CI | workflow/deploy fail-closed contracts | PASS, 3 commands |
-| type | course generation platform | PASS |
-| process | artifact/schema/orchestration | PASS |
-| remote | server/database/real secrets | not run by instruction |
+| Tier    | Surface                               | Result                  |
+| ------- | ------------------------------------- | ----------------------- |
+| inner   | backup operator correction            | PASS, 1 file / 18 tests |
+| delta   | shell, locale, collision, retention   | PASS                    |
+| CI      | workflow/deploy fail-closed contracts | PASS, 3 commands        |
+| type    | course generation platform            | PASS                    |
+| process | artifact/schema/orchestration         | PASS                    |
+| remote  | server/database/real secrets          | not run by instruction  |
 
 Commands:
 
@@ -160,10 +160,10 @@ the explicit server-parent blocker.
 
 # Delivery / Cleanup
 
-Only this rereview artifact is changed on the review branch. The corrected
-implementation is approved for orchestrator integration, subject to the remote
-preparation gates below. Disposable synthetic roots were test-owned and
-removed; temporary dependency symlinks are removed before delivery.
+Only this rereview artifact changed on the review branch. The corrected
+implementation is integrated and accepted, subject to the live preparation
+gates below. Disposable synthetic roots, temporary dependency symlinks, and the
+dedicated worktree were removed after acceptance.
 
 # Risks / Follow-ups / Explicit Defers
 

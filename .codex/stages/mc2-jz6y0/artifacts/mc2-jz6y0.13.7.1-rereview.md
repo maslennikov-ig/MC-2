@@ -47,7 +47,7 @@ cleanup_notes: The zero-finding rereview is accepted and its dedicated worktree 
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: no-change-needed
-docs_review_notes: This branch changes only its immutable rereview artifact; future runbooks and the exact execution packet must consume the accepted correction contract.
+docs_review_notes: This branch changed only its immutable rereview artifact; both durable runbooks and the sole PG17 execution packet now consume the accepted correction contract.
 graph_reviewed: used
 graph_review_notes: The existing local GRAPH_REPORT was read for orientation; a review-only artifact does not justify graph refresh.
 verification:
@@ -61,7 +61,7 @@ changed_files:
 explicit_defers:
   - The permanent verify-full Session pooler DSN remains owner-provided and unavailable; no credential was sought or accessed.
   - Every Docker pull/run/create, SSH, Supabase, database, backup, restore, Qdrant, service, staging, production, deploy, and other live or remote action remains deferred to a separately authorized observed window.
-  - The accepted documentation contract still requires an exact executable packet and observed zero-residue proof before migration or activation.
+  - The accepted executable packet still requires observed live restore and zero-residue proof before migration or activation.
 ---
 
 # Summary
@@ -146,8 +146,9 @@ The external immutable review and its `2e736067` blob both hashed to
 `1995018352e36522af0505ce701d252232e84e80ad7f6d8c98eed47626b42c32`.
 No Docker image or layer was pulled, and no runtime or remote action was taken.
 
-`docs-reviewed: no-change-needed` — only this rereview artifact changes; the
-accepted correction remains the source for future runbook and packet updates.
+`docs-reviewed: no-change-needed` — only this rereview artifact changed on its
+branch; the accepted correction is now consumed by both durable runbooks and
+the sole PG17 execution packet.
 
 `graph-reviewed: used` — the existing report was sufficient for orientation;
 there is no implementation or architecture change to refresh.
@@ -160,8 +161,8 @@ resource was needed. Acceptance covers the documentation contract at
 
 # Risks / Follow-ups / Explicit Defers
 
-- The future executable restore packet must implement these exact invariants and
-  receive its own review before execution.
+- The sole PG17 execution packet implements these invariants and still requires
+  its own zero-finding docs rereview before execution.
 - The permanent verify-full Session pooler DSN remains owner-provided and absent.
 - Every image pull, backup, restore, remote observation, and live mutation
   remains deferred to a separately authorized observed window.

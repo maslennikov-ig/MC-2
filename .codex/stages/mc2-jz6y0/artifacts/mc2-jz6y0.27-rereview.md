@@ -59,7 +59,6 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.27-rereview.md
 explicit_defers:
-  - durable runbook and replacement server execution-packet corrections remain integration-owner work
   - current verify-full Session pooler DSN, remote client/operator installation, directory and cron changes, fresh dump, isolated PostgreSQL 17 restore, and every live operation remain deferred
   - no Supabase, SSH, server, credential, database, package installation, service, container, Qdrant, staging, or production mutation was performed
 ---
@@ -165,9 +164,10 @@ appropriate for a rereview artifact.
 
 # Delivery / Cleanup
 
-Only this rereview artifact changes on the review branch. Temporary dependency
-symlinks are removed before commit; worktree and branch cleanup remain pending
-orchestrator acceptance.
+Only this rereview artifact changed on the review branch. It is integrated and
+accepted; temporary dependency symlinks and the dedicated rereview worktree
+were removed. The remote evidence branch remains because normal closeout does
+not force-delete cherry-picked history.
 
 # Risks / Follow-ups / Explicit Defers
 

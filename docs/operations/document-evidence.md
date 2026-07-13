@@ -305,6 +305,11 @@ The accepted remote chain is exactly
 unknown or later frontier, history/catalog mismatch, lock overrun, or TLS failure
 is a hard stop.
 
+Only
+`.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7-server-execution-packet-pg17.md`
+is executable for the `.13.7` database backup/restore gate. Command snippets in
+older `.13.7` stage artifacts are historical evidence and must not be run.
+
 The owner authorized the staging migration and the downloaded Supabase Root
 2021 CA has been validated. Exhaustive read-only discovery found zero working
 credentials among 16 unique candidates and six complete external URIs; the

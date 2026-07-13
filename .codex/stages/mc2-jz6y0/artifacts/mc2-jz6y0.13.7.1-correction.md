@@ -41,14 +41,14 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.7.1-correction.md
 explicit_defers:
-  - independent zero-finding rereview remains required before accepting the image pin or future execution packet
+  - integration Graphify refresh remains closeout-owned after accepted durable documentation changes
   - the permanent Session pooler DSN and every live backup/restore/server action remain external gates
 ---
 
 # Summary
 
 This forward-only correction closes P1 finding `2e736067` without rewriting the
-research or review artifacts. The future PostgreSQL 17 restore packet must treat
+research or review artifacts. The accepted PostgreSQL 17 restore packet treats
 mount identity as a hard pre-restore invariant, not a cleanup suggestion.
 
 For run ID `<run_id>`, create exactly one named data volume owned by that run and
@@ -116,8 +116,9 @@ the approved server.
 
 # Risks / Follow-ups
 
-This correction must receive an independent zero-finding rereview. Even after
-acceptance, the immutable digest is only a prepared restore target: the
-permanent verify-full Session pooler DSN, safe server modes, CA/operator
-installation, fresh archive, live isolated restore, and zero-residue proof
-remain mandatory before any migration or Qdrant activation.
+Independent rereview returned zero findings, and the accepted runbooks and sole
+PG17 execution packet consume this contract. The immutable digest is still only
+a prepared restore target: the permanent verify-full Session pooler DSN, safe
+server modes, CA/operator installation, fresh archive, live isolated restore,
+and zero-residue proof remain mandatory before any migration or Qdrant
+activation.

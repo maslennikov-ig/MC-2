@@ -44,8 +44,8 @@ cleanup_status: cleaned
 cleanup_notes: accepted finding evidence changed only this artifact; no runtime residue was created, and immutable correction/rereview artifacts mc2-jz6y0.27-correction.md and mc2-jz6y0.27-rereview.md close the PostgreSQL-major finding without rewriting this verdict
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: needs-update
-docs_review_notes: the operator and proposed server packet currently select PostgreSQL 18.1 through /usr/bin wrappers; they must pin and verify major 17 before the backup gate can run
+docs_reviewed: updated
+docs_review_notes: immutable correction mc2-jz6y0.27-correction.md, zero-finding rereview mc2-jz6y0.27-rereview.md, both durable runbooks, and the sole PG17 execution packet now close this finding without rewriting the historical NO-GO verdict
 verification:
   - PostgreSQL 17 and 18 pg_dump compatibility notes and the PostgreSQL versioning policy were re-read from postgresql.org on 2026-07-13
   - both completed artifacts, the reviewed operator, its exact command-path unit contract, accepted backup evidence, and both runbook call sites were inspected

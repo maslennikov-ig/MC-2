@@ -55,8 +55,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/supabase-backup-operator.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.27.md
 explicit_defers:
-  - independent correctness review and integration acceptance remain orchestrator-owned
-  - runbook and live server packet path corrections remain outside this worker write zone
+  - live Session pooler DSN, server installation, fresh dump, isolated restore, and every remote action remain external gates
   - no server, Supabase, credential, dump, database, package, service, Docker, staging, or production operation was performed
 ---
 
@@ -96,6 +95,7 @@ and record their exact patch version. The resulting archive is not accepted as
 rollback evidence until the exact archive passes a real isolated restore into a
 pinned PostgreSQL 17 target.
 
-The reviewed runbooks and server packet still need their `/usr/bin/pg_restore`
-examples replaced by the explicit verified PostgreSQL 17 path in a separately
-owned documentation stream. This worker made no remote or credential operation.
+Independent correction/rereview, integration acceptance, both durable runbook
+updates, and the sole PG17 execution packet are complete. Only the live DSN,
+server preparation, fresh dump, isolated restore, and later authorized Q12
+actions remain. This worker made no remote or credential operation.

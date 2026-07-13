@@ -58,7 +58,7 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/supabase-backup-operator.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.27-correction.md
 explicit_defers:
-  - independent zero-finding rereview, integration acceptance, Graphify refresh, and durable runbook corrections remain orchestrator-owned
+  - integration Graphify refresh remains closeout-owned after accepted durable documentation changes
   - a current verify-full Session pooler DSN, fresh dump, isolated PostgreSQL 17 restore, and every remote action remain deferred
   - no Supabase, SSH, server, credential, database, package installation, service, container, Qdrant, staging, or production mutation was performed
 ---
@@ -95,7 +95,7 @@ PostgreSQL 17 executables and patch version during the authorized server window.
 It also does not turn offline archive traversal into rollback proof: the exact
 fresh archive must still restore into an isolated, pinned PostgreSQL 17 target.
 
-Durable runbook and server execution-packet corrections identified by the
-immutable review remain outside this write zone until an independent rereview
-returns zero findings. The current Session pooler DSN and every remote action
-remain explicitly deferred.
+Independent rereview returned zero findings; the correction is integrated, and
+both durable runbooks plus the sole PG17 execution packet consume it. Graphify
+refresh remains integration-closeout work. The current Session pooler DSN and
+every remote action remain explicitly deferred.

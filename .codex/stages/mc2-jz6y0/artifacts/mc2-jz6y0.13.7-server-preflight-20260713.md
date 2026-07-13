@@ -33,8 +33,8 @@ cleanup_status: cleaned
 cleanup_notes: read-only SSH commands created no server files, containers, volumes, networks, ports, dumps, database sessions, or local temporary files
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: needs-update
-docs_review_notes: current host truth supersedes the handoff implication that one substantive historical dump remains retained; the server now has zero usable retained database backups
+docs_reviewed: updated
+docs_review_notes: zero usable retained backups are now recorded in handoff and both durable runbooks; this historical preflight's proposed commands are non-executable and superseded by the sole PG17 execution packet
 verification:
   - strict-host-key BatchMode SSH access to the approved megacampus-prod alias returned info511.fvds.ru and the expected claude-deploy identity
   - read-only sudo metadata inventory completed without reading any environment, DSN, token, key, or certificate content on the server
