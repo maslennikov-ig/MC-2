@@ -46,8 +46,8 @@ parallel_decision: sequential
 status: accepted
 delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: Accepted source HEAD fa6172fc was merged and pushed as integration commit 227ca90d; worker cleanup is the next orchestrator action.
+cleanup_status: cleaned
+cleanup_notes: Safe cleanup removed only the delivered q12-d5-root-producer worktree and local branch after pushed integration acceptance; integration and unrelated worktrees remain.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
@@ -80,6 +80,7 @@ verification:
   - independent R4 evidence-only review: PASS with P0/P1/P2/P3 0/0/0/0
   - integration focused Root D5 GREEN 251 tests: passed with zero failed and zero pending in 68.47 seconds
   - integration static/artifact proof: all seven gates passed with exit 0
+  - accepted-workspace cleanup: dry-run and actual cleanup passed; delivered worker worktree/local branch removed and unrelated worktrees preserved
   - bash -n deployed wrappers: passed
   - python3 -m py_compile core and runner: passed
   - jq -e command manifest: passed
@@ -128,11 +129,11 @@ Runtime tested: Python `3.14.4` and Linux kernel `6.6.114.1-microsoft-standard-W
 
 # Delivery / Cleanup
 
-The R1 commits `c93d766d94d36b57fbb95a4b2bea61e1f31e2169` and `e6a8440a2c6f6814329496633c06bfab6f37a502`, R2 commit `541ae20b490a7634d8819066f73455cffa73c4f7`, reviewed R3 implementation commit `7d38c30b43bf0efb61e2ab4daa0571569f58c5f4`, and R4 evidence commit `fa6172fc74cd79e6c6f3f67e268fdc16bca262f4` are pushed. The accepted source was merged without rewriting into `codex/self-hosted-qdrant-platform` as `227ca90d49049c5c46c4d873be9dbe71aabcb6d1`, pushed with upstream divergence `0/0`. Safe removal of the delivered worker worktree/local branch is the remaining cleanup action.
+The R1 commits `c93d766d94d36b57fbb95a4b2bea61e1f31e2169` and `e6a8440a2c6f6814329496633c06bfab6f37a502`, R2 commit `541ae20b490a7634d8819066f73455cffa73c4f7`, reviewed R3 implementation commit `7d38c30b43bf0efb61e2ab4daa0571569f58c5f4`, and R4 evidence commit `fa6172fc74cd79e6c6f3f67e268fdc16bca262f4` are pushed. The accepted source was merged without rewriting into `codex/self-hosted-qdrant-platform` as `227ca90d49049c5c46c4d873be9dbe71aabcb6d1`, pushed with upstream divergence `0/0`. The cleanup dry-run and actual cleanup then removed only the delivered `q12-d5-root-producer` worktree/local branch; integration and unrelated worktrees remain.
 
 # Risks / Follow-ups / Explicit Defers
 
-Root-D5 is accepted and integrated locally/remotely after implementer, controller, correctness, documentation, and R4 evidence review. This does not claim the full Q12 stage complete: Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Worker cleanup remains pending.
+Root-D5 is accepted, integrated, pushed, and locally cleaned after implementer, controller, correctness, documentation, and R4 evidence review. This does not claim the full Q12 stage complete: Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred.
 
 docs-reviewed: updated — corrected the Task 2 artifact to exact pushed R2, R3, controller, review-report, and consulted-document version truth; project runbooks remain Task 9-owned.
 
