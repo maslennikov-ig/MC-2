@@ -73,6 +73,14 @@ verification:
   - bash syntax passed source-recovery-run.sh, q12-database-barrier.sh, and the Qdrant operator entrypoint; Python byte-compilation passed q12-writer-resume.py
   - structural catalog retained exact SHA-256 0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e, 1254 lines, and one semicolon-free query
   - git diff --check and secret/live-command scans passed; no current-run synthetic process, temporary run root, PostgreSQL 17 container, or matching Docker volume remained
+  - retained-recovery positive RED selected exactly the two legal historical-authority cases and failed 0 of 2, with 138 filter-pending tests: one immutable cutover capability completed at cutover-recovery-1, and one directly linked cutover to cutover-recovery-1 capability chain
+  - retained recovery now distinguishes capability execution epoch from journal completion epoch: only a one-record cutover execution may complete at exactly cutover-recovery-1; a reissued recovery tip must execute and complete in its own exact epoch
+  - every retained chain has one completed tip, is walked backward across every record exactly once, starts at cutover, advances through every consecutive cutover-recovery-N epoch without a gap, keeps predecessors superseded and only the tip completed, and preserves one exact command/run/release/operator/resource/quiesce contract
+  - an additional command-contract RED proved a linked recovery tip with a changed command SHA was accepted before the guard; after correction the same case fails before Docker and the legal chain preserves the identical command SHA from predecessor through tip
+  - final retained-history focused GREEN passed 16 of 16 selected positives and prior negatives; complete runtime passed 141 of 141 with zero failures and zero pending tests
+  - canonical joined runtime plus database-barrier validation with actual PostgreSQL 17 passed 192 of 192 across 6 suites; auxiliary runtime plus source-recovery-database validation passed 153 of 153 across 6 suites
+  - final real-PG17 structural fixture passed 34 of 34, and the five-file barrier/runtime/database/adapters/reindex aggregate passed 290 of 290 across 17 suites, all with zero failures and zero pending tests
+  - retained-recovery closeout reran workspace type-check and synthetic-environment build, Prettier, ESLint, Python byte-compilation, Bash syntax, git diff checking, and unchanged structural SQL hash/line/semicolon invariants; all blocking checks passed and ESLint retained only the same 13 fixture warnings
   - commit and push state is committed and pushed on codex/q12-w-writer-barrier; exact branch-tip SHA is returned out-of-band because an artifact cannot self-reference its own commit
 changed_files:
   - deploy/qdrant/source-recovery-run.sh

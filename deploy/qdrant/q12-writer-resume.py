@@ -1711,25 +1711,92 @@ for historical_command_id, historical_records in historical_barrier_capabilities
         len(historical_completed_records) == 1,
         "historical barrier completed authority is ambiguous",
     )
+    historical_records_by_digest = {
+        record["file"].digest: record for record in historical_records
+    }
     require(
-        len(historical_records) == 1
-        and historical_completed_records[0]["value"]["lease_epoch"] == "cutover"
-        and historical_completed_records[0]["value"]["supersedes_capability_sha256"] is None,
+        len(historical_records_by_digest) == len(historical_records),
+        "historical barrier capability digest is duplicated",
+    )
+    historical_chain = []
+    historical_chain_digests = set()
+    historical_cursor = historical_completed_records[0]
+    while historical_cursor is not None:
+        historical_cursor_digest = historical_cursor["file"].digest
+        require(
+            historical_cursor_digest not in historical_chain_digests,
+            "historical barrier capability supersession cycle exists",
+        )
+        historical_chain.append(historical_cursor)
+        historical_chain_digests.add(historical_cursor_digest)
+        historical_predecessor_digest = historical_cursor["value"]["supersedes_capability_sha256"]
+        if historical_predecessor_digest is None:
+            historical_cursor = None
+        else:
+            require(
+                historical_predecessor_digest in historical_records_by_digest,
+                "historical barrier capability supersession link is missing",
+            )
+            historical_cursor = historical_records_by_digest[historical_predecessor_digest]
+    historical_chain.reverse()
+    require(
+        len(historical_chain) == len(historical_records),
+        "historical barrier capability fork or orphan exists",
+    )
+    historical_epochs = [
+        record["value"]["lease_epoch"] for record in historical_chain
+    ]
+    require(
+        historical_epochs
+        == ["cutover"] + [
+            f"cutover-recovery-{ordinal}"
+            for ordinal in range(1, len(historical_epochs))
+        ],
         "historical barrier capability lifecycle is unsupported or ambiguous",
     )
-    historical_record = historical_completed_records[0]
-    historical_value = historical_record["value"]
+    for historical_index, historical_record in enumerate(historical_chain):
+        historical_predecessor = historical_chain[historical_index - 1] if historical_index else None
+        require(
+            historical_record["location"]
+            == ("completed" if historical_index == len(historical_chain) - 1 else "superseded")
+            and historical_record["value"]["supersedes_capability_sha256"]
+            == (historical_predecessor["file"].digest if historical_predecessor else None),
+            "historical barrier capability location or supersession is invalid",
+        )
+    historical_tip = historical_chain[-1]
+    historical_value = historical_tip["value"]
     expected_historical_phase, expected_historical_quiesce = historical_barrier_contexts[
         historical_command_id
     ]
+    historical_contract = historical_chain[0]["value"]
+    require(
+        all(
+            record["value"]["command_id"] == historical_command_id
+            and record["value"]["run_id"] == historical_contract["run_id"]
+            and record["value"]["release_sha"] == historical_contract["release_sha"]
+            and record["value"]["operator_digest"] == historical_contract["operator_digest"]
+            and record["value"]["resource_manifest_sha256"]
+            == historical_contract["resource_manifest_sha256"]
+            and record["value"]["command_sha256"]
+            == historical_contract["command_sha256"]
+            for record in historical_chain
+        ),
+        "historical barrier command contract chain is invalid",
+    )
+    require(
+        all(
+            record["value"]["quiesce_manifest_sha256"] == expected_historical_quiesce
+            for record in historical_chain
+        ),
+        "historical barrier command phase or context chain is invalid",
+    )
     historical_journal_entries = [
         entry for entry in journal_lines
         if entry["phase"] == expected_historical_phase
         and entry["outcome"] == "completed"
         and entry["command_id"] == historical_command_id
         and entry["command_sha256"] == historical_value["command_sha256"]
-        and entry["capability_manifest_sha256"] == historical_record["file"].digest
-        and entry["lease_epoch"] == historical_value["lease_epoch"]
+        and entry["capability_manifest_sha256"] == historical_tip["file"].digest
         and entry["release_sha"] == historical_value["release_sha"]
         and entry["operator_digest"] == historical_value["operator_digest"]
         and entry["resource_manifest_sha256"] == historical_value["resource_manifest_sha256"]
@@ -1738,9 +1805,19 @@ for historical_command_id, historical_records in historical_barrier_capabilities
         and entry["accepted_object_sha256"] is None
     ]
     require(
-        historical_value["quiesce_manifest_sha256"] == expected_historical_quiesce
-        and len(historical_journal_entries) == 1,
+        len(historical_journal_entries) == 1,
         "historical barrier command phase or context binding is invalid",
+    )
+    historical_completion_epoch = historical_journal_entries[0]["lease_epoch"]
+    historical_execution_epoch = historical_value["lease_epoch"]
+    require(
+        historical_completion_epoch == historical_execution_epoch
+        or (
+            len(historical_chain) == 1
+            and historical_execution_epoch == "cutover"
+            and historical_completion_epoch == "cutover-recovery-1"
+        ),
+        "historical barrier execution/completion epoch transition is invalid",
     )
 
 database_capability_by_digest = {
