@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
@@ -20,11 +19,13 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  canonical,
   materializeFreshProcessRecoveryCheckpointPair,
   materializeRootRetainedBarrierFixture,
   parseLeaseEpoch,
   r3NegativeMutationFixture,
   rehashJournalAndCheckpointsAfterMutation,
+  sha,
   type CompletionMode,
   type FrontierCopySet,
   type FrontierForm,
@@ -76,22 +77,17 @@ function spec(
   chains: Partial<Record<RetainedBarrierOperation, RetainedChainSpec>>,
   mode: 'forward' | 'rollback' = 'forward'
 ): RootRetainedBarrierFixtureSpec {
-  return {
+  const candidate: RootRetainedBarrierFixtureSpec = {
     runRoot: root(),
     mode,
     completed: Object.keys(chains) as RetainedBarrierOperation[],
     chains,
   };
-}
-
-function sha(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
-
-function canonical(value: Record<string, unknown>): string {
-  return JSON.stringify(
-    Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
-  );
+  if (mode === 'rollback' || Object.keys(chains).some(operation => operation !== 'install')) {
+    candidate.existingQuiesceManifestPath = join(candidate.runRoot, 'w.json');
+    writeFileSync(candidate.existingQuiesceManifestPath, '{}\n', { mode: 0o400 });
+  }
+  return candidate;
 }
 
 describe('Root D5 fixture contract boundary', () => {

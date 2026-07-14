@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import importlib.util
 import fcntl
+import hashlib
 import json
 import os
 import pathlib
+import stat
 import subprocess
 import sys
+import time
 import uuid
 from typing import Any
 
@@ -23,6 +26,39 @@ sys.modules[SPEC.name] = CORE
 SPEC.loader.exec_module(CORE)
 run_supervisor = CORE.run_supervisor
 run_claim = CORE.run_claim
+
+FIXTURE_COORDINATION_LOCK = pathlib.Path(
+    "/tmp/.mc2-q12-retained-barrier-fixture.lock"
+)
+FIXTURE_COORDINATION_TIMEOUT_SECONDS = 120.0
+
+
+def acquire_fixture_coordination_lock() -> int:
+    """Serialize test runners without changing the production canonical lease."""
+    flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(FIXTURE_COORDINATION_LOCK, flags, 0o600)
+    try:
+        identity = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(identity.st_mode)
+            or identity.st_uid != os.getuid()
+            or identity.st_gid != os.getgid()
+            or stat.S_IMODE(identity.st_mode) != 0o600
+            or identity.st_nlink != 1
+        ):
+            raise RuntimeError("unsafe test fixture coordination lock")
+        deadline = time.monotonic() + FIXTURE_COORDINATION_TIMEOUT_SECONDS
+        while True:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return descriptor
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("timed out waiting for test fixture coordination lock")
+                time.sleep(0.01)
+    except Exception:
+        os.close(descriptor)
+        raise
 
 
 class NoIoExecutor:
@@ -325,7 +361,161 @@ def write_audit(
     )
 
 
+def derive_run_id(run_root: pathlib.Path) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, str(run_root)))
+
+
+def open_directory_chain(path: pathlib.Path, label: str) -> int:
+    directory_fd = os.open(
+        "/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    )
+    try:
+        for component in path.parts[1:]:
+            next_fd = os.open(
+                component,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=directory_fd,
+            )
+            os.close(directory_fd)
+            directory_fd = next_fd
+    except OSError as error:
+        os.close(directory_fd)
+        raise RuntimeError(f"{label} ancestor symlink or unsafe directory") from error
+    return directory_fd
+
+
+def fixture_root(raw: Any) -> pathlib.Path:
+    if not isinstance(raw, str) or not raw.startswith("/tmp/"):
+        raise RuntimeError("fixture root must be an absolute path below /tmp")
+    if os.path.normpath(raw) != raw:
+        raise RuntimeError("fixture root must be normalized")
+    root = pathlib.Path(raw)
+    root_fd = open_directory_chain(root, "fixture root")
+    try:
+        root_stat = os.fstat(root_fd)
+        if (
+            not stat.S_ISDIR(root_stat.st_mode)
+            or stat.S_IMODE(root_stat.st_mode) != 0o700
+            or root_stat.st_uid != os.geteuid()
+            or root_stat.st_gid != os.getegid()
+        ):
+            raise RuntimeError("fixture root must be a safe owner-only real directory")
+    finally:
+        os.close(root_fd)
+    return root
+
+
+def existing_quiesce_manifest_sha256(
+    root: pathlib.Path, raw_path: Any, mutation: Any
+) -> str:
+    if not isinstance(raw_path, str) or not raw_path.startswith("/"):
+        raise RuntimeError("existing quiesce manifest path must be absolute")
+    if os.path.normpath(raw_path) != raw_path:
+        raise RuntimeError("existing quiesce manifest path must be normalized")
+    path = pathlib.Path(raw_path)
+    try:
+        relative = path.relative_to(root)
+    except ValueError as error:
+        raise RuntimeError("existing quiesce manifest path is outside fixture root") from error
+    if not relative.parts or any(part in ("", ".", "..") for part in relative.parts):
+        raise RuntimeError("existing quiesce manifest path is unsafe")
+
+    directory_fd = open_directory_chain(root, "fixture root")
+    file_fd: int | None = None
+    try:
+        for component in relative.parts[:-1]:
+            next_fd = os.open(
+                component,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=directory_fd,
+            )
+            os.close(directory_fd)
+            directory_fd = next_fd
+        filename = relative.parts[-1]
+        try:
+            file_fd = os.open(
+                filename,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=directory_fd,
+            )
+        except OSError as error:
+            raise RuntimeError("existing quiesce manifest is missing or unsafe") from error
+        before = os.fstat(file_fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or stat.S_IMODE(before.st_mode) != 0o400
+            or before.st_uid != os.geteuid()
+            or before.st_gid != os.getegid()
+            or before.st_nlink != 1
+            or before.st_size <= 0
+            or before.st_size > 4 * 1024 * 1024
+        ):
+            raise RuntimeError("existing quiesce manifest file identity/mode/link is unsafe")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(file_fd, 64 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        after = os.fstat(file_fd)
+        identity = lambda item: (
+            item.st_dev,
+            item.st_ino,
+            stat.S_IMODE(item.st_mode),
+            item.st_uid,
+            item.st_gid,
+            item.st_nlink,
+            item.st_size,
+            item.st_mtime_ns,
+            item.st_ctime_ns,
+        )
+        if identity(after) != identity(before):
+            raise RuntimeError("existing quiesce manifest changed while hashing")
+
+        if mutation == "replace-after-validation":
+            replacement = f".{filename}.replacement"
+            replacement_fd = os.open(
+                replacement,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0o600,
+                dir_fd=directory_fd,
+            )
+            try:
+                os.write(replacement_fd, b'{"changed":true}\n')
+                os.fsync(replacement_fd)
+                os.fchmod(replacement_fd, 0o400)
+            finally:
+                os.close(replacement_fd)
+            os.replace(
+                replacement,
+                filename,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+            os.fsync(directory_fd)
+        elif mutation is not None:
+            raise RuntimeError("unknown quiesce manifest mutation")
+
+        current = os.stat(filename, dir_fd=directory_fd, follow_symlinks=False)
+        if identity(current) != identity(before):
+            raise RuntimeError("existing quiesce manifest identity changed after validation")
+        return digest.hexdigest()
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        os.close(directory_fd)
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--derive-run-id":
+        if len(sys.argv) != 2:
+            raise RuntimeError("invalid run-id derivation arguments")
+        request = json.load(sys.stdin)
+        if set(request) != {"runRoot"}:
+            raise RuntimeError("run-id derivation accepts only runRoot")
+        root = fixture_root(request["runRoot"])
+        sys.stdout.write(json.dumps({"runId": derive_run_id(root)}) + "\n")
+        return 0
     if len(sys.argv) > 1 and sys.argv[1] == "--claim-noio":
         claim_arguments = sys.argv[2:]
         if claim_arguments[:1] != ["--fault"] or len(claim_arguments) < 3:
@@ -351,8 +541,28 @@ def main() -> int:
         sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
         return 0
     spec = json.load(sys.stdin)
-    root = pathlib.Path(spec["runRoot"]).resolve()
-    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if "quiesceManifestSha256" in spec or "quiesce_manifest_sha256" in spec:
+        raise RuntimeError("caller quiesce digest override is forbidden")
+    root = fixture_root(spec["runRoot"])
+    frontier = spec.get("abandonedFrontier")
+    has_later_four = any(
+        operation != "install" for operation in spec.get("chains", {})
+    ) or (frontier is not None and frontier.get("operation") != "install")
+    existing_manifest_path = spec.get("existingQuiesceManifestPath")
+    if has_later_four and existing_manifest_path is None:
+        raise RuntimeError(
+            "existing quiesce manifest byte preimage is required for later-four fixtures"
+        )
+    if not has_later_four and existing_manifest_path is not None:
+        raise RuntimeError("install-only fixture cannot accept a quiesce manifest preimage")
+    quiesce_manifest_sha256 = (
+        existing_quiesce_manifest_sha256(
+            root, existing_manifest_path, spec.get("quiesceManifestMutation")
+        )
+        if existing_manifest_path is not None
+        else "0" * 64
+    )
+    coordination_fd = acquire_fixture_coordination_lock()
     canonical_lock_path = root.parent / "cutover.lock"
     if canonical_lock_path.exists():
         canonical_lock_path.chmod(0o600)
@@ -418,7 +628,6 @@ def main() -> int:
             executor.claim_fault = "after-claim-checkpoint"
     if spec.get("checkpointPublicationRace") == "claim-current-swap":
         executor.claim_fault = "checkpoint-cas-swap"
-    frontier = spec.get("abandonedFrontier")
     if (
         frontier
         and not frontier.get("exactSuccessBeforeDisposition")
@@ -442,18 +651,19 @@ def main() -> int:
     if not expected_catalog.exists():
         expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
         expected_catalog.chmod(0o400)
+    production_spec = {
+        key: value
+        for key, value in spec.items()
+        if key not in {"existingQuiesceManifestPath", "quiesceManifestMutation"}
+    }
     request = {
-        **spec,
+        **production_spec,
         "run_root": str(root),
-        "run_id": str(uuid.uuid5(uuid.NAMESPACE_URL, str(root))),
+        "run_id": derive_run_id(root),
         "release_sha": "0123456789abcdef0123456789abcdef01234567",
         "operator_digest": "1" * 64,
         "resource_manifest_sha256": "2" * 64,
-        "quiesce_manifest_sha256": (
-            "0" * 64
-            if tuple(spec.get("chains", {})) == ("install",)
-            else "3" * 64
-        ),
+        "quiesce_manifest_sha256": quiesce_manifest_sha256,
         "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
         "rotation_required": bool(spec.get("rotationRequired", False)),
         "lease_fd": 9,
