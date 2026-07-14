@@ -44,6 +44,18 @@ JOURNAL_KEYS = {
     "capability_manifest_sha256", "accepted_object_kind",
     "accepted_object_sha256",
 }
+CHECKPOINT_KEYS = {
+    "schema_version", "run_id", "seq", "phase", "journal_entry_hash",
+    "previous_journal_entry_hash", "journal_device", "journal_inode",
+    "accepted_object_kind", "accepted_object_sha256", "resume_authority_sha256",
+    "lease_epoch",
+}
+CAPABILITY_KEYS = {
+    "schema_version", "run_id", "command_id", "command_sha256", "release_sha",
+    "operator_digest", "resource_manifest_sha256", "quiesce_manifest_sha256",
+    "resume_authority_sha256", "capability_input_checkpoint_sha256", "lease_epoch",
+    "supersedes_capability_sha256",
+}
 MAX_SAFE_INTEGER = 2**53 - 1
 EXPECTED_ENVIRONMENT = {
     "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
@@ -172,6 +184,18 @@ class Opened:
 def exact(obj, keys, label):
     require(set(obj) == set(keys), f"{label} has a non-exact projection")
 
+def exact_directory(path, label, expected_mode=0o700):
+    require(os.path.isabs(path) and os.path.realpath(path) == path, f"{label} path is not canonical")
+    value = os.lstat(path)
+    require(
+        stat.S_ISDIR(value.st_mode)
+        and not stat.S_ISLNK(value.st_mode)
+        and value.st_uid == uid
+        and value.st_gid == gid
+        and stat.S_IMODE(value.st_mode) == expected_mode,
+        f"{label} owner or mode is invalid",
+    )
+
 def hex64(value):
     return isinstance(value, str) and HEX64.fullmatch(value) is not None
 
@@ -270,7 +294,8 @@ if local_test:
     docker_environment = test_environment["environment"]
 
 paths = {
-    "capability": os.path.join(run_root, "secrets", "db-capability"),
+    "db_capability": os.path.join(run_root, "secrets", "db-capability"),
+    "capabilities": os.path.join(run_root, "capabilities"),
     "barrier": os.path.join(run_root, "database-barrier-receipt.json"),
     "probe": os.path.join(run_root, "database-barrier-probe-receipt.json"),
     "quiesce": os.path.join(run_root, f"writer-quiesce-{run_id}.json"),
@@ -285,7 +310,7 @@ paths = {
     "checkpoint": os.path.join(run_root, "phase-checkpoint.json"),
 }
 require(
-    not os.path.lexists(paths["capability"]),
+    not os.path.lexists(paths["db_capability"]),
     "database capability still exists and must be absent before writer resume",
 )
 unexpected_terminal_residue = [
@@ -476,7 +501,7 @@ authority_file = Opened(paths["authority"], "writer resume authority", 0o400)
 authority = authority_file.json()
 exact(authority, {"schema_version","run_id","state","mode","release_sha","expected_catalog_sha256","writer_quiesce_manifest_sha256","final_writer_manifest_sha256","database_barrier_receipt_sha256","recovery_state_sha256","handoff_state_sha256","rollback_state_sha256","authority_intent_journal_entry_hash","input_checkpoint_sha256","lease_epoch"}, "writer resume authority")
 require(authority["schema_version"] == "megacampus.q12.writer-resume-authority/v1" and authority["run_id"] == run_id and authority["mode"] == mode and authority["release_sha"] == final_manifest["release_sha"] and authority["expected_catalog_sha256"] == barrier["expected_catalog_sha256"] and authority["writer_quiesce_manifest_sha256"] == quiesce_file.digest and authority["final_writer_manifest_sha256"] == final_file.digest and authority["database_barrier_receipt_sha256"] == barrier_file.digest and hex64(authority["authority_intent_journal_entry_hash"]) and hex64(authority["input_checkpoint_sha256"]) and RESUME_LEASE.fullmatch(authority["lease_epoch"]), "writer resume authority binding is invalid")
-require((authority["lease_epoch"] == "cutover" and authority["lease_epoch"] == final_manifest["lease_epoch"]) or (authority["lease_epoch"].startswith("cutover-recovery-") and final_manifest["lease_epoch"] == "cutover"), "writer resume authority/final lease transition is invalid")
+require(authority["lease_epoch"] == final_manifest["lease_epoch"] == "cutover", "writer resume authority/final lease transition is invalid")
 if mode == "forward":
     require(authority["state"] == "handoff_ready_writers_quiesced" and authority["recovery_state_sha256"] == recovery_file.digest and authority["handoff_state_sha256"] == handoff_file.digest and authority["rollback_state_sha256"] is None, "forward resume authority is invalid")
 else:
@@ -485,8 +510,8 @@ else:
 journal_file = Opened(paths["journal"], "cutover journal", 0o600)
 checkpoint_file = Opened(paths["checkpoint"], "cutover checkpoint", 0o600)
 checkpoint = checkpoint_file.json()
-exact(checkpoint, {"schema_version","run_id","seq","phase","journal_entry_hash","previous_journal_entry_hash","journal_device","journal_inode","accepted_object_kind","accepted_object_sha256","resume_authority_sha256","lease_epoch"}, "cutover checkpoint")
-require(checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1" and checkpoint["run_id"] == run_id and isinstance(checkpoint["seq"], int) and checkpoint["seq"] > 1 and checkpoint["phase"] == f"resume_committing_{mode}" and hex64(checkpoint["journal_entry_hash"]) and hex64(checkpoint["previous_journal_entry_hash"]) and checkpoint["accepted_object_kind"] == "none" and checkpoint["accepted_object_sha256"] is None and checkpoint["resume_authority_sha256"] == authority_file.digest and checkpoint["lease_epoch"] == authority["lease_epoch"], "resume checkpoint projection is invalid")
+exact(checkpoint, CHECKPOINT_KEYS, "cutover checkpoint")
+require(checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1" and checkpoint["run_id"] == run_id and isinstance(checkpoint["seq"], int) and checkpoint["seq"] > 1 and checkpoint["phase"] == f"resume_committing_{mode}" and hex64(checkpoint["journal_entry_hash"]) and hex64(checkpoint["previous_journal_entry_hash"]) and checkpoint["accepted_object_kind"] == "none" and checkpoint["accepted_object_sha256"] is None and checkpoint["resume_authority_sha256"] == authority_file.digest and RESUME_LEASE.fullmatch(checkpoint["lease_epoch"]), "resume checkpoint projection is invalid")
 require(isinstance(checkpoint["journal_device"], str) and re.fullmatch(r"0|[1-9][0-9]*", checkpoint["journal_device"]) and isinstance(checkpoint["journal_inode"], str) and re.fullmatch(r"[1-9][0-9]*", checkpoint["journal_inode"]), "resume checkpoint journal identity is invalid")
 require((str(journal_file.identity[0]), str(journal_file.identity[1])) == (checkpoint["journal_device"], checkpoint["journal_inode"]), "resume checkpoint journal device/inode mismatch")
 raw_journal_lines = journal_file.data.splitlines(keepends=True)
@@ -533,6 +558,191 @@ for expected_seq, raw_line in enumerate(raw_journal_lines, start=1):
     journal_lines.append(entry)
     previous_hash = entry["entry_hash"]
 head = journal_lines[-1]
+
+def checkpoint_matches_entry(value, entry, label):
+    exact(value, CHECKPOINT_KEYS, label)
+    require(
+        value["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
+        and value["run_id"] == run_id
+        and value["seq"] == entry["seq"]
+        and value["phase"] == entry["phase"]
+        and value["journal_entry_hash"] == entry["entry_hash"]
+        and value["previous_journal_entry_hash"] == entry["previous_hash"]
+        and value["journal_device"] == str(journal_file.identity[0])
+        and value["journal_inode"] == str(journal_file.identity[1])
+        and value["accepted_object_kind"] == entry["accepted_object_kind"]
+        and value["accepted_object_sha256"] == entry["accepted_object_sha256"]
+        and value["resume_authority_sha256"] == authority_file.digest
+        and value["lease_epoch"] == entry["lease_epoch"],
+        f"{label} does not copy the exact journal checkpoint",
+    )
+
+command_id = f"writers.resume.{mode}"
+exact_directory(paths["capabilities"], "host capability root")
+capability_directories = {
+    name: os.path.join(paths["capabilities"], name)
+    for name in ("issued", "claimed", "completed", "superseded")
+}
+for name, directory in capability_directories.items():
+    exact_directory(directory, f"host capability {name} directory")
+
+capability_records = []
+for location, directory in capability_directories.items():
+    for directory_entry in os.scandir(directory):
+        if not directory_entry.name.startswith("writers.resume."):
+            continue
+        require(
+            directory_entry.name.startswith(f"{command_id}--"),
+            "cross-mode writer resume capability exists",
+        )
+        match = re.fullmatch(
+            re.escape(command_id) + r"--((?:cutover|cutover-recovery-[1-9][0-9]*))\.json",
+            directory_entry.name,
+        )
+        require(match is not None, "writer resume capability basename is invalid")
+        opened = Opened(directory_entry.path, f"{location} writer resume capability", 0o400)
+        value = opened.json()
+        exact(value, CAPABILITY_KEYS, "writer resume capability")
+        require(
+            opened.data == canonical_json(value, "writer resume capability") + b"\n",
+            "writer resume capability bytes are not canonical",
+        )
+        require(
+            value["schema_version"] == "megacampus.q12.host-command-capability/v1"
+            and value["run_id"] == run_id
+            and value["command_id"] == command_id
+            and value["command_sha256"] == head["command_sha256"]
+            and value["release_sha"] == final_manifest["release_sha"]
+            and value["operator_digest"] == head["operator_digest"]
+            and value["resource_manifest_sha256"] == head["resource_manifest_sha256"]
+            and value["quiesce_manifest_sha256"] == quiesce_file.digest
+            and value["resume_authority_sha256"] == authority_file.digest
+            and hex64(value["capability_input_checkpoint_sha256"])
+            and value["lease_epoch"] == match.group(1)
+            and (
+                value["supersedes_capability_sha256"] is None
+                or hex64(value["supersedes_capability_sha256"])
+            ),
+            "writer resume capability binding is invalid",
+        )
+        capability_records.append({
+            "location": location,
+            "file": opened,
+            "value": value,
+        })
+
+claimed_records = [record for record in capability_records if record["location"] == "claimed"]
+require(
+    len(claimed_records) == 1
+    and not any(record["location"] in {"issued", "completed"} for record in capability_records),
+    "writer resume capability lifecycle is ambiguous",
+)
+current_capability = claimed_records[0]
+require(
+    current_capability["value"]["lease_epoch"] == checkpoint["lease_epoch"],
+    "claimed writer resume capability epoch does not match the current checkpoint",
+)
+by_digest = {record["file"].digest: record for record in capability_records}
+require(len(by_digest) == len(capability_records), "duplicate writer resume capability exists")
+capability_chain = []
+cursor = current_capability
+while cursor is not None:
+    require(cursor not in capability_chain, "writer resume capability supersession cycle exists")
+    capability_chain.append(cursor)
+    predecessor_sha256 = cursor["value"]["supersedes_capability_sha256"]
+    if predecessor_sha256 is None:
+        cursor = None
+    else:
+        require(predecessor_sha256 in by_digest, "writer resume capability supersession link is missing")
+        cursor = by_digest[predecessor_sha256]
+capability_chain.reverse()
+require(
+    len(capability_chain) == len(capability_records)
+    and capability_chain[0]["value"]["lease_epoch"] == "cutover"
+    and capability_chain[0]["location"] in {"claimed", "superseded"}
+    and all(record["location"] == "superseded" for record in capability_chain[:-1]),
+    "orphan or misplaced writer resume capability exists",
+)
+for ordinal, record in enumerate(capability_chain[1:], start=1):
+    require(
+        record["value"]["lease_epoch"] == f"cutover-recovery-{ordinal}",
+        "writer resume capability recovery epochs are not consecutive",
+    )
+
+authority_intent_index = next(
+    index for index, entry in enumerate(journal_lines)
+    if entry["entry_hash"] == authority["authority_intent_journal_entry_hash"]
+)
+authority_accepted_index = authority_intent_index + 1
+authority_accepted_entry = journal_lines[authority_accepted_index]
+lifecycle_entries = journal_lines[authority_accepted_index + 1:]
+expected_lifecycle = []
+initial_capability = capability_chain[0]
+expected_lifecycle.extend([
+    ("intent", "cutover", "0" * 64),
+    ("capability_issued", "cutover", initial_capability["file"].digest),
+    ("capability_claimed", "cutover", initial_capability["file"].digest),
+])
+for record in capability_chain[1:]:
+    expected_lifecycle.extend([
+        ("recovery_reacquired", record["value"]["lease_epoch"], record["file"].digest),
+        ("capability_claimed", record["value"]["lease_epoch"], record["file"].digest),
+    ])
+actual_lifecycle = [
+    (entry["outcome"], entry["lease_epoch"], entry["capability_manifest_sha256"])
+    for entry in lifecycle_entries
+]
+require(
+    actual_lifecycle == expected_lifecycle
+    and all(
+        entry["phase"] == f"resume_committing_{mode}"
+        and entry["command_id"] == command_id
+        and entry["accepted_object_kind"] == "none"
+        and entry["accepted_object_sha256"] is None
+        for entry in lifecycle_entries
+    ),
+        f"{mode} capability journal/checkpoint binding graph is invalid",
+)
+resume_intent_entry = lifecycle_entries[0]
+opened_capability_checkpoints = []
+opened_input_checkpoints = []
+for index, record in enumerate(capability_chain):
+    lease_epoch = record["value"]["lease_epoch"]
+    capability_checkpoint_file = Opened(
+        os.path.join(run_root, f"writer-resume-capability-checkpoint-{mode}-{lease_epoch}.json"),
+        f"writer resume capability checkpoint {lease_epoch}",
+        0o600,
+    )
+    capability_checkpoint = capability_checkpoint_file.json()
+    expected_capability_entry = resume_intent_entry if index == 0 else authority_accepted_entry
+    checkpoint_matches_entry(
+        capability_checkpoint,
+        expected_capability_entry,
+        f"writer resume capability checkpoint {lease_epoch}",
+    )
+    require(
+        capability_checkpoint_file.digest
+        == record["value"]["capability_input_checkpoint_sha256"],
+        "writer resume capability checkpoint hash mismatch",
+    )
+    claimed_offset = 2 + (index * 2)
+    claimed_entry = lifecycle_entries[claimed_offset]
+    input_checkpoint_file = Opened(
+        os.path.join(run_root, f"writer-resume-input-checkpoint-{mode}-{lease_epoch}.json"),
+        f"writer resume input checkpoint {lease_epoch}",
+        0o600,
+    )
+    checkpoint_matches_entry(
+        input_checkpoint_file.json(),
+        claimed_entry,
+        f"writer resume input checkpoint {lease_epoch}",
+    )
+    opened_capability_checkpoints.append(capability_checkpoint_file)
+    opened_input_checkpoints.append(input_checkpoint_file)
+require(
+    checkpoint_file.data == opened_input_checkpoints[-1].data,
+    "current fixed checkpoint does not equal the child-input checkpoint",
+)
 
 def require_published_object(intent_hash, phase, object_kind, object_sha256, object_lease_epoch):
     matches = [index for index, entry in enumerate(journal_lines[:-1]) if entry["entry_hash"] == intent_hash]
@@ -639,39 +849,19 @@ if mode == "rollback":
             rollback_file.digest,
         ),
     ])
-recovery_epoch = authority["lease_epoch"].startswith("cutover-recovery-")
-initial_authority_sha256 = authority_file.digest
-if recovery_epoch:
-    require(
-        len(journal_lines) >= 6
-        and journal_lines[-5]["phase"] == f"resume_authority_{mode}"
-        and journal_lines[-5]["outcome"] == "accepted"
-        and journal_lines[-5]["accepted_object_kind"] == "writer_resume_authority"
-        and hex64(journal_lines[-5]["accepted_object_sha256"]),
-        f"{mode} recovery journal prefix is invalid",
-    )
-    initial_authority_sha256 = journal_lines[-5]["accepted_object_sha256"]
 expected_phase_graph.extend([
     (f"resume_authority_{mode}", "intent", "none", None),
     (
         f"resume_authority_{mode}",
         "accepted",
         "writer_resume_authority",
-        initial_authority_sha256,
+        authority_file.digest,
     ),
-    (f"resume_committing_{mode}", "intent", "none", None),
 ])
-if recovery_epoch:
-    expected_phase_graph.extend([
-        (f"resume_authority_{mode}", "intent", "none", None),
-        (
-            f"resume_authority_{mode}",
-            "accepted",
-            "writer_resume_authority",
-            authority_file.digest,
-        ),
-        (f"resume_committing_{mode}", "intent", "none", None),
-    ])
+expected_phase_graph.extend([
+    (f"resume_committing_{mode}", outcome, "none", None)
+    for outcome, _, _ in expected_lifecycle
+])
 actual_phase_graph = [
     (
         entry["phase"],
@@ -703,7 +893,7 @@ if mode == "rollback":
         "guard_cleanup_complete",
         "rollback_ready_writers_quiesced", "rollback_ready_writers_quiesced",
         "resume_authority_rollback", "resume_authority_rollback",
-        "resume_committing_rollback",
+        *(["resume_committing_rollback"] * len(expected_lifecycle)),
     ])
     require(
         [entry["phase"] for entry in journal_lines[rollback_intent_index:]]
@@ -713,13 +903,14 @@ if mode == "rollback":
 require(
     head["seq"] == checkpoint["seq"]
     and head["phase"] == checkpoint["phase"] == f"resume_committing_{mode}"
-    and head["outcome"] == "intent"
-    and head["command_id"] == f"writers.resume.{mode}"
+    and head["outcome"] == "capability_claimed"
+    and head["command_id"] == command_id
     and head["entry_hash"] == checkpoint["journal_entry_hash"]
     and head["previous_hash"] == checkpoint["previous_journal_entry_hash"]
     and head["accepted_object_kind"] == checkpoint["accepted_object_kind"] == "none"
     and head["accepted_object_sha256"] is checkpoint["accepted_object_sha256"] is None
-    and head["lease_epoch"] == checkpoint["lease_epoch"] == authority["lease_epoch"]
+    and head["lease_epoch"] == checkpoint["lease_epoch"] == current_capability["value"]["lease_epoch"]
+    and head["capability_manifest_sha256"] == current_capability["file"].digest
     and head["quiesce_manifest_sha256"] == quiesce_file.digest,
     "cutover journal/checkpoint binding is invalid",
 )
@@ -738,7 +929,12 @@ for project in sorted({item["project"] for item in target}):
     }
     require(observed == expected, "unrecorded target inventory exists")
 
-opened_inputs = [barrier_file, quiesce_file, final_file, authority_file, checkpoint_file, journal_file]
+opened_inputs = [
+    barrier_file, quiesce_file, final_file, authority_file, checkpoint_file, journal_file,
+    *[record["file"] for record in capability_chain],
+    *opened_capability_checkpoints,
+    *opened_input_checkpoints,
+]
 if mode == "forward": opened_inputs.extend([probe_file, recovery_file, handoff_file])
 else: opened_inputs.append(rollback_file)
 
@@ -791,9 +987,9 @@ def expected_receipt(final_projection, held_projection):
         "final_writer_manifest_sha256":final_file.digest,
         "resume_authority_sha256":authority_file.digest,
         "database_barrier_receipt_sha256":barrier_file.digest,
-        "resume_intent_journal_entry_hash":checkpoint["journal_entry_hash"],
-        "input_checkpoint_sha256":checkpoint_file.digest,
-        "lease_epoch":checkpoint["lease_epoch"],
+        "resume_intent_journal_entry_hash":resume_intent_entry["entry_hash"],
+        "input_checkpoint_sha256":opened_input_checkpoints[-1].digest,
+        "lease_epoch":current_capability["value"]["lease_epoch"],
         "final_inventory_sha256":canonical_inventory(final_projection),
         "held_inventory_sha256":canonical_inventory(held_projection),
     }

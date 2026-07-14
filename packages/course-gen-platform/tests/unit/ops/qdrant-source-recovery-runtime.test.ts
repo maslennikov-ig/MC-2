@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -965,11 +966,16 @@ function writeResumeTestDockerEnvironment(
 
 interface ResumeWriterFixture extends ComposeWriterFixture {
   authority: string;
+  capabilitiesRoot: string;
+  capability: string;
+  capabilityCheckpoint: string;
   checkpoint: string;
   cutoverLock: string;
   finalIds: string[];
   finalManifest: string;
   heldIds: string[];
+  inputCheckpoint: string;
+  resumeIntentHash: string;
   resumeState: string;
   resume(
     modeOverride?: 'forward' | 'rollback',
@@ -1084,6 +1090,28 @@ interface ResumeJournalFixtureOptions {
   targetRecordsTransform?: (records: Array<Record<string, any>>) => Array<Record<string, any>>;
 }
 
+function checkpointForJournalEntry(
+  entry: Record<string, any>,
+  journalPath: string,
+  authoritySha256: string
+): Record<string, any> {
+  const journalStat = statSync(journalPath);
+  return {
+    schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+    run_id: Q12_RUN_ID,
+    seq: entry.seq,
+    phase: entry.phase,
+    journal_entry_hash: entry.entry_hash,
+    previous_journal_entry_hash: entry.previous_hash,
+    journal_device: String(journalStat.dev),
+    journal_inode: String(journalStat.ino),
+    accepted_object_kind: entry.accepted_object_kind,
+    accepted_object_sha256: entry.accepted_object_sha256,
+    resume_authority_sha256: authoritySha256,
+    lease_epoch: entry.lease_epoch,
+  };
+}
+
 function writerResumeFixture(
   mode: 'forward' | 'rollback',
   heldTargetCount = mode === 'forward' ? 5 : 3,
@@ -1190,7 +1218,8 @@ function writerResumeFixture(
     outcome: string,
     acceptedObjectKind = 'none',
     acceptedObjectSha256: string | null = null,
-    entryLeaseEpoch = leaseEpoch
+    entryLeaseEpoch = leaseEpoch,
+    overrides: Record<string, any> = {}
   ): Record<string, any> => {
     const seq = journalEntries.length + 1;
     const preimage = {
@@ -1212,6 +1241,7 @@ function writerResumeFixture(
       capability_manifest_sha256: '0'.repeat(64),
       accepted_object_kind: acceptedObjectKind,
       accepted_object_sha256: acceptedObjectSha256,
+      ...overrides,
     };
     journalOptions.entryMutator?.(preimage);
     const entry = withJournalEntryHash(preimage);
@@ -1384,47 +1414,84 @@ function writerResumeFixture(
     authoritySha,
     authorityLeaseEpoch
   );
-  const resumeHead = withJournalEntryHash({
-    schema: 'megacampus.q12.cutover-journal/v1',
-    run_id: Q12_RUN_ID,
-    seq: journalEntries.length + 1,
-    phase: `resume_committing_${mode}`,
-    outcome: 'intent',
-    timestamp: '2026-07-13T12:00:42.000Z',
-    release_sha: releaseSha,
-    operator_digest: '8'.repeat(64),
-    command_id: `writers.resume.${mode}`,
-    command_sha256: '9'.repeat(64),
-    lease_epoch: authorityLeaseEpoch,
-    previous_hash: previousHash,
-    rotation_required: true,
-    resource_manifest_sha256: resourceManifestSha,
-    quiesce_manifest_sha256: quiesceSha,
-    capability_manifest_sha256: '0'.repeat(64),
-    accepted_object_kind: 'none',
-    accepted_object_sha256: null,
-  });
-  journalEntries.push(resumeHead);
+  const resumeIntent = appendJournalEntry(
+    `resume_committing_${mode}`,
+    'intent',
+    'none',
+    null,
+    authorityLeaseEpoch,
+    { command_id: `writers.resume.${mode}` }
+  );
   writeJournal(journal, journalEntries);
-  const journalStat = statSync(journal);
+  const capabilitiesRoot = join(fixture.q12RunRoot, 'capabilities');
+  const capabilityDirectories = Object.fromEntries(
+    ['issued', 'claimed', 'completed', 'superseded'].map(directory => {
+      const path = join(capabilitiesRoot, directory);
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+      chmodSync(path, 0o700);
+      return [directory, path];
+    })
+  );
+  const capabilityCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-resume-capability-checkpoint-${mode}-${authorityLeaseEpoch}.json`
+  );
   writeProtectedJson(
-    checkpoint,
-    {
-      schema_version: 'megacampus.q12.cutover-checkpoint/v1',
-      run_id: Q12_RUN_ID,
-      seq: resumeHead.seq,
-      phase: `resume_committing_${mode}`,
-      journal_entry_hash: resumeHead.entry_hash,
-      previous_journal_entry_hash: resumeHead.previous_hash,
-      journal_device: String(journalStat.dev),
-      journal_inode: String(journalStat.ino),
-      accepted_object_kind: 'none',
-      accepted_object_sha256: null,
-      resume_authority_sha256: authoritySha,
-      lease_epoch: authorityLeaseEpoch,
-    },
+    capabilityCheckpoint,
+    checkpointForJournalEntry(resumeIntent, journal, authoritySha),
     0o600
   );
+  const capabilityBasename = `writers.resume.${mode}--${authorityLeaseEpoch}.json`;
+  const issuedCapability = join(capabilityDirectories.issued, capabilityBasename);
+  const capabilityValue = {
+    schema_version: 'megacampus.q12.host-command-capability/v1',
+    run_id: Q12_RUN_ID,
+    command_id: `writers.resume.${mode}`,
+    command_sha256: '9'.repeat(64),
+    release_sha: releaseSha,
+    operator_digest: '8'.repeat(64),
+    resource_manifest_sha256: resourceManifestSha,
+    quiesce_manifest_sha256: quiesceSha,
+    resume_authority_sha256: authoritySha,
+    capability_input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+    lease_epoch: authorityLeaseEpoch,
+    supersedes_capability_sha256: null,
+  };
+  writeFileSync(issuedCapability, `${canonicalJson(capabilityValue)}\n`, { mode: 0o400 });
+  chmodSync(issuedCapability, 0o400);
+  const capabilitySha256 = fileSha256(issuedCapability);
+  appendJournalEntry(
+    `resume_committing_${mode}`,
+    'capability_issued',
+    'none',
+    null,
+    authorityLeaseEpoch,
+    {
+      command_id: `writers.resume.${mode}`,
+      capability_manifest_sha256: capabilitySha256,
+    }
+  );
+  const capability = join(capabilityDirectories.claimed, capabilityBasename);
+  renameSync(issuedCapability, capability);
+  const resumeHead = appendJournalEntry(
+    `resume_committing_${mode}`,
+    'capability_claimed',
+    'none',
+    null,
+    authorityLeaseEpoch,
+    {
+      command_id: `writers.resume.${mode}`,
+      capability_manifest_sha256: capabilitySha256,
+    }
+  );
+  writeJournal(journal, journalEntries);
+  const currentCheckpoint = checkpointForJournalEntry(resumeHead, journal, authoritySha);
+  const inputCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-resume-input-checkpoint-${mode}-${authorityLeaseEpoch}.json`
+  );
+  writeProtectedJson(inputCheckpoint, currentCheckpoint, 0o600);
+  writeProtectedJson(checkpoint, currentCheckpoint, 0o600);
   writeFileSync(cutoverLock, '', { mode: 0o600 });
   chmodSync(cutoverLock, 0o600);
   rmSync(fixture.q12Capability, { force: true });
@@ -1463,11 +1530,16 @@ function writerResumeFixture(
   return {
     ...fixture,
     authority,
+    capabilitiesRoot,
+    capability,
+    capabilityCheckpoint,
     checkpoint,
     cutoverLock,
     finalIds: finalWriters.map(writer => String(writer.id)),
     finalManifest,
     heldIds: heldWriters.map(writer => String(writer.id)),
+    inputCheckpoint,
+    resumeIntentHash: String(resumeIntent.entry_hash),
     resumeState,
     resume,
   };
@@ -1478,77 +1550,95 @@ function rewriteWriterResumeEpoch(
   mode: 'forward' | 'rollback',
   leaseEpoch: string
 ): string {
-  const checkpointBefore = JSON.parse(readFileSync(fixture.checkpoint, 'utf8')) as Record<
-    string,
-    any
-  >;
-  const checkpointBeforeSha = fileSha256(fixture.checkpoint);
   const journal = join(fixture.q12RunRoot, 'phase.jsonl');
   const journalEntries = readFileSync(journal, 'utf8')
     .trimEnd()
     .split('\n')
     .map(line => JSON.parse(line) as Record<string, any>);
   const previousHead = journalEntries.at(-1)!;
+  const firstResumeIndex = journalEntries.findIndex(
+    entry => entry.phase === `resume_committing_${mode}`
+  );
+  const acceptedPredecessor = journalEntries[firstResumeIndex - 1];
+  expect(acceptedPredecessor?.outcome).toBe('accepted');
+  const authoritySha256 = fileSha256(fixture.authority);
+  const previousCapabilityBytes = readFileSync(fixture.capability);
+  const previousCapabilitySha256 = createHash('sha256')
+    .update(previousCapabilityBytes)
+    .digest('hex');
+  const previousCapability = JSON.parse(previousCapabilityBytes.toString('utf8')) as Record<
+    string,
+    any
+  >;
+  const previousBasename = fixture.capability.slice(fixture.capability.lastIndexOf('/') + 1);
+  const supersededCapability = join(fixture.capabilitiesRoot, 'superseded', previousBasename);
+  renameSync(fixture.capability, supersededCapability);
+
+  const capabilityCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-resume-capability-checkpoint-${mode}-${leaseEpoch}.json`
+  );
+  writeProtectedJson(
+    capabilityCheckpoint,
+    checkpointForJournalEntry(acceptedPredecessor, journal, authoritySha256),
+    0o600
+  );
+  const capabilityBasename = `writers.resume.${mode}--${leaseEpoch}.json`;
+  const issuedCapability = join(fixture.capabilitiesRoot, 'issued', capabilityBasename);
+  writeFileSync(
+    issuedCapability,
+    `${canonicalJson({
+      ...previousCapability,
+      capability_input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+      lease_epoch: leaseEpoch,
+      supersedes_capability_sha256: previousCapabilitySha256,
+    })}\n`,
+    { mode: 0o400 }
+  );
+  chmodSync(issuedCapability, 0o400);
+  const capabilitySha256 = fileSha256(issuedCapability);
   const previousPreimage = { ...previousHead };
   delete previousPreimage.entry_hash;
-  const authorityIntent = withJournalEntryHash({
+  const recoveryReacquired = withJournalEntryHash({
     ...previousPreimage,
-    seq: Number(checkpointBefore.seq) + 1,
-    phase: `resume_authority_${mode}`,
-    outcome: 'intent',
+    seq: Number(previousHead.seq) + 1,
+    phase: `resume_committing_${mode}`,
+    outcome: 'recovery_reacquired',
     timestamp: '2026-07-13T12:01:00.000Z',
     command_id: `writers.resume.${mode}`,
     lease_epoch: leaseEpoch,
-    previous_hash: checkpointBefore.journal_entry_hash,
+    previous_hash: previousHead.entry_hash,
+    capability_manifest_sha256: capabilitySha256,
     accepted_object_kind: 'none',
     accepted_object_sha256: null,
   });
-  const authority = JSON.parse(readFileSync(fixture.authority, 'utf8')) as Record<string, any>;
-  authority.authority_intent_journal_entry_hash = authorityIntent.entry_hash;
-  authority.input_checkpoint_sha256 = checkpointBeforeSha;
-  authority.lease_epoch = leaseEpoch;
-  writeProtectedJson(fixture.authority, authority);
-  const authoritySha = fileSha256(fixture.authority);
-  const authorityAccepted = withJournalEntryHash({
+  const capability = join(fixture.capabilitiesRoot, 'claimed', capabilityBasename);
+  renameSync(issuedCapability, capability);
+  const capabilityClaimed = withJournalEntryHash({
     ...previousPreimage,
-    seq: authorityIntent.seq + 1,
-    phase: authorityIntent.phase,
-    outcome: 'accepted',
+    seq: recoveryReacquired.seq + 1,
+    phase: recoveryReacquired.phase,
+    outcome: 'capability_claimed',
     timestamp: '2026-07-13T12:01:01.000Z',
     command_id: `writers.resume.${mode}`,
     lease_epoch: leaseEpoch,
-    previous_hash: authorityIntent.entry_hash,
-    resource_manifest_sha256: previousPreimage.resource_manifest_sha256,
-    accepted_object_kind: 'writer_resume_authority',
-    accepted_object_sha256: authoritySha,
-  });
-  const journalHead = withJournalEntryHash({
-    ...previousPreimage,
-    seq: authorityAccepted.seq + 1,
-    phase: `resume_committing_${mode}`,
-    outcome: 'intent',
-    timestamp: '2026-07-13T12:01:02.000Z',
-    command_id: `writers.resume.${mode}`,
-    lease_epoch: leaseEpoch,
-    previous_hash: authorityAccepted.entry_hash,
-    resource_manifest_sha256: previousPreimage.resource_manifest_sha256,
+    previous_hash: recoveryReacquired.entry_hash,
+    capability_manifest_sha256: capabilitySha256,
     accepted_object_kind: 'none',
     accepted_object_sha256: null,
   });
-  journalEntries.push(authorityIntent, authorityAccepted, journalHead);
+  journalEntries.push(recoveryReacquired, capabilityClaimed);
   writeJournal(journal, journalEntries);
-  const journalStat = statSync(journal);
-  Object.assign(checkpointBefore, {
-    seq: journalHead.seq,
-    phase: journalHead.phase,
-    journal_entry_hash: journalHead.entry_hash,
-    previous_journal_entry_hash: journalHead.previous_hash,
-    journal_device: String(journalStat.dev),
-    journal_inode: String(journalStat.ino),
-    resume_authority_sha256: authoritySha,
-    lease_epoch: leaseEpoch,
-  });
-  writeProtectedJson(fixture.checkpoint, checkpointBefore, 0o600);
+  const currentCheckpoint = checkpointForJournalEntry(capabilityClaimed, journal, authoritySha256);
+  const inputCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-resume-input-checkpoint-${mode}-${leaseEpoch}.json`
+  );
+  writeProtectedJson(inputCheckpoint, currentCheckpoint, 0o600);
+  writeProtectedJson(fixture.checkpoint, currentCheckpoint, 0o600);
+  fixture.capability = capability;
+  fixture.capabilityCheckpoint = capabilityCheckpoint;
+  fixture.inputCheckpoint = inputCheckpoint;
   return leaseEpoch;
 }
 
@@ -1875,6 +1965,143 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/capability.*still exists|capability.*must be absent/iu);
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('binds one immutable claimed capability to distinct capability and child-input checkpoints', () => {
+    const fixture = writerResumeFixture('forward');
+    const capability = JSON.parse(readFileSync(fixture.capability, 'utf8')) as Record<string, any>;
+
+    expect(Object.keys(capability).sort()).toEqual(
+      [
+        'schema_version',
+        'run_id',
+        'command_id',
+        'command_sha256',
+        'release_sha',
+        'operator_digest',
+        'resource_manifest_sha256',
+        'quiesce_manifest_sha256',
+        'resume_authority_sha256',
+        'capability_input_checkpoint_sha256',
+        'lease_epoch',
+        'supersedes_capability_sha256',
+      ].sort()
+    );
+    expect(capability).toMatchObject({
+      schema_version: 'megacampus.q12.host-command-capability/v1',
+      run_id: Q12_RUN_ID,
+      command_id: 'writers.resume.forward',
+      lease_epoch: 'cutover',
+      supersedes_capability_sha256: null,
+      capability_input_checkpoint_sha256: fileSha256(fixture.capabilityCheckpoint),
+    });
+    expect(readFileSync(fixture.inputCheckpoint)).toEqual(readFileSync(fixture.checkpoint));
+    expect(fileSha256(fixture.inputCheckpoint)).not.toBe(fileSha256(fixture.capabilityCheckpoint));
+    for (const directory of ['issued', 'claimed', 'completed', 'superseded']) {
+      expect(statSync(join(fixture.capabilitiesRoot, directory)).mode & 0o777).toBe(0o700);
+    }
+    expect(statSync(fixture.capability).mode & 0o777).toBe(0o400);
+    expect(statSync(fixture.capabilityCheckpoint).mode & 0o777).toBe(0o600);
+    expect(statSync(fixture.inputCheckpoint).mode & 0o777).toBe(0o600);
+    const graph = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, any>)
+      .filter(entry => entry.phase === 'resume_committing_forward');
+    expect(graph.map(entry => entry.outcome)).toEqual([
+      'intent',
+      'capability_issued',
+      'capability_claimed',
+    ]);
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
+    expect(receipt.resume_intent_journal_entry_hash).toBe(fixture.resumeIntentHash);
+    expect(receipt.input_checkpoint_sha256).toBe(fileSha256(fixture.inputCheckpoint));
+  });
+
+  it.each([
+    {
+      label: 'orphan issued file',
+      mutate: (fixture: ResumeWriterFixture) => {
+        const orphan = join(
+          fixture.capabilitiesRoot,
+          'issued',
+          'writers.resume.forward--cutover-recovery-99.json'
+        );
+        writeFileSync(orphan, readFileSync(fixture.capability), { mode: 0o400 });
+      },
+    },
+    {
+      label: 'current capability in the wrong directory',
+      mutate: (fixture: ResumeWriterFixture) => {
+        renameSync(
+          fixture.capability,
+          join(fixture.capabilitiesRoot, 'issued', 'writers.resume.forward--cutover.json')
+        );
+      },
+    },
+    {
+      label: 'capability hash mismatch',
+      mutate: (fixture: ResumeWriterFixture) => {
+        mutateProtectedJson(fixture.capability, value => {
+          value.resource_manifest_sha256 = 'f'.repeat(64);
+        });
+      },
+    },
+    {
+      label: 'duplicate lifecycle file',
+      mutate: (fixture: ResumeWriterFixture) => {
+        const duplicate = join(
+          fixture.capabilitiesRoot,
+          'completed',
+          'writers.resume.forward--cutover.json'
+        );
+        writeFileSync(duplicate, readFileSync(fixture.capability), { mode: 0o400 });
+      },
+    },
+    {
+      label: 'missing capability checkpoint',
+      mutate: (fixture: ResumeWriterFixture) => {
+        rmSync(fixture.capabilityCheckpoint);
+      },
+    },
+    {
+      label: 'wrong child-input checkpoint',
+      mutate: (fixture: ResumeWriterFixture) => {
+        mutateProtectedJson(fixture.inputCheckpoint, value => {
+          value.journal_entry_hash = 'f'.repeat(64);
+        });
+      },
+    },
+    {
+      label: 'old claimed capability after lock loss',
+      mutate: (fixture: ResumeWriterFixture) => {
+        advanceWriterResumeRecoveryEpoch(fixture, 'forward');
+        const superseded = join(
+          fixture.capabilitiesRoot,
+          'superseded',
+          'writers.resume.forward--cutover.json'
+        );
+        const oldClaimed = join(
+          fixture.capabilitiesRoot,
+          'claimed',
+          'writers.resume.forward--cutover.json'
+        );
+        writeFileSync(oldClaimed, readFileSync(superseded), { mode: 0o400 });
+      },
+    },
+  ])('rejects a $label before Docker inspection', ({ mutate }) => {
+    const fixture = writerResumeFixture('forward');
+    mutate(fixture);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/capability|checkpoint|lifecycle|supersed/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect /mu);
   });
 
   it.each([
