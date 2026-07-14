@@ -293,7 +293,7 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - The owner approved Option A at the architecture level: one immutable
   byte-exact retained launcher-checkpoint copy per retained command execution
   epoch, with no second claimed-input copy.
-- The complete non-normative candidate is
+- The complete exact candidate is
   `docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md`
   at SHA-256
   `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`.
@@ -310,13 +310,14 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   `3907f56b16c52fae26f5eb299595c26678c1874cd9b996e1b798f37e5443b170`.
   Fresh documentation rereview-6 also passed `0/0/0/0`, report SHA-256
   `5e39597adf3b87db066755ccadeab7d359751cd9672a78cabc2fce67ad128cb4`.
-- Decision `.13.17` remains open until the owner approves this exact path/SHA.
-  No implementation planning, W integration, remote or live action is
-  authorized by the candidate or reviews.
+- The owner explicitly approved this exact path/SHA on 2026-07-14 by replying
+  `Да, подтверждаю, делай` to the exact-SHA request. Decision `.13.17` is
+  accepted; local implementation planning and TDD are authorized. W remains
+  unintegrated, and no remote or live action is authorized by this decision.
 - `docs-reviewed: updated` — exact candidate and decision evidence are current.
-- `graph-reviewed: no-change-needed` — the candidate is intentionally
-  non-normative until exact-SHA approval; refresh after approval avoids
-  promoting unapproved product truth.
+- `graph-reviewed: no-change-needed` — acceptance changes no design bytes;
+  refresh at the immediately following D5 plan/implementation integration
+  boundary avoids redundant full graph rebuilds.
 - The exact candidate path is listed in `.prettierignore`: the first local
   commit hook demonstrated that otherwise Prettier rewrites Markdown table
   spacing and invalidates the independently reviewed byte SHA. The original
