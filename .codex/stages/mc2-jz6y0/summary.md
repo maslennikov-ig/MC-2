@@ -265,6 +265,29 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   source-copy, reindex, service, cron, staging, or production mutation occurred
   while approving/planning this correction wave.
 
+### W retained provenance stop (2026-07-14)
+
+- W is pushed clean at `21cff2d0`; the latest exact gates pass runtime 141/141,
+  canonical runtime plus database-barrier PostgreSQL 17 192/192, structural
+  PostgreSQL 17 34/34, and the five-file aggregate 290/290.
+- Independent reviews closed the prior journal graph, immutable publication,
+  existing-proof, rollback freeze, retained classifier, phase/context,
+  uniqueness, legal recovery, epoch and command-SHA findings.
+- The terminal review still reports P0=0/P1=1/P2=0/P3=0: a linked retained
+  recovery predecessor is digest-linked but lacks frozen pre-D4
+  issuance/claim plus checkpoint provenance.
+- Truth-gate inspection found no Root producer in any ref/worktree and no
+  normative retained checkpoint filename, journal-head anchor, retention, or
+  deterministic reconstruction rule. D4 per-epoch checkpoint filenames are
+  explicitly limited to its five commands and cannot be copied by inference.
+- Created blocking owner decision `mc2-jz6y0.13.17`; W, M, H and Root remain
+  local-only and unaccepted. No remote/live mutation occurred.
+
+- `docs-reviewed: updated` — the source gap and no-invention boundary are
+  durable; operator docs are unchanged pending a normative owner decision.
+- `graph-reviewed: no-change-needed` — exact frozen docs, refs and producer
+  absence determined the blocker; no accepted code/architecture was integrated.
+
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
