@@ -60,9 +60,10 @@ verification:
   - Task 2 exact resume-capability RED-to-GREEN completed and the then-current source-recovery runtime passed 137 of 137 with zero failures
   - Task 3 quiesce/recovery-prefix and immutable inventory/transition/final coverage passed in the complete source-recovery runtime at 152 of 152 with zero failures
   - Task 4 database baseline/proof/crash/mismatch coverage passed 45 of 45, including terminal reconnect RED 0 of 2 to GREEN 2 of 2; the three fail-closed source/reindex adapter files passed 98 of 98 without adapter-code changes
-  - independent acceptance fix-cycle runtime JSON passed 121 of 121 with zero failures and zero pending tests
-  - database barrier JSON with the actual protected PostgreSQL 17 reconnect active passed 51 of 51 with zero failures and zero pending tests
-  - frozen real-PG17 five-file barrier/runtime/database/adapters/reindex aggregate passed 270 of 270 across 17 suites with zero failures and zero pending tests
+  - round-two P1 targeted RED selected six new cases and failed all six for the intended missing guards: two old-execution/new-completion existing-proof modes, three full DB capability-directory incidents, and one locally rehashed rollback cross-wire; the other 121 tests were filter-pending
+  - round-two targeted GREEN passed all 6 of 6 selected tests; the complete runtime JSON then passed 127 of 127 with zero failures and zero pending tests
+  - round-two joined runtime/database JSON with the actual protected PostgreSQL 17 reconnect active passed 178 of 178 across 6 suites with zero failures and zero pending tests
+  - frozen real-PG17 five-file barrier/runtime/database/adapters/reindex aggregate passed 276 of 276 across 17 suites with zero failures and zero pending tests
   - opt-in stock PostgreSQL 17 fixture passed 34 of 34 including fresh-session default read-only and explicit primary READ WRITE proof
   - workspace pnpm type-check passed across all five projects; workspace pnpm build passed with synthetic test-only Supabase environment values
   - Prettier check passed every changed TypeScript test/tool file
@@ -102,8 +103,8 @@ and exact rollback conditional ordering. Writer-recovery completion no longer
 uses replacement publication: it accepts only byte-exact existing evidence or
 uses Linux `renameat2(RENAME_NOREPLACE)`, followed by directory sync and reopened
 owner/mode/hash validation. Those pre-review totals were superseded by the
-independent acceptance fix cycle below; the current runtime is 121/121 and the
-current real-PG17 joined W aggregate is 270/270 with zero pending tests.
+independent acceptance fix cycles below; the current runtime is 127/127 and the
+current real-PG17 joined W aggregate is 276/276 with zero pending tests.
 
 The W delta implements the approved local writer/database lifecycle without any
 remote activation. `barrier.prepare-recovery` publishes
@@ -234,7 +235,7 @@ pnpm --filter @megacampus/course-gen-platform exec vitest run \
   tests/unit/tools/qdrant/source-recovery-database.test.ts \
   tests/unit/tools/qdrant/source-recovery-reindex-adapters.test.ts \
   tests/unit/tools/qdrant/reindex-course-embeddings.test.ts
-# 5 files, 270/270 passed, 0 pending (MC2_Q12_REAL_PG17=1)
+# 5 files, 276/276 passed, 0 pending (MC2_Q12_REAL_PG17=1)
 
 MC2_Q12_REAL_PG17=1 \
 SUPABASE_URL=http://127.0.0.1:54321 \
@@ -277,6 +278,41 @@ real-PG17 aggregate 270/270, and structural PostgreSQL 17 34/34, all with zero
 pending tests. Final current-run process, temporary, container, and volume
 checks were empty; older unrelated `/tmp` fixtures dated before this worker
 session were outside the write zone and were not altered.
+
+# Round-two P1 correction
+
+The round-two rereview found two remaining P1 authority gaps. The focused RED
+run selected six new cases and failed exactly six: forward and rollback exact
+terminal proofs whose immutable capability/proof retain the old execution epoch
+while only `capability_completed -> accepted` use the next recovery epoch;
+unreferenced, duplicate, and cross-operation DB host-capability files; and a
+writer rollback receipt SHA changed with its local nested hash recomputed.
+
+The resume validator now models DB execution and completion epochs separately.
+It accepts the frozen existing-proof continuation without issuing, claiming, or
+replaying a child, while retaining the uninterrupted and ordinary recovery
+graphs. Before Docker inspection it scans all exact `issued`, `claimed`,
+`completed`, and `superseded` directories; binds every matching DB capability
+to its journal epoch, exact location, immutable predecessor chain, and exact
+capability checkpoint; and requires the original execution capability to be
+the sole completed record. Orphan, duplicate, unreferenced, misplaced,
+broken-link, and cross-operation records fail closed. Rollback additionally
+requires canonical byte equality of the writer and DB-intent required receipt
+arrays plus exact equality of their frozen nested hashes.
+
+Fresh round-two evidence is runtime `127/127`, joined runtime plus actual
+disposable PG17 reconnect `178/178` across 6 suites, structural PG17 `34/34`,
+and the five-file real-PG17 aggregate `276/276` across 17 suites, all with zero
+failed or pending tests. Workspace type-check and synthetic-env build exited
+zero. The structural SQL remains SHA-256
+`0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e`,
+1,254 lines, and semicolon-free.
+
+`docs-reviewed: updated` — this artifact and the ignored implementer report
+record the round-two contract and evidence; frozen normative docs and operator
+surfaces need no change. `graph-reviewed: blocked` — this isolated worktree has
+no `graphify-out/GRAPH_REPORT.md`; Root owns refresh after accepted integration.
+The branch remains pending Root rereview and is not self-accepted by W.
 
 # Risks / Follow-ups
 

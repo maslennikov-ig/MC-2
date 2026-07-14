@@ -1091,13 +1091,35 @@ function targetWriterRecords(): Array<Record<string, any>> {
 interface ResumeJournalFixtureOptions {
   authorityLeaseEpoch?: string;
   commonPrefixTransform?: (phases: string[]) => string[];
+  databaseExistingProofCompletionEpoch?: boolean;
   databaseRecoveryEpoch?: boolean;
   duplicateFinalPair?: boolean;
   entryMutator?: (entry: Record<string, any>) => void;
   probeMutator?: (probe: Record<string, any>) => void;
   rollbackJournalPhaseOrderTransform?: (phases: string[]) => string[];
   rollbackRequiredPhases?: string[];
+  rollbackStateRequiredReceiptsTransform?: (
+    receipts: Array<{ phase: string; receipt_sha256: string }>
+  ) => Array<{ phase: string; receipt_sha256: string }>;
   targetRecordsTransform?: (records: Array<Record<string, any>>) => Array<Record<string, any>>;
+}
+
+function databaseCompletionEpoch(
+  executionEpoch: string,
+  existingProofCompletion: boolean | undefined
+): string {
+  return existingProofCompletion ? 'cutover-recovery-1' : executionEpoch;
+}
+
+function writerRollbackRequiredReceipts(
+  receipts: Array<{ phase: string; receipt_sha256: string }>,
+  transform:
+    | ((
+        values: Array<{ phase: string; receipt_sha256: string }>
+      ) => Array<{ phase: string; receipt_sha256: string }>)
+    | undefined
+): Array<{ phase: string; receipt_sha256: string }> {
+  return transform ? transform(receipts) : receipts;
 }
 
 function checkpointForJournalEntry(
@@ -1832,12 +1854,16 @@ function writerResumeFixture(
     });
     const completedCapability = join(capabilityDirectories.completed, currentCapabilityBasename);
     renameSync(currentClaimedCapability, completedCapability);
+    const completionEpoch = databaseCompletionEpoch(
+      databaseExecutionEpoch,
+      journalOptions.databaseExistingProofCompletionEpoch
+    );
     appendJournalEntry(
       'guard_cleanup_complete',
       'capability_completed',
       'none',
       null,
-      databaseExecutionEpoch,
+      completionEpoch,
       {
         command_id: commandId,
         capability_manifest_sha256: currentHostCapabilitySha256,
@@ -1861,7 +1887,7 @@ function writerResumeFixture(
       'accepted',
       'database_barrier_receipt',
       fileSha256(fixture.barrierReceipt),
-      databaseExecutionEpoch,
+      completionEpoch,
       { command_id: commandId, capability_manifest_sha256: currentHostCapabilitySha256 }
     );
   };
@@ -1955,9 +1981,6 @@ function writerResumeFixture(
     const requiredPhaseReceipts = [...requiredPhaseNames]
       .sort()
       .map((phase, index) => ({ phase, receipt_sha256: String(index + 1).repeat(64) }));
-    const requiredPhaseReceiptsSha = createHash('sha256')
-      .update(canonicalJson(requiredPhaseReceipts))
-      .digest('hex');
     const rollbackJournalPhaseOrder =
       journalOptions.rollbackJournalPhaseOrderTransform?.(rollbackPhaseOrder) ?? rollbackPhaseOrder;
     for (const phase of rollbackJournalPhaseOrder) {
@@ -1965,6 +1988,13 @@ function writerResumeFixture(
     }
     appendDatabaseTerminalLifecycle('rollback', requiredPhaseReceipts);
     stateIntent = appendJournalEntry(statePhase, 'intent');
+    const rollbackStateRequiredReceipts = writerRollbackRequiredReceipts(
+      requiredPhaseReceipts,
+      journalOptions.rollbackStateRequiredReceiptsTransform
+    );
+    const rollbackStateRequiredReceiptsSha = createHash('sha256')
+      .update(canonicalJson(rollbackStateRequiredReceipts))
+      .digest('hex');
     writeProtectedJson(rollbackState, {
       schema_version: 'megacampus.q12.writer-rollback-state/v1',
       run_id: Q12_RUN_ID,
@@ -1975,8 +2005,8 @@ function writerResumeFixture(
       writer_quiesce_manifest_sha256: quiesceSha,
       final_writer_manifest_sha256: finalManifestSha,
       database_barrier_receipt_sha256: fileSha256(fixture.barrierReceipt),
-      required_phase_receipts: requiredPhaseReceipts,
-      required_phase_receipts_sha256: requiredPhaseReceiptsSha,
+      required_phase_receipts: rollbackStateRequiredReceipts,
+      required_phase_receipts_sha256: rollbackStateRequiredReceiptsSha,
       publication_intent_journal_entry_hash: stateIntent.entry_hash,
       input_checkpoint_sha256: '2'.repeat(64),
       lease_epoch: leaseEpoch,
@@ -2665,6 +2695,129 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       });
     }
   );
+
+  it.each(['forward', 'rollback'] as const)(
+    'accepts existing exact database proof from the old execution epoch before %s writer resume',
+    mode => {
+      const fixture = writerResumeFixture(mode, mode === 'forward' ? 5 : 3, false, {
+        databaseExistingProofCompletionEpoch: true,
+      });
+      const databaseOperation = mode === 'forward' ? 'cleanup' : 'rollback';
+      const databaseGraph = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
+        .trimEnd()
+        .split('\n')
+        .map(line => JSON.parse(line) as Record<string, any>)
+        .filter(
+          entry =>
+            entry.phase === 'guard_cleanup_complete' &&
+            entry.command_id === `barrier.${databaseOperation}`
+        );
+
+      expect(databaseGraph.map(entry => [entry.lease_epoch, entry.outcome])).toEqual([
+        ['cutover', 'intent'],
+        ['cutover', 'capability_issued'],
+        ['cutover', 'capability_claimed'],
+        ['cutover-recovery-1', 'capability_completed'],
+        ['cutover-recovery-1', 'accepted'],
+      ]);
+      expect(
+        existsSync(
+          join(fixture.capabilitiesRoot, 'completed', `barrier.${databaseOperation}--cutover.json`)
+        )
+      ).toBe(true);
+      expect(
+        existsSync(
+          join(
+            fixture.capabilitiesRoot,
+            'claimed',
+            `barrier.${databaseOperation}--cutover-recovery-1.json`
+          )
+        )
+      ).toBe(false);
+
+      const result = fixture.resume(mode);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(fixture.resumeState, 'utf8'))).toMatchObject({
+        state: 'writers_resumed',
+        mode,
+      });
+    }
+  );
+
+  it.each([
+    {
+      label: 'unreferenced file',
+      mutate: (fixture: ResumeWriterFixture) => {
+        const completed = join(
+          fixture.capabilitiesRoot,
+          'completed',
+          'barrier.cleanup--cutover.json'
+        );
+        const value = JSON.parse(readFileSync(completed, 'utf8')) as Record<string, any>;
+        value.lease_epoch = 'cutover-recovery-1';
+        value.supersedes_capability_sha256 = fileSha256(completed);
+        writeCanonicalProtectedJson(
+          join(fixture.capabilitiesRoot, 'superseded', 'barrier.cleanup--cutover-recovery-1.json'),
+          value
+        );
+      },
+    },
+    {
+      label: 'duplicate file',
+      mutate: (fixture: ResumeWriterFixture) => {
+        const completed = join(
+          fixture.capabilitiesRoot,
+          'completed',
+          'barrier.cleanup--cutover.json'
+        );
+        writeFileSync(
+          join(fixture.capabilitiesRoot, 'superseded', 'barrier.cleanup--cutover.json'),
+          readFileSync(completed),
+          { mode: 0o400 }
+        );
+      },
+    },
+    {
+      label: 'cross-operation file',
+      mutate: (fixture: ResumeWriterFixture) => {
+        const completed = join(
+          fixture.capabilitiesRoot,
+          'completed',
+          'barrier.cleanup--cutover.json'
+        );
+        writeFileSync(
+          join(fixture.capabilitiesRoot, 'superseded', 'barrier.rollback--cutover.json'),
+          readFileSync(completed),
+          { mode: 0o400 }
+        );
+      },
+    },
+  ])('rejects a database barrier host capability $label before Docker inspection', ({ mutate }) => {
+    const fixture = writerResumeFixture('forward');
+    mutate(fixture);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/database barrier.*capability|capability.*database barrier/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+  });
+
+  it('rejects writer rollback required receipts that differ from the frozen database intent', () => {
+    const fixture = writerResumeFixture('rollback', 3, false, {
+      rollbackStateRequiredReceiptsTransform: receipts =>
+        receipts.map((receipt, index) =>
+          index === 0 ? { ...receipt, receipt_sha256: 'f'.repeat(64) } : receipt
+        ),
+    });
+
+    const result = fixture.resume('rollback');
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/rollback.*required.*receipts|rollback.*intent/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+  });
 
   it('binds one immutable claimed capability to distinct capability and child-input checkpoints', () => {
     const fixture = writerResumeFixture('forward');

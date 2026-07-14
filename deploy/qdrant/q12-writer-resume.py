@@ -1360,6 +1360,16 @@ else:
         set(phases).issubset(set(ROLLBACK_CONDITIONAL_PHASES)),
         "rollback conditional phase receipt is unknown",
     )
+    require(
+        canonical_json(required, "writer rollback required phase receipts")
+        == canonical_json(
+            database_rollback_intent["required_phase_receipts"],
+            "database rollback intent required phase receipts",
+        )
+        and rollback["required_phase_receipts_sha256"]
+        == database_rollback_intent["required_phase_receipts_sha256"],
+        "writer rollback required phase receipts differ from database rollback intent",
+    )
 
 authority_file = Opened(paths["authority"], "writer resume authority", 0o400)
 authority = authority_file.json()
@@ -1441,6 +1451,14 @@ def checkpoint_matches_entry(value, entry, label):
         f"{label} does not copy the exact journal checkpoint",
     )
 
+exact_directory(paths["capabilities"], "host capability root")
+capability_directories = {
+    name: os.path.join(paths["capabilities"], name)
+    for name in ("issued", "claimed", "completed", "superseded")
+}
+for name, directory in capability_directories.items():
+    exact_directory(directory, f"host capability {name} directory")
+
 database_lifecycle_entries = [
     entry for entry in journal_lines
     if entry["phase"] == "guard_cleanup_complete"
@@ -1492,15 +1510,32 @@ else:
             in [["recovery_reacquired"], ["recovery_reacquired", "capability_claimed"]],
             "database barrier intermediate recovery prefix is invalid",
         )
+    database_terminal_outcomes = [
+        entry["outcome"] for entry in database_epoch_groups[-1][1]
+    ]
+    database_existing_proof_completion = (
+        database_terminal_outcomes == ["capability_completed", "accepted"]
+    )
     require(
-        [entry["outcome"] for entry in database_epoch_groups[-1][1]]
-        == ["recovery_reacquired", "capability_claimed", "capability_completed", "accepted"],
+        database_terminal_outcomes
+        == ["recovery_reacquired", "capability_claimed", "capability_completed", "accepted"]
+        or (
+            database_existing_proof_completion
+            and database_epoch_groups[-2][1][-1]["outcome"] == "capability_claimed"
+        ),
         "database barrier terminal recovery lifecycle is invalid",
     )
+if len(database_epoch_groups) == 1:
+    database_existing_proof_completion = False
 database_intent_entry = database_epoch_groups[0][1][0]
 database_terminal_entries = database_epoch_groups[-1][1]
+database_execution_entries = (
+    database_epoch_groups[-2][1]
+    if database_existing_proof_completion
+    else database_terminal_entries
+)
 database_claimed_entry = next(
-    entry for entry in database_terminal_entries
+    entry for entry in database_execution_entries
     if entry["outcome"] == "capability_claimed"
 )
 database_completed_entry = database_terminal_entries[-2]
@@ -1520,9 +1555,13 @@ for _, entries in database_epoch_groups:
 require(
     database_intent_entry["entry_hash"] == database_proof["intent_journal_entry_hash"]
     and database_intent_entry["capability_manifest_sha256"] == "0" * 64
-    and database_claimed_entry["lease_epoch"] == database_epochs[-1]
-    and database_completed_entry["lease_epoch"] == database_epochs[-1]
-    and database_accepted_entry["lease_epoch"] == database_epochs[-1]
+    and database_claimed_entry["lease_epoch"] == database_execution_entries[0]["lease_epoch"]
+    and database_completed_entry["lease_epoch"] == database_terminal_entries[0]["lease_epoch"]
+    and database_accepted_entry["lease_epoch"] == database_terminal_entries[0]["lease_epoch"]
+    and database_completed_entry["capability_manifest_sha256"]
+    == database_claimed_entry["capability_manifest_sha256"]
+    and database_accepted_entry["capability_manifest_sha256"]
+    == database_claimed_entry["capability_manifest_sha256"]
     and database_accepted_entry["accepted_object_kind"] == "database_barrier_receipt"
     and database_accepted_entry["accepted_object_sha256"] == barrier_file.digest
     and all(
@@ -1534,6 +1573,16 @@ require(
     "database barrier lifecycle binding is invalid",
 )
 database_execution_epoch = database_claimed_entry["lease_epoch"]
+database_completion_epoch = database_completed_entry["lease_epoch"]
+require(
+    database_execution_epoch == database_completion_epoch
+    or (
+        database_existing_proof_completion
+        and database_epochs.index(database_completion_epoch)
+        == database_epochs.index(database_execution_epoch) + 1
+    ),
+    "database barrier execution/completion epoch transition is invalid",
+)
 database_input_checkpoint_file = Opened(
     os.path.join(
         run_root,
@@ -1560,81 +1609,155 @@ require(
     and database_input_checkpoint["lease_epoch"] == database_execution_epoch,
     "database barrier input checkpoint binding is invalid",
 )
-database_capability_path = os.path.join(
-    paths["capabilities"], "completed",
-    f"barrier.{database_operation}--{database_execution_epoch}.json",
+
+database_capability_records = []
+for location, directory in capability_directories.items():
+    for directory_entry in os.scandir(directory):
+        if not directory_entry.name.startswith("barrier."):
+            continue
+        require(
+            directory_entry.name.startswith(f"barrier.{database_operation}--"),
+            "cross-operation database barrier capability exists",
+        )
+        match = re.fullmatch(
+            re.escape(f"barrier.{database_operation}")
+            + r"--((?:cutover|cutover-recovery-[1-9][0-9]*))\.json",
+            directory_entry.name,
+        )
+        require(match is not None, "database barrier capability basename is invalid")
+        opened = Opened(
+            directory_entry.path,
+            f"{location} database barrier host capability",
+            0o400,
+        )
+        value = opened.json()
+        exact(value, CAPABILITY_KEYS, "database barrier host capability")
+        require(
+            opened.data == canonical_json(value, "database barrier host capability") + b"\n"
+            and value["schema_version"] == "megacampus.q12.host-command-capability/v1"
+            and value["run_id"] == run_id
+            and value["command_id"] == f"barrier.{database_operation}"
+            and value["command_sha256"] == database_claimed_entry["command_sha256"]
+            and value["release_sha"] == database_claimed_entry["release_sha"]
+            and value["operator_digest"] == database_claimed_entry["operator_digest"]
+            and value["resource_manifest_sha256"] == database_claimed_entry["resource_manifest_sha256"]
+            and value["quiesce_manifest_sha256"] == quiesce_file.digest
+            and value["resume_authority_sha256"] is None
+            and hex64(value["capability_input_checkpoint_sha256"])
+            and value["lease_epoch"] == match.group(1)
+            and (
+                value["supersedes_capability_sha256"] is None
+                or hex64(value["supersedes_capability_sha256"])
+            ),
+            "database barrier host capability binding is invalid",
+        )
+        database_capability_records.append({
+            "location": location,
+            "file": opened,
+            "value": value,
+        })
+
+database_capability_by_digest = {
+    record["file"].digest: record for record in database_capability_records
+}
+require(
+    len(database_capability_by_digest) == len(database_capability_records),
+    "duplicate database barrier host capability exists",
 )
-database_capability_file = Opened(
-    database_capability_path,
-    "completed database barrier host capability",
-    0o400,
+database_referenced_capabilities = []
+for epoch, group_hash in zip(database_epochs, database_group_capability_hashes):
+    if group_hash is None:
+        continue
+    if not database_referenced_capabilities or database_referenced_capabilities[-1][0] != group_hash:
+        database_referenced_capabilities.append((group_hash, epoch))
+require(
+    len(database_referenced_capabilities) == len(database_capability_records)
+    and all(
+        digest in database_capability_by_digest
+        for digest, _ in database_referenced_capabilities
+    ),
+    "orphan or unreferenced database barrier host capability exists",
 )
-database_capability = database_capability_file.json()
-exact(database_capability, CAPABILITY_KEYS, "completed database barrier host capability")
+database_capability_chain = [
+    database_capability_by_digest[digest]
+    for digest, _ in database_referenced_capabilities
+]
+for index, (record, (digest, execution_epoch)) in enumerate(
+    zip(database_capability_chain, database_referenced_capabilities)
+):
+    require(
+        record["file"].digest == digest
+        and record["value"]["lease_epoch"] == execution_epoch
+        and record["value"]["supersedes_capability_sha256"]
+        == (database_referenced_capabilities[index - 1][0] if index else None)
+        and record["location"]
+        == ("completed" if index == len(database_capability_chain) - 1 else "superseded"),
+        "database barrier host capability lifecycle location or supersession is invalid",
+    )
+database_capability_file = database_capability_chain[-1]["file"]
+database_capability = database_capability_chain[-1]["value"]
 require(
     database_capability_file.digest == database_claimed_entry["capability_manifest_sha256"]
-    and database_capability["schema_version"] == "megacampus.q12.host-command-capability/v1"
-    and database_capability["run_id"] == run_id
-    and database_capability["command_id"] == f"barrier.{database_operation}"
-    and database_capability["command_sha256"] == database_claimed_entry["command_sha256"]
-    and database_capability["release_sha"] == database_claimed_entry["release_sha"]
-    and database_capability["operator_digest"] == database_claimed_entry["operator_digest"]
-    and database_capability["resource_manifest_sha256"] == database_claimed_entry["resource_manifest_sha256"]
-    and database_capability["quiesce_manifest_sha256"] == quiesce_file.digest
-    and database_capability["resume_authority_sha256"] is None
-    and database_capability["lease_epoch"] == database_execution_epoch
-    and (
-        database_capability["supersedes_capability_sha256"] is None
-        or hex64(database_capability["supersedes_capability_sha256"])
-    ),
-    "completed database barrier host capability is invalid",
+    and database_capability["lease_epoch"] == database_execution_epoch,
+    "completed database barrier host capability is not the execution capability",
 )
-database_capability_checkpoint_file = Opened(
-    os.path.join(
-        run_root,
-        f"database-barrier-capability-checkpoint-{database_operation}-{database_execution_epoch}.json",
-    ),
-    "database barrier capability checkpoint",
-    0o600,
-)
-database_capability_checkpoint = database_capability_checkpoint_file.json()
-exact(database_capability_checkpoint, CHECKPOINT_KEYS, "database barrier capability checkpoint")
-if database_execution_epoch == "cutover":
-    database_capability_anchor_entry = database_intent_entry
-else:
-    database_current_start = journal_lines.index(database_terminal_entries[0])
-    database_accepted_predecessors = [
-        entry for entry in journal_lines[:database_current_start]
-        if entry["outcome"] == "accepted"
-    ]
-    require(
-        database_accepted_predecessors,
-        "database barrier recovery accepted predecessor is missing",
+
+database_capability_checkpoint_files = {}
+for record in database_capability_chain:
+    capability_epoch = record["value"]["lease_epoch"]
+    capability_journal_entry = next(
+        entry for entry in database_lifecycle_entries
+        if entry["capability_manifest_sha256"] == record["file"].digest
+        and entry["outcome"] in {"capability_issued", "recovery_reacquired"}
     )
-    database_capability_anchor_entry = database_accepted_predecessors[-1]
-database_prior_capability_hashes = [
-    value for value in database_group_capability_hashes[:-1]
-    if value is not None
+    if capability_epoch == "cutover":
+        database_capability_anchor_entry = database_intent_entry
+    else:
+        capability_journal_index = journal_lines.index(capability_journal_entry)
+        database_accepted_predecessors = [
+            entry for entry in journal_lines[:capability_journal_index]
+            if entry["outcome"] == "accepted"
+        ]
+        require(
+            database_accepted_predecessors,
+            "database barrier recovery accepted predecessor is missing",
+        )
+        database_capability_anchor_entry = database_accepted_predecessors[-1]
+    capability_checkpoint_file = Opened(
+        os.path.join(
+            run_root,
+            f"database-barrier-capability-checkpoint-{database_operation}-{capability_epoch}.json",
+        ),
+        f"database barrier capability checkpoint {capability_epoch}",
+        0o600,
+    )
+    capability_checkpoint = capability_checkpoint_file.json()
+    exact(
+        capability_checkpoint,
+        CHECKPOINT_KEYS,
+        f"database barrier capability checkpoint {capability_epoch}",
+    )
+    require(
+        capability_checkpoint_file.digest
+        == record["value"]["capability_input_checkpoint_sha256"]
+        and capability_checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
+        and capability_checkpoint["run_id"] == run_id
+        and capability_checkpoint["journal_entry_hash"] == database_capability_anchor_entry["entry_hash"]
+        and capability_checkpoint["previous_journal_entry_hash"] == database_capability_anchor_entry["previous_hash"]
+        and capability_checkpoint["seq"] == database_capability_anchor_entry["seq"]
+        and capability_checkpoint["phase"] == database_capability_anchor_entry["phase"]
+        and capability_checkpoint["journal_device"] == str(journal_file.identity[0])
+        and capability_checkpoint["journal_inode"] == str(journal_file.identity[1])
+        and capability_checkpoint["accepted_object_kind"] == database_capability_anchor_entry["accepted_object_kind"]
+        and capability_checkpoint["accepted_object_sha256"] == database_capability_anchor_entry["accepted_object_sha256"]
+        and capability_checkpoint["resume_authority_sha256"] is None
+        and capability_checkpoint["lease_epoch"] == database_capability_anchor_entry["lease_epoch"],
+        "database barrier capability checkpoint binding is invalid",
+    )
+    database_capability_checkpoint_files[record["file"].digest] = capability_checkpoint_file
+database_capability_checkpoint_file = database_capability_checkpoint_files[
+    database_capability_file.digest
 ]
-require(
-    database_capability_checkpoint_file.digest
-    == database_capability["capability_input_checkpoint_sha256"]
-    and database_capability_checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
-    and database_capability_checkpoint["run_id"] == run_id
-    and database_capability_checkpoint["journal_entry_hash"] == database_capability_anchor_entry["entry_hash"]
-    and database_capability_checkpoint["previous_journal_entry_hash"] == database_capability_anchor_entry["previous_hash"]
-    and database_capability_checkpoint["seq"] == database_capability_anchor_entry["seq"]
-    and database_capability_checkpoint["phase"] == database_capability_anchor_entry["phase"]
-    and database_capability_checkpoint["journal_device"] == str(journal_file.identity[0])
-    and database_capability_checkpoint["journal_inode"] == str(journal_file.identity[1])
-    and database_capability_checkpoint["accepted_object_kind"] == database_capability_anchor_entry["accepted_object_kind"]
-    and database_capability_checkpoint["accepted_object_sha256"] == database_capability_anchor_entry["accepted_object_sha256"]
-    and database_capability_checkpoint["resume_authority_sha256"] is None
-    and database_capability_checkpoint["lease_epoch"] == database_capability_anchor_entry["lease_epoch"]
-    and database_capability["supersedes_capability_sha256"]
-    == (database_prior_capability_hashes[-1] if database_prior_capability_hashes else None),
-    "database barrier capability checkpoint binding is invalid",
-)
 if mode == "rollback":
     require(
         database_rollback_intent["input_checkpoint_sha256"]
@@ -1643,13 +1766,6 @@ if mode == "rollback":
     )
 
 command_id = f"writers.resume.{mode}"
-exact_directory(paths["capabilities"], "host capability root")
-capability_directories = {
-    name: os.path.join(paths["capabilities"], name)
-    for name in ("issued", "claimed", "completed", "superseded")
-}
-for name, directory in capability_directories.items():
-    exact_directory(directory, f"host capability {name} directory")
 
 capability_records = []
 for location, directory in capability_directories.items():
