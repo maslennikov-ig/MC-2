@@ -38,6 +38,8 @@ class NoIoExecutor:
         self.durable_reloads = 0
         self.actual_deployed_wrapper = False
         self.claim_fault = "none"
+        self.frontier_claim_fault = "none"
+        self.frontier_claim_command: str | None = None
         self.root_fault = "none"
         self.injected_boundary_observed: str | None = None
         self.continuous_lease = False
@@ -47,6 +49,8 @@ class NoIoExecutor:
         self.checkpoint_repair_case: str | None = None
         self.checkpoint_repair_performed = False
         self.resumed_with_production_shape = False
+        self.ancestor_symlink_rejected = False
+        self.lease_session_retained_after_failed_validation: bool | None = None
 
     def _claim_sandbox(self, argv: list[str]) -> tuple[list[str], list[str]]:
         if self.root is None:
@@ -79,6 +83,8 @@ class NoIoExecutor:
             "--dir", "/opt/megacampus/backups", "--dir", "/opt/megacampus/backups/q12",
             "--dir", os.fspath(production_root), "--bind", os.fspath(self.root),
             os.fspath(production_root),
+            "--bind", os.fspath(self.root.parent / "cutover.lock"),
+            "/opt/megacampus/backups/q12/cutover.lock",
         ]
         return sandbox, rewritten
 
@@ -129,13 +135,19 @@ class NoIoExecutor:
 
     def launch_claim(self, argv: list[str], journal_fd: int) -> dict[str, Any]:
         sandbox, rewritten = self._claim_sandbox(argv)
+        command_id = argv[argv.index("--command-id") + 1]
+        fault = (
+            self.frontier_claim_fault
+            if command_id == self.frontier_claim_command
+            else self.claim_fault
+        )
         child = self._run_with_inherited_fd8(
             [*sandbox, "--",
                 "/usr/bin/python3",
                 str(pathlib.Path(__file__).resolve()),
                 "--claim-noio",
                 "--fault",
-                self.claim_fault,
+                fault,
                 *rewritten,
             ],
             journal_fd,
@@ -290,6 +302,9 @@ def write_audit(
                 "actualDeployedWrapper": executor.actual_deployed_wrapper,
                 "injectedBoundaryObserved": executor.injected_boundary_observed,
                 "leaseFd9Validated": bool(output and output.get("leaseFd9Validated")),
+                "canonicalLeaseFd9Validated": bool(
+                    output and output.get("canonicalLeaseFd9Validated")
+                ),
                 "inheritedJournalIdentityValidated": bool(
                     output and output.get("inheritedJournalIdentityValidated")
                 ),
@@ -297,6 +312,10 @@ def write_audit(
                 "checkpointRepairCase": executor.checkpoint_repair_case,
                 "checkpointRepairPerformed": executor.checkpoint_repair_performed,
                 "resumedWithProductionShape": executor.resumed_with_production_shape,
+                "ancestorSymlinkRejected": executor.ancestor_symlink_rejected,
+                "leaseSessionRetainedAfterFailedValidation": (
+                    executor.lease_session_retained_after_failed_validation
+                ),
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -334,13 +353,28 @@ def main() -> int:
     spec = json.load(sys.stdin)
     root = pathlib.Path(spec["runRoot"]).resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    lock_path = root / "cutover.lock"
+    canonical_lock_path = root.parent / "cutover.lock"
+    if canonical_lock_path.exists():
+        canonical_lock_path.chmod(0o600)
+    lock_path = (
+        root / "cutover.lock"
+        if spec.get("leaseMutation") == "wrong-path"
+        else canonical_lock_path
+    )
     lease_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     if lease_fd != 9:
         os.dup2(lease_fd, 9)
         os.close(lease_fd)
         lease_fd = 9
-    fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    if spec.get("leaseMutation") != "unlocked":
+        fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    if spec.get("leaseMutation") == "wrong-inode":
+        replacement = root.parent / ".cutover.lock.replacement"
+        replacement.write_bytes(b"")
+        replacement.chmod(0o600)
+        os.replace(replacement, canonical_lock_path)
+    elif spec.get("leaseMutation") == "wrong-mode":
+        canonical_lock_path.chmod(0o640)
     lock_stat = os.fstat(lease_fd)
     executor = (
         SandboxedDeployedWrapperExecutor(root)
@@ -351,6 +385,29 @@ def main() -> int:
     executor.claim_path_mutation = spec.get("claimPathMutation")
     executor.clear_journal_append_flag = bool(spec.get("clearJournalAppendFlag"))
     executor.checkpoint_repair_case = spec.get("checkpointRepairCase")
+    if spec.get("leaseMutation") == "ancestor-symlink":
+        target_ancestor = root / ".lease-probe-target"
+        target_parent = target_ancestor / "parent"
+        target_parent.mkdir(parents=True)
+        linked_ancestor = root / ".lease-probe-link"
+        linked_ancestor.symlink_to(target_ancestor, target_is_directory=True)
+        probe_lock = target_parent / "cutover.lock"
+        probe_fd = os.open(probe_lock, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            CORE.validate_canonical_lease_lock(
+                linked_ancestor / "parent" / "probe-run", probe_fd
+            )
+        except (CORE.LifecycleError, OSError):
+            executor.ancestor_symlink_rejected = True
+        finally:
+            os.close(probe_fd)
+            probe_lock.unlink()
+            linked_ancestor.unlink()
+            target_parent.rmdir()
+            target_ancestor.rmdir()
+        if not executor.ancestor_symlink_rejected:
+            raise CORE.LifecycleError("canonical lease ancestor symlink was accepted")
     install_chain = spec.get("chains", {}).get("install")
     if install_chain:
         if install_chain.get("stopAfter") == "claim-moved":
@@ -361,6 +418,21 @@ def main() -> int:
             executor.claim_fault = "after-claim-checkpoint"
     if spec.get("checkpointPublicationRace") == "claim-current-swap":
         executor.claim_fault = "checkpoint-cas-swap"
+    frontier = spec.get("abandonedFrontier")
+    if (
+        frontier
+        and not frontier.get("exactSuccessBeforeDisposition")
+        and frontier.get("form") == "claim-moved"
+    ):
+        executor.frontier_claim_command = f"barrier.{frontier['operation']}"
+        executor.frontier_claim_fault = "after-move"
+    elif (
+        frontier
+        and not frontier.get("exactSuccessBeforeDisposition")
+        and frontier.get("form") == "claimed-no-success"
+    ):
+        executor.frontier_claim_command = f"barrier.{frontier['operation']}"
+        executor.frontier_claim_fault = "after-claim-checkpoint"
     restart_boundary = spec.get("restartBoundary")
     if restart_boundary in ("claim-row", "result-publication"):
         executor.claim_fault = restart_boundary
@@ -377,13 +449,39 @@ def main() -> int:
         "release_sha": "0123456789abcdef0123456789abcdef01234567",
         "operator_digest": "1" * 64,
         "resource_manifest_sha256": "2" * 64,
-        "quiesce_manifest_sha256": "3" * 64,
+        "quiesce_manifest_sha256": (
+            "0" * 64
+            if tuple(spec.get("chains", {})) == ("install",)
+            else "3" * 64
+        ),
         "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
-        "rotation_required": False,
+        "rotation_required": bool(spec.get("rotationRequired", False)),
         "lease_fd": 9,
         "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
     }
     try:
+        if spec.get("leaseMutation") == "wrong-fd-then-correct":
+            correct_lease_anchor = os.dup(9)
+            wrong_path = root / ".wrong-lease-session.lock"
+            wrong_fd = os.open(
+                wrong_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600
+            )
+            fcntl.flock(wrong_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            os.dup2(wrong_fd, 9, inheritable=True)
+            try:
+                run_supervisor(request, executor)
+            except CORE.LifecycleError as error:
+                if "canonical" not in str(error) and "FD 9" not in str(error):
+                    raise
+            else:
+                raise RuntimeError("wrong FD9 unexpectedly passed canonical validation")
+            executor.lease_session_retained_after_failed_validation = (
+                executor in CORE._LEASE_SESSIONS
+            )
+            os.dup2(correct_lease_anchor, 9, inheritable=True)
+            os.close(correct_lease_anchor)
+            os.close(wrong_fd)
+            wrong_path.unlink()
         if spec.get("journalMutation"):
             output = run_supervisor(request, executor)
             journal_path = root / "phase.jsonl"
@@ -488,6 +586,12 @@ def main() -> int:
         elif spec.get("resumeAfterStop"):
             run_supervisor(request, executor)
             executor.claim_fault = "none"
+            if spec.get("reopenLeaseFdBeforeResume"):
+                os.close(9)
+                reopened = os.open(canonical_lock_path, os.O_RDWR | os.O_NOFOLLOW)
+                if reopened != 9:
+                    os.dup2(reopened, 9)
+                    os.close(reopened)
             resumed = json.loads(json.dumps(request))
             for chain in resumed["chains"].values():
                 chain["stopAfter"] = "completed"

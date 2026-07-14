@@ -15,6 +15,7 @@ import stat as stat_module
 import subprocess
 import sys
 import uuid
+import weakref
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -28,6 +29,21 @@ OPERATIONS = (
     "activate",
 )
 COMMANDS = {operation: f"barrier.{operation}" for operation in OPERATIONS}
+
+
+@dataclass
+class LeaseSession:
+    """Opaque process-local proof that retries still use the same open lease."""
+
+    device: int
+    inode: int
+    anchor_fd: int
+    finalizer: weakref.finalize
+
+
+_LEASE_SESSIONS: weakref.WeakKeyDictionary[object, LeaseSession] = (
+    weakref.WeakKeyDictionary()
+)
 TARGET_PHASES = {
     "install": "maintenance_guarded",
     "verify-after-base": "base_migration_guarded",
@@ -217,6 +233,46 @@ def fsync_directory(path: pathlib.Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def validate_canonical_lease_lock(run_root: pathlib.Path, lease_fd: int = 9) -> tuple[int, int]:
+    """Bind FD9 to the canonical parent lock and prove another OFD is excluded."""
+    lock_path = run_root.parent / "cutover.lock"
+    parent_fd = open_parent_directory(lock_path)
+    canonical_fd = -1
+    try:
+        canonical_fd = os.open(
+            "cutover.lock", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent_fd
+        )
+        inherited = os.fstat(lease_fd)
+        canonical = os.fstat(canonical_fd)
+        path_identity = os.stat(
+            "cutover.lock", dir_fd=parent_fd, follow_symlinks=False
+        )
+        if (
+            not stat_module.S_ISREG(inherited.st_mode)
+            or inherited.st_uid != 1000
+            or inherited.st_gid != 1000
+            or stat_module.S_IMODE(inherited.st_mode) != 0o600
+            or inherited.st_nlink != 1
+            or (inherited.st_dev, inherited.st_ino)
+            != (canonical.st_dev, canonical.st_ino)
+            or (canonical.st_dev, canonical.st_ino)
+            != (path_identity.st_dev, path_identity.st_ino)
+        ):
+            raise LifecycleError("FD 9 canonical cutover.lock identity mismatch")
+        try:
+            fcntl.flock(canonical_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            pass
+        else:
+            fcntl.flock(canonical_fd, fcntl.LOCK_UN)
+            raise LifecycleError("FD 9 canonical lease lock is not held")
+        return inherited.st_dev, inherited.st_ino
+    finally:
+        if canonical_fd >= 0:
+            os.close(canonical_fd)
+        os.close(parent_fd)
 
 
 def rename_noreplace(source: pathlib.Path, destination: pathlib.Path) -> None:
@@ -534,7 +590,9 @@ class Engine:
     checkpoint_paths: list[str] = field(default_factory=list)
     frontier_hash: str | None = None
     lease_fd_9_validated: bool = False
+    canonical_lease_fd_9_validated: bool = False
     inherited_journal_identity_validated: bool = False
+    lease_reacquired: bool = False
     journal_fd: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -705,6 +763,10 @@ class Engine:
                 raise LifecycleError(
                     f"matching final and publishing residue retained after lease loss: {temporary}"
                 )
+            if not bool(getattr(self.executor, "continuous_lease", False)):
+                raise LifecycleError(
+                    f"publishing residue retained after lease loss: {temporary}"
+                )
         if journal_bytes and not journal_bytes.endswith(b"\n"):
             raise LifecycleError("torn journal tail")
         entries: list[dict[str, Any]] = []
@@ -727,6 +789,7 @@ class Engine:
                 "operator_digest",
                 "resource_manifest_sha256",
                 "quiesce_manifest_sha256",
+                "rotation_required",
             ):
                 if key in self.request and entry.get(key) != self.request[key]:
                     raise LifecycleError(f"journal stable binding mismatch: {key}")
@@ -736,7 +799,15 @@ class Engine:
         entries_by_hash = {entry["entry_hash"]: entry for entry in entries}
 
         if entries:
-            expected = self.checkpoint_bytes(entries[-1])
+            checkpoint_entry = entries[-1]
+            if (
+                checkpoint_entry["phase"] == "rollback_preparing"
+                and checkpoint_entry["outcome"] == "intent"
+                and len(entries) >= 2
+                and entries[-2]["outcome"] == "retained_attempt_abandoning"
+            ):
+                checkpoint_entry = entries[-2]
+            expected = self.checkpoint_bytes(checkpoint_entry)
             next_path = pathlib.Path(f"{self.checkpoint_path}.next")
             if os.path.lexists(self.checkpoint_path):
                 current_checkpoint = validate_regular_file(
@@ -745,8 +816,11 @@ class Engine:
             else:
                 current_checkpoint = None
             if current_checkpoint != expected or os.path.lexists(next_path):
+                checkpoint_index = entries.index(checkpoint_entry)
                 predecessor = (
-                    self.checkpoint_bytes(entries[-2]) if len(entries) > 1 else None
+                    self.checkpoint_bytes(entries[checkpoint_index - 1])
+                    if checkpoint_index > 0
+                    else None
                 )
                 self.repair_checkpoint(expected, predecessor, journal_bytes)
             self.checkpoint_paths = [str(self.checkpoint_path)]
@@ -863,6 +937,18 @@ class Engine:
                 if state in ("claimed", "completed") and not matching_references:
                     raise LifecycleError("durable capability lacks journal reference")
 
+        known_capability_paths = {
+            pathlib.Path(path) for path in self.capabilities.values()
+        }
+        capability_root = self.run_root / "capabilities"
+        expected_state_directories = {"issued", "claimed", "completed", "superseded"}
+        if {path.name for path in capability_root.iterdir()} != expected_state_directories:
+            raise LifecycleError("unknown capability lifecycle directory")
+        for state in expected_state_directories:
+            for path in (capability_root / state).iterdir():
+                if path not in known_capability_paths:
+                    raise LifecycleError("unknown capability lifecycle residue")
+
         self.results = {}
         for path in sorted(self.run_root.glob("retained-barrier-result-*.json")):
             result_bytes = validate_regular_file(path, mode=0o600)
@@ -893,6 +979,78 @@ class Engine:
                 raise LifecycleError("duplicate retained result")
             self.results[key] = str(path)
 
+        known_lifecycle_paths = {
+            pathlib.Path(path)
+            for path in (*self.retained.values(), *self.results.values())
+        }
+        for path in self.run_root.iterdir():
+            if path.name.startswith(
+                ("retained-barrier-capability-checkpoint-", "retained-barrier-result-")
+            ) and path not in known_lifecycle_paths and not (
+                path.name.endswith(".publishing")
+                and bool(getattr(self.executor, "continuous_lease", False))
+            ):
+                raise LifecycleError("unknown retained lifecycle residue")
+
+        # Validate each complete capability graph before any completion can be
+        # indexed or any continuation can move/execute a member.
+        for operation in OPERATIONS:
+            members: list[tuple[int, str, str, dict[str, Any]]] = []
+            for key, digest in capability_digests.items():
+                member_operation, epoch = key.split(":", 1)
+                if member_operation != operation:
+                    continue
+                order = 0 if epoch == "cutover" else int(epoch.rsplit("-", 1)[1])
+                capability = json.loads(
+                    validate_regular_file(
+                        pathlib.Path(self.capabilities[key]), mode=0o400
+                    )
+                )
+                members.append((order, epoch, digest, capability))
+            members.sort()
+            if not members:
+                continue
+            first = members[0][0]
+            if first not in (0, 1) or [item[0] for item in members] != list(
+                range(first, members[-1][0] + 1)
+            ):
+                raise LifecycleError("capability epoch gap/repetition")
+            if members[0][3]["supersedes_capability_sha256"] is not None:
+                raise LifecycleError("capability graph root is not null-supersedes")
+            journal_less_orders: list[int] = []
+            for index, (order, _epoch, digest, capability) in enumerate(members):
+                if index > 0 and capability["supersedes_capability_sha256"] != members[index - 1][2]:
+                    raise LifecycleError("capability graph direct edge mismatch")
+                references = [
+                    entry
+                    for entry in entries
+                    if entry["capability_manifest_sha256"] == digest
+                ]
+                issuances = [
+                    entry
+                    for entry in references
+                    if entry["outcome"] in ("capability_issued", "recovery_reacquired")
+                ]
+                claims = [entry for entry in references if entry["outcome"] == "capability_claimed"]
+                completions = [entry for entry in references if entry["outcome"] == "completed"]
+                abandonments = [
+                    entry
+                    for entry in references
+                    if entry["outcome"] == "retained_attempt_abandoning"
+                ]
+                if len(issuances) > 1 or len(claims) > 1 or len(completions) > 1:
+                    raise LifecycleError("duplicate capability lifecycle row")
+                if claims and not issuances:
+                    raise LifecycleError("journal-less capability was claimed")
+                if not references:
+                    journal_less_orders.append(order)
+                elif not issuances and references != abandonments:
+                    raise LifecycleError("invalid journal-less capability reference")
+            if journal_less_orders and journal_less_orders != list(
+                range(journal_less_orders[0], journal_less_orders[-1] + 1)
+            ):
+                raise LifecycleError("journal-less capability suffix is not consecutive")
+
         self.selectors = {}
         self.completions = {}
         self.frontier_hash = None
@@ -902,10 +1060,60 @@ class Engine:
             )
             if operation is not None and entry["outcome"] == "intent":
                 self.selectors[operation] = entry["entry_hash"]
-            if operation is not None and entry["outcome"] == "completed":
-                self.completions[operation] = entry["entry_hash"]
             if entry["outcome"] == "retained_attempt_abandoning":
                 self.frontier_hash = entry["entry_hash"]
+
+        # A completed row is authority only as the terminal member of the exact
+        # durable capability/result lifecycle.  Do this after every directory
+        # has been scanned so an early completion can never mask missing or
+        # displaced evidence.
+        for entry in entries:
+            operation = next(
+                (item for item in OPERATIONS if COMMANDS[item] == entry["command_id"]),
+                None,
+            )
+            if operation is None or entry["outcome"] != "completed":
+                continue
+            digest = entry["capability_manifest_sha256"]
+            matching_keys = [
+                key
+                for key, candidate_digest in capability_digests.items()
+                if candidate_digest == digest
+            ]
+            if len(matching_keys) != 1:
+                raise LifecycleError("terminal capability cardinality mismatch")
+            key = matching_keys[0]
+            member_operation, execution_epoch = key.split(":", 1)
+            completion_epoch = entry["lease_epoch"]
+            next_epoch = (
+                "cutover-recovery-1"
+                if execution_epoch == "cutover"
+                else f"cutover-recovery-{int(execution_epoch.rsplit('-', 1)[1]) + 1}"
+            )
+            claims = [
+                row
+                for row in entries
+                if row["outcome"] == "capability_claimed"
+                and row["capability_manifest_sha256"] == digest
+            ]
+            completions = [
+                row
+                for row in entries
+                if row["outcome"] == "completed"
+                and row["capability_manifest_sha256"] == digest
+            ]
+            if (
+                member_operation != operation
+                or capability_states[key] != "completed"
+                or key not in self.results
+                or len(claims) != 1
+                or len(completions) != 1
+                or completion_epoch not in (execution_epoch, next_epoch)
+            ):
+                raise LifecycleError("terminal completed/result/location mismatch")
+            if operation in self.completions:
+                raise LifecycleError("duplicate terminal completion")
+            self.completions[operation] = entry["entry_hash"]
 
     def append(
         self,
@@ -918,6 +1126,8 @@ class Engine:
         *,
         accepted_kind: str = "none",
         accepted_hash: str | None = None,
+        publish_fixed_checkpoint: bool = True,
+        checkpoint_predecessor: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         previous = self.journal[-1]["entry_hash"] if self.journal else ZERO
         entry = {
@@ -953,17 +1163,27 @@ class Engine:
         after_journal = getattr(self.executor, "after_journal_fsync", None)
         if after_journal is not None:
             after_journal(entry)
-        self.publish_checkpoint(entry)
-        after_checkpoint = getattr(self.executor, "after_checkpoint_publication", None)
-        if after_checkpoint is not None:
-            after_checkpoint(entry)
+        if publish_fixed_checkpoint:
+            self.publish_checkpoint(entry, checkpoint_predecessor)
+            after_checkpoint = getattr(self.executor, "after_checkpoint_publication", None)
+            if after_checkpoint is not None:
+                after_checkpoint(entry)
         self.trace.append(f"journal:{outcome}")
         return entry
 
-    def publish_checkpoint(self, entry: dict[str, Any]) -> bytes:
+    def publish_checkpoint(
+        self,
+        entry: dict[str, Any],
+        checkpoint_predecessor: dict[str, Any] | None = None,
+    ) -> bytes:
         data = self.checkpoint_bytes(entry)
+        predecessor_entry = checkpoint_predecessor
+        if predecessor_entry is None and len(self.journal) > 1:
+            predecessor_entry = self.journal[-2]
         predecessor = (
-            self.checkpoint_bytes(self.journal[-2]) if len(self.journal) > 1 else None
+            self.checkpoint_bytes(predecessor_entry)
+            if predecessor_entry is not None
+            else None
         )
         journal_bytes = validate_regular_file(self.journal_path, mode=0o600)
         self.repair_checkpoint(
@@ -1125,39 +1345,85 @@ class Engine:
         path, capability, digest = self.publish_capability(operation, root_epoch, command, copy_path, None)
         if operation == "install" and stop == "published":
             return
-        total_predecessors = int(chain["recoveryReissues"]) + int(chain["publicationWindowOrphans"])
+        recovery_reissues = int(chain["recoveryReissues"])
+        publication_orphans = int(chain["publicationWindowOrphans"])
         epochs = [root_epoch]
         digests = [digest]
         capability_objects = [capability]
-        if total_predecessors == 0:
+        retirement_count = 0
+
+        def publish_successor() -> None:
+            nonlocal retirement_count
+            next_number = 1 if epochs[-1] == "cutover" else int(epochs[-1].rsplit("-", 1)[1]) + 1
+            epoch = f"cutover-recovery-{next_number}"
+            recovery_copy = self.publish_copy(
+                operation, epoch, self.checkpoint_path.read_bytes()
+            )
+            _, next_capability, next_digest = self.publish_capability(
+                operation, epoch, command, recovery_copy, digests[-1]
+            )
+            epochs.append(epoch)
+            digests.append(next_digest)
+            capability_objects.append(next_capability)
+            if chain["faultAfter"] == "successor-publication":
+                raise LifecycleError("injected crash after successor publication")
+
+        def retire_backlog() -> None:
+            nonlocal retirement_count
+            for epoch in epochs[:-1]:
+                current = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
+                if current.parent.name in ("issued", "claimed"):
+                    self.move_capability(
+                        operation, epoch, current.parent.name, "superseded"
+                    )
+                    self.trace.append("retire:predecessor")
+                    retirement_count += 1
+                    if chain["faultAfter"] == f"predecessor-retirement-{retirement_count}":
+                        raise LifecycleError(
+                            f"injected crash after predecessor retirement {retirement_count}"
+                        )
+
+        if recovery_reissues == 0 and publication_orphans == 0:
             outcome = "capability_issued" if root_epoch == "cutover" else "recovery_reacquired"
             self.append(TARGET_PHASES[operation], outcome, COMMANDS[operation], command["command_sha256"], root_epoch, digest)
         else:
             if root_epoch == "cutover":
                 self.append(TARGET_PHASES[operation], "capability_issued", COMMANDS[operation], command["command_sha256"], root_epoch, digest)
-            for index in range(1, total_predecessors + 1):
-                epoch = f"cutover-recovery-{index}"
-                recovery_copy = self.publish_copy(operation, epoch, self.checkpoint_path.read_bytes())
-                path, next_capability, next_digest = self.publish_capability(
-                    operation, epoch, command, recovery_copy, digests[-1]
+            else:
+                self.append(TARGET_PHASES[operation], "recovery_reacquired", COMMANDS[operation], command["command_sha256"], root_epoch, digest)
+
+            # A reissue was real recovery authority before the following lease
+            # loss, so each has its own recovery lifecycle row.
+            for _ in range(recovery_reissues):
+                publish_successor()
+                retire_backlog()
+                self.append(
+                    TARGET_PHASES[operation],
+                    "recovery_reacquired",
+                    COMMANDS[operation],
+                    command["command_sha256"],
+                    epochs[-1],
+                    digests[-1],
                 )
-                epochs.append(epoch)
-                digests.append(next_digest)
-                capability_objects.append(next_capability)
-                if chain["faultAfter"] == "successor-publication":
-                    raise LifecycleError("injected crash after successor publication")
-            for index, epoch in enumerate(epochs[:-1], 1):
-                current = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
-                state = current.parent.name
-                if state in ("issued", "claimed"):
-                    self.move_capability(operation, epoch, state, "superseded")
-                self.trace.append("retire:predecessor")
-                if chain["faultAfter"] == f"predecessor-retirement-{index}":
-                    raise LifecycleError(f"injected crash after predecessor retirement {index}")
+
+            # Publication-window orphans are a consecutive unreferenced suffix.
+            # The first later authority is one additional direct successor.
+            for _ in range(publication_orphans):
+                publish_successor()
+            if publication_orphans:
+                publish_successor()
+                retire_backlog()
+                self.append(
+                    TARGET_PHASES[operation],
+                    "recovery_reacquired",
+                    COMMANDS[operation],
+                    command["command_sha256"],
+                    epochs[-1],
+                    digests[-1],
+                )
             root_epoch = epochs[-1]
             capability = capability_objects[-1]
             digest = digests[-1]
-            self.append(TARGET_PHASES[operation], "recovery_reacquired", COMMANDS[operation], command["command_sha256"], root_epoch, digest)
         if operation == "install" and stop == "issued":
             return
         result = self.delegate_claim(operation, root_epoch)
@@ -1198,6 +1464,9 @@ class Engine:
             member_bytes = validate_regular_file(pathlib.Path(value), mode=0o400)
             members[sha256(member_bytes)] = (epoch, json.loads(member_bytes))
 
+        lease_reacquired = self.lease_reacquired
+
+        created_after_loss = False
         if not members:
             copy_epochs = sorted(
                 (
@@ -1207,7 +1476,11 @@ class Engine:
                 ),
                 key=epoch_order,
             )
-            root_epoch = copy_epochs[-1] if copy_epochs else "cutover"
+            root_epoch = (
+                "cutover-recovery-1"
+                if lease_reacquired
+                else (copy_epochs[-1] if copy_epochs else "cutover")
+            )
             root_key = f"{operation}:{root_epoch}"
             copy_path = (
                 pathlib.Path(self.retained[root_key])
@@ -1230,6 +1503,7 @@ class Engine:
                     )
                 ),
             )
+            created_after_loss = lease_reacquired
 
         roots = [
             digest
@@ -1257,6 +1531,65 @@ class Engine:
         tip_path = pathlib.Path(self.capabilities[f"{operation}:{tip_epoch}"])
         tip_bytes = validate_regular_file(tip_path, mode=0o400)
         tip_digest = sha256(tip_bytes)
+
+        result_path = self.results.get(f"{operation}:{tip_epoch}")
+        if result_path is not None:
+            result = json.loads(
+                validate_regular_file(pathlib.Path(result_path), mode=0o600)
+            )
+            current = pathlib.Path(self.capabilities[f"{operation}:{tip_epoch}"])
+            self.finish(
+                operation,
+                tip_epoch,
+                command,
+                tip_digest,
+                result,
+                "move-no-row-reacquired" if lease_reacquired else "normal",
+            )
+            return
+
+        if lease_reacquired and not created_after_loss:
+            next_number = epoch_order(tip_epoch) + 1
+            next_epoch = f"cutover-recovery-{next_number}"
+            recovery_copy = self.publish_copy(
+                operation,
+                next_epoch,
+                self.checkpoint_bytes(selector_entry),
+            )
+            _, _, successor_digest = self.publish_capability(
+                operation,
+                next_epoch,
+                command,
+                recovery_copy,
+                tip_digest,
+            )
+            if chain.get("faultAfter") == "successor-publication":
+                raise LifecycleError("injected crash after successor publication")
+            retirement_count = 0
+            for epoch in epochs:
+                path = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
+                if path.parent.name in ("issued", "claimed"):
+                    self.move_capability(
+                        operation, epoch, path.parent.name, "superseded"
+                    )
+                    self.trace.append("retire:predecessor")
+                    self.reload_durable()
+                    retirement_count += 1
+                    if chain.get("faultAfter") == f"predecessor-retirement-{retirement_count}":
+                        raise LifecycleError(
+                            f"injected crash after predecessor retirement {retirement_count}"
+                        )
+            self.append(
+                TARGET_PHASES[operation],
+                "recovery_reacquired",
+                COMMANDS[operation],
+                command["command_sha256"],
+                next_epoch,
+                successor_digest,
+            )
+            tip_epoch = next_epoch
+            tip_digest = successor_digest
+
         for epoch in epochs[:-1]:
             path = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
             if path.parent.name in ("issued", "claimed"):
@@ -1383,7 +1716,10 @@ class Engine:
         )
         self.completions[operation] = completed["entry_hash"]
 
-    def frontier(self, frontier: dict[str, Any], manifest: dict[str, Any]) -> None:
+    def materialize_frontier_precondition(
+        self, frontier: dict[str, Any], manifest: dict[str, Any]
+    ) -> None:
+        """Fixture scheduler: create a durable boundary, then classify only disk state."""
         operation = frontier["operation"]
         command = resolved_command(manifest, COMMANDS[operation], self.request)
         self.bootstrap_selector(operation, command)
@@ -1451,10 +1787,24 @@ class Engine:
                 )
                 carried = self.journal[-1]["capability_manifest_sha256"]
             if form in ("claim-moved", "claimed-no-success"):
-                self.move_capability(operation, tip_epoch, "issued", "claimed")
-            if form == "claimed-no-success":
-                self.append(TARGET_PHASES[operation], "capability_claimed", COMMANDS[operation], command["command_sha256"], tip_epoch, tip_digest)
-                carried = self.journal[-1]["capability_manifest_sha256"]
+                # The fixture schedules a real launcher stop.  Only the
+                # delegated claim process may perform the move/claim row; Root
+                # reloads and classifies the durable boundary afterward.
+                self.delegate_claim(operation, tip_epoch)
+                self.reload_durable()
+                current = pathlib.Path(self.capabilities[f"{operation}:{tip_epoch}"])
+                if current.parent.name != "claimed":
+                    raise LifecycleError("frontier launcher boundary not durable")
+                if form == "claimed-no-success":
+                    claims = [
+                        row
+                        for row in self.journal
+                        if row["outcome"] == "capability_claimed"
+                        and row["capability_manifest_sha256"] == tip_digest
+                    ]
+                    if len(claims) != 1:
+                        raise LifecycleError("frontier claim row cardinality mismatch")
+                    carried = claims[0]["capability_manifest_sha256"]
         if frontier["activationCommitRace"] == "committed-before-r":
             raise LifecycleError("activation classification incident")
         if frontier["exactSuccessBeforeDisposition"]:
@@ -1462,13 +1812,61 @@ class Engine:
                 copy = self.publish_copy(operation, "cutover", selector_bytes)
                 _, capability, tip_digest = self.publish_capability(operation, "cutover", command, copy, None)
                 self.append(TARGET_PHASES[operation], "capability_issued", COMMANDS[operation], command["command_sha256"], "cutover", tip_digest)
-                self.move_capability(operation, "cutover", "issued", "claimed")
-                self.append(TARGET_PHASES[operation], "capability_claimed", COMMANDS[operation], command["command_sha256"], "cutover", tip_digest)
-            result = self.synthetic_result(operation, tip_digest)
+            result_path = self.results.get(f"{operation}:{tip_epoch}")
+            result = (
+                json.loads(validate_regular_file(pathlib.Path(result_path), mode=0o600))
+                if result_path is not None
+                else self.delegate_claim(operation, tip_epoch)
+            )
+            if result is None:
+                raise LifecycleError("exact success was not durably produced by launcher")
             self.finish(operation, tip_epoch, command, tip_digest, result, "move-no-row-reacquired")
             return
-        f_capability = carried
-        decision_epoch = "cutover" if frontier["lease"] == "continuous" else "cutover-recovery-1"
+        self.reload_durable()
+        self.dispose_durable_frontier(
+            operation,
+            command,
+            activation_after_r=frontier["activationCommitRace"] == "committed-after-r",
+        )
+
+    def dispose_durable_frontier(
+        self,
+        operation: str,
+        command: dict[str, Any],
+        *,
+        activation_after_r: bool,
+    ) -> None:
+        """Classify and dispose only the unique frontier reconstructed from disk."""
+        if operation in self.completions:
+            return
+        f_capability = self.journal[-1]["capability_manifest_sha256"]
+        members: list[tuple[int, str, str]] = []
+        for key, raw_path in self.capabilities.items():
+            member_operation, epoch = key.split(":", 1)
+            if member_operation != operation:
+                continue
+            data = validate_regular_file(pathlib.Path(raw_path), mode=0o400)
+            order = 0 if epoch == "cutover" else int(epoch.rsplit("-", 1)[1])
+            members.append((order, epoch, sha256(data)))
+        members.sort()
+        tip_epoch = members[-1][1] if members else "cutover"
+        tip_digest = members[-1][2] if members else None
+        highest = 0
+        for key in (*self.retained.keys(), *self.capabilities.keys()):
+            member_operation, epoch = key.split(":", 1)
+            if member_operation != operation:
+                continue
+            highest = max(
+                highest,
+                0 if epoch == "cutover" else int(epoch.rsplit("-", 1)[1]),
+            )
+        # This structural producer does not select product rollback.  Its R
+        # epoch follows the durable frontier: multi-epoch evidence consumes the
+        # next decision epoch; initial evidence remains cutover.  The scenario
+        # lease label is never authority.
+        decision_epoch = (
+            f"cutover-recovery-{highest + 1}" if highest > 0 else "cutover"
+        )
         r_capability = tip_digest if tip_digest is not None else f_capability
         disposition = self.append(
             "rollback_preparing",
@@ -1479,12 +1877,12 @@ class Engine:
             r_capability,
         )
         self.frontier_hash = disposition["entry_hash"]
-        if frontier["activationCommitRace"] == "committed-after-r":
+        if activation_after_r:
             raise LifecycleError("activation-after-R incident")
-        if tip_digest is not None:
-            current = pathlib.Path(self.capabilities[f"{operation}:{tip_epoch}"])
+        for _, epoch, _ in members:
+            current = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
             if current.parent.name in ("issued", "claimed"):
-                self.move_capability(operation, tip_epoch, current.parent.name, "superseded")
+                self.move_capability(operation, epoch, current.parent.name, "superseded")
                 self.trace.append("retire:predecessor")
         intent = self.append(
             "rollback_preparing",
@@ -1493,6 +1891,7 @@ class Engine:
             ZERO,
             decision_epoch,
             f_capability,
+            publish_fixed_checkpoint=False,
         )
         final_manifest = {
             "schema_version": "megacampus.q12.final-writer-manifest/v1",
@@ -1513,6 +1912,7 @@ class Engine:
             f_capability,
             accepted_kind="final_writer_manifest",
             accepted_hash=manifest_hash,
+            checkpoint_predecessor=disposition,
         )
 
     def output(self) -> dict[str, Any]:
@@ -1527,6 +1927,7 @@ class Engine:
             "frontierDispositionEntryHash": self.frontier_hash,
             "checkpointPaths": self.checkpoint_paths,
             "leaseFd9Validated": self.lease_fd_9_validated,
+            "canonicalLeaseFd9Validated": self.canonical_lease_fd_9_validated,
             "inheritedJournalIdentityValidated": self.inherited_journal_identity_validated,
         }
 
@@ -1554,8 +1955,6 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
         or lease_stat.st_nlink != 1
     ):
         raise LifecycleError("inherited descriptor identity mismatch")
-    fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
     capability_argument = pathlib.Path(arguments.capability)
     require_lexical_absolute(capability_argument)
     validate_regular_file(capability_argument, mode=0o400)
@@ -1565,6 +1964,7 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
     expected_run_root = pathlib.Path("/opt/megacampus/backups/q12") / arguments.run_id
     if run_root != expected_run_root:
         raise LifecycleError("capability run root mismatch")
+    lease_identity = validate_canonical_lease_lock(run_root, 9)
 
     journal_path = run_root / "phase.jsonl"
     path_stat = journal_path.lstat()
@@ -1581,6 +1981,7 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
         "operator_digest": last["operator_digest"],
         "resource_manifest_sha256": last["resource_manifest_sha256"],
         "quiesce_manifest_sha256": last["quiesce_manifest_sha256"],
+        "rotation_required": last["rotation_required"],
         "expected_catalog_sha256": "",
         "inherited_journal_fd": 8,
         "production": True,
@@ -1673,6 +2074,8 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
     result_path = engine.run_root / f"retained-barrier-result-{operation}-{epoch}.json"
     if os.path.lexists(result_path):
         result = json.loads(validate_regular_file(result_path, mode=0o600))
+        if validate_canonical_lease_lock(run_root, 9) != lease_identity:
+            raise LifecycleError("canonical lease lock changed during claim")
         return {
             "claimProcessBoundary": True,
             "launcherOwnedClaimMutation": True,
@@ -1701,6 +2104,8 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
     result_hook = getattr(executor, "after_result_publication", None)
     if result_hook is not None:
         result_hook()
+    if validate_canonical_lease_lock(run_root, 9) != lease_identity:
+        raise LifecycleError("canonical lease lock changed during child transition")
     return {
         "claimProcessBoundary": True,
         "launcherOwnedClaimMutation": True,
@@ -1731,12 +2136,43 @@ def validate_request(request: dict[str, Any]) -> None:
             raise LifecycleError(f"invalid request hash: {name}")
     if not re.fullmatch(r"[0-9a-f]{40}", request["release_sha"]):
         raise LifecycleError("invalid release SHA")
+    if "rotation_required" in request and not isinstance(
+        request["rotation_required"], bool
+    ):
+        raise LifecycleError("rotation_required must be boolean")
 
 
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     validate_request(request)
     manifest = load_manifest()
-    engine = Engine(request, executor)
+    lease_fd = int(request.get("lease_fd", 9))
+    run_root = pathlib.Path(request["run_root"])
+    session = _LEASE_SESSIONS.get(executor)
+    new_session = session is None
+    if session is not None:
+        anchor_stat = os.fstat(session.anchor_fd)
+        if (anchor_stat.st_dev, anchor_stat.st_ino) != (session.device, session.inode):
+            raise LifecycleError("lease session anchor identity changed")
+        os.dup2(session.anchor_fd, lease_fd, inheritable=True)
+    canonical_identity = validate_canonical_lease_lock(run_root, lease_fd)
+    if session is None:
+        anchor_fd = os.dup(lease_fd)
+        os.set_inheritable(anchor_fd, False)
+        session = LeaseSession(
+            canonical_identity[0],
+            canonical_identity[1],
+            anchor_fd,
+            weakref.finalize(executor, os.close, anchor_fd),
+        )
+        _LEASE_SESSIONS[executor] = session
+    elif canonical_identity != (session.device, session.inode):
+        raise LifecycleError("lease session canonical identity changed")
+    engine = Engine(request, executor, lease_reacquired=False)
+    # Engine obtained the journal through its validated descriptor and parsed
+    # its complete ancestry.  Only that durable view may classify a fresh
+    # process-local session as a reacquisition.
+    engine.lease_reacquired = new_session and bool(engine.journal)
+    engine.canonical_lease_fd_9_validated = True
     for operation, chain in request["chains"].items():
         if operation not in OPERATIONS or chain.get("operation") != operation:
             raise LifecycleError("chain operation mismatch")
@@ -1749,8 +2185,10 @@ def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any
     if frontier is not None:
         if frontier["operation"] == "install":
             raise LifecycleError("install cannot be an abandoned frontier")
-        engine.frontier(frontier, manifest)
+        engine.materialize_frontier_precondition(frontier, manifest)
     atomic_replace(engine.run_root / "trace.json", complete_object(engine.trace), 0o600)
+    if validate_canonical_lease_lock(run_root, lease_fd) != canonical_identity:
+        raise LifecycleError("canonical lease lock changed during supervisor transition")
     return engine.output()
 
 

@@ -93,6 +93,15 @@ export interface RootRetainedBarrierFixtureSpec {
     | 'completed-row'
     | 'completed-checkpoint';
   simulateLeaseLoss?: boolean;
+  leaseMutation?:
+    | 'wrong-path'
+    | 'wrong-inode'
+    | 'wrong-mode'
+    | 'unlocked'
+    | 'ancestor-symlink'
+    | 'wrong-fd-then-correct';
+  rotationRequired?: boolean;
+  reopenLeaseFdBeforeResume?: boolean;
   claimPathMutation?: 'symlink' | 'dotdot' | 'parent-symlink';
   clearJournalAppendFlag?: boolean;
   checkpointRepairCase?: 'foreign-next' | 'stale-predecessor' | 'identity-swap' | 'missing-current';

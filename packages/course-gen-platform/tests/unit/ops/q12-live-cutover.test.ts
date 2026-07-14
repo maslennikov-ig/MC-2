@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -92,6 +93,191 @@ function canonical(value: Record<string, unknown>): string {
 }
 
 describe('Root D5 fixture contract boundary', () => {
+  it('direct-supersedes an issued cutover capability after a real two-process lease loss', async () => {
+    const first = spec({
+      install: chain('install', {
+        stopAfter: 'issued',
+        installTransaction: 'not-committed',
+      }),
+    });
+    await materializeRootRetainedBarrierFixture(first);
+    const firstPid = Number(
+      JSON.parse(readFileSync(join(first.runRoot, 'executor-audit.json'), 'utf8')).supervisorPid
+    );
+
+    const fixture = await materializeRootRetainedBarrierFixture({
+      ...first,
+      chains: { install: chain('install') },
+    });
+    const secondAudit = JSON.parse(
+      readFileSync(join(first.runRoot, 'executor-audit.json'), 'utf8')
+    ) as { supervisorPid: number; childExecutions: number };
+    expect(secondAudit.supervisorPid).not.toBe(firstPid);
+    expect(secondAudit.childExecutions).toBe(1);
+    expect(
+      fixture.journalEntries.some(
+        row => row.outcome === 'capability_claimed' && row.lease_epoch === 'cutover'
+      )
+    ).toBe(false);
+    expect(fixture.journalEntries).toContainEqual(
+      expect.objectContaining({
+        outcome: 'recovery_reacquired',
+        lease_epoch: 'cutover-recovery-1',
+      })
+    );
+    expect(fixture.journalEntries.at(-1)).toMatchObject({
+      outcome: 'completed',
+      lease_epoch: 'cutover-recovery-1',
+    });
+    expect(fixture.capabilityPaths.get('install:cutover')).toContain('/superseded/');
+    expect(fixture.capabilityPaths.get('install:cutover-recovery-1')).toContain('/completed/');
+  });
+
+  it('continues selector-only state after real lease loss from a null-root recovery-1', async () => {
+    const first = spec({
+      install: chain('install', {
+        stopAfter: 'selector',
+        installTransaction: 'not-committed',
+      }),
+    });
+    await materializeRootRetainedBarrierFixture(first);
+    const fixture = await materializeRootRetainedBarrierFixture({
+      ...first,
+      chains: { install: chain('install') },
+    });
+    expect(fixture.retainedCopyPaths.has('install:cutover')).toBe(false);
+    const recovery = fixture.capabilityPaths.get('install:cutover-recovery-1')!;
+    expect(JSON.parse(readFileSync(recovery, 'utf8')).supersedes_capability_sha256).toBeNull();
+    expect(recovery).toContain('/completed/');
+  });
+
+  it.each(['missing-result', 'completed-capability-in-claimed'] as const)(
+    'rejects terminal durable inconsistency %s in a second process',
+    async inconsistency => {
+      const first = spec({ install: chain('install') });
+      await materializeRootRetainedBarrierFixture(first);
+      if (inconsistency === 'missing-result') {
+        rmSync(join(first.runRoot, 'retained-barrier-result-install-cutover.json'));
+      } else {
+        const name = 'barrier.install--cutover.json';
+        renameSync(
+          join(first.runRoot, 'capabilities', 'completed', name),
+          join(first.runRoot, 'capabilities', 'claimed', name)
+        );
+      }
+      await expect(
+        materializeRootRetainedBarrierFixture({ ...first, chains: { install: chain('install') } })
+      ).rejects.toThrow(/terminal|completed|result/i);
+    }
+  );
+
+  it.each([
+    ['unknown capability residue', 'capabilities/issued/foreign.tmp'],
+    ['unknown retained lifecycle residue', 'retained-barrier-result-install-cutover.json.tmp'],
+  ] as const)('rejects %s before trusting terminal completion', async (_label, relativePath) => {
+    const first = spec({ install: chain('install') });
+    await materializeRootRetainedBarrierFixture(first);
+    writeFileSync(join(first.runRoot, relativePath), 'foreign\n', { mode: 0o600 });
+    await expect(
+      materializeRootRetainedBarrierFixture({ ...first, chains: { install: chain('install') } })
+    ).rejects.toThrow(/unknown|residue|lifecycle/i);
+  });
+
+  it('binds inherited FD9 to the canonical parent cutover.lock identity', async () => {
+    const candidate = spec({ install: chain('install') });
+    await materializeRootRetainedBarrierFixture(candidate);
+    expect(existsSync(join(candidate.runRoot, 'cutover.lock'))).toBe(false);
+    expect(lstatSync(join(candidate.runRoot, '..', 'cutover.lock')).mode & 0o777).toBe(0o600);
+    expect(
+      JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+    ).toMatchObject({ canonicalLeaseFd9Validated: true });
+  });
+
+  it.each(['wrong-path', 'wrong-inode', 'wrong-mode', 'unlocked'] as const)(
+    'rejects canonical FD9 mutation %s before claim',
+    async leaseMutation => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({ install: chain('install') }),
+        leaseMutation,
+      };
+      await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+        /canonical.*lock|lease.*lock|FD 9/i
+      );
+      expect(JSON.parse(readFileSync(join(candidate.runRoot, 'effects.json'), 'utf8'))).toEqual([]);
+    }
+  );
+
+  it('rejects a symlink in the canonical lock ancestor chain', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      leaseMutation: 'ancestor-symlink',
+    };
+    await materializeRootRetainedBarrierFixture(candidate);
+    expect(
+      JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+    ).toMatchObject({ ancestorSymlinkRejected: true });
+  });
+
+  it('does not retain a LeaseSession after failed canonical FD9 validation', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      leaseMutation: 'wrong-fd-then-correct',
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    expect(fixture.journalEntries.at(-1)).toMatchObject({ outcome: 'completed' });
+    expect(
+      JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+    ).toMatchObject({ leaseSessionRetainedAfterFailedValidation: false });
+  });
+
+  it('restores the core-owned lease anchor when the same executor closes and reopens FD9', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({
+        install: chain('install', {
+          stopAfter: 'issued',
+          installTransaction: 'not-committed',
+        }),
+      }),
+      resumeAfterStop: true,
+      reopenLeaseFdBeforeResume: true,
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    expect(
+      fixture.journalEntries.filter(row => row.outcome === 'recovery_reacquired')
+    ).toHaveLength(0);
+    expect(fixture.journalEntries.at(-1)).toMatchObject({
+      outcome: 'completed',
+      lease_epoch: 'cutover',
+    });
+  });
+
+  it('uses the frozen all-zero quiesce hash for the install command', async () => {
+    const fixture = await materializeRootRetainedBarrierFixture(
+      spec({ install: chain('install') })
+    );
+    const capability = JSON.parse(
+      readFileSync(fixture.capabilityPaths.get('install:cutover')!, 'utf8')
+    ) as Record<string, unknown>;
+    expect(capability.quiesce_manifest_sha256).toBe('0'.repeat(64));
+    expect(
+      fixture.journalEntries.every(row => row.quiesce_manifest_sha256 === '0'.repeat(64))
+    ).toBe(true);
+  });
+
+  it.each([false, true])(
+    'preserves rotation_required=%s through issuance, delegated claim, and completion',
+    async rotationRequired => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({ install: chain('install') }),
+        rotationRequired,
+      };
+      const fixture = await materializeRootRetainedBarrierFixture(candidate);
+      expect(fixture.journalEntries.every(row => row.rotation_required === rotationRequired)).toBe(
+        true
+      );
+    }
+  );
+
   it('routes every positive through production run_supervisor/run_claim with no independent serializer', async () => {
     const runner = readFileSync(
       join(
@@ -189,6 +375,102 @@ describe('Root D5 fixture contract boundary', () => {
     'accepts exact epoch %s',
     value => {
       expect(parseLeaseEpoch(value)).toBe(value);
+    }
+  );
+
+  it('creates the next direct successor after a real process dies at reissue publication', async () => {
+    const first = spec({
+      'verify-after-base': chain('verify-after-base', {
+        recoveryReissues: 1,
+        faultAfter: 'successor-publication',
+      }),
+    });
+    await expect(materializeRootRetainedBarrierFixture(first)).rejects.toThrow(/injected crash/);
+    const firstPid = Number(
+      JSON.parse(readFileSync(join(first.runRoot, 'executor-audit.json'), 'utf8')).supervisorPid
+    );
+    const fixture = await materializeRootRetainedBarrierFixture({
+      ...first,
+      chains: { 'verify-after-base': chain('verify-after-base') },
+    });
+    const secondPid = Number(
+      JSON.parse(readFileSync(join(first.runRoot, 'executor-audit.json'), 'utf8')).supervisorPid
+    );
+    expect(secondPid).not.toBe(firstPid);
+    expect(fixture.journalEntries.filter(row => row.outcome === 'recovery_reacquired')).toEqual([
+      expect.objectContaining({ lease_epoch: 'cutover-recovery-2' }),
+    ]);
+    expect(fixture.capabilityPaths.get('verify-after-base:cutover-recovery-1')).toContain(
+      '/superseded/'
+    );
+  });
+
+  it('derives two consecutive journal-less orphans from two real publication-loss PIDs', async () => {
+    const first = spec({
+      'verify-after-base': chain('verify-after-base', {
+        publicationWindowOrphans: 1,
+        faultAfter: 'successor-publication',
+      }),
+    });
+    await expect(materializeRootRetainedBarrierFixture(first)).rejects.toThrow(/injected crash/);
+    await expect(
+      materializeRootRetainedBarrierFixture({
+        ...first,
+        chains: {
+          'verify-after-base': chain('verify-after-base', {
+            faultAfter: 'successor-publication',
+          }),
+        },
+      })
+    ).rejects.toThrow(/injected crash/);
+    const fixture = await materializeRootRetainedBarrierFixture({
+      ...first,
+      chains: { 'verify-after-base': chain('verify-after-base') },
+    });
+    expect(fixture.journalEntries).toContainEqual(
+      expect.objectContaining({
+        outcome: 'recovery_reacquired',
+        lease_epoch: 'cutover-recovery-3',
+      })
+    );
+    for (const epoch of ['cutover-recovery-1', 'cutover-recovery-2']) {
+      const path = fixture.capabilityPaths.get(`verify-after-base:${epoch}`)!;
+      const digest = sha(readFileSync(path));
+      expect(fixture.journalEntries.some(row => row.capability_manifest_sha256 === digest)).toBe(
+        false
+      );
+      expect(path).toContain('/superseded/');
+    }
+  });
+
+  it.each([1, 2, 3] as const)(
+    'publishes a fresh successor after real process loss at predecessor retirement %i',
+    async retirement => {
+      const first = spec({
+        'verify-after-base': chain('verify-after-base', {
+          publicationWindowOrphans: 2,
+          faultAfter: `predecessor-retirement-${retirement}`,
+        }),
+      });
+      await expect(materializeRootRetainedBarrierFixture(first)).rejects.toThrow(/injected crash/);
+      const fixture = await materializeRootRetainedBarrierFixture({
+        ...first,
+        chains: { 'verify-after-base': chain('verify-after-base') },
+      });
+      expect(fixture.journalEntries).toContainEqual(
+        expect.objectContaining({
+          outcome: 'recovery_reacquired',
+          lease_epoch: 'cutover-recovery-4',
+        })
+      );
+      for (const epoch of [
+        'cutover',
+        'cutover-recovery-1',
+        'cutover-recovery-2',
+        'cutover-recovery-3',
+      ]) {
+        expect(fixture.capabilityPaths.get(`verify-after-base:${epoch}`)).toContain('/superseded/');
+      }
     }
   );
 
@@ -520,22 +802,22 @@ describe('Root recovery and crash matrix', () => {
     expect(audit.attemptedEffects).toEqual([]);
   });
 
-  it('infers a durable recovery-4 tip when resumed with production-shaped zero dimensions', async () => {
+  it('infers a durable recovery-5 tip when resumed with production-shaped zero dimensions', async () => {
     const candidate: RootRetainedBarrierFixtureSpec = {
       ...spec({
         'verify-after-observability': chain('verify-after-observability', {
           recoveryReissues: 2,
           publicationWindowOrphans: 2,
-          faultAfter: 'predecessor-retirement-2',
+          faultAfter: 'predecessor-retirement-3',
         }),
       }),
       resumeAfterFault: true,
     };
     const fixture = await materializeRootRetainedBarrierFixture(candidate);
     expect(fixture.journalEntries).toContainEqual(
-      expect.objectContaining({ outcome: 'recovery_reacquired', lease_epoch: 'cutover-recovery-4' })
+      expect.objectContaining({ outcome: 'recovery_reacquired', lease_epoch: 'cutover-recovery-5' })
     );
-    expect(fixture.capabilityPaths.get('verify-after-observability:cutover-recovery-4')).toContain(
+    expect(fixture.capabilityPaths.get('verify-after-observability:cutover-recovery-5')).toContain(
       '/completed/'
     );
     expect(
@@ -644,7 +926,7 @@ describe('Root recovery and crash matrix', () => {
       const superseded = [...fixture.capabilityPaths.values()].filter(path =>
         path.includes('/superseded/')
       );
-      expect(superseded.length).toBe(reissues + orphans);
+      expect(superseded.length).toBe(orphans > 0 ? 1 + reissues + orphans : reissues);
     }
   );
 
@@ -912,6 +1194,69 @@ describe('Rollback frontier and activation classifier', () => {
     }
   );
 
+  it.each([
+    [2, 0, ['cutover-recovery-1', 'cutover-recovery-2'], []],
+    [0, 2, ['cutover-recovery-3'], ['cutover-recovery-1', 'cutover-recovery-2']],
+    [
+      1,
+      2,
+      ['cutover-recovery-1', 'cutover-recovery-4'],
+      ['cutover-recovery-2', 'cutover-recovery-3'],
+    ],
+  ] as const)(
+    'separates %i recovery reissues from %i journal-less orphan epochs',
+    async (reissues, orphans, recoveryEpochs, orphanEpochs) => {
+      const fixture = await materializeRootRetainedBarrierFixture(
+        spec({
+          'verify-after-base': chain('verify-after-base', {
+            recoveryReissues: reissues,
+            publicationWindowOrphans: orphans,
+          }),
+        })
+      );
+      const capabilities = [...fixture.capabilityPaths.entries()]
+        .filter(([key]) => key.startsWith('verify-after-base:'))
+        .sort(([left], [right]) => left.localeCompare(right));
+      const byEpoch = new Map(
+        capabilities.map(([key, path]) => {
+          const capability = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+          return [key.split(':')[1], { path, capability, digest: sha(readFileSync(path)) }];
+        })
+      );
+      const orderedEpochs = [
+        'cutover',
+        ...Array.from(
+          { length: reissues + orphans + (orphans > 0 ? 1 : 0) },
+          (_, index) => `cutover-recovery-${index + 1}`
+        ),
+      ];
+      expect(
+        [...byEpoch.keys()].sort(
+          (left, right) => orderedEpochs.indexOf(left) - orderedEpochs.indexOf(right)
+        )
+      ).toEqual(orderedEpochs);
+      for (let index = 1; index < orderedEpochs.length; index += 1) {
+        expect(byEpoch.get(orderedEpochs[index])?.capability.supersedes_capability_sha256).toBe(
+          byEpoch.get(orderedEpochs[index - 1])?.digest
+        );
+      }
+      const recoveryRows = fixture.journalEntries.filter(
+        row => row.outcome === 'recovery_reacquired'
+      );
+      expect(recoveryRows.map(row => row.lease_epoch)).toEqual(recoveryEpochs);
+      for (const epoch of orphanEpochs) {
+        const digest = byEpoch.get(epoch)!.digest;
+        expect(fixture.journalEntries.some(row => row.capability_manifest_sha256 === digest)).toBe(
+          false
+        );
+      }
+      expect(byEpoch.get(orderedEpochs.at(-1)!)?.path).toContain('/completed/');
+      for (const epoch of orderedEpochs.slice(0, -1)) {
+        expect(byEpoch.get(epoch)?.path).toContain('/superseded/');
+      }
+    }
+  );
+
   it.each(copySets)('preserves exact pre-capability copy set %s', async copySet => {
     const candidate: RootRetainedBarrierFixtureSpec = {
       ...spec({ install: chain('install') }, 'rollback'),
@@ -938,7 +1283,8 @@ describe('Rollback frontier and activation classifier', () => {
           : copySet === 'recovery-1'
             ? ['verify-after-base:cutover-recovery-1']
             : ['verify-after-base:cutover', 'verify-after-base:cutover-recovery-1'];
-    expect(keys).toEqual(expected);
+    const byCapabilityName = (left: string, right: string) => left.localeCompare(right);
+    expect([...keys].sort(byCapabilityName)).toEqual([...expected].sort(byCapabilityName));
   });
 
   it('makes R the sole journal-less tip reference and projects F afterward', async () => {
@@ -957,12 +1303,42 @@ describe('Rollback frontier and activation classifier', () => {
     };
     const fixture = await materializeRootRetainedBarrierFixture(candidate);
     const r = fixture.journalEntries.find(row => row.outcome === 'retained_attempt_abandoning')!;
+    expect(r.lease_epoch).toBe('cutover-recovery-2');
     const tip = String(r.capability_manifest_sha256);
     expect(fixture.journalEntries.filter(row => row.capability_manifest_sha256 === tip)).toEqual([
       r,
     ]);
     const later = fixture.journalEntries.slice(fixture.journalEntries.indexOf(r) + 1);
     expect(later.every(row => row.capability_manifest_sha256 !== tip)).toBe(true);
+    const fixed = JSON.parse(readFileSync(fixture.fixedCheckpointPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const rCheckpoint = {
+      schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+      run_id: r.run_id,
+      seq: r.seq,
+      phase: r.phase,
+      journal_entry_hash: r.entry_hash,
+      previous_journal_entry_hash: r.previous_hash,
+      journal_device: fixed.journal_device,
+      journal_inode: fixed.journal_inode,
+      accepted_object_kind: r.accepted_object_kind,
+      accepted_object_sha256: r.accepted_object_sha256,
+      resume_authority_sha256: null,
+      lease_epoch: r.lease_epoch,
+    };
+    const manifestName = readdirSync(candidate.runRoot).find(name =>
+      name.startsWith('final-writer-manifest-')
+    )!;
+    const finalWriterManifest = JSON.parse(
+      readFileSync(join(candidate.runRoot, manifestName), 'utf8')
+    ) as Record<string, unknown>;
+    expect(finalWriterManifest.input_checkpoint_sha256).toBe(
+      sha(Buffer.from(`${canonical(rCheckpoint)}\n`))
+    );
+    const intent = later.find(row => row.outcome === 'intent')!;
+    expect(intent.previous_hash).toBe(r.entry_hash);
   });
 
   it.each(['committed-before-r', 'committed-after-r'] as const)(
