@@ -1,11 +1,18 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; exact Q12 D4 normative design/plan are independently accepted and W is unblocked for local TDD; remote/live activation remains NO-GO
+Status: all safe local Q6-Q11 and E1-E7 work accepted; exact Q12 D5 design and execution plan are owner/reviewer accepted; Root-D5 is the next local TDD dependency; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: pushed head `9d3f3a1c` plus normative clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`
+Current accepted integration evidence before D5 plan publication: pushed head `09fe24ad`; accepted D5 design SHA `b5f63cd6…540e8`; accepted D5 plan SHA `8278bce9…a0ed`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
 Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
+
+## Q12 D5 Plan Acceptance (2026-07-14)
+
+- Exact plan: `docs/superpowers/plans/2026-07-14-q12-retained-barrier-capability-provenance-addendum.md`, SHA-256 `8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed`.
+- Final independent correctness/docs rereview: P0/P1/P2/P3 `0/0/0/0`; report SHA-256 values `db8bf55d…1d09` and `69b49f2b…e3c4`.
+- Ordering: Root-D5 `.13.18`, then W `.13.10`, then parallel M/H `.13.11/.13.12`, then Root `.13.13` and full local closeout; Beads cycle check passed.
+- No implementation or remote/live mutation occurred during planning. External S3 and Qdrant Cloud remain out of scope; the final activation packet still requires explicit current authorization.
 
 ## Beads Mapping
 

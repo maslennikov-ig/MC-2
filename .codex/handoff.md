@@ -3,9 +3,10 @@
 Updated: 2026-07-14
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; accepted head
-before this current-state metadata is `11ac0f0c`, and the normative addendum
-SHA-256 is `7188d792…`. Resolve the remote branch SHA before any later
-continuation. The dedicated integration worktree remains authoritative for Q12.
+before D5 plan publication is `09fe24ad`. The owner-approved D5 design is
+`b5f63cd6…540e8`; the independently accepted execution plan is
+`8278bce9…a0ed`. Resolve the containing remote SHA before continuation. The
+dedicated integration worktree remains authoritative for Q12.
 
 ## Product Truth
 
@@ -45,6 +46,7 @@ continuation. The dedicated integration worktree remains authoritative for Q12.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and a current owner-supplied Session pooler URI passed PostgreSQL `17.6` `verify-full` read-only inventory. The credential exists only in the owner-only local session file and is never copied into Git, artifacts, argv, environment, logs, or worker prompts. The owner authorized its temporary use for this staging window; terminal rotation remains a separate mutation under `.13.8`. The server still has 12/12 invalid 20-byte legacy backups and zero usable generations, so `.13.7` remains open until the new fail-closed operator creates a fresh four-file generation and its Supabase-compatible isolated restore succeeds. No live mutation has occurred.
 - The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
 - Publisher `.13.9` and G7 `.13.7.2` are accepted and integrated. W `.13.10` is pushed clean at `21cff2d0` but is not accepted; its gates pass runtime 141/141, canonical PostgreSQL 17 joined 192/192, structural 34/34 and five-file 290/290. D5 Option A and exact provenance design SHA-256 `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8` passed independent correctness/docs rereview-6 with P0-P3 zero and were explicitly owner-approved on 2026-07-14. Decision `.13.17` is accepted; local plan/TDD may proceed. M `.13.11`, H `.13.12`, and root `.13.13` remain dependency-ordered and local-only. No remote/live mutation occurred.
+- D5 execution plan SHA-256 `8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed` is accepted after final independent correctness/docs P0-P3-zero rereviews. It freezes a production-only lifecycle core, shared Root-produced fixtures, complete install/frontier/activation TDD, exact artifacts and cleanup commits. Beads `.13.18` now explicitly blocks W `.13.10`; next is Root-D5 RED/GREEN in a fresh worktree. No remote/live authority.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -67,10 +69,9 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: write and independently review the D5 execution plan for
-the owner-approved design SHA-256
-`b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`,
-then implement producer/validator TDD, finish and independently accept W `.13.10`, run M/H
+Recommended action: execute the independently accepted D5 plan SHA-256
+`8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed`:
+implement and review Root-D5 producer/core/fixture TDD, then finish and independently accept W `.13.10`, run M/H
 in parallel, and finish the root supervisor/journal join. Run the
 joined local release matrix before presenting the separate GHCR publication and
 live-cutover packet. Keep Q12 remote execution NO-GO until the frozen
