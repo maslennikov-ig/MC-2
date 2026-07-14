@@ -84,6 +84,10 @@ export interface RootRetainedBarrierFixtureSpec {
   mode: 'forward' | 'rollback';
   completed: readonly RetainedBarrierOperation[];
   chains: Readonly<Partial<Record<RetainedBarrierOperation, RetainedChainSpec>>>;
+  /** Existing immutable W-owned bytes. The runner derives the digest; callers cannot supply it. */
+  existingQuiesceManifestPath?: string;
+  /** Test-driver TOCTOU injection only; never forwarded into the production request. */
+  quiesceManifestMutation?: 'replace-after-validation';
   abandonedFrontier?: RetainedFrontierSpec;
   /** Test-driver crash injection only; never forwarded into the production request. */
   resumeAfterFault?: boolean;
@@ -178,9 +182,46 @@ export function parseLeaseEpoch(value: string): LeaseEpoch {
   return value as LeaseEpoch;
 }
 
+export function deriveRootRetainedBarrierFixtureRunId(runRoot: string): string {
+  if (!resolve(runRoot).startsWith('/tmp/')) throw new Error('fixture runRoot must be below /tmp');
+  const child = spawnSync('/usr/bin/python3', [RUNNER, '--derive-run-id'], {
+    input: JSON.stringify({ runRoot }),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+  });
+  if (child.status !== 0) {
+    throw new Error(
+      `retained barrier run-id derivation failed (${child.status}): ${child.stderr.trim()}`
+    );
+  }
+  const output = JSON.parse(child.stdout) as { runId: string };
+  return output.runId;
+}
+
+function hasLaterFourWork(spec: RootRetainedBarrierFixtureSpec): boolean {
+  return (
+    Object.keys(spec.chains).some(operation => operation !== 'install') ||
+    (spec.abandonedFrontier !== undefined && spec.abandonedFrontier.operation !== 'install')
+  );
+}
+
 function validateSpec(spec: RootRetainedBarrierFixtureSpec): void {
   if (!resolve(spec.runRoot).startsWith('/tmp/'))
     throw new Error('fixture runRoot must be below /tmp');
+  const raw = spec as RootRetainedBarrierFixtureSpec & Record<string, unknown>;
+  if ('quiesceManifestSha256' in raw || 'quiesce_manifest_sha256' in raw) {
+    throw new Error('caller quiesce digest override is forbidden');
+  }
+  const hasLaterFour = hasLaterFourWork(spec);
+  if (hasLaterFour && !spec.existingQuiesceManifestPath) {
+    throw new Error('existing quiesce manifest byte preimage is required for later-four fixtures');
+  }
+  if (!hasLaterFour && spec.existingQuiesceManifestPath) {
+    throw new Error('install-only fixture cannot accept a quiesce manifest preimage');
+  }
+  if (spec.quiesceManifestMutation && !spec.existingQuiesceManifestPath) {
+    throw new Error('quiesce manifest mutation requires an existing preimage');
+  }
   const completed = new Set(spec.completed);
   if (completed.size !== spec.completed.length)
     throw new Error('completed operations must be unique');
@@ -298,7 +339,7 @@ export async function materializeRootRetainedBarrierFixture(
   return result;
 }
 
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
@@ -307,6 +348,10 @@ function canonical(value: unknown): string {
       .join(',')}}`;
   }
   return JSON.stringify(value);
+}
+
+export function sha(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 export function rehashJournalAndCheckpointsAfterMutation(
