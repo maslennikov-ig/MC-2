@@ -20,8 +20,10 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  materializeFreshProcessRecoveryCheckpointPair,
   materializeRootRetainedBarrierFixture,
   parseLeaseEpoch,
+  r3NegativeMutationFixture,
   rehashJournalAndCheckpointsAfterMutation,
   type CompletionMode,
   type FrontierCopySet,
@@ -133,6 +135,16 @@ describe('Root D5 fixture contract boundary', () => {
     expect(fixture.capabilityPaths.get('install:cutover-recovery-1')).toContain('/completed/');
   });
 
+  it('copies the exact current issuance checkpoint into a fresh-process recovery successor', async () => {
+    const candidate = spec({ install: chain('install') });
+    const { predecessor, issuanceEntryHash, predecessorCheckpoint, recoveryCopy } =
+      await materializeFreshProcessRecoveryCheckpointPair(candidate);
+    expect(predecessor.seq).toBe(3);
+    expect(predecessor.journal_entry_hash).toBe(issuanceEntryHash);
+
+    expect(recoveryCopy).toEqual(predecessorCheckpoint);
+  });
+
   it('continues selector-only state after real lease loss from a null-root recovery-1', async () => {
     const first = spec({
       install: chain('install', {
@@ -170,6 +182,26 @@ describe('Root D5 fixture contract boundary', () => {
       ).rejects.toThrow(/terminal|completed|result/i);
     }
   );
+
+  it('rejects terminal completion ordered before its exact capability claim', async () => {
+    const candidate = spec({ install: chain('install') });
+    expect(await r3NegativeMutationFixture.claimAfterCompletion(candidate)).toEqual([
+      'completed',
+      'capability_claimed',
+    ]);
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+      /lifecycle|claim|completion|terminal/i
+    );
+  });
+
+  it('rejects a completed recovery tip whose predecessor moved back to issued', async () => {
+    const candidate = spec({ install: chain('install') });
+    expect(await r3NegativeMutationFixture.issuedPredecessor(candidate)).toBe('issued');
+
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+      /predecessor|superseded|terminal|lifecycle/i
+    );
+  });
 
   it.each([
     ['unknown capability residue', 'capabilities/issued/foreign.tmp'],

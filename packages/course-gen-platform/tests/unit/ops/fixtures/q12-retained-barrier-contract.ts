@@ -1,6 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -340,3 +347,85 @@ export function rehashJournalAndCheckpointsAfterMutation(
     throw new Error('mutation helper cannot create a positive fixture');
   }
 }
+
+export async function materializeFreshProcessRecoveryCheckpointPair(
+  candidateSpec: RootRetainedBarrierFixtureSpec
+): Promise<{
+  predecessor: Record<string, unknown>;
+  issuanceEntryHash: unknown;
+  predecessorCheckpoint: Uint8Array;
+  recoveryCopy: Uint8Array;
+}> {
+  const issuedSpec = structuredClone(candidateSpec);
+  for (const chain of Object.values(issuedSpec.chains)) {
+    if (!chain) continue;
+    chain.stopAfter = 'issued';
+    if (chain.operation === 'install') chain.installTransaction = 'not-committed';
+  }
+  const issued = await materializeRootRetainedBarrierFixture(issuedSpec);
+  const predecessorCheckpoint = readFileSync(issued.fixedCheckpointPath);
+  const recovered = await materializeRootRetainedBarrierFixture(candidateSpec);
+  const recoveryPath = recovered.retainedCopyPaths.get('install:cutover-recovery-1');
+  if (!recoveryPath) throw new Error('fresh-process recovery copy was not materialized');
+  return {
+    predecessor: JSON.parse(predecessorCheckpoint.toString()) as Record<string, unknown>,
+    issuanceEntryHash: issued.journalEntries.find(row => row.outcome === 'capability_issued')
+      ?.entry_hash,
+    predecessorCheckpoint,
+    recoveryCopy: readFileSync(recoveryPath),
+  };
+}
+
+export async function materializeTerminalClaimAfterCompletionForNegativeTest(
+  spec: RootRetainedBarrierFixtureSpec
+): Promise<string[]> {
+  const result = await materializeRootRetainedBarrierFixture(spec);
+  rehashJournalAndCheckpointsAfterMutation(result, state => {
+    const claimIndex = state.journalEntries.findIndex(row => row.outcome === 'capability_claimed');
+    const [claim] = state.journalEntries.splice(claimIndex, 1);
+    const completionIndex = state.journalEntries.findIndex(row => row.outcome === 'completed');
+    state.journalEntries.splice(completionIndex + 1, 0, claim);
+    state.journalEntries.forEach((row, index) => {
+      row.seq = index + 1;
+    });
+  });
+  const rows = readFileSync(join(dirname(result.fixedCheckpointPath), 'phase.jsonl'), 'utf8')
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line) as Record<string, unknown>);
+  const claim = rows.at(-1)!;
+  const checkpoint = JSON.parse(readFileSync(result.fixedCheckpointPath, 'utf8')) as Record<
+    string,
+    unknown
+  >;
+  Object.assign(checkpoint, {
+    seq: claim.seq,
+    phase: claim.phase,
+    journal_entry_hash: claim.entry_hash,
+    previous_journal_entry_hash: claim.previous_hash,
+    accepted_object_kind: claim.accepted_object_kind,
+    accepted_object_sha256: claim.accepted_object_sha256,
+    lease_epoch: claim.lease_epoch,
+  });
+  writeFileSync(result.fixedCheckpointPath, `${canonical(checkpoint)}\n`, { mode: 0o600 });
+  return rows.slice(-2).map(row => String(row.outcome));
+}
+
+export async function materializeIssuedRecoveryPredecessorForNegativeTest(
+  spec: RootRetainedBarrierFixtureSpec
+): Promise<string> {
+  const recoverySpec = structuredClone(spec);
+  for (const chain of Object.values(recoverySpec.chains)) {
+    if (chain) chain.recoveryReissues = 1;
+  }
+  const result = await materializeRootRetainedBarrierFixture(recoverySpec);
+  const source = result.capabilityPaths.get('install:cutover');
+  if (!source?.includes('/superseded/')) throw new Error('capability is not superseded');
+  renameSync(source, source.replace('/superseded/', '/issued/'));
+  return 'issued';
+}
+
+export const r3NegativeMutationFixture = {
+  claimAfterCompletion: materializeTerminalClaimAfterCompletionForNegativeTest,
+  issuedPredecessor: materializeIssuedRecoveryPredecessorForNegativeTest,
+} as const;

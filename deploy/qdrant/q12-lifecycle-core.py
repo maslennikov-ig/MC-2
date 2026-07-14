@@ -1042,6 +1042,12 @@ class Engine:
                     raise LifecycleError("duplicate capability lifecycle row")
                 if claims and not issuances:
                     raise LifecycleError("journal-less capability was claimed")
+                if claims and claims[0]["seq"] <= issuances[0]["seq"]:
+                    raise LifecycleError("capability claim precedes issuance")
+                if completions and (
+                    not claims or completions[0]["seq"] <= claims[0]["seq"]
+                ):
+                    raise LifecycleError("capability completion precedes claim")
                 if not references:
                     journal_less_orders.append(order)
                 elif not issuances and references != abandonments:
@@ -1090,6 +1096,14 @@ class Engine:
                 if execution_epoch == "cutover"
                 else f"cutover-recovery-{int(execution_epoch.rsplit('-', 1)[1]) + 1}"
             )
+            operation_members = sorted(
+                (
+                    0 if candidate_key.endswith(":cutover") else int(candidate_key.rsplit("-", 1)[1]),
+                    candidate_key,
+                )
+                for candidate_key in capability_digests
+                if candidate_key.startswith(f"{operation}:")
+            )
             claims = [
                 row
                 for row in entries
@@ -1109,6 +1123,11 @@ class Engine:
                 or len(claims) != 1
                 or len(completions) != 1
                 or completion_epoch not in (execution_epoch, next_epoch)
+                or key != operation_members[-1][1]
+                or any(
+                    capability_states[candidate_key] != "superseded"
+                    for _, candidate_key in operation_members[:-1]
+                )
             ):
                 raise LifecycleError("terminal completed/result/location mismatch")
             if operation in self.completions:
@@ -1551,10 +1570,15 @@ class Engine:
         if lease_reacquired and not created_after_loss:
             next_number = epoch_order(tip_epoch) + 1
             next_epoch = f"cutover-recovery-{next_number}"
+            predecessor_checkpoint = validate_regular_file(
+                self.checkpoint_path,
+                mode=0o600,
+                expected=self.checkpoint_bytes(self.journal[-1]),
+            )
             recovery_copy = self.publish_copy(
                 operation,
                 next_epoch,
-                self.checkpoint_bytes(selector_entry),
+                predecessor_checkpoint,
             )
             _, _, successor_digest = self.publish_capability(
                 operation,

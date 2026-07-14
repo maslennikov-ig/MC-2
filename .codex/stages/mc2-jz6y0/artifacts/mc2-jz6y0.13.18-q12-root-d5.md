@@ -50,8 +50,8 @@ cleanup_status: pending
 cleanup_notes: Worker worktree remains for independent review and orchestrator-owned integration cleanup.
 risk_level: high
 docs_impact: ops-deploy
-docs_reviewed: no-change-needed
-docs_review_notes: Frozen D5 design and plan already define the durable contract; worker scope forbids project-doc edits and implementation introduces no new contract beyond them.
+docs_reviewed: updated
+docs_review_notes: Corrected this Task 2 artifact's pushed-head, review, controller, and consulted-document version truth; Task 9 retains ownership of project runbook changes.
 verification:
   - focused RED 91 tests: failed as expected with 17 passed and 74 missing-production failures
   - independent-review repair RED 171 tests: 164 passed and 7 failed at process/crash boundaries
@@ -70,6 +70,11 @@ verification:
   - R2 lease hardening GREEN: 2/2 narrow and 8/8 adjacent FD9/session tests passed
   - R2 full focused Root D5 GREEN 248 tests: passed with zero failed and zero pending
   - controller rerun focused Root D5 GREEN 248 tests: passed in 78.73 seconds
+  - R3 durable-authority RED: 248 lifecycle tests collected; 3 selected and 3 failed
+  - R3 durable-authority GREEN: 3/3 narrow and 48/48 adjacent lifecycle tests passed
+  - R3 full focused Root D5 GREEN 251 tests: passed with zero failed and zero pending in 77.07 seconds
+  - controller R3 rerun focused Root D5 GREEN 251 tests: passed with zero failed and zero pending in 77.15 seconds
+  - controller R3 static/artifact proof: all seven gates passed with exit 0
   - bash -n deployed wrappers: passed
   - python3 -m py_compile core and runner: passed
   - jq -e command manifest: passed
@@ -94,28 +99,32 @@ explicit_defers:
 
 # Summary
 
-Implemented and R2-hardened the Root-owned D5 retained-barrier producer, fixed five-command manifest, production-only shell entrypoints, separate delegated claim transaction, symlink-safe canonical FD9 identity checks, post-validation lease-session anchoring, durable true-lease-loss recovery inference, complete terminal-evidence validation, fixed-R rollback projection, distinct reissue/orphan ancestry, no-I/O shared fixture runner, branded TypeScript fixture contract, and table-driven Root matrix. Production CLI inputs remain fixed typed fields and cannot select a manifest, executor, command, environment, path, fixture mode, or fault injection.
+Implemented and R3-hardened the Root-owned D5 retained-barrier producer, fixed five-command manifest, production-only shell entrypoints, separate delegated claim transaction, symlink-safe canonical FD9 identity checks, post-validation lease-session anchoring, byte-exact current-checkpoint recovery ancestry, ordered terminal lifecycle/backlog validation, fixed-R rollback projection, distinct reissue/orphan ancestry, no-I/O shared fixture runner, branded TypeScript fixture contract, and table-driven Root matrix. Production CLI inputs remain fixed typed fields and cannot select a manifest, executor, command, environment, path, fixture mode, or fault injection.
 
 # Scope / Routing
 
-The worker used only the exact Root-D5 write zone. The approved design SHA-256 `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`, plan SHA-256 `8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed`, all six inherited design/plan hashes, base HEAD, branch, and clean starting state were verified before RED. The pushed review baseline is `e6a8440a2c6f6814329496633c06bfab6f37a502` with upstream divergence `0/0`; R2 corrections are intentionally uncommitted pending the controller rerun. Work stayed sequential because Root-D5 is the explicit producer dependency for W.
+The worker used only the exact Root-D5 write zone. The approved design SHA-256 `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`, plan SHA-256 `8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed`, all six inherited design/plan hashes, base HEAD, branch, and clean starting state were verified before RED. The pushed R2 review baseline is `541ae20b490a7634d8819066f73455cffa73c4f7` with upstream divergence `0/0`; the R2 controller rerun completed 248/248. The R3 controller rerun completed 251/251 in 77.15 seconds and all seven static/artifact gates exited 0. Current R3 corrections are intentionally uncommitted pending delta review. Work stayed sequential because Root-D5 is the explicit producer dependency for W.
 
 # Verification
 
-The initial focused RED collected successfully and failed for missing production files/runner: 91 total, 17 passed, 74 failed. Independent repair then witnessed separate REDs for the process boundary/same-root crash matrix, checkpoint repair and normal-publication CAS, production-shaped zero-dimension durable recovery, exact-result binding, and self-consistent journal grammar. R2 added genuine RED/GREEN coverage for independent-process lease loss, canonical FD9 identity, complete terminal evidence, fixed-R rollback ancestry, separate recovery reissues/publication-window orphans, and stable install/rotation bindings. The final narrow lease hardening RED collected 245 lifecycle tests with exactly two selected failures: a symlinked canonical-lock ancestor was accepted, and a failed wrong-FD call poisoned the same executor's session. The corresponding GREEN passed 2/2 narrow and 8/8 adjacent rows. Fresh implementer and controller focused evidence is 248/248 with zero failed/pending (245 lifecycle plus 3 manifest); the controller rerun took 78.73 seconds. Static gates cover both wrappers, both Python files, JSON syntax, all three TypeScript files, artifact format, whitespace, process residue, and temporary run roots.
+The initial focused RED collected successfully and failed for missing production files/runner: 91 total, 17 passed, 74 failed. Independent repair then witnessed separate REDs for the process boundary/same-root crash matrix, checkpoint repair and normal-publication CAS, production-shaped zero-dimension durable recovery, exact-result binding, and self-consistent journal grammar. R2 added genuine RED/GREEN coverage for independent-process lease loss, canonical FD9 identity, complete terminal evidence, fixed-R rollback ancestry, separate recovery reissues/publication-window orphans, and stable install/rotation bindings. The final R2 lease hardening GREEN passed 2/2 narrow, 8/8 adjacent, and 248/248 full rows; the controller rerun took 78.73 seconds.
 
-The last independent rereview of pushed HEAD `e6a8440a` is the blocking FAIL report `.superpowers/sdd/d5-root-implementation-rereview-report.md`, SHA-256 `5e1e5e9c1cae9122bd5ec4c86c5bf8d8034a9e57f7d54fca3ea019c9f468f18e` (P0/P1/P2/P3 `2/4/1/0`). The current uncommitted R2 correction has not yet received the required controller-owned rereview, so this artifact does not claim acceptance.
+R3 began from clean pushed `541ae20b`. Its genuine RED collected 248 lifecycle tests with exactly three selected failures: the fresh-process successor copied selector seq 2 instead of the current issuance seq 3 checkpoint; a fully resequenced/rehashed `issuance -> completed -> claim` terminal journal was accepted; and a completed recovery tip was accepted while its predecessor had moved back to `issued/`. The corresponding GREEN passed 3/3 narrow and 48/48 adjacent recovery/order/result/crash rows. Fresh implementer evidence is 251/251 with zero failed/pending (248 lifecycle plus 3 manifest), duration 77.07 seconds; the independent controller rerun passed the same 251/251 in 77.15 seconds. Static gates cover both wrappers, both Python files, JSON syntax, all three TypeScript files, artifact format, whitespace, process residue, and temporary run roots; the controller independently confirmed all seven gates with exit 0.
 
-FD/open-file-description implementation checks used Python `3.14.4` / Linux `6.6.114.1-microsoft-standard-WSL2` and the first-party Python `os` reference (`https://docs.python.org/3/library/os.html#os.dup`) plus Linux man-pages `flock(2)` and `rename(2)` references (`https://man7.org/linux/man-pages/man2/flock.2.html`, `https://man7.org/linux/man-pages/man2/rename.2.html`).
+The independent R2 correctness report `.superpowers/sdd/d5-root-r2-final-review-report.md`, SHA-256 `55c5bc1575076969809cb0592132d62da7dcc7e6f88753abc0c617ddefec7adf`, reviewed pushed `541ae20b` and returned **FAIL / NEEDS FIXES**, P0/P1/P2/P3 `0/2/1/0`. The independent R2 documentation report `.superpowers/sdd/d5-root-r2-final-docs-review-report.md`, SHA-256 `a52ae04ade530a1fdf54c8aed88e79e2d103e73e1c69c28e167ae295b8c5eab4`, returned **FAIL**, P0/P1/P2/P3 `0/1/1/0`. This R3 delta addresses those implementation and artifact-truth findings but does not claim acceptance.
+
+R3 final correctness delta review: **pending** — report path, SHA-256, verdict, and priority counts will be recorded after the controller rerun. R3 artifact/docs delta rereview: **pending** for the same handoff boundary.
+
+Runtime tested: Python `3.14.4` and Linux kernel `6.6.114.1-microsoft-standard-WSL2`. References consulted: Python documentation `3.14.6` (`https://docs.python.org/3/library/os.html#os.dup`) and Linux man-pages `6.18` for `flock(2)` / `rename(2)` (`https://man7.org/linux/man-pages/man2/flock.2.html`, `https://man7.org/linux/man-pages/man2/rename.2.html`).
 
 # Delivery / Cleanup
 
-The R1 implementation/repair commits `c93d766d94d36b57fbb95a4b2bea61e1f31e2169` and `e6a8440a2c6f6814329496633c06bfab6f37a502` are pushed. R2 corrections are intentionally uncommitted and unpushed pending the controller rerun. Integration acceptance and safe removal of this worktree/local branch remain orchestrator-owned; cleanup is correctly `pending` here.
+The R1 commits `c93d766d94d36b57fbb95a4b2bea61e1f31e2169` and `e6a8440a2c6f6814329496633c06bfab6f37a502`, plus R2 commit `541ae20b490a7634d8819066f73455cffa73c4f7`, are pushed with verified upstream divergence `0/0` before R3. R3 corrections are intentionally uncommitted and unpushed pending delta review; their controller rerun and seven gates are complete. Integration acceptance and safe removal of this worktree/local branch remain orchestrator-owned; cleanup is correctly `pending` here.
 
 # Risks / Follow-ups / Explicit Defers
 
-This is a locally verified R2 producer correction, not an accepted review result or full-spec completion claim. Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Root-D5 still awaits the controller rerun before acceptance.
+This is an implementer- and controller-verified R3 producer correction, not an accepted review result or full-spec completion claim. Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Root-D5 awaits the R3 delta reviews before acceptance.
 
-docs-reviewed: no-change-needed — frozen design/plan already specify the implemented durable behavior and this worker was prohibited from editing durable docs.
+docs-reviewed: updated — corrected the Task 2 artifact to exact pushed R2, R3, controller, review-report, and consulted-document version truth; project runbooks remain Task 9-owned.
 
 graph-reviewed: no-change-needed — Graphify output was unavailable in this isolated worktree and the assigned write zone forbids graph changes; the accepted plan defers refresh to integration closeout.
