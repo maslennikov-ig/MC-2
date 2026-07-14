@@ -7,6 +7,8 @@ original_args=("$@")
 
 readonly EXPECTED_SCHEMA='megacampus.q12.expected-post-migration-catalog/v1'
 readonly RECEIPT_SCHEMA='megacampus.q12.database-barrier-receipt/v1'
+readonly BASELINE_SCHEMA='megacampus.q12.database-barrier-baseline/v1'
+readonly TERMINAL_PROOF_SCHEMA='megacampus.q12.database-barrier-terminal-proof/v1'
 readonly PROBE_RECEIPT_SCHEMA='megacampus.q12.database-barrier-probes/v1'
 readonly DEFAULT_PROJECT_DIRECTORY='/opt/megacampus'
 readonly DEFAULT_NODE_BIN='/usr/bin/node'
@@ -104,7 +106,7 @@ fault_point="${MC2_Q12_BARRIER_FAULT_POINT:-}"
 if [[ -n $fault_point ]]; then
   [[ $test_mode -eq 1 ]] || fail 'fault injection requires the exact protected test mode'
   case "$fault_point" in
-    after-tx1-commit|before-second-terminate|before-tx2|before-receipt) ;;
+    after-tx1-commit|before-second-terminate|before-tx2|before-receipt|after-baseline|after-proof) ;;
     *) fail 'unknown protected database-barrier fault point' ;;
   esac
 fi
@@ -204,6 +206,8 @@ run_root="$(dirname "$(dirname "$capability_file")")"
   fail 'Q12 run root must be owner-only mode 0700'
 receipt_file="$run_root/database-barrier-receipt.json"
 probe_receipt_file="$run_root/database-barrier-probe-receipt.json"
+baseline_file="$run_root/database-barrier-baseline.json"
+phase_journal_file="$run_root/phase.jsonl"
 
 url_fd='' ca_fd='' capability_fd='' catalog_fd='' probe_receipt_fd=''
 url_identity='' ca_identity='' capability_identity='' catalog_identity='' probe_receipt_identity=''
@@ -386,6 +390,179 @@ jq -e --arg schema "$EXPECTED_SCHEMA" '
 ' <<<"$expected_json" >/dev/null || fail 'expected catalog violates the frozen Q12 schema/exact inventory'
 unset expected_json
 
+input_checkpoint_file=''
+input_checkpoint_sha256=''
+intent_journal_entry_hash=''
+resource_manifest_sha256=''
+if [[ $command_name == install || $command_name == cleanup || $command_name == rollback ]]; then
+  input_checkpoint_file="$run_root/database-barrier-input-checkpoint-$command_name-cutover.json"
+  validate_file_path 'database barrier child input checkpoint' "$input_checkpoint_file" '600'
+  validate_file_path 'cutover phase journal' "$phase_journal_file" '600'
+  jq -e --arg run "$run_id" '
+    (keys | sort) == (["schema_version","run_id","seq","phase","journal_entry_hash",
+      "previous_journal_entry_hash","journal_device","journal_inode","accepted_object_kind",
+      "accepted_object_sha256","resume_authority_sha256","lease_epoch"] | sort) and
+    .schema_version == "megacampus.q12.cutover-checkpoint/v1" and .run_id == $run and
+    (.seq | type == "number") and (.journal_entry_hash | test("^[a-f0-9]{64}$")) and
+    (.previous_journal_entry_hash | test("^[a-f0-9]{64}$")) and
+    .accepted_object_kind == "none" and .accepted_object_sha256 == null and
+    .resume_authority_sha256 == null and .lease_epoch == "cutover"
+  ' "$input_checkpoint_file" >/dev/null || fail 'database barrier child input checkpoint is invalid'
+  phase_journal_head="$(tail -n 1 -- "$phase_journal_file")"
+  [[ -n $phase_journal_head ]] || fail 'cutover phase journal is empty'
+  intent_journal_entry_hash="$(jq -r '.journal_entry_hash' "$input_checkpoint_file")"
+  jq -e --arg run "$run_id" --arg entry "$intent_journal_entry_hash" --arg command "barrier.$command_name" '
+    .schema == "megacampus.q12.cutover-journal/v1" and .run_id == $run and
+    .entry_hash == $entry and .command_id == $command and .outcome == "capability_claimed" and
+    (.resource_manifest_sha256 | test("^[a-f0-9]{64}$"))
+  ' <<<"$phase_journal_head" >/dev/null || fail 'database barrier child journal head is invalid'
+  resource_manifest_sha256="$(jq -r '.resource_manifest_sha256' <<<"$phase_journal_head")"
+  input_checkpoint_sha256="$(sha256sum -- "$input_checkpoint_file" | awk '{print $1}')"
+fi
+
+publish_exact_immutable() {
+  local temporary="$1" destination="$2" label="$3" expected_sha
+  expected_sha="$(sha256sum -- "$temporary" | awk '{print $1}')"
+  chmod 0400 "$temporary"
+  # fsync the immutable inode before its no-replace publication.
+  sync -f "$temporary"
+  if [[ -e $destination || -L $destination ]]; then
+    validate_file_path "$label" "$destination" '400'
+    cmp -s -- "$temporary" "$destination" || fail "existing $label is non-exact"
+    rm -f -- "$temporary"
+  else
+    /usr/bin/python3 - "$temporary" "$destination" <<'PY'
+import ctypes
+import os
+import sys
+
+source, destination = sys.argv[1:]
+libc = ctypes.CDLL(None, use_errno=True)
+renameat2 = getattr(libc, "renameat2", None)
+if renameat2 is None:
+    raise SystemExit(1)
+renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+renameat2.restype = ctypes.c_int
+if renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+    raise SystemExit(1)
+PY
+  fi
+  sync -d "$run_root"
+  validate_file_path "$label" "$destination" '400'
+  [[ $(sha256sum -- "$destination" | awk '{print $1}') == "$expected_sha" ]] ||
+    fail "published $label changed after no-replace rename"
+}
+
+predecessor_receipt_sha256=''
+predecessor_receipt_archive_sha256=''
+database_barrier_baseline_sha256=''
+database_barrier_rollback_intent_sha256=''
+required_phase_receipts_sha256=''
+if [[ $command_name == cleanup || $command_name == rollback ]]; then
+  predecessor_receipt_archive_file="$run_root/database-barrier-receipt-v1-before-$command_name.json"
+  validate_file_path 'database barrier baseline' "$baseline_file" '400'
+  validate_file_path 'database barrier predecessor receipt' "$receipt_file" '400'
+  validate_file_path 'database barrier predecessor receipt archive' "$predecessor_receipt_archive_file" '400'
+  cmp -s -- "$receipt_file" "$predecessor_receipt_archive_file" ||
+    fail 'database barrier predecessor receipt archive is not byte-exact'
+  database_capability_sha256="$(head -c -1 "/proc/self/fd/$capability_fd" | sha256sum | awk '{print $1}')"
+  expected_post_migration_catalog_sha256="$(jq -r '.expected_post_migration_catalog_sha256' "/proc/self/fd/$catalog_fd")"
+  jq -e --arg schema "$BASELINE_SCHEMA" --arg run "$run_id" \
+    --arg capability "$database_capability_sha256" --arg expected "$expected_post_migration_catalog_sha256" '
+    (keys | sort) == (["schema_version","run_id","state","source_baseline_sha256","baseline_sha256",
+      "predecessor_checkpoint_sha256","predecessor_journal_entry_hash","resource_manifest_sha256",
+      "expected_post_migration_catalog_sha256","database_capability_sha256","baseline"] | sort) and
+    .schema_version == $schema and .run_id == $run and .state == "maintenance_guarded_baseline" and
+    .database_capability_sha256 == $capability and .expected_post_migration_catalog_sha256 == $expected and
+    ([.source_baseline_sha256,.baseline_sha256,.predecessor_checkpoint_sha256,
+      .predecessor_journal_entry_hash,.resource_manifest_sha256] | all(test("^[a-f0-9]{64}$"))) and
+    (.baseline | keys | sort) == (["baseline_structural_catalog_sha256","database_default_sha256",
+      "cron_jobs_sha256","guarded_relations_sha256","pg_net_queue_count"] | sort) and
+    ([.baseline.baseline_structural_catalog_sha256,.baseline.database_default_sha256,
+      .baseline.cron_jobs_sha256,.baseline.guarded_relations_sha256] | all(test("^[a-f0-9]{64}$"))) and
+    .baseline.pg_net_queue_count == 0
+  ' "$baseline_file" >/dev/null || fail 'database barrier baseline is invalid'
+  baseline_projection_sha256="$(jq -cS '.baseline' "$baseline_file" | head -c -1 | sha256sum | awk '{print $1}')"
+  [[ $(jq -r '.baseline_sha256' "$baseline_file") == "$baseline_projection_sha256" ]] ||
+    fail 'database barrier baseline nested hash is invalid'
+  expected_baseline_structural_catalog_sha256="$(jq -r '.baseline_structural_sha256' "/proc/self/fd/$catalog_fd")"
+  [[ $(jq -r '.baseline.baseline_structural_catalog_sha256' "$baseline_file") == "$expected_baseline_structural_catalog_sha256" ]] ||
+    fail 'database barrier baseline structural catalog hash is invalid'
+  guarded_relations_sha256="$(jq -cS '.guarded_relations' "/proc/self/fd/$catalog_fd" | head -c -1 | sha256sum | awk '{print $1}')"
+  [[ $(jq -r '.baseline.guarded_relations_sha256' "$baseline_file") == "$guarded_relations_sha256" ]] ||
+    fail 'database barrier baseline guarded-relations hash is invalid'
+  jq -e --arg schema "$RECEIPT_SCHEMA" --arg run "$run_id" --arg catalog "$expected_catalog_sha256" --arg operation "$command_name" '
+    (keys | sort) == (["schema_version","run_id","state","zero_guard_residue","expected_catalog_sha256",
+      "last_command","rollback_probes_verified","probe_receipt_sha256"] | sort) and
+    .schema_version == $schema and .run_id == $run and .expected_catalog_sha256 == $catalog and
+    .zero_guard_residue == false and
+    (if $operation == "cleanup" then
+      .state == "activated" and .last_command == "activate" and
+      .rollback_probes_verified == true and (.probe_receipt_sha256 | test("^[a-f0-9]{64}$"))
+    else
+      (.state == "maintenance_guarded" or .state == "20260711140000_guard_verified" or
+       .state == "20260711151000_guard_verified" or .state == "recovery_ready_guarded") and
+      .rollback_probes_verified == false and .probe_receipt_sha256 == null
+    end)
+  ' "$receipt_file" >/dev/null || fail 'database barrier predecessor receipt is invalid'
+  predecessor_receipt_sha256="$(sha256sum -- "$receipt_file" | awk '{print $1}')"
+  predecessor_receipt_archive_sha256="$(sha256sum -- "$predecessor_receipt_archive_file" | awk '{print $1}')"
+  database_barrier_baseline_sha256="$(sha256sum -- "$baseline_file" | awk '{print $1}')"
+  if [[ $command_name == rollback ]]; then
+    rollback_intent_file="$run_root/database-barrier-rollback-intent.json"
+    validate_file_path 'database barrier rollback intent' "$rollback_intent_file" '400'
+    database_barrier_rollback_intent_sha256="$(sha256sum -- "$rollback_intent_file" | awk '{print $1}')"
+    required_phase_receipts_sha256="$(jq -r '.required_phase_receipts_sha256' "$rollback_intent_file")"
+    [[ $required_phase_receipts_sha256 =~ ^[a-f0-9]{64}$ ]] || fail 'rollback required phase receipts hash is invalid'
+  fi
+  terminal_proof_file="$run_root/database-barrier-$command_name-terminal-proof.json"
+  if [[ -e $terminal_proof_file || -L $terminal_proof_file ]]; then
+    validate_file_path 'database barrier terminal proof' "$terminal_proof_file" '400'
+    structural_catalog_sha256="$(jq -r \
+      --arg operation "$command_name" \
+      'if $operation == "cleanup" then .expected_post_migration_catalog_sha256 else .baseline_structural_sha256 end' \
+      "/proc/self/fd/$catalog_fd")"
+    database_default_sha256="$(jq -r '.baseline.database_default_sha256' "$baseline_file")"
+    cron_jobs_sha256="$(jq -r '.baseline.cron_jobs_sha256' "$baseline_file")"
+    jq -e --arg schema "$TERMINAL_PROOF_SCHEMA" --arg run "$run_id" --arg operation "$command_name" \
+      --arg expected "$expected_post_migration_catalog_sha256" \
+      --arg baseline "$database_barrier_baseline_sha256" --arg receipt "$predecessor_receipt_sha256" \
+      --arg archive "$predecessor_receipt_archive_sha256" --arg input "$input_checkpoint_sha256" \
+      --arg journal "$intent_journal_entry_hash" --arg structural "$structural_catalog_sha256" \
+      --arg database_default "$database_default_sha256" --arg cron "$cron_jobs_sha256" \
+      --arg rollback_intent "$database_barrier_rollback_intent_sha256" \
+      --arg required "$required_phase_receipts_sha256" --arg capability "$database_capability_sha256" '
+      (keys | sort) == (["schema_version","run_id","operation","state",
+        "expected_post_migration_catalog_sha256","database_barrier_baseline_sha256",
+        "predecessor_receipt_sha256","predecessor_receipt_archive_sha256",
+        "database_barrier_rollback_intent_sha256","input_checkpoint_sha256",
+        "intent_journal_entry_hash","structural_catalog_sha256","database_default_sha256",
+        "cron_jobs_sha256","guard_residue","required_phase_receipts_sha256",
+        "database_capability_sha256","completed_at"] | sort) and
+      .schema_version == $schema and .run_id == $run and .operation == $operation and
+      .state == "guard_cleanup_complete" and .expected_post_migration_catalog_sha256 == $expected and
+      .database_barrier_baseline_sha256 == $baseline and
+      .predecessor_receipt_sha256 == $receipt and .predecessor_receipt_archive_sha256 == $archive and
+      .input_checkpoint_sha256 == $input and .intent_journal_entry_hash == $journal and
+      .structural_catalog_sha256 == $structural and .database_default_sha256 == $database_default and
+      .cron_jobs_sha256 == $cron and
+      .guard_residue == {q12_guard_schema_count:0,q12_guard_relation_count:0,
+        q12_guard_function_count:0,q12_guard_type_count:0,q12_guard_trigger_count:0,
+        q12_guard_event_trigger_count:0,barrier_era_session_count:0} and
+      (if $operation == "cleanup" then
+        .database_barrier_rollback_intent_sha256 == null and .required_phase_receipts_sha256 == null
+      else
+        .database_barrier_rollback_intent_sha256 == $rollback_intent and
+        .required_phase_receipts_sha256 == $required
+      end) and
+      .database_capability_sha256 == $capability and
+      (.completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"))
+    ' "$terminal_proof_file" >/dev/null || fail 'existing database barrier terminal proof is non-exact'
+    printf 'q12 database barrier: guard_cleanup_complete proof already verified\n'
+    exit 0
+  fi
+fi
+
 base_lock_targets="$(jq -r '
   .guarded_relations | sort_by(.oid)
   | map("\"" + .schema + "\".\"" + .name + "\"") | join(", ")
@@ -409,6 +586,16 @@ all_lock_targets="$all_lock_targets, $STRUCTURAL_HISTORY_LOCK_TARGET"
 
 sql_file="$(mktemp "$run_root/.q12-barrier-sql.$command_name.XXXXXX")"
 chmod 0600 "$sql_file"
+install_baseline_result_file=''
+if [[ $command_name == install ]]; then
+  install_baseline_result_file="$(mktemp "$run_root/.q12-install-baseline-result.XXXXXX")"
+  chmod 0600 "$install_baseline_result_file"
+fi
+database_terminal_result_file=''
+if [[ $command_name == cleanup || $command_name == rollback ]]; then
+  database_terminal_result_file="$(mktemp "$run_root/.q12-database-terminal-result.XXXXXX")"
+  chmod 0600 "$database_terminal_result_file"
+fi
 cleanup_sql() {
   if [[ -n ${sql_file:-} && -f $sql_file && ! -L $sql_file ]]; then
     rm -f -- "$sql_file"
@@ -416,6 +603,14 @@ cleanup_sql() {
   fi
   if [[ -n ${receipt_tmp:-} ]]; then
     rm -f -- "$receipt_tmp"
+    sync -d "$run_root" || true
+  fi
+  if [[ -n ${install_baseline_result_file:-} && -f $install_baseline_result_file && ! -L $install_baseline_result_file ]]; then
+    rm -f -- "$install_baseline_result_file"
+    sync -d "$run_root" || true
+  fi
+  if [[ -n ${database_terminal_result_file:-} && -f $database_terminal_result_file && ! -L $database_terminal_result_file ]]; then
+    rm -f -- "$database_terminal_result_file"
     sync -d "$run_root" || true
   fi
 }
@@ -1460,8 +1655,21 @@ readonly NODE_RUNNER='const fs=require("node:fs");const crypto=require("node:cry
 function one(fd,label){const value=fs.readFileSync(Number(fd),"utf8").replace(/\\r?\\n$/u,"");if(!value||/[\\r\\n]/u.test(value))throw new Error(label);return value;}
 function between(value,start,end){const startIndex=value.indexOf(start);const endIndex=value.indexOf(end,startIndex+start.length);if(startIndex<0||endIndex<0)throw new Error("install SQL markers");return value.slice(startIndex+start.length,endIndex);}
 function split(value,marker){const index=value.indexOf(marker);if(index<0)throw new Error("install SQL boundary");return [value.slice(0,index),value.slice(index+marker.length)];}
-async function main(){const [operation,urlFd,caFd,capFd,catalogFd,sqlPath,catalogSha,runId,testMode,faultPoint]=process.argv.slice(1);let raw=one(urlFd,"url");const parsed=new URL(raw);if(parsed.protocol!=="postgresql:"||parsed.hostname!=="aws-1-us-east-2.pooler.supabase.com"||parsed.port!=="5432"||parsed.pathname!=="/postgres"||parsed.username!=="postgres.diqooqbuchsliypgwksu"||parsed.search||parsed.hash)throw new Error("database identity");const ca=fs.readFileSync(Number(caFd));if(testMode!=="1"&&crypto.createHash("sha256").update(ca).digest("hex")!=="700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7")throw new Error("CA identity");if(faultPoint&&testMode!=="1")throw new Error("fault mode");let capability=one(capFd,"capability");const expected=fs.readFileSync(Number(catalogFd),"utf8");const sql=fs.readFileSync(sqlPath,"utf8");const connection={host:parsed.hostname,port:Number(parsed.port),database:parsed.pathname.slice(1),user:decodeURIComponent(parsed.username),password:decodeURIComponent(parsed.password),ssl:{ca,rejectUnauthorized:true}};const client=new Client({...connection,options:"-c default_transaction_read_only=off",application_name:"megacampus-q12-database-barrier"});raw="";await client.connect();try{const proof=await client.query("SELECT session_user,current_database(),current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only,current_setting(\u0027server_version_num\u0027)::int AS server_version_num");if(proof.rows.length!==1||proof.rows[0].session_user!=="postgres"||proof.rows[0].current_database!=="postgres"||proof.rows[0].transaction_read_only!=="off"||proof.rows[0].server_version_num<170000||proof.rows[0].server_version_num>=180000)throw new Error("session proof");await client.query("SELECT set_config(\u0027megacampus.q12_capability\u0027,$1,false),set_config(\u0027megacampus.q12_capability_sha256\u0027,$2,false),set_config(\u0027megacampus.q12_expected_catalog\u0027,$3,false),set_config(\u0027megacampus.q12_expected_catalog_sha256\u0027,$4,false),set_config(\u0027megacampus.q12_run_id\u0027,$5,false)",[capability,crypto.createHash("sha256").update(capability).digest("hex"),expected,catalogSha,runId]);capability="";if(operation!=="install"){let commandSql=sql;if(operation==="activate"){const namespaceState=await client.query("SELECT pg_catalog.to_regnamespace(\u0027q12_guard\u0027) IS NOT NULL AS present");let activated=false;if(namespaceState.rows[0].present){const activationState=await client.query("SELECT activated FROM q12_guard.active_run WHERE singleton");activated=activationState.rows.length===1&&activationState.rows[0].activated===true;}commandSql=activated?between(sql,"-- Q12_ACTIVATE_RECOVERY_BEGIN","-- Q12_ACTIVATE_RECOVERY_END"):between(sql,"-- Q12_ACTIVATE_NORMAL_BEGIN","-- Q12_ACTIVATE_NORMAL_END");}await client.query(commandSql);if(operation==="prepare-recovery"){const inherited=new Client({...connection,application_name:"megacampus-q12-recovery-readiness-proof"});await inherited.connect();try{const inheritedProof=await inherited.query("SELECT current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only");if(inheritedProof.rows.length!==1||inheritedProof.rows[0].transaction_read_only!=="on")throw new Error("recovery readiness inherited read-only proof");}finally{await inherited.end();}}if(faultPoint==="before-receipt")throw new Error("injected before receipt");return;}const state=await client.query("SELECT pg_catalog.to_regnamespace(\u0027q12_guard\u0027) IS NOT NULL AS present");const fresh=!state.rows[0].present;let postVisibility;if(fresh){const freshSql=between(sql,"-- Q12_INSTALL_FRESH_BEGIN","-- Q12_INSTALL_FRESH_END");const pieces=split(freshSql,"-- Q12_INSTALL_TX1_COMMITTED");await client.query(pieces[0]);postVisibility=pieces[1];if(faultPoint==="after-tx1-commit")throw new Error("injected after tx1");}else{postVisibility=between(sql,"-- Q12_INSTALL_RESUME_BEGIN","-- Q12_INSTALL_RESUME_END");}const terminatePieces=split(postVisibility,"-- Q12_INSTALL_SECOND_TERMINATE");if(terminatePieces[0].trim())await client.query(terminatePieces[0]);if(faultPoint==="before-second-terminate")throw new Error("injected before terminate");const tx2Pieces=split(terminatePieces[1],"-- Q12_INSTALL_TX2_BEGIN");if(tx2Pieces[0].trim())await client.query(tx2Pieces[0]);if(faultPoint==="before-tx2")throw new Error("injected before tx2");await client.query(tx2Pieces[1]);if(faultPoint==="before-receipt")throw new Error("injected before receipt");}finally{capability="";await client.end();}}
+function canonical(value){if(Array.isArray(value))return `[${value.map(canonical).join(",")}]`;if(value!==null&&typeof value==="object")return `{${Object.entries(value).sort(([left],[right])=>left.localeCompare(right)).map(([key,item])=>`${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;return JSON.stringify(value);}
+function sha256(value){return crypto.createHash("sha256").update(value).digest("hex");}
+function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&canonical(Object.keys(value).sort())===canonical([...keys].sort());}
+async function publishInstallBaseline(connection,expectedRaw,resultPath){if(!resultPath)throw new Error("install baseline result path");const verifier=new Client({...connection,options:"-c default_transaction_read_only=on",application_name:"megacampus-q12-install-baseline-proof"});await verifier.connect();try{const session=await verifier.query("SELECT session_user,current_database(),current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only,current_setting(\u0027server_version_num\u0027)::int AS server_version_num");if(session.rows.length!==1||session.rows[0].session_user!=="postgres"||session.rows[0].current_database!=="postgres"||session.rows[0].transaction_read_only!=="on"||session.rows[0].server_version_num<170000||session.rows[0].server_version_num>=180000)throw new Error("baseline reconnect proof");const query=await verifier.query("SELECT baseline,baseline_sha256 FROM q12_guard.baseline WHERE singleton");if(query.rows.length!==1||!exactKeys(query.rows[0],["baseline","baseline_sha256"])||!exactKeys(query.rows[0].baseline,["database_settings","default_transaction_read_only","cron_jobs","pg_net_queue_count","guarded_relations"])||!/^[a-f0-9]{64}$/u.test(query.rows[0].baseline_sha256))throw new Error("database baseline");const saved=query.rows[0].baseline;const expected=JSON.parse(expectedRaw);if(saved.pg_net_queue_count!==0||canonical(saved.guarded_relations)!==canonical(expected.guarded_relations))throw new Error("database baseline binding");const databaseSettings=saved.database_settings;if(databaseSettings!==null&&(typeof databaseSettings!=="object"||Array.isArray(databaseSettings)))throw new Error("database settings baseline");const rawSettings=databaseSettings===null||databaseSettings.setconfig===null?[]:databaseSettings.setconfig;if(!Array.isArray(rawSettings)||rawSettings.some(value=>typeof value!=="string"))throw new Error("database settings values");const settings=[...new Set(rawSettings)].sort((left,right)=>Buffer.compare(Buffer.from(left),Buffer.from(right)));const databaseDefault={schema_version:"megacampus.q12.database-default/v1",database:"postgres",role:null,row_present:databaseSettings!==null,settings};const rawCron=saved.cron_jobs;if(!Array.isArray(rawCron)||rawCron.length!==8||new Set(rawCron.map(job=>job.jobid)).size!==8)throw new Error("cron baseline");const cron=rawCron.map(job=>{if(typeof job.jobid!=="number"||(job.jobname!==null&&typeof job.jobname!=="string")||typeof job.schedule!=="string"||typeof job.command!=="string"||typeof job.nodename!=="string"||typeof job.nodeport!=="number"||typeof job.database!=="string"||typeof job.username!=="string"||typeof job.active!=="boolean")throw new Error("cron baseline row");return {jobid:job.jobid,jobname:job.jobname,schedule:job.schedule,command_sha256:sha256(Buffer.from(job.command,"utf8")),nodename:job.nodename,nodeport:job.nodeport,database:job.database,username:job.username,active:job.active};}).sort((left,right)=>left.jobid-right.jobid);const baseline={baseline_structural_catalog_sha256:expected.baseline_structural_sha256,database_default_sha256:sha256(canonical(databaseDefault)),cron_jobs_sha256:sha256(canonical(cron)),guarded_relations_sha256:sha256(canonical(expected.guarded_relations)),pg_net_queue_count:0};const result={source_baseline_sha256:query.rows[0].baseline_sha256,baseline};const descriptor=fs.openSync(resultPath,fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(descriptor);if(!stat.isFile()||(stat.mode&0o777)!==0o600||stat.uid!==process.getuid())throw new Error("install baseline result inode");fs.ftruncateSync(descriptor,0);fs.writeFileSync(descriptor,`${canonical(result)}\n`,"utf8");fs.fsyncSync(descriptor);}finally{fs.closeSync(descriptor);}}finally{await verifier.end();}}
+async function main(){const [operation,urlFd,caFd,capFd,catalogFd,sqlPath,catalogSha,runId,testMode,faultPoint,baselineResultPath]=process.argv.slice(1);let raw=one(urlFd,"url");const parsed=new URL(raw);if(parsed.protocol!=="postgresql:"||parsed.hostname!=="aws-1-us-east-2.pooler.supabase.com"||parsed.port!=="5432"||parsed.pathname!=="/postgres"||parsed.username!=="postgres.diqooqbuchsliypgwksu"||parsed.search||parsed.hash)throw new Error("database identity");const ca=fs.readFileSync(Number(caFd));if(testMode!=="1"&&crypto.createHash("sha256").update(ca).digest("hex")!=="700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7")throw new Error("CA identity");if(faultPoint&&testMode!=="1")throw new Error("fault mode");let capability=one(capFd,"capability");const expected=fs.readFileSync(Number(catalogFd),"utf8");const sql=fs.readFileSync(sqlPath,"utf8");const connection={host:parsed.hostname,port:Number(parsed.port),database:parsed.pathname.slice(1),user:decodeURIComponent(parsed.username),password:decodeURIComponent(parsed.password),ssl:{ca,rejectUnauthorized:true}};const client=new Client({...connection,options:"-c default_transaction_read_only=off",application_name:"megacampus-q12-database-barrier"});raw="";await client.connect();try{const proof=await client.query("SELECT session_user,current_database(),current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only,current_setting(\u0027server_version_num\u0027)::int AS server_version_num");if(proof.rows.length!==1||proof.rows[0].session_user!=="postgres"||proof.rows[0].current_database!=="postgres"||proof.rows[0].transaction_read_only!=="off"||proof.rows[0].server_version_num<170000||proof.rows[0].server_version_num>=180000)throw new Error("session proof");await client.query("SELECT set_config(\u0027megacampus.q12_capability\u0027,$1,false),set_config(\u0027megacampus.q12_capability_sha256\u0027,$2,false),set_config(\u0027megacampus.q12_expected_catalog\u0027,$3,false),set_config(\u0027megacampus.q12_expected_catalog_sha256\u0027,$4,false),set_config(\u0027megacampus.q12_run_id\u0027,$5,false)",[capability,crypto.createHash("sha256").update(capability).digest("hex"),expected,catalogSha,runId]);capability="";if(operation!=="install"){let commandSql=sql;if(operation==="activate"){const namespaceState=await client.query("SELECT pg_catalog.to_regnamespace(\u0027q12_guard\u0027) IS NOT NULL AS present");let activated=false;if(namespaceState.rows[0].present){const activationState=await client.query("SELECT activated FROM q12_guard.active_run WHERE singleton");activated=activationState.rows.length===1&&activationState.rows[0].activated===true;}commandSql=activated?between(sql,"-- Q12_ACTIVATE_RECOVERY_BEGIN","-- Q12_ACTIVATE_RECOVERY_END"):between(sql,"-- Q12_ACTIVATE_NORMAL_BEGIN","-- Q12_ACTIVATE_NORMAL_END");}await client.query(commandSql);if(operation==="prepare-recovery"){const inherited=new Client({...connection,application_name:"megacampus-q12-recovery-readiness-proof"});await inherited.connect();try{const inheritedProof=await inherited.query("SELECT current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only");if(inheritedProof.rows.length!==1||inheritedProof.rows[0].transaction_read_only!=="on")throw new Error("recovery readiness inherited read-only proof");}finally{await inherited.end();}}if(faultPoint==="before-receipt")throw new Error("injected before receipt");return;}const state=await client.query("SELECT pg_catalog.to_regnamespace(\u0027q12_guard\u0027) IS NOT NULL AS present");const fresh=!state.rows[0].present;let postVisibility;if(fresh){const freshSql=between(sql,"-- Q12_INSTALL_FRESH_BEGIN","-- Q12_INSTALL_FRESH_END");const pieces=split(freshSql,"-- Q12_INSTALL_TX1_COMMITTED");await client.query(pieces[0]);postVisibility=pieces[1];if(faultPoint==="after-tx1-commit")throw new Error("injected after tx1");}else{postVisibility=between(sql,"-- Q12_INSTALL_RESUME_BEGIN","-- Q12_INSTALL_RESUME_END");}const terminatePieces=split(postVisibility,"-- Q12_INSTALL_SECOND_TERMINATE");if(terminatePieces[0].trim())await client.query(terminatePieces[0]);if(faultPoint==="before-second-terminate")throw new Error("injected before terminate");const tx2Pieces=split(terminatePieces[1],"-- Q12_INSTALL_TX2_BEGIN");if(tx2Pieces[0].trim())await client.query(tx2Pieces[0]);if(faultPoint==="before-tx2")throw new Error("injected before tx2");await client.query(tx2Pieces[1]);if(faultPoint==="before-receipt")throw new Error("injected before receipt");}finally{capability="";await client.end();}if(operation==="install")await publishInstallBaseline(connection,expected,baselineResultPath);}
 main().catch(()=>{process.stderr.write("q12 database barrier: database command failed\\n");process.exitCode=1;});'
+
+readonly TERMINAL_PROOF_RUNNER='const fs=require("node:fs");const crypto=require("node:crypto");const {Client}=require("pg");
+function one(fd,label){const value=fs.readFileSync(Number(fd),"utf8").replace(/\\r?\\n$/u,"");if(!value||/[\\r\\n]/u.test(value))throw new Error(label);return value;}
+function canonical(value){if(Array.isArray(value))return `[${value.map(canonical).join(",")}]`;if(value!==null&&typeof value==="object")return `{${Object.entries(value).sort(([left],[right])=>left.localeCompare(right)).map(([key,item])=>`${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;return JSON.stringify(value);}
+function sha256(value){return crypto.createHash("sha256").update(value).digest("hex");}
+function cronProjection(rawCron){if(!Array.isArray(rawCron)||rawCron.length!==8||new Set(rawCron.map(job=>job.jobid)).size!==8)throw new Error("terminal cron baseline");return rawCron.map(job=>{if(typeof job.jobid!=="number"||(job.jobname!==null&&typeof job.jobname!=="string")||typeof job.schedule!=="string"||typeof job.command!=="string"||typeof job.nodename!=="string"||typeof job.nodeport!=="number"||typeof job.database!=="string"||typeof job.username!=="string"||typeof job.active!=="boolean")throw new Error("terminal cron row");return {jobid:job.jobid,jobname:job.jobname,schedule:job.schedule,command_sha256:sha256(Buffer.from(job.command,"utf8")),nodename:job.nodename,nodeport:job.nodeport,database:job.database,username:job.username,active:job.active};}).sort((left,right)=>left.jobid-right.jobid);}
+function databaseDefaultProjection(databaseSettings){if(databaseSettings!==null&&(typeof databaseSettings!=="object"||Array.isArray(databaseSettings)))throw new Error("terminal database settings");const rawSettings=databaseSettings===null||databaseSettings.setconfig===null?[]:databaseSettings.setconfig;if(!Array.isArray(rawSettings)||rawSettings.some(value=>typeof value!=="string"))throw new Error("terminal database setting values");const settings=[...new Set(rawSettings)].sort((left,right)=>Buffer.compare(Buffer.from(left),Buffer.from(right)));return {schema_version:"megacampus.q12.database-default/v1",database:"postgres",role:null,row_present:databaseSettings!==null,settings};}
+async function main(){const [urlFd,caFd,structuralFd,resultPath]=process.argv.slice(1);let raw=one(urlFd,"url");const parsed=new URL(raw);if(parsed.protocol!=="postgresql:"||parsed.hostname!=="aws-1-us-east-2.pooler.supabase.com"||parsed.port!=="5432"||parsed.pathname!=="/postgres"||parsed.username!=="postgres.diqooqbuchsliypgwksu"||parsed.search||parsed.hash)throw new Error("database identity");const ca=fs.readFileSync(Number(caFd));if(sha256(ca)!=="700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7")throw new Error("CA identity");const structuralSql=fs.readFileSync(Number(structuralFd),"utf8");if(!structuralSql||structuralSql.includes(";"))throw new Error("structural SQL identity");const connection={host:parsed.hostname,port:Number(parsed.port),database:parsed.pathname.slice(1),user:decodeURIComponent(parsed.username),password:decodeURIComponent(parsed.password),ssl:{ca,rejectUnauthorized:true},options:"-c default_transaction_read_only=on",application_name:"megacampus-q12-database-terminal-proof"};raw="";const client=new Client(connection);await client.connect();try{const session=await client.query("SELECT session_user,current_database(),current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only,current_setting(\u0027server_version_num\u0027)::int AS server_version_num");if(session.rows.length!==1||session.rows[0].session_user!=="postgres"||session.rows[0].current_database!=="postgres"||session.rows[0].transaction_read_only!=="on"||session.rows[0].server_version_num<170000||session.rows[0].server_version_num>=180000)throw new Error("terminal reconnect proof");const structural=await client.query(structuralSql);if(structural.rows.length!==1||!/^[a-f0-9]{64}$/u.test(structural.rows[0].structural_sha256))throw new Error("terminal structural catalog");const databaseSetting=await client.query("SELECT COALESCE((SELECT to_jsonb(setting) FROM pg_db_role_setting setting WHERE setdatabase=(SELECT oid FROM pg_database WHERE datname=\u0027postgres\u0027) AND setrole=0),\u0027null\u0027::jsonb) AS setting");const cronJobs=await client.query("SELECT to_jsonb(job) AS job FROM cron.job job ORDER BY jobid");const residue=await client.query("SELECT (SELECT count(*)::int FROM pg_namespace WHERE nspname=\u0027q12_guard\u0027) AS q12_guard_schema_count,(SELECT count(*)::int FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_relation_count,(SELECT count(*)::int FROM pg_proc function_object JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_function_count,(SELECT count(*)::int FROM pg_type type_object JOIN pg_namespace namespace ON namespace.oid=type_object.typnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_type_count,(SELECT count(*)::int FROM pg_trigger trigger_object JOIN pg_class relation ON relation.oid=trigger_object.tgrelid JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_trigger_count,(SELECT count(*)::int FROM pg_event_trigger event_trigger JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_event_trigger_count,(SELECT count(*)::int FROM pg_stat_activity WHERE pid<>pg_backend_pid() AND datname=\u0027postgres\u0027 AND application_name LIKE \u0027megacampus-q12-%\u0027) AS barrier_era_session_count");if(databaseSetting.rows.length!==1||residue.rows.length!==1)throw new Error("terminal projection cardinality");const result={structural_catalog_sha256:structural.rows[0].structural_sha256,database_default_sha256:sha256(canonical(databaseDefaultProjection(databaseSetting.rows[0].setting))),cron_jobs_sha256:sha256(canonical(cronProjection(cronJobs.rows.map(row=>row.job)))),guard_residue:residue.rows[0]};const descriptor=fs.openSync(resultPath,fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(descriptor);if(!stat.isFile()||(stat.mode&0o777)!==0o600||stat.uid!==process.getuid())throw new Error("terminal result inode");fs.ftruncateSync(descriptor,0);fs.writeFileSync(descriptor,`${canonical(result)}\n`,"utf8");fs.fsyncSync(descriptor);}finally{fs.closeSync(descriptor);}}finally{await client.end();}}
+main().catch(()=>{process.stderr.write("q12 database barrier: terminal reconnect verification failed\\n");process.exitCode=1;});'
 
 recheck_open_file 'database URL file' "$db_url_file" "$url_fd" "$url_identity"
 recheck_open_file 'CA file' "$ca_file" "$ca_fd" "$ca_identity"
@@ -1478,8 +1686,17 @@ fi
 (
   cd "$project_directory/packages/course-gen-platform"
   "$node_bin" -e "$NODE_RUNNER" "$command_name" "$url_fd" "$ca_fd" "$capability_fd" "$catalog_fd" \
-    "$sql_file" "$expected_catalog_sha256" "$run_id" "$test_mode" "$fault_point"
+    "$sql_file" "$expected_catalog_sha256" "$run_id" "$test_mode" "$fault_point" \
+    "$install_baseline_result_file" "$database_terminal_result_file" "$structural_catalog_fd"
 ) || fail 'database command did not complete'
+
+if [[ ($command_name == cleanup || $command_name == rollback) && $test_mode -eq 0 ]]; then
+  (
+    cd "$project_directory/packages/course-gen-platform"
+    "$node_bin" -e "$TERMINAL_PROOF_RUNNER" "$url_fd" "$ca_fd" "$structural_catalog_fd" \
+      "$database_terminal_result_file"
+  ) || fail 'database terminal reconnect verification did not complete'
+fi
 
 recheck_open_file 'database capability file' "$capability_file" "$capability_fd" "$capability_identity"
 recheck_open_file 'canonical structural catalog SQL' "$STRUCTURAL_CATALOG_FILE" "$structural_catalog_fd" "$structural_catalog_identity"
@@ -1496,6 +1713,142 @@ exec {ca_fd}<&-
 exec {capability_fd}<&-
 exec {catalog_fd}<&-
 exec {structural_catalog_fd}<&-
+
+database_capability_sha256="$(head -c -1 "$capability_file" | sha256sum | awk '{print $1}')"
+expected_post_migration_catalog_sha256="$(jq -r '.expected_post_migration_catalog_sha256' "$expected_catalog_file")"
+if [[ $command_name == install ]]; then
+  if [[ -s $install_baseline_result_file ]]; then
+    validate_file_path 'install reconnect baseline result' "$install_baseline_result_file" '600'
+    jq -e '
+      (keys | sort) == (["source_baseline_sha256","baseline"] | sort) and
+      (.source_baseline_sha256 | test("^[a-f0-9]{64}$")) and
+      (.baseline | keys | sort) == (["baseline_structural_catalog_sha256","database_default_sha256",
+        "cron_jobs_sha256","guarded_relations_sha256","pg_net_queue_count"] | sort) and
+      ([.baseline.baseline_structural_catalog_sha256,.baseline.database_default_sha256,
+        .baseline.cron_jobs_sha256,.baseline.guarded_relations_sha256] | all(test("^[a-f0-9]{64}$"))) and
+      .baseline.pg_net_queue_count == 0
+    ' "$install_baseline_result_file" >/dev/null || fail 'install reconnect baseline result is invalid'
+    source_baseline_sha256="$(jq -r '.source_baseline_sha256' "$install_baseline_result_file")"
+    baseline_projection="$(jq -cS '.baseline' "$install_baseline_result_file")"
+  else
+    [[ $test_mode -eq 1 ]] || fail 'install reconnect baseline result is missing'
+    [[ -f $install_baseline_result_file && ! -L $install_baseline_result_file &&
+      $(stat -c '%u:%g:%a' -- "$install_baseline_result_file") == "$(id -u):$(id -g):600" ]] ||
+      fail 'empty synthetic install reconnect baseline result is unsafe'
+    baseline_structural_catalog_sha256="$(jq -r '.baseline_structural_sha256' "$expected_catalog_file")"
+    database_default_projection='{"database":"postgres","role":null,"row_present":false,"schema_version":"megacampus.q12.database-default/v1","settings":[]}'
+    database_default_sha256="$(printf '%s' "$database_default_projection" | sha256sum | awk '{print $1}')"
+    cron_jobs_sha256="$(jq -cS '.cron_jobs' "$expected_catalog_file" | head -c -1 | sha256sum | awk '{print $1}')"
+    guarded_relations_sha256="$(jq -cS '.guarded_relations' "$expected_catalog_file" | head -c -1 | sha256sum | awk '{print $1}')"
+    baseline_projection="$(jq -cnS \
+      --arg structural "$baseline_structural_catalog_sha256" \
+      --arg database_default "$database_default_sha256" \
+      --arg cron "$cron_jobs_sha256" --arg guarded "$guarded_relations_sha256" \
+      '{baseline_structural_catalog_sha256:$structural,database_default_sha256:$database_default,
+        cron_jobs_sha256:$cron,guarded_relations_sha256:$guarded,pg_net_queue_count:0}')"
+    source_baseline_sha256="$(printf '%s' "$baseline_projection" | sha256sum | awk '{print $1}')"
+  fi
+  expected_baseline_structural_catalog_sha256="$(jq -r '.baseline_structural_sha256' "$expected_catalog_file")"
+  [[ $(jq -r '.baseline_structural_catalog_sha256' <<<"$baseline_projection") == "$expected_baseline_structural_catalog_sha256" ]] ||
+    fail 'install reconnect structural baseline hash is cross-wired'
+  guarded_relations_sha256="$(jq -cS '.guarded_relations' "$expected_catalog_file" | head -c -1 | sha256sum | awk '{print $1}')"
+  [[ $(jq -r '.guarded_relations_sha256' <<<"$baseline_projection") == "$guarded_relations_sha256" ]] ||
+    fail 'install reconnect guarded-relations hash is cross-wired'
+  baseline_sha256="$(printf '%s' "$baseline_projection" | sha256sum | awk '{print $1}')"
+  baseline_temporary="$run_root/.database-barrier-baseline.tmp"
+  [[ ! -e $baseline_temporary && ! -L $baseline_temporary ]] || fail 'unknown database barrier baseline temporary residue exists'
+  jq -cnS --arg schema "$BASELINE_SCHEMA" --arg run "$run_id" \
+    --arg source "$source_baseline_sha256" --arg baseline_sha "$baseline_sha256" \
+    --arg checkpoint "$input_checkpoint_sha256" --arg journal "$intent_journal_entry_hash" \
+    --arg resource "$resource_manifest_sha256" --arg expected "$expected_post_migration_catalog_sha256" \
+    --arg capability "$database_capability_sha256" --argjson baseline "$baseline_projection" \
+    '{schema_version:$schema,run_id:$run,state:"maintenance_guarded_baseline",
+      source_baseline_sha256:$source,baseline_sha256:$baseline_sha,
+      predecessor_checkpoint_sha256:$checkpoint,predecessor_journal_entry_hash:$journal,
+      resource_manifest_sha256:$resource,expected_post_migration_catalog_sha256:$expected,
+      database_capability_sha256:$capability,baseline:$baseline}' >"$baseline_temporary"
+  publish_exact_immutable "$baseline_temporary" "$baseline_file" 'database barrier baseline'
+  [[ $fault_point != after-baseline ]] || fail 'injected after database barrier baseline publication'
+fi
+
+if [[ $command_name == cleanup || $command_name == rollback ]]; then
+  expected_terminal_structural_catalog_sha256="$(jq -r \
+    --arg operation "$command_name" \
+    'if $operation == "cleanup" then .expected_post_migration_catalog_sha256 else .baseline_structural_sha256 end' \
+    "$expected_catalog_file")"
+  expected_terminal_database_default_sha256="$(jq -r '.baseline.database_default_sha256' "$baseline_file")"
+  expected_terminal_cron_jobs_sha256="$(jq -r '.baseline.cron_jobs_sha256' "$baseline_file")"
+  if [[ -s $database_terminal_result_file ]]; then
+    validate_file_path 'database terminal reconnect result' "$database_terminal_result_file" '600'
+    jq -e '
+      (keys | sort) == (["structural_catalog_sha256","database_default_sha256",
+        "cron_jobs_sha256","guard_residue"] | sort) and
+      ([.structural_catalog_sha256,.database_default_sha256,.cron_jobs_sha256] |
+        all(test("^[a-f0-9]{64}$"))) and
+      .guard_residue == {q12_guard_schema_count:0,q12_guard_relation_count:0,
+        q12_guard_function_count:0,q12_guard_type_count:0,q12_guard_trigger_count:0,
+        q12_guard_event_trigger_count:0,barrier_era_session_count:0}
+    ' "$database_terminal_result_file" >/dev/null || fail 'database terminal reconnect result is invalid'
+    structural_catalog_sha256="$(jq -r '.structural_catalog_sha256' "$database_terminal_result_file")"
+    database_default_sha256="$(jq -r '.database_default_sha256' "$database_terminal_result_file")"
+    cron_jobs_sha256="$(jq -r '.cron_jobs_sha256' "$database_terminal_result_file")"
+  else
+    [[ $test_mode -eq 1 ]] || fail 'database terminal reconnect result is missing'
+    [[ -f $database_terminal_result_file && ! -L $database_terminal_result_file &&
+      $(stat -c '%u:%g:%a' -- "$database_terminal_result_file") == "$(id -u):$(id -g):600" ]] ||
+      fail 'empty synthetic database terminal reconnect result is unsafe'
+    structural_catalog_sha256="$expected_terminal_structural_catalog_sha256"
+    database_default_sha256="$expected_terminal_database_default_sha256"
+    cron_jobs_sha256="$expected_terminal_cron_jobs_sha256"
+  fi
+  [[ $structural_catalog_sha256 == "$expected_terminal_structural_catalog_sha256" ]] ||
+    fail 'database terminal structural catalog hash is invalid'
+  [[ $database_default_sha256 == "$expected_terminal_database_default_sha256" ]] ||
+    fail 'database terminal default hash is invalid'
+  [[ $cron_jobs_sha256 == "$expected_terminal_cron_jobs_sha256" ]] ||
+    fail 'database terminal cron hash is invalid'
+  terminal_proof_file="$run_root/database-barrier-$command_name-terminal-proof.json"
+  if [[ -e $terminal_proof_file || -L $terminal_proof_file ]]; then
+    validate_file_path 'database barrier terminal proof' "$terminal_proof_file" '400'
+    jq -e --arg schema "$TERMINAL_PROOF_SCHEMA" --arg run "$run_id" --arg operation "$command_name" \
+      --arg baseline "$database_barrier_baseline_sha256" --arg receipt "$predecessor_receipt_sha256" \
+      --arg archive "$predecessor_receipt_archive_sha256" --arg input "$input_checkpoint_sha256" \
+      --arg journal "$intent_journal_entry_hash" --arg capability "$database_capability_sha256" '
+      (keys | length) == 18 and .schema_version == $schema and .run_id == $run and
+      .operation == $operation and .state == "guard_cleanup_complete" and
+      .database_barrier_baseline_sha256 == $baseline and .predecessor_receipt_sha256 == $receipt and
+      .predecessor_receipt_archive_sha256 == $archive and .input_checkpoint_sha256 == $input and
+      .intent_journal_entry_hash == $journal and .database_capability_sha256 == $capability
+    ' "$terminal_proof_file" >/dev/null || fail 'existing database barrier terminal proof is non-exact'
+  else
+    proof_temporary="$run_root/.database-barrier-$command_name-terminal-proof.tmp"
+    [[ ! -e $proof_temporary && ! -L $proof_temporary ]] || fail 'unknown database barrier terminal proof temporary residue exists'
+    completed_at="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
+    jq -cnS --arg schema "$TERMINAL_PROOF_SCHEMA" --arg run "$run_id" --arg operation "$command_name" \
+      --arg expected "$expected_post_migration_catalog_sha256" --arg baseline "$database_barrier_baseline_sha256" \
+      --arg receipt "$predecessor_receipt_sha256" --arg archive "$predecessor_receipt_archive_sha256" \
+      --arg rollback_intent "$database_barrier_rollback_intent_sha256" --arg input "$input_checkpoint_sha256" \
+      --arg journal "$intent_journal_entry_hash" --arg structural "$structural_catalog_sha256" \
+      --arg database_default "$database_default_sha256" --arg cron "$cron_jobs_sha256" \
+      --arg required "$required_phase_receipts_sha256" --arg capability "$database_capability_sha256" \
+      --arg completed "$completed_at" \
+      '{schema_version:$schema,run_id:$run,operation:$operation,state:"guard_cleanup_complete",
+        expected_post_migration_catalog_sha256:$expected,database_barrier_baseline_sha256:$baseline,
+        predecessor_receipt_sha256:$receipt,predecessor_receipt_archive_sha256:$archive,
+        database_barrier_rollback_intent_sha256:(if $rollback_intent=="" then null else $rollback_intent end),
+        input_checkpoint_sha256:$input,intent_journal_entry_hash:$journal,
+        structural_catalog_sha256:$structural,database_default_sha256:$database_default,
+        cron_jobs_sha256:$cron,guard_residue:{q12_guard_schema_count:0,q12_guard_relation_count:0,
+          q12_guard_function_count:0,q12_guard_type_count:0,q12_guard_trigger_count:0,
+          q12_guard_event_trigger_count:0,barrier_era_session_count:0},
+        required_phase_receipts_sha256:(if $required=="" then null else $required end),
+        database_capability_sha256:$capability,completed_at:$completed}' >"$proof_temporary"
+    publish_exact_immutable "$proof_temporary" "$terminal_proof_file" 'database barrier terminal proof'
+  fi
+  [[ $fault_point != after-proof ]] || fail 'injected after database barrier terminal proof publication'
+  printf 'q12 database barrier: guard_cleanup_complete proof verified\n'
+  exit 0
+fi
 
 receipt_state='maintenance_guarded'
 zero_guard_residue=false
@@ -1524,11 +1877,5 @@ sync -f "$receipt_tmp"
 mv -f -- "$receipt_tmp" "$receipt_file"
 receipt_tmp=''
 sync -d "$run_root"
-
-if [[ $command_name == cleanup || $command_name == rollback ]]; then
-  rm -f -- "$capability_file"
-  # fsync the persistent secret parent only after the database proved zero guard residue.
-  sync -d "$(dirname "$capability_file")"
-fi
 
 printf 'q12 database barrier: %s verified\n' "$receipt_state"

@@ -168,6 +168,156 @@ interface BarrierFixture {
   sqlLog: string;
   receipt: string;
   probeReceipt: string;
+  baseline: string;
+  cleanupProof: string;
+  rollbackProof: string;
+  runRoot: string;
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value: string | Buffer): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function writeCanonical(path: string, value: unknown, mode = 0o400): void {
+  writeFileSync(path, `${canonicalJson(value)}\n`, { mode });
+  chmodSync(path, mode);
+}
+
+function prepareTerminalInputs(fixture: BarrierFixture, operation: 'cleanup' | 'rollback'): void {
+  const expected = expectedCatalog();
+  const catalogSha =
+    fixture.args[fixture.args.indexOf('--expected-post-migration-catalog-sha256') + 1];
+  const capabilitySha = sha256(readFileSync(fixture.capability, 'utf8').trim());
+  const checkpoint = {
+    schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+    run_id: RUN_ID,
+    seq: operation === 'cleanup' ? 41 : 42,
+    phase: 'guard_cleanup_complete',
+    journal_entry_hash: (operation === 'cleanup' ? '4' : '5').repeat(64),
+    previous_journal_entry_hash: '3'.repeat(64),
+    journal_device: '1',
+    journal_inode: '1',
+    accepted_object_kind: 'none',
+    accepted_object_sha256: null,
+    resume_authority_sha256: null,
+    lease_epoch: 'cutover',
+  };
+  writeCanonical(
+    join(fixture.runRoot, `database-barrier-input-checkpoint-${operation}-cutover.json`),
+    checkpoint,
+    0o600
+  );
+  writeCanonical(
+    join(fixture.runRoot, 'phase.jsonl'),
+    {
+      schema: 'megacampus.q12.cutover-journal/v1',
+      run_id: RUN_ID,
+      seq: checkpoint.seq,
+      phase: checkpoint.phase,
+      outcome: 'capability_claimed',
+      timestamp: '2026-07-14T08:00:00.000Z',
+      release_sha: '1'.repeat(40),
+      operator_digest: '2'.repeat(64),
+      command_id: `barrier.${operation}`,
+      command_sha256: '3'.repeat(64),
+      lease_epoch: 'cutover',
+      previous_hash: checkpoint.previous_journal_entry_hash,
+      entry_hash: checkpoint.journal_entry_hash,
+      rotation_required: true,
+      resource_manifest_sha256: 'b'.repeat(64),
+      quiesce_manifest_sha256: '0'.repeat(64),
+      capability_manifest_sha256: 'c'.repeat(64),
+      accepted_object_kind: 'none',
+      accepted_object_sha256: null,
+    },
+    0o600
+  );
+  const baselineProjection = {
+    baseline_structural_catalog_sha256: expected.baseline_structural_sha256,
+    database_default_sha256: '6'.repeat(64),
+    cron_jobs_sha256: '7'.repeat(64),
+    guarded_relations_sha256: sha256(canonicalJson(expected.guarded_relations)),
+    pg_net_queue_count: 0,
+  };
+  writeCanonical(fixture.baseline, {
+    schema_version: 'megacampus.q12.database-barrier-baseline/v1',
+    run_id: RUN_ID,
+    state: 'maintenance_guarded_baseline',
+    source_baseline_sha256: '8'.repeat(64),
+    baseline_sha256: sha256(canonicalJson(baselineProjection)),
+    predecessor_checkpoint_sha256: '9'.repeat(64),
+    predecessor_journal_entry_hash: 'a'.repeat(64),
+    resource_manifest_sha256: 'b'.repeat(64),
+    expected_post_migration_catalog_sha256: expected.expected_post_migration_catalog_sha256,
+    database_capability_sha256: capabilitySha,
+    baseline: baselineProjection,
+  });
+  const receipt = {
+    schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+    run_id: RUN_ID,
+    state: operation === 'cleanup' ? 'activated' : 'maintenance_guarded',
+    zero_guard_residue: false,
+    expected_catalog_sha256: catalogSha,
+    last_command: operation === 'cleanup' ? 'activate' : 'install',
+    rollback_probes_verified: operation === 'cleanup',
+    probe_receipt_sha256:
+      operation === 'cleanup' ? sha256(readFileSync(fixture.probeReceipt)) : null,
+  };
+  writeCanonical(fixture.receipt, receipt);
+  const archive = join(fixture.runRoot, `database-barrier-receipt-v1-before-${operation}.json`);
+  writeFileSync(archive, readFileSync(fixture.receipt), { mode: 0o400 });
+  chmodSync(archive, 0o400);
+  if (operation === 'rollback') {
+    const requiredPhaseReceipts: unknown[] = [];
+    writeCanonical(join(fixture.runRoot, 'database-barrier-rollback-intent.json'), {
+      schema_version: 'megacampus.q12.database-barrier-rollback-intent/v1',
+      run_id: RUN_ID,
+      state: 'rollback_intent',
+      expected_post_migration_catalog_sha256: expected.expected_post_migration_catalog_sha256,
+      database_barrier_baseline_sha256: sha256(readFileSync(fixture.baseline)),
+      predecessor_receipt_sha256: sha256(readFileSync(fixture.receipt)),
+      input_checkpoint_sha256: sha256(
+        readFileSync(
+          join(fixture.runRoot, 'database-barrier-input-checkpoint-rollback-cutover.json')
+        )
+      ),
+      intent_journal_entry_hash: checkpoint.journal_entry_hash,
+      required_phase_receipts: requiredPhaseReceipts,
+      required_phase_receipts_sha256: sha256(canonicalJson(requiredPhaseReceipts)),
+    });
+  }
+}
+
+function terminalChildResult(operation: 'cleanup' | 'rollback'): Record<string, unknown> {
+  const catalog = expectedCatalog();
+  return {
+    structural_catalog_sha256:
+      operation === 'cleanup'
+        ? catalog.expected_post_migration_catalog_sha256
+        : catalog.baseline_structural_sha256,
+    database_default_sha256: '6'.repeat(64),
+    cron_jobs_sha256: '7'.repeat(64),
+    guard_residue: {
+      q12_guard_schema_count: 0,
+      q12_guard_relation_count: 0,
+      q12_guard_function_count: 0,
+      q12_guard_type_count: 0,
+      q12_guard_trigger_count: 0,
+      q12_guard_event_trigger_count: 0,
+      barrier_era_session_count: 0,
+    },
+  };
 }
 
 function rewriteExpectedCatalog(
@@ -208,6 +358,49 @@ function barrierFixture(): BarrierFixture {
     dbUrl,
     `postgresql://postgres.diqooqbuchsliypgwksu:${URI_PASSWORD_SENTINEL}@aws-1-us-east-2.pooler.supabase.com:5432/postgres\n`,
     { mode: 0o600 }
+  );
+  writeCanonical(
+    join(runRoot, 'database-barrier-input-checkpoint-install-cutover.json'),
+    {
+      schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+      run_id: RUN_ID,
+      seq: 3,
+      phase: 'maintenance_guarded',
+      journal_entry_hash: '1'.repeat(64),
+      previous_journal_entry_hash: '0'.repeat(64),
+      journal_device: '1',
+      journal_inode: '1',
+      accepted_object_kind: 'none',
+      accepted_object_sha256: null,
+      resume_authority_sha256: null,
+      lease_epoch: 'cutover',
+    },
+    0o600
+  );
+  writeCanonical(
+    join(runRoot, 'phase.jsonl'),
+    {
+      schema: 'megacampus.q12.cutover-journal/v1',
+      run_id: RUN_ID,
+      seq: 3,
+      phase: 'maintenance_guarded',
+      outcome: 'capability_claimed',
+      timestamp: '2026-07-14T07:00:00.000Z',
+      release_sha: '1'.repeat(40),
+      operator_digest: '2'.repeat(64),
+      command_id: 'barrier.install',
+      command_sha256: '3'.repeat(64),
+      lease_epoch: 'cutover',
+      previous_hash: '0'.repeat(64),
+      entry_hash: '1'.repeat(64),
+      rotation_required: true,
+      resource_manifest_sha256: 'd'.repeat(64),
+      quiesce_manifest_sha256: '0'.repeat(64),
+      capability_manifest_sha256: 'c'.repeat(64),
+      accepted_object_kind: 'none',
+      accepted_object_sha256: null,
+    },
+    0o600
   );
   writeFileSync(ca, 'synthetic-ca\n', { mode: 0o644 });
   writeFileSync(capability, `${CAPABILITY_SENTINEL}\n`, { mode: 0o400 });
@@ -256,6 +449,14 @@ set -euo pipefail
 printf '%s\n' "$@" > "$NODE_ARGS_LOG"
 env | sort > "$NODE_ENV_LOG"
 cp -- "$8" "$SQL_LOG"
+if [[ "$3" == install && -n "\${MC2_Q12_FAKE_BASELINE_RESULT:-}" ]]; then
+  [[ -n "\${13:-}" ]] || exit 83
+  printf '%s\n' "$MC2_Q12_FAKE_BASELINE_RESULT" > "\${13}"
+fi
+if [[ ( "$3" == cleanup || "$3" == rollback ) && -n "\${MC2_Q12_FAKE_TERMINAL_RESULT:-}" ]]; then
+  [[ -n "\${14:-}" ]] || exit 84
+  printf '%s\n' "$MC2_Q12_FAKE_TERMINAL_RESULT" > "\${14}"
+fi
 if [[ "\${12:-}" == before-receipt ]]; then
   printf '%s\n' "$3" > "$MC2_Q12_FAKE_COMMITTED_OPERATION"
   exit 82
@@ -273,6 +474,10 @@ fi
     sqlLog,
     receipt: join(runRoot, 'database-barrier-receipt.json'),
     probeReceipt,
+    baseline: join(runRoot, 'database-barrier-baseline.json'),
+    cleanupProof: join(runRoot, 'database-barrier-cleanup-terminal-proof.json'),
+    rollbackProof: join(runRoot, 'database-barrier-rollback-terminal-proof.json'),
+    runRoot,
     env: {
       PATH: process.env.PATH,
       MC2_Q12_BARRIER_TEST_MODE: 'mc2-synthetic-q12-database-barrier-test-only',
@@ -301,6 +506,231 @@ fi
 }
 
 describe('Q12 durable database maintenance barrier', () => {
+  it('publishes the exact immutable eleven-key install baseline before the first v1 receipt', () => {
+    const fixture = barrierFixture();
+
+    const result = spawnSync('bash', [BARRIER, 'install', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    const baseline = JSON.parse(readFileSync(fixture.baseline, 'utf8')) as Record<string, any>;
+    expect(Object.keys(baseline).sort()).toEqual(
+      [
+        'schema_version',
+        'run_id',
+        'state',
+        'source_baseline_sha256',
+        'baseline_sha256',
+        'predecessor_checkpoint_sha256',
+        'predecessor_journal_entry_hash',
+        'resource_manifest_sha256',
+        'expected_post_migration_catalog_sha256',
+        'database_capability_sha256',
+        'baseline',
+      ].sort()
+    );
+    expect(Object.keys(baseline.baseline).sort()).toEqual(
+      [
+        'baseline_structural_catalog_sha256',
+        'database_default_sha256',
+        'cron_jobs_sha256',
+        'guarded_relations_sha256',
+        'pg_net_queue_count',
+      ].sort()
+    );
+    expect(baseline).toMatchObject({
+      schema_version: 'megacampus.q12.database-barrier-baseline/v1',
+      run_id: RUN_ID,
+      state: 'maintenance_guarded_baseline',
+    });
+    expect(existsSync(fixture.receipt)).toBe(true);
+  });
+
+  it('derives install evidence from the reconnect-verified immutable database baseline', () => {
+    const fixture = barrierFixture();
+    const catalog = expectedCatalog();
+    const projection = {
+      baseline_structural_catalog_sha256: catalog.baseline_structural_sha256,
+      database_default_sha256: '6'.repeat(64),
+      cron_jobs_sha256: '7'.repeat(64),
+      guarded_relations_sha256: sha256(canonicalJson(catalog.guarded_relations)),
+      pg_net_queue_count: 0,
+    };
+    const childResult = {
+      source_baseline_sha256: '8'.repeat(64),
+      baseline: projection,
+    };
+
+    const result = spawnSync('bash', [BARRIER, 'install', ...fixture.args], {
+      env: {
+        ...fixture.env,
+        MC2_Q12_FAKE_BASELINE_RESULT: canonicalJson(childResult),
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(fixture.baseline, 'utf8'))).toMatchObject({
+      source_baseline_sha256: childResult.source_baseline_sha256,
+      baseline_sha256: sha256(canonicalJson(projection)),
+      baseline: projection,
+    });
+  });
+
+  it.each(['cleanup', 'rollback'] as const)(
+    'publishes only the exact eighteen-key %s terminal proof and leaves Root mutations untouched',
+    command => {
+      const fixture = barrierFixture();
+      prepareTerminalInputs(fixture, command);
+      const proofPath = command === 'cleanup' ? fixture.cleanupProof : fixture.rollbackProof;
+      const predecessorReceipt = readFileSync(fixture.receipt);
+
+      const result = spawnSync('bash', [BARRIER, command, ...fixture.args], {
+        env: {
+          ...fixture.env,
+          MC2_Q12_FAKE_TERMINAL_RESULT: canonicalJson(terminalChildResult(command)),
+        },
+        encoding: 'utf8',
+      });
+
+      expect(result.status, result.stderr).toBe(0);
+      const proof = JSON.parse(readFileSync(proofPath, 'utf8')) as Record<string, any>;
+      expect(Object.keys(proof).sort()).toEqual(
+        [
+          'schema_version',
+          'run_id',
+          'operation',
+          'state',
+          'expected_post_migration_catalog_sha256',
+          'database_barrier_baseline_sha256',
+          'predecessor_receipt_sha256',
+          'predecessor_receipt_archive_sha256',
+          'database_barrier_rollback_intent_sha256',
+          'input_checkpoint_sha256',
+          'intent_journal_entry_hash',
+          'structural_catalog_sha256',
+          'database_default_sha256',
+          'cron_jobs_sha256',
+          'guard_residue',
+          'required_phase_receipts_sha256',
+          'database_capability_sha256',
+          'completed_at',
+        ].sort()
+      );
+      expect(proof).toMatchObject({
+        schema_version: 'megacampus.q12.database-barrier-terminal-proof/v1',
+        run_id: RUN_ID,
+        operation: command,
+        state: 'guard_cleanup_complete',
+      });
+      expect(readFileSync(fixture.capability, 'utf8').trim()).toBe(CAPABILITY_SENTINEL);
+      expect(readFileSync(fixture.receipt)).toEqual(predecessorReceipt);
+    }
+  );
+
+  it('reconstructs a missing baseline and v1 receipt after install COMMIT without replacing the baseline', () => {
+    const fixture = barrierFixture();
+    const faulted = spawnSync('bash', [BARRIER, 'install', ...fixture.args], {
+      env: { ...fixture.env, MC2_Q12_BARRIER_FAULT_POINT: 'after-baseline' },
+      encoding: 'utf8',
+    });
+    expect(faulted.status).not.toBe(0);
+    expect(existsSync(fixture.baseline)).toBe(true);
+    expect(existsSync(fixture.receipt)).toBe(false);
+    const baselineBytes = readFileSync(fixture.baseline);
+
+    const recovered = spawnSync('bash', [BARRIER, 'install', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(recovered.status, recovered.stderr).toBe(0);
+    expect(readFileSync(fixture.baseline)).toEqual(baselineBytes);
+    expect(JSON.parse(readFileSync(fixture.receipt, 'utf8'))).toMatchObject({
+      schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+      state: 'maintenance_guarded',
+    });
+  });
+
+  it('rejects a replaced or extended immutable install baseline', () => {
+    const fixture = barrierFixture();
+    expect(
+      spawnSync('bash', [BARRIER, 'install', ...fixture.args], {
+        env: fixture.env,
+        encoding: 'utf8',
+      }).status
+    ).toBe(0);
+    const baseline = JSON.parse(readFileSync(fixture.baseline, 'utf8')) as Record<string, any>;
+    baseline.unexpected = true;
+    chmodSync(fixture.baseline, 0o600);
+    writeCanonical(fixture.baseline, baseline);
+
+    const rejected = spawnSync('bash', [BARRIER, 'install', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(rejected.status).not.toBe(0);
+    expect(rejected.stderr).toMatch(/baseline.*non-exact|baseline.*invalid/iu);
+  });
+
+  it.each(['cleanup', 'rollback'] as const)(
+    'reuses an exact durable %s proof after a post-publication crash without replaying the child',
+    command => {
+      const fixture = barrierFixture();
+      prepareTerminalInputs(fixture, command);
+      const proofPath = command === 'cleanup' ? fixture.cleanupProof : fixture.rollbackProof;
+      const faulted = spawnSync('bash', [BARRIER, command, ...fixture.args], {
+        env: { ...fixture.env, MC2_Q12_BARRIER_FAULT_POINT: 'after-proof' },
+        encoding: 'utf8',
+      });
+      expect(faulted.status).not.toBe(0);
+      const proofBytes = readFileSync(proofPath);
+      rmSync(fixture.nodeArgsLog, { force: true });
+
+      const recovered = spawnSync('bash', [BARRIER, command, ...fixture.args], {
+        env: fixture.env,
+        encoding: 'utf8',
+      });
+
+      expect(recovered.status, recovered.stderr).toBe(0);
+      expect(readFileSync(proofPath)).toEqual(proofBytes);
+      expect(existsSync(fixture.nodeArgsLog)).toBe(false);
+      expect(readFileSync(fixture.capability, 'utf8').trim()).toBe(CAPABILITY_SENTINEL);
+    }
+  );
+
+  it.each(['cleanup', 'rollback'] as const)(
+    'rejects a replaced or extended immutable %s terminal proof before child replay',
+    command => {
+      const fixture = barrierFixture();
+      prepareTerminalInputs(fixture, command);
+      const proofPath = command === 'cleanup' ? fixture.cleanupProof : fixture.rollbackProof;
+      expect(
+        spawnSync('bash', [BARRIER, command, ...fixture.args], {
+          env: fixture.env,
+          encoding: 'utf8',
+        }).status
+      ).toBe(0);
+      const proof = JSON.parse(readFileSync(proofPath, 'utf8')) as Record<string, unknown>;
+      proof.unexpected = true;
+      chmodSync(proofPath, 0o600);
+      writeCanonical(proofPath, proof);
+      rmSync(fixture.nodeArgsLog, { force: true });
+
+      const rejected = spawnSync('bash', [BARRIER, command, ...fixture.args], {
+        env: fixture.env,
+        encoding: 'utf8',
+      });
+
+      expect(rejected.status).not.toBe(0);
+      expect(rejected.stderr).toMatch(/terminal proof.*non-exact/iu);
+      expect(existsSync(fixture.nodeArgsLog)).toBe(false);
+    }
+  );
+
   it('freezes the exact file-only command surface and owner-only receipt contract', () => {
     const script = source();
     for (const command of ['install', 'verify-extended', 'activate', 'rollback', 'cleanup']) {
@@ -577,6 +1007,7 @@ describe('Q12 durable database maintenance barrier', () => {
 
   it('derives rollback locks from base plus only committed migration guard truth at every phase', () => {
     const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'rollback');
     const result = spawnSync('bash', [BARRIER, 'rollback', ...fixture.args], {
       env: fixture.env,
       encoding: 'utf8',
@@ -604,12 +1035,12 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(sql).not.toContain('"public"."document_evidence_runs"');
     expect(sql).not.toContain('"public"."document_evidence_observability_totals"');
     expect(JSON.parse(readFileSync(fixture.receipt, 'utf8'))).toMatchObject({
-      state: 'guard_cleanup_complete',
-      zero_guard_residue: true,
-      last_command: 'rollback',
+      state: 'maintenance_guarded',
+      zero_guard_residue: false,
       rollback_probes_verified: false,
       probe_receipt_sha256: null,
     });
+    expect(existsSync(fixture.rollbackProof)).toBe(true);
   });
 
   it.each([
@@ -654,6 +1085,7 @@ describe('Q12 durable database maintenance barrier', () => {
 
   it('restores the exact captured database default before rollback drops guard state', () => {
     const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'rollback');
     const result = spawnSync('bash', [BARRIER, 'rollback', ...fixture.args], {
       env: fixture.env,
       encoding: 'utf8',
@@ -672,19 +1104,19 @@ describe('Q12 durable database maintenance barrier', () => {
     );
   });
 
-  it('unlinks the fixed capability only after cleanup returns zero residue', () => {
+  it('leaves the fixed capability and v1 receipt for Root after cleanup proves zero residue', () => {
     const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'cleanup');
+    const predecessorReceipt = readFileSync(fixture.receipt);
     const result = spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
       env: fixture.env,
       encoding: 'utf8',
     });
 
     expect(result.status, result.stderr).toBe(0);
-    expect(() => readFileSync(fixture.capability)).toThrow();
-    expect(JSON.parse(readFileSync(fixture.receipt, 'utf8'))).toMatchObject({
-      state: 'guard_cleanup_complete',
-      zero_guard_residue: true,
-    });
+    expect(readFileSync(fixture.capability, 'utf8').trim()).toBe(CAPABILITY_SENTINEL);
+    expect(readFileSync(fixture.receipt)).toEqual(predecessorReceipt);
+    expect(existsSync(fixture.cleanupProof)).toBe(true);
   });
 
   it('rejects unknown top-level catalog fields and a seventy-seventh public relation', () => {
@@ -920,6 +1352,7 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(activationSql).toContain('q12_guard_ddl_command_start');
 
     const cleanupFixture = barrierFixture();
+    prepareTerminalInputs(cleanupFixture, 'cleanup');
     expect(
       spawnSync('bash', [BARRIER, 'cleanup', ...cleanupFixture.args], {
         env: cleanupFixture.env,
@@ -1111,6 +1544,8 @@ describe('Q12 durable database maintenance barrier', () => {
     'does not forge a terminal %s receipt after a protected post-COMMIT fault',
     command => {
       const fixture = barrierFixture();
+      prepareTerminalInputs(fixture, command);
+      const predecessorReceipt = readFileSync(fixture.receipt);
       const committedOperation = join(resolve(fixture.receipt, '..'), `fake-committed-${command}`);
       const result = spawnSync('bash', [BARRIER, command, ...fixture.args], {
         env: {
@@ -1123,7 +1558,10 @@ describe('Q12 durable database maintenance barrier', () => {
 
       expect(result.status).not.toBe(0);
       expect(readFileSync(committedOperation, 'utf8').trim()).toBe(command);
-      expect(existsSync(fixture.receipt)).toBe(false);
+      expect(readFileSync(fixture.receipt)).toEqual(predecessorReceipt);
+      expect(existsSync(command === 'cleanup' ? fixture.cleanupProof : fixture.rollbackProof)).toBe(
+        false
+      );
       expect(readFileSync(fixture.capability, 'utf8').trim()).toBe(CAPABILITY_SENTINEL);
     }
   );
