@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily MegaCampus Supabase backup schedule
+
+[Timer]
+OnCalendar=*-*-* 00:30:00 Europe/Amsterdam
+Persistent=true
+AccuracySec=1m
+RandomizedDelaySec=0
+Unit=megacampus-supabase-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,11 +1,18 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 staging authorized but live activation remains NO-GO until current DB credentials and truthful backup evidence
+Status: all safe local Q6-Q11 and E1-E7 work accepted; exact Q12 D5 design and execution plan are owner/reviewer accepted; Root-D5 is the next local TDD dependency; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: through local PostgreSQL 17 backup correction/rereview integration `1e41adc2`, in addition to Task 6 source recovery and final activation-contract correction/review; final closeout metadata is delivered at the branch HEAD
-Integration branch: `codex/self-hosted-qdrant-platform`
-Implementation scope: Q1-Q11, E1-E7, Q12 guarded migration/operator/rollback/local snapshots, and the complete source-recovery operator are locally accepted. Exact-count Task 6 proves 42 physical/125 logical recovery, 24 dispositions, 234+6 parity, crash resume, guarded rollback, tenant isolation, and zero residue. Final root verification passed backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, exact Qdrant 15/15, applicable local recovery 5/5, Compose 8/8, type-check, and build 75/75. Local closeout is in progress; live execution remains fail-closed.
+Current accepted integration evidence before D5 plan publication: pushed head `09fe24ad`; accepted D5 design SHA `b5f63cd6…540e8`; accepted D5 plan SHA `8278bce9…a0ed`
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
+Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
+
+## Q12 D5 Plan Acceptance (2026-07-14)
+
+- Exact plan: `docs/superpowers/plans/2026-07-14-q12-retained-barrier-capability-provenance-addendum.md`, SHA-256 `8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed`.
+- Final independent correctness/docs rereview: P0/P1/P2/P3 `0/0/0/0`; report SHA-256 values `db8bf55d…1d09` and `69b49f2b…e3c4`.
+- Ordering: Root-D5 `.13.18`, then W `.13.10`, then parallel M/H `.13.11/.13.12`, then Root `.13.13` and full local closeout; Beads cycle check passed.
+- No implementation or remote/live mutation occurred during planning. External S3 and Qdrant Cloud remain out of scope; the final activation packet still requires explicit current authorization.
 
 ## Beads Mapping
 
@@ -20,7 +27,7 @@ Implementation scope: Q1-Q11, E1-E7, Q12 guarded migration/operator/rollback/loc
 - Q9 `mc2-jz6y0.10`
 - Q10 `mc2-jz6y0.11`
 - Q11 `mc2-jz6y0.12`
-- Q12 `mc2-jz6y0.13` — authorized staging activation, currently NO-GO on hard inputs
+- Q12 `mc2-jz6y0.13` — authorized staging objective, currently NO-GO until correction implementation and local hard gates pass
 - E1 `mc2-jz6y0.18` — evidence contracts, persistence and RLS
 - E2 `mc2-jz6y0.19` — large-corpus preflight and allocator
 - E3 `mc2-jz6y0.20` — conflicts and manual/automatic decisions
@@ -117,13 +124,12 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
 
 ## Current Recovery Point
 
-- Q12 source-recovery core is accepted at integration `cfce2c1c`. Its final
-  independent review reported `PASS` with P0/P1 zero; integration-root recovery
-  regression passed 48/48 plus package type-check. The immutable manifest now
-  binds canonical SHA, operator/audit/root identity and exact prior CAS state;
-  its separate journal enforces paired Career Playbook checkpoints and coherent
-  reindex gating. Workflow/CAS, audited reindex and Stage 4 failed coverage are
-  running in three isolated parallel worktrees. No source copy, database write,
+- Q12 source recovery is fully accepted locally through Task 6. Its immutable
+  manifest, workflow/CAS, audited reindex, Stage 4 failed coverage, concrete
+  multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact
+  count acceptance passed final P0-P3-zero rereview. Fresh integration evidence
+  is 3/3 focused and 456/456 combined plus type-check/artifact/process gates;
+  every Task 6 worktree/local branch is cleaned. No source copy, database write,
   reindex, deploy, service change, or live mutation has occurred.
 
 - Integration branch contains accepted Q1-Q9 and evidence E1-E7 with exact 100% local/development activation. The combined activation/docs branch passed final independent review at `d3417610`, merged as `ea183d83`, and passed its parent acceptance rerun.
@@ -132,8 +138,9 @@ Validated continuation prompt: `docs/superpowers/prompts/2026-07-11-self-hosted-
   `/qdrant/storage/snapshots`, survive container replacement with the named
   volume, pass 7/7 exact restore/isolation checks, and fail durably after volume
   deletion. This is not host/disk/off-host DR; production S3 is tracked by
-  `.13.6`. The Supabase CA is valid, but all retrievable database URLs have
-  stale credentials. Source audit `.13.4` proves 42 exact copies can restore
+  `.13.6`. The Supabase CA is valid, and the current owner-only Session pooler
+  URI passed PostgreSQL 17.6 verify-full read-only probes without disclosure.
+  Source audit `.13.4` proves 42 exact copies can restore
   125 eligible rows (109 -> 234/240); six eligible originals and eighteen
   non-eligible Career Playbook originals are absent. No remote mutation or copy
   has occurred.
@@ -211,35 +218,138 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - Owner approved the immutable correction specification at SHA-256
   `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` after
   two independent P0/P1/P2-zero reviews.
-- Local execution is tracked by G7 `.13.7.2`, publisher `.13.9`, writer/barrier
-  `.13.10`, migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
-- The accepted plan is
-  `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; wave 1 is
-  G7/P/W in isolated worktrees, wave 2 is M/H after the W interface is frozen,
-  and root owns only the sequential integration/supervisor join.
+- Owner approved `.13.14` and `.13.15` on 2026-07-13. The managed Supabase
+  internal superuser/reserved/background plane is an explicit trusted residual
+  boundary, and the recoverable lifecycle now requires guarded
+  `prepare-recovery`, quiesced recovery completion, final cleanup, and separate
+  lease-bound `resume-writers-only`. Both decision Beads are closed.
+- The normative addendum is
+  `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
+  at SHA-256
+  `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`;
+  its exact command/receipt/checkpoint/journal/CAS/epoch and mode-DAG contract
+  passed independent rereview with P0-P3 zero and supersedes the initial
+  decision record at `c8d22c2a` and the earlier package at `099fc44b`; the only
+  later normative change freezes cross-language canonical journal bytes and
+  exact object-publication phases/outcomes.
+- G7 `.13.7.2` and publisher `.13.9` are accepted and integrated; G7 passed
+  independent P0-P3-zero rereview plus fresh integration 99/99 and five-project
+  type-check. W `.13.10` candidate `5390a2f6` is not accepted: independent
+  review found P1=4/P2=3. Safe TDD correction has 120/120 nonblocked tests GREEN
+  while 8 exact-journal and 1 immutable-publication tests remain deliberately
+  RED behind decision `.13.16`. D4 candidate v1 `3354379f…` and corrected v2
+  `90fcd3ee…` were both independently returned. Candidate v4 `e6ac9c5e…`
+  closed all remaining findings and now has independent correctness and docs
+  PASS, both P0=P1=P2=P3=0. On 2026-07-14 the owner explicitly approved the
+  exact complete D4 v4 sentence by replying `Подтверждаю`. The initial plan
+  `82766542…` returned correctness
+  P1=2 and docs P1=2/P2=2; round-2 plan `3d5fe077…` returned correctness
+  P1=3 and docs P1=1/P2=1. Round-3 plan `30d43610…` passed correctness
+  P0-P3 zero but docs returned P1=1/P2=2 for its M gate and two top-level
+  references. Round-4 plan `ae4ec2f2…` returned both reviews P1=1 because its
+  otherwise exact disposable PostgreSQL gate used the nonisolated package
+  Vitest config. Round-5 plan `e891a657…` switches that gate to the proven
+  migration-only `../../vitest.shared.ts`; round-5 correctness and docs reviews
+  both passed P0=P1=P2=P3=0 on exact design `28655ffe…` and plan `e891a657…`.
+  Decision `.13.16` is accepted/closed and W is unblocked for local TDD only.
+  Remaining local execution is tracked by W,
+  migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
+- The inherited base plan is
+  `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; the current
+  conflict-superseding execution plan is
+  `docs/superpowers/plans/2026-07-14-q12-durable-recovery-projections-addendum.md`,
+  supplementing
+  `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`.
+  Frozen normative mapping: design
+  `docs/superpowers/specs/2026-07-14-q12-durable-recovery-projections-addendum-design.md`
+  = SHA-256 `28655ffe401efe39b09ba436d101aeed055c8fe25cb8a8e4fd3e90720e745ab4`;
+  round-5 plan
+  `docs/superpowers/plans/2026-07-14-q12-durable-recovery-projections-addendum.md`
+  = SHA-256 `e891a65745210248bf04b325cc7ef7bd1dba562ea5ac40c6b63aa88a6abcd97c`.
+  Wave 1 is G7/P/W in isolated worktrees, wave 2 is M/H after the W interface is
+  frozen, and root owns only the sequential integration/supervisor join.
 - No GHCR, SSH, server, Supabase, migration, database, container, Qdrant,
   source-copy, reindex, service, cron, staging, or production mutation occurred
   while approving/planning this correction wave.
 
+### W retained provenance stop (2026-07-14)
+
+- W is pushed clean at `21cff2d0`; the latest exact gates pass runtime 141/141,
+  canonical runtime plus database-barrier PostgreSQL 17 192/192, structural
+  PostgreSQL 17 34/34, and the five-file aggregate 290/290.
+- Independent reviews closed the prior journal graph, immutable publication,
+  existing-proof, rollback freeze, retained classifier, phase/context,
+  uniqueness, legal recovery, epoch and command-SHA findings.
+- The terminal review still reports P0=0/P1=1/P2=0/P3=0: a linked retained
+  recovery predecessor is digest-linked but lacks frozen pre-D4
+  issuance/claim plus checkpoint provenance.
+- Truth-gate inspection found no Root producer in any ref/worktree and no
+  normative retained checkpoint filename, journal-head anchor, retention, or
+  deterministic reconstruction rule. D4 per-epoch checkpoint filenames are
+  explicitly limited to its five commands and cannot be copied by inference.
+- Created blocking owner decision `mc2-jz6y0.13.17`; W, M, H and Root remain
+  local-only and unaccepted. No remote/live mutation occurred.
+
+- `docs-reviewed: updated` — the source gap and no-invention boundary are
+  durable; operator docs are unchanged pending a normative owner decision.
+- `graph-reviewed: no-change-needed` — exact frozen docs, refs and producer
+  absence determined the blocker; no accepted code/architecture was integrated.
+
+### D5 exact written candidate gate (2026-07-14)
+
+- The owner approved Option A at the architecture level: one immutable
+  byte-exact retained launcher-checkpoint copy per retained command execution
+  epoch, with no second claimed-input copy.
+- The complete exact candidate is
+  `docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md`
+  at SHA-256
+  `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`.
+- It freezes the selector/copy/capability lifecycle, direct recovery and
+  no-replay result completion, four rollback frontiers, install exclusion,
+  activation precommit classifier, crash continuations, Root/launcher/W
+  ownership and required TDD/adversarial coverage.
+- For a journal-less newest tip `T`, checkpointed non-authority row `R` is its
+  sole direct journal reference. The later final-writer-manifest intent and
+  accepted row carry exact pre-disposition `F.capability_manifest_sha256`;
+  retirement remains transitively bound through `intent.previous_hash` and the
+  exact `R` input-checkpoint hash.
+- Fresh correctness rereview-6 passed P0/P1/P2/P3 `0/0/0/0`, report SHA-256
+  `3907f56b16c52fae26f5eb299595c26678c1874cd9b996e1b798f37e5443b170`.
+  Fresh documentation rereview-6 also passed `0/0/0/0`, report SHA-256
+  `5e39597adf3b87db066755ccadeab7d359751cd9672a78cabc2fce67ad128cb4`.
+- The owner explicitly approved this exact path/SHA on 2026-07-14 by replying
+  `Да, подтверждаю, делай` to the exact-SHA request. Decision `.13.17` is
+  accepted; local implementation planning and TDD are authorized. W remains
+  unintegrated, and no remote or live action is authorized by this decision.
+- `docs-reviewed: updated` — exact candidate and decision evidence are current.
+- `graph-reviewed: no-change-needed` — acceptance changes no design bytes;
+  refresh at the immediately following D5 plan/implementation integration
+  boundary avoids redundant full graph rebuilds.
+- The exact candidate path is listed in `.prettierignore`: the first local
+  commit hook demonstrated that otherwise Prettier rewrites Markdown table
+  spacing and invalidates the independently reviewed byte SHA. The original
+  reviewed blob was recovered exactly and its SHA reverified before delivery.
+
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
-- `graph-reviewed: updated` — local Graphify `0.9.13` ran `graphify update .` and `graphify cluster-only . --no-viz`: 52,662 nodes, 79,924 edges, zero model/API tokens, zero forbidden runtime/noise source paths, and no Git hooks. The exact community total is read from the ignored final report because reclustering may repartition an unchanged graph; that report is refreshed after the last tracked metadata commit and must report the delivered HEAD. Optional SQL AST enrichment remains deferred because 283 SQL files require the uninstalled `tree_sitter_sql` extra; this docs-only slice did not change global tooling.
+- `graph-reviewed: used` — the existing report and a focused query were consulted, but the graph predates the new Q12 shell lifecycle. Safe local refresh remains a closeout gate after the active dirty isolated worktrees are integrated; no external model/API mode or Git hook is authorized.
 - Q12 remains open until every live gate and observation passes; authorization
-  is recorded, while current verify-full DB credentials and source truth are
-  hard stops.
+  is recorded, while accepted correction code, a truthful fresh backup/restore,
+  and the complete local verification matrix remain hard stops.
 
 ## Explicit Defers
 
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke
-  are authorized but NO-GO until current DB credentials, a truthful fresh
-  validated database backup, and all hard gates pass. The 2026-07-13 preflight
+  remain NO-GO until the correction streams, a truthful fresh validated
+  database backup, and all hard gates pass. The 2026-07-13 preflight
   found that all 12 retained files are 20-byte empty streams and usable backups
   are zero; the previous substantive 2026-06-27 dump has aged out. The accepted
-  local operator repair does not substitute for the missing permanent Session
-  pooler DSN or a real isolated PostgreSQL 17 restore. Beads `mc2-jz6y0.13.7`
-  remains open; no migration, dump, service, cron, server file, permission, or
-  Qdrant change ran.
+  local operator repair does not substitute for a fresh server backup or real
+  isolated PostgreSQL 17 restore. A current owner-only Session pooler URI and
+  valid Supabase Root 2021 CA passed verify-full read-only probes without secret
+  disclosure. Beads `mc2-jz6y0.13.7` remains open; no migration, dump, service,
+  cron, server file, permission, or Qdrant change ran.
 - Production off-host S3 remains bounded defer `mc2-jz6y0.13.6`; owner-approved
   local staging snapshots do not satisfy that future production gate.
 - Prometheus retention YAML migration remains bounded defer `mc2-jz6y0.25`
@@ -247,14 +357,12 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - Final workspace cleanup intentionally retains the current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree for Q12 continuation. `cleanup_stage_workspace.py` returned non-zero only because it safely refused to delete that checked-out branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are absent.
 - Capacity-triggered non-goals remain those listed in the approved design; they are not implementation debt.
 
-docs-reviewed: updated — Q12 operator, migration, first activation, rollback,
-authorization, and sanitized environment contracts are reconciled.
+docs-reviewed: updated — the owner-approved lifecycle/trust-boundary addendum is
+recorded; final independent docs review remains required after implementation
+reconciles the operator, migration, activation, rollback, and runbooks.
 
-graph-reviewed: updated — local `graphify update .` and
-`graphify cluster-only . --no-viz` completed with zero model/API tokens and no
-Git hooks; Graphify `0.9.13` reported 52,662 nodes and 79,924 edges. The exact
-community total is read from the ignored final report because reclustering may
-repartition an unchanged graph; that report is refreshed after the last tracked
-metadata commit and must match the delivered HEAD.
+graph-reviewed: used — current focused queries used the existing local graph,
+which predates the Q12 lifecycle delta. Refresh remains required after safe
+integration, with zero model/API modes and no Git hooks.
 
 project-index: updated — Q10 added stable Qdrant developer setup, schema/retrieval, reindex/recovery and operations asset entrypoints without stage history.

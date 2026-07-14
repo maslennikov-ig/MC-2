@@ -1,10 +1,12 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-13
+Updated: 2026-07-14
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: `codex/self-hosted-qdrant-platform`
-Resolve the current SHA of `origin/codex/self-hosted-qdrant-platform` before
-continuation; the dedicated integration worktree remains authoritative for Q12.
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; accepted head
+before D5 plan publication is `09fe24ad`. The owner-approved D5 design is
+`b5f63cd6…540e8`; the independently accepted execution plan is
+`8278bce9…a0ed`. Resolve the containing remote SHA before continuation. The
+dedicated integration worktree remains authoritative for Q12.
 
 ## Product Truth
 
@@ -28,6 +30,10 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 - `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`
 - `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`
 - `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`
+- `docs/superpowers/specs/2026-07-13-q12-live-cutover-corrections-design.md`
+- `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`
+- `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
+- `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`
 - `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md`
 
 ## Accepted and Open Work
@@ -38,7 +44,9 @@ continuation; the dedicated integration worktree remains authoritative for Q12.
 - Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and a current owner-supplied Session pooler URI passed PostgreSQL `17.6` `verify-full` read-only inventory. The credential exists only in the owner-only local session file and is never copied into Git, artifacts, argv, environment, logs, or worker prompts. The owner authorized its temporary use for this staging window; terminal rotation remains a separate mutation under `.13.8`. The server still has 12/12 invalid 20-byte legacy backups and zero usable generations, so `.13.7` remains open until the new fail-closed operator creates a fresh four-file generation and its Supabase-compatible isolated restore succeeds. No live mutation has occurred.
-- The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. Its implementation plan is `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; wave 1 is G7 `.13.7.2`, publisher `.13.9`, and writer/barrier `.13.10`, followed by migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`. The first five streams receive no live credential and perform no remote mutation.
+- The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
+- Publisher `.13.9` and G7 `.13.7.2` are accepted and integrated. W `.13.10` is pushed clean at `21cff2d0` but is not accepted; its gates pass runtime 141/141, canonical PostgreSQL 17 joined 192/192, structural 34/34 and five-file 290/290. D5 Option A and exact provenance design SHA-256 `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8` passed independent correctness/docs rereview-6 with P0-P3 zero and were explicitly owner-approved on 2026-07-14. Decision `.13.17` is accepted; local plan/TDD may proceed. M `.13.11`, H `.13.12`, and root `.13.13` remain dependency-ordered and local-only. No remote/live mutation occurred.
+- D5 execution plan SHA-256 `8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed` is accepted after final independent correctness/docs P0-P3-zero rereviews. It freezes a production-only lifecycle core, shared Root-produced fixtures, complete install/frontier/activation TDD, exact artifacts and cleanup commits. Beads `.13.18` now explicitly blocks W `.13.10`; next is Root-D5 RED/GREEN in a fresh worktree. No remote/live authority.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -61,13 +69,16 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: implement and independently accept the approved Q12
-correction plan in two isolated local waves. Then run the joined local release
-matrix and present the separate GHCR publication and live-cutover packets.
-Keep Q12 remote execution NO-GO until the frozen supervisor, truthful four-file
-backup, Supabase-compatible isolated restore, ten-writer barrier, migrations,
-handoff and recovery tests all pass. Do not rotate the database password
-without the separate `.13.8` effects/rollback packet and current authorization.
+Recommended action: execute the independently accepted D5 plan SHA-256
+`8278bce9f335bbef1204e60ff7c22383d15abc13237b80abfc53a6d2d285a0ed`:
+implement and review Root-D5 producer/core/fixture TDD, then finish and independently accept W `.13.10`, run M/H
+in parallel, and finish the root supervisor/journal join. Run the
+joined local release matrix before presenting the separate GHCR publication and
+live-cutover packet. Keep Q12 remote execution NO-GO until the frozen
+supervisor, truthful four-file backup, Supabase-compatible isolated restore,
+ten-writer barrier, migrations, handoff and recovery tests all pass. Do not
+rotate the database password without the separate `.13.8` effects/rollback
+packet and current authorization.
 
 ## Starter prompt for next orchestrator
 
@@ -79,8 +90,10 @@ Use `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuatio
 
 - E1-E6 and Q7 are accepted and integrated.
 - Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
-- E7, Q10, Q11 and Q12 local remediation are accepted. Q12 live execution and
-  observation remain the only open boundary.
+- E7, Q10, Q11, and the earlier Q12 foundation/source-recovery work are
+  accepted. The correction wave W/G7/M/H/Root remains open locally; only after
+  its independent acceptance and joined release matrix may the separate Q12
+  live execution/observation boundary be presented.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
@@ -108,6 +121,11 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   publication and password rotation retain their separate secret/effects gates.
   Missing-source product truth is resolved by the approved six failed plus
   eighteen retained-derived-only dispositions. Do not partially activate.
+- Retained barrier recovery provenance design SHA-256
+  `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`
+  is owner-approved and independently P0-P3-zero. Implementation must follow
+  the exact contract; W, M/H, and Root still require their own TDD, review,
+  integration, and verification before any live action.
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
@@ -116,14 +134,10 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: updated — the Q12 operator, sole PG17 execution packet, both
-runbooks, migration/activation order, rollback, authorization, and sanitized
-environment contracts are reconciled; final rereview reported P0-P3 zero.
-graph-reviewed: updated — local Graphify `0.9.13` ran `graphify update .` and
-`graphify cluster-only . --no-viz`: 52,662 nodes, 79,924 edges, zero model/API
-tokens, zero forbidden runtime/noise source paths, and no Git hooks. The exact
-community total is read from the ignored final report because reclustering may
-repartition an unchanged graph; that report is refreshed after the last tracked
-metadata commit and must report the delivered HEAD.
+docs-reviewed: updated — the exact D5 design, P0-P3-zero reviews, and owner
+approval are recorded; local planning/TDD is now authorized.
+graph-reviewed: no-change-needed — approval changes no design bytes; refresh at
+the following accepted D5 implementation boundary with zero model/API modes and
+no Git hooks.
 Optional SQL AST enrichment is deferred: 283 SQL files require the uninstalled
 `tree_sitter_sql` extra; this docs-only slice did not install global tooling.
