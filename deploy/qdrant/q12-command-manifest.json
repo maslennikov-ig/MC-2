@@ -1,0 +1,134 @@
+{
+  "schema_version": "megacampus.q12.command-manifest/v1",
+  "commands": {
+    "barrier.install": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "install",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "0caafb416a252f5b00d606e813ac2d4c021415e1137ecb6b7c5383e058db373b",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.verify-after-base": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "verify-extended",
+        "--after-migration",
+        "20260711140000",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "a9eb8d69416dbc8102e473d1b6c9716d5604392b4140581a18b65137210eea1e",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.verify-after-observability": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "verify-extended",
+        "--after-migration",
+        "20260711151000",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "0dfd3b80aac5674cbb77a1c708e8f4751dff96f4465362c3a4c0862b78ab321d",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.prepare-recovery": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "prepare-recovery",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "b45a23caaa74f197a0779e52b460079c53ea246ba1951456fd8f04856673021c",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.activate": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "activate",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "f267f1dc9889ae85171257b2ddaf553cb372fe97be9deb7e201b7e5bcc69c191",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    }
+  }
+}
