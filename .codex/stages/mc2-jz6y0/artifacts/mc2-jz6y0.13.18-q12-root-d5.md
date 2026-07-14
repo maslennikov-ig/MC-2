@@ -54,7 +54,13 @@ docs_reviewed: no-change-needed
 docs_review_notes: Frozen D5 design and plan already define the durable contract; worker scope forbids project-doc edits and implementation introduces no new contract beyond them.
 verification:
   - focused RED 91 tests: failed as expected with 17 passed and 74 missing-production failures
-  - focused Root D5 GREEN 165 tests: passed with zero failed and zero pending
+  - independent-review repair RED 171 tests: 164 passed and 7 failed at process/crash boundaries
+  - checkpoint repair CAS RED 205 selected tests: 201 skipped and 4 failed
+  - normal checkpoint publication CAS RED: 1 selected test failed
+  - durable zero-dimension recovery scan RED: 3 of 6 selected crash rows failed
+  - exact-result binding RED: all 6 selected mutation rows failed
+  - self-consistent journal grammar RED: all 6 selected mutation rows failed
+  - final focused Root D5 GREEN 223 tests: passed with zero failed and zero pending
   - bash -n deployed wrappers: passed
   - python3 -m py_compile core and runner: passed
   - jq -e command manifest: passed
@@ -74,12 +80,12 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/q12-command-manifest.test.ts
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.18-q12-root-d5.md
 explicit_defers:
-  - none; independent review integration and worktree cleanup are the next planned orchestration gate, not worker-owned defers
+  - Full plan/live/recover controller, joined rollback/DB proof, and activation truth classifier are Task 9 join responsibilities; D6 blocks that join, not this Root producer checkpoint.
 ---
 
 # Summary
 
-Implemented the Root-owned D5 retained-barrier producer, fixed five-command manifest, production-only shell entrypoints, delegated claim transaction, no-I/O shared fixture runner, branded TypeScript fixture contract, and table-driven Root matrix. Production CLI inputs are fixed typed fields and cannot select a manifest, executor, command, environment, path, fixture mode, or fault injection.
+Implemented and review-hardened the Root-owned D5 retained-barrier producer, fixed five-command manifest, production-only shell entrypoints, separate delegated claim transaction, durable recovery inference, no-I/O shared fixture runner, branded TypeScript fixture contract, and table-driven Root matrix. Production CLI inputs remain fixed typed fields and cannot select a manifest, executor, command, environment, path, fixture mode, or fault injection.
 
 # Scope / Routing
 
@@ -87,15 +93,15 @@ The worker used only the exact Root-D5 write zone. The approved design SHA-256 `
 
 # Verification
 
-The initial focused RED collected successfully and failed for missing production files/runner: 91 total, 17 passed, 74 failed. Focused FD9/open-journal and activation-after-R tests each witnessed their own expected RED before implementation. Fresh final focused evidence is 165/165 with zero failed/pending. Static gates cover both wrappers, both Python files, JSON syntax, all three TypeScript files, artifact format, whitespace, external-effect keywords, process residue, and temporary run roots.
+The initial focused RED collected successfully and failed for missing production files/runner: 91 total, 17 passed, 74 failed. Independent repair then witnessed separate REDs for the process boundary/same-root crash matrix, checkpoint repair and normal-publication CAS, production-shaped zero-dimension durable recovery, exact-result binding, and self-consistent journal grammar. Fresh final focused evidence is 223/223 with zero failed/pending. Static gates cover both wrappers, both Python files, JSON syntax, all three TypeScript files, artifact format, whitespace, process residue, and temporary run roots.
 
 # Delivery / Cleanup
 
-The dedicated branch is committed and pushed by this worker. Independent correctness/security review, integration acceptance, and safe removal of this worktree/local branch remain orchestrator-owned Task 3 actions; therefore cleanup is correctly `pending` here.
+The original implementation commit is pushed; review-repair changes are intentionally uncommitted pending the controller rerun. Integration acceptance and safe removal of this worktree/local branch remain orchestrator-owned; cleanup is correctly `pending` here.
 
 # Risks / Follow-ups / Explicit Defers
 
-No worker-owned defer. This is intentionally local/synthetic verification only: no Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Root-D5 must still pass independent review before W consumes the shared fixture.
+This is a verified producer checkpoint, not a full-spec completion claim. Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Root-D5 still awaits the controller rerun before acceptance.
 
 docs-reviewed: no-change-needed — frozen design/plan already specify the implemented durable behavior and this worker was prohibited from editing durable docs.
 

@@ -78,6 +78,39 @@ export interface RootRetainedBarrierFixtureSpec {
   completed: readonly RetainedBarrierOperation[];
   chains: Readonly<Partial<Record<RetainedBarrierOperation, RetainedChainSpec>>>;
   abandonedFrontier?: RetainedFrontierSpec;
+  /** Test-driver crash injection only; never forwarded into the production request. */
+  resumeAfterFault?: boolean;
+  /** Ask the test driver to enter the unmodified deployed shell launcher in a sandbox. */
+  executeActualWrapper?: boolean;
+  /** Restart the production classifier on the same root after a materialized stop. */
+  resumeAfterStop?: boolean;
+  restartBoundary?:
+    | 'selector-row'
+    | 'issuance-row'
+    | 'claim-row'
+    | 'result-publication'
+    | 'completion-move'
+    | 'completed-row'
+    | 'completed-checkpoint';
+  simulateLeaseLoss?: boolean;
+  claimPathMutation?: 'symlink' | 'dotdot' | 'parent-symlink';
+  clearJournalAppendFlag?: boolean;
+  checkpointRepairCase?: 'foreign-next' | 'stale-predecessor' | 'identity-swap' | 'missing-current';
+  checkpointPublicationRace?: 'claim-current-swap';
+  resultMutation?:
+    | 'wrong-command'
+    | 'wrong-capability'
+    | 'wrong-status'
+    | 'extra-key'
+    | 'invalid-result-hash'
+    | 'wrong-epoch';
+  journalMutation?:
+    | 'unknown-phase'
+    | 'unknown-outcome'
+    | 'wrong-command'
+    | 'invalid-epoch'
+    | 'accepted-pairing'
+    | 'hash-field-type';
 }
 
 export interface RootRetainedBarrierFixtureResult {

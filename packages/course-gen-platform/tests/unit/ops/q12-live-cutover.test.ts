@@ -1,5 +1,18 @@
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,10 +112,63 @@ describe('Root D5 fixture contract boundary', () => {
     ).toMatchObject({
       enteredRunSupervisor: true,
       enteredRunClaim: true,
+      claimProcessBoundary: true,
+      launcherOwnedClaimMutation: true,
       leaseFd9Validated: true,
       inheritedJournalIdentityValidated: true,
       attemptedEffects: [],
     });
+    const audit = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+    ) as { supervisorPid: number; claimProcessPid: number };
+    expect(audit.claimProcessPid).not.toBe(audit.supervisorPid);
+  });
+
+  it('executes the actual deployed shell launcher successfully across the process boundary', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      executeActualWrapper: true,
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const audit = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(audit).toMatchObject({
+      actualDeployedWrapper: true,
+      claimProcessBoundary: true,
+      launcherOwnedClaimMutation: true,
+      childExecutions: 1,
+      attemptedEffects: [],
+    });
+    expect(fixture.journalEntries.map(row => row.outcome)).toContain('capability_claimed');
+    expect(fixture.journalEntries.at(-1)?.outcome).toBe('completed');
+    expect(
+      lstatSync(join(candidate.runRoot, 'expected-post-migration-catalog.json')).mode & 0o777
+    ).toBe(0o400);
+  });
+
+  it.each(['symlink', 'dotdot', 'parent-symlink'] as const)(
+    'rejects non-canonical delegated capability path form %s',
+    async claimPathMutation => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({ install: chain('install') }),
+        claimPathMutation,
+      };
+      await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
+      expect(JSON.parse(readFileSync(join(candidate.runRoot, 'effects.json'), 'utf8'))).toEqual([]);
+    }
+  );
+
+  it('rejects inherited journal FD8 without O_APPEND sync flags and restores the parent descriptor', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      clearJournalAppendFlag: true,
+    };
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(/FD 8|journal/i);
+    const audit = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(audit.parentFd8Restored).toBe(true);
   });
   it.each([
     '',
@@ -293,6 +359,246 @@ function candidateRoot(path: string): string {
 }
 
 describe('Root recovery and crash matrix', () => {
+  it('rejects claim checkpoint publication when current identity swaps after claim row fsync', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      checkpointPublicationRace: 'claim-current-swap',
+    };
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+      /checkpoint|identity/i
+    );
+    expect(readFileSync(join(candidate.runRoot, 'phase-checkpoint.json'))).toEqual(
+      Buffer.from('{"claim-cas":"replacement"}\n')
+    );
+    const victim = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'claim-checkpoint-cas-victim.json'), 'utf8')
+    ) as Record<string, unknown>;
+    const pending = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'phase-checkpoint.json.next'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(victim.journal_entry_hash).not.toBe(pending.journal_entry_hash);
+    const audit = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(audit.childExecutions).toBe(0);
+    expect(JSON.parse(readFileSync(join(candidate.runRoot, 'effects.json'), 'utf8'))).toEqual([]);
+  });
+
+  it('rejects a foreign checkpoint .next and retains its exact bytes at its exact path', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      checkpointRepairCase: 'foreign-next',
+    };
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(/next/i);
+    expect(readFileSync(join(candidate.runRoot, 'phase-checkpoint.json.next'))).toEqual(
+      Buffer.from('{"foreign":"checkpoint-next"}\n')
+    );
+    expect(JSON.parse(readFileSync(join(candidate.runRoot, 'effects.json'), 'utf8'))).toEqual([]);
+  });
+
+  it('rejects a stale predecessor and leaves current checkpoint byte-identical', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      checkpointRepairCase: 'stale-predecessor',
+    };
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+      /immediate predecessor/i
+    );
+    expect(readFileSync(join(candidate.runRoot, 'phase-checkpoint.json'))).toEqual(
+      readFileSync(
+        join(candidate.runRoot, 'retained-barrier-capability-checkpoint-install-cutover.json')
+      )
+    );
+    expect(existsSync(join(candidate.runRoot, 'phase-checkpoint.json.next'))).toBe(false);
+  });
+
+  it('rejects checkpoint identity swap and leaves victim, replacement, and .next evidence', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      checkpointRepairCase: 'identity-swap',
+    };
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(/identity/i);
+    expect(readFileSync(join(candidate.runRoot, 'phase-checkpoint.json'))).toEqual(
+      Buffer.from('{"identity":"replacement"}\n')
+    );
+    const victim = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'checkpoint-identity-victim.json'), 'utf8')
+    ) as Record<string, unknown>;
+    const pending = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'phase-checkpoint.json.next'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(victim.journal_entry_hash).not.toBe(pending.journal_entry_hash);
+    const rows = readFileSync(join(candidate.runRoot, 'phase.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map(row => JSON.parse(row) as Record<string, unknown>);
+    expect(pending.journal_entry_hash).toBe(rows.at(-1)?.entry_hash);
+  });
+
+  it('repairs a missing current checkpoint only from the exact journal head', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      checkpointRepairCase: 'missing-current',
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const checkpoint = JSON.parse(readFileSync(fixture.fixedCheckpointPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(checkpoint.journal_entry_hash).toBe(fixture.journalEntries.at(-1)?.entry_hash);
+    expect(
+      JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+    ).toMatchObject({
+      checkpointRepairCase: 'missing-current',
+      checkpointRepairPerformed: true,
+      childExecutions: 1,
+    });
+    expect(existsSync(`${fixture.fixedCheckpointPath}.next`)).toBe(false);
+  });
+
+  it.each(['selector', 'copy', 'published', 'issued', 'claim-moved', 'claimed'] as const)(
+    'restarts the same root after durable %s without duplicate rows or child replay',
+    async stopAfter => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({
+          install: chain('install', {
+            stopAfter,
+            installTransaction: 'not-committed',
+          }),
+        }),
+        resumeAfterStop: true,
+      };
+      const fixture = await materializeRootRetainedBarrierFixture(candidate);
+      expect(fixture.journalEntries.at(-1)?.outcome).toBe('completed');
+      expect(fixture.journalEntries.map(row => row.seq)).toEqual(
+        fixture.journalEntries.map((_, index) => index + 1)
+      );
+      expect(new Set(fixture.journalEntries.map(row => row.entry_hash)).size).toBe(
+        fixture.journalEntries.length
+      );
+      const audit = JSON.parse(
+        readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+      ) as { childExecutions: number; durableReloads: number; attemptedEffects: string[] };
+      expect(audit.childExecutions).toBe(1);
+      expect(audit.durableReloads).toBeGreaterThan(0);
+      expect(audit.attemptedEffects).toEqual([]);
+    }
+  );
+
+  it.each([
+    'selector-row',
+    'issuance-row',
+    'claim-row',
+    'result-publication',
+    'completion-move',
+    'completed-row',
+    'completed-checkpoint',
+  ] as const)('repairs and continues exact crash boundary %s on the same root', async boundary => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({ install: chain('install') }),
+      restartBoundary: boundary,
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    expect(fixture.journalEntries.at(-1)?.outcome).toBe('completed');
+    expect(fixture.journalEntries.map(row => row.seq)).toEqual(
+      fixture.journalEntries.map((_, index) => index + 1)
+    );
+    for (let index = 1; index < fixture.journalEntries.length; index += 1) {
+      expect(fixture.journalEntries[index].previous_hash).toBe(
+        fixture.journalEntries[index - 1].entry_hash
+      );
+    }
+    const audit = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+    ) as {
+      childExecutions: number;
+      injectedBoundaryObserved: string | null;
+      attemptedEffects: string[];
+    };
+    expect(audit.injectedBoundaryObserved).toBe(boundary);
+    expect(audit.childExecutions).toBe(1);
+    expect(audit.attemptedEffects).toEqual([]);
+  });
+
+  it('infers a durable recovery-4 tip when resumed with production-shaped zero dimensions', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({
+        'verify-after-observability': chain('verify-after-observability', {
+          recoveryReissues: 2,
+          publicationWindowOrphans: 2,
+          faultAfter: 'predecessor-retirement-2',
+        }),
+      }),
+      resumeAfterFault: true,
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    expect(fixture.journalEntries).toContainEqual(
+      expect.objectContaining({ outcome: 'recovery_reacquired', lease_epoch: 'cutover-recovery-4' })
+    );
+    expect(fixture.capabilityPaths.get('verify-after-observability:cutover-recovery-4')).toContain(
+      '/completed/'
+    );
+    expect(
+      JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+    ).toMatchObject({ resumedWithProductionShape: true, childExecutions: 1 });
+  });
+
+  it.each([
+    ['initial', 0],
+    ['recovery', 1],
+  ] as const)(
+    'finishes an exact durable %s result after restart without child replay',
+    async (_execution, recoveryReissues) => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({
+          'prepare-recovery': chain('prepare-recovery', { recoveryReissues }),
+        }),
+        restartBoundary: 'result-publication',
+      };
+      const fixture = await materializeRootRetainedBarrierFixture(candidate);
+      expect(
+        fixture.journalEntries.filter(row => row.outcome === 'capability_claimed')
+      ).toHaveLength(1);
+      expect(fixture.journalEntries.filter(row => row.outcome === 'completed')).toHaveLength(1);
+      expect(
+        JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+      ).toMatchObject({ childExecutions: 1, attemptedEffects: [] });
+    }
+  );
+
+  it.each([
+    'wrong-command',
+    'wrong-capability',
+    'wrong-status',
+    'extra-key',
+    'invalid-result-hash',
+    'wrong-epoch',
+  ] as const)(
+    'rejects an existing result with %s before replay or completion',
+    async resultMutation => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({ install: chain('install') }),
+        restartBoundary: 'result-publication',
+        resultMutation,
+      };
+      await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(/result/i);
+      const audit = JSON.parse(
+        readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+      ) as Record<string, unknown>;
+      expect(audit.childExecutions).toBe(1);
+      expect(
+        readFileSync(join(candidate.runRoot, 'phase.jsonl'), 'utf8').includes(
+          '"outcome":"completed"'
+        )
+      ).toBe(false);
+      expect(
+        readdirSync(join(candidate.runRoot, 'capabilities', 'claimed')).some(name =>
+          name.startsWith('barrier.install--')
+        )
+      ).toBe(true);
+    }
+  );
+
   it.each(
     operations.flatMap(operation => ['absent', 'present'].map(copy => [operation, copy] as const))
   )('creates null-root recovery-1 for %s with cutover copy %s', async (operation, copyState) => {
@@ -389,9 +695,111 @@ describe('Root recovery and crash matrix', () => {
     ) as string[];
     expect(effects).toEqual([]);
   });
+
+  it.each([
+    'copy-temp-fsync',
+    'copy-rename',
+    'successor-publication',
+    'predecessor-retirement-1',
+    'predecessor-retirement-2',
+    'predecessor-retirement-3',
+  ] as const)('continues the same durable root after crash boundary %s', async faultAfter => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({
+        'verify-after-observability': chain('verify-after-observability', {
+          recoveryReissues: 2,
+          publicationWindowOrphans: 2,
+          faultAfter,
+        }),
+      }),
+      resumeAfterFault: true,
+    };
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    expect(fixture.journalEntries.at(-1)).toMatchObject({
+      command_id: 'barrier.verify-after-observability',
+      outcome: 'completed',
+    });
+    expect(fixture.journalEntries.map(row => row.seq)).toEqual(
+      fixture.journalEntries.map((_, index) => index + 1)
+    );
+    expect(fixture.journalEntries[0].previous_hash).toBe('0'.repeat(64));
+    for (let index = 1; index < fixture.journalEntries.length; index += 1) {
+      expect(fixture.journalEntries[index].previous_hash).toBe(
+        fixture.journalEntries[index - 1].entry_hash
+      );
+    }
+    const audit = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8')
+    ) as { childExecutions: number; durableReloads: number; attemptedEffects: string[] };
+    expect(audit.childExecutions).toBe(1);
+    expect(audit.durableReloads).toBeGreaterThan(0);
+    expect(audit.attemptedEffects).toEqual([]);
+  });
+
+  it('retains an exact .publishing file as incident after actual lease loss', async () => {
+    const candidate: RootRetainedBarrierFixtureSpec = {
+      ...spec({
+        'verify-after-observability': chain('verify-after-observability', {
+          faultAfter: 'copy-temp-fsync',
+        }),
+      }),
+      resumeAfterFault: true,
+      simulateLeaseLoss: true,
+    };
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+      /publishing.*lease loss|lease loss.*publishing/i
+    );
+    const leftovers = readdirSync(candidate.runRoot).filter(path => path.endsWith('.publishing'));
+    expect(leftovers).toHaveLength(1);
+  });
+
+  it('retains matching final plus .publishing evidence after lease loss', async () => {
+    const candidate = spec({ install: chain('install') });
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const retained = fixture.retainedCopyPaths.get('install:cutover')!;
+    const temporary = `${retained}.publishing`;
+    writeFileSync(temporary, readFileSync(retained), { mode: 0o600, flag: 'wx' });
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(/lease loss/i);
+    expect(readFileSync(temporary)).toEqual(readFileSync(retained));
+  });
 });
 
 describe('Install transaction boundary', () => {
+  it('binds baseline to the actual claim projection without rewinding the fixed checkpoint', async () => {
+    const candidate = spec({ install: chain('install') });
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const fixed = JSON.parse(readFileSync(fixture.fixedCheckpointPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const claim = fixture.journalEntries.find(row => row.outcome === 'capability_claimed')!;
+    const baseline = JSON.parse(
+      readFileSync(join(candidate.runRoot, 'database-barrier-baseline.json'), 'utf8')
+    ) as Record<string, unknown>;
+    const claimProjection = {
+      accepted_object_kind: claim.accepted_object_kind,
+      accepted_object_sha256: claim.accepted_object_sha256,
+      journal_device: fixed.journal_device,
+      journal_entry_hash: claim.entry_hash,
+      journal_inode: fixed.journal_inode,
+      lease_epoch: claim.lease_epoch,
+      phase: claim.phase,
+      previous_journal_entry_hash: claim.previous_hash,
+      resume_authority_sha256: null,
+      run_id: claim.run_id,
+      schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+      seq: claim.seq,
+    };
+    expect(fixed.journal_entry_hash).toBe(fixture.journalEntries.at(-1)?.entry_hash);
+    expect(baseline.predecessor_journal_entry_hash).toBe(claim.entry_hash);
+    expect(baseline.predecessor_checkpoint_sha256).toBe(
+      sha(Buffer.from(`${canonical(claimProjection)}\n`))
+    );
+    expect(baseline.predecessor_checkpoint_sha256).not.toBe(
+      sha(readFileSync(fixture.fixedCheckpointPath))
+    );
+  });
+
   it.each(['selector', 'copy', 'published', 'issued', 'claim-moved', 'claimed'] as const)(
     'keeps pre-COMMIT %s forward-only without rollback authority',
     async stopAfter => {
@@ -615,6 +1023,29 @@ describe('Rollback frontier and activation classifier', () => {
 });
 
 describe('Negative-only mutation helper', () => {
+  it.each([
+    'unknown-phase',
+    'unknown-outcome',
+    'wrong-command',
+    'invalid-epoch',
+    'accepted-pairing',
+    'hash-field-type',
+  ] as const)(
+    'rejects self-consistent durable journal grammar mutation %s',
+    async journalMutation => {
+      const candidate: RootRetainedBarrierFixtureSpec = {
+        ...spec({ install: chain('install') }),
+        journalMutation,
+      };
+      await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow(
+        /journal|phase|outcome|command|epoch|accepted|hash/i
+      );
+      expect(
+        JSON.parse(readFileSync(join(candidate.runRoot, 'executor-audit.json'), 'utf8'))
+      ).toMatchObject({ childExecutions: 1, attemptedEffects: [] });
+    }
+  );
+
   it('cannot bless a hand-built result and keeps adversarial mutation separate', async () => {
     const fixture = await materializeRootRetainedBarrierFixture(
       spec({ install: chain('install') })
@@ -628,5 +1059,106 @@ describe('Negative-only mutation helper', () => {
         state.journalEntries[0].command_id = 'barrier.activate';
       })
     ).not.toThrow();
+  });
+});
+
+describe('Retained publication identity is fail-closed on durable reload', () => {
+  it.each([
+    [
+      'symlink',
+      (path: string, checkpoint: string) => {
+        rmSync(path);
+        symlinkSync(checkpoint, path);
+      },
+    ],
+    [
+      'nonregular',
+      (path: string) => {
+        rmSync(path);
+        mkdirSync(path, { mode: 0o600 });
+      },
+    ],
+    ['wrong-mode', (path: string) => chmodSync(path, 0o640)],
+    [
+      'hard-link',
+      (path: string) => {
+        linkSync(path, `${path}.foreign-link`);
+      },
+    ],
+    [
+      'source-same-inode',
+      (path: string, checkpoint: string) => {
+        rmSync(path);
+        linkSync(checkpoint, path);
+      },
+    ],
+    [
+      'byte-drift',
+      (path: string) => {
+        const original = readFileSync(path);
+        writeFileSync(path, Buffer.concat([original, Buffer.from('foreign')]), { mode: 0o600 });
+      },
+    ],
+  ] as const)('rejects %s without deleting the foreign evidence', async (_kind, corrupt) => {
+    const candidate = spec({ install: chain('install') });
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const retained = fixture.retainedCopyPaths.get('install:cutover')!;
+    corrupt(retained, fixture.fixedCheckpointPath);
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
+    expect(() => lstatSync(retained)).not.toThrow();
+  });
+
+  it('rejects a retained file viewed with the wrong owner without mutating it', async () => {
+    const candidate = spec({ install: chain('install') });
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const retained = fixture.retainedCopyPaths.get('install:cutover')!;
+    const core = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
+    const probe = [
+      'import importlib.util, pathlib, sys',
+      's=importlib.util.spec_from_file_location("q12_identity_probe", sys.argv[1])',
+      'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
+      'm.validate_regular_file(pathlib.Path(sys.argv[2]), mode=0o600)',
+    ].join(';');
+    const child = spawnSync(
+      '/usr/bin/bwrap',
+      [
+        '--unshare-user',
+        '--uid',
+        '0',
+        '--gid',
+        '0',
+        '--ro-bind',
+        '/',
+        '/',
+        '--',
+        '/usr/bin/python3',
+        '-c',
+        probe,
+        core,
+        retained,
+      ],
+      { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' } }
+    );
+    expect(child.status).not.toBe(0);
+    expect(child.stderr).toContain('unsafe file identity');
+    expect(() => lstatSync(retained)).not.toThrow();
+  });
+
+  it.each([
+    'release_sha',
+    'operator_digest',
+    'quiesce_manifest_sha256',
+    'supersedes_capability_sha256',
+  ])('rejects completed capability stable-binding drift in %s', async field => {
+    const candidate = spec({ install: chain('install') });
+    const fixture = await materializeRootRetainedBarrierFixture(candidate);
+    const capabilityPath = fixture.capabilityPaths.get('install:cutover')!;
+    const capability = JSON.parse(readFileSync(capabilityPath, 'utf8')) as Record<string, unknown>;
+    capability[field] = 'f'.repeat(64);
+    chmodSync(capabilityPath, 0o600);
+    writeFileSync(capabilityPath, `${canonical(capability)}\n`, { mode: 0o600 });
+    chmodSync(capabilityPath, 0o400);
+    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
+    expect(() => lstatSync(capabilityPath)).not.toThrow();
   });
 });
