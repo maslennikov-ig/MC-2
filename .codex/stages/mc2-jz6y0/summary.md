@@ -1,6 +1,6 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; Q12 W correction is locally NO-GO pending decision `.13.16`, and remote/live activation remains NO-GO
+Status: all safe local Q6-Q11 and E1-E7 work accepted; exact Q12 D4 normative design/plan are independently accepted and W is unblocked for local TDD; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
 Current accepted integration evidence: pushed head `9d3f3a1c` plus normative clarification SHA `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`
@@ -233,14 +233,32 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   RED behind decision `.13.16`. D4 candidate v1 `3354379f…` and corrected v2
   `90fcd3ee…` were both independently returned. Candidate v4 `e6ac9c5e…`
   closed all remaining findings and now has independent correctness and docs
-  PASS, both P0=P1=P2=P3=0. Exact owner approval and normative incorporation
-  remain pending before W can turn the nine preserved RED cases GREEN.
+  PASS, both P0=P1=P2=P3=0. On 2026-07-14 the owner explicitly approved the
+  exact complete D4 v4 sentence by replying `Подтверждаю`. The initial plan
+  `82766542…` returned correctness
+  P1=2 and docs P1=2/P2=2; round-2 plan `3d5fe077…` returned correctness
+  P1=3 and docs P1=1/P2=1. Round-3 plan `30d43610…` passed correctness
+  P0-P3 zero but docs returned P1=1/P2=2 for its M gate and two top-level
+  references. Round-4 plan `ae4ec2f2…` returned both reviews P1=1 because its
+  otherwise exact disposable PostgreSQL gate used the nonisolated package
+  Vitest config. Round-5 plan `e891a657…` switches that gate to the proven
+  migration-only `../../vitest.shared.ts`; round-5 correctness and docs reviews
+  both passed P0=P1=P2=P3=0 on exact design `28655ffe…` and plan `e891a657…`.
+  Decision `.13.16` is accepted/closed and W is unblocked for local TDD only.
   Remaining local execution is tracked by W,
   migration `.13.11`, handoff `.13.12`, and root supervisor `.13.13`.
 - The inherited base plan is
   `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`; the current
   conflict-superseding execution plan is
+  `docs/superpowers/plans/2026-07-14-q12-durable-recovery-projections-addendum.md`,
+  supplementing
   `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`.
+  Frozen normative mapping: design
+  `docs/superpowers/specs/2026-07-14-q12-durable-recovery-projections-addendum-design.md`
+  = SHA-256 `28655ffe401efe39b09ba436d101aeed055c8fe25cb8a8e4fd3e90720e745ab4`;
+  round-5 plan
+  `docs/superpowers/plans/2026-07-14-q12-durable-recovery-projections-addendum.md`
+  = SHA-256 `e891a65745210248bf04b325cc7ef7bd1dba562ea5ac40c6b63aa88a6abcd97c`.
   Wave 1 is G7/P/W in isolated worktrees, wave 2 is M/H after the W interface is
   frozen, and root owns only the sequential integration/supervisor join.
 - No GHCR, SSH, server, Supabase, migration, database, container, Qdrant,
