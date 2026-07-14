@@ -807,6 +807,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n $headers && -n $body && -n $url ]]
+printf 'probe %s\n' "$url" >> "$DOCKER_LOG"
 status=502
 reason='Bad Gateway'
 title='502 Bad Gateway'
@@ -983,6 +984,21 @@ interface ResumeWriterFixture extends ComposeWriterFixture {
   ): ReturnType<typeof spawnSync>;
 }
 
+interface WriterQuiesceFixture extends ComposeWriterFixture {
+  capabilitiesRoot: string;
+  capability: string;
+  capabilityCheckpoint: string;
+  checkpoint: string;
+  cutoverLock: string;
+  inputCheckpoint: string;
+  inventory: string;
+  journal: string;
+  plannedTransition: string;
+  policyNoTransition: string;
+  terminalTransition: string;
+  quiesce(env?: NodeJS.ProcessEnv): ReturnType<typeof spawnSync>;
+}
+
 function writerClass(record: Record<string, any>): string {
   const service = String(record.Config.Labels['com.docker.compose.service']);
   if (service === 'api' || service === 'api-dev') {
@@ -1093,7 +1109,7 @@ interface ResumeJournalFixtureOptions {
 function checkpointForJournalEntry(
   entry: Record<string, any>,
   journalPath: string,
-  authoritySha256: string
+  authoritySha256: string | null
 ): Record<string, any> {
   const journalStat = statSync(journalPath);
   return {
@@ -1110,6 +1126,321 @@ function checkpointForJournalEntry(
     resume_authority_sha256: authoritySha256,
     lease_epoch: entry.lease_epoch,
   };
+}
+
+function writerQuiesceFixture(): WriterQuiesceFixture {
+  const fixture = composeWriterFixture();
+  const journal = join(fixture.q12RunRoot, 'phase.jsonl');
+  const checkpoint = join(fixture.q12RunRoot, 'phase-checkpoint.json');
+  const cutoverLock = join(fixture.directory, 'q12-cutover.lock');
+  const capabilitiesRoot = join(fixture.q12RunRoot, 'capabilities');
+  const capabilityDirectories = Object.fromEntries(
+    ['issued', 'claimed', 'completed', 'superseded'].map(directory => {
+      const path = join(capabilitiesRoot, directory);
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+      chmodSync(path, 0o700);
+      return [directory, path];
+    })
+  );
+  const releaseSha = 'e'.repeat(40);
+  const resourceManifestSha256 = 'd'.repeat(64);
+  const commandSha256 = '9'.repeat(64);
+  const leaseEpoch = 'cutover';
+  const entries: Array<Record<string, any>> = [];
+  let previousHash = '0'.repeat(64);
+  const append = (
+    phase: string,
+    outcome: string,
+    capabilityManifestSha256 = '0'.repeat(64),
+    entryLeaseEpoch = leaseEpoch,
+    acceptedObjectKind = 'none',
+    acceptedObjectSha256: string | null = null
+  ): Record<string, any> => {
+    const entry = withJournalEntryHash({
+      schema: 'megacampus.q12.cutover-journal/v1',
+      run_id: Q12_RUN_ID,
+      seq: entries.length + 1,
+      phase,
+      outcome,
+      timestamp: new Date(Date.UTC(2026, 6, 14, 8, 0, entries.length + 1)).toISOString(),
+      release_sha: releaseSha,
+      operator_digest: '8'.repeat(64),
+      command_id: outcome === 'completed' ? 'barrier.prepare-recovery' : 'writers.quiesce',
+      command_sha256: commandSha256,
+      lease_epoch: entryLeaseEpoch,
+      previous_hash: previousHash,
+      rotation_required: true,
+      resource_manifest_sha256: resourceManifestSha256,
+      quiesce_manifest_sha256: '0'.repeat(64),
+      capability_manifest_sha256: capabilityManifestSha256,
+      accepted_object_kind: acceptedObjectKind,
+      accepted_object_sha256: acceptedObjectSha256,
+    });
+    entries.push(entry);
+    previousHash = String(entry.entry_hash);
+    return entry;
+  };
+  append('preflight', 'completed');
+  append('maintenance_guarded', 'completed');
+  const intent = append('quiesced', 'intent');
+  writeJournal(journal, entries);
+  const capabilityCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-quiesce-capability-checkpoint-${Q12_RUN_ID}-${leaseEpoch}.json`
+  );
+  writeProtectedJson(capabilityCheckpoint, checkpointForJournalEntry(intent, journal, null), 0o600);
+  const capabilityBasename = `writers.quiesce--${leaseEpoch}.json`;
+  const issuedCapability = join(capabilityDirectories.issued, capabilityBasename);
+  writeFileSync(
+    issuedCapability,
+    `${canonicalJson({
+      schema_version: 'megacampus.q12.host-command-capability/v1',
+      run_id: Q12_RUN_ID,
+      command_id: 'writers.quiesce',
+      command_sha256: commandSha256,
+      release_sha: releaseSha,
+      operator_digest: '8'.repeat(64),
+      resource_manifest_sha256: resourceManifestSha256,
+      quiesce_manifest_sha256: '0'.repeat(64),
+      resume_authority_sha256: null,
+      capability_input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+      lease_epoch: leaseEpoch,
+      supersedes_capability_sha256: null,
+    })}\n`,
+    { mode: 0o400 }
+  );
+  chmodSync(issuedCapability, 0o400);
+  const capabilitySha256 = fileSha256(issuedCapability);
+  append('quiesced', 'capability_issued', capabilitySha256);
+  const capability = join(capabilityDirectories.claimed, capabilityBasename);
+  renameSync(issuedCapability, capability);
+  const claimed = append('quiesced', 'capability_claimed', capabilitySha256);
+  writeJournal(journal, entries);
+  const currentCheckpoint = checkpointForJournalEntry(claimed, journal, null);
+  const inputCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-quiesce-input-checkpoint-${Q12_RUN_ID}-${leaseEpoch}.json`
+  );
+  writeProtectedJson(inputCheckpoint, currentCheckpoint, 0o600);
+  writeProtectedJson(checkpoint, currentCheckpoint, 0o600);
+  writeFileSync(cutoverLock, '', { mode: 0o600 });
+  chmodSync(cutoverLock, 0o600);
+  const quiesce = (env: NodeJS.ProcessEnv = {}): ReturnType<typeof spawnSync> => {
+    writeResumeTestDockerEnvironment(fixture, env);
+    return spawnSync(
+      'bash',
+      [
+        '-c',
+        'exec 9<>"$1"; flock -n 9; shift; exec bash "$@"',
+        'q12-quiesce-lease',
+        cutoverLock,
+        WRAPPER,
+        '--operation',
+        'quiesce-writers-only',
+        '--run-id',
+        Q12_RUN_ID,
+      ],
+      {
+        env: {
+          ...fixture.env,
+          SOURCE_RECOVERY_Q12_RUN_ROOT: fixture.q12RunRoot,
+          SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE: cutoverLock,
+          Q12_EXTERNAL_QUIESCE_LEASE_FD: '9',
+          ...env,
+        },
+        encoding: 'utf8',
+      }
+    );
+  };
+  return {
+    ...fixture,
+    capabilitiesRoot,
+    capability,
+    capabilityCheckpoint,
+    checkpoint,
+    cutoverLock,
+    inputCheckpoint,
+    inventory: join(fixture.q12RunRoot, `writer-quiesce-inventory-${Q12_RUN_ID}.json`),
+    journal,
+    plannedTransition: join(
+      fixture.q12RunRoot,
+      `writer-quiesce-policy-change-planned-${Q12_RUN_ID}.json`
+    ),
+    policyNoTransition: join(
+      fixture.q12RunRoot,
+      `writer-quiesce-policy-no-verified-${Q12_RUN_ID}.json`
+    ),
+    terminalTransition: join(fixture.q12RunRoot, `writer-quiesce-quiesced-${Q12_RUN_ID}.json`),
+    quiesce,
+  };
+}
+
+function advanceWriterQuiesceRecoveryEpoch(
+  fixture: WriterQuiesceFixture,
+  ordinal = 1,
+  acceptOverlay = true
+): { capability: string; overlay: string } {
+  const leaseEpoch = `cutover-recovery-${ordinal}`;
+  const journalEntries = readFileSync(fixture.journal, 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map(line => JSON.parse(line) as Record<string, any>);
+  const previousHead = journalEntries.at(-1)!;
+  const predecessor = journalEntries.find(
+    entry => entry.phase === 'maintenance_guarded' && entry.outcome === 'completed'
+  )!;
+  const previousCapabilityBytes = readFileSync(fixture.capability);
+  const previousCapabilitySha256 = createHash('sha256')
+    .update(previousCapabilityBytes)
+    .digest('hex');
+  const previousCapability = JSON.parse(previousCapabilityBytes.toString('utf8')) as Record<
+    string,
+    any
+  >;
+  const previousBasename = fixture.capability.slice(fixture.capability.lastIndexOf('/') + 1);
+  renameSync(fixture.capability, join(fixture.capabilitiesRoot, 'superseded', previousBasename));
+  const capabilityCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-quiesce-capability-checkpoint-${Q12_RUN_ID}-${leaseEpoch}.json`
+  );
+  writeProtectedJson(
+    capabilityCheckpoint,
+    checkpointForJournalEntry(predecessor, fixture.journal, null),
+    0o600
+  );
+  const capabilityBasename = `writers.quiesce--${leaseEpoch}.json`;
+  const issuedCapability = join(fixture.capabilitiesRoot, 'issued', capabilityBasename);
+  writeProtectedJson(issuedCapability, {
+    ...previousCapability,
+    capability_input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+    lease_epoch: leaseEpoch,
+    supersedes_capability_sha256: previousCapabilitySha256,
+  });
+  const capabilitySha256 = fileSha256(issuedCapability);
+  const journalEntry = (
+    prior: Record<string, any>,
+    outcome: string,
+    acceptedObjectKind = 'none',
+    acceptedObjectSha256: string | null = null
+  ): Record<string, any> => {
+    const preimage = { ...prior };
+    delete preimage.entry_hash;
+    return withJournalEntryHash({
+      ...preimage,
+      seq: Number(prior.seq) + 1,
+      phase: 'quiesced',
+      outcome,
+      timestamp: new Date(Date.UTC(2026, 6, 14, 9, ordinal, Number(prior.seq))).toISOString(),
+      command_id: 'writers.quiesce',
+      lease_epoch: leaseEpoch,
+      previous_hash: prior.entry_hash,
+      capability_manifest_sha256: capabilitySha256,
+      accepted_object_kind: acceptedObjectKind,
+      accepted_object_sha256: acceptedObjectSha256,
+    });
+  };
+  const recovery = journalEntry(previousHead, 'recovery_reacquired');
+  journalEntries.push(recovery);
+  writeJournal(fixture.journal, journalEntries);
+  const recoveryCheckpoint = checkpointForJournalEntry(recovery, fixture.journal, null);
+  writeProtectedJson(fixture.checkpoint, recoveryCheckpoint, 0o600);
+
+  if (!existsSync(fixture.inventory)) {
+    const capability = join(fixture.capabilitiesRoot, 'claimed', capabilityBasename);
+    renameSync(issuedCapability, capability);
+    const claimed = journalEntry(recovery, 'capability_claimed');
+    journalEntries.push(claimed);
+    writeJournal(fixture.journal, journalEntries);
+    const inputCheckpoint = join(
+      fixture.q12RunRoot,
+      `writer-quiesce-input-checkpoint-${Q12_RUN_ID}-${leaseEpoch}.json`
+    );
+    const claimedCheckpoint = checkpointForJournalEntry(claimed, fixture.journal, null);
+    writeProtectedJson(inputCheckpoint, claimedCheckpoint, 0o600);
+    writeProtectedJson(fixture.checkpoint, claimedCheckpoint, 0o600);
+    fixture.capability = capability;
+    fixture.capabilityCheckpoint = capabilityCheckpoint;
+    fixture.inputCheckpoint = inputCheckpoint;
+    return { capability, overlay: '' };
+  }
+
+  const inventory = JSON.parse(readFileSync(fixture.inventory, 'utf8')) as Record<string, any>;
+  let lastTransitionState = 'inventory_only';
+  let lastTransitionSha256: string | null = null;
+  if (existsSync(fixture.policyNoTransition)) {
+    lastTransitionState = 'policy_no_verified';
+    lastTransitionSha256 = fileSha256(fixture.policyNoTransition);
+  } else if (existsSync(fixture.plannedTransition)) {
+    lastTransitionState = 'policy_change_planned';
+    lastTransitionSha256 = fileSha256(fixture.plannedTransition);
+  }
+  const previousOverlays = readdirSync(fixture.q12RunRoot)
+    .filter(name => name.startsWith(`writer-quiesce-recovery-overlay-${Q12_RUN_ID}-`))
+    .sort((left, right) => {
+      const leftOrdinal = Number(left.slice(left.lastIndexOf('-') + 1).replace('.json', ''));
+      const rightOrdinal = Number(right.slice(right.lastIndexOf('-') + 1).replace('.json', ''));
+      return leftOrdinal - rightOrdinal;
+    });
+  const previousOverlaySha256 = previousOverlays.length
+    ? fileSha256(join(fixture.q12RunRoot, previousOverlays.at(-1)!))
+    : null;
+  const overlay = join(
+    fixture.q12RunRoot,
+    `writer-quiesce-recovery-overlay-${Q12_RUN_ID}-${leaseEpoch}.json`
+  );
+  const overlayValue = {
+    schema_version: 'megacampus.q12.writer-quiesce-recovery-overlay/v1',
+    run_id: Q12_RUN_ID,
+    lease_epoch: leaseEpoch,
+    prior_capability_sha256: previousCapabilitySha256,
+    new_capability_sha256: capabilitySha256,
+    recovery_checkpoint_sha256: createHash('sha256')
+      .update(`${canonicalJson(recoveryCheckpoint)}\n`)
+      .digest('hex'),
+    inventory_sha256: fileSha256(fixture.inventory),
+    initial_capability_input_checkpoint_sha256: inventory.capability_input_checkpoint_sha256,
+    initial_input_checkpoint_sha256: inventory.input_checkpoint_sha256,
+    last_transition_state: lastTransitionState,
+    last_transition_sha256: lastTransitionSha256,
+    previous_overlay_sha256: previousOverlaySha256,
+    continuation: 'monotonic_quiesce_only',
+  };
+  writeFileSync(overlay, `${canonicalJson(overlayValue)}\n`, { mode: 0o400 });
+  chmodSync(overlay, 0o400);
+  if (!acceptOverlay) {
+    fixture.capability = issuedCapability;
+    fixture.capabilityCheckpoint = capabilityCheckpoint;
+    return { capability: issuedCapability, overlay };
+  }
+  const overlayAccepted = journalEntry(
+    recovery,
+    'recovery_prefix_accepted',
+    'writer_quiesce_recovery_overlay',
+    fileSha256(overlay)
+  );
+  journalEntries.push(overlayAccepted);
+  writeJournal(fixture.journal, journalEntries);
+  writeProtectedJson(
+    fixture.checkpoint,
+    checkpointForJournalEntry(overlayAccepted, fixture.journal, null),
+    0o600
+  );
+  const capability = join(fixture.capabilitiesRoot, 'claimed', capabilityBasename);
+  renameSync(issuedCapability, capability);
+  const claimed = journalEntry(overlayAccepted, 'capability_claimed');
+  journalEntries.push(claimed);
+  writeJournal(fixture.journal, journalEntries);
+  const inputCheckpoint = join(
+    fixture.q12RunRoot,
+    `writer-quiesce-input-checkpoint-${Q12_RUN_ID}-${leaseEpoch}.json`
+  );
+  const claimedCheckpoint = checkpointForJournalEntry(claimed, fixture.journal, null);
+  writeProtectedJson(inputCheckpoint, claimedCheckpoint, 0o600);
+  writeProtectedJson(fixture.checkpoint, claimedCheckpoint, 0o600);
+  fixture.capability = capability;
+  fixture.capabilityCheckpoint = capabilityCheckpoint;
+  fixture.inputCheckpoint = inputCheckpoint;
+  return { capability, overlay };
 }
 
 function writerResumeFixture(
@@ -3117,6 +3448,306 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
       true
     );
+  });
+
+  it('publishes the exact immutable quiesce inventory, transitions, and final evidence', () => {
+    const fixture = writerQuiesceFixture();
+
+    const result = fixture.quiesce();
+
+    expect(result.status, result.stderr).toBe(0);
+    const inventory = JSON.parse(readFileSync(fixture.inventory, 'utf8')) as Record<string, any>;
+    expect(Object.keys(inventory).sort()).toEqual(
+      [
+        'schema_version',
+        'run_id',
+        'command_id',
+        'lease_epoch',
+        'capability_sha256',
+        'capability_input_checkpoint_sha256',
+        'input_checkpoint_sha256',
+        'database_barrier_receipt_sha256',
+        'writers',
+      ].sort()
+    );
+    expect(inventory).toMatchObject({
+      schema_version: 'megacampus.q12.writer-quiesce-inventory/v1',
+      run_id: Q12_RUN_ID,
+      command_id: 'writers.quiesce',
+      lease_epoch: 'cutover',
+      capability_sha256: fileSha256(fixture.capability),
+      capability_input_checkpoint_sha256: fileSha256(fixture.capabilityCheckpoint),
+      input_checkpoint_sha256: fileSha256(fixture.inputCheckpoint),
+      database_barrier_receipt_sha256: fileSha256(fixture.barrierReceipt),
+    });
+    expect(inventory.writers).toHaveLength(10);
+    const planned = JSON.parse(readFileSync(fixture.plannedTransition, 'utf8')) as Record<
+      string,
+      any
+    >;
+    const policyNo = JSON.parse(readFileSync(fixture.policyNoTransition, 'utf8')) as Record<
+      string,
+      any
+    >;
+    const terminal = JSON.parse(readFileSync(fixture.terminalTransition, 'utf8')) as Record<
+      string,
+      any
+    >;
+    expect([planned.state, policyNo.state, terminal.state]).toEqual([
+      'policy_change_planned',
+      'policy_no_verified',
+      'quiesced',
+    ]);
+    expect(planned.previous_transition_sha256).toBeNull();
+    expect(policyNo.previous_transition_sha256).toBe(fileSha256(fixture.plannedTransition));
+    expect(terminal.previous_transition_sha256).toBe(fileSha256(fixture.policyNoTransition));
+    expect(terminal.writer_quiesce_manifest_sha256).toBe(fileSha256(fixture.quiesceManifest));
+    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
+    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
+      true
+    );
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+    const operationLog = readFileSync(fixture.dockerLog, 'utf8').trim().split('\n');
+    const productionProbe = operationLog.findIndex(line =>
+      line.includes('probe https://ai.megacampus.ru/')
+    );
+    const developmentProbe = operationLog.findIndex(line =>
+      line.includes('probe https://dev.ai.megacampus.ru/')
+    );
+    const firstWorkerStop = operationLog.findIndex(
+      line =>
+        line.startsWith('stop ') &&
+        fixture
+          .records()
+          .filter(record =>
+            String(record.Config.Labels['com.docker.compose.service']).includes('worker')
+          )
+          .some(record => line.endsWith(record.Id))
+    );
+    expect(productionProbe).toBeGreaterThan(-1);
+    expect(developmentProbe).toBeGreaterThan(productionProbe);
+    expect(firstWorkerStop).toBeGreaterThan(developmentProbe);
+    expect(
+      readdirSync(fixture.q12RunRoot).filter(name => name.includes('quiesce-recovery-overlay'))
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['after-inventory', ['inventory']],
+    ['after-planned', ['inventory', 'plannedTransition']],
+    ['after-policy-no', ['inventory', 'plannedTransition', 'policyNoTransition']],
+  ] as const)(
+    'continues the immutable quiesce prefix through a Root-accepted overlay: %s',
+    (faultPoint, evidenceNames) => {
+      const fixture = writerQuiesceFixture();
+      const interrupted = fixture.quiesce({
+        SOURCE_RECOVERY_QUIESCE_FAULT_POINT: faultPoint,
+      });
+      expect(interrupted.status).not.toBe(0);
+      expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+      const immutablePrefix = Object.fromEntries(
+        evidenceNames.map(name => {
+          const path = fixture[name];
+          return [path, readFileSync(path)];
+        })
+      );
+      const { overlay } = advanceWriterQuiesceRecoveryEpoch(fixture);
+      writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+      const recovered = fixture.quiesce();
+
+      expect(recovered.status, recovered.stderr).toBe(0);
+      for (const [path, bytes] of Object.entries(immutablePrefix)) {
+        expect(readFileSync(path)).toEqual(bytes);
+      }
+      expect(existsSync(overlay)).toBe(true);
+      expect(
+        readdirSync(fixture.q12RunRoot).filter(name =>
+          name.startsWith(`writer-quiesce-recovery-overlay-${Q12_RUN_ID}-`)
+        )
+      ).toHaveLength(1);
+      expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+      expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
+      expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
+        true
+      );
+    }
+  );
+
+  it('reissues before inventory without any recovery overlay or pre-inventory mutation', () => {
+    const fixture = writerQuiesceFixture();
+    const interrupted = fixture.quiesce({
+      SOURCE_RECOVERY_QUIESCE_FAULT_POINT: 'before-inventory',
+    });
+    expect(interrupted.status).not.toBe(0);
+    expect(existsSync(fixture.inventory)).toBe(false);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:start|stop|update) /mu);
+    const recovery = advanceWriterQuiesceRecoveryEpoch(fixture);
+    expect(recovery.overlay).toBe('');
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+    const recovered = fixture.quiesce();
+
+    expect(recovered.status, recovered.stderr).toBe(0);
+    expect(
+      readdirSync(fixture.q12RunRoot).filter(name => name.includes('quiesce-recovery-overlay'))
+    ).toEqual([]);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('reconstructs only the missing terminal transition after an exact final manifest', () => {
+    const fixture = writerQuiesceFixture();
+    const interrupted = fixture.quiesce({
+      SOURCE_RECOVERY_QUIESCE_FAULT_POINT: 'after-final',
+    });
+    expect(interrupted.status).not.toBe(0);
+    const immutableFiles = [
+      fixture.inventory,
+      fixture.plannedTransition,
+      fixture.policyNoTransition,
+      fixture.quiesceManifest,
+    ];
+    const immutableBytes = immutableFiles.map(path => readFileSync(path));
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+    const recovered = fixture.quiesce();
+
+    expect(recovered.status, recovered.stderr).toBe(0);
+    expect(existsSync(fixture.terminalTransition)).toBe(true);
+    immutableFiles.forEach((path, index) =>
+      expect(readFileSync(path)).toEqual(immutableBytes[index])
+    );
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:start|stop|update) /mu);
+    expect(
+      readdirSync(fixture.q12RunRoot).filter(name => name.includes('quiesce-recovery-overlay'))
+    ).toEqual([]);
+  });
+
+  it('leaves an unaccepted Root overlay immutable and requires the next linked recovery epoch', () => {
+    const fixture = writerQuiesceFixture();
+    expect(
+      fixture.quiesce({ SOURCE_RECOVERY_QUIESCE_FAULT_POINT: 'after-inventory' }).status
+    ).not.toBe(0);
+    const abandoned = advanceWriterQuiesceRecoveryEpoch(fixture, 1, false).overlay;
+    const abandonedBytes = readFileSync(abandoned);
+    const journalBeforeChild = readFileSync(fixture.journal);
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+    const forbiddenChild = fixture.quiesce();
+
+    expect(forbiddenChild.status).not.toBe(0);
+    expect(readFileSync(fixture.journal)).toEqual(journalBeforeChild);
+    expect(readFileSync(abandoned)).toEqual(abandonedBytes);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:start|stop|update) /mu);
+
+    const accepted = advanceWriterQuiesceRecoveryEpoch(fixture, 2).overlay;
+    expect(JSON.parse(readFileSync(accepted, 'utf8')).previous_overlay_sha256).toBe(
+      fileSha256(abandoned)
+    );
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+    const recovered = fixture.quiesce();
+
+    expect(recovered.status, recovered.stderr).toBe(0);
+    expect(readFileSync(abandoned)).toEqual(abandonedBytes);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it.each([
+    {
+      label: 'overlay replacement',
+      mutate: (fixture: WriterQuiesceFixture, overlay: string) => {
+        mutateProtectedJson(overlay, value => {
+          value.previous_overlay_sha256 = 'f'.repeat(64);
+        });
+      },
+    },
+    {
+      label: 'cross-capability overlay',
+      mutate: (fixture: WriterQuiesceFixture, overlay: string) => {
+        mutateProtectedJson(overlay, value => {
+          value.new_capability_sha256 = 'f'.repeat(64);
+        });
+      },
+    },
+    {
+      label: 'unknown temporary residue',
+      mutate: (fixture: WriterQuiesceFixture) => {
+        writeFileSync(`${fixture.plannedTransition}.tmp`, 'untrusted\n', { mode: 0o400 });
+      },
+    },
+    {
+      label: 'invented abandonment object',
+      mutate: (fixture: WriterQuiesceFixture) => {
+        writeFileSync(
+          join(fixture.q12RunRoot, `writer-quiesce-recovery-abandonment-${Q12_RUN_ID}.json`),
+          '{}\n',
+          { mode: 0o400 }
+        );
+      },
+    },
+    {
+      label: 'writer identity drift',
+      mutate: (fixture: WriterQuiesceFixture) => {
+        const records = fixture.records();
+        records[0].Name = '/replacement-writer';
+        writeFileSync(fixture.recordsPath, `${JSON.stringify(records)}\n`, { mode: 0o600 });
+      },
+    },
+    {
+      label: 'unreferenced capability',
+      mutate: (fixture: WriterQuiesceFixture) => {
+        writeFileSync(
+          join(fixture.capabilitiesRoot, 'issued', 'writers.quiesce--cutover-recovery-99.json'),
+          readFileSync(fixture.capability),
+          { mode: 0o400 }
+        );
+      },
+    },
+  ])('rejects a quiesce recovery $label without child start', ({ mutate }) => {
+    const fixture = writerQuiesceFixture();
+    expect(
+      fixture.quiesce({ SOURCE_RECOVERY_QUIESCE_FAULT_POINT: 'after-inventory' }).status
+    ).not.toBe(0);
+    const { overlay } = advanceWriterQuiesceRecoveryEpoch(fixture);
+    mutate(fixture, overlay);
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+    const rejected = fixture.quiesce();
+
+    expect(rejected.status).not.toBe(0);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+    expect(existsSync(fixture.quiesceManifest)).toBe(false);
+  });
+
+  it('rejects a missing abandoned-overlay chain link', () => {
+    const fixture = writerQuiesceFixture();
+    expect(
+      fixture.quiesce({ SOURCE_RECOVERY_QUIESCE_FAULT_POINT: 'after-inventory' }).status
+    ).not.toBe(0);
+    const abandoned = advanceWriterQuiesceRecoveryEpoch(fixture, 1, false).overlay;
+    advanceWriterQuiesceRecoveryEpoch(fixture, 2);
+    rmSync(abandoned);
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+    const rejected = fixture.quiesce();
+
+    expect(rejected.status).not.toBe(0);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('rejects a mutable final quiesce result without replay', () => {
+    const fixture = writerQuiesceFixture();
+    expect(fixture.quiesce({ SOURCE_RECOVERY_QUIESCE_FAULT_POINT: 'after-final' }).status).not.toBe(
+      0
+    );
+    chmodSync(fixture.quiesceManifest, 0o600);
+    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
+
+    const rejected = fixture.quiesce();
+
+    expect(rejected.status).not.toBe(0);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:start|stop|update) /mu);
+    expect(existsSync(fixture.terminalTransition)).toBe(false);
   });
 
   it('pins the approved exact ten-writer Compose inventory and external quiesce contract', () => {

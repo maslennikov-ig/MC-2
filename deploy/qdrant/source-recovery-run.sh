@@ -68,6 +68,9 @@ Usage: source-recovery-run.sh [--stop-writers] \
 Writer-only resume: source-recovery-run.sh \
   --operation resume-writers-only --resume-mode forward|rollback --run-id UUID
 
+Writer-only quiesce: source-recovery-run.sh \
+  --operation quiesce-writers-only --run-id UUID
+
 Q12 Compose quiesce: --database-barrier-receipt PATH
 External Q12 quiesce: --external-quiesce-manifest PATH with inherited
 Q12_EXTERNAL_QUIESCE_LEASE_FD.
@@ -98,6 +101,7 @@ if [[ $local_test == 1 ]]; then
   Q12_CUTOVER_LOCK_FILE="${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-$LOCK_FILE.q12-cutover}"
   Q12_RUN_ROOT_OVERRIDE="${SOURCE_RECOVERY_Q12_RUN_ROOT:-}"
   resume_fault_point="${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}"
+  quiesce_fault_point="${SOURCE_RECOVERY_QUIESCE_FAULT_POINT:-}"
   expected_uid="${SOURCE_RECOVERY_EXPECTED_UID:?local test UID is required}"
   expected_gid="${SOURCE_RECOVERY_EXPECTED_GID:?local test GID is required}"
   controller_uid="${SOURCE_RECOVERY_CONTROLLER_UID:?local test controller UID is required}"
@@ -105,7 +109,7 @@ if [[ $local_test == 1 ]]; then
   restore_verification_attempts=2
   restore_verification_delay=0
 else
-  [[ -z ${SOURCE_RECOVERY_WRITER_BACKEND:-}${SOURCE_RECOVERY_SYSTEMCTL_BIN:-}${SOURCE_RECOVERY_DOCKER_BIN:-}${SOURCE_RECOVERY_COMPOSE_BIN:-}${SOURCE_RECOVERY_CURL_BIN:-}${SOURCE_RECOVERY_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_RUN_ROOT:-}${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}${SOURCE_RECOVERY_EXPECTED_UID:-}${SOURCE_RECOVERY_EXPECTED_GID:-}${SOURCE_RECOVERY_CONTROLLER_UID:-}${SOURCE_RECOVERY_CONTROLLER_GID:-} ]] ||
+  [[ -z ${SOURCE_RECOVERY_WRITER_BACKEND:-}${SOURCE_RECOVERY_SYSTEMCTL_BIN:-}${SOURCE_RECOVERY_DOCKER_BIN:-}${SOURCE_RECOVERY_COMPOSE_BIN:-}${SOURCE_RECOVERY_CURL_BIN:-}${SOURCE_RECOVERY_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_RUN_ROOT:-}${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}${SOURCE_RECOVERY_QUIESCE_FAULT_POINT:-}${SOURCE_RECOVERY_EXPECTED_UID:-}${SOURCE_RECOVERY_EXPECTED_GID:-}${SOURCE_RECOVERY_CONTROLLER_UID:-}${SOURCE_RECOVERY_CONTROLLER_GID:-} ]] ||
     fail 'test-only command, lock, and UID overrides require SOURCE_RECOVERY_LOCAL_TEST=1'
   [[ $EUID -eq 0 ]] || fail 'production source recovery must run as root'
   SYSTEMCTL_BIN='/usr/bin/systemctl'
@@ -116,6 +120,7 @@ else
   Q12_CUTOVER_LOCK_FILE="$DEFAULT_Q12_CUTOVER_LOCK_FILE"
   Q12_RUN_ROOT_OVERRIDE=''
   resume_fault_point=''
+  quiesce_fault_point=''
   expected_uid="$NODE_UID"
   expected_gid="$NODE_GID"
   controller_uid="$CONTROLLER_UID"
@@ -124,7 +129,7 @@ else
   restore_verification_delay=1
   writer_backend='compose'
 fi
-readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN CURL_BIN LOCK_FILE Q12_CUTOVER_LOCK_FILE Q12_RUN_ROOT_OVERRIDE resume_fault_point expected_uid expected_gid controller_uid controller_gid writer_backend restore_verification_attempts restore_verification_delay
+readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN CURL_BIN LOCK_FILE Q12_CUTOVER_LOCK_FILE Q12_RUN_ROOT_OVERRIDE resume_fault_point quiesce_fault_point expected_uid expected_gid controller_uid controller_gid writer_backend restore_verification_attempts restore_verification_delay
 
 case "$writer_backend" in
   compose) ;;
@@ -220,8 +225,8 @@ done
 [[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
   fail '--run-id must be a UUIDv4'
 case "$operation" in
-  forward|rollback|resume-writers-only) ;;
-  *) fail '--operation must be forward, rollback, or resume-writers-only' ;;
+  forward|rollback|resume-writers-only|quiesce-writers-only) ;;
+  *) fail '--operation must be forward, rollback, resume-writers-only, or quiesce-writers-only' ;;
 esac
 if [[ $operation == resume-writers-only ]]; then
   case "$resume_mode" in forward|rollback) ;; *) fail 'resume-writers-only requires --resume-mode forward or rollback' ;; esac
@@ -232,6 +237,14 @@ if [[ $operation == resume-writers-only ]]; then
     fail 'resume-writers-only accepts only --operation, --resume-mode, and --run-id'
 else
   [[ -z $resume_mode ]] || fail '--resume-mode is accepted only by resume-writers-only'
+fi
+if [[ $operation == quiesce-writers-only ]]; then
+  [[ $stop_writers -eq 0 && -z $resume_mode && -z $resume_from && -z $project_directory &&
+     -z $env_file && -z $plan_input && -z $manifest && -z $progress_directory &&
+     -z $development_root && -z $production_root && -z $capability_directory &&
+     -z $database_barrier_receipt && -z $external_quiesce_manifest &&
+     -z $q12_db_capability_file ]] ||
+    fail 'quiesce-writers-only accepts only --operation and --run-id'
 fi
 case "$resume_from" in
   ''|execute|verify|apply-dispositions|verify-dispositions) ;;
@@ -294,8 +307,44 @@ run_writer_resume_only() {
   return "$resume_controller_status"
 }
 
+run_writer_quiesce_only() {
+  local quiesce_run_root
+  if [[ $local_test == 1 ]]; then
+    quiesce_run_root="$Q12_RUN_ROOT_OVERRIDE"
+    [[ $quiesce_run_root == /tmp/mc2-source-recovery-wrapper-*/backups/q12/$run_id ]] ||
+      fail 'protected quiesce test run root is invalid'
+  else
+    quiesce_run_root="/opt/megacampus/backups/q12/$run_id"
+  fi
+  [[ $quiesce_run_root == /* && -d $quiesce_run_root && ! -L $quiesce_run_root &&
+     $(realpath -e -- "$quiesce_run_root") == "$quiesce_run_root" ]] ||
+    fail 'writer quiesce run root must be a canonical non-symlink directory'
+  [[ $(stat -c '%u:%g:%a' -- "$quiesce_run_root") == "$controller_uid:$controller_gid:700" ]] ||
+    fail 'writer quiesce run root must have the exact controller owner and mode 0700'
+  local quiesce_lock_directory
+  quiesce_lock_directory="$(dirname -- "$LOCK_FILE")"
+  if [[ $local_test == 1 ]]; then
+    mkdir -p -- "$quiesce_lock_directory"
+    chmod 0700 -- "$quiesce_lock_directory"
+  else
+    install -d -o root -g root -m 0700 -- "$quiesce_lock_directory"
+  fi
+  exec {quiesce_host_lock_fd}>"$LOCK_FILE"
+  flock -n "$quiesce_host_lock_fd" || fail 'another source-recovery run holds the host lock'
+  /usr/bin/env -i \
+    PATH='/usr/sbin:/usr/bin:/sbin:/bin' \
+    LC_ALL='C' LANG='C' HOME='/root' Q12_EXTERNAL_QUIESCE_LEASE_FD='9' \
+    "$PYTHON_BIN" "$RESUME_CONTROLLER" quiesce "$run_id" "$quiesce_run_root" "$DOCKER_BIN" \
+    "$Q12_CUTOVER_LOCK_FILE" "$controller_uid" "$controller_gid" "$local_test" "$quiesce_fault_point" "$CURL_BIN" \
+    {quiesce_host_lock_fd}>&- </dev/null
+}
+
 if [[ $operation == resume-writers-only ]]; then
   run_writer_resume_only
+  exit 0
+fi
+if [[ $operation == quiesce-writers-only ]]; then
+  run_writer_quiesce_only
   exit 0
 fi
 

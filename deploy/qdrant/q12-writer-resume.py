@@ -7,8 +7,13 @@ import signal
 import stat
 import subprocess
 import sys
+import tempfile
 
-mode, run_id, run_root, docker_bin, lock_path, uid_raw, gid_raw, local_test_raw, fault_point = sys.argv[1:]
+arguments = sys.argv[1:]
+if len(arguments) not in {9, 10}:
+    raise RuntimeError("writer controller argument surface is invalid")
+mode, run_id, run_root, docker_bin, lock_path, uid_raw, gid_raw, local_test_raw, fault_point = arguments[:9]
+auxiliary_bin = arguments[9] if len(arguments) == 10 else None
 uid = int(uid_raw)
 gid = int(gid_raw)
 local_test = local_test_raw == "1"
@@ -261,7 +266,12 @@ def canonical_inventory(values):
     ordered = sorted(values, key=lambda item: (item["project"], item["service"], item["id"]))
     return sha(json.dumps(ordered, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode())
 
-require(mode in {"forward", "rollback"} and UUID4.fullmatch(run_id), "resume mode or run identity is invalid")
+require(mode in {"forward", "rollback", "quiesce"} and UUID4.fullmatch(run_id), "writer mode or run identity is invalid")
+require(
+    (mode == "quiesce" and auxiliary_bin is not None)
+    or (mode in {"forward", "rollback"} and auxiliary_bin is None),
+    "writer controller auxiliary executable surface is invalid",
+)
 run_stat = os.stat(run_root, follow_symlinks=False)
 require(stat.S_ISDIR(run_stat.st_mode) and run_stat.st_uid == uid and run_stat.st_gid == gid and stat.S_IMODE(run_stat.st_mode) == 0o700, "resume run root identity is invalid")
 lease_fd_raw = os.environ.get("Q12_EXTERNAL_QUIESCE_LEASE_FD", "")
@@ -292,6 +302,710 @@ if local_test:
         "resume test Docker environment is invalid",
     )
     docker_environment = test_environment["environment"]
+
+def run_quiesce():
+    require(fault_point in {"", "before-inventory", "after-inventory", "after-planned", "after-policy-no", "after-final"}, "unknown protected quiesce fault point")
+    barrier_file = Opened(os.path.join(run_root, "database-barrier-receipt.json"), "database barrier receipt", 0o400)
+    barrier = barrier_file.json()
+    exact(barrier, {
+        "schema_version", "run_id", "state", "zero_guard_residue",
+        "expected_catalog_sha256", "last_command", "rollback_probes_verified",
+        "probe_receipt_sha256",
+    }, "database barrier receipt")
+    require(
+        barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v1"
+        and barrier["run_id"] == run_id
+        and barrier["state"] == "recovery_ready_guarded"
+        and barrier["zero_guard_residue"] is False
+        and barrier["last_command"] == "prepare-recovery"
+        and barrier["rollback_probes_verified"] is True
+        and hex64(barrier["expected_catalog_sha256"])
+        and hex64(barrier["probe_receipt_sha256"]),
+        "database barrier receipt is not quiesce-ready",
+    )
+    db_capability_path = os.path.join(run_root, "secrets", "db-capability")
+    db_capability_stat = os.lstat(db_capability_path)
+    require(
+        stat.S_ISREG(db_capability_stat.st_mode)
+        and not stat.S_ISLNK(db_capability_stat.st_mode)
+        and db_capability_stat.st_uid == uid
+        and db_capability_stat.st_gid == gid
+        and stat.S_IMODE(db_capability_stat.st_mode) == 0o400,
+        "database capability must remain present during quiesce",
+    )
+
+    journal_file = Opened(os.path.join(run_root, "phase.jsonl"), "cutover journal", 0o600)
+    checkpoint_file = Opened(os.path.join(run_root, "phase-checkpoint.json"), "cutover checkpoint", 0o600)
+    checkpoint = checkpoint_file.json()
+    exact(checkpoint, CHECKPOINT_KEYS, "cutover checkpoint")
+    raw_lines = journal_file.data.splitlines(keepends=True)
+    require(raw_lines and b"".join(raw_lines) == journal_file.data, "cutover journal is empty or torn")
+    journal_entries = []
+    previous_hash = "0" * 64
+    for sequence, raw_line in enumerate(raw_lines, start=1):
+        require(raw_line.endswith(b"\n") and not raw_line.endswith(b"\r\n"), "cutover journal line ending is not canonical")
+        encoded = raw_line[:-1]
+        entry = strict_json_loads(encoded.decode("utf-8"), "cutover journal entry")
+        exact(entry, JOURNAL_KEYS, "cutover journal entry")
+        preimage = {key: value for key, value in entry.items() if key != "entry_hash"}
+        require(
+            canonical_json(entry, "cutover journal entry") == encoded
+            and entry["schema"] == "megacampus.q12.cutover-journal/v1"
+            and entry["run_id"] == run_id
+            and entry["seq"] == sequence
+            and entry["previous_hash"] == previous_hash
+            and sha(canonical_json(preimage)) == entry["entry_hash"],
+            "cutover journal chain is invalid",
+        )
+        journal_entries.append(entry)
+        previous_hash = entry["entry_hash"]
+    head = journal_entries[-1]
+    require(
+        checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
+        and checkpoint["run_id"] == run_id
+        and checkpoint["journal_entry_hash"] == head["entry_hash"]
+        and checkpoint["previous_journal_entry_hash"] == head["previous_hash"]
+        and checkpoint["journal_device"] == str(journal_file.identity[0])
+        and checkpoint["journal_inode"] == str(journal_file.identity[1])
+        and checkpoint["phase"] == head["phase"] == "quiesced"
+        and checkpoint["accepted_object_kind"] == head["accepted_object_kind"] == "none"
+        and checkpoint["accepted_object_sha256"] is head["accepted_object_sha256"] is None
+        and checkpoint["resume_authority_sha256"] is None
+        and checkpoint["lease_epoch"] == head["lease_epoch"],
+        "quiesce journal/checkpoint binding is invalid",
+    )
+
+    capabilities_root = os.path.join(run_root, "capabilities")
+    exact_directory(capabilities_root, "host capability root")
+    capability_directories = {
+        name: os.path.join(capabilities_root, name)
+        for name in ("issued", "claimed", "completed", "superseded")
+    }
+    for name, directory in capability_directories.items():
+        exact_directory(directory, f"host capability {name} directory")
+    quiesce_capabilities = []
+    for location, directory in capability_directories.items():
+        for directory_entry in os.scandir(directory):
+            if not directory_entry.name.startswith("writers.quiesce--"):
+                continue
+            match = re.fullmatch(r"writers\.quiesce--((?:cutover|cutover-recovery-[1-9][0-9]*))\.json", directory_entry.name)
+            require(match is not None, "writer quiesce capability basename is invalid")
+            opened = Opened(directory_entry.path, f"{location} writer quiesce capability", 0o400)
+            value = opened.json()
+            exact(value, CAPABILITY_KEYS, "writer quiesce capability")
+            require(
+                opened.data == canonical_json(value) + b"\n"
+                and value["schema_version"] == "megacampus.q12.host-command-capability/v1"
+                and value["run_id"] == run_id
+                and value["command_id"] == "writers.quiesce"
+                and value["command_sha256"] == head["command_sha256"]
+                and value["release_sha"] == head["release_sha"]
+                and value["operator_digest"] == head["operator_digest"]
+                and value["resource_manifest_sha256"] == head["resource_manifest_sha256"]
+                and value["quiesce_manifest_sha256"] == "0" * 64
+                and value["resume_authority_sha256"] is None
+                and hex64(value["capability_input_checkpoint_sha256"])
+                and value["lease_epoch"] == match.group(1)
+                and (
+                    value["supersedes_capability_sha256"] is None
+                    or hex64(value["supersedes_capability_sha256"])
+                ),
+                "writer quiesce capability binding is invalid",
+            )
+            quiesce_capabilities.append((location, opened, value))
+    def lease_ordinal(value):
+        return 0 if value == "cutover" else int(value.rsplit("-", 1)[1])
+    quiesce_capabilities.sort(key=lambda item: lease_ordinal(item[2]["lease_epoch"]))
+    require(quiesce_capabilities, "writer quiesce capability lifecycle is empty")
+    require(
+        [item[2]["lease_epoch"] for item in quiesce_capabilities]
+        == ["cutover", *[f"cutover-recovery-{ordinal}" for ordinal in range(1, len(quiesce_capabilities))]],
+        "writer quiesce capability supersession epochs are not consecutive",
+    )
+    for index, (location, opened, value) in enumerate(quiesce_capabilities):
+        expected_supersedes = None if index == 0 else quiesce_capabilities[index - 1][1].digest
+        require(
+            value["supersedes_capability_sha256"] == expected_supersedes
+            and location == ("claimed" if index == len(quiesce_capabilities) - 1 else "superseded"),
+            "writer quiesce capability supersession lifecycle is invalid",
+        )
+    _, capability_file, capability = quiesce_capabilities[-1]
+    require(
+        head["outcome"] == "capability_claimed"
+        and head["command_id"] == "writers.quiesce"
+        and head["capability_manifest_sha256"] == capability_file.digest
+        and head["lease_epoch"] == capability["lease_epoch"],
+        "writer quiesce claimed journal head is invalid",
+    )
+    quiesce_rows = [entry for entry in journal_entries if entry["phase"] == "quiesced"]
+    require(all(entry["command_id"] == "writers.quiesce" for entry in quiesce_rows), "writer quiesce journal command graph is invalid")
+    expected_rows = []
+    for index, (_, opened, value) in enumerate(quiesce_capabilities):
+        epoch_rows = [entry for entry in quiesce_rows if entry["lease_epoch"] == value["lease_epoch"]]
+        observed_outcomes = [entry["outcome"] for entry in epoch_rows]
+        allowed_outcomes = (
+            [["intent", "capability_issued", "capability_claimed"]]
+            if index == 0
+            else (
+                [
+                    ["recovery_reacquired", "capability_claimed"],
+                    ["recovery_reacquired", "recovery_prefix_accepted", "capability_claimed"],
+                ]
+                if index == len(quiesce_capabilities) - 1
+                else [
+                    ["recovery_reacquired"],
+                    ["recovery_reacquired", "recovery_prefix_accepted", "capability_claimed"],
+                ]
+            )
+        )
+        require(
+            observed_outcomes in allowed_outcomes
+            and all(entry["capability_manifest_sha256"] in ({"intent": "0" * 64}.get(entry["outcome"], opened.digest),) for entry in epoch_rows),
+            "writer quiesce journal graph is invalid",
+        )
+        if "recovery_prefix_accepted" in observed_outcomes:
+            overlay_row = epoch_rows[1]
+            require(
+                overlay_row["accepted_object_kind"] == "writer_quiesce_recovery_overlay"
+                and hex64(overlay_row["accepted_object_sha256"]),
+                "writer quiesce recovery overlay acceptance is invalid",
+            )
+        expected_rows.extend(epoch_rows)
+    require(expected_rows == quiesce_rows, "writer quiesce journal recovery epochs are interleaved")
+    intent_entry = quiesce_rows[0]
+    capability_checkpoint_file = Opened(
+        os.path.join(run_root, f"writer-quiesce-capability-checkpoint-{run_id}-{capability['lease_epoch']}.json"),
+        "writer quiesce capability checkpoint",
+        0o600,
+    )
+    input_checkpoint_file = Opened(
+        os.path.join(run_root, f"writer-quiesce-input-checkpoint-{run_id}-{capability['lease_epoch']}.json"),
+        "writer quiesce input checkpoint",
+        0o600,
+    )
+    def quiesce_checkpoint_matches(value, entry):
+        exact(value, CHECKPOINT_KEYS, "writer quiesce checkpoint")
+        return (
+            value["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
+            and value["run_id"] == run_id
+            and value["seq"] == entry["seq"]
+            and value["phase"] == entry["phase"]
+            and value["journal_entry_hash"] == entry["entry_hash"]
+            and value["previous_journal_entry_hash"] == entry["previous_hash"]
+            and value["journal_device"] == str(journal_file.identity[0])
+            and value["journal_inode"] == str(journal_file.identity[1])
+            and value["accepted_object_kind"] == entry["accepted_object_kind"]
+            and value["accepted_object_sha256"] == entry["accepted_object_sha256"]
+            and value["resume_authority_sha256"] is None
+            and value["lease_epoch"] == entry["lease_epoch"]
+        )
+    capability_predecessor = intent_entry
+    if capability["lease_epoch"] != "cutover":
+        first_quiesce_index = journal_entries.index(intent_entry)
+        require(first_quiesce_index > 0, "writer quiesce recovery predecessor is missing")
+        capability_predecessor = journal_entries[first_quiesce_index - 1]
+    require(
+        quiesce_checkpoint_matches(capability_checkpoint_file.json(), capability_predecessor)
+        and capability_checkpoint_file.digest == capability["capability_input_checkpoint_sha256"],
+        "writer quiesce capability checkpoint is invalid",
+    )
+    for index, (_, _, historical_capability) in enumerate(quiesce_capabilities):
+        historical_checkpoint = Opened(
+            os.path.join(
+                run_root,
+                f"writer-quiesce-capability-checkpoint-{run_id}-{historical_capability['lease_epoch']}.json",
+            ),
+            "historical writer quiesce capability checkpoint",
+            0o600,
+        )
+        expected_checkpoint_entry = intent_entry if index == 0 else capability_predecessor
+        require(
+            quiesce_checkpoint_matches(historical_checkpoint.json(), expected_checkpoint_entry)
+            and historical_checkpoint.digest == historical_capability["capability_input_checkpoint_sha256"],
+            "historical writer quiesce capability checkpoint is invalid",
+        )
+    require(
+        quiesce_checkpoint_matches(input_checkpoint_file.json(), head)
+        and input_checkpoint_file.data == checkpoint_file.data,
+        "writer quiesce input checkpoint is invalid",
+    )
+
+    def publish_immutable(path, label, value):
+        encoded = canonical_json(value, label) + b"\n"
+        if os.path.lexists(path):
+            existing = Opened(path, label, 0o400)
+            require(existing.data == encoded, f"existing {label} is non-exact")
+            return existing
+        temporary = path + ".tmp"
+        require(not os.path.lexists(temporary), f"unknown {label} temporary residue exists")
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        try:
+            os.write(fd, encoded)
+            os.fchown(fd, uid, gid)
+            os.fchmod(fd, 0o400)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        rename_noreplace(temporary, path)
+        directory_fd = os.open(run_root, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+        published = Opened(path, label, 0o400)
+        require(published.data == encoded, f"published {label} identity is invalid")
+        return published
+
+    def raw_inspect(writer_id):
+        rows = strict_json_loads(docker("inspect", writer_id), "Docker writer inspection")
+        require(isinstance(rows, list) and len(rows) == 1, "writer identity is missing or duplicated")
+        return rows[0]
+
+    def probe_closed_inbound():
+        for host in ("ai.megacampus.ru", "dev.ai.megacampus.ru"):
+            probe_directory = tempfile.mkdtemp(prefix=".inbound-probe.", dir=run_root)
+            headers_path = os.path.join(probe_directory, "headers")
+            body_path = os.path.join(probe_directory, "body")
+            try:
+                probe = subprocess.run(
+                    [
+                        auxiliary_bin,
+                        "--silent", "--show-error", "--http1.1", "--proto", "=https",
+                        "--max-redirs", "0", "--user-agent", "mc2-q12-inbound-probe/1",
+                        "--dump-header", headers_path, "--output", body_path,
+                        "--write-out", "%{http_code}", "--max-filesize", "512",
+                        "--resolve", f"{host}:443:127.0.0.1", "--connect-timeout", "10",
+                        "--max-time", "30", f"https://{host}/",
+                    ],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=docker_environment,
+                    close_fds=True,
+                )
+                require(probe.returncode == 0, f"closed inbound probe failed for {host}")
+                directory_stat = os.lstat(probe_directory)
+                require(
+                    stat.S_ISDIR(directory_stat.st_mode)
+                    and directory_stat.st_uid == uid
+                    and directory_stat.st_gid == gid
+                    and stat.S_IMODE(directory_stat.st_mode) == 0o700,
+                    "closed inbound probe directory identity is invalid",
+                )
+                headers = Opened(headers_path, "closed inbound probe headers", 0o600).data
+                body = Opened(body_path, "closed inbound probe body", 0o600).data
+                require(len(body) <= 512 and headers.endswith(b"\r\n\r\n"), "closed inbound probe framing is invalid")
+                lines = headers[:-4].split(b"\r\n")
+                require(lines and all(lines), "closed inbound probe headers are invalid")
+                status_match = re.fullmatch(rb"HTTP/1\.1 (502 Bad Gateway|503 Service Temporarily Unavailable)", lines[0])
+                require(status_match is not None, "closed inbound probe status is invalid")
+                reason = status_match.group(1).decode("ascii")
+                require(probe.stdout == reason.split(" ", 1)[0], "closed inbound probe reported status is invalid")
+                values = {}
+                for raw in lines[1:]:
+                    require(b":" in raw and raw[:1] not in b" \t", "closed inbound probe header is malformed")
+                    raw_name, raw_value = raw.split(b":", 1)
+                    try:
+                        name = raw_name.decode("ascii").lower()
+                        value = raw_value.strip(b" \t").decode("ascii")
+                    except UnicodeDecodeError as exc:
+                        raise ResumeError("closed inbound probe header is non-ASCII") from exc
+                    require(re.fullmatch(r"[!#$%&'*+.^_`|~0-9a-z-]+", name) is not None, "closed inbound probe header name is invalid")
+                    values.setdefault(name, []).append(value)
+                require(
+                    all(len(values.get(key, [])) == 1 for key in ("server", "content-type", "content-length"))
+                    and "transfer-encoding" not in values
+                    and values["content-type"][0] == "text/html",
+                    "closed inbound probe critical headers are invalid",
+                )
+                server = values["server"][0]
+                require(
+                    re.fullmatch(r"nginx(?:/[0-9]+\.[0-9]+\.[0-9]+(?: \([A-Za-z0-9][A-Za-z0-9 ._+~:-]{0,63}\))?)?", server) is not None,
+                    "closed inbound probe server header is invalid",
+                )
+                content_length = values["content-length"][0]
+                require(
+                    re.fullmatch(r"0|[1-9][0-9]*", content_length) is not None
+                    and int(content_length) == len(body),
+                    "closed inbound probe content length is invalid",
+                )
+                expected_body = (
+                    f"<html>\r\n<head><title>{reason}</title></head>\r\n<body>\r\n"
+                    f"<center><h1>{reason}</h1></center>\r\n<hr><center>{server}</center>\r\n"
+                    "</body>\r\n</html>\r\n"
+                ).encode("ascii")
+                require(body == expected_body, "closed inbound probe body is invalid")
+            finally:
+                for path in (headers_path, body_path):
+                    try:
+                        os.unlink(path)
+                    except FileNotFoundError:
+                        pass
+                os.rmdir(probe_directory)
+
+    inventory_path = os.path.join(run_root, f"writer-quiesce-inventory-{run_id}.json")
+    planned_path = os.path.join(run_root, f"writer-quiesce-policy-change-planned-{run_id}.json")
+    policy_path = os.path.join(run_root, f"writer-quiesce-policy-no-verified-{run_id}.json")
+    final_path = os.path.join(run_root, f"writer-quiesce-{run_id}.json")
+    terminal_path = os.path.join(run_root, f"writer-quiesce-quiesced-{run_id}.json")
+    for name in os.listdir(run_root):
+        require(
+            not (
+                (name.startswith("writer-quiesce-") or name.startswith(".writer-quiesce-"))
+                and (name.endswith(".tmp") or "abandon" in name)
+            ),
+            "unknown writer quiesce temporary or abandonment residue exists",
+        )
+
+    quiesce_writer_keys = {
+        "class", "id", "name", "project", "service", "config_files", "working_dir",
+        "image_id", "image_ref", "prior_running", "prior_status", "healthcheck_present",
+        "prior_health_status", "prior_restart_policy", "temporary_restart_policy",
+    }
+    def validate_quiesce_writers(values):
+        require(isinstance(values, list) and len(values) == 10, "writer quiesce inventory is not exact")
+        require(values == sorted(values, key=lambda value: (value["project"], value["service"], value["id"])), "writer quiesce inventory order is invalid")
+        require(len({value.get("id") for value in values}) == 10, "writer quiesce identities are duplicated")
+        for writer in values:
+            exact(writer, quiesce_writer_keys, "writer quiesce inventory row")
+            require(
+                writer["class"] in CLASSES
+                and hex64(writer["id"])
+                and all(isinstance(writer[key], str) and writer[key] for key in ("name", "project", "service", "config_files", "working_dir", "image_id", "image_ref"))
+                and isinstance(writer["prior_running"], bool)
+                and writer["prior_status"] == ("running" if writer["prior_running"] else writer["prior_status"])
+                and (writer["prior_running"] or writer["prior_status"] in {"created", "exited"})
+                and isinstance(writer["healthcheck_present"], bool)
+                and writer["prior_health_status"] == ("healthy" if writer["healthcheck_present"] else None)
+                and policy(writer["prior_restart_policy"])
+                and writer["temporary_restart_policy"] == {"name": "no", "maximum_retry_count": 0},
+                "writer quiesce inventory row is invalid",
+            )
+        require(
+            sum(value["class"] == "production-api" for value in values) == 1
+            and sum(value["class"] == "production-web" for value in values) == 1
+            and sum(value["class"] == "production-worker" for value in values) == 3
+            and sum(value["class"] == "development-api" for value in values) == 1
+            and sum(value["class"] == "development-web" for value in values) == 1
+            and sum(value["class"] == "development-worker" for value in values) == 3,
+            "writer quiesce class counts are invalid",
+        )
+
+    existing_inventory = os.path.lexists(inventory_path)
+    if fault_point == "before-inventory" and not existing_inventory:
+        os.kill(os.getpid(), signal.SIGKILL)
+    policy_already_published = False
+    if existing_inventory:
+        inventory_file = Opened(inventory_path, "writer quiesce inventory", 0o400)
+        inventory_value = inventory_file.json()
+        exact(inventory_value, {
+            "schema_version", "run_id", "command_id", "lease_epoch", "capability_sha256",
+            "capability_input_checkpoint_sha256", "input_checkpoint_sha256",
+            "database_barrier_receipt_sha256", "writers",
+        }, "writer quiesce inventory")
+        require(
+            inventory_file.data == canonical_json(inventory_value) + b"\n"
+            and inventory_value["schema_version"] == "megacampus.q12.writer-quiesce-inventory/v1"
+            and inventory_value["run_id"] == run_id
+            and inventory_value["command_id"] == "writers.quiesce"
+            and inventory_value["lease_epoch"] == quiesce_capabilities[0][2]["lease_epoch"] == "cutover"
+            and inventory_value["capability_sha256"] == quiesce_capabilities[0][1].digest
+            and inventory_value["capability_input_checkpoint_sha256"] == quiesce_capabilities[0][2]["capability_input_checkpoint_sha256"]
+            and hex64(inventory_value["input_checkpoint_sha256"])
+            and inventory_value["database_barrier_receipt_sha256"] == barrier_file.digest,
+            "writer quiesce inventory binding is invalid",
+        )
+        initial_claimed_entry = next(
+            entry
+            for entry in quiesce_rows
+            if entry["lease_epoch"] == "cutover" and entry["outcome"] == "capability_claimed"
+        )
+        initial_input_checkpoint = Opened(
+            os.path.join(run_root, f"writer-quiesce-input-checkpoint-{run_id}-cutover.json"),
+            "initial writer quiesce input checkpoint",
+            0o600,
+        )
+        require(
+            quiesce_checkpoint_matches(initial_input_checkpoint.json(), initial_claimed_entry)
+            and initial_input_checkpoint.digest == inventory_value["input_checkpoint_sha256"],
+            "initial writer quiesce input checkpoint is invalid",
+        )
+        writers = inventory_value["writers"]
+        validate_quiesce_writers(writers)
+        raw_rows = {}
+        for writer in writers:
+            row = raw_inspect(writer["id"])
+            raw_rows[writer["id"]] = row
+            labels = row.get("Config", {}).get("Labels", {})
+            state = row.get("State", {})
+            health = state.get("Health")
+            require(
+                row.get("Id") == writer["id"]
+                and row.get("Name") == writer["name"]
+                and labels.get("com.docker.compose.project") == writer["project"]
+                and labels.get("com.docker.compose.service") == writer["service"]
+                and labels.get("com.docker.compose.project.config_files") == writer["config_files"]
+                and labels.get("com.docker.compose.project.working_dir") == writer["working_dir"]
+                and row.get("Image") == writer["image_id"]
+                and row.get("Config", {}).get("Image") == writer["image_ref"]
+                and (health is not None) == writer["healthcheck_present"]
+                and state.get("Restarting") is False
+                and not (writer["prior_running"] is False and state.get("Running") is True),
+                "writer quiesce durable identity changed",
+            )
+
+        planned_file = Opened(planned_path, "writer quiesce planned transition", 0o400) if os.path.lexists(planned_path) else None
+        policy_file = Opened(policy_path, "writer quiesce policy-no transition", 0o400) if os.path.lexists(policy_path) else None
+        policy_already_published = policy_file is not None
+        final_file = Opened(final_path, "writer quiesce manifest", 0o400) if os.path.lexists(final_path) else None
+        terminal_file = Opened(terminal_path, "writer quiesce terminal transition", 0o400) if os.path.lexists(terminal_path) else None
+        require(not (policy_file and not planned_file) and not (final_file and not policy_file) and not (terminal_file and not final_file), "writer quiesce evidence is not a prefix")
+        transition_base = {
+            "schema_version": "megacampus.q12.writer-quiesce-transition/v1",
+            "run_id": run_id,
+            "inventory_sha256": inventory_file.digest,
+            "input_checkpoint_sha256": inventory_value["input_checkpoint_sha256"],
+            "database_barrier_receipt_sha256": barrier_file.digest,
+        }
+        planned_value = {**transition_base, "state": "policy_change_planned", "previous_transition_sha256": None, "writer_quiesce_manifest_sha256": None}
+        if planned_file:
+            require(planned_file.data == canonical_json(planned_value) + b"\n", "existing writer quiesce planned transition is non-exact")
+        policy_value = {**transition_base, "state": "policy_no_verified", "previous_transition_sha256": planned_file.digest if planned_file else None, "writer_quiesce_manifest_sha256": None}
+        if policy_file:
+            require(policy_file.data == canonical_json(policy_value) + b"\n", "existing writer quiesce policy-no transition is non-exact")
+
+        if final_file:
+            final_value = {
+                "schema_version": "megacampus.q12.writer-quiesce/v1",
+                "run_id": run_id,
+                "status": "quiesced",
+                "barrier": {
+                    "state": barrier["state"],
+                    "zero_guard_residue": barrier["zero_guard_residue"],
+                    "expected_catalog_sha256": barrier["expected_catalog_sha256"],
+                    "probe_receipt_sha256": barrier["probe_receipt_sha256"],
+                },
+                "writers": writers,
+            }
+            require(final_file.data == canonical_json(final_value) + b"\n", "existing writer quiesce manifest is non-exact")
+            for writer in writers:
+                require(is_stopped_no(raw_rows[writer["id"]]), "writer final quiesce state changed")
+            terminal_value = {**transition_base, "state": "quiesced", "previous_transition_sha256": policy_file.digest, "writer_quiesce_manifest_sha256": final_file.digest}
+            publish_immutable(terminal_path, "writer quiesce terminal transition", terminal_value)
+            return
+
+        require(capability["lease_epoch"] != "cutover", "writer quiesce prefix requires a recovery capability")
+        overlay_names = [
+            name for name in os.listdir(run_root)
+            if name.startswith(f"writer-quiesce-recovery-overlay-{run_id}-")
+        ]
+        overlay_names.sort(
+            key=lambda name: int(
+                re.fullmatch(
+                    rf"writer-quiesce-recovery-overlay-{re.escape(run_id)}-cutover-recovery-([1-9][0-9]*)\.json",
+                    name,
+                ).group(1)
+            )
+            if re.fullmatch(
+                rf"writer-quiesce-recovery-overlay-{re.escape(run_id)}-cutover-recovery-([1-9][0-9]*)\.json",
+                name,
+            )
+            else -1
+        )
+        require(len(overlay_names) == len(quiesce_capabilities) - 1, "writer quiesce recovery overlay lifecycle is ambiguous")
+        previous_overlay_sha256 = None
+        for index, name in enumerate(overlay_names, start=1):
+            expected_epoch = f"cutover-recovery-{index}"
+            require(name == f"writer-quiesce-recovery-overlay-{run_id}-{expected_epoch}.json", "writer quiesce recovery overlay basename is invalid")
+            overlay_file = Opened(os.path.join(run_root, name), "writer quiesce recovery overlay", 0o400)
+            overlay = overlay_file.json()
+            exact(overlay, {
+                "schema_version", "run_id", "lease_epoch", "prior_capability_sha256",
+                "new_capability_sha256", "recovery_checkpoint_sha256", "inventory_sha256",
+                "initial_capability_input_checkpoint_sha256", "initial_input_checkpoint_sha256",
+                "last_transition_state", "last_transition_sha256", "previous_overlay_sha256",
+                "continuation",
+            }, "writer quiesce recovery overlay")
+            recovery_row = next(entry for entry in quiesce_rows if entry["lease_epoch"] == expected_epoch and entry["outcome"] == "recovery_reacquired")
+            recovery_checkpoint_value = {
+                "schema_version": "megacampus.q12.cutover-checkpoint/v1",
+                "run_id": run_id,
+                "seq": recovery_row["seq"],
+                "phase": recovery_row["phase"],
+                "journal_entry_hash": recovery_row["entry_hash"],
+                "previous_journal_entry_hash": recovery_row["previous_hash"],
+                "journal_device": str(journal_file.identity[0]),
+                "journal_inode": str(journal_file.identity[1]),
+                "accepted_object_kind": recovery_row["accepted_object_kind"],
+                "accepted_object_sha256": recovery_row["accepted_object_sha256"],
+                "resume_authority_sha256": None,
+                "lease_epoch": recovery_row["lease_epoch"],
+            }
+            declared_last_state = overlay["last_transition_state"]
+            expected_last_sha256 = {
+                "inventory_only": None,
+                "policy_change_planned": planned_file.digest if planned_file else "missing",
+                "policy_no_verified": policy_file.digest if policy_file else "missing",
+            }.get(declared_last_state, "invalid")
+            require(overlay_file.data == canonical_json(overlay) + b"\n", "writer quiesce recovery overlay bytes are non-canonical")
+            require(
+                overlay["schema_version"] == "megacampus.q12.writer-quiesce-recovery-overlay/v1"
+                and overlay["run_id"] == run_id
+                and overlay["lease_epoch"] == expected_epoch,
+                "writer quiesce recovery overlay identity is invalid",
+            )
+            require(
+                overlay["prior_capability_sha256"] == quiesce_capabilities[index - 1][1].digest
+                and overlay["new_capability_sha256"] == quiesce_capabilities[index][1].digest,
+                "writer quiesce recovery overlay capability chain is invalid",
+            )
+            require(
+                overlay["recovery_checkpoint_sha256"] == sha(canonical_json(recovery_checkpoint_value) + b"\n"),
+                "writer quiesce recovery overlay checkpoint binding is invalid",
+            )
+            require(
+                overlay["inventory_sha256"] == inventory_file.digest
+                and overlay["initial_capability_input_checkpoint_sha256"] == inventory_value["capability_input_checkpoint_sha256"]
+                and overlay["initial_input_checkpoint_sha256"] == inventory_value["input_checkpoint_sha256"],
+                "writer quiesce recovery overlay initial prefix binding is invalid",
+            )
+            require(
+                expected_last_sha256 not in {"missing", "invalid"}
+                and overlay["last_transition_sha256"] == expected_last_sha256,
+                "writer quiesce recovery overlay last transition is invalid",
+            )
+            require(
+                overlay["previous_overlay_sha256"] == previous_overlay_sha256
+                and overlay["continuation"] == "monotonic_quiesce_only",
+                "writer quiesce recovery overlay continuation chain is invalid",
+            )
+            accepted_rows = [entry for entry in quiesce_rows if entry["lease_epoch"] == expected_epoch and entry["outcome"] == "recovery_prefix_accepted"]
+            require(
+                (len(accepted_rows) == 1 and accepted_rows[0]["accepted_object_sha256"] == overlay_file.digest)
+                if index == len(overlay_names)
+                else len(accepted_rows) in {0, 1} and (not accepted_rows or accepted_rows[0]["accepted_object_sha256"] == overlay_file.digest),
+                "writer quiesce recovery overlay acceptance hash is invalid",
+            )
+            previous_overlay_sha256 = overlay_file.digest
+    else:
+        writer_ids = []
+        for project in ("megacampus-blue", "megacampus-green", "megacampus"):
+            writer_ids.extend(
+                value for value in docker("ps", "-aq", "--no-trunc", "--filter", f"label=com.docker.compose.project={project}").splitlines()
+                if value
+            )
+        require(len(writer_ids) == 10 and len(set(writer_ids)) == 10, "writer quiesce inventory is not exact")
+        writers = []
+        raw_rows = {}
+        for writer_id in writer_ids:
+            row = raw_inspect(writer_id)
+            raw_rows[writer_id] = row
+            labels = row.get("Config", {}).get("Labels", {})
+            project = labels.get("com.docker.compose.project")
+            service = labels.get("com.docker.compose.service")
+            if service in {"api", "web"}:
+                writer_class = f"production-{service}"
+            elif service in {"api-dev", "web-dev"}:
+                writer_class = f"development-{service[:-4]}"
+            else:
+                writer_class = "development-worker" if isinstance(service, str) and service.endswith("-dev") else "production-worker"
+            state = row.get("State", {})
+            health = state.get("Health")
+            restart = row.get("HostConfig", {}).get("RestartPolicy", {})
+            writer = {
+                "class": writer_class,
+                "id": row.get("Id"),
+                "name": row.get("Name"),
+                "project": project,
+                "service": service,
+                "config_files": labels.get("com.docker.compose.project.config_files"),
+                "working_dir": labels.get("com.docker.compose.project.working_dir"),
+                "image_id": row.get("Image"),
+                "image_ref": row.get("Config", {}).get("Image"),
+                "prior_running": state.get("Running"),
+                "prior_status": state.get("Status"),
+                "healthcheck_present": health is not None,
+                "prior_health_status": None if health is None else health.get("Status"),
+                "prior_restart_policy": {"name": restart.get("Name"), "maximum_retry_count": restart.get("MaximumRetryCount")},
+                "temporary_restart_policy": {"name": "no", "maximum_retry_count": 0},
+            }
+            writers.append(writer)
+        writers.sort(key=lambda value: (value["project"], value["service"], value["id"]))
+        validate_quiesce_writers(writers)
+    require(
+        sum(value["class"] == "production-api" for value in writers) == 1
+        and sum(value["class"] == "production-web" for value in writers) == 1
+        and sum(value["class"] == "production-worker" for value in writers) == 3
+        and sum(value["class"] == "development-api" for value in writers) == 1
+        and sum(value["class"] == "development-web" for value in writers) == 1
+        and sum(value["class"] == "development-worker" for value in writers) == 3,
+        "writer quiesce class counts are invalid",
+    )
+    if not existing_inventory:
+        inventory_value = {
+            "schema_version": "megacampus.q12.writer-quiesce-inventory/v1",
+            "run_id": run_id,
+            "command_id": "writers.quiesce",
+            "lease_epoch": capability["lease_epoch"],
+            "capability_sha256": capability_file.digest,
+            "capability_input_checkpoint_sha256": capability_checkpoint_file.digest,
+            "input_checkpoint_sha256": input_checkpoint_file.digest,
+            "database_barrier_receipt_sha256": barrier_file.digest,
+            "writers": writers,
+        }
+        inventory_file = publish_immutable(inventory_path, "writer quiesce inventory", inventory_value)
+    if fault_point == "after-inventory": os.kill(os.getpid(), signal.SIGKILL)
+    transition_base = {
+        "schema_version": "megacampus.q12.writer-quiesce-transition/v1",
+        "run_id": run_id,
+        "inventory_sha256": inventory_file.digest,
+        "input_checkpoint_sha256": inventory_value["input_checkpoint_sha256"],
+        "database_barrier_receipt_sha256": barrier_file.digest,
+    }
+    planned_value = {**transition_base, "state": "policy_change_planned", "previous_transition_sha256": None, "writer_quiesce_manifest_sha256": None}
+    planned_file = publish_immutable(os.path.join(run_root, f"writer-quiesce-policy-change-planned-{run_id}.json"), "writer quiesce planned transition", planned_value)
+    if fault_point == "after-planned": os.kill(os.getpid(), signal.SIGKILL)
+    if not policy_already_published:
+        for writer in writers:
+            docker("update", "--restart=no", writer["id"], capture=False)
+    for writer in writers:
+        row = raw_inspect(writer["id"])
+        require(row.get("HostConfig", {}).get("RestartPolicy") == {"Name": "no", "MaximumRetryCount": 0}, "writer restart=no policy did not persist")
+    policy_value = {**transition_base, "state": "policy_no_verified", "previous_transition_sha256": planned_file.digest, "writer_quiesce_manifest_sha256": None}
+    policy_file = publish_immutable(os.path.join(run_root, f"writer-quiesce-policy-no-verified-{run_id}.json"), "writer quiesce policy-no transition", policy_value)
+    if fault_point == "after-policy-no": os.kill(os.getpid(), signal.SIGKILL)
+    for writer_class in ("production-api", "development-api", "production-web", "development-web"):
+        for writer in writers:
+            if writer["class"] == writer_class and raw_rows[writer["id"]].get("State", {}).get("Running"):
+                docker("stop", "--time", "30", writer["id"], capture=False)
+    probe_closed_inbound()
+    for writer_class in ("production-worker", "development-worker"):
+        for writer in writers:
+            if writer["class"] == writer_class and raw_rows[writer["id"]].get("State", {}).get("Running"):
+                docker("stop", "--time", "30", writer["id"], capture=False)
+    for writer in writers:
+        row = raw_inspect(writer["id"])
+        require(is_stopped_no(row), "writer did not reach exact stopped/no quiesce state")
+    final_value = {
+        "schema_version": "megacampus.q12.writer-quiesce/v1",
+        "run_id": run_id,
+        "status": "quiesced",
+        "barrier": {
+            "state": barrier["state"],
+            "zero_guard_residue": barrier["zero_guard_residue"],
+            "expected_catalog_sha256": barrier["expected_catalog_sha256"],
+            "probe_receipt_sha256": barrier["probe_receipt_sha256"],
+        },
+        "writers": writers,
+    }
+    final_file = publish_immutable(os.path.join(run_root, f"writer-quiesce-{run_id}.json"), "writer quiesce manifest", final_value)
+    if fault_point == "after-final": os.kill(os.getpid(), signal.SIGKILL)
+    terminal_value = {**transition_base, "state": "quiesced", "previous_transition_sha256": policy_file.digest, "writer_quiesce_manifest_sha256": final_file.digest}
+    publish_immutable(os.path.join(run_root, f"writer-quiesce-quiesced-{run_id}.json"), "writer quiesce terminal transition", terminal_value)
+
+if mode == "quiesce":
+    run_quiesce()
+    raise SystemExit(0)
 
 paths = {
     "db_capability": os.path.join(run_root, "secrets", "db-capability"),
