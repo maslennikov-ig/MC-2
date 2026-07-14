@@ -43,11 +43,11 @@ parallel_group: Root-D5 mc2-jz6y0.13.18
 depends_on_streams:
   - accepted D5 plan mc2-jz6y0.13.13
 parallel_decision: sequential
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: merge
+accepted_by_orchestrator: yes
 cleanup_status: pending
-cleanup_notes: Worker worktree remains for independent review and orchestrator-owned integration cleanup.
+cleanup_notes: Accepted source HEAD fa6172fc was merged and pushed as integration commit 227ca90d; worker cleanup is the next orchestrator action.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
@@ -77,6 +77,9 @@ verification:
   - independent R3 correctness reviewer focused Root D5 GREEN 251 tests: passed with zero failed and zero pending in 77.74 seconds
   - controller R3 static/artifact proof: all seven gates passed with exit 0
   - independent R3 correctness/code-quality delta review: PASS/PASS with P0/P1/P2/P3 0/0/1/0; sole P2 was this artifact's stale delivery state
+  - independent R4 evidence-only review: PASS with P0/P1/P2/P3 0/0/0/0
+  - integration focused Root D5 GREEN 251 tests: passed with zero failed and zero pending in 68.47 seconds
+  - integration static/artifact proof: all seven gates passed with exit 0
   - bash -n deployed wrappers: passed
   - python3 -m py_compile core and runner: passed
   - jq -e command manifest: passed
@@ -119,15 +122,17 @@ The completed R3 correctness delta report `.superpowers/sdd/d5-root-r3-delta-rev
 
 The completed R3 documentation delta report `.superpowers/sdd/d5-root-r3-delta-docs-review-report.md`, SHA-256 `2d8a1bf3420346e7f6b35e32e8bcdbeb13d73bced64a77ddcaafc9c5c3a406a0`, returned **FAIL**, P0/P1/P2/P3 `0/1/0/0`. Its sole P1 was the same stale artifact delivery/review state corrected by this R4 evidence-only artifact commit.
 
+The independent R4 evidence-only report `.superpowers/sdd/d5-root-r4-evidence-review-report.md`, SHA-256 `4761a43c53d2fdde123048dcf14c51c75e57f961f2e614cba2a3de6271cc9f57`, returned **PASS**, P0/P1/P2/P3 `0/0/0/0`, and confirmed the corrected pushed/review truth without overclaiming integration or activation. Integration then reproduced 251/251 in 68.47 seconds and all seven static/artifact gates with exit 0.
+
 Runtime tested: Python `3.14.4` and Linux kernel `6.6.114.1-microsoft-standard-WSL2`. References consulted: Python documentation `3.14.6` (`https://docs.python.org/3/library/os.html#os.dup`) and Linux man-pages `6.18` for `flock(2)` / `rename(2)` (`https://man7.org/linux/man-pages/man2/flock.2.html`, `https://man7.org/linux/man-pages/man2/rename.2.html`).
 
 # Delivery / Cleanup
 
-The R1 commits `c93d766d94d36b57fbb95a4b2bea61e1f31e2169` and `e6a8440a2c6f6814329496633c06bfab6f37a502`, R2 commit `541ae20b490a7634d8819066f73455cffa73c4f7`, and reviewed R3 implementation commit `7d38c30b43bf0efb61e2ab4daa0571569f58c5f4` are pushed. Immediately before this R4 evidence-only correction, local HEAD and origin matched at `7d38c30b` with upstream divergence `0/0`. Integration acceptance and safe removal of this worktree/local branch remain orchestrator-owned; `delivery_method: not accepted`, `accepted_by_orchestrator: no`, and cleanup `pending` are intentionally preserved.
+The R1 commits `c93d766d94d36b57fbb95a4b2bea61e1f31e2169` and `e6a8440a2c6f6814329496633c06bfab6f37a502`, R2 commit `541ae20b490a7634d8819066f73455cffa73c4f7`, reviewed R3 implementation commit `7d38c30b43bf0efb61e2ab4daa0571569f58c5f4`, and R4 evidence commit `fa6172fc74cd79e6c6f3f67e268fdc16bca262f4` are pushed. The accepted source was merged without rewriting into `codex/self-hosted-qdrant-platform` as `227ca90d49049c5c46c4d873be9dbe71aabcb6d1`, pushed with upstream divergence `0/0`. Safe removal of the delivered worker worktree/local branch is the remaining cleanup action.
 
 # Risks / Follow-ups / Explicit Defers
 
-This is an implementer-, controller-, and reviewer-verified R3 producer correction, not an orchestrator acceptance or full-spec completion claim. The R3 correctness/code-quality verdict is PASS/PASS; the sole correctness P2 and docs P1 were evidence-truth findings corrected by this R4 artifact-only commit. Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Root-D5 remains not accepted and cleanup remains pending until integration.
+Root-D5 is accepted and integrated locally/remotely after implementer, controller, correctness, documentation, and R4 evidence review. This does not claim the full Q12 stage complete: Task 9 owns the joined `plan|live|recover` controller and consumes W/M/H; D6 must supply the read-only activation truth classifier before that join can select activation rollback versus finish-forward. No Docker, database, network, SSH, service, Qdrant, Supabase, writer, scheduler, staging, or production action occurred. Worker cleanup remains pending.
 
 docs-reviewed: updated — corrected the Task 2 artifact to exact pushed R2, R3, controller, review-report, and consulted-document version truth; project runbooks remain Task 9-owned.
 
