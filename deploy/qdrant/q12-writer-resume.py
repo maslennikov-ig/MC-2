@@ -1610,47 +1610,90 @@ require(
     "database barrier input checkpoint binding is invalid",
 )
 
+barrier_command_ids = {
+    "barrier.install",
+    "barrier.activate",
+    "barrier.verify-after-base",
+    "barrier.verify-after-observability",
+    "barrier.prepare-recovery",
+    "barrier.cleanup",
+    "barrier.rollback",
+}
+barrier_terminal_command_ids = {"barrier.cleanup", "barrier.rollback"}
+barrier_command_pattern = "|".join(
+    re.escape(command_id) for command_id in sorted(barrier_command_ids)
+)
 database_capability_records = []
 for location, directory in capability_directories.items():
     for directory_entry in os.scandir(directory):
         if not directory_entry.name.startswith("barrier."):
             continue
-        if not directory_entry.name.startswith(("barrier.cleanup", "barrier.rollback")):
-            continue
-        require(
-            directory_entry.name.startswith(f"barrier.{database_operation}--"),
-            "conflicting database barrier terminal capability exists",
-        )
         match = re.fullmatch(
-            re.escape(f"barrier.{database_operation}")
-            + r"--((?:cutover|cutover-recovery-[1-9][0-9]*))\.json",
+            rf"({barrier_command_pattern})"
+            r"--((?:cutover|cutover-recovery-[1-9][0-9]*))\.json",
             directory_entry.name,
         )
-        require(match is not None, "database barrier capability basename is invalid")
+        require(match is not None, "barrier capability command or basename is invalid")
+        barrier_command_id = match.group(1)
+        barrier_lease_epoch = match.group(2)
+        if barrier_command_id in barrier_terminal_command_ids:
+            require(
+                barrier_command_id == f"barrier.{database_operation}",
+                "conflicting database barrier terminal capability exists",
+            )
         opened = Opened(
             directory_entry.path,
-            f"{location} database barrier host capability",
+            f"{location} barrier host capability",
             0o400,
         )
         value = opened.json()
-        exact(value, CAPABILITY_KEYS, "database barrier host capability")
+        exact(value, CAPABILITY_KEYS, "barrier host capability")
         require(
-            opened.data == canonical_json(value, "database barrier host capability") + b"\n"
+            opened.data == canonical_json(value, "barrier host capability") + b"\n"
             and value["schema_version"] == "megacampus.q12.host-command-capability/v1"
             and value["run_id"] == run_id
-            and value["command_id"] == f"barrier.{database_operation}"
-            and value["command_sha256"] == database_claimed_entry["command_sha256"]
-            and value["release_sha"] == database_claimed_entry["release_sha"]
-            and value["operator_digest"] == database_claimed_entry["operator_digest"]
-            and value["resource_manifest_sha256"] == database_claimed_entry["resource_manifest_sha256"]
-            and value["quiesce_manifest_sha256"] == quiesce_file.digest
+            and value["command_id"] == barrier_command_id
+            and hex64(value["command_sha256"])
+            and isinstance(value["release_sha"], str)
+            and re.fullmatch(r"[a-f0-9]{40}", value["release_sha"])
+            and hex64(value["operator_digest"])
+            and hex64(value["resource_manifest_sha256"])
+            and hex64(value["quiesce_manifest_sha256"])
             and value["resume_authority_sha256"] is None
             and hex64(value["capability_input_checkpoint_sha256"])
-            and value["lease_epoch"] == match.group(1)
+            and value["lease_epoch"] == barrier_lease_epoch
             and (
                 value["supersedes_capability_sha256"] is None
                 or hex64(value["supersedes_capability_sha256"])
             ),
+            "barrier host capability binding is invalid",
+        )
+        if barrier_command_id not in barrier_terminal_command_ids:
+            historical_journal_entries = [
+                entry for entry in journal_lines
+                if entry["outcome"] == "completed"
+                and entry["command_id"] == barrier_command_id
+                and entry["command_sha256"] == value["command_sha256"]
+                and entry["capability_manifest_sha256"] == opened.digest
+                and entry["lease_epoch"] == barrier_lease_epoch
+                and entry["release_sha"] == value["release_sha"]
+                and entry["operator_digest"] == value["operator_digest"]
+                and entry["resource_manifest_sha256"] == value["resource_manifest_sha256"]
+                and entry["quiesce_manifest_sha256"] == value["quiesce_manifest_sha256"]
+                and entry["accepted_object_kind"] == "none"
+                and entry["accepted_object_sha256"] is None
+            ]
+            require(
+                location == "completed" and len(historical_journal_entries) == 1,
+                "historical barrier host capability journal binding is invalid",
+            )
+            continue
+        require(
+            value["command_sha256"] == database_claimed_entry["command_sha256"]
+            and value["release_sha"] == database_claimed_entry["release_sha"]
+            and value["operator_digest"] == database_claimed_entry["operator_digest"]
+            and value["resource_manifest_sha256"] == database_claimed_entry["resource_manifest_sha256"]
+            and value["quiesce_manifest_sha256"] == quiesce_file.digest,
             "database barrier host capability binding is invalid",
         )
         database_capability_records.append({

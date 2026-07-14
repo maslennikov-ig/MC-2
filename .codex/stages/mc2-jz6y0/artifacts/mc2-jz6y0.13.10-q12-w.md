@@ -321,6 +321,57 @@ surfaces need no change. `graph-reviewed: blocked` — this isolated worktree ha
 no `graphify-out/GRAPH_REPORT.md`; Root owns refresh after accepted integration.
 The branch remains pending Root rereview and is not self-accepted by W.
 
+# Final barrier classifier P1 correction
+
+The final terminal rereview identified one remaining fail-open namespace edge:
+the resume validator skipped every `barrier.*` file whose name did not begin
+with cleanup or rollback. A focused RED selected seven cases. The separately
+journal-bound historical install positive passed, while exactly six classifier
+negatives failed because the old validator returned success: canonical
+`barrier.evil` in each of issued, claimed, completed, and superseded; a
+malformed known-command basename; and a known install basename cross-wired to
+an embedded activate command. Every negative also proved that no Docker inspect
+or start occurred.
+
+The capability namespace is now the closed seven-command set
+`barrier.install`, `barrier.activate`, `barrier.verify-after-base`,
+`barrier.verify-after-observability`, `barrier.prepare-recovery`,
+`barrier.cleanup`, and `barrier.rollback`. Every `barrier.*` entry in all four
+lifecycle directories must first pass exact basename/epoch classification,
+safe owner/mode/identity opening, exact canonical schema/bytes, and embedded
+run/command/epoch/field validation. Cleanup and rollback then retain the
+existing current-terminal conflict rule and complete backward supersession
+chain. A recognized prior command is excluded from that chain only as a
+completed capability bound exactly to one already validated completed journal
+row with its own command SHA, capability digest, epoch, release, operator,
+resource, and then-current quiesce hash. No D4 checkpoint is invented for a
+prior command.
+
+The historical install fixture is no longer a renamed cleanup capability. It
+has its own command SHA and capability digest, a canonical completed path, and
+a matching `maintenance_guarded/completed` journal row. Its quiesce hash is the
+pre-quiesce zero hash in both capability and journal, so acceptance does not
+depend on future terminal quiesce state.
+
+Fresh classifier evidence is focused GREEN `7/7` and complete runtime
+`135/135`, with zero failed or pending tests. Joined runtime plus the actual
+disposable PostgreSQL 17 reconnect passed `186/186` across 6 suites; structural
+PostgreSQL 17 passed `34/34`; and the five-file real-PG17 aggregate passed
+`284/284` across 17 suites, all with zero failed or pending tests. Workspace
+type-check and the final synthetic-env build exited zero. Prettier, Python
+byte-compilation, Bash syntax, `git diff --check`, unchanged structural SQL
+hash/line/semicolon invariants, artifact/process checks, secret/live/debt
+scans, and current-run cleanup passed. ESLint reports zero errors and the same
+13 pre-existing unsafe-`any` warnings in the exhaustive runtime fixture; the
+classifier introduced no new complexity warning.
+
+`docs-reviewed: updated` — this artifact and the ignored implementer report
+record the final classifier contract and evidence; frozen normative docs and
+operator-facing surfaces need no change. `graph-reviewed: blocked` — this
+isolated worktree has no `graphify-out/GRAPH_REPORT.md`; Root owns refresh after
+accepted integration. W does not claim acceptance; the pushed branch is
+returned for final Root rereview.
+
 # Risks / Follow-ups
 
 All changes are local to `codex/q12-w-writer-barrier`; no external state exists
