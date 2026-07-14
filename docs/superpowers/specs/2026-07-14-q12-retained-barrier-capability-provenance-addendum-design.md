@@ -1,18 +1,18 @@
 # Q12 Retained Barrier Capability Provenance Addendum Design
 
-| Field                      | Value                                                                             |
-| -------------------------- | --------------------------------------------------------------------------------- |
-| Date                       | 2026-07-14                                                                        |
-| Beads                      | `mc2-jz6y0.13.17`, `mc2-jz6y0.13.10`, `mc2-jz6y0.13.13`                           |
-| Status                     | one-copy direction confirmed; exact written specification not yet owner-approved  |
-| Base design                | `2026-07-13-q12-live-cutover-corrections-design.md`                               |
-| Base design SHA-256        | `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15`                |
-| Lifecycle addendum         | `2026-07-13-q12-recoverable-lifecycle-addendum-design.md`                         |
-| Lifecycle addendum SHA-256 | `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`                |
-| D4 addendum                | `2026-07-14-q12-durable-recovery-projections-addendum-design.md`                  |
-| D4 addendum SHA-256        | `28655ffe401efe39b09ba436d101aeed055c8fe25cb8a8e4fd3e90720e745ab4`                |
-| Tracked D5 gap evidence    | `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.17-q12-d5-provenance-decision.md` |
-| Tracked evidence SHA-256   | `3a3c5f0161f68fbe2018977d0127a154c00865a4dfcfd5b5c97f6e1c481e681d`                |
+| Field                      | Value                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| Date                       | 2026-07-14                                                                             |
+| Beads                      | `mc2-jz6y0.13.17`, `mc2-jz6y0.13.10`, `mc2-jz6y0.13.13`                               |
+| Status                     | one-copy direction confirmed; exact written specification not yet owner-approved        |
+| Base design                | `2026-07-13-q12-live-cutover-corrections-design.md`                                    |
+| Base design SHA-256        | `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15`                     |
+| Lifecycle addendum         | `2026-07-13-q12-recoverable-lifecycle-addendum-design.md`                              |
+| Lifecycle addendum SHA-256 | `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27`                     |
+| D4 addendum                | `2026-07-14-q12-durable-recovery-projections-addendum-design.md`                       |
+| D4 addendum SHA-256        | `28655ffe401efe39b09ba436d101aeed055c8fe25cb8a8e4fd3e90720e745ab4`                     |
+| Tracked D5 gap evidence    | `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.17-q12-d5-provenance-decision.md`        |
+| Tracked evidence SHA-256   | `3a3c5f0161f68fbe2018977d0127a154c00865a4dfcfd5b5c97f6e1c481e681d`                     |
 
 ## Purpose and precedence
 
@@ -132,13 +132,13 @@ No equivalent child-input file is added for the other four commands.
 The operation token, command ID, target phase, exact initial checkpoint head,
 and quiesce binding are:
 
-| Operation token              | Command ID                           | Target phase                      | Exact initial checkpoint head                                                         | `quiesce_manifest_sha256`                |
-| ---------------------------- | ------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `install`                    | `barrier.install`                    | `maintenance_guarded`             | new `maintenance_guarded/intent` for `barrier.install`                                | 64 zeroes                                |
-| `verify-after-base`          | `barrier.verify-after-base`          | `base_migration_guarded`          | new `base_migration_guarded/intent` for `barrier.verify-after-base`                   | accepted writer-quiesce manifest SHA-256 |
+| Operation token              | Command ID                           | Target phase                      | Exact initial checkpoint head                                  | `quiesce_manifest_sha256`                |
+| ---------------------------- | ------------------------------------ | --------------------------------- | -------------------------------------------------------------- | ---------------------------------------- |
+| `install`                    | `barrier.install`                    | `maintenance_guarded`             | new `maintenance_guarded/intent` for `barrier.install`         | 64 zeroes                                |
+| `verify-after-base`          | `barrier.verify-after-base`          | `base_migration_guarded`          | new `base_migration_guarded/intent` for `barrier.verify-after-base` | accepted writer-quiesce manifest SHA-256 |
 | `verify-after-observability` | `barrier.verify-after-observability` | `observability_migration_guarded` | new `observability_migration_guarded/intent` for `barrier.verify-after-observability` | accepted writer-quiesce manifest SHA-256 |
-| `prepare-recovery`           | `barrier.prepare-recovery`           | `recovery_ready_guarded`          | new `recovery_ready_guarded/intent` for `barrier.prepare-recovery`                    | accepted writer-quiesce manifest SHA-256 |
-| `activate`                   | `barrier.activate`                   | `activated`                       | exact `activation_committing/intent` for `barrier.activate`                           | accepted writer-quiesce manifest SHA-256 |
+| `prepare-recovery`           | `barrier.prepare-recovery`           | `recovery_ready_guarded`          | new `recovery_ready_guarded/intent` for `barrier.prepare-recovery` | accepted writer-quiesce manifest SHA-256 |
+| `activate`                   | `barrier.activate`                   | `activated`                       | exact `activation_committing/intent` for `barrier.activate`    | accepted writer-quiesce manifest SHA-256 |
 
 For `install`, both verifier commands, and `prepare-recovery`, Root first appends
 and checkpoints exactly one same-target-phase `intent` row in `cutover`. Let
@@ -344,17 +344,17 @@ binding, wrong directory, or checkpoint/head disagreement is an incident.
 The initial capability uses `lease_epoch=cutover` and
 `supersedes_capability_sha256=null`. Its exact order is:
 
-| Order | Durable action or row                                                           | Capability location | Authority result                                    |
-| ----: | ------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------- |
-|     1 | For the four normalized selectors only, append/checkpoint exact `intent`        | none                | no capability authority                             |
-|     2 | Validate the exact selector; publish retained D5 copy                           | none                | no capability authority                             |
-|     3 | Publish immutable capability                                                    | `issued/`           | not authority until journal/checkpoint              |
-|     4 | Append/checkpoint `capability_issued`                                           | `issued/`           | current authority for claim only                    |
-|     5 | Launcher no-replace moves identical file and fsyncs both directories            | `claimed/`          | zero execution authority until claim row/checkpoint |
-|     6 | Launcher appends/checkpoints `capability_claimed`                               | `claimed/`          | child execution may begin                           |
-|     7 | Child produces and fsyncs exact command-specific result/evidence                | `claimed/`          | no completion yet                                   |
-|     8 | Root validates result, no-replace moves identical file, fsyncs both directories | `completed/`        | pending completion row/checkpoint                   |
-|     9 | Root appends/checkpoints terminal `completed`                                   | `completed/`        | one completed tip                                   |
+| Order | Durable action or row                                                          | Capability location | Authority result                                      |
+| ----: | ------------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------- |
+| 1     | For the four normalized selectors only, append/checkpoint exact `intent`         | none                | no capability authority                               |
+| 2     | Validate the exact selector; publish retained D5 copy                            | none                | no capability authority                               |
+| 3     | Publish immutable capability                                                    | `issued/`           | not authority until journal/checkpoint                |
+| 4     | Append/checkpoint `capability_issued`                                            | `issued/`           | current authority for claim only                      |
+| 5     | Launcher no-replace moves identical file and fsyncs both directories             | `claimed/`          | zero execution authority until claim row/checkpoint   |
+| 6     | Launcher appends/checkpoints `capability_claimed`                                | `claimed/`          | child execution may begin                             |
+| 7     | Child produces and fsyncs exact command-specific result/evidence                 | `claimed/`          | no completion yet                                     |
+| 8     | Root validates result, no-replace moves identical file, fsyncs both directories | `completed/`        | pending completion row/checkpoint                     |
+| 9     | Root appends/checkpoints terminal `completed`                                    | `completed/`        | one completed tip                                     |
 
 D5 adds initial `intent` only for `install`, both verifier commands, and
 `prepare-recovery`; an `activated/intent` is an incident. There is no D5
@@ -604,14 +604,14 @@ capability graph, the phase-required rollback choice, and that the launcher,
 child, and command-specific database sessions are absent. For one of the four
 rollback-frontier commands, exactly one of these inputs is permitted:
 
-| Input                            | Exact current `F`                                                  | Files before disposition                                                              |
-| -------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| selector-only                    | exact command selector checkpoint                                  | no D5 copy and no capability                                                          |
-| copy-prefix                      | exact command selector checkpoint                                  | one or two exact allowed pre-capability copies below and no capability                |
-| journal-less published           | exact predecessor named by the copy/capability; no row names `T`   | exact copy and `T` in `issued/`; every older direct ancestor is exact                 |
-| issued                           | `capability_issued` or `recovery_reacquired` checkpoint naming `T` | `T` in `issued/`                                                                      |
-| claim-moved                      | same issuance checkpoint; no claim row                             | `T` in `claimed/`; launcher is proven stopped before child invocation                 |
-| claimed without accepted success | `capability_claimed` checkpoint naming `T`                         | `T` in `claimed/`; child/sessions stopped and no exact accepted-success result exists |
+| Input                           | Exact current `F`                                              | Files before disposition                                                                 |
+| ------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| selector-only                   | exact command selector checkpoint                              | no D5 copy and no capability                                                             |
+| copy-prefix                     | exact command selector checkpoint                              | one or two exact allowed pre-capability copies below and no capability                    |
+| journal-less published          | exact predecessor named by the copy/capability; no row names `T` | exact copy and `T` in `issued/`; every older direct ancestor is exact                    |
+| issued                          | `capability_issued` or `recovery_reacquired` checkpoint naming `T` | `T` in `issued/`                                                                        |
+| claim-moved                     | same issuance checkpoint; no claim row                         | `T` in `claimed/`; launcher is proven stopped before child invocation                    |
+| claimed without accepted success | `capability_claimed` checkpoint naming `T`                    | `T` in `claimed/`; child/sessions stopped and no exact accepted-success result exists    |
 
 The pre-capability copy set is exact. Under the original continuously held
 lease it is either empty or the sole `cutover` copy. After lock loss and before
@@ -891,34 +891,34 @@ lifecycle row.
 
 ## Crash and fail-closed matrix
 
-| Last durable boundary                                     | Sole legal continuation after complete validation                                                                |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| new selector row present, fixed checkpoint absent         | repair only that exact current checkpoint from verified journal head and predecessor CAS                         |
-| exact selector checkpoint current, D5 copy absent         | forward may publish/recover; only a rollback-reachable command may append `R` while preserving copy absence      |
-| exact `.publishing`, final absent                         | same continuously held lease/source may finish no-replace; after loss or drift retain as incident                |
-| allowed D5 copy set present, capability absent            | forward may publish/recover; only reachable rollback retains the exact set and appends `R`                       |
-| capability in `issued/`, issuance row absent              | same lease may issue; otherwise forward reissue or eligible `R` then retirement, never late execution            |
-| issuance row present, fixed checkpoint absent             | repair only that exact current checkpoint from verified journal head and predecessor CAS                         |
-| claim move present, claim row absent                      | same lease may claim; otherwise forward reissue or eligible `R` then retirement, never journal old claim         |
-| claim row present, fixed checkpoint absent                | repair only that exact current checkpoint; no child before repair                                                |
-| exact result absent after lock loss                       | classifier selects forward reissue or an eligible rollback `R`; old capability never executes                    |
-| exact result present under claimed capability             | complete unchanged capability in next recovery epoch without replay                                              |
-| completion move present, row absent, same lease           | append only execution-epoch `completed` after exact result/location/copy/claim/context validation                |
-| completion move present, row absent, lock lost            | append only next-recovery-epoch `completed` after reacquisition and the same complete validation                 |
-| completion row present, fixed checkpoint absent           | repair only that exact current checkpoint                                                                        |
-| recovery capability published before backlog retirement   | after loss it becomes the next orphan; publish a direct successor and repeat full oldest-to-newest retirement    |
-| crash after any predecessor retirement move               | after loss publish a direct successor; revalidate the chain and retire every remaining predecessor oldest-first  |
-| consecutive publication-window orphans                    | direct next-epoch links plus complete backlog retirement before the sole later `recovery_reacquired`             |
-| `R` journal row present, fixed checkpoint absent          | repair only exact `R` checkpoint from predecessor CAS; move no capability first                                  |
-| exact `R` checkpoint, frontier not fully retired          | finish oldest-to-newest retirement; forward recovery/reissue is forbidden                                        |
-| all frontier capabilities retired, rollback intent absent | append only existing rollback intent after exact absence/location revalidation                                   |
-| rollback intent present, final manifest not accepted      | continue only the frozen object/accepted/checkpoint publication protocol                                         |
-| exact accepted success discovered before `R`              | do not abandon; complete without replay, then recompute the rollback prefix                                      |
-| pending `barrier.install` without accepted baseline/v1    | exact forward recovery/completion or pre-maintenance incident; no `R`, W resume, DB rollback, or capability move |
-| exact activation commit before `R`                        | finish-forward only; `R` and rollback are forbidden                                                              |
-| activated truth appears after `R`                         | incident containment; no automatic rollback or forward execution                                                 |
-| D5 copy missing after capability publication              | incident; historical authority is not reconstructed                                                              |
-| wrong head/inode/context, fork, gap, duplicate, ambiguity | incident; no Docker, database continuation, writer start, or automated mutation                                  |
+| Last durable boundary                                      | Sole legal continuation after complete validation                                                               |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| new selector row present, fixed checkpoint absent          | repair only that exact current checkpoint from verified journal head and predecessor CAS                         |
+| exact selector checkpoint current, D5 copy absent          | forward may publish/recover; only a rollback-reachable command may append `R` while preserving copy absence       |
+| exact `.publishing`, final absent                           | same continuously held lease/source may finish no-replace; after loss or drift retain as incident                |
+| allowed D5 copy set present, capability absent             | forward may publish/recover; only reachable rollback retains the exact set and appends `R`                        |
+| capability in `issued/`, issuance row absent               | same lease may issue; otherwise forward reissue or eligible `R` then retirement, never late execution             |
+| issuance row present, fixed checkpoint absent              | repair only that exact current checkpoint from verified journal head and predecessor CAS                         |
+| claim move present, claim row absent                       | same lease may claim; otherwise forward reissue or eligible `R` then retirement, never journal old claim         |
+| claim row present, fixed checkpoint absent                 | repair only that exact current checkpoint; no child before repair                                                |
+| exact result absent after lock loss                        | classifier selects forward reissue or an eligible rollback `R`; old capability never executes                    |
+| exact result present under claimed capability              | complete unchanged capability in next recovery epoch without replay                                              |
+| completion move present, row absent, same lease            | append only execution-epoch `completed` after exact result/location/copy/claim/context validation                |
+| completion move present, row absent, lock lost             | append only next-recovery-epoch `completed` after reacquisition and the same complete validation                 |
+| completion row present, fixed checkpoint absent            | repair only that exact current checkpoint                                                                        |
+| recovery capability published before backlog retirement    | after loss it becomes the next orphan; publish a direct successor and repeat full oldest-to-newest retirement    |
+| crash after any predecessor retirement move                | after loss publish a direct successor; revalidate the chain and retire every remaining predecessor oldest-first |
+| consecutive publication-window orphans                     | direct next-epoch links plus complete backlog retirement before the sole later `recovery_reacquired`             |
+| `R` journal row present, fixed checkpoint absent            | repair only exact `R` checkpoint from predecessor CAS; move no capability first                                  |
+| exact `R` checkpoint, frontier not fully retired            | finish oldest-to-newest retirement; forward recovery/reissue is forbidden                                       |
+| all frontier capabilities retired, rollback intent absent  | append only existing rollback intent after exact absence/location revalidation                                   |
+| rollback intent present, final manifest not accepted       | continue only the frozen object/accepted/checkpoint publication protocol                                         |
+| exact accepted success discovered before `R`               | do not abandon; complete without replay, then recompute the rollback prefix                                      |
+| pending `barrier.install` without accepted baseline/v1     | exact forward recovery/completion or pre-maintenance incident; no `R`, W resume, DB rollback, or capability move |
+| exact activation commit before `R`                         | finish-forward only; `R` and rollback are forbidden                                                              |
+| activated truth appears after `R`                          | incident containment; no automatic rollback or forward execution                                                 |
+| D5 copy missing after capability publication               | incident; historical authority is not reconstructed                                                              |
+| wrong head/inode/context, fork, gap, duplicate, ambiguity  | incident; no Docker, database continuation, writer start, or automated mutation                                  |
 
 `SIGKILL`, torn journal tail, SSH loss, controller death, Docker restart, and
 host reboot do not widen these continuations. A torn or unknown state remains

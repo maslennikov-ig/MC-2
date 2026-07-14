@@ -317,6 +317,10 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - `graph-reviewed: no-change-needed` — the candidate is intentionally
   non-normative until exact-SHA approval; refresh after approval avoids
   promoting unapproved product truth.
+- The exact candidate path is listed in `.prettierignore`: the first local
+  commit hook demonstrated that otherwise Prettier rewrites Markdown table
+  spacing and invalidates the independently reviewed byte SHA. The original
+  reviewed blob was recovered exactly and its SHA reverified before delivery.
 
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.

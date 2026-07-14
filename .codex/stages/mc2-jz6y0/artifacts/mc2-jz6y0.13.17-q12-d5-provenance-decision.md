@@ -13,6 +13,7 @@ base_branch: codex/self-hosted-qdrant-platform
 base_commit: e4a7abdb1ba5a859041d2d0c6d292c95e34093d4
 worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
 write_zone:
+  - .prettierignore
   - docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.17-q12-d5-provenance-decision.md
   - .codex/stages/mc2-jz6y0/summary.md
@@ -35,7 +36,9 @@ verification:
   - W remains pushed clean at 21cff2d0b50df3b2de8e0e7e29fc147658df1eed with upstream divergence 0/0
   - W gates remain runtime 141/141 canonical real-PG17 joined 192/192 structural 34/34 and five-file aggregate 290/290
   - candidate and both reviews preserve the separate no-live and no-remote gate
+  - exact candidate path is excluded from automatic Prettier rewrites so commit hooks cannot invalidate the reviewed SHA
 changed_files:
+  - .prettierignore
   - docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.17-q12-d5-provenance-decision.md
   - .codex/stages/mc2-jz6y0/summary.md
