@@ -444,7 +444,15 @@ def run_quiesce():
         epoch_rows = [entry for entry in quiesce_rows if entry["lease_epoch"] == value["lease_epoch"]]
         observed_outcomes = [entry["outcome"] for entry in epoch_rows]
         allowed_outcomes = (
-            [["intent", "capability_issued", "capability_claimed"]]
+            (
+                [["intent", "capability_issued", "capability_claimed"]]
+                if len(quiesce_capabilities) == 1
+                else [
+                    ["intent"],
+                    ["intent", "capability_issued"],
+                    ["intent", "capability_issued", "capability_claimed"],
+                ]
+            )
             if index == 0
             else (
                 [
@@ -1041,8 +1049,19 @@ if os.path.lexists(paths["terminal_temporary"]):
 
 barrier_file = Opened(paths["barrier"], "database barrier receipt", 0o400)
 barrier = barrier_file.json()
-exact(barrier, {"schema_version","run_id","state","zero_guard_residue","expected_catalog_sha256","last_command","rollback_probes_verified","probe_receipt_sha256"}, "database barrier receipt")
-require(barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v1" and barrier["run_id"] == run_id and barrier["state"] == "guard_cleanup_complete" and barrier["zero_guard_residue"] is True and hex64(barrier["expected_catalog_sha256"]), "database barrier receipt is not terminal cleanup")
+exact(barrier, {"schema_version","run_id","state","expected_catalog_sha256","zero_guard_residue","last_command","rollback_probes_verified","probe_receipt_sha256","terminal_proof_sha256","database_capability_deleted"}, "database barrier receipt")
+require(
+    barrier_file.data == canonical_json(barrier, "database barrier receipt") + b"\n"
+    and barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v2"
+    and barrier["run_id"] == run_id
+    and barrier["state"] == "guard_cleanup_complete"
+    and barrier["zero_guard_residue"] is True
+    and barrier["database_capability_deleted"] is True
+    and hex64(barrier["expected_catalog_sha256"])
+    and hex64(barrier["terminal_proof_sha256"]),
+    "database barrier receipt v2 is not exact terminal authority",
+)
+database_operation = "cleanup" if mode == "forward" else "rollback"
 if mode == "forward":
     require(barrier["last_command"] == "cleanup" and barrier["rollback_probes_verified"] is True and hex64(barrier["probe_receipt_sha256"]), "forward cleanup receipt is invalid")
     probe_file = Opened(paths["probe"], "database barrier probe receipt", 0o400)
@@ -1077,6 +1096,137 @@ if mode == "forward":
     )
 else:
     require(barrier["last_command"] == "rollback" and barrier["rollback_probes_verified"] is False and barrier["probe_receipt_sha256"] is None, "rollback cleanup receipt is invalid")
+
+database_baseline_file = Opened(
+    os.path.join(run_root, "database-barrier-baseline.json"),
+    "database barrier baseline",
+    0o400,
+)
+database_baseline = database_baseline_file.json()
+exact(database_baseline, {"schema_version","run_id","state","source_baseline_sha256","baseline_sha256","predecessor_checkpoint_sha256","predecessor_journal_entry_hash","resource_manifest_sha256","expected_post_migration_catalog_sha256","database_capability_sha256","baseline"}, "database barrier baseline")
+exact(database_baseline["baseline"], {"baseline_structural_catalog_sha256","database_default_sha256","cron_jobs_sha256","guarded_relations_sha256","pg_net_queue_count"}, "database barrier baseline projection")
+require(
+    database_baseline_file.data == canonical_json(database_baseline, "database barrier baseline") + b"\n"
+    and database_baseline["schema_version"] == "megacampus.q12.database-barrier-baseline/v1"
+    and database_baseline["run_id"] == run_id
+    and database_baseline["state"] == "maintenance_guarded_baseline"
+    and database_baseline["expected_post_migration_catalog_sha256"] == barrier["expected_catalog_sha256"]
+    and all(hex64(database_baseline[key]) for key in ("source_baseline_sha256","baseline_sha256","predecessor_checkpoint_sha256","predecessor_journal_entry_hash","resource_manifest_sha256","database_capability_sha256"))
+    and all(hex64(database_baseline["baseline"][key]) for key in ("baseline_structural_catalog_sha256","database_default_sha256","cron_jobs_sha256","guarded_relations_sha256"))
+    and database_baseline["baseline"]["pg_net_queue_count"] == 0
+    and database_baseline["baseline_sha256"] == sha(canonical_json(database_baseline["baseline"], "database barrier baseline projection")),
+    "database barrier baseline is invalid",
+)
+database_archive_file = Opened(
+    os.path.join(run_root, f"database-barrier-receipt-v1-before-{database_operation}.json"),
+    "database barrier predecessor receipt archive",
+    0o400,
+)
+database_archive = database_archive_file.json()
+exact(database_archive, {"schema_version","run_id","state","zero_guard_residue","expected_catalog_sha256","last_command","rollback_probes_verified","probe_receipt_sha256"}, "database barrier predecessor receipt archive")
+require(
+    database_archive_file.data == canonical_json(database_archive, "database barrier predecessor receipt archive") + b"\n"
+    and database_archive["schema_version"] == "megacampus.q12.database-barrier-receipt/v1"
+    and database_archive["run_id"] == run_id
+    and database_archive["expected_catalog_sha256"] == barrier["expected_catalog_sha256"]
+    and database_archive["zero_guard_residue"] is False,
+    "database barrier predecessor receipt archive is invalid",
+)
+if mode == "forward":
+    require(
+        database_archive["state"] == "activated"
+        and database_archive["last_command"] == "activate"
+        and database_archive["rollback_probes_verified"] is True
+        and database_archive["probe_receipt_sha256"] == barrier["probe_receipt_sha256"],
+        "cleanup predecessor receipt archive is invalid",
+    )
+else:
+    rollback_receipt_commands = {
+        "maintenance_guarded": "install",
+        "20260711140000_guard_verified": "verify-extended",
+        "20260711151000_guard_verified": "verify-extended",
+        "recovery_ready_guarded": "prepare-recovery",
+    }
+    require(
+        database_archive["state"] in rollback_receipt_commands
+        and database_archive["last_command"] == rollback_receipt_commands[database_archive["state"]]
+        and database_archive["rollback_probes_verified"] is False
+        and database_archive["probe_receipt_sha256"] is None,
+        "rollback predecessor receipt archive is invalid",
+    )
+database_proof_file = Opened(
+    os.path.join(run_root, f"database-barrier-{database_operation}-terminal-proof.json"),
+    "database barrier terminal proof",
+    0o400,
+)
+database_proof = database_proof_file.json()
+exact(database_proof, {"schema_version","run_id","operation","state","expected_post_migration_catalog_sha256","database_barrier_baseline_sha256","predecessor_receipt_sha256","predecessor_receipt_archive_sha256","database_barrier_rollback_intent_sha256","input_checkpoint_sha256","intent_journal_entry_hash","structural_catalog_sha256","database_default_sha256","cron_jobs_sha256","guard_residue","required_phase_receipts_sha256","database_capability_sha256","completed_at"}, "database barrier terminal proof")
+exact(database_proof["guard_residue"], {"q12_guard_schema_count","q12_guard_relation_count","q12_guard_function_count","q12_guard_type_count","q12_guard_trigger_count","q12_guard_event_trigger_count","barrier_era_session_count"}, "database barrier terminal residue")
+require(
+    database_proof_file.data == canonical_json(database_proof, "database barrier terminal proof") + b"\n"
+    and database_proof_file.digest == barrier["terminal_proof_sha256"]
+    and database_proof["schema_version"] == "megacampus.q12.database-barrier-terminal-proof/v1"
+    and database_proof["run_id"] == run_id
+    and database_proof["operation"] == database_operation
+    and database_proof["state"] == "guard_cleanup_complete"
+    and database_proof["expected_post_migration_catalog_sha256"] == barrier["expected_catalog_sha256"]
+    and database_proof["database_barrier_baseline_sha256"] == database_baseline_file.digest
+    and database_proof["predecessor_receipt_sha256"] == database_archive_file.digest
+    and database_proof["predecessor_receipt_archive_sha256"] == database_archive_file.digest
+    and database_proof["database_capability_sha256"] == database_baseline["database_capability_sha256"]
+    and database_proof["database_default_sha256"] == database_baseline["baseline"]["database_default_sha256"]
+    and database_proof["cron_jobs_sha256"] == database_baseline["baseline"]["cron_jobs_sha256"]
+    and database_proof["guard_residue"] == {key: 0 for key in database_proof["guard_residue"]}
+    and hex64(database_proof["input_checkpoint_sha256"])
+    and hex64(database_proof["intent_journal_entry_hash"])
+    and hex64(database_proof["structural_catalog_sha256"])
+    and isinstance(database_proof["completed_at"], str)
+    and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z", database_proof["completed_at"]),
+    "database barrier terminal proof binding is invalid",
+)
+require(
+    database_proof["structural_catalog_sha256"]
+    == (barrier["expected_catalog_sha256"] if mode == "forward" else database_baseline["baseline"]["baseline_structural_catalog_sha256"]),
+    "database barrier terminal structural catalog is invalid",
+)
+database_rollback_intent_file = None
+if mode == "forward":
+    require(
+        database_proof["database_barrier_rollback_intent_sha256"] is None
+        and database_proof["required_phase_receipts_sha256"] is None,
+        "cleanup terminal proof has rollback evidence",
+    )
+else:
+    database_rollback_intent_file = Opened(
+        os.path.join(run_root, "database-barrier-rollback-intent.json"),
+        "database barrier rollback intent",
+        0o400,
+    )
+    database_rollback_intent = database_rollback_intent_file.json()
+    exact(database_rollback_intent, {"schema_version","run_id","state","expected_post_migration_catalog_sha256","database_barrier_baseline_sha256","predecessor_receipt_sha256","input_checkpoint_sha256","intent_journal_entry_hash","required_phase_receipts","required_phase_receipts_sha256"}, "database barrier rollback intent")
+    rollback_required = database_rollback_intent["required_phase_receipts"]
+    require(isinstance(rollback_required, list), "database barrier rollback required receipts are invalid")
+    rollback_required_phases = []
+    for receipt in rollback_required:
+        exact(receipt, {"phase","receipt_sha256"}, "database barrier rollback required receipt")
+        require(receipt["phase"] in ROLLBACK_CONDITIONAL_PHASES and hex64(receipt["receipt_sha256"]), "database barrier rollback required receipt is invalid")
+        rollback_required_phases.append(receipt["phase"])
+    require(
+        database_rollback_intent_file.data == canonical_json(database_rollback_intent, "database barrier rollback intent") + b"\n"
+        and database_rollback_intent["schema_version"] == "megacampus.q12.database-barrier-rollback-intent/v1"
+        and database_rollback_intent["run_id"] == run_id
+        and database_rollback_intent["state"] == "rollback_intent"
+        and database_rollback_intent["expected_post_migration_catalog_sha256"] == barrier["expected_catalog_sha256"]
+        and database_rollback_intent["database_barrier_baseline_sha256"] == database_baseline_file.digest
+        and database_rollback_intent["predecessor_receipt_sha256"] == database_archive_file.digest
+        and database_rollback_intent["intent_journal_entry_hash"] == database_proof["intent_journal_entry_hash"]
+        and rollback_required_phases == sorted(rollback_required_phases)
+        and len(rollback_required_phases) == len(set(rollback_required_phases))
+        and database_rollback_intent["required_phase_receipts_sha256"] == sha(canonical_json(rollback_required, "database barrier rollback required receipts"))
+        and database_proof["database_barrier_rollback_intent_sha256"] == database_rollback_intent_file.digest
+        and database_proof["required_phase_receipts_sha256"] == database_rollback_intent["required_phase_receipts_sha256"],
+        "database barrier rollback intent binding is invalid",
+    )
 
 quiesce_file = Opened(paths["quiesce"], "writer quiesce manifest", 0o400)
 quiesce = quiesce_file.json()
@@ -1291,6 +1441,207 @@ def checkpoint_matches_entry(value, entry, label):
         f"{label} does not copy the exact journal checkpoint",
     )
 
+database_lifecycle_entries = [
+    entry for entry in journal_lines
+    if entry["phase"] == "guard_cleanup_complete"
+    and entry["command_id"] == f"barrier.{database_operation}"
+]
+require(database_lifecycle_entries, "accepted database barrier lifecycle is missing")
+database_lifecycle_indexes = [journal_lines.index(entry) for entry in database_lifecycle_entries]
+require(
+    database_lifecycle_indexes
+    == list(range(database_lifecycle_indexes[0], database_lifecycle_indexes[-1] + 1)),
+    "database barrier lifecycle is interleaved",
+)
+database_outcomes = [entry["outcome"] for entry in database_lifecycle_entries]
+database_epoch_groups = []
+for entry in database_lifecycle_entries:
+    if not database_epoch_groups or database_epoch_groups[-1][0] != entry["lease_epoch"]:
+        database_epoch_groups.append((entry["lease_epoch"], []))
+    database_epoch_groups[-1][1].append(entry)
+database_epochs = [epoch for epoch, _ in database_epoch_groups]
+require(
+    database_epochs
+    == ["cutover"] + [
+        f"cutover-recovery-{ordinal}"
+        for ordinal in range(1, len(database_epochs))
+    ],
+    "database barrier recovery epochs are not consecutive",
+)
+if len(database_epoch_groups) == 1:
+    require(
+        database_outcomes == [
+            "intent", "capability_issued", "capability_claimed",
+            "capability_completed", "accepted",
+        ],
+        "database barrier accepted lifecycle graph is invalid",
+    )
+else:
+    initial_outcomes = [entry["outcome"] for entry in database_epoch_groups[0][1]]
+    require(
+        initial_outcomes in [
+            ["intent"],
+            ["intent", "capability_issued"],
+            ["intent", "capability_issued", "capability_claimed"],
+        ],
+        "database barrier initial recovery prefix is invalid",
+    )
+    for _, entries in database_epoch_groups[1:-1]:
+        require(
+            [entry["outcome"] for entry in entries]
+            in [["recovery_reacquired"], ["recovery_reacquired", "capability_claimed"]],
+            "database barrier intermediate recovery prefix is invalid",
+        )
+    require(
+        [entry["outcome"] for entry in database_epoch_groups[-1][1]]
+        == ["recovery_reacquired", "capability_claimed", "capability_completed", "accepted"],
+        "database barrier terminal recovery lifecycle is invalid",
+    )
+database_intent_entry = database_epoch_groups[0][1][0]
+database_terminal_entries = database_epoch_groups[-1][1]
+database_claimed_entry = next(
+    entry for entry in database_terminal_entries
+    if entry["outcome"] == "capability_claimed"
+)
+database_completed_entry = database_terminal_entries[-2]
+database_accepted_entry = database_terminal_entries[-1]
+database_group_capability_hashes = []
+for _, entries in database_epoch_groups:
+    hashes = {
+        entry["capability_manifest_sha256"]
+        for entry in entries
+        if entry["outcome"] != "intent"
+    }
+    require(
+        len(hashes) <= 1 and all(hex64(value) for value in hashes),
+        "database barrier epoch capability binding is invalid",
+    )
+    database_group_capability_hashes.append(next(iter(hashes)) if hashes else None)
+require(
+    database_intent_entry["entry_hash"] == database_proof["intent_journal_entry_hash"]
+    and database_intent_entry["capability_manifest_sha256"] == "0" * 64
+    and database_claimed_entry["lease_epoch"] == database_epochs[-1]
+    and database_completed_entry["lease_epoch"] == database_epochs[-1]
+    and database_accepted_entry["lease_epoch"] == database_epochs[-1]
+    and database_accepted_entry["accepted_object_kind"] == "database_barrier_receipt"
+    and database_accepted_entry["accepted_object_sha256"] == barrier_file.digest
+    and all(
+        entry["accepted_object_kind"] == "none"
+        and entry["accepted_object_sha256"] is None
+        for entry in database_lifecycle_entries[:-1]
+    )
+    and database_group_capability_hashes[-1] is not None,
+    "database barrier lifecycle binding is invalid",
+)
+database_execution_epoch = database_claimed_entry["lease_epoch"]
+database_input_checkpoint_file = Opened(
+    os.path.join(
+        run_root,
+        f"database-barrier-input-checkpoint-{database_operation}-{database_execution_epoch}.json",
+    ),
+    "database barrier input checkpoint",
+    0o600,
+)
+database_input_checkpoint = database_input_checkpoint_file.json()
+exact(database_input_checkpoint, CHECKPOINT_KEYS, "database barrier input checkpoint")
+require(
+    database_input_checkpoint_file.digest == database_proof["input_checkpoint_sha256"]
+    and database_input_checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
+    and database_input_checkpoint["run_id"] == run_id
+    and database_input_checkpoint["seq"] == database_claimed_entry["seq"]
+    and database_input_checkpoint["phase"] == "guard_cleanup_complete"
+    and database_input_checkpoint["journal_entry_hash"] == database_claimed_entry["entry_hash"]
+    and database_input_checkpoint["previous_journal_entry_hash"] == database_claimed_entry["previous_hash"]
+    and database_input_checkpoint["journal_device"] == str(journal_file.identity[0])
+    and database_input_checkpoint["journal_inode"] == str(journal_file.identity[1])
+    and database_input_checkpoint["accepted_object_kind"] == "none"
+    and database_input_checkpoint["accepted_object_sha256"] is None
+    and database_input_checkpoint["resume_authority_sha256"] is None
+    and database_input_checkpoint["lease_epoch"] == database_execution_epoch,
+    "database barrier input checkpoint binding is invalid",
+)
+database_capability_path = os.path.join(
+    paths["capabilities"], "completed",
+    f"barrier.{database_operation}--{database_execution_epoch}.json",
+)
+database_capability_file = Opened(
+    database_capability_path,
+    "completed database barrier host capability",
+    0o400,
+)
+database_capability = database_capability_file.json()
+exact(database_capability, CAPABILITY_KEYS, "completed database barrier host capability")
+require(
+    database_capability_file.digest == database_claimed_entry["capability_manifest_sha256"]
+    and database_capability["schema_version"] == "megacampus.q12.host-command-capability/v1"
+    and database_capability["run_id"] == run_id
+    and database_capability["command_id"] == f"barrier.{database_operation}"
+    and database_capability["command_sha256"] == database_claimed_entry["command_sha256"]
+    and database_capability["release_sha"] == database_claimed_entry["release_sha"]
+    and database_capability["operator_digest"] == database_claimed_entry["operator_digest"]
+    and database_capability["resource_manifest_sha256"] == database_claimed_entry["resource_manifest_sha256"]
+    and database_capability["quiesce_manifest_sha256"] == quiesce_file.digest
+    and database_capability["resume_authority_sha256"] is None
+    and database_capability["lease_epoch"] == database_execution_epoch
+    and (
+        database_capability["supersedes_capability_sha256"] is None
+        or hex64(database_capability["supersedes_capability_sha256"])
+    ),
+    "completed database barrier host capability is invalid",
+)
+database_capability_checkpoint_file = Opened(
+    os.path.join(
+        run_root,
+        f"database-barrier-capability-checkpoint-{database_operation}-{database_execution_epoch}.json",
+    ),
+    "database barrier capability checkpoint",
+    0o600,
+)
+database_capability_checkpoint = database_capability_checkpoint_file.json()
+exact(database_capability_checkpoint, CHECKPOINT_KEYS, "database barrier capability checkpoint")
+if database_execution_epoch == "cutover":
+    database_capability_anchor_entry = database_intent_entry
+else:
+    database_current_start = journal_lines.index(database_terminal_entries[0])
+    database_accepted_predecessors = [
+        entry for entry in journal_lines[:database_current_start]
+        if entry["outcome"] == "accepted"
+    ]
+    require(
+        database_accepted_predecessors,
+        "database barrier recovery accepted predecessor is missing",
+    )
+    database_capability_anchor_entry = database_accepted_predecessors[-1]
+database_prior_capability_hashes = [
+    value for value in database_group_capability_hashes[:-1]
+    if value is not None
+]
+require(
+    database_capability_checkpoint_file.digest
+    == database_capability["capability_input_checkpoint_sha256"]
+    and database_capability_checkpoint["schema_version"] == "megacampus.q12.cutover-checkpoint/v1"
+    and database_capability_checkpoint["run_id"] == run_id
+    and database_capability_checkpoint["journal_entry_hash"] == database_capability_anchor_entry["entry_hash"]
+    and database_capability_checkpoint["previous_journal_entry_hash"] == database_capability_anchor_entry["previous_hash"]
+    and database_capability_checkpoint["seq"] == database_capability_anchor_entry["seq"]
+    and database_capability_checkpoint["phase"] == database_capability_anchor_entry["phase"]
+    and database_capability_checkpoint["journal_device"] == str(journal_file.identity[0])
+    and database_capability_checkpoint["journal_inode"] == str(journal_file.identity[1])
+    and database_capability_checkpoint["accepted_object_kind"] == database_capability_anchor_entry["accepted_object_kind"]
+    and database_capability_checkpoint["accepted_object_sha256"] == database_capability_anchor_entry["accepted_object_sha256"]
+    and database_capability_checkpoint["resume_authority_sha256"] is None
+    and database_capability_checkpoint["lease_epoch"] == database_capability_anchor_entry["lease_epoch"]
+    and database_capability["supersedes_capability_sha256"]
+    == (database_prior_capability_hashes[-1] if database_prior_capability_hashes else None),
+    "database barrier capability checkpoint binding is invalid",
+)
+if mode == "rollback":
+    require(
+        database_rollback_intent["input_checkpoint_sha256"]
+        == database_capability_checkpoint_file.digest,
+        "database barrier rollback intent capability checkpoint is invalid",
+    )
+
 command_id = f"writers.resume.{mode}"
 exact_directory(paths["capabilities"], "host capability root")
 capability_directories = {
@@ -1390,24 +1741,8 @@ authority_intent_index = next(
 authority_accepted_index = authority_intent_index + 1
 authority_accepted_entry = journal_lines[authority_accepted_index]
 lifecycle_entries = journal_lines[authority_accepted_index + 1:]
-expected_lifecycle = []
-initial_capability = capability_chain[0]
-expected_lifecycle.extend([
-    ("intent", "cutover", "0" * 64),
-    ("capability_issued", "cutover", initial_capability["file"].digest),
-    ("capability_claimed", "cutover", initial_capability["file"].digest),
-])
-for record in capability_chain[1:]:
-    expected_lifecycle.extend([
-        ("recovery_reacquired", record["value"]["lease_epoch"], record["file"].digest),
-        ("capability_claimed", record["value"]["lease_epoch"], record["file"].digest),
-    ])
-actual_lifecycle = [
-    (entry["outcome"], entry["lease_epoch"], entry["capability_manifest_sha256"])
-    for entry in lifecycle_entries
-]
 require(
-    actual_lifecycle == expected_lifecycle
+    lifecycle_entries
     and all(
         entry["phase"] == f"resume_committing_{mode}"
         and entry["command_id"] == command_id
@@ -1415,9 +1750,46 @@ require(
         and entry["accepted_object_sha256"] is None
         for entry in lifecycle_entries
     ),
-        f"{mode} capability journal/checkpoint binding graph is invalid",
+    f"{mode} capability journal/checkpoint binding graph is invalid",
 )
-resume_intent_entry = lifecycle_entries[0]
+resume_rows_by_epoch = {}
+for entry in lifecycle_entries:
+    resume_rows_by_epoch.setdefault(entry["lease_epoch"], []).append(entry)
+require(
+    list(resume_rows_by_epoch) == [record["value"]["lease_epoch"] for record in capability_chain],
+    f"{mode} capability recovery epochs are missing or interleaved",
+)
+for index, record in enumerate(capability_chain):
+    lease_epoch = record["value"]["lease_epoch"]
+    epoch_rows = resume_rows_by_epoch[lease_epoch]
+    observed_outcomes = [entry["outcome"] for entry in epoch_rows]
+    allowed_outcomes = (
+        [["intent", "capability_issued", "capability_claimed"]]
+        if index == 0 and len(capability_chain) == 1
+        else (
+            [
+                ["intent"],
+                ["intent", "capability_issued"],
+                ["intent", "capability_issued", "capability_claimed"],
+            ]
+            if index == 0
+            else (
+                [["recovery_reacquired"], ["recovery_reacquired", "capability_claimed"]]
+                if index < len(capability_chain) - 1
+                else [["recovery_reacquired", "capability_claimed"]]
+            )
+        )
+    )
+    require(
+        observed_outcomes in allowed_outcomes
+        and all(
+            entry["capability_manifest_sha256"]
+            == ("0" * 64 if entry["outcome"] == "intent" else record["file"].digest)
+            for entry in epoch_rows
+        ),
+        f"{mode} capability journal/checkpoint binding graph is invalid",
+    )
+resume_intent_entry = resume_rows_by_epoch["cutover"][0]
 opened_capability_checkpoints = []
 opened_input_checkpoints = []
 for index, record in enumerate(capability_chain):
@@ -1439,20 +1811,31 @@ for index, record in enumerate(capability_chain):
         == record["value"]["capability_input_checkpoint_sha256"],
         "writer resume capability checkpoint hash mismatch",
     )
-    claimed_offset = 2 + (index * 2)
-    claimed_entry = lifecycle_entries[claimed_offset]
-    input_checkpoint_file = Opened(
-        os.path.join(run_root, f"writer-resume-input-checkpoint-{mode}-{lease_epoch}.json"),
-        f"writer resume input checkpoint {lease_epoch}",
-        0o600,
-    )
-    checkpoint_matches_entry(
-        input_checkpoint_file.json(),
-        claimed_entry,
-        f"writer resume input checkpoint {lease_epoch}",
-    )
     opened_capability_checkpoints.append(capability_checkpoint_file)
-    opened_input_checkpoints.append(input_checkpoint_file)
+    claimed_entries = [
+        entry for entry in resume_rows_by_epoch[lease_epoch]
+        if entry["outcome"] == "capability_claimed"
+    ]
+    input_checkpoint_path = os.path.join(
+        run_root, f"writer-resume-input-checkpoint-{mode}-{lease_epoch}.json",
+    )
+    if claimed_entries:
+        input_checkpoint_file = Opened(
+            input_checkpoint_path,
+            f"writer resume input checkpoint {lease_epoch}",
+            0o600,
+        )
+        checkpoint_matches_entry(
+            input_checkpoint_file.json(),
+            claimed_entries[0],
+            f"writer resume input checkpoint {lease_epoch}",
+        )
+        opened_input_checkpoints.append(input_checkpoint_file)
+    else:
+        require(
+            not os.path.lexists(input_checkpoint_path),
+            f"unclaimed writer resume input checkpoint exists for {lease_epoch}",
+        )
 require(
     checkpoint_file.data == opened_input_checkpoints[-1].data,
     "current fixed checkpoint does not equal the child-input checkpoint",
@@ -1552,7 +1935,13 @@ else:
         for phase in ROLLBACK_CONDITIONAL_PHASES
         if phase in required_phase_set
     ])
-expected_phase_graph.append(("guard_cleanup_complete", "completed", "none", None))
+expected_phase_graph.extend([
+    (
+        entry["phase"], entry["outcome"],
+        entry["accepted_object_kind"], entry["accepted_object_sha256"],
+    )
+    for entry in database_lifecycle_entries
+])
 if mode == "rollback":
     expected_phase_graph.extend([
         ("rollback_ready_writers_quiesced", "intent", "none", None),
@@ -1573,8 +1962,8 @@ expected_phase_graph.extend([
     ),
 ])
 expected_phase_graph.extend([
-    (f"resume_committing_{mode}", outcome, "none", None)
-    for outcome, _, _ in expected_lifecycle
+    (entry["phase"], entry["outcome"], "none", None)
+    for entry in lifecycle_entries
 ])
 actual_phase_graph = [
     (
@@ -1604,10 +1993,10 @@ if mode == "rollback":
         phase for phase in ROLLBACK_CONDITIONAL_PHASES if phase in required_phase_set
     )
     expected_rollback_suffix.extend([
-        "guard_cleanup_complete",
+        *( ["guard_cleanup_complete"] * len(database_lifecycle_entries) ),
         "rollback_ready_writers_quiesced", "rollback_ready_writers_quiesced",
         "resume_authority_rollback", "resume_authority_rollback",
-        *(["resume_committing_rollback"] * len(expected_lifecycle)),
+        *(["resume_committing_rollback"] * len(lifecycle_entries)),
     ])
     require(
         [entry["phase"] for entry in journal_lines[rollback_intent_index:]]
@@ -1645,12 +2034,15 @@ for project in sorted({item["project"] for item in target}):
 
 opened_inputs = [
     barrier_file, quiesce_file, final_file, authority_file, checkpoint_file, journal_file,
+    database_baseline_file, database_archive_file, database_proof_file,
+    database_input_checkpoint_file, database_capability_file,
+    database_capability_checkpoint_file,
     *[record["file"] for record in capability_chain],
     *opened_capability_checkpoints,
     *opened_input_checkpoints,
 ]
 if mode == "forward": opened_inputs.extend([probe_file, recovery_file, handoff_file])
-else: opened_inputs.append(rollback_file)
+else: opened_inputs.extend([rollback_file, database_rollback_intent_file])
 
 def observe_all(allow_unready=False):
     final_rows = []
@@ -1788,14 +2180,14 @@ if os.path.exists(paths["terminal"]):
 initial_final, initial_held = observe_all(True)
 prove_held(initial_held)
 if recovery_epoch:
-    try:
+    if all(is_terminal(row, item) for item, row, _ in initial_final):
         final_projection, held_projection = terminal_projection()
-    except Exception:
+        for item in opened_inputs: item.recheck()
+        publish_receipt(expected_receipt(final_projection, held_projection))
+        sys.exit(0)
+    if not all(is_stopped_no(row) for _, row, _ in initial_final):
         compensate()
         raise ResumeError("recovered partial resume was compensated; a new recovery epoch is required")
-    for item in opened_inputs: item.recheck()
-    publish_receipt(expected_receipt(final_projection, held_projection))
-    sys.exit(0)
 require(all(is_stopped_no(row) for _,row,_ in initial_final), "final writers are not initially stopped/no")
 
 mutation_started = False

@@ -14,6 +14,7 @@ readonly DEFAULT_PROJECT_DIRECTORY='/opt/megacampus'
 readonly DEFAULT_NODE_BIN='/usr/bin/node'
 readonly REQUIRED_CA_SHA256='700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7'
 readonly TEST_MODE_TOKEN='mc2-synthetic-q12-database-barrier-test-only'
+readonly REAL_RECONNECT_TEST_TOKEN='mc2-local-pg17-terminal-reconnect-only'
 readonly STRUCTURAL_CATALOG_FILE="$(dirname "$(realpath -e -- "$0")")/q12-structural-catalog.sql"
 
 fail() {
@@ -85,6 +86,8 @@ test_mode=0
 trust_boundary='/'
 project_directory="$DEFAULT_PROJECT_DIRECTORY"
 node_bin="$DEFAULT_NODE_BIN"
+terminal_node_bin="$DEFAULT_NODE_BIN"
+real_reconnect_test=0
 if [[ -n ${MC2_Q12_BARRIER_TEST_MODE:-} ]]; then
   [[ ${MC2_Q12_BARRIER_TEST_MODE} == "$TEST_MODE_TOKEN" ]] || fail 'invalid protected test mode token'
   test_mode=1
@@ -97,11 +100,22 @@ if [[ -n ${MC2_Q12_BARRIER_TEST_MODE:-} ]]; then
   node_bin="${MC2_Q12_BARRIER_TEST_NODE:-}"
   [[ -x $node_bin && ! -L $node_bin && $node_bin == "$trust_boundary"/* ]] ||
     fail 'protected test node must be an executable below the test root'
+  terminal_node_bin="$node_bin"
+  if [[ -n ${MC2_Q12_BARRIER_TEST_REAL_RECONNECT:-} ]]; then
+    [[ ${MC2_Q12_BARRIER_TEST_REAL_RECONNECT} == "$REAL_RECONNECT_TEST_TOKEN" ]] ||
+      fail 'invalid protected real reconnect test token'
+    real_reconnect_test=1
+    terminal_node_bin="${MC2_Q12_BARRIER_TEST_TERMINAL_NODE:-}"
+    [[ -x $terminal_node_bin && ! -L $terminal_node_bin && $terminal_node_bin == "$trust_boundary"/* ]] ||
+      fail 'protected terminal reconnect node must be an executable below the test root'
+  elif [[ -n ${MC2_Q12_BARRIER_TEST_TERMINAL_NODE:-} ]]; then
+    fail 'protected terminal reconnect node requires the exact real reconnect test token'
+  fi
 else
-  [[ -z ${MC2_Q12_BARRIER_TEST_ROOT:-}${MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY:-}${MC2_Q12_BARRIER_TEST_NODE:-} ]] ||
+  [[ -z ${MC2_Q12_BARRIER_TEST_ROOT:-}${MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY:-}${MC2_Q12_BARRIER_TEST_NODE:-}${MC2_Q12_BARRIER_TEST_REAL_RECONNECT:-}${MC2_Q12_BARRIER_TEST_TERMINAL_NODE:-} ]] ||
     fail 'test overrides require the exact protected test mode'
 fi
-readonly test_mode trust_boundary project_directory node_bin
+readonly test_mode trust_boundary project_directory node_bin terminal_node_bin real_reconnect_test
 fault_point="${MC2_Q12_BARRIER_FAULT_POINT:-}"
 if [[ -n $fault_point ]]; then
   [[ $test_mode -eq 1 ]] || fail 'fault injection requires the exact protected test mode'
@@ -229,7 +243,7 @@ fi
 if [[ ${MC2_Q12_BARRIER_FD_BOOTSTRAPPED:-0} != 1 ]]; then
   readonly FD_BOOTSTRAP_PY='import os,stat,sys
 script=sys.argv[1]
-paths=sys.argv[2:9]
+paths=sys.argv[2:12]
 separator=sys.argv.index("--")
 original=sys.argv[separator+1:]
 for index,path in enumerate(paths):
@@ -254,6 +268,7 @@ os.execve("/bin/bash",["bash",script,*original],environment)'
   exec /usr/bin/python3 -c "$FD_BOOTSTRAP_PY" "$(realpath -e -- "$0")" \
     "$db_url_file" "$ca_file" "$capability_file" "$expected_catalog_file" "$probe_bootstrap_path" \
     "$STRUCTURAL_CATALOG_FILE" "$prior_receipt_bootstrap_path" \
+    "$db_url_file" "$ca_file" "$STRUCTURAL_CATALOG_FILE" \
     -- "${original_args[@]}"
 fi
 url_fd=10
@@ -262,6 +277,9 @@ capability_fd=12
 catalog_fd=13
 structural_catalog_fd=15
 prior_receipt_fd=16
+terminal_url_fd=17
+terminal_ca_fd=18
+terminal_structural_catalog_fd=19
 adopt_validated_fd 'database URL file' "$db_url_file" '400:600' "$url_fd" url_identity
 adopt_validated_fd 'CA file' "$ca_file" '644' "$ca_fd" ca_identity
 adopt_validated_fd 'database capability file' "$capability_file" '400' "$capability_fd" capability_identity
@@ -270,6 +288,11 @@ validate_code_file_path 'canonical structural catalog SQL' "$STRUCTURAL_CATALOG_
 structural_catalog_identity="$(file_identity "$STRUCTURAL_CATALOG_FILE")"
 [[ ! -L $STRUCTURAL_CATALOG_FILE && $(fd_identity "$structural_catalog_fd") == "$structural_catalog_identity" ]] ||
   fail 'canonical structural catalog SQL O_NOFOLLOW descriptor identity changed while opening'
+adopt_validated_fd 'terminal database URL file' "$db_url_file" '400:600' \
+  "$terminal_url_fd" terminal_url_identity
+adopt_validated_fd 'terminal CA file' "$ca_file" '644' "$terminal_ca_fd" terminal_ca_identity
+[[ ! -L $STRUCTURAL_CATALOG_FILE && $(fd_identity "$terminal_structural_catalog_fd") == "$structural_catalog_identity" ]] ||
+  fail 'terminal structural catalog SQL O_NOFOLLOW descriptor identity changed while opening'
 STRUCTURAL_CATALOG_SQL="$(cat <&"$structural_catalog_fd")"
 [[ -n $STRUCTURAL_CATALOG_SQL && $STRUCTURAL_CATALOG_SQL != *';'* ]] ||
   fail 'canonical structural catalog SQL must be one semicolon-free query'
@@ -394,8 +417,8 @@ input_checkpoint_file=''
 input_checkpoint_sha256=''
 intent_journal_entry_hash=''
 resource_manifest_sha256=''
-if [[ $command_name == install || $command_name == cleanup || $command_name == rollback ]]; then
-  input_checkpoint_file="$run_root/database-barrier-input-checkpoint-$command_name-cutover.json"
+if [[ $command_name == install ]]; then
+  input_checkpoint_file="$run_root/database-barrier-input-checkpoint-install-cutover.json"
   validate_file_path 'database barrier child input checkpoint' "$input_checkpoint_file" '600'
   validate_file_path 'cutover phase journal' "$phase_journal_file" '600'
   jq -e --arg run "$run_id" '
@@ -417,6 +440,161 @@ if [[ $command_name == install || $command_name == cleanup || $command_name == r
     (.resource_manifest_sha256 | test("^[a-f0-9]{64}$"))
   ' <<<"$phase_journal_head" >/dev/null || fail 'database barrier child journal head is invalid'
   resource_manifest_sha256="$(jq -r '.resource_manifest_sha256' <<<"$phase_journal_head")"
+  input_checkpoint_sha256="$(sha256sum -- "$input_checkpoint_file" | awk '{print $1}')"
+elif [[ $command_name == cleanup || $command_name == rollback ]]; then
+  validate_file_path 'cutover phase journal' "$phase_journal_file" '600'
+  journal_projection="$(/usr/bin/python3 - "$phase_journal_file" "$run_id" "$command_name" <<'PY'
+import hashlib
+import json
+import os
+import re
+import sys
+
+path, run_id, operation = sys.argv[1:]
+exact_keys = {
+    "schema", "run_id", "seq", "phase", "outcome", "timestamp", "release_sha",
+    "operator_digest", "command_id", "command_sha256", "lease_epoch", "previous_hash",
+    "entry_hash", "rotation_required", "resource_manifest_sha256",
+    "quiesce_manifest_sha256", "capability_manifest_sha256", "accepted_object_kind",
+    "accepted_object_sha256",
+}
+hex64 = re.compile(r"[a-f0-9]{64}\Z")
+epoch_pattern = re.compile(r"cutover(?:-recovery-([1-9][0-9]*))?\Z")
+
+def reject(message):
+    raise SystemExit(message)
+
+def pairs(values):
+    result = {}
+    for key, value in values:
+        if key in result:
+            reject("duplicate journal key")
+        result[key] = value
+    return result
+
+def canonical(value):
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()
+
+raw = open(path, "rb").read()
+if not raw or not raw.endswith(b"\n") or b"\r" in raw:
+    reject("torn journal")
+entries = []
+previous = "0" * 64
+for sequence, line in enumerate(raw.splitlines(), start=1):
+    try:
+        entry = json.loads(line.decode("utf-8"), object_pairs_hook=pairs)
+    except Exception:
+        reject("invalid journal JSON")
+    if not isinstance(entry, dict) or set(entry) != exact_keys or canonical(entry) != line:
+        reject("non-canonical journal entry")
+    if any(isinstance(value, float) or isinstance(value, int) and not isinstance(value, bool) and abs(value) > 9007199254740991 for value in entry.values()):
+        reject("unsafe journal number")
+    preimage = {key: value for key, value in entry.items() if key != "entry_hash"}
+    if (
+        entry["schema"] != "megacampus.q12.cutover-journal/v1"
+        or entry["run_id"] != run_id
+        or entry["seq"] != sequence
+        or entry["previous_hash"] != previous
+        or not isinstance(entry["entry_hash"], str)
+        or hashlib.sha256(canonical(preimage)).hexdigest() != entry["entry_hash"]
+        or not isinstance(entry["lease_epoch"], str)
+        or epoch_pattern.fullmatch(entry["lease_epoch"]) is None
+    ):
+        reject("invalid journal chain")
+    previous = entry["entry_hash"]
+    entries.append(entry)
+
+command_id = f"barrier.{operation}"
+rows = [entry for entry in entries if entry["phase"] == "guard_cleanup_complete" and entry["command_id"] == command_id]
+if not rows:
+    reject("missing database lifecycle")
+indexes = [entries.index(entry) for entry in rows]
+if indexes != list(range(indexes[0], indexes[-1] + 1)) or indexes[-1] != len(entries) - 1:
+    reject("interleaved database lifecycle")
+epochs = []
+for row in rows:
+    if not epochs or epochs[-1] != row["lease_epoch"]:
+        epochs.append(row["lease_epoch"])
+if epochs != ["cutover", *[f"cutover-recovery-{number}" for number in range(1, len(epochs))]]:
+    reject("non-consecutive database recovery epochs")
+for index, epoch in enumerate(epochs):
+    epoch_rows = [row for row in rows if row["lease_epoch"] == epoch]
+    outcomes = [row["outcome"] for row in epoch_rows]
+    if index == 0:
+        allowed = [["intent", "capability_issued", "capability_claimed"]]
+        if len(epochs) > 1:
+            allowed.extend([["intent"], ["intent", "capability_issued"]])
+    elif index == len(epochs) - 1:
+        allowed = [["recovery_reacquired", "capability_claimed"]]
+    else:
+        allowed = [["recovery_reacquired"], ["recovery_reacquired", "capability_claimed"]]
+    if outcomes not in allowed:
+        reject("invalid database lifecycle slice")
+    capability_hashes = {
+        row["capability_manifest_sha256"]
+        for row in epoch_rows
+        if row["outcome"] != "intent"
+    }
+    if len(capability_hashes) != 1 or any(not hex64.fullmatch(value) for value in capability_hashes):
+        reject("invalid database capability binding")
+    if any(
+        row["accepted_object_kind"] != "none"
+        or row["accepted_object_sha256"] is not None
+        for row in epoch_rows
+    ):
+        reject("invalid database lifecycle acceptance")
+head = rows[-1]
+intent = rows[0]
+if (
+    head["outcome"] != "capability_claimed"
+    or intent["outcome"] != "intent"
+    or intent["capability_manifest_sha256"] != "0" * 64
+):
+    reject("database child is not at a claimed boundary")
+if head["lease_epoch"] == "cutover":
+    capability_anchor = intent
+else:
+    current_start = next(index for index, row in enumerate(entries) if row["lease_epoch"] == head["lease_epoch"])
+    accepted_predecessors = [row for row in entries[:current_start] if row["outcome"] == "accepted"]
+    if not accepted_predecessors:
+        reject("database recovery accepted predecessor is missing")
+    capability_anchor = accepted_predecessors[-1]
+print("\t".join([
+    head["lease_epoch"], intent["entry_hash"], head["resource_manifest_sha256"],
+    head["entry_hash"], head["previous_hash"], str(head["seq"]),
+    head["capability_manifest_sha256"], capability_anchor["entry_hash"],
+    capability_anchor["previous_hash"], str(capability_anchor["seq"]),
+    capability_anchor["phase"], capability_anchor["lease_epoch"],
+    capability_anchor["accepted_object_kind"],
+    capability_anchor["accepted_object_sha256"] or "null",
+]))
+PY
+)" || fail 'database barrier journal chain/lifecycle is invalid'
+  IFS=$'\t' read -r database_execution_epoch intent_journal_entry_hash resource_manifest_sha256 \
+    database_head_hash database_head_previous database_head_seq database_host_capability_sha256 \
+    database_capability_anchor_hash database_capability_anchor_previous \
+    database_capability_anchor_seq database_capability_anchor_phase \
+    database_capability_anchor_epoch database_capability_anchor_kind \
+    database_capability_anchor_sha256 \
+    <<<"$journal_projection"
+  [[ $database_execution_epoch =~ ^cutover(-recovery-[1-9][0-9]*)?$ ]] ||
+    fail 'database barrier execution epoch is invalid'
+  input_checkpoint_file="$run_root/database-barrier-input-checkpoint-$command_name-$database_execution_epoch.json"
+  validate_file_path 'database barrier child input checkpoint' "$input_checkpoint_file" '600'
+  jq -e --arg run "$run_id" --arg epoch "$database_execution_epoch" \
+    --arg entry "$database_head_hash" --arg previous "$database_head_previous" \
+    --argjson seq "$database_head_seq" --arg device "$(stat -c '%d' -- "$phase_journal_file")" \
+    --arg inode "$(stat -c '%i' -- "$phase_journal_file")" '
+    (keys | sort) == (["schema_version","run_id","seq","phase","journal_entry_hash",
+      "previous_journal_entry_hash","journal_device","journal_inode","accepted_object_kind",
+      "accepted_object_sha256","resume_authority_sha256","lease_epoch"] | sort) and
+    .schema_version == "megacampus.q12.cutover-checkpoint/v1" and .run_id == $run and
+    .seq == $seq and .phase == "guard_cleanup_complete" and
+    .journal_entry_hash == $entry and .previous_journal_entry_hash == $previous and
+    .journal_device == $device and .journal_inode == $inode and
+    .accepted_object_kind == "none" and .accepted_object_sha256 == null and
+    .resume_authority_sha256 == null and .lease_epoch == $epoch
+  ' "$input_checkpoint_file" >/dev/null || fail 'database barrier child input checkpoint is invalid'
   input_checkpoint_sha256="$(sha256sum -- "$input_checkpoint_file" | awk '{print $1}')"
 fi
 
@@ -500,8 +678,10 @@ if [[ $command_name == cleanup || $command_name == rollback ]]; then
       .state == "activated" and .last_command == "activate" and
       .rollback_probes_verified == true and (.probe_receipt_sha256 | test("^[a-f0-9]{64}$"))
     else
-      (.state == "maintenance_guarded" or .state == "20260711140000_guard_verified" or
-       .state == "20260711151000_guard_verified" or .state == "recovery_ready_guarded") and
+      ((.state == "maintenance_guarded" and .last_command == "install") or
+       ((.state == "20260711140000_guard_verified" or
+         .state == "20260711151000_guard_verified") and .last_command == "verify-extended") or
+       (.state == "recovery_ready_guarded" and .last_command == "prepare-recovery")) and
       .rollback_probes_verified == false and .probe_receipt_sha256 == null
     end)
   ' "$receipt_file" >/dev/null || fail 'database barrier predecessor receipt is invalid'
@@ -511,9 +691,75 @@ if [[ $command_name == cleanup || $command_name == rollback ]]; then
   if [[ $command_name == rollback ]]; then
     rollback_intent_file="$run_root/database-barrier-rollback-intent.json"
     validate_file_path 'database barrier rollback intent' "$rollback_intent_file" '400'
+    cmp -s -- "$rollback_intent_file" <(jq -cS . "$rollback_intent_file") ||
+      fail 'database barrier rollback intent bytes are not canonical'
+    capability_checkpoint_file="$run_root/database-barrier-capability-checkpoint-$command_name-$database_execution_epoch.json"
+    validate_file_path 'database barrier capability checkpoint' "$capability_checkpoint_file" '600'
+    capability_anchor_sha_json='null'
+    if [[ $database_capability_anchor_sha256 != null ]]; then
+      capability_anchor_sha_json="\"$database_capability_anchor_sha256\""
+    fi
+    jq -e --arg run "$run_id" --arg entry "$database_capability_anchor_hash" \
+      --arg previous "$database_capability_anchor_previous" \
+      --argjson seq "$database_capability_anchor_seq" \
+      --arg phase "$database_capability_anchor_phase" \
+      --arg epoch "$database_capability_anchor_epoch" \
+      --arg kind "$database_capability_anchor_kind" \
+      --argjson accepted "$capability_anchor_sha_json" \
+      --arg device "$(stat -c '%d' -- "$phase_journal_file")" \
+      --arg inode "$(stat -c '%i' -- "$phase_journal_file")" '
+      (keys | sort) == (["schema_version","run_id","seq","phase","journal_entry_hash",
+        "previous_journal_entry_hash","journal_device","journal_inode","accepted_object_kind",
+        "accepted_object_sha256","resume_authority_sha256","lease_epoch"] | sort) and
+      .schema_version == "megacampus.q12.cutover-checkpoint/v1" and .run_id == $run and
+      .seq == $seq and .phase == $phase and .journal_entry_hash == $entry and
+      .previous_journal_entry_hash == $previous and .journal_device == $device and
+      .journal_inode == $inode and .accepted_object_kind == $kind and
+      .accepted_object_sha256 == $accepted and .resume_authority_sha256 == null and
+      .lease_epoch == $epoch
+    ' "$capability_checkpoint_file" >/dev/null ||
+      fail 'database barrier capability checkpoint is invalid'
+    capability_checkpoint_sha256="$(sha256sum -- "$capability_checkpoint_file" | awk '{print $1}')"
+    expected_required_phases="$(jq -sc '
+      [ .[] | select(
+          (.phase == "handoff_rollback_verified" or
+           .phase == "qdrant_rollback_verified" or
+           .phase == "source_rollback_verified" or
+           .phase == "observability_migration_rollback_guarded" or
+           .phase == "base_migration_rollback_guarded")
+        ) | .phase ] | unique | sort
+    ' "$phase_journal_file")"
+    jq -e --arg schema 'megacampus.q12.database-barrier-rollback-intent/v1' \
+      --arg run "$run_id" --arg expected "$expected_post_migration_catalog_sha256" \
+      --arg baseline "$database_barrier_baseline_sha256" \
+      --arg receipt "$predecessor_receipt_sha256" \
+      --arg checkpoint "$capability_checkpoint_sha256" \
+      --arg journal "$intent_journal_entry_hash" \
+      --argjson expected_phases "$expected_required_phases" '
+      (keys | sort) == (["schema_version","run_id","state",
+        "expected_post_migration_catalog_sha256","database_barrier_baseline_sha256",
+        "predecessor_receipt_sha256","input_checkpoint_sha256","intent_journal_entry_hash",
+        "required_phase_receipts","required_phase_receipts_sha256"] | sort) and
+      .schema_version == $schema and .run_id == $run and .state == "rollback_intent" and
+      .expected_post_migration_catalog_sha256 == $expected and
+      .database_barrier_baseline_sha256 == $baseline and
+      .predecessor_receipt_sha256 == $receipt and
+      .input_checkpoint_sha256 == $checkpoint and .intent_journal_entry_hash == $journal and
+      (.required_phase_receipts | type == "array") and
+      ([.required_phase_receipts[].phase] == $expected_phases) and
+      ([.required_phase_receipts[] | select(
+        (keys | sort) != (["phase","receipt_sha256"] | sort) or
+        (.receipt_sha256 | test("^[a-f0-9]{64}$") | not)
+      )] | length) == 0
+    ' "$rollback_intent_file" >/dev/null || fail 'database barrier rollback intent is invalid'
+    calculated_required_phase_receipts_sha256="$(
+      jq -cS '.required_phase_receipts' "$rollback_intent_file" |
+        head -c -1 | sha256sum | awk '{print $1}'
+    )"
     database_barrier_rollback_intent_sha256="$(sha256sum -- "$rollback_intent_file" | awk '{print $1}')"
     required_phase_receipts_sha256="$(jq -r '.required_phase_receipts_sha256' "$rollback_intent_file")"
-    [[ $required_phase_receipts_sha256 =~ ^[a-f0-9]{64}$ ]] || fail 'rollback required phase receipts hash is invalid'
+    [[ $required_phase_receipts_sha256 == "$calculated_required_phase_receipts_sha256" ]] ||
+      fail 'rollback required phase receipts hash is invalid'
   fi
   terminal_proof_file="$run_root/database-barrier-$command_name-terminal-proof.json"
   if [[ -e $terminal_proof_file || -L $terminal_proof_file ]]; then
@@ -1652,7 +1898,7 @@ chmod 0600 "$sql_file"
 sync -f "$sql_file"
 
 readonly NODE_RUNNER='const fs=require("node:fs");const crypto=require("node:crypto");const {Client}=require("pg");
-function one(fd,label){const value=fs.readFileSync(Number(fd),"utf8").replace(/\\r?\\n$/u,"");if(!value||/[\\r\\n]/u.test(value))throw new Error(label);return value;}
+function one(fd,label){const value=fs.readFileSync(Number(fd),"utf8").replace(/\r?\n$/u,"");if(!value||/[\r\n]/u.test(value))throw new Error(label);return value;}
 function between(value,start,end){const startIndex=value.indexOf(start);const endIndex=value.indexOf(end,startIndex+start.length);if(startIndex<0||endIndex<0)throw new Error("install SQL markers");return value.slice(startIndex+start.length,endIndex);}
 function split(value,marker){const index=value.indexOf(marker);if(index<0)throw new Error("install SQL boundary");return [value.slice(0,index),value.slice(index+marker.length)];}
 function canonical(value){if(Array.isArray(value))return `[${value.map(canonical).join(",")}]`;if(value!==null&&typeof value==="object")return `{${Object.entries(value).sort(([left],[right])=>left.localeCompare(right)).map(([key,item])=>`${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;return JSON.stringify(value);}
@@ -1663,13 +1909,13 @@ async function main(){const [operation,urlFd,caFd,capFd,catalogFd,sqlPath,catalo
 main().catch(()=>{process.stderr.write("q12 database barrier: database command failed\\n");process.exitCode=1;});'
 
 readonly TERMINAL_PROOF_RUNNER='const fs=require("node:fs");const crypto=require("node:crypto");const {Client}=require("pg");
-function one(fd,label){const value=fs.readFileSync(Number(fd),"utf8").replace(/\\r?\\n$/u,"");if(!value||/[\\r\\n]/u.test(value))throw new Error(label);return value;}
+function one(fd,label){const value=fs.readFileSync(Number(fd),"utf8").replace(/\r?\n$/u,"");if(!value||/[\r\n]/u.test(value))throw new Error(label);return value;}
 function canonical(value){if(Array.isArray(value))return `[${value.map(canonical).join(",")}]`;if(value!==null&&typeof value==="object")return `{${Object.entries(value).sort(([left],[right])=>left.localeCompare(right)).map(([key,item])=>`${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;return JSON.stringify(value);}
 function sha256(value){return crypto.createHash("sha256").update(value).digest("hex");}
 function cronProjection(rawCron){if(!Array.isArray(rawCron)||rawCron.length!==8||new Set(rawCron.map(job=>job.jobid)).size!==8)throw new Error("terminal cron baseline");return rawCron.map(job=>{if(typeof job.jobid!=="number"||(job.jobname!==null&&typeof job.jobname!=="string")||typeof job.schedule!=="string"||typeof job.command!=="string"||typeof job.nodename!=="string"||typeof job.nodeport!=="number"||typeof job.database!=="string"||typeof job.username!=="string"||typeof job.active!=="boolean")throw new Error("terminal cron row");return {jobid:job.jobid,jobname:job.jobname,schedule:job.schedule,command_sha256:sha256(Buffer.from(job.command,"utf8")),nodename:job.nodename,nodeport:job.nodeport,database:job.database,username:job.username,active:job.active};}).sort((left,right)=>left.jobid-right.jobid);}
 function databaseDefaultProjection(databaseSettings){if(databaseSettings!==null&&(typeof databaseSettings!=="object"||Array.isArray(databaseSettings)))throw new Error("terminal database settings");const rawSettings=databaseSettings===null||databaseSettings.setconfig===null?[]:databaseSettings.setconfig;if(!Array.isArray(rawSettings)||rawSettings.some(value=>typeof value!=="string"))throw new Error("terminal database setting values");const settings=[...new Set(rawSettings)].sort((left,right)=>Buffer.compare(Buffer.from(left),Buffer.from(right)));return {schema_version:"megacampus.q12.database-default/v1",database:"postgres",role:null,row_present:databaseSettings!==null,settings};}
-async function main(){const [urlFd,caFd,structuralFd,resultPath]=process.argv.slice(1);let raw=one(urlFd,"url");const parsed=new URL(raw);if(parsed.protocol!=="postgresql:"||parsed.hostname!=="aws-1-us-east-2.pooler.supabase.com"||parsed.port!=="5432"||parsed.pathname!=="/postgres"||parsed.username!=="postgres.diqooqbuchsliypgwksu"||parsed.search||parsed.hash)throw new Error("database identity");const ca=fs.readFileSync(Number(caFd));if(sha256(ca)!=="700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7")throw new Error("CA identity");const structuralSql=fs.readFileSync(Number(structuralFd),"utf8");if(!structuralSql||structuralSql.includes(";"))throw new Error("structural SQL identity");const connection={host:parsed.hostname,port:Number(parsed.port),database:parsed.pathname.slice(1),user:decodeURIComponent(parsed.username),password:decodeURIComponent(parsed.password),ssl:{ca,rejectUnauthorized:true},options:"-c default_transaction_read_only=on",application_name:"megacampus-q12-database-terminal-proof"};raw="";const client=new Client(connection);await client.connect();try{const session=await client.query("SELECT session_user,current_database(),current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only,current_setting(\u0027server_version_num\u0027)::int AS server_version_num");if(session.rows.length!==1||session.rows[0].session_user!=="postgres"||session.rows[0].current_database!=="postgres"||session.rows[0].transaction_read_only!=="on"||session.rows[0].server_version_num<170000||session.rows[0].server_version_num>=180000)throw new Error("terminal reconnect proof");const structural=await client.query(structuralSql);if(structural.rows.length!==1||!/^[a-f0-9]{64}$/u.test(structural.rows[0].structural_sha256))throw new Error("terminal structural catalog");const databaseSetting=await client.query("SELECT COALESCE((SELECT to_jsonb(setting) FROM pg_db_role_setting setting WHERE setdatabase=(SELECT oid FROM pg_database WHERE datname=\u0027postgres\u0027) AND setrole=0),\u0027null\u0027::jsonb) AS setting");const cronJobs=await client.query("SELECT to_jsonb(job) AS job FROM cron.job job ORDER BY jobid");const residue=await client.query("SELECT (SELECT count(*)::int FROM pg_namespace WHERE nspname=\u0027q12_guard\u0027) AS q12_guard_schema_count,(SELECT count(*)::int FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_relation_count,(SELECT count(*)::int FROM pg_proc function_object JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_function_count,(SELECT count(*)::int FROM pg_type type_object JOIN pg_namespace namespace ON namespace.oid=type_object.typnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_type_count,(SELECT count(*)::int FROM pg_trigger trigger_object JOIN pg_class relation ON relation.oid=trigger_object.tgrelid JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_trigger_count,(SELECT count(*)::int FROM pg_event_trigger event_trigger JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_event_trigger_count,(SELECT count(*)::int FROM pg_stat_activity WHERE pid<>pg_backend_pid() AND datname=\u0027postgres\u0027 AND application_name LIKE \u0027megacampus-q12-%\u0027) AS barrier_era_session_count");if(databaseSetting.rows.length!==1||residue.rows.length!==1)throw new Error("terminal projection cardinality");const result={structural_catalog_sha256:structural.rows[0].structural_sha256,database_default_sha256:sha256(canonical(databaseDefaultProjection(databaseSetting.rows[0].setting))),cron_jobs_sha256:sha256(canonical(cronProjection(cronJobs.rows.map(row=>row.job)))),guard_residue:residue.rows[0]};const descriptor=fs.openSync(resultPath,fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(descriptor);if(!stat.isFile()||(stat.mode&0o777)!==0o600||stat.uid!==process.getuid())throw new Error("terminal result inode");fs.ftruncateSync(descriptor,0);fs.writeFileSync(descriptor,`${canonical(result)}\n`,"utf8");fs.fsyncSync(descriptor);}finally{fs.closeSync(descriptor);}}finally{await client.end();}}
-main().catch(()=>{process.stderr.write("q12 database barrier: terminal reconnect verification failed\\n");process.exitCode=1;});'
+async function main(){const [urlFd,caFd,structuralFd,resultPath,protectedMode]=process.argv.slice(1);const protectedLocal=protectedMode==="1";let raw=one(urlFd,"url");const parsed=new URL(raw);const productionIdentity=parsed.protocol==="postgresql:"&&parsed.hostname==="aws-1-us-east-2.pooler.supabase.com"&&parsed.port==="5432"&&parsed.pathname==="/postgres"&&parsed.username==="postgres.diqooqbuchsliypgwksu"&&!parsed.search&&!parsed.hash;const localPort=Number(parsed.port);const protectedIdentity=parsed.protocol==="postgresql:"&&parsed.hostname==="127.0.0.1"&&Number.isInteger(localPort)&&localPort>=1024&&localPort<=65535&&parsed.pathname==="/postgres"&&parsed.username==="postgres"&&!parsed.search&&!parsed.hash;if((protectedLocal&&!protectedIdentity)||(!protectedLocal&&!productionIdentity))throw new Error("database identity");const ca=fs.readFileSync(Number(caFd));if(!protectedLocal&&sha256(ca)!=="700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7")throw new Error("CA identity");const structuralSql=fs.readFileSync(Number(structuralFd),"utf8");if(!structuralSql||structuralSql.includes(";"))throw new Error("structural SQL identity");const connection={host:parsed.hostname,port:Number(parsed.port),database:parsed.pathname.slice(1),user:decodeURIComponent(parsed.username),password:decodeURIComponent(parsed.password),ssl:protectedLocal?false:{ca,rejectUnauthorized:true},options:"-c default_transaction_read_only=on",application_name:"megacampus-q12-database-terminal-proof"};raw="";const client=new Client(connection);await client.connect();try{const session=await client.query("SELECT session_user,current_database(),current_setting(\u0027transaction_read_only\u0027) AS transaction_read_only,current_setting(\u0027server_version_num\u0027)::int AS server_version_num");if(session.rows.length!==1||session.rows[0].session_user!=="postgres"||session.rows[0].current_database!=="postgres"||session.rows[0].transaction_read_only!=="on"||session.rows[0].server_version_num<170000||session.rows[0].server_version_num>=180000)throw new Error("terminal reconnect proof");const structural=await client.query(structuralSql);if(structural.rows.length!==1||!/^[a-f0-9]{64}$/u.test(structural.rows[0].structural_sha256))throw new Error("terminal structural catalog");const databaseSetting=await client.query("SELECT COALESCE((SELECT to_jsonb(setting) FROM pg_db_role_setting setting WHERE setdatabase=(SELECT oid FROM pg_database WHERE datname=\u0027postgres\u0027) AND setrole=0),\u0027null\u0027::jsonb) AS setting");const cronJobs=await client.query("SELECT to_jsonb(job) AS job FROM cron.job job ORDER BY jobid");const residue=await client.query("SELECT (SELECT count(*)::int FROM pg_namespace WHERE nspname=\u0027q12_guard\u0027) AS q12_guard_schema_count,(SELECT count(*)::int FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_relation_count,(SELECT count(*)::int FROM pg_proc function_object JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_function_count,(SELECT count(*)::int FROM pg_type type_object JOIN pg_namespace namespace ON namespace.oid=type_object.typnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_type_count,(SELECT count(*)::int FROM pg_trigger trigger_object JOIN pg_class relation ON relation.oid=trigger_object.tgrelid JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_trigger_count,(SELECT count(*)::int FROM pg_event_trigger event_trigger JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace WHERE namespace.nspname=\u0027q12_guard\u0027) AS q12_guard_event_trigger_count,(SELECT count(*)::int FROM pg_stat_activity WHERE pid<>pg_backend_pid() AND datname=\u0027postgres\u0027 AND application_name LIKE \u0027megacampus-q12-%\u0027) AS barrier_era_session_count");if(databaseSetting.rows.length!==1||residue.rows.length!==1)throw new Error("terminal projection cardinality");const result={structural_catalog_sha256:structural.rows[0].structural_sha256,database_default_sha256:sha256(canonical(databaseDefaultProjection(databaseSetting.rows[0].setting))),cron_jobs_sha256:sha256(canonical(cronProjection(cronJobs.rows.map(row=>row.job)))),guard_residue:residue.rows[0]};const descriptor=fs.openSync(resultPath,fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(descriptor);if(!stat.isFile()||(stat.mode&0o777)!==0o600||stat.uid!==process.getuid())throw new Error("terminal result inode");fs.ftruncateSync(descriptor,0);fs.writeFileSync(descriptor,`${canonical(result)}\n`,"utf8");fs.fsyncSync(descriptor);}finally{fs.closeSync(descriptor);}}finally{await client.end();}}
+main().catch(error=>{if(process.argv.at(-1)==="1")process.stderr.write(`q12 protected reconnect detail: ${error instanceof Error?error.message:"unknown"}\\n`);process.stderr.write("q12 database barrier: terminal reconnect verification failed\\n");process.exitCode=1;});'
 
 recheck_open_file 'database URL file' "$db_url_file" "$url_fd" "$url_identity"
 recheck_open_file 'CA file' "$ca_file" "$ca_fd" "$ca_identity"
@@ -1690,11 +1936,16 @@ fi
     "$install_baseline_result_file" "$database_terminal_result_file" "$structural_catalog_fd"
 ) || fail 'database command did not complete'
 
-if [[ ($command_name == cleanup || $command_name == rollback) && $test_mode -eq 0 ]]; then
+if [[ ($command_name == cleanup || $command_name == rollback) && ($test_mode -eq 0 || $real_reconnect_test -eq 1) ]]; then
+  recheck_open_file 'terminal database URL file' "$db_url_file" "$terminal_url_fd" "$terminal_url_identity"
+  recheck_open_file 'terminal CA file' "$ca_file" "$terminal_ca_fd" "$terminal_ca_identity"
+  recheck_open_file 'terminal structural catalog SQL' "$STRUCTURAL_CATALOG_FILE" \
+    "$terminal_structural_catalog_fd" "$structural_catalog_identity"
   (
     cd "$project_directory/packages/course-gen-platform"
-    "$node_bin" -e "$TERMINAL_PROOF_RUNNER" "$url_fd" "$ca_fd" "$structural_catalog_fd" \
-      "$database_terminal_result_file"
+    "$terminal_node_bin" -e "$TERMINAL_PROOF_RUNNER" "$terminal_url_fd" "$terminal_ca_fd" \
+      "$terminal_structural_catalog_fd" \
+      "$database_terminal_result_file" "$real_reconnect_test"
   ) || fail 'database terminal reconnect verification did not complete'
 fi
 
@@ -1713,6 +1964,9 @@ exec {ca_fd}<&-
 exec {capability_fd}<&-
 exec {catalog_fd}<&-
 exec {structural_catalog_fd}<&-
+exec {terminal_url_fd}<&-
+exec {terminal_ca_fd}<&-
+exec {terminal_structural_catalog_fd}<&-
 
 database_capability_sha256="$(head -c -1 "$capability_file" | sha256sum | awk '{print $1}')"
 expected_post_migration_catalog_sha256="$(jq -r '.expected_post_migration_catalog_sha256' "$expected_catalog_file")"

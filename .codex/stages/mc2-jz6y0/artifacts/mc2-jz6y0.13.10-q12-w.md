@@ -47,8 +47,8 @@ parallel_decision: sequential - the database barrier, immutable artifacts, and w
 status: returned
 delivery_method: not accepted
 accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: root must independently inspect the diff and evidence before integration; do not remove this worktree before acceptance
+cleanup_status: blocked
+cleanup_notes: branch/worktree must remain available for Root independent acceptance and integration; removing the current checked-out worker worktree before acceptance would destroy the required review surface
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
@@ -60,10 +60,13 @@ verification:
   - Task 2 exact resume-capability RED-to-GREEN completed and the then-current source-recovery runtime passed 137 of 137 with zero failures
   - Task 3 quiesce/recovery-prefix and immutable inventory/transition/final coverage passed in the complete source-recovery runtime at 152 of 152 with zero failures
   - Task 4 database baseline/proof/crash/mismatch coverage passed 45 of 45, including terminal reconnect RED 0 of 2 to GREEN 2 of 2; the three fail-closed source/reindex adapter files passed 98 of 98 without adapter-code changes
-  - frozen five-file barrier/runtime/database/adapters/reindex aggregate passed 295 of 295 with zero failures
+  - independent acceptance fix-cycle runtime JSON passed 121 of 121 with zero failures and zero pending tests
+  - database barrier JSON with the actual protected PostgreSQL 17 reconnect active passed 51 of 51 with zero failures and zero pending tests
+  - frozen real-PG17 five-file barrier/runtime/database/adapters/reindex aggregate passed 270 of 270 across 17 suites with zero failures and zero pending tests
   - opt-in stock PostgreSQL 17 fixture passed 34 of 34 including fresh-session default read-only and explicit primary READ WRITE proof
   - workspace pnpm type-check passed across all five projects; workspace pnpm build passed with synthetic test-only Supabase environment values
   - Prettier check passed every changed TypeScript test/tool file
+  - ESLint completed with zero errors; the database test uses the same narrow max-lines exemption as the exhaustive runtime suite because splitting the shared exact durable fixture would duplicate or weaken cross-artifact invariants
   - bash syntax passed source-recovery-run.sh, q12-database-barrier.sh, and the Qdrant operator entrypoint; Python byte-compilation passed q12-writer-resume.py
   - structural catalog retained exact SHA-256 0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e, 1254 lines, and one semicolon-free query
   - git diff --check and secret/live-command scans passed; no current-run synthetic process, temporary run root, PostgreSQL 17 container, or matching Docker volume remained
@@ -98,8 +101,9 @@ row in the complete forward graph while preserving the bounded recovery suffix
 and exact rollback conditional ordering. Writer-recovery completion no longer
 uses replacement publication: it accepts only byte-exact existing evidence or
 uses Linux `renameat2(RENAME_NOREPLACE)`, followed by directory sync and reopened
-owner/mode/hash validation. The final complete runtime is 152/152 and the joined
-W aggregate is 295/295.
+owner/mode/hash validation. Those pre-review totals were superseded by the
+independent acceptance fix cycle below; the current runtime is 121/121 and the
+current real-PG17 joined W aggregate is 270/270 with zero pending tests.
 
 The W delta implements the approved local writer/database lifecycle without any
 remote activation. `barrier.prepare-recovery` publishes
@@ -189,9 +193,38 @@ structural SQL and reprojects database-default, all eight cron rows, and seven
 zero-residue counts before proof publication. Exact existing proof retry performs no DB-child replay, and
 any replacement, extra key, cross-binding, or non-exact proof fails closed.
 
+# Independent acceptance fix cycle
+
+The round-one independent review reported one P0 and six P1 findings. All seven
+are corrected in this branch:
+
+- post-cleanup writer resume accepts only the exact canonical v2 database
+  receipt, bound terminal proof, baseline, predecessor v1/archive, absent DB
+  capability, and a complete mode-specific accepted database lifecycle;
+- uninterrupted and consecutive recovery-epoch database lifecycles bind the
+  exact claimed child checkpoint, capability checkpoint anchor, completed host
+  capability, and supersession link before any Docker inspection/start;
+- Q12 `--stop-writers` is rejected before writer mutation; Q12 source recovery
+  consumes only the separately capability-gated immutable external quiesce
+  manifest, while the general non-Q12 compatibility path remains available;
+- exact issued/claimed orphan histories are recoverable for both quiesce and
+  resume, and exact stopped/no state with no recovery publication proceeds
+  through the normal path;
+- the database child validates the full canonical journal/hash chain, derives
+  the current recovery epoch, and rejects corrupt earlier rows even when the
+  tail/checkpoint matches;
+- rollback binds valid receipt state to `last_command`, the current capability
+  checkpoint, and the exact required phase receipt set/hash;
+- a protected test-only seam drives the actual terminal Node/`pg` runner against
+  disposable PostgreSQL 17.10 without weakening production identity, pinned CA,
+  or TLS. The seam exposed and fixed consumed shared URL/CA/structural FD
+  offsets and an over-escaped trailing-newline regex. Separate O_NOFOLLOW
+  terminal descriptors are now identity-rechecked before reconnect.
+
 # Verification evidence
 
 ```text
+MC2_Q12_REAL_PG17=1 \
 SUPABASE_URL=http://127.0.0.1:54321 \
 SUPABASE_SERVICE_KEY=synthetic-test-key \
 pnpm --filter @megacampus/course-gen-platform exec vitest run \
@@ -201,7 +234,7 @@ pnpm --filter @megacampus/course-gen-platform exec vitest run \
   tests/unit/tools/qdrant/source-recovery-database.test.ts \
   tests/unit/tools/qdrant/source-recovery-reindex-adapters.test.ts \
   tests/unit/tools/qdrant/reindex-course-embeddings.test.ts
-# 5 files, 295/295 passed
+# 5 files, 270/270 passed, 0 pending (MC2_Q12_REAL_PG17=1)
 
 MC2_Q12_REAL_PG17=1 \
 SUPABASE_URL=http://127.0.0.1:54321 \
@@ -209,7 +242,7 @@ SUPABASE_SERVICE_KEY=synthetic-test-key \
 pnpm --filter @megacampus/course-gen-platform exec vitest run \
   --config vitest.config.unit.ts \
   tests/unit/ops/q12-structural-catalog-pg17.test.ts
-# 34/34 passed
+# 34/34 passed, 0 pending
 
 pnpm type-check
 # exit 0
@@ -237,11 +270,13 @@ The test was corrected to exercise the actual supervisor boundary: signal the
 shell, forward to the controller, and wait for proven compensation. That test
 then passed three consecutive isolated runs. After the final normative
 hardening pass, the complete runtime file passed 108/108 and the fresh combined
-run passed 241/241. The D4 pass supersedes those totals with Task 2 runtime
-137/137, final Task 3 runtime 152/152, Task 4 database 45/45 and adapters 98/98,
-aggregate 295/295, and PostgreSQL 17 34/34. Final current-run process, temporary,
-container, and volume checks were empty; older unrelated `/tmp` fixtures dated
-before this worker session were outside the write zone and were not altered.
+run passed 241/241. The D4/Task 2/Task 3/Task 4 totals were the accepted baseline
+for round-one review. The subsequent seven-finding fix cycle supersedes them
+with runtime 121/121, database 51/51 with the actual PG17 reconnect active,
+real-PG17 aggregate 270/270, and structural PostgreSQL 17 34/34, all with zero
+pending tests. Final current-run process, temporary, container, and volume
+checks were empty; older unrelated `/tmp` fixtures dated before this worker
+session were outside the write zone and were not altered.
 
 # Risks / Follow-ups
 

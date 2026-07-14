@@ -422,8 +422,10 @@ if [[ -n $q12_db_capability_file ]]; then
   q12_run_id="${BASH_REMATCH[1]}"
   [[ -n $database_barrier_receipt || -n $external_quiesce_manifest ]] ||
     fail 'Q12 database capability requires a durable writer-quiesce contract'
-  [[ -n $external_quiesce_manifest || $stop_writers -eq 1 ]] ||
-    fail 'standalone Q12 source recovery requires --stop-writers'
+  [[ $stop_writers -eq 0 ]] ||
+    fail 'Q12 --stop-writers is forbidden; use quiesce-writers-only and --external-quiesce-manifest'
+  [[ -n $external_quiesce_manifest ]] ||
+    fail 'standalone Q12 source recovery requires --external-quiesce-manifest from quiesce-writers-only'
 elif [[ -n $database_barrier_receipt || -n $external_quiesce_manifest ]]; then
   fail 'Q12 writer quiesce requires --q12-db-capability-file'
 fi

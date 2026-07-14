@@ -896,19 +896,6 @@ function states(fixture: WrapperFixture): Record<string, string> {
   );
 }
 
-function markBarrierCleanupComplete(fixture: ComposeWriterFixture): void {
-  const receipt = JSON.parse(readFileSync(fixture.barrierReceipt, 'utf8')) as Record<string, any>;
-  Object.assign(receipt, {
-    state: 'guard_cleanup_complete',
-    zero_guard_residue: true,
-    last_command: 'cleanup',
-    rollback_probes_verified: true,
-  });
-  chmodSync(fixture.barrierReceipt, 0o600);
-  writeFileSync(fixture.barrierReceipt, `${JSON.stringify(receipt)}\n`);
-  chmodSync(fixture.barrierReceipt, 0o400);
-}
-
 function fileSha256(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
@@ -941,6 +928,12 @@ function writeJournal(path: string, entries: Array<Record<string, any>>): void {
 function writeProtectedJson(path: string, value: unknown, mode = 0o400): void {
   if (existsSync(path)) chmodSync(path, 0o600);
   writeFileSync(path, `${JSON.stringify(value)}\n`, { mode });
+  chmodSync(path, mode);
+}
+
+function writeCanonicalProtectedJson(path: string, value: unknown, mode = 0o400): void {
+  if (existsSync(path)) chmodSync(path, 0o600);
+  writeFileSync(path, `${canonicalJson(value)}\n`, { mode });
   chmodSync(path, mode);
 }
 
@@ -1098,6 +1091,7 @@ function targetWriterRecords(): Array<Record<string, any>> {
 interface ResumeJournalFixtureOptions {
   authorityLeaseEpoch?: string;
   commonPrefixTransform?: (phases: string[]) => string[];
+  databaseRecoveryEpoch?: boolean;
   duplicateFinalPair?: boolean;
   entryMutator?: (entry: Record<string, any>) => void;
   probeMutator?: (probe: Record<string, any>) => void;
@@ -1580,6 +1574,297 @@ function writerResumeFixture(
     previousHash = String(entry.entry_hash);
     return entry;
   };
+  const capabilitiesRoot = join(fixture.q12RunRoot, 'capabilities');
+  const capabilityDirectories = Object.fromEntries(
+    ['issued', 'claimed', 'completed', 'superseded'].map(directory => {
+      const path = join(capabilitiesRoot, directory);
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+      chmodSync(path, 0o700);
+      return [directory, path];
+    })
+  );
+  const appendDatabaseTerminalLifecycle = (
+    operation: 'cleanup' | 'rollback',
+    requiredPhaseReceipts: Array<{ phase: string; receipt_sha256: string }>
+  ): void => {
+    const predecessor = JSON.parse(readFileSync(fixture.barrierReceipt, 'utf8')) as Record<
+      string,
+      any
+    >;
+    Object.assign(
+      predecessor,
+      operation === 'cleanup'
+        ? {
+            state: 'activated',
+            zero_guard_residue: false,
+            last_command: 'activate',
+            rollback_probes_verified: true,
+            probe_receipt_sha256: fileSha256(fixture.probeReceipt),
+          }
+        : {
+            state: 'maintenance_guarded',
+            zero_guard_residue: false,
+            last_command: 'install',
+            rollback_probes_verified: false,
+            probe_receipt_sha256: null,
+          }
+    );
+    writeCanonicalProtectedJson(fixture.barrierReceipt, predecessor);
+    const predecessorSha256 = fileSha256(fixture.barrierReceipt);
+    const predecessorArchive = join(
+      fixture.q12RunRoot,
+      `database-barrier-receipt-v1-before-${operation}.json`
+    );
+    writeFileSync(predecessorArchive, readFileSync(fixture.barrierReceipt), { mode: 0o400 });
+    chmodSync(predecessorArchive, 0o400);
+    const databaseCapabilitySha256 = createHash('sha256')
+      .update(readFileSync(fixture.q12Capability, 'utf8').trimEnd())
+      .digest('hex');
+    const baselineProjection = {
+      baseline_structural_catalog_sha256: 'a'.repeat(64),
+      database_default_sha256: '6'.repeat(64),
+      cron_jobs_sha256: '7'.repeat(64),
+      guarded_relations_sha256: '8'.repeat(64),
+      pg_net_queue_count: 0,
+    };
+    const baseline = join(fixture.q12RunRoot, 'database-barrier-baseline.json');
+    writeCanonicalProtectedJson(baseline, {
+      schema_version: 'megacampus.q12.database-barrier-baseline/v1',
+      run_id: Q12_RUN_ID,
+      state: 'maintenance_guarded_baseline',
+      source_baseline_sha256: '9'.repeat(64),
+      baseline_sha256: createHash('sha256').update(canonicalJson(baselineProjection)).digest('hex'),
+      predecessor_checkpoint_sha256: 'a'.repeat(64),
+      predecessor_journal_entry_hash: 'b'.repeat(64),
+      resource_manifest_sha256: resourceManifestSha,
+      expected_post_migration_catalog_sha256: 'b'.repeat(64),
+      database_capability_sha256: databaseCapabilitySha256,
+      baseline: baselineProjection,
+    });
+    const recoveryCapabilityAnchor = [...journalEntries]
+      .reverse()
+      .find(entry => entry.outcome === 'accepted');
+    expect(recoveryCapabilityAnchor).toBeDefined();
+    const commandId = `barrier.${operation}`;
+    const intent = appendJournalEntry(
+      'guard_cleanup_complete',
+      'intent',
+      'none',
+      null,
+      leaseEpoch,
+      {
+        command_id: commandId,
+      }
+    );
+    writeJournal(journal, journalEntries);
+    let capabilityCheckpoint = join(
+      fixture.q12RunRoot,
+      `database-barrier-capability-checkpoint-${operation}-${leaseEpoch}.json`
+    );
+    writeProtectedJson(
+      capabilityCheckpoint,
+      checkpointForJournalEntry(intent, journal, null),
+      0o600
+    );
+    let rollbackIntentSha256: string | null = null;
+    let requiredReceiptsSha256: string | null = null;
+    const databaseCapabilityBasename = `${commandId}--${leaseEpoch}.json`;
+    const issuedCapability = join(capabilityDirectories.issued, databaseCapabilityBasename);
+    writeCanonicalProtectedJson(issuedCapability, {
+      schema_version: 'megacampus.q12.host-command-capability/v1',
+      run_id: Q12_RUN_ID,
+      command_id: commandId,
+      command_sha256: '9'.repeat(64),
+      release_sha: releaseSha,
+      operator_digest: '8'.repeat(64),
+      resource_manifest_sha256: resourceManifestSha,
+      quiesce_manifest_sha256: quiesceSha,
+      resume_authority_sha256: null,
+      capability_input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+      lease_epoch: leaseEpoch,
+      supersedes_capability_sha256: null,
+    });
+    const hostCapabilitySha256 = fileSha256(issuedCapability);
+    appendJournalEntry('guard_cleanup_complete', 'capability_issued', 'none', null, leaseEpoch, {
+      command_id: commandId,
+      capability_manifest_sha256: hostCapabilitySha256,
+    });
+    const claimedCapability = join(capabilityDirectories.claimed, databaseCapabilityBasename);
+    renameSync(issuedCapability, claimedCapability);
+    const claimed = appendJournalEntry(
+      'guard_cleanup_complete',
+      'capability_claimed',
+      'none',
+      null,
+      leaseEpoch,
+      { command_id: commandId, capability_manifest_sha256: hostCapabilitySha256 }
+    );
+    writeJournal(journal, journalEntries);
+    let databaseExecutionEpoch = leaseEpoch;
+    let currentCapabilityBasename = databaseCapabilityBasename;
+    let currentClaimedCapability = claimedCapability;
+    let currentHostCapabilitySha256 = hostCapabilitySha256;
+    let currentClaimed = claimed;
+    if (journalOptions.databaseRecoveryEpoch) {
+      const supersededCapability = join(
+        capabilityDirectories.superseded,
+        databaseCapabilityBasename
+      );
+      renameSync(claimedCapability, supersededCapability);
+      databaseExecutionEpoch = 'cutover-recovery-1';
+      capabilityCheckpoint = join(
+        fixture.q12RunRoot,
+        `database-barrier-capability-checkpoint-${operation}-${databaseExecutionEpoch}.json`
+      );
+      writeProtectedJson(
+        capabilityCheckpoint,
+        checkpointForJournalEntry(recoveryCapabilityAnchor!, journal, null),
+        0o600
+      );
+      currentCapabilityBasename = `${commandId}--${databaseExecutionEpoch}.json`;
+      const recoveryIssuedCapability = join(
+        capabilityDirectories.issued,
+        currentCapabilityBasename
+      );
+      writeCanonicalProtectedJson(recoveryIssuedCapability, {
+        schema_version: 'megacampus.q12.host-command-capability/v1',
+        run_id: Q12_RUN_ID,
+        command_id: commandId,
+        command_sha256: '9'.repeat(64),
+        release_sha: releaseSha,
+        operator_digest: '8'.repeat(64),
+        resource_manifest_sha256: resourceManifestSha,
+        quiesce_manifest_sha256: quiesceSha,
+        resume_authority_sha256: null,
+        capability_input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+        lease_epoch: databaseExecutionEpoch,
+        supersedes_capability_sha256: hostCapabilitySha256,
+      });
+      currentHostCapabilitySha256 = fileSha256(recoveryIssuedCapability);
+      appendJournalEntry(
+        'guard_cleanup_complete',
+        'recovery_reacquired',
+        'none',
+        null,
+        databaseExecutionEpoch,
+        {
+          command_id: commandId,
+          capability_manifest_sha256: currentHostCapabilitySha256,
+        }
+      );
+      currentClaimedCapability = join(capabilityDirectories.claimed, currentCapabilityBasename);
+      renameSync(recoveryIssuedCapability, currentClaimedCapability);
+      currentClaimed = appendJournalEntry(
+        'guard_cleanup_complete',
+        'capability_claimed',
+        'none',
+        null,
+        databaseExecutionEpoch,
+        {
+          command_id: commandId,
+          capability_manifest_sha256: currentHostCapabilitySha256,
+        }
+      );
+      writeJournal(journal, journalEntries);
+    }
+    if (operation === 'rollback') {
+      requiredReceiptsSha256 = createHash('sha256')
+        .update(canonicalJson(requiredPhaseReceipts))
+        .digest('hex');
+      const rollbackIntent = join(fixture.q12RunRoot, 'database-barrier-rollback-intent.json');
+      writeCanonicalProtectedJson(rollbackIntent, {
+        schema_version: 'megacampus.q12.database-barrier-rollback-intent/v1',
+        run_id: Q12_RUN_ID,
+        state: 'rollback_intent',
+        expected_post_migration_catalog_sha256: 'b'.repeat(64),
+        database_barrier_baseline_sha256: fileSha256(baseline),
+        predecessor_receipt_sha256: predecessorSha256,
+        input_checkpoint_sha256: fileSha256(capabilityCheckpoint),
+        intent_journal_entry_hash: intent.entry_hash,
+        required_phase_receipts: requiredPhaseReceipts,
+        required_phase_receipts_sha256: requiredReceiptsSha256,
+      });
+      rollbackIntentSha256 = fileSha256(rollbackIntent);
+    }
+    const inputCheckpoint = join(
+      fixture.q12RunRoot,
+      `database-barrier-input-checkpoint-${operation}-${databaseExecutionEpoch}.json`
+    );
+    writeProtectedJson(
+      inputCheckpoint,
+      checkpointForJournalEntry(currentClaimed, journal, null),
+      0o600
+    );
+    const terminalProof = join(
+      fixture.q12RunRoot,
+      `database-barrier-${operation}-terminal-proof.json`
+    );
+    writeCanonicalProtectedJson(terminalProof, {
+      schema_version: 'megacampus.q12.database-barrier-terminal-proof/v1',
+      run_id: Q12_RUN_ID,
+      operation,
+      state: 'guard_cleanup_complete',
+      expected_post_migration_catalog_sha256: 'b'.repeat(64),
+      database_barrier_baseline_sha256: fileSha256(baseline),
+      predecessor_receipt_sha256: predecessorSha256,
+      predecessor_receipt_archive_sha256: fileSha256(predecessorArchive),
+      database_barrier_rollback_intent_sha256: rollbackIntentSha256,
+      input_checkpoint_sha256: fileSha256(inputCheckpoint),
+      intent_journal_entry_hash: intent.entry_hash,
+      structural_catalog_sha256:
+        operation === 'cleanup'
+          ? 'b'.repeat(64)
+          : baselineProjection.baseline_structural_catalog_sha256,
+      database_default_sha256: baselineProjection.database_default_sha256,
+      cron_jobs_sha256: baselineProjection.cron_jobs_sha256,
+      guard_residue: {
+        q12_guard_schema_count: 0,
+        q12_guard_relation_count: 0,
+        q12_guard_function_count: 0,
+        q12_guard_type_count: 0,
+        q12_guard_trigger_count: 0,
+        q12_guard_event_trigger_count: 0,
+        barrier_era_session_count: 0,
+      },
+      required_phase_receipts_sha256: requiredReceiptsSha256,
+      database_capability_sha256: databaseCapabilitySha256,
+      completed_at: '2026-07-14T08:00:00.000Z',
+    });
+    const completedCapability = join(capabilityDirectories.completed, currentCapabilityBasename);
+    renameSync(currentClaimedCapability, completedCapability);
+    appendJournalEntry(
+      'guard_cleanup_complete',
+      'capability_completed',
+      'none',
+      null,
+      databaseExecutionEpoch,
+      {
+        command_id: commandId,
+        capability_manifest_sha256: currentHostCapabilitySha256,
+      }
+    );
+    rmSync(fixture.q12Capability);
+    writeCanonicalProtectedJson(fixture.barrierReceipt, {
+      schema_version: 'megacampus.q12.database-barrier-receipt/v2',
+      run_id: Q12_RUN_ID,
+      state: 'guard_cleanup_complete',
+      expected_catalog_sha256: 'b'.repeat(64),
+      zero_guard_residue: true,
+      last_command: operation,
+      rollback_probes_verified: operation === 'cleanup',
+      probe_receipt_sha256: operation === 'cleanup' ? fileSha256(fixture.probeReceipt) : null,
+      terminal_proof_sha256: fileSha256(terminalProof),
+      database_capability_deleted: true,
+    });
+    appendJournalEntry(
+      'guard_cleanup_complete',
+      'accepted',
+      'database_barrier_receipt',
+      fileSha256(fixture.barrierReceipt),
+      databaseExecutionEpoch,
+      { command_id: commandId, capability_manifest_sha256: currentHostCapabilitySha256 }
+    );
+  };
   const commonPrefix = journalOptions.commonPrefixTransform?.([
     'preflight',
     'maintenance_guarded',
@@ -1657,17 +1942,8 @@ function writerResumeFixture(
     });
     handoffStateSha = fileSha256(handoffState);
     appendJournalEntry(statePhase, 'accepted', 'writer_handoff_state', handoffStateSha);
-    markBarrierCleanupComplete(fixture);
-    appendJournalEntry('guard_cleanup_complete', 'completed');
+    appendDatabaseTerminalLifecycle('cleanup', []);
   } else {
-    Object.assign(barrier, {
-      state: 'guard_cleanup_complete',
-      zero_guard_residue: true,
-      last_command: 'rollback',
-      rollback_probes_verified: false,
-      probe_receipt_sha256: null,
-    });
-    writeProtectedJson(fixture.barrierReceipt, barrier);
     const rollbackPhaseOrder = [
       'handoff_rollback_verified',
       'qdrant_rollback_verified',
@@ -1687,7 +1963,7 @@ function writerResumeFixture(
     for (const phase of rollbackJournalPhaseOrder) {
       if (requiredPhaseNames.includes(phase)) appendJournalEntry(phase, 'completed');
     }
-    appendJournalEntry('guard_cleanup_complete', 'completed');
+    appendDatabaseTerminalLifecycle('rollback', requiredPhaseReceipts);
     stateIntent = appendJournalEntry(statePhase, 'intent');
     writeProtectedJson(rollbackState, {
       schema_version: 'megacampus.q12.writer-rollback-state/v1',
@@ -1754,15 +2030,6 @@ function writerResumeFixture(
     { command_id: `writers.resume.${mode}` }
   );
   writeJournal(journal, journalEntries);
-  const capabilitiesRoot = join(fixture.q12RunRoot, 'capabilities');
-  const capabilityDirectories = Object.fromEntries(
-    ['issued', 'claimed', 'completed', 'superseded'].map(directory => {
-      const path = join(capabilitiesRoot, directory);
-      mkdirSync(path, { recursive: true, mode: 0o700 });
-      chmodSync(path, 0o700);
-      return [directory, path];
-    })
-  );
   const capabilityCheckpoint = join(
     fixture.q12RunRoot,
     `writer-resume-capability-checkpoint-${mode}-${authorityLeaseEpoch}.json`
@@ -1979,6 +2246,68 @@ function advanceWriterResumeRecoveryEpoch(
   ordinal = 1
 ): string {
   return rewriteWriterResumeEpoch(fixture, mode, `cutover-recovery-${ordinal}`);
+}
+
+function rewindWriterResumeToOrphanBoundary(
+  fixture: ResumeWriterFixture,
+  mode: 'forward' | 'rollback',
+  boundary: 'issued-file' | 'claimed-file'
+): void {
+  const journal = join(fixture.q12RunRoot, 'phase.jsonl');
+  const entries = readFileSync(journal, 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map(line => JSON.parse(line) as Record<string, any>);
+  const resumeIndexes = entries
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.phase === `resume_committing_${mode}`);
+  const retainedHead =
+    boundary === 'issued-file'
+      ? resumeIndexes[0]
+      : resumeIndexes.find(({ entry }) => entry.outcome === 'capability_issued')!;
+  entries.splice(retainedHead.index + 1);
+  writeJournal(journal, entries);
+  writeProtectedJson(
+    fixture.checkpoint,
+    checkpointForJournalEntry(retainedHead.entry, journal, fileSha256(fixture.authority)),
+    0o600
+  );
+  rmSync(fixture.inputCheckpoint, { force: true });
+  if (boundary === 'issued-file') {
+    const issued = join(fixture.capabilitiesRoot, 'issued', `writers.resume.${mode}--cutover.json`);
+    renameSync(fixture.capability, issued);
+    fixture.capability = issued;
+  }
+}
+
+function rewindWriterQuiesceToOrphanBoundary(
+  fixture: WriterQuiesceFixture,
+  boundary: 'issued-file' | 'claimed-file'
+): void {
+  const entries = readFileSync(fixture.journal, 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map(line => JSON.parse(line) as Record<string, any>);
+  const quiesceIndexes = entries
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.phase === 'quiesced');
+  const retainedHead =
+    boundary === 'issued-file'
+      ? quiesceIndexes[0]
+      : quiesceIndexes.find(({ entry }) => entry.outcome === 'capability_issued')!;
+  entries.splice(retainedHead.index + 1);
+  writeJournal(fixture.journal, entries);
+  writeProtectedJson(
+    fixture.checkpoint,
+    checkpointForJournalEntry(retainedHead.entry, fixture.journal, null),
+    0o600
+  );
+  rmSync(fixture.inputCheckpoint, { force: true });
+  if (boundary === 'issued-file') {
+    const issued = join(fixture.capabilitiesRoot, 'issued', 'writers.quiesce--cutover.json');
+    renameSync(fixture.capability, issued);
+    fixture.capability = issued;
+  }
 }
 
 function rewriteResumeJournalHead(
@@ -2298,6 +2627,45 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
+  it('rejects the legacy post-cleanup database receipt v1 before Docker inspection', () => {
+    const fixture = writerResumeFixture('forward');
+    writeProtectedJson(fixture.barrierReceipt, {
+      schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+      run_id: Q12_RUN_ID,
+      state: 'guard_cleanup_complete',
+      zero_guard_residue: true,
+      expected_catalog_sha256: 'b'.repeat(64),
+      last_command: 'cleanup',
+      rollback_probes_verified: true,
+      probe_receipt_sha256: fileSha256(fixture.probeReceipt),
+    });
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(
+      /database.*receipt.*(?:v2|non-exact projection)|terminal.*database.*authority/iu
+    );
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+  });
+
+  it.each(['forward', 'rollback'] as const)(
+    'accepts the exact terminal database recovery lifecycle before %s writer resume',
+    mode => {
+      const fixture = writerResumeFixture(mode, mode === 'forward' ? 5 : 3, false, {
+        databaseRecoveryEpoch: true,
+      });
+
+      const result = fixture.resume(mode);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(fixture.resumeState, 'utf8'))).toMatchObject({
+        state: 'writers_resumed',
+        mode,
+      });
+    }
+  );
+
   it('binds one immutable claimed capability to distinct capability and child-input checkpoints', () => {
     const fixture = writerResumeFixture('forward');
     const capability = JSON.parse(readFileSync(fixture.capability, 'utf8')) as Record<string, any>;
@@ -2433,6 +2801,31 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/capability|checkpoint|lifecycle|supersed/iu);
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect /mu);
+  });
+
+  it.each(['issued-file', 'claimed-file'] as const)(
+    'accepts a superseded resume capability recovered from the %s durable boundary',
+    boundary => {
+      const fixture = writerResumeFixture('forward');
+      rewindWriterResumeToOrphanBoundary(fixture, 'forward', boundary);
+      advanceWriterResumeRecoveryEpoch(fixture, 'forward');
+
+      const result = fixture.resume();
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(fixture.dockerLog, 'utf8')).toMatch(/^start /mu);
+    }
+  );
+
+  it('starts normally from an exact stopped/no recovery boundary without compensation', () => {
+    const fixture = writerResumeFixture('forward');
+    advanceWriterResumeRecoveryEpoch(fixture, 'forward');
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).toMatch(/^start /mu);
+    expect(existsSync(fixture.resumeState)).toBe(true);
   });
 
   it.each([
@@ -3336,7 +3729,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(existsSync(fixture.resumeState)).toBe(false);
   });
 
-  it('completes standalone recovery with every writer still quiesced and a controller receipt', () => {
+  it('rejects the mutable monolithic --stop-writers path for a Q12 run before writer mutation', () => {
     const fixture = composeWriterFixture();
 
     const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
@@ -3344,109 +3737,10 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       encoding: 'utf8',
     });
 
-    expect(result.status, result.stderr).toBe(0);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
-      true
-    );
-    const state = JSON.parse(readFileSync(fixture.recoveryState, 'utf8')) as Record<string, any>;
-    expect(state).toMatchObject({
-      schema_version: 'megacampus.q12.writer-recovery-state/v1',
-      run_id: Q12_RUN_ID,
-      state: 'recovery_complete_writers_quiesced',
-      expected_catalog_sha256: 'b'.repeat(64),
-    });
-    for (const field of [
-      'writer_quiesce_manifest_sha256',
-      'source_manifest_sha256',
-      'source_journal_sha256',
-    ]) {
-      expect(state[field]).toMatch(/^[a-f0-9]{64}$/u);
-    }
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
-  });
-
-  it('never replaces a pre-existing non-exact immutable writer recovery receipt', () => {
-    const fixture = composeWriterFixture();
-    const existing = '{"preexisting":"must-not-be-replaced"}\n';
-    writeFileSync(fixture.recoveryState, existing, { mode: 0o400 });
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/recovery.*already exists|recovery.*non-exact/iu);
-    expect(readFileSync(fixture.recoveryState, 'utf8')).toBe(existing);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-  });
-
-  it.each([
-    'maintenance_guarded',
-    '20260711151000_guard_verified',
-    'activated',
-    'guard_cleanup_complete',
-  ])('rejects non-ready database barrier state %s before writer mutation', state => {
-    const fixture = composeWriterFixture();
-    const receipt = JSON.parse(readFileSync(fixture.barrierReceipt, 'utf8')) as Record<string, any>;
-    receipt.state = state;
-    if (state === 'guard_cleanup_complete') {
-      receipt.zero_guard_residue = true;
-      receipt.last_command = 'cleanup';
-    }
-    chmodSync(fixture.barrierReceipt, 0o600);
-    writeFileSync(fixture.barrierReceipt, `${JSON.stringify(receipt)}\n`);
-    chmodSync(fixture.barrierReceipt, 0o400);
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/recovery_ready_guarded/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-  });
-
-  it('fails closed without a recovery-complete receipt when a recovery child fails', () => {
-    const fixture = composeWriterFixture();
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: { ...fixture.env, SOURCE_RECOVERY_TEST_FAIL_MODE: 'execute' },
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(existsSync(fixture.recoveryState)).toBe(false);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
-      true
-    );
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
-  });
-
-  it('rejects an immutable source manifest replacement after the final recovery child', () => {
-    const fixture = composeWriterFixture();
-    const sourceManifest = fixture.args[fixture.args.indexOf('--manifest') + 1];
-    const replacement = join(fixture.directory, 'replacement-source-manifest.json');
-    writeFileSync(replacement, '{"replacement":true}\n', { mode: 0o400 });
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: {
-        ...fixture.env,
-        SOURCE_RECOVERY_TEST_SWAP_AFTER_MODE: 'verify-dispositions',
-        SOURCE_RECOVERY_TEST_SWAP_TARGET: sourceManifest,
-        SOURCE_RECOVERY_TEST_SWAP_REPLACEMENT: replacement,
-      },
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(existsSync(fixture.recoveryState)).toBe(false);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
-      true
+    expect(result.stderr).toMatch(/quiesce-writers-only|external-quiesce-manifest/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(
+      /^(?:inspect|update|stop|start) /mu
     );
   });
 
@@ -3594,6 +3888,21 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     ).toEqual([]);
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
+
+  it.each(['issued-file', 'claimed-file'] as const)(
+    'accepts a superseded quiesce capability recovered from the %s durable boundary',
+    boundary => {
+      const fixture = writerQuiesceFixture();
+      rewindWriterQuiesceToOrphanBoundary(fixture, boundary);
+      advanceWriterQuiesceRecoveryEpoch(fixture);
+
+      const result = fixture.quiesce();
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
+      expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+    }
+  );
 
   it('reconstructs only the missing terminal transition after an exact final manifest', () => {
     const fixture = writerQuiesceFixture();
@@ -3771,366 +4080,6 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(wrapper).toContain("readonly CONTROLLER_GID='1000'");
     expect(entrypoint).toContain("readonly CONTROLLER_UID='1000'");
     expect(entrypoint).toContain("readonly CONTROLLER_GID='1000'");
-  });
-
-  it('binds a validated Q12 capability file into every ephemeral operator without reading it', () => {
-    const fixture = composeWriterFixture();
-    const sentinel = 'q12-wrapper-secret-sentinel';
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-
-    expect(result.status, result.stderr).toBe(0);
-    const composeLog = readFileSync(fixture.composeLog, 'utf8');
-    expect(composeLog).toContain(
-      `-v ${fixture.q12Capability}:/run/secrets/q12_db_capability:ro -e Q12_DB_CAPABILITY_FILE=/run/secrets/q12_db_capability`
-    );
-    expect(composeLog).toContain(
-      `-v ${fixture.probeReceipt}:/run/secrets/q12_database_barrier_probe_receipt:ro`
-    );
-    expect(composeLog).not.toContain(sentinel);
-    expect(readFileSync(fixture.q12Capability, 'utf8').trim()).toBe(sentinel);
-  });
-
-  it('quiesces the exact ten writers and hard-stops pending an approved resume contract', () => {
-    const fixture = composeWriterFixture();
-    const before = fixture.records();
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-
-    expect(
-      result.status,
-      `${result.stderr}\nreceipt=${readFileSync(fixture.barrierReceipt, 'utf8')}\nmanifest=${readFileSync(fixture.quiesceManifest, 'utf8')}`
-    ).toBe(0);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
-      true
-    );
-    expect(existsSync(fixture.oldCrossedQuiesceManifest)).toBe(false);
-    const manifest = JSON.parse(readFileSync(fixture.quiesceManifest, 'utf8')) as Record<
-      string,
-      any
-    >;
-    expect(manifest).toMatchObject({
-      schema_version: 'megacampus.q12.writer-quiesce/v1',
-      run_id: Q12_RUN_ID,
-      status: 'quiesced',
-      barrier: { state: 'recovery_ready_guarded', zero_guard_residue: false },
-    });
-    expect(manifest.writers).toHaveLength(10);
-    expect(new Set(manifest.writers.map((writer: Record<string, string>) => writer.id)).size).toBe(
-      10
-    );
-    const dockerLines = readFileSync(fixture.dockerLog, 'utf8').trim().split('\n');
-    const mutationLines = dockerLines.filter(line => /^(?:update|stop|start) /u.test(line));
-    const knownIds = new Set(before.map(record => record.Id));
-    for (const line of mutationLines) {
-      expect([...knownIds].some(id => line.includes(id))).toBe(true);
-    }
-    const firstStop = mutationLines.findIndex(line => line.startsWith('stop '));
-    expect(mutationLines.slice(0, firstStop)).toHaveLength(10);
-    expect(
-      mutationLines.slice(0, firstStop).every(line => line.startsWith('update --restart=no '))
-    ).toBe(true);
-    const stopLines = mutationLines.filter(line => line.startsWith('stop '));
-    const apiWebIds = new Set([before[0].Id, before[1].Id, before[5].Id, before[6].Id]);
-    expect(stopLines.slice(0, 4).every(line => [...apiWebIds].some(id => line.includes(id)))).toBe(
-      true
-    );
-    expect(mutationLines.some(line => line.startsWith('start '))).toBe(false);
-    const curlLog = readFileSync(fixture.curlLog, 'utf8');
-    expect(curlLog).toContain('ai.megacampus.ru');
-    expect(curlLog).toContain('dev.ai.megacampus.ru');
-  });
-
-  it('proves the production cleanup-to-resume handoff is blocked after capability deletion', () => {
-    const fixture = composeWriterFixture();
-    const quiesced = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-    expect(quiesced.status).toBe(0);
-    markBarrierCleanupComplete(fixture);
-    rmSync(fixture.q12Capability, { force: true });
-    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
-
-    const resumed = spawnSync(
-      'bash',
-      [WRAPPER, '--resume-from', 'verify-dispositions', '--stop-writers', ...fixture.args],
-      { env: fixture.env, encoding: 'utf8' }
-    );
-
-    expect(resumed.status).not.toBe(0);
-    expect(resumed.stderr).toMatch(/capability.*existing absolute non-symlink file/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-  });
-
-  it('accepts the exact Nginx 502/503 pages when server_tokens is disabled', () => {
-    const fixture = composeWriterFixture();
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: { ...fixture.env, SOURCE_RECOVERY_TEST_NGINX_VARIANT: 'tokens-off' },
-      encoding: 'utf8',
-    });
-
-    expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).not.toMatch(/inbound Nginx response signature/iu);
-    expect(JSON.parse(readFileSync(fixture.quiesceManifest, 'utf8'))).toMatchObject({
-      status: 'quiesced',
-    });
-    expect(readFileSync(fixture.curlLog, 'utf8')).toContain('dev.ai.megacampus.ru');
-  });
-
-  it.each([
-    'custom-body',
-    'wrong-reason',
-    'wrong-status',
-    'mismatched-footer',
-    'lf-only',
-    'extra-bytes',
-    'oversized',
-    'json',
-    'wrong-content-type',
-    'missing-content-type',
-    'duplicate-content-type',
-    'missing-content-length',
-    'duplicate-content-length',
-    'missing-server',
-    'duplicate-server',
-    'chunked',
-  ])('rejects a non-standard Nginx maintenance response: %s', variant => {
-    const fixture = composeWriterFixture();
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: { ...fixture.env, SOURCE_RECOVERY_TEST_NGINX_VARIANT: variant },
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/inbound.*signature|inbound.*probe/iu);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
-      true
-    );
-  });
-
-  it('re-quiesces every captured writer when an exact stop boundary fails', () => {
-    const fixture = composeWriterFixture();
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: {
-        ...fixture.env,
-        SOURCE_RECOVERY_TEST_FAIL_STOP_AFTER: '2',
-        SOURCE_RECOVERY_TEST_STOP_COUNTER: join(fixture.directory, 'stop-counter'),
-      },
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
-    expect(fixture.records().every(record => record.HostConfig.RestartPolicy.Name === 'no')).toBe(
-      true
-    );
-  });
-
-  it('does not follow a crash-stale predictable writer-manifest temporary symlink', () => {
-    const fixture = composeWriterFixture();
-    const victim = join(fixture.directory, 'manifest-symlink-victim');
-    writeFileSync(victim, 'unchanged\n', { mode: 0o400 });
-    const result = spawnSync(
-      'bash',
-      [
-        '-c',
-        'victim="$1"; manifest="$2"; wrapper="$3"; shift 3; ln -s -- "$victim" "$manifest.tmp.$$"; exec bash "$wrapper" --stop-writers "$@"',
-        'q12-manifest-stale-temp',
-        victim,
-        fixture.quiesceManifest,
-        WRAPPER,
-        ...fixture.args,
-      ],
-      { env: fixture.env, encoding: 'utf8' }
-    );
-
-    expect(result.status, result.stderr).toBe(0);
-    expect(readFileSync(victim, 'utf8')).toBe('unchanged\n');
-    expect(JSON.parse(readFileSync(fixture.quiesceManifest, 'utf8'))).toMatchObject({
-      status: 'quiesced',
-    });
-  });
-
-  it('rejects recovery/Q12 UUID cross-wiring before any Compose writer mutation', () => {
-    const fixture = composeWriterFixture();
-    const receipt = JSON.parse(readFileSync(fixture.barrierReceipt, 'utf8')) as Record<string, any>;
-    receipt.run_id = '123e4567-e89b-42d3-a456-426614174000';
-    chmodSync(fixture.barrierReceipt, 0o600);
-    writeFileSync(fixture.barrierReceipt, `${JSON.stringify(receipt)}\n`);
-    chmodSync(fixture.barrierReceipt, 0o400);
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/barrier receipt/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-  });
-
-  it('rejects extra receipt and quiesce-manifest fields instead of accepting supersets', () => {
-    const receiptFixture = composeWriterFixture();
-    const receipt = JSON.parse(readFileSync(receiptFixture.barrierReceipt, 'utf8')) as Record<
-      string,
-      any
-    >;
-    receipt.unreviewed = true;
-    chmodSync(receiptFixture.barrierReceipt, 0o600);
-    writeFileSync(receiptFixture.barrierReceipt, `${JSON.stringify(receipt)}\n`);
-    chmodSync(receiptFixture.barrierReceipt, 0o400);
-    const receiptResult = spawnSync('bash', [WRAPPER, '--stop-writers', ...receiptFixture.args], {
-      env: receiptFixture.env,
-      encoding: 'utf8',
-    });
-    expect(receiptResult.status).not.toBe(0);
-    expect(receiptResult.stderr).toMatch(/barrier receipt/iu);
-    expect(readFileSync(receiptFixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-
-    const manifestFixture = composeWriterFixture();
-    const quiesced = spawnSync('bash', [WRAPPER, '--stop-writers', ...manifestFixture.args], {
-      env: manifestFixture.env,
-      encoding: 'utf8',
-    });
-    expect(quiesced.status).toBe(0);
-    const manifest = JSON.parse(readFileSync(manifestFixture.quiesceManifest, 'utf8')) as Record<
-      string,
-      any
-    >;
-    manifest.unreviewed = true;
-    chmodSync(manifestFixture.quiesceManifest, 0o600);
-    writeFileSync(manifestFixture.quiesceManifest, `${JSON.stringify(manifest)}\n`);
-    chmodSync(manifestFixture.quiesceManifest, 0o400);
-    writeFileSync(manifestFixture.dockerLog, '', { mode: 0o600 });
-    const manifestResult = spawnSync(
-      'bash',
-      [WRAPPER, '--resume-from', 'execute', '--stop-writers', ...manifestFixture.args],
-      { env: manifestFixture.env, encoding: 'utf8' }
-    );
-    expect(manifestResult.status).not.toBe(0);
-    expect(manifestResult.stderr).toMatch(/quiesce manifest.*invalid|cross-wired/iu);
-    expect(readFileSync(manifestFixture.dockerLog, 'utf8')).not.toMatch(
-      /^(?:update|stop|start) /mu
-    );
-  });
-
-  it.each(['class', 'service', 'config_files'] as const)(
-    'rejects a durable writer manifest with a changed immutable %s projection',
-    field => {
-      const fixture = composeWriterFixture();
-      const quiesced = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-        env: fixture.env,
-        encoding: 'utf8',
-      });
-      expect(quiesced.status).toBe(0);
-      const manifest = JSON.parse(readFileSync(fixture.quiesceManifest, 'utf8')) as Record<
-        string,
-        any
-      >;
-      if (field === 'class') manifest.writers[0].class = 'production-worker';
-      if (field === 'service') manifest.writers[0].service = 'web';
-      if (field === 'config_files') manifest.writers[0].config_files = '/srv/tampered/compose.yml';
-      chmodSync(fixture.quiesceManifest, 0o600);
-      writeFileSync(fixture.quiesceManifest, `${JSON.stringify(manifest)}\n`);
-      chmodSync(fixture.quiesceManifest, 0o400);
-      writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
-
-      const result = spawnSync(
-        'bash',
-        [WRAPPER, '--resume-from', 'execute', '--stop-writers', ...fixture.args],
-        { env: fixture.env, encoding: 'utf8' }
-      );
-
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toMatch(/quiesce manifest.*invalid|cross-wired|inventory differs/iu);
-      expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-    }
-  );
-
-  it('rejects host Q12 artifacts owned as operator state instead of controller state', () => {
-    const fixture = composeWriterFixture();
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: {
-        ...fixture.env,
-        SOURCE_RECOVERY_CONTROLLER_UID: String(Number(process.getuid?.() ?? 1000) + 1),
-      },
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/capability.*exact owner and mode/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-  });
-
-  it('fails before Docker mutation for duplicate or mismatched Compose identity', () => {
-    const fixture = composeWriterFixture();
-    const records = fixture.records();
-    records.push({ ...records[2], Id: `ff${'b'.repeat(62)}`, Name: '/duplicate-worker' });
-    writeFileSync(fixture.recordsPath, `${JSON.stringify(records)}\n`, { mode: 0o600 });
-
-    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/exactly one|duplicate|identity/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-  });
-
-  it.each(['unhealthy', 'starting'])(
-    'fails closed for a %s writer before changing restart policy',
-    health => {
-      const fixture = composeWriterFixture();
-      const records = fixture.records();
-      records[4].State.Health.Status = health;
-      writeFileSync(fixture.recordsPath, `${JSON.stringify(records)}\n`, { mode: 0o600 });
-
-      const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-        env: fixture.env,
-        encoding: 'utf8',
-      });
-
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toMatch(/unhealthy|identity|inspect/iu);
-      expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
-    }
-  );
-
-  it('rejects a recreated container ID against a durable partial-policy manifest', () => {
-    const fixture = composeWriterFixture();
-    const updateCounter = join(fixture.directory, 'update-counter-recreated');
-    const interrupted = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: {
-        ...fixture.env,
-        SOURCE_RECOVERY_TEST_FAIL_UPDATE_AFTER: '2',
-        SOURCE_RECOVERY_TEST_UPDATE_COUNTER: updateCounter,
-      },
-      encoding: 'utf8',
-    });
-    expect(interrupted.status).not.toBe(0);
-    const records = fixture.records();
-    records[0].Id = `ff${'c'.repeat(62)}`;
-    writeFileSync(fixture.recordsPath, `${JSON.stringify(records)}\n`, { mode: 0o600 });
-    writeFileSync(fixture.dockerLog, '', { mode: 0o600 });
-
-    const resumed = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
-      env: fixture.env,
-      encoding: 'utf8',
-    });
-    expect(resumed.status).not.toBe(0);
-    expect(resumed.stderr).toMatch(/durable writer inventory|identity/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
   });
 
   it('accepts an exact external quiesce lease without any automatic Docker start or stop', () => {

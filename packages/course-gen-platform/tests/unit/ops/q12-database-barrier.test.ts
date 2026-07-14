@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The exhaustive Q12 barrier suite shares one exact durable fixture. */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -8,6 +9,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -22,6 +24,9 @@ const STRUCTURAL_CATALOG = resolve(REPO_ROOT, 'deploy/qdrant/q12-structural-cata
 const RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
 const CAPABILITY_SENTINEL = 'q12-capability-synthetic-sentinel';
 const URI_PASSWORD_SENTINEL = 'q12-uri-password-synthetic-sentinel';
+const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
+const POSTGRES_IMAGE = 'postgres:17.10-bookworm';
+const POSTGRES_PASSWORD = 'q12-local-terminal-proof-password';
 const temporaryDirectories: string[] = [];
 
 function source(): string {
@@ -194,52 +199,100 @@ function writeCanonical(path: string, value: unknown, mode = 0o400): void {
   chmodSync(path, mode);
 }
 
-function prepareTerminalInputs(fixture: BarrierFixture, operation: 'cleanup' | 'rollback'): void {
-  const expected = expectedCatalog();
+function prepareTerminalInputs(
+  fixture: BarrierFixture,
+  operation: 'cleanup' | 'rollback',
+  executionEpoch = 'cutover'
+): void {
+  const expected = JSON.parse(readFileSync(fixture.catalog, 'utf8')) as Record<string, any>;
   const catalogSha =
     fixture.args[fixture.args.indexOf('--expected-post-migration-catalog-sha256') + 1];
   const capabilitySha = sha256(readFileSync(fixture.capability, 'utf8').trim());
-  const checkpoint = {
-    schema_version: 'megacampus.q12.cutover-checkpoint/v1',
-    run_id: RUN_ID,
-    seq: operation === 'cleanup' ? 41 : 42,
-    phase: 'guard_cleanup_complete',
-    journal_entry_hash: (operation === 'cleanup' ? '4' : '5').repeat(64),
-    previous_journal_entry_hash: '3'.repeat(64),
-    journal_device: '1',
-    journal_inode: '1',
-    accepted_object_kind: 'none',
-    accepted_object_sha256: null,
-    resume_authority_sha256: null,
-    lease_epoch: 'cutover',
-  };
-  writeCanonical(
-    join(fixture.runRoot, `database-barrier-input-checkpoint-${operation}-cutover.json`),
-    checkpoint,
-    0o600
-  );
-  writeCanonical(
-    join(fixture.runRoot, 'phase.jsonl'),
-    {
+  const journal = join(fixture.runRoot, 'phase.jsonl');
+  const entries: Array<Record<string, any>> = [];
+  let previousHash = '0'.repeat(64);
+  const append = (
+    phase: string,
+    outcome: string,
+    leaseEpoch: string,
+    capabilityManifestSha256: string
+  ): Record<string, any> => {
+    const preimage = {
       schema: 'megacampus.q12.cutover-journal/v1',
       run_id: RUN_ID,
-      seq: checkpoint.seq,
-      phase: checkpoint.phase,
-      outcome: 'capability_claimed',
-      timestamp: '2026-07-14T08:00:00.000Z',
+      seq: entries.length + 1,
+      phase,
+      outcome,
+      timestamp: `2026-07-14T08:00:${String(entries.length + 1).padStart(2, '0')}.000Z`,
       release_sha: '1'.repeat(40),
       operator_digest: '2'.repeat(64),
-      command_id: `barrier.${operation}`,
+      command_id:
+        phase === 'guard_cleanup_complete' ? `barrier.${operation}` : 'barrier.prepare-recovery',
       command_sha256: '3'.repeat(64),
-      lease_epoch: 'cutover',
-      previous_hash: checkpoint.previous_journal_entry_hash,
-      entry_hash: checkpoint.journal_entry_hash,
+      lease_epoch: leaseEpoch,
+      previous_hash: previousHash,
       rotation_required: true,
       resource_manifest_sha256: 'b'.repeat(64),
       quiesce_manifest_sha256: '0'.repeat(64),
-      capability_manifest_sha256: 'c'.repeat(64),
+      capability_manifest_sha256: capabilityManifestSha256,
       accepted_object_kind: 'none',
       accepted_object_sha256: null,
+    };
+    const entry = { ...preimage, entry_hash: sha256(canonicalJson(preimage)) };
+    entries.push(entry);
+    previousHash = entry.entry_hash;
+    return entry;
+  };
+  const acceptedPredecessor = append('preflight', 'accepted', 'cutover', '0'.repeat(64));
+  const intent = append('guard_cleanup_complete', 'intent', 'cutover', '0'.repeat(64));
+  append('guard_cleanup_complete', 'capability_issued', 'cutover', 'c'.repeat(64));
+  let claimed = append('guard_cleanup_complete', 'capability_claimed', 'cutover', 'c'.repeat(64));
+  if (executionEpoch !== 'cutover') {
+    append('guard_cleanup_complete', 'recovery_reacquired', executionEpoch, 'd'.repeat(64));
+    claimed = append(
+      'guard_cleanup_complete',
+      'capability_claimed',
+      executionEpoch,
+      'd'.repeat(64)
+    );
+  }
+  writeFileSync(journal, `${entries.map(canonicalJson).join('\n')}\n`, { mode: 0o600 });
+  chmodSync(journal, 0o600);
+  const journalStat = statSync(journal);
+  const checkpoint = {
+    schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+    run_id: RUN_ID,
+    seq: claimed.seq,
+    phase: 'guard_cleanup_complete',
+    journal_entry_hash: claimed.entry_hash,
+    previous_journal_entry_hash: claimed.previous_hash,
+    journal_device: String(journalStat.dev),
+    journal_inode: String(journalStat.ino),
+    accepted_object_kind: 'none',
+    accepted_object_sha256: null,
+    resume_authority_sha256: null,
+    lease_epoch: executionEpoch,
+  };
+  writeCanonical(
+    join(fixture.runRoot, `database-barrier-input-checkpoint-${operation}-${executionEpoch}.json`),
+    checkpoint,
+    0o600
+  );
+  const capabilityCheckpoint = join(
+    fixture.runRoot,
+    `database-barrier-capability-checkpoint-${operation}-${executionEpoch}.json`
+  );
+  writeCanonical(
+    capabilityCheckpoint,
+    {
+      ...checkpoint,
+      seq: executionEpoch === 'cutover' ? intent.seq : acceptedPredecessor.seq,
+      phase: executionEpoch === 'cutover' ? intent.phase : acceptedPredecessor.phase,
+      journal_entry_hash:
+        executionEpoch === 'cutover' ? intent.entry_hash : acceptedPredecessor.entry_hash,
+      previous_journal_entry_hash:
+        executionEpoch === 'cutover' ? intent.previous_hash : acceptedPredecessor.previous_hash,
+      lease_epoch: 'cutover',
     },
     0o600
   );
@@ -287,12 +340,8 @@ function prepareTerminalInputs(fixture: BarrierFixture, operation: 'cleanup' | '
       expected_post_migration_catalog_sha256: expected.expected_post_migration_catalog_sha256,
       database_barrier_baseline_sha256: sha256(readFileSync(fixture.baseline)),
       predecessor_receipt_sha256: sha256(readFileSync(fixture.receipt)),
-      input_checkpoint_sha256: sha256(
-        readFileSync(
-          join(fixture.runRoot, 'database-barrier-input-checkpoint-rollback-cutover.json')
-        )
-      ),
-      intent_journal_entry_hash: checkpoint.journal_entry_hash,
+      input_checkpoint_sha256: sha256(readFileSync(capabilityCheckpoint)),
+      intent_journal_entry_hash: intent.entry_hash,
       required_phase_receipts: requiredPhaseReceipts,
       required_phase_receipts_sha256: sha256(canonicalJson(requiredPhaseReceipts)),
     });
@@ -629,6 +678,107 @@ describe('Q12 durable database maintenance barrier', () => {
       expect(readFileSync(fixture.receipt)).toEqual(predecessorReceipt);
     }
   );
+
+  it('accepts an exact cleanup child-input checkpoint in the current recovery epoch', () => {
+    const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'cleanup', 'cutover-recovery-1');
+
+    const result = spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(fixture.cleanupProof)).toBe(true);
+  });
+
+  it('rejects a corrupt earlier database lifecycle row even when the claimed tail matches', () => {
+    const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'cleanup');
+    const journal = join(fixture.runRoot, 'phase.jsonl');
+    const tail = readFileSync(journal, 'utf8');
+    writeFileSync(
+      journal,
+      `${canonicalJson({
+        schema: 'megacampus.q12.cutover-journal/v1',
+        run_id: RUN_ID,
+        seq: 1,
+        phase: 'guard_cleanup_complete',
+        outcome: 'intent',
+        previous_hash: '0'.repeat(64),
+        entry_hash: 'f'.repeat(64),
+      })}\n${tail}`,
+      { mode: 0o600 }
+    );
+
+    const result = spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/journal.*chain|journal.*canonical|lifecycle/iu);
+    expect(existsSync(fixture.cleanupProof)).toBe(false);
+  });
+
+  it('rejects a rollback predecessor receipt whose state and last_command disagree', () => {
+    const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'rollback');
+    const receipt = JSON.parse(readFileSync(fixture.receipt, 'utf8')) as Record<string, any>;
+    receipt.last_command = 'activate';
+    chmodSync(fixture.receipt, 0o600);
+    writeCanonical(fixture.receipt, receipt);
+    const archive = join(fixture.runRoot, 'database-barrier-receipt-v1-before-rollback.json');
+    chmodSync(archive, 0o600);
+    writeFileSync(archive, readFileSync(fixture.receipt));
+    chmodSync(archive, 0o400);
+
+    const result = spawnSync('bash', [BARRIER, 'rollback', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/predecessor receipt|last_command/iu);
+    expect(existsSync(fixture.rollbackProof)).toBe(false);
+  });
+
+  it.each([
+    {
+      label: 'cross-wired capability checkpoint',
+      mutate: (intent: Record<string, any>) => {
+        intent.input_checkpoint_sha256 = 'f'.repeat(64);
+      },
+    },
+    {
+      label: 'extra rollback phase receipt',
+      mutate: (intent: Record<string, any>) => {
+        intent.required_phase_receipts = [
+          { phase: 'handoff_rollback_verified', receipt_sha256: '1'.repeat(64) },
+        ];
+        intent.required_phase_receipts_sha256 = sha256(
+          canonicalJson(intent.required_phase_receipts)
+        );
+      },
+    },
+  ])('rejects a rollback intent with a $label before database mutation', ({ mutate }) => {
+    const fixture = barrierFixture();
+    prepareTerminalInputs(fixture, 'rollback');
+    const intentPath = join(fixture.runRoot, 'database-barrier-rollback-intent.json');
+    const intent = JSON.parse(readFileSync(intentPath, 'utf8')) as Record<string, any>;
+    mutate(intent);
+    chmodSync(intentPath, 0o600);
+    writeCanonical(intentPath, intent);
+
+    const result = spawnSync('bash', [BARRIER, 'rollback', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/rollback intent|required phase receipt|checkpoint/iu);
+    expect(existsSync(fixture.rollbackProof)).toBe(false);
+  });
 
   it('reconstructs a missing baseline and v1 receipt after install COMMIT without replacing the baseline', () => {
     const fixture = barrierFixture();
@@ -1566,3 +1716,203 @@ describe('Q12 durable database maintenance barrier', () => {
     }
   );
 });
+
+describe.runIf(REAL_PG17)(
+  'Q12 terminal proof reconnect against disposable PostgreSQL 17.10',
+  () => {
+    it('drives the protected cleanup seam through the actual terminal reconnect runner', async () => {
+      const container = `mc2-q12-terminal-${process.pid}-${Date.now()}`;
+      const docker = (args: string[], input?: string) =>
+        spawnSync('docker', args, {
+          encoding: 'utf8',
+          input,
+          timeout: 60_000,
+        });
+      const started = docker([
+        'run',
+        '-d',
+        '--rm',
+        '--name',
+        container,
+        '-e',
+        `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+        '-p',
+        '127.0.0.1::5432',
+        POSTGRES_IMAGE,
+      ]);
+      expect(started.status, started.stderr).toBe(0);
+
+      try {
+        let ready = false;
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          const logs = docker(['logs', container]);
+          const probe = docker([
+            'exec',
+            container,
+            'pg_isready',
+            '-U',
+            'postgres',
+            '-d',
+            'postgres',
+          ]);
+          if (
+            probe.status === 0 &&
+            logs.stdout.includes('PostgreSQL init process complete; ready for start up.')
+          ) {
+            ready = true;
+            break;
+          }
+          await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
+        }
+        expect(ready, docker(['logs', container]).stdout).toBe(true);
+
+        const setup = docker(
+          ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+          `
+CREATE SCHEMA extensions;
+CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+CREATE SCHEMA supabase_migrations;
+CREATE TABLE supabase_migrations.schema_migrations(
+  version text PRIMARY KEY,
+  name text,
+  statements text[]
+);
+CREATE SCHEMA cron;
+CREATE TABLE cron.job(
+  jobid bigint PRIMARY KEY,
+  schedule text NOT NULL,
+  command text NOT NULL,
+  nodename text NOT NULL,
+  nodeport integer NOT NULL,
+  database text NOT NULL,
+  username text NOT NULL,
+  active boolean NOT NULL,
+  jobname text
+);
+INSERT INTO cron.job(jobid,schedule,command,nodename,nodeport,database,username,active,jobname)
+SELECT value,'0 * * * *','SELECT ' || value,'localhost',5432,'postgres','postgres',true,
+       'q12_job_' || value
+FROM generate_series(1,8) AS value;
+`
+        );
+        expect(setup.status, setup.stderr).toBe(0);
+
+        const structuralSql = readFileSync(STRUCTURAL_CATALOG, 'utf8').trim();
+        const structural = docker(
+          ['exec', '-i', container, 'psql', '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+          `SELECT structural_sha256 FROM (\n${structuralSql}\n) AS terminal_catalog;\n`
+        );
+        expect(structural.status, structural.stderr).toBe(0);
+        const structuralSha256 = structural.stdout.trim();
+        expect(structuralSha256).toMatch(/^[a-f0-9]{64}$/u);
+
+        const cronProjection = Array.from({ length: 8 }, (_, index) => {
+          const jobid = index + 1;
+          return {
+            jobid,
+            jobname: `q12_job_${jobid}`,
+            schedule: '0 * * * *',
+            command_sha256: sha256(`SELECT ${jobid}`),
+            nodename: 'localhost',
+            nodeport: 5432,
+            database: 'postgres',
+            username: 'postgres',
+            active: true,
+          };
+        });
+        const databaseDefault = {
+          schema_version: 'megacampus.q12.database-default/v1',
+          database: 'postgres',
+          role: null,
+          row_present: false,
+          settings: [],
+        };
+        const fixture = barrierFixture();
+        rewriteExpectedCatalog(fixture, catalog => {
+          catalog.baseline_structural_sha256 = structuralSha256;
+          catalog.expected_post_migration_catalog_sha256 = structuralSha256;
+          catalog.migrations['20260711151000'].catalog_sha256 = structuralSha256;
+        });
+        const expectedCatalogSha256 =
+          fixture.args[fixture.args.indexOf('--expected-post-migration-catalog-sha256') + 1];
+        const probeReceipt = JSON.parse(readFileSync(fixture.probeReceipt, 'utf8')) as Record<
+          string,
+          unknown
+        >;
+        probeReceipt.expected_catalog_sha256 = expectedCatalogSha256;
+        chmodSync(fixture.probeReceipt, 0o600);
+        writeCanonical(fixture.probeReceipt, probeReceipt);
+        prepareTerminalInputs(fixture, 'cleanup');
+
+        const baseline = JSON.parse(readFileSync(fixture.baseline, 'utf8')) as Record<string, any>;
+        baseline.baseline.database_default_sha256 = sha256(canonicalJson(databaseDefault));
+        baseline.baseline.cron_jobs_sha256 = sha256(canonicalJson(cronProjection));
+        baseline.baseline_sha256 = sha256(canonicalJson(baseline.baseline));
+        chmodSync(fixture.baseline, 0o600);
+        writeCanonical(fixture.baseline, baseline);
+
+        const publishedPort = docker(['port', container, '5432/tcp']);
+        expect(publishedPort.status, publishedPort.stderr).toBe(0);
+        const port = publishedPort.stdout.trim().match(/:(\d+)$/u)?.[1];
+        expect(port).toMatch(/^\d+$/u);
+        writeFileSync(
+          fixture.dbUrl,
+          `postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:${port}/postgres\n`
+        );
+        chmodSync(fixture.dbUrl, 0o600);
+
+        const testRoot = fixture.env.MC2_Q12_BARRIER_TEST_ROOT as string;
+        const terminalNode = join(testRoot, 'terminal-node');
+        const terminalInvocationLog = join(testRoot, 'terminal-node-invoked.log');
+        writeFileSync(
+          terminalNode,
+          `#!/usr/bin/env bash
+set -euo pipefail
+{
+  printf 'invoked url_fd=%s\\n' "$3"
+  readlink "/proc/self/fd/$3"
+  cat "/proc/self/fdinfo/$3"
+} > "$MC2_Q12_REAL_TERMINAL_NODE_LOG"
+exec node "$@"
+`,
+          { mode: 0o700 }
+        );
+        chmodSync(terminalNode, 0o700);
+
+        const result = spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
+          env: {
+            ...fixture.env,
+            MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY: REPO_ROOT,
+            MC2_Q12_BARRIER_TEST_REAL_RECONNECT: 'mc2-local-pg17-terminal-reconnect-only',
+            MC2_Q12_BARRIER_TEST_TERMINAL_NODE: terminalNode,
+            MC2_Q12_REAL_TERMINAL_NODE_LOG: terminalInvocationLog,
+          },
+          encoding: 'utf8',
+          timeout: 60_000,
+        });
+
+        expect(
+          result.status,
+          `${result.stderr}\n${readFileSync(terminalInvocationLog, 'utf8')}`
+        ).toBe(0);
+        expect(readFileSync(terminalInvocationLog, 'utf8')).toMatch(/^invoked url_fd=\d+\n/u);
+        expect(JSON.parse(readFileSync(fixture.cleanupProof, 'utf8'))).toMatchObject({
+          structural_catalog_sha256: structuralSha256,
+          database_default_sha256: sha256(canonicalJson(databaseDefault)),
+          cron_jobs_sha256: sha256(canonicalJson(cronProjection)),
+          guard_residue: {
+            q12_guard_schema_count: 0,
+            q12_guard_relation_count: 0,
+            q12_guard_function_count: 0,
+            q12_guard_type_count: 0,
+            q12_guard_trigger_count: 0,
+            q12_guard_event_trigger_count: 0,
+            barrier_era_session_count: 0,
+          },
+        });
+      } finally {
+        docker(['rm', '-f', container]);
+      }
+    }, 120_000);
+  }
+);
