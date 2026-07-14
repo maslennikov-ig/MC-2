@@ -1096,7 +1096,7 @@ interface ResumeJournalFixtureOptions {
   databaseRecoveryEpoch?: boolean;
   duplicateFinalPair?: boolean;
   entryMutator?: (entry: Record<string, any>) => void;
-  historicalInstallCapability?: boolean;
+  historicalInstallScenario?: 'valid' | 'wrong-context' | 'ambiguous' | 'orphan-recovery';
   probeMutator?: (probe: Record<string, any>) => void;
   rollbackJournalPhaseOrderTransform?: (phases: string[]) => string[];
   rollbackRequiredPhases?: string[];
@@ -1153,50 +1153,86 @@ function databaseRecoveryRequired(options: ResumeJournalFixtureOptions): boolean
 
 function appendResumeCommonPrefix(
   phases: string[],
-  historicalInstallCapability: boolean | undefined,
+  historicalInstallScenario: ResumeJournalFixtureOptions['historicalInstallScenario'],
   completedCapabilities: string,
   releaseSha: string,
   resourceManifestSha: string,
+  quiesceManifestSha: string,
   appendJournalEntry: AppendJournalEntry
 ): void {
-  const historicalInstallCommandSha = '4'.repeat(64);
-  let historicalInstallCapabilitySha: string | null = null;
-  if (historicalInstallCapability) {
+  const historicalInstallDefinitions: Array<{
+    phase: string;
+    leaseEpoch: string;
+    commandSha: string;
+    inputCheckpointSha: string;
+    quiesceSha: string;
+  }> = [];
+  if (
+    historicalInstallScenario === 'valid' ||
+    historicalInstallScenario === 'ambiguous' ||
+    historicalInstallScenario === 'orphan-recovery'
+  ) {
+    historicalInstallDefinitions.push({
+      phase: 'maintenance_guarded',
+      leaseEpoch:
+        historicalInstallScenario === 'orphan-recovery' ? 'cutover-recovery-1' : 'cutover',
+      commandSha: '4'.repeat(64),
+      inputCheckpointSha: '5'.repeat(64),
+      quiesceSha: '0'.repeat(64),
+    });
+  }
+  if (historicalInstallScenario === 'wrong-context' || historicalInstallScenario === 'ambiguous') {
+    historicalInstallDefinitions.push({
+      phase: 'snapshot_exported',
+      leaseEpoch: historicalInstallScenario === 'ambiguous' ? 'cutover-recovery-1' : 'cutover',
+      commandSha: historicalInstallScenario === 'ambiguous' ? '6'.repeat(64) : '4'.repeat(64),
+      inputCheckpointSha:
+        historicalInstallScenario === 'ambiguous' ? '7'.repeat(64) : '5'.repeat(64),
+      quiesceSha: quiesceManifestSha,
+    });
+  }
+  const historicalInstallJournalBindings = new Map<
+    string,
+    { leaseEpoch: string; overrides: Record<string, any> }
+  >();
+  for (const definition of historicalInstallDefinitions) {
     const historicalInstallCapabilityPath = join(
       completedCapabilities,
-      'barrier.install--cutover.json'
+      `barrier.install--${definition.leaseEpoch}.json`
     );
     writeCanonicalProtectedJson(historicalInstallCapabilityPath, {
       schema_version: 'megacampus.q12.host-command-capability/v1',
       run_id: Q12_RUN_ID,
       command_id: 'barrier.install',
-      command_sha256: historicalInstallCommandSha,
+      command_sha256: definition.commandSha,
       release_sha: releaseSha,
       operator_digest: '8'.repeat(64),
       resource_manifest_sha256: resourceManifestSha,
-      quiesce_manifest_sha256: '0'.repeat(64),
-      capability_input_checkpoint_sha256: '5'.repeat(64),
+      quiesce_manifest_sha256: definition.quiesceSha,
+      capability_input_checkpoint_sha256: definition.inputCheckpointSha,
       resume_authority_sha256: null,
-      lease_epoch: 'cutover',
+      lease_epoch: definition.leaseEpoch,
       supersedes_capability_sha256: null,
     });
-    historicalInstallCapabilitySha = fileSha256(historicalInstallCapabilityPath);
+    historicalInstallJournalBindings.set(definition.phase, {
+      leaseEpoch: definition.leaseEpoch,
+      overrides: {
+        command_id: 'barrier.install',
+        command_sha256: definition.commandSha,
+        capability_manifest_sha256: fileSha256(historicalInstallCapabilityPath),
+        quiesce_manifest_sha256: definition.quiesceSha,
+      },
+    });
   }
   for (const phase of phases) {
+    const historicalBinding = historicalInstallJournalBindings.get(phase);
     appendJournalEntry(
       phase,
       'completed',
       'none',
       null,
-      'cutover',
-      phase === 'maintenance_guarded' && historicalInstallCapabilitySha
-        ? {
-            command_id: 'barrier.install',
-            command_sha256: historicalInstallCommandSha,
-            capability_manifest_sha256: historicalInstallCapabilitySha,
-            quiesce_manifest_sha256: '0'.repeat(64),
-          }
-        : {}
+      historicalBinding?.leaseEpoch ?? 'cutover',
+      historicalBinding?.overrides ?? {}
     );
   }
 }
@@ -2008,10 +2044,11 @@ function writerResumeFixture(
   ];
   appendResumeCommonPrefix(
     commonPrefix,
-    journalOptions.historicalInstallCapability,
+    journalOptions.historicalInstallScenario,
     String(capabilityDirectories.completed),
     releaseSha,
     resourceManifestSha,
+    quiesceSha,
     appendJournalEntry
   );
   const finalPhase = mode === 'forward' ? 'prepared_quiesced' : 'rollback_preparing';
@@ -2832,7 +2869,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it('accepts a separately journal-bound completed barrier install capability', () => {
     const fixture = writerResumeFixture('forward', 5, false, {
-      historicalInstallCapability: true,
+      historicalInstallScenario: 'valid',
     });
     const installCapabilityPath = join(
       fixture.capabilitiesRoot,
@@ -2875,6 +2912,123 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     });
   });
 
+  it('rejects a historical install bound to a later phase and future quiesce context before Docker', () => {
+    const fixture = writerResumeFixture('forward', 5, false, {
+      historicalInstallScenario: 'wrong-context',
+    });
+    const installCapabilityPath = join(
+      fixture.capabilitiesRoot,
+      'completed',
+      'barrier.install--cutover.json'
+    );
+    const installCapability = JSON.parse(readFileSync(installCapabilityPath, 'utf8')) as Record<
+      string,
+      any
+    >;
+    const installJournalEntries = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, any>)
+      .filter(entry => entry.command_id === 'barrier.install');
+
+    expect(installCapability.quiesce_manifest_sha256).toBe(fileSha256(fixture.quiesceManifest));
+    expect(installCapability.quiesce_manifest_sha256).not.toBe('0'.repeat(64));
+    expect(installJournalEntries).toEqual([
+      expect.objectContaining({
+        phase: 'snapshot_exported',
+        outcome: 'completed',
+        command_sha256: installCapability.command_sha256,
+        capability_manifest_sha256: fileSha256(installCapabilityPath),
+        quiesce_manifest_sha256: installCapability.quiesce_manifest_sha256,
+        lease_epoch: 'cutover',
+      }),
+    ]);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/historical barrier.*(?:phase|context).*invalid/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+  });
+
+  it('rejects two independently completed historical install authorities before Docker', () => {
+    const fixture = writerResumeFixture('forward', 5, false, {
+      historicalInstallScenario: 'ambiguous',
+    });
+    const installJournalEntries = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, any>)
+      .filter(entry => entry.command_id === 'barrier.install');
+
+    expect(
+      ['cutover', 'cutover-recovery-1'].map(epoch => {
+        const capabilityPath = join(
+          fixture.capabilitiesRoot,
+          'completed',
+          `barrier.install--${epoch}.json`
+        );
+        const capability = JSON.parse(readFileSync(capabilityPath, 'utf8')) as Record<string, any>;
+        return [
+          capability.lease_epoch,
+          capability.command_sha256,
+          fileSha256(capabilityPath),
+          capability.supersedes_capability_sha256,
+        ];
+      })
+    ).toEqual([
+      ['cutover', '4'.repeat(64), expect.stringMatching(/^[a-f0-9]{64}$/u), null],
+      ['cutover-recovery-1', '6'.repeat(64), expect.stringMatching(/^[a-f0-9]{64}$/u), null],
+    ]);
+    expect(
+      installJournalEntries.map(entry => [
+        entry.phase,
+        entry.lease_epoch,
+        entry.command_sha256,
+        entry.capability_manifest_sha256,
+      ])
+    ).toEqual([
+      ['maintenance_guarded', 'cutover', '4'.repeat(64), expect.stringMatching(/^[a-f0-9]{64}$/u)],
+      [
+        'snapshot_exported',
+        'cutover-recovery-1',
+        '6'.repeat(64),
+        expect.stringMatching(/^[a-f0-9]{64}$/u),
+      ],
+    ]);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/historical barrier.*completed.*ambiguous/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+  });
+
+  it('rejects a lone historical recovery capability without its predecessor before Docker', () => {
+    const fixture = writerResumeFixture('forward', 5, false, {
+      historicalInstallScenario: 'orphan-recovery',
+    });
+    const capabilityPath = join(
+      fixture.capabilitiesRoot,
+      'completed',
+      'barrier.install--cutover-recovery-1.json'
+    );
+    const capability = JSON.parse(readFileSync(capabilityPath, 'utf8')) as Record<string, any>;
+
+    expect(capability).toMatchObject({
+      command_id: 'barrier.install',
+      lease_epoch: 'cutover-recovery-1',
+      supersedes_capability_sha256: null,
+      quiesce_manifest_sha256: '0'.repeat(64),
+    });
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/historical barrier.*lifecycle.*(?:unsupported|ambiguous)/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+  });
+
   it.each(['issued', 'claimed', 'completed', 'superseded'])(
     'rejects a canonical unknown barrier command in the %s lifecycle directory before Docker',
     lifecycleDirectory => {
@@ -2904,7 +3058,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it('rejects a malformed known barrier capability basename before Docker', () => {
     const fixture = writerResumeFixture('forward', 5, false, {
-      historicalInstallCapability: true,
+      historicalInstallScenario: 'valid',
     });
     renameSync(
       join(fixture.capabilitiesRoot, 'completed', 'barrier.install--cutover.json'),
@@ -2920,7 +3074,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it('rejects a known historical barrier command cross-wired to another command before Docker', () => {
     const fixture = writerResumeFixture('forward', 5, false, {
-      historicalInstallCapability: true,
+      historicalInstallScenario: 'valid',
     });
     const installCapabilityPath = join(
       fixture.capabilitiesRoot,

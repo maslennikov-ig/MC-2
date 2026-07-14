@@ -1620,10 +1620,18 @@ barrier_command_ids = {
     "barrier.rollback",
 }
 barrier_terminal_command_ids = {"barrier.cleanup", "barrier.rollback"}
+historical_barrier_contexts = {
+    "barrier.install": ("maintenance_guarded", "0" * 64),
+    "barrier.verify-after-base": ("base_migration_guarded", quiesce_file.digest),
+    "barrier.verify-after-observability": ("observability_migration_guarded", quiesce_file.digest),
+    "barrier.prepare-recovery": ("recovery_ready_guarded", quiesce_file.digest),
+    "barrier.activate": ("activated", quiesce_file.digest),
+}
 barrier_command_pattern = "|".join(
     re.escape(command_id) for command_id in sorted(barrier_command_ids)
 )
 database_capability_records = []
+historical_barrier_capability_records = []
 for location, directory in capability_directories.items():
     for directory_entry in os.scandir(directory):
         if not directory_entry.name.startswith("barrier."):
@@ -1669,24 +1677,11 @@ for location, directory in capability_directories.items():
             "barrier host capability binding is invalid",
         )
         if barrier_command_id not in barrier_terminal_command_ids:
-            historical_journal_entries = [
-                entry for entry in journal_lines
-                if entry["outcome"] == "completed"
-                and entry["command_id"] == barrier_command_id
-                and entry["command_sha256"] == value["command_sha256"]
-                and entry["capability_manifest_sha256"] == opened.digest
-                and entry["lease_epoch"] == barrier_lease_epoch
-                and entry["release_sha"] == value["release_sha"]
-                and entry["operator_digest"] == value["operator_digest"]
-                and entry["resource_manifest_sha256"] == value["resource_manifest_sha256"]
-                and entry["quiesce_manifest_sha256"] == value["quiesce_manifest_sha256"]
-                and entry["accepted_object_kind"] == "none"
-                and entry["accepted_object_sha256"] is None
-            ]
-            require(
-                location == "completed" and len(historical_journal_entries) == 1,
-                "historical barrier host capability journal binding is invalid",
-            )
+            historical_barrier_capability_records.append({
+                "location": location,
+                "file": opened,
+                "value": value,
+            })
             continue
         require(
             value["command_sha256"] == database_claimed_entry["command_sha256"]
@@ -1701,6 +1696,52 @@ for location, directory in capability_directories.items():
             "file": opened,
             "value": value,
         })
+
+historical_barrier_capabilities_by_command = {}
+for record in historical_barrier_capability_records:
+    historical_barrier_capabilities_by_command.setdefault(
+        record["value"]["command_id"], []
+    ).append(record)
+for historical_command_id, historical_records in historical_barrier_capabilities_by_command.items():
+    historical_completed_records = [
+        record for record in historical_records
+        if record["location"] == "completed"
+    ]
+    require(
+        len(historical_completed_records) == 1,
+        "historical barrier completed authority is ambiguous",
+    )
+    require(
+        len(historical_records) == 1
+        and historical_completed_records[0]["value"]["lease_epoch"] == "cutover"
+        and historical_completed_records[0]["value"]["supersedes_capability_sha256"] is None,
+        "historical barrier capability lifecycle is unsupported or ambiguous",
+    )
+    historical_record = historical_completed_records[0]
+    historical_value = historical_record["value"]
+    expected_historical_phase, expected_historical_quiesce = historical_barrier_contexts[
+        historical_command_id
+    ]
+    historical_journal_entries = [
+        entry for entry in journal_lines
+        if entry["phase"] == expected_historical_phase
+        and entry["outcome"] == "completed"
+        and entry["command_id"] == historical_command_id
+        and entry["command_sha256"] == historical_value["command_sha256"]
+        and entry["capability_manifest_sha256"] == historical_record["file"].digest
+        and entry["lease_epoch"] == historical_value["lease_epoch"]
+        and entry["release_sha"] == historical_value["release_sha"]
+        and entry["operator_digest"] == historical_value["operator_digest"]
+        and entry["resource_manifest_sha256"] == historical_value["resource_manifest_sha256"]
+        and entry["quiesce_manifest_sha256"] == historical_value["quiesce_manifest_sha256"]
+        and entry["accepted_object_kind"] == "none"
+        and entry["accepted_object_sha256"] is None
+    ]
+    require(
+        historical_value["quiesce_manifest_sha256"] == expected_historical_quiesce
+        and len(historical_journal_entries) == 1,
+        "historical barrier command phase or context binding is invalid",
+    )
 
 database_capability_by_digest = {
     record["file"].digest: record for record in database_capability_records

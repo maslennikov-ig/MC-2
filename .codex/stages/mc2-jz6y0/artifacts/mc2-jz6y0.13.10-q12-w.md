@@ -372,6 +372,47 @@ isolated worktree has no `graphify-out/GRAPH_REPORT.md`; Root owns refresh after
 accepted integration. W does not claim acceptance; the pushed branch is
 returned for final Root rereview.
 
+# Retained historical authority semantics
+
+The classifier rereview exposed a semantic overstatement in the prior section:
+matching an arbitrary completed journal row did not prove a retained command's
+normative phase/context, and validating files independently did not prove one
+current authority. The required adversarial RED failed `0/2` because the old
+code accepted both a canonical install at `snapshot_exported` with the future
+quiesce hash and two independently completed install authorities. A follow-up
+RED failed `0/1` because a lone recovery-epoch install without its predecessor
+was also accepted.
+
+Historical records are now grouped by command. The deliberately conservative
+supported lifecycle is exactly one completed initial-`cutover` capability with
+no supersedes predecessor; all historical recovery, companion lifecycle,
+forked, orphaned, duplicate, or ambiguous records fail closed. Supported
+records must bind one exact completed journal row at install→
+`maintenance_guarded`, verify-after-base→`base_migration_guarded`,
+verify-after-observability→`observability_migration_guarded`,
+prepare-recovery→`recovery_ready_guarded`, or activate→`activated`. Install
+requires the pre-quiesce zero hash, while the later four require the accepted
+quiesce manifest hash. Exact own command SHA, capability digest, epoch,
+release, operator, resource, and quiesce equality remains mandatory; no D4
+checkpoint or new recovery contract was added.
+
+Fresh final evidence is focused GREEN `13/13`, runtime `138/138`, joined
+runtime plus actual disposable PostgreSQL 17 `189/189` across 6 suites,
+structural PG17 `34/34`, and the real-PG17 five-file aggregate `287/287` across
+17 suites, all with zero failed or pending tests. Workspace type-check and the
+final synthetic-env build exited zero. Prettier, Python byte-compilation, Bash
+syntax, `git diff --check`, unchanged structural SQL invariants,
+artifact/process validation, secret/live/debt scans, and current-run cleanup
+passed. ESLint reports zero errors and the same 13 pre-existing unsafe-`any`
+warnings.
+
+`docs-reviewed: updated` — this artifact and the ignored implementer report
+correct the retained-history semantic/uniqueness claim; frozen normative docs
+and operator surfaces need no change. `graph-reviewed: blocked` — this isolated
+worktree has no `graphify-out/GRAPH_REPORT.md`; Root owns refresh after accepted
+integration. W does not claim acceptance; the branch is returned for Root
+rereview.
+
 # Risks / Follow-ups
 
 All changes are local to `codex/q12-w-writer-barrier`; no external state exists
