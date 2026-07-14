@@ -69,8 +69,8 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 Next stage id: `mc2-jz6y0`
 
 Recommended action: finish and independently accept W `.13.10` against the
-accepted D4 design/plan SHA pair, then
-then run M/H in parallel and finish the root supervisor/journal join. Run the
+accepted D4 design/plan SHA pair, then run M/H in parallel and finish the root
+supervisor/journal join. Run the
 joined local release matrix before presenting the separate GHCR publication and
 live-cutover packet. Keep Q12 remote execution NO-GO until the frozen
 supervisor, truthful four-file backup, Supabase-compatible isolated restore,
