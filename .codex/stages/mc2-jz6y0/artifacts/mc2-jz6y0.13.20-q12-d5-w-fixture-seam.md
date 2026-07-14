@@ -45,11 +45,11 @@ parallel_group: D5-W-fixture-seam
 depends_on_streams:
   - accepted Root D5 producer mc2-jz6y0.13.18
 parallel_decision: sequential
-status: accepted
-delivery_method: manual integration
+status: merged
+delivery_method: merge
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: Accepted/reviewed source branch is pushed with exact immutable tip returned out-of-band; worktree cleanup remains pending W merge and integration verification.
+cleanup_status: cleaned
+cleanup_notes: Source commit 3dd9ad53 was merged into integration as da5d8305 and into W as 383443aa; both integration/W reruns passed 271/271 before the clean source worktree and local branch were removed. The remote source branch was preserved.
 risk_level: high
 docs_impact: tests-only
 docs_reviewed: no-change-needed
@@ -65,6 +65,8 @@ verification:
   - 'controller ordinary file-parallel rerun: 268/268 passed, zero failed or skipped, in 84.97 seconds'
   - 'controller serialized three-file rerun: 271/271 passed, zero failed or skipped, in 84.33 seconds'
   - 'controller statics and cleanup: all focused static gates passed; zero current-run processes, roots, caches, or test locks after safe cleanup'
+  - 'integration serialized three-file rerun at da5d8305: 271/271 passed, zero failed or skipped, in 74.06 seconds'
+  - 'W merge serialized three-file rerun at 383443aa: 271/271 passed, zero failed or skipped, in 74.19 seconds; the two pre-existing W-owned uncommitted files remained intact'
   - 'post-fix correctness delta review: PASS P0/P1/P2/P3 0/0/0/0'
   - 'post-fix docs delta review: PASS P0/P1/P2/P3 0/0/0/0; durable docs no-change-needed'
   - 'bash -n both deployed wrappers, py_compile production core plus runner, jq command manifest, ordinary Prettier four TS files, and git diff --check: passed'
@@ -127,9 +129,9 @@ SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=ci-placeholder \
 
 # Delivery / Cleanup
 
-The controller accepted the exact five-path diff after independent reruns and two clean post-fix delta reviews. The accepted source branch is delivered by normal push; its exact immutable commit tip is returned out-of-band because embedding the commit that contains this artifact would be self-referential. Bash syntax for both deployed wrappers, Python byte-compilation for the unchanged production core and changed runner, JSON manifest parsing, ordinary Prettier and ESLint for the four focused TypeScript files, `git diff --check`, and artifact validation all passed. The ordinary ESLint command used no override or suppression; after the seam split the lifecycle file remains within the configured counted limit.
+The controller accepted the exact five-path diff after independent reruns and two clean post-fix delta reviews. The accepted source commit `3dd9ad53ac506f9bfdaeca1ef29709b082bd4e3e` was pushed, merged normally into integration as `da5d83050b95d701a6d055b35dc0fca24cb8d39e`, and merged normally into the preserved W branch as `383443aacef27122933197884777d2f0e4a87f5c`; the two W-owned uncommitted files remained intact. Bash syntax for both deployed wrappers, Python byte-compilation for the unchanged production core and changed runner, JSON manifest parsing, ordinary Prettier and ESLint for the four focused TypeScript files, `git diff --check`, and artifact validation all passed. The ordinary ESLint command used no override or suppression; after the seam split the lifecycle file remains within the configured counted limit.
 
-The interrupted pre-hardening run root, generated Python caches, unlocked canonical test lock, and unlocked safe test coordination inode were removed only after proving no runner process remained. The controller independently confirmed zero current-run processes, roots, caches, or test locks after cleanup. The older `/tmp/mc2-q12-d5-root-probe-qP49vk` predates this worktree and was preserved as unrelated state. The pushed source branch and worktree must remain until exact integration into W, integration rerun, and safe workspace cleanup. No remote/live operation occurred.
+The interrupted pre-hardening run root, generated Python caches, unlocked canonical test lock, and unlocked safe test coordination inode were removed only after proving no runner process remained. The controller independently confirmed zero current-run processes, roots, caches, or test locks after the integration and W reruns. The older `/tmp/mc2-q12-d5-root-probe-qP49vk` predates this worktree and was preserved as unrelated state. After both merges and reruns, the clean source worktree and local source branch were removed; the remote source branch remains. No remote/live operation occurred.
 
 # Risks / Follow-ups / Explicit Defers
 
