@@ -23,6 +23,7 @@ write_zone:
   - packages/course-gen-platform/tools/qdrant/reindex-course-embeddings.ts
   - focused unit tests and this artifact
 selected_docs:
+  - Q12 durable recovery projections addendum SHA-256 28655ffe401efe39b09ba436d101aeed055c8fe25cb8a8e4fd3e90720e745ab4
   - Q12 live-cutover base design SHA-256 5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15
   - Q12 normative lifecycle addendum SHA-256 7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27 (final normative pass; P0=P1=P2=P3=0)
   - PostgreSQL 17 system catalog overview - https://www.postgresql.org/docs/17/catalogs-overview.html
@@ -51,18 +52,20 @@ cleanup_notes: root must independently inspect the diff and evidence before inte
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: this artifact now records the final approved lifecycle contract and exact design hashes; root owns consolidated runbook/addendum review at integration
+docs_review_notes: this artifact records the D4 RED-GREEN implementation and exact approved design hash; no operator runbook surface changed, and root owns consolidated docs review at integration
 graph_reviewed: blocked
 graph_review_notes: graphify-out/GRAPH_REPORT.md is absent from this isolated worktree; root must query/refresh the local graph after accepted integration
 verification:
-  - focused barrier/runtime/database/adapters/reindex aggregate passed 241 of 241 with zero failures
-  - complete source-recovery runtime passed 108 of 108, including exact environment and FD isolation, canonical journal chain/pairs, forward, rollback 0/3/5, compensation, signal, crash, recovery epoch, atomic terminal publication, exact-14 terminal receipt, and non-resume epoch rejection
+  - initial D4 runtime RED reproduced exactly 120 of 129 passing and nine expected failures, comprising eight journal-graph cases and one immutable recovery-publication case
+  - focused D4 RED-to-GREEN subset passed 9 of 9 and the complete source-recovery runtime passed 129 of 129 with zero failures
+  - focused barrier/runtime/database/adapters/reindex aggregate passed 262 of 262 with zero failures
   - opt-in stock PostgreSQL 17 fixture passed 34 of 34 including fresh-session default read-only and explicit primary READ WRITE proof
   - course-gen-platform type-check passed with shared-logger, shared-types, and shared-utils prerequisite builds
   - Prettier check passed every changed TypeScript test/tool file
-  - bash syntax passed source-recovery-run.sh, q12-database-barrier.sh, and the Qdrant operator entrypoint
-  - structural catalog remained one semicolon-free query and executed in the real PostgreSQL fixture
-  - git diff --check passed; no synthetic resume process or Q12 test container remained
+  - bash syntax passed source-recovery-run.sh, q12-database-barrier.sh, and the Qdrant operator entrypoint; Python byte-compilation passed q12-writer-resume.py
+  - structural catalog retained exact SHA-256 0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e, 1254 lines, and one semicolon-free query
+  - git diff --check and secret/live-command scans passed; no current-run synthetic process, temporary run root, PostgreSQL 17 container, or matching Docker volume remained
+  - commit and push state is committed and pushed on codex/q12-w-writer-barrier; exact branch-tip SHA is returned out-of-band because an artifact cannot self-reference its own commit
 changed_files:
   - deploy/qdrant/source-recovery-run.sh
   - deploy/qdrant/q12-writer-resume.py
@@ -83,6 +86,18 @@ explicit_defers:
 ---
 
 # Summary
+
+The approved D4 hardening delta was reproduced RED exactly before implementation:
+eight malformed journal-graph cases and one pre-existing non-exact immutable
+writer-recovery publication were the only failures (120/129 remained green).
+The resume controller now rejects any missing, reordered, repeated, unknown,
+cross-mode, wrong-outcome, ordinary accepted-object, or duplicate publication
+row in the complete forward graph while preserving the bounded recovery suffix
+and exact rollback conditional ordering. Writer-recovery completion no longer
+uses replacement publication: it accepts only byte-exact existing evidence or
+uses Linux `renameat2(RENAME_NOREPLACE)`, followed by directory sync and reopened
+owner/mode/hash validation. The complete runtime is now 129/129 and the joined
+W aggregate is 262/262.
 
 The W delta implements the approved local writer/database lifecycle without any
 remote activation. `barrier.prepare-recovery` publishes
@@ -171,7 +186,7 @@ pnpm --filter @megacampus/course-gen-platform exec vitest run \
   tests/unit/tools/qdrant/source-recovery-database.test.ts \
   tests/unit/tools/qdrant/source-recovery-reindex-adapters.test.ts \
   tests/unit/tools/qdrant/reindex-course-embeddings.test.ts
-# 5 files, 241/241 passed
+# 5 files, 262/262 passed
 
 MC2_Q12_REAL_PG17=1 \
 SUPABASE_URL=http://127.0.0.1:54321 \
@@ -185,6 +200,13 @@ pnpm --filter @megacampus/course-gen-platform type-check
 # exit 0
 ```
 
+The preserved D4 RED run reached 120/129 with exactly eight malformed graph
+failures plus the immutable recovery-publication failure. The first minimal
+GREEN implementation made those 9/9 pass; full runtime exposed three ordering/
+recovery compatibility regressions, which were traced to the bounded recovery
+suffix and rejection-message ordering, corrected without weakening the D4
+cases, and rerun to 129/129.
+
 The earlier pre-hardening combined run reached 215/216 because the test sent
 SIGTERM to the whole synthetic process group and timed out while shell and
 controller raced. The leftover local synthetic process was explicitly stopped.
@@ -192,7 +214,10 @@ The test was corrected to exercise the actual supervisor boundary: signal the
 shell, forward to the controller, and wait for proven compensation. That test
 then passed three consecutive isolated runs. After the final normative
 hardening pass, the complete runtime file passed 108/108 and the fresh combined
-run passed 241/241. Final process/container checks were empty.
+run passed 241/241. The D4 pass supersedes those totals with runtime 129/129,
+aggregate 262/262, and PostgreSQL 17 34/34. Final current-run process, temporary,
+container, and volume checks were empty; older unrelated `/tmp` fixtures dated
+before this worker session were outside the write zone and were not altered.
 
 # Risks / Follow-ups
 

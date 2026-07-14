@@ -7,7 +7,6 @@ import signal
 import stat
 import subprocess
 import sys
-import tempfile
 
 mode, run_id, run_root, docker_bin, lock_path, uid_raw, gid_raw, local_test_raw, fault_point = sys.argv[1:]
 uid = int(uid_raw)
@@ -21,6 +20,13 @@ CLASSES = {
     "production-api", "production-web", "production-worker",
     "development-api", "development-web", "development-worker",
 }
+ROLLBACK_CONDITIONAL_PHASES = [
+    "handoff_rollback_verified",
+    "qdrant_rollback_verified",
+    "source_rollback_verified",
+    "observability_migration_rollback_guarded",
+    "base_migration_rollback_guarded",
+]
 WRITER_KEYS = {
     "class", "id", "name", "project", "service", "config_files", "working_dir",
     "image_id", "image_ref", "healthcheck_present", "intended_running",
@@ -40,7 +46,7 @@ JOURNAL_KEYS = {
 }
 MAX_SAFE_INTEGER = 2**53 - 1
 EXPECTED_ENVIRONMENT = {
-    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
     "LC_ALL": "C",
     "LANG": "C",
     "HOME": "/root",
@@ -81,6 +87,21 @@ def validate_canonical_value(value, label="canonical JSON"):
 def canonical_json(value, label="canonical JSON"):
     validate_canonical_value(value, label)
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+def reject_duplicate_json_keys(pairs):
+    value = {}
+    for key, item in pairs:
+        require(key not in value, f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+def strict_json_loads(data, label):
+    try:
+        return json.loads(data, object_pairs_hook=reject_duplicate_json_keys)
+    except ResumeError:
+        raise
+    except Exception as exc:
+        raise ResumeError(f"{label} JSON is invalid") from exc
 
 def rename_noreplace(source, destination):
     import ctypes
@@ -141,10 +162,7 @@ class Opened:
         finally:
             os.close(fd)
     def json(self):
-        try:
-            value = json.loads(self.data)
-        except Exception as exc:
-            raise ResumeError(f"{self.label} JSON is invalid") from exc
+        value = strict_json_loads(self.data, self.label)
         require(isinstance(value, dict), f"{self.label} must be a JSON object")
         return value
     def recheck(self):
@@ -171,7 +189,9 @@ def docker(*args, capture=True):
 
 def inspect(expected, allow_unready=False):
     try:
-        payload = json.loads(docker("inspect", expected["id"]))
+        payload = strict_json_loads(
+            docker("inspect", expected["id"]), "Docker writer inspection",
+        )
     except Exception as exc:
         raise ResumeError("writer identity inspection failed") from exc
     require(isinstance(payload, list) and len(payload) == 1, "writer identity is missing or duplicated")
@@ -250,6 +270,7 @@ if local_test:
     docker_environment = test_environment["environment"]
 
 paths = {
+    "capability": os.path.join(run_root, "secrets", "db-capability"),
     "barrier": os.path.join(run_root, "database-barrier-receipt.json"),
     "probe": os.path.join(run_root, "database-barrier-probe-receipt.json"),
     "quiesce": os.path.join(run_root, f"writer-quiesce-{run_id}.json"),
@@ -259,9 +280,25 @@ paths = {
     "rollback": os.path.join(run_root, f"writer-rollback-state-{run_id}.json"),
     "authority": os.path.join(run_root, f"writer-resume-authority-{run_id}.json"),
     "terminal": os.path.join(run_root, f"writer-resume-state-{run_id}.json"),
+    "terminal_temporary": os.path.join(run_root, ".writer-resume-state.tmp"),
     "journal": os.path.join(run_root, "phase.jsonl"),
     "checkpoint": os.path.join(run_root, "phase-checkpoint.json"),
 }
+require(
+    not os.path.lexists(paths["capability"]),
+    "database capability still exists and must be absent before writer resume",
+)
+unexpected_terminal_residue = [
+    name for name in os.listdir(run_root)
+    if name.startswith(".writer-resume-state.")
+    and os.path.join(run_root, name) != paths["terminal_temporary"]
+]
+require(not unexpected_terminal_residue, "unexpected writer resume temporary residue exists")
+startup_terminal_temporary = None
+if os.path.lexists(paths["terminal_temporary"]):
+    startup_terminal_temporary = Opened(
+        paths["terminal_temporary"], "writer resume temporary", 0o400,
+    )
 
 barrier_file = Opened(paths["barrier"], "database barrier receipt", 0o400)
 barrier = barrier_file.json()
@@ -273,7 +310,32 @@ if mode == "forward":
     require(probe_file.digest == barrier["probe_receipt_sha256"], "database barrier probe receipt hash mismatch")
     probe = probe_file.json()
     exact(probe, {"schema_version","run_id","expected_catalog_sha256","completed_at","probes","residue"}, "database barrier probe receipt")
-    require(probe["schema_version"] == "megacampus.q12.database-barrier-probes/v1" and probe["run_id"] == run_id and probe["expected_catalog_sha256"] == barrier["expected_catalog_sha256"], "database barrier probe receipt binding is invalid")
+    require(probe["schema_version"] == "megacampus.q12.database-barrier-probes/v1" and probe["run_id"] == run_id and probe["expected_catalog_sha256"] == barrier["expected_catalog_sha256"] and isinstance(probe["completed_at"], str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z", probe["completed_at"]), "database barrier probe receipt binding is invalid")
+    expected_probes = {
+        "postgrest_anon":"rejected",
+        "postgrest_authenticated":"rejected",
+        "postgrest_service_role_without_capability":"rejected",
+        "postgrest_service_role_with_capability":"rolled_back",
+        "postgrest_preference_applied":"tx=rollback",
+        "auth_profile":"rejected_zero_residue",
+        "storage_object":"rejected_zero_metadata_zero_bytes",
+        "cron_rpc":"rejected_exact_jobs_unchanged",
+        "pg_net_rpc":"rejected_zero_queue_zero_external_request",
+        "direct_supervisor":"rolled_back",
+    }
+    expected_residue = {
+        "guard_probe_rows":0,
+        "auth_rows":0,
+        "storage_metadata_rows":0,
+        "storage_object_bytes":0,
+        "cron_job_set_unchanged":True,
+        "pg_net_queue_rows":0,
+        "external_requests":0,
+    }
+    require(
+        probe["probes"] == expected_probes and probe["residue"] == expected_residue,
+        "database barrier probe receipt nested projection is not exact",
+    )
 else:
     require(barrier["last_command"] == "rollback" and barrier["rollback_probes_verified"] is False and barrier["probe_receipt_sha256"] is None, "rollback cleanup receipt is invalid")
 
@@ -292,6 +354,37 @@ for item in quiesce["writers"]:
     require(item["id"] not in original, "quiesced writer ID is duplicated")
     original[item["id"]] = item
 require(len([x for x in original.values() if x["class"].startswith("production-")]) == 5 and len([x for x in original.values() if x["class"].startswith("development-")]) == 5, "original writer class inventory is invalid")
+original_frontends = [
+    item for item in original.values()
+    if item["class"] in {"production-api", "production-web"}
+]
+require(
+    len(original_frontends) == 2
+    and len({item["project"] for item in original_frontends}) == 1,
+    "original writer topology has no exact active project color",
+)
+active_project = original_frontends[0]["project"]
+require(
+    active_project in {"megacampus-blue", "megacampus-green"},
+    "original writer topology has an invalid active project color",
+)
+expected_original_topology = {
+    (active_project, "api", "production-api"),
+    (active_project, "web", "production-web"),
+    ("megacampus", "worker", "production-worker"),
+    ("megacampus", "worker-stage6", "production-worker"),
+    ("megacampus", "worker-stage7", "production-worker"),
+    ("megacampus", "api-dev", "development-api"),
+    ("megacampus", "web-dev", "development-web"),
+    ("megacampus", "worker-dev", "development-worker"),
+    ("megacampus", "worker-stage6-dev", "development-worker"),
+    ("megacampus", "worker-stage7-dev", "development-worker"),
+}
+require(
+    {(item["project"], item["service"], item["class"]) for item in original.values()}
+    == expected_original_topology,
+    "original writer topology is not the exact ten-service projection",
+)
 
 final_file = Opened(paths["final"], "final writer manifest", 0o400)
 final_manifest = final_file.json()
@@ -320,6 +413,28 @@ if mode == "forward":
 else:
     require(final_ids == set(original) and not held_ids.intersection(original), "rollback final/held selection is invalid")
     target = held_writers
+target_project = "megacampus-green" if active_project == "megacampus-blue" else "megacampus-blue"
+expected_target_topology = [
+    (target_project, "api", "production-api"),
+    (target_project, "web", "production-web"),
+    ("megacampus", "worker", "production-worker"),
+    ("megacampus", "worker-stage6", "production-worker"),
+    ("megacampus", "worker-stage7", "production-worker"),
+]
+target_topology = [
+    (item["project"], item["service"], item["class"])
+    for item in target
+]
+if mode == "forward":
+    require(
+        target_topology == expected_target_topology,
+        "forward target topology or project color is invalid",
+    )
+else:
+    require(
+        target_topology == expected_target_topology[:len(target_topology)],
+        "rollback target creation prefix or project color is invalid",
+    )
 for item in final_writers:
     if item["id"] in original:
         prior = original[item["id"]]
@@ -352,6 +467,10 @@ else:
         require(isinstance(entry["phase"], str) and hex64(entry["receipt_sha256"]), "rollback phase receipt is invalid")
         phases.append(entry["phase"])
     require(phases == sorted(phases) and len(phases) == len(set(phases)) and rollback["required_phase_receipts_sha256"] == sha(canonical_json(sorted(required, key=lambda item:item["phase"]), "rollback phase receipts")), "rollback phase receipt hash is invalid")
+    require(
+        set(phases).issubset(set(ROLLBACK_CONDITIONAL_PHASES)),
+        "rollback conditional phase receipt is unknown",
+    )
 
 authority_file = Opened(paths["authority"], "writer resume authority", 0o400)
 authority = authority_file.json()
@@ -378,7 +497,9 @@ for expected_seq, raw_line in enumerate(raw_journal_lines, start=1):
     require(raw_line.endswith(b"\n") and not raw_line.endswith(b"\r\n"), "cutover journal line ending is not canonical")
     encoded_entry = raw_line[:-1]
     try:
-        entry = json.loads(encoded_entry.decode("utf-8"))
+        entry = strict_json_loads(encoded_entry.decode("utf-8"), "cutover journal entry")
+    except ResumeError:
+        raise
     except Exception as exc:
         raise ResumeError("cutover journal JSONL is invalid") from exc
     require(isinstance(entry, dict), "cutover journal entry must be an object")
@@ -429,7 +550,6 @@ def require_published_object(intent_hash, phase, object_kind, object_sha256, obj
         and accepted["previous_hash"] == intent["entry_hash"]
         and accepted["accepted_object_kind"] == object_kind
         and accepted["accepted_object_sha256"] == object_sha256
-        and accepted["resource_manifest_sha256"] == object_sha256
         and intent["lease_epoch"] == accepted["lease_epoch"] == object_lease_epoch,
         f"{object_kind} publication pair is invalid",
     )
@@ -464,6 +584,132 @@ require_published_object(
     authority_file.digest,
     authority["lease_epoch"],
 )
+
+common_phase_graph = [
+    "preflight",
+    "maintenance_guarded",
+    "quiesced",
+    "snapshot_exported",
+    "backup_committed",
+    "restore_verified",
+    "base_migration_guarded",
+    "observability_migration_guarded",
+    "migrations_applied",
+    "recovery_ready_guarded",
+    "source_recovered",
+    "reindex_started",
+    "qdrant_verified",
+]
+expected_phase_graph = [
+    (phase, "completed", "none", None) for phase in common_phase_graph
+]
+final_phase = "prepared_quiesced" if mode == "forward" else "rollback_preparing"
+expected_phase_graph.extend([
+    (final_phase, "intent", "none", None),
+    (final_phase, "accepted", "final_writer_manifest", final_file.digest),
+])
+if mode == "forward":
+    expected_phase_graph.extend([
+        ("activation_ready", "completed", "none", None),
+        ("activation_committing", "completed", "none", None),
+        ("activated", "completed", "none", None),
+        ("handoff_ready_writers_quiesced", "intent", "none", None),
+        (
+            "handoff_ready_writers_quiesced",
+            "accepted",
+            "writer_handoff_state",
+            handoff_file.digest,
+        ),
+    ])
+else:
+    required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
+    expected_phase_graph.extend([
+        (phase, "completed", "none", None)
+        for phase in ROLLBACK_CONDITIONAL_PHASES
+        if phase in required_phase_set
+    ])
+expected_phase_graph.append(("guard_cleanup_complete", "completed", "none", None))
+if mode == "rollback":
+    expected_phase_graph.extend([
+        ("rollback_ready_writers_quiesced", "intent", "none", None),
+        (
+            "rollback_ready_writers_quiesced",
+            "accepted",
+            "writer_rollback_state",
+            rollback_file.digest,
+        ),
+    ])
+recovery_epoch = authority["lease_epoch"].startswith("cutover-recovery-")
+initial_authority_sha256 = authority_file.digest
+if recovery_epoch:
+    require(
+        len(journal_lines) >= 6
+        and journal_lines[-5]["phase"] == f"resume_authority_{mode}"
+        and journal_lines[-5]["outcome"] == "accepted"
+        and journal_lines[-5]["accepted_object_kind"] == "writer_resume_authority"
+        and hex64(journal_lines[-5]["accepted_object_sha256"]),
+        f"{mode} recovery journal prefix is invalid",
+    )
+    initial_authority_sha256 = journal_lines[-5]["accepted_object_sha256"]
+expected_phase_graph.extend([
+    (f"resume_authority_{mode}", "intent", "none", None),
+    (
+        f"resume_authority_{mode}",
+        "accepted",
+        "writer_resume_authority",
+        initial_authority_sha256,
+    ),
+    (f"resume_committing_{mode}", "intent", "none", None),
+])
+if recovery_epoch:
+    expected_phase_graph.extend([
+        (f"resume_authority_{mode}", "intent", "none", None),
+        (
+            f"resume_authority_{mode}",
+            "accepted",
+            "writer_resume_authority",
+            authority_file.digest,
+        ),
+        (f"resume_committing_{mode}", "intent", "none", None),
+    ])
+actual_phase_graph = [
+    (
+        entry["phase"],
+        entry["outcome"],
+        entry["accepted_object_kind"],
+        entry["accepted_object_sha256"],
+    )
+    for entry in journal_lines
+]
+require(
+    actual_phase_graph == expected_phase_graph,
+    (
+        "rollback conditional phase receipt journal graph is invalid"
+        if mode == "rollback"
+        else "forward journal phase graph is invalid"
+    ),
+)
+if mode == "rollback":
+    rollback_intent_index = next(
+        index for index, entry in enumerate(journal_lines)
+        if entry["entry_hash"] == final_manifest["publication_intent_journal_entry_hash"]
+    )
+    required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
+    expected_rollback_suffix = ["rollback_preparing", "rollback_preparing"]
+    expected_rollback_suffix.extend(
+        phase for phase in ROLLBACK_CONDITIONAL_PHASES if phase in required_phase_set
+    )
+    expected_rollback_suffix.extend([
+        "guard_cleanup_complete",
+        "rollback_ready_writers_quiesced", "rollback_ready_writers_quiesced",
+        "resume_authority_rollback", "resume_authority_rollback",
+        "resume_committing_rollback",
+    ])
+    require(
+        [entry["phase"] for entry in journal_lines[rollback_intent_index:]]
+        == expected_rollback_suffix,
+        "rollback conditional phase receipt journal is missing or out of reverse order",
+    )
 require(
     head["seq"] == checkpoint["seq"]
     and head["phase"] == checkpoint["phase"] == f"resume_committing_{mode}"
@@ -474,14 +720,22 @@ require(
     and head["accepted_object_kind"] == checkpoint["accepted_object_kind"] == "none"
     and head["accepted_object_sha256"] is checkpoint["accepted_object_sha256"] is None
     and head["lease_epoch"] == checkpoint["lease_epoch"] == authority["lease_epoch"]
-    and head["resource_manifest_sha256"] == final_file.digest
     and head["quiesce_manifest_sha256"] == quiesce_file.digest,
     "cutover journal/checkpoint binding is invalid",
 )
 
+known_writers = [*final_writers, *held_writers]
 for project in sorted({item["project"] for item in target}):
-    observed = {value for value in docker("ps", "-aq", "--no-trunc", "--filter", f"label=com.docker.compose.project={project}").splitlines() if value}
-    expected = {item["id"] for item in target if item["project"] == project}
+    observed = {
+        value for value in docker(
+            "ps", "-aq", "--no-trunc",
+            "--filter", f"label=com.docker.compose.project={project}",
+        ).splitlines() if value
+    }
+    expected = {
+        item["id"] for item in known_writers
+        if item["project"] == project
+    }
     require(observed == expected, "unrecorded target inventory exists")
 
 opened_inputs = [barrier_file, quiesce_file, final_file, authority_file, checkpoint_file, journal_file]
@@ -544,19 +798,50 @@ def expected_receipt(final_projection, held_projection):
         "held_inventory_sha256":canonical_inventory(held_projection),
     }
 
+def fsync_run_root():
+    directory_fd = os.open(run_root, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
 def publish_receipt(value):
     encoded = canonical_json(value, "writer resume state") + b"\n"
     if os.path.exists(paths["terminal"]):
         existing = Opened(paths["terminal"], "writer resume state", 0o400)
         require(existing.data == encoded, "existing writer resume state is ambiguous")
+        if startup_terminal_temporary is not None:
+            startup_terminal_temporary.recheck()
+            require(
+                startup_terminal_temporary.data == encoded,
+                "existing writer resume temporary is ambiguous",
+            )
+            os.unlink(paths["terminal_temporary"])
+            fsync_run_root()
         return
-    fd, temporary = tempfile.mkstemp(prefix=".writer-resume-state.", dir=run_root)
+    fd = -1
+    temporary = paths["terminal_temporary"]
     try:
-        os.write(fd, encoded)
-        os.fchown(fd, uid, gid)
-        os.fchmod(fd, 0o400)
-        os.fsync(fd)
-        os.close(fd); fd = -1
+        if startup_terminal_temporary is None:
+            fd = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0o600,
+            )
+            os.write(fd, encoded)
+            os.fchown(fd, uid, gid)
+            os.fchmod(fd, 0o400)
+            os.fsync(fd)
+            os.close(fd); fd = -1
+            fsync_run_root()
+        else:
+            startup_terminal_temporary.recheck()
+            require(
+                startup_terminal_temporary.data == encoded,
+                "existing writer resume temporary is ambiguous",
+            )
+        if fault_point == "after-terminal-temp-fsync":
+            os.kill(os.getpid(), signal.SIGKILL)
         try:
             rename_noreplace(temporary, paths["terminal"])
             temporary = None
@@ -565,18 +850,26 @@ def publish_receipt(value):
             require(existing.data == encoded, "existing writer resume state is ambiguous")
             os.unlink(temporary)
             temporary = None
+            fsync_run_root()
             return
         if fault_point == "after-terminal-rename":
             os.kill(os.getpid(), signal.SIGKILL)
-        directory_fd = os.open(run_root, os.O_RDONLY | os.O_DIRECTORY)
-        try: os.fsync(directory_fd)
-        finally: os.close(directory_fd)
+        fsync_run_root()
     finally:
         if fd >= 0: os.close(fd)
-        if temporary is not None:
-            try: os.unlink(temporary)
-            except FileNotFoundError: pass
+        if temporary is not None and fault_point != "after-terminal-temp-fsync":
+            try:
+                os.unlink(temporary)
+                fsync_run_root()
+            except FileNotFoundError:
+                pass
 
+recovery_epoch = checkpoint["lease_epoch"].startswith("cutover-recovery-")
+if startup_terminal_temporary is not None and not os.path.exists(paths["terminal"]):
+    require(
+        recovery_epoch,
+        "writer resume temporary residue requires an approved recovery epoch",
+    )
 if os.path.exists(paths["terminal"]):
     final_projection, held_projection = terminal_projection()
     publish_receipt(expected_receipt(final_projection, held_projection))
@@ -584,7 +877,6 @@ if os.path.exists(paths["terminal"]):
 
 initial_final, initial_held = observe_all(True)
 prove_held(initial_held)
-recovery_epoch = checkpoint["lease_epoch"].startswith("cutover-recovery-")
 if recovery_epoch:
     try:
         final_projection, held_projection = terminal_projection()

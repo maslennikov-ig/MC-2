@@ -251,7 +251,7 @@ run_writer_resume_only() {
     resume_run_root="$Q12_RUN_ROOT_OVERRIDE"
     [[ $resume_run_root == /tmp/mc2-source-recovery-wrapper-*/backups/q12/$run_id ]] ||
       fail 'protected resume test run root is invalid'
-    case "$resume_fault_point" in ''|after-first-start|before-receipt|after-terminal-before-receipt|after-terminal-rename) ;; *) fail 'unknown protected resume fault point' ;; esac
+    case "$resume_fault_point" in ''|after-first-start|before-receipt|after-terminal-before-receipt|after-terminal-temp-fsync|after-terminal-rename) ;; *) fail 'unknown protected resume fault point' ;; esac
   else
     resume_run_root="/opt/megacampus/backups/q12/$run_id"
   fi
@@ -273,7 +273,7 @@ run_writer_resume_only() {
 
   local resume_controller_pid resume_controller_status
   /usr/bin/env -i \
-    PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
+    PATH='/usr/sbin:/usr/bin:/sbin:/bin' \
     LC_ALL='C' LANG='C' HOME='/root' Q12_EXTERNAL_QUIESCE_LEASE_FD='9' \
     "$PYTHON_BIN" "$RESUME_CONTROLLER" "$resume_mode" "$run_id" "$resume_run_root" "$DOCKER_BIN" \
     "$Q12_CUTOVER_LOCK_FILE" "$controller_uid" "$controller_gid" "$local_test" "$resume_fault_point" \
@@ -866,12 +866,45 @@ write_recovery_complete_state() {
     ! chmod 0400 "$temporary" ||
     [[ ! -f $temporary || -L $temporary ]] ||
     [[ $(owner_group_mode "$temporary") != "$controller_uid:$controller_gid:400" ]] ||
-    ! sync -f "$temporary" ||
-    ! mv -f -- "$temporary" "$writer_recovery_state" ||
-    ! sync -d "$q12_run_root"; then
+    ! sync -f "$temporary"; then
     rm -f -- "$temporary"
     return 1
   fi
+  if [[ -e $writer_recovery_state || -L $writer_recovery_state ]]; then
+    if [[ ! -f $writer_recovery_state || -L $writer_recovery_state ]] ||
+      [[ $(owner_group_mode "$writer_recovery_state") != "$controller_uid:$controller_gid:400" ]] ||
+      ! cmp -s -- "$temporary" "$writer_recovery_state"; then
+      printf 'source-recovery host wrapper: writer recovery state already exists with non-exact bytes\n' >&2
+      rm -f -- "$temporary"
+      return 1
+    fi
+    rm -f -- "$temporary"
+  elif ! "$PYTHON_BIN" - "$temporary" "$writer_recovery_state" <<'PY'
+import ctypes
+import os
+import sys
+
+source, destination = sys.argv[1:]
+libc = ctypes.CDLL(None, use_errno=True)
+renameat2 = getattr(libc, "renameat2", None)
+if renameat2 is None:
+    raise SystemExit(1)
+renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+renameat2.restype = ctypes.c_int
+if renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+    raise SystemExit(1)
+PY
+  then
+    if [[ ! -f $writer_recovery_state || -L $writer_recovery_state ]] ||
+      [[ $(owner_group_mode "$writer_recovery_state") != "$controller_uid:$controller_gid:400" ]] ||
+      ! cmp -s -- "$temporary" "$writer_recovery_state"; then
+      printf 'source-recovery host wrapper: writer recovery state already exists with non-exact bytes\n' >&2
+      rm -f -- "$temporary"
+      return 1
+    fi
+    rm -f -- "$temporary"
+  fi
+  sync -d "$q12_run_root" || return 1
   recovery_state_identity=''
   recovery_state_sha256=''
   open_controller_file "$writer_recovery_state" 'published writer recovery state' \

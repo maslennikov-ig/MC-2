@@ -10,6 +10,7 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -1043,14 +1044,22 @@ function quiesceWriter(record: Record<string, any>): Record<string, any> {
 function targetWriterRecords(): Array<Record<string, any>> {
   return ['api', 'web', 'worker', 'worker-stage6', 'worker-stage7'].map((service, index) => ({
     Id: `${String(index + 11).padStart(2, '0')}${'b'.repeat(62)}`,
-    Name: `/megacampus-green-${service}-1`,
+    Name:
+      service === 'api' || service === 'web'
+        ? `/megacampus-green-${service}-1`
+        : `/megacampus-${service}`,
     Config: {
       Image: `registry.invalid/megacampus-green/${service}@sha256:${String(index + 5).repeat(64)}`,
       Labels: {
-        'com.docker.compose.project': 'megacampus-green',
+        'com.docker.compose.project':
+          service === 'api' || service === 'web' ? 'megacampus-green' : 'megacampus',
         'com.docker.compose.service': service,
-        'com.docker.compose.project.config_files': '/srv/megacampus-green/compose.yml',
-        'com.docker.compose.project.working_dir': '/srv/megacampus-green',
+        'com.docker.compose.project.config_files':
+          service === 'api' || service === 'web'
+            ? '/srv/megacampus-green/compose.yml'
+            : '/srv/megacampus/docker-compose.production.yml',
+        'com.docker.compose.project.working_dir':
+          service === 'api' || service === 'web' ? '/srv/megacampus-green' : '/srv/megacampus',
       },
     },
     Image: `sha256:${String(index + 5).repeat(64)}`,
@@ -1064,12 +1073,30 @@ function targetWriterRecords(): Array<Record<string, any>> {
   }));
 }
 
+interface ResumeJournalFixtureOptions {
+  authorityLeaseEpoch?: string;
+  commonPrefixTransform?: (phases: string[]) => string[];
+  duplicateFinalPair?: boolean;
+  entryMutator?: (entry: Record<string, any>) => void;
+  probeMutator?: (probe: Record<string, any>) => void;
+  rollbackJournalPhaseOrderTransform?: (phases: string[]) => string[];
+  rollbackRequiredPhases?: string[];
+  targetRecordsTransform?: (records: Array<Record<string, any>>) => Array<Record<string, any>>;
+}
+
 function writerResumeFixture(
   mode: 'forward' | 'rollback',
   heldTargetCount = mode === 'forward' ? 5 : 3,
-  createdNoHealth = false
+  createdNoHealth = false,
+  journalOptions: ResumeJournalFixtureOptions = {}
 ): ResumeWriterFixture {
   const fixture = composeWriterFixture();
+  if (journalOptions.probeMutator) {
+    mutateProtectedJson(fixture.probeReceipt, journalOptions.probeMutator);
+    mutateProtectedJson(fixture.barrierReceipt, barrier => {
+      barrier.probe_receipt_sha256 = fileSha256(fixture.probeReceipt);
+    });
+  }
   const originalRecords = fixture.records();
   if (createdNoHealth) {
     originalRecords[9].State = {
@@ -1080,7 +1107,9 @@ function writerResumeFixture(
     };
   }
   const originalQuiesce = originalRecords.map(quiesceWriter);
-  const targetRecords = targetWriterRecords();
+  const rawTargetRecords = targetWriterRecords();
+  const targetRecords =
+    journalOptions.targetRecordsTransform?.(rawTargetRecords) ?? rawTargetRecords;
   const capturedTargets = targetRecords.slice(0, heldTargetCount);
   const barrier = JSON.parse(readFileSync(fixture.barrierReceipt, 'utf8')) as Record<string, any>;
   const readinessBarrier = {
@@ -1153,6 +1182,7 @@ function writerResumeFixture(
   const cutoverLock = join(fixture.directory, 'q12-cutover.lock');
   const releaseSha = 'e'.repeat(40);
   const leaseEpoch = 'cutover';
+  const resourceManifestSha = 'd'.repeat(64);
   const journalEntries: Array<Record<string, any>> = [];
   let previousHash = '0'.repeat(64);
   const appendJournalEntry = (
@@ -1160,10 +1190,10 @@ function writerResumeFixture(
     outcome: string,
     acceptedObjectKind = 'none',
     acceptedObjectSha256: string | null = null,
-    resourceManifestSha256 = 'd'.repeat(64)
+    entryLeaseEpoch = leaseEpoch
   ): Record<string, any> => {
     const seq = journalEntries.length + 1;
-    const entry = withJournalEntryHash({
+    const preimage = {
       schema: 'megacampus.q12.cutover-journal/v1',
       run_id: Q12_RUN_ID,
       seq,
@@ -1174,20 +1204,51 @@ function writerResumeFixture(
       operator_digest: '8'.repeat(64),
       command_id: 'barrier.prepare-recovery',
       command_sha256: '9'.repeat(64),
-      lease_epoch: leaseEpoch,
+      lease_epoch: entryLeaseEpoch,
       previous_hash: previousHash,
       rotation_required: true,
-      resource_manifest_sha256: resourceManifestSha256,
+      resource_manifest_sha256: resourceManifestSha,
       quiesce_manifest_sha256: quiesceSha,
       capability_manifest_sha256: '0'.repeat(64),
       accepted_object_kind: acceptedObjectKind,
       accepted_object_sha256: acceptedObjectSha256,
-    });
+    };
+    journalOptions.entryMutator?.(preimage);
+    const entry = withJournalEntryHash(preimage);
     journalEntries.push(entry);
     previousHash = String(entry.entry_hash);
     return entry;
   };
-  appendJournalEntry('cutover_prepared', 'completed');
+  const commonPrefix = journalOptions.commonPrefixTransform?.([
+    'preflight',
+    'maintenance_guarded',
+    'quiesced',
+    'snapshot_exported',
+    'backup_committed',
+    'restore_verified',
+    'base_migration_guarded',
+    'observability_migration_guarded',
+    'migrations_applied',
+    'recovery_ready_guarded',
+    'source_recovered',
+    'reindex_started',
+    'qdrant_verified',
+  ]) ?? [
+    'preflight',
+    'maintenance_guarded',
+    'quiesced',
+    'snapshot_exported',
+    'backup_committed',
+    'restore_verified',
+    'base_migration_guarded',
+    'observability_migration_guarded',
+    'migrations_applied',
+    'recovery_ready_guarded',
+    'source_recovered',
+    'reindex_started',
+    'qdrant_verified',
+  ];
+  for (const phase of commonPrefix) appendJournalEntry(phase, 'completed');
   const finalPhase = mode === 'forward' ? 'prepared_quiesced' : 'rollback_preparing';
   const finalIntent = appendJournalEntry(finalPhase, 'intent');
   writeProtectedJson(finalManifest, {
@@ -1204,19 +1265,21 @@ function writerResumeFixture(
     held_writers: heldWriters,
   });
   const finalManifestSha = fileSha256(finalManifest);
-  appendJournalEntry(
-    finalPhase,
-    'accepted',
-    'final_writer_manifest',
-    finalManifestSha,
-    finalManifestSha
-  );
+  appendJournalEntry(finalPhase, 'accepted', 'final_writer_manifest', finalManifestSha);
+  if (journalOptions.duplicateFinalPair) {
+    appendJournalEntry(finalPhase, 'intent');
+    appendJournalEntry(finalPhase, 'accepted', 'final_writer_manifest', finalManifestSha);
+  }
   let handoffStateSha: string | null = null;
   let rollbackStateSha: string | null = null;
   const statePhase =
     mode === 'forward' ? 'handoff_ready_writers_quiesced' : 'rollback_ready_writers_quiesced';
-  const stateIntent = appendJournalEntry(statePhase, 'intent');
+  let stateIntent: Record<string, any>;
   if (mode === 'forward') {
+    for (const phase of ['activation_ready', 'activation_committing', 'activated']) {
+      appendJournalEntry(phase, 'completed');
+    }
+    stateIntent = appendJournalEntry(statePhase, 'intent');
     writeProtectedJson(handoffState, {
       schema_version: 'megacampus.q12.writer-handoff-state/v1',
       run_id: Q12_RUN_ID,
@@ -1232,14 +1295,9 @@ function writerResumeFixture(
       lease_epoch: leaseEpoch,
     });
     handoffStateSha = fileSha256(handoffState);
-    appendJournalEntry(
-      statePhase,
-      'accepted',
-      'writer_handoff_state',
-      handoffStateSha,
-      handoffStateSha
-    );
+    appendJournalEntry(statePhase, 'accepted', 'writer_handoff_state', handoffStateSha);
     markBarrierCleanupComplete(fixture);
+    appendJournalEntry('guard_cleanup_complete', 'completed');
   } else {
     Object.assign(barrier, {
       state: 'guard_cleanup_complete',
@@ -1249,8 +1307,27 @@ function writerResumeFixture(
       probe_receipt_sha256: null,
     });
     writeProtectedJson(fixture.barrierReceipt, barrier);
-    const requiredPhaseReceipts: Array<{ phase: string; receipt_sha256: string }> = [];
-    const requiredPhaseReceiptsSha = createHash('sha256').update('[]').digest('hex');
+    const rollbackPhaseOrder = [
+      'handoff_rollback_verified',
+      'qdrant_rollback_verified',
+      'source_rollback_verified',
+      'observability_migration_rollback_guarded',
+      'base_migration_rollback_guarded',
+    ];
+    const requiredPhaseNames = journalOptions.rollbackRequiredPhases ?? rollbackPhaseOrder;
+    const requiredPhaseReceipts = [...requiredPhaseNames]
+      .sort()
+      .map((phase, index) => ({ phase, receipt_sha256: String(index + 1).repeat(64) }));
+    const requiredPhaseReceiptsSha = createHash('sha256')
+      .update(canonicalJson(requiredPhaseReceipts))
+      .digest('hex');
+    const rollbackJournalPhaseOrder =
+      journalOptions.rollbackJournalPhaseOrderTransform?.(rollbackPhaseOrder) ?? rollbackPhaseOrder;
+    for (const phase of rollbackJournalPhaseOrder) {
+      if (requiredPhaseNames.includes(phase)) appendJournalEntry(phase, 'completed');
+    }
+    appendJournalEntry('guard_cleanup_complete', 'completed');
+    stateIntent = appendJournalEntry(statePhase, 'intent');
     writeProtectedJson(rollbackState, {
       schema_version: 'megacampus.q12.writer-rollback-state/v1',
       run_id: Q12_RUN_ID,
@@ -1268,17 +1345,18 @@ function writerResumeFixture(
       lease_epoch: leaseEpoch,
     });
     rollbackStateSha = fileSha256(rollbackState);
-    appendJournalEntry(
-      statePhase,
-      'accepted',
-      'writer_rollback_state',
-      rollbackStateSha,
-      rollbackStateSha
-    );
+    appendJournalEntry(statePhase, 'accepted', 'writer_rollback_state', rollbackStateSha);
   }
   const barrierSha = fileSha256(fixture.barrierReceipt);
   const authorityPhase = `resume_authority_${mode}`;
-  const authorityIntent = appendJournalEntry(authorityPhase, 'intent');
+  const authorityLeaseEpoch = journalOptions.authorityLeaseEpoch ?? leaseEpoch;
+  const authorityIntent = appendJournalEntry(
+    authorityPhase,
+    'intent',
+    'none',
+    null,
+    authorityLeaseEpoch
+  );
   const authorityValue = {
     schema_version: 'megacampus.q12.writer-resume-authority/v1',
     run_id: Q12_RUN_ID,
@@ -1295,7 +1373,7 @@ function writerResumeFixture(
     rollback_state_sha256: rollbackStateSha,
     authority_intent_journal_entry_hash: authorityIntent.entry_hash,
     input_checkpoint_sha256: '3'.repeat(64),
-    lease_epoch: leaseEpoch,
+    lease_epoch: authorityLeaseEpoch,
   };
   writeProtectedJson(authority, authorityValue);
   const authoritySha = fileSha256(authority);
@@ -1304,7 +1382,7 @@ function writerResumeFixture(
     'accepted',
     'writer_resume_authority',
     authoritySha,
-    authoritySha
+    authorityLeaseEpoch
   );
   const resumeHead = withJournalEntryHash({
     schema: 'megacampus.q12.cutover-journal/v1',
@@ -1317,10 +1395,10 @@ function writerResumeFixture(
     operator_digest: '8'.repeat(64),
     command_id: `writers.resume.${mode}`,
     command_sha256: '9'.repeat(64),
-    lease_epoch: leaseEpoch,
+    lease_epoch: authorityLeaseEpoch,
     previous_hash: previousHash,
     rotation_required: true,
-    resource_manifest_sha256: finalManifestSha,
+    resource_manifest_sha256: resourceManifestSha,
     quiesce_manifest_sha256: quiesceSha,
     capability_manifest_sha256: '0'.repeat(64),
     accepted_object_kind: 'none',
@@ -1343,7 +1421,7 @@ function writerResumeFixture(
       accepted_object_kind: 'none',
       accepted_object_sha256: null,
       resume_authority_sha256: authoritySha,
-      lease_epoch: leaseEpoch,
+      lease_epoch: authorityLeaseEpoch,
     },
     0o600
   );
@@ -1440,7 +1518,7 @@ function rewriteWriterResumeEpoch(
     command_id: `writers.resume.${mode}`,
     lease_epoch: leaseEpoch,
     previous_hash: authorityIntent.entry_hash,
-    resource_manifest_sha256: authoritySha,
+    resource_manifest_sha256: previousPreimage.resource_manifest_sha256,
     accepted_object_kind: 'writer_resume_authority',
     accepted_object_sha256: authoritySha,
   });
@@ -1453,7 +1531,7 @@ function rewriteWriterResumeEpoch(
     command_id: `writers.resume.${mode}`,
     lease_epoch: leaseEpoch,
     previous_hash: authorityAccepted.entry_hash,
-    resource_manifest_sha256: fileSha256(fixture.finalManifest),
+    resource_manifest_sha256: previousPreimage.resource_manifest_sha256,
     accepted_object_kind: 'none',
     accepted_object_sha256: null,
   });
@@ -1592,6 +1670,20 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(help.stdout).not.toContain('--resume-run-root');
     expect(help.stdout).not.toContain('--resume-database-url');
     expect(help.stdout).not.toContain('--resume-capability');
+  });
+
+  it('pins the exact normative writer-resume PATH without local executable directories', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    const controller = source('deploy/qdrant/q12-writer-resume.py');
+
+    expect(wrapper).toContain("PATH='/usr/sbin:/usr/bin:/sbin:/bin'");
+    expect(controller).toContain('"PATH": "/usr/sbin:/usr/bin:/sbin:/bin"');
+    expect(wrapper).not.toContain(
+      "PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'"
+    );
+    expect(controller).not.toContain(
+      '"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
+    );
   });
 
   it('sanitizes an unapproved launcher variable before entering the exact controller environment', () => {
@@ -1746,6 +1838,125 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
+  it('rejects duplicate keys in a protected JSON authority input before Docker inspection', () => {
+    const fixture = writerResumeFixture('forward');
+    const barrier = readFileSync(fixture.barrierReceipt, 'utf8').trimEnd();
+    chmodSync(fixture.barrierReceipt, 0o600);
+    writeFileSync(fixture.barrierReceipt, `${barrier.slice(0, -1)},"zero_guard_residue":true}\n`);
+    chmodSync(fixture.barrierReceipt, 0o400);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/duplicate JSON key/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('rejects a hash-bound probe receipt with a non-exact nested probe value', () => {
+    const fixture = writerResumeFixture('forward', 5, false, {
+      probeMutator: probe => {
+        probe.probes.postgrest_anon = 'rolled_back';
+      },
+    });
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/probe receipt.*nested|probe receipt.*projection/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('forbids every Docker writer start while the database capability still exists', () => {
+    const fixture = writerResumeFixture('forward');
+    writeFileSync(fixture.q12Capability, 'still-live-capability\n', { mode: 0o400 });
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/capability.*still exists|capability.*must be absent/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it.each([
+    {
+      label: 'missing phase',
+      options: {
+        commonPrefixTransform: (phases: string[]) =>
+          phases.filter(phase => phase !== 'restore_verified'),
+      },
+    },
+    {
+      label: 'out-of-order phase',
+      options: {
+        commonPrefixTransform: (phases: string[]) => {
+          const changed = [...phases];
+          const backup = changed.indexOf('backup_committed');
+          const restore = changed.indexOf('restore_verified');
+          [changed[backup], changed[restore]] = [changed[restore], changed[backup]];
+          return changed;
+        },
+      },
+    },
+    {
+      label: 'repeated phase',
+      options: {
+        commonPrefixTransform: (phases: string[]) => [
+          ...phases.slice(0, 6),
+          'restore_verified',
+          ...phases.slice(6),
+        ],
+      },
+    },
+    {
+      label: 'unknown phase',
+      options: {
+        commonPrefixTransform: (phases: string[]) =>
+          phases.map(phase => (phase === 'restore_verified' ? 'cutover_prepared' : phase)),
+      },
+    },
+    {
+      label: 'cross-mode phase',
+      options: {
+        commonPrefixTransform: (phases: string[]) => [
+          ...phases.slice(0, 6),
+          'rollback_complete',
+          ...phases.slice(6),
+        ],
+      },
+    },
+    {
+      label: 'wrong ordinary outcome',
+      options: {
+        entryMutator: (entry: Record<string, any>) => {
+          if (entry.phase === 'migrations_applied') entry.outcome = 'accepted';
+        },
+      },
+    },
+    {
+      label: 'accepted object on an ordinary phase',
+      options: {
+        entryMutator: (entry: Record<string, any>) => {
+          if (entry.phase === 'migrations_applied') {
+            entry.accepted_object_kind = 'writer_resume_state';
+            entry.accepted_object_sha256 = 'f'.repeat(64);
+          }
+        },
+      },
+    },
+    {
+      label: 'second object publication pair',
+      options: { duplicateFinalPair: true },
+    },
+  ])('rejects a $label in the exact forward journal prefix', ({ options }) => {
+    const fixture = writerResumeFixture('forward', 5, false, options);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/phase graph|journal prefix/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
   it('resumes the exact forward final ten in workers, API, Web order and leaves held five stopped', () => {
     const fixture = writerResumeFixture('forward');
     const checkpointBefore = readFileSync(fixture.checkpoint, 'utf8');
@@ -1882,6 +2093,95 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       });
     }
   );
+
+  it.each([
+    {
+      label: 'same active project color',
+      mode: 'forward' as const,
+      held: 5,
+      transform: (records: Array<Record<string, any>>) =>
+        records.map((record, index) => {
+          if (index > 1) return record;
+          return {
+            ...record,
+            Config: {
+              ...record.Config,
+              Labels: {
+                ...record.Config.Labels,
+                'com.docker.compose.project': 'megacampus-blue',
+              },
+            },
+          };
+        }),
+    },
+    {
+      label: 'duplicated production worker service',
+      mode: 'forward' as const,
+      held: 5,
+      transform: (records: Array<Record<string, any>>) =>
+        records.map((record, index) => {
+          if (index !== 2) return record;
+          return {
+            ...record,
+            Config: {
+              ...record.Config,
+              Labels: {
+                ...record.Config.Labels,
+                'com.docker.compose.service': 'worker-stage6',
+              },
+            },
+          };
+        }),
+    },
+    {
+      label: 'non-prefix rollback target creation set',
+      mode: 'rollback' as const,
+      held: 3,
+      transform: (records: Array<Record<string, any>>) => [
+        records[0],
+        records[1],
+        records[3],
+        records[2],
+        records[4],
+      ],
+    },
+  ])('rejects a $label before any writer start', ({ mode, held, transform }) => {
+    const fixture = writerResumeFixture(mode, held, false, {
+      targetRecordsTransform: transform,
+    });
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/topology|target creation prefix|project color/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it.each([
+    {
+      label: 'unknown conditional receipt',
+      options: { rollbackRequiredPhases: ['unknown_rollback_verified'] },
+    },
+    {
+      label: 'out-of-order conditional receipt journal',
+      options: {
+        rollbackJournalPhaseOrderTransform: (phases: string[]) => [
+          phases[0],
+          phases[2],
+          phases[1],
+          ...phases.slice(3),
+        ],
+      },
+    },
+  ])('rejects an $label before rollback writer start', ({ options }) => {
+    const fixture = writerResumeFixture('rollback', 3, false, options);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/rollback.*conditional|rollback.*phase receipt/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
 
   it('compensates every final writer to stopped/no after an ordered resume start failure', () => {
     const fixture = writerResumeFixture('forward');
@@ -2088,6 +2388,59 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(startsAfterRetry).toBe(startsBeforeRetry);
     const controller = source('deploy/qdrant/q12-writer-resume.py');
     expect(controller).toMatch(/os\.fchown\(fd, uid, gid\)[\s\S]*rename_noreplace/);
+  });
+
+  it('fails closed on a deterministic terminal temporary symlink before writer start', () => {
+    const fixture = writerResumeFixture('forward');
+    const target = join(fixture.directory, 'terminal-temp-target');
+    writeFileSync(target, 'attacker-controlled\n', { mode: 0o400 });
+    symlinkSync(target, join(fixture.q12RunRoot, '.writer-resume-state.tmp'));
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/temporary.*(?:regular file|symlink|not canonical)/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('retains a durable deterministic terminal temporary after fsync crash and blocks same-epoch replay', () => {
+    const fixture = writerResumeFixture('forward');
+    const terminalTemporary = join(fixture.q12RunRoot, '.writer-resume-state.tmp');
+
+    const interrupted = fixture.resume('forward', {
+      SOURCE_RECOVERY_RESUME_FAULT_POINT: 'after-terminal-temp-fsync',
+    });
+
+    expect(interrupted.status).not.toBe(0);
+    expect(existsSync(fixture.resumeState)).toBe(false);
+    expect(existsSync(terminalTemporary)).toBe(true);
+    expect(statSync(terminalTemporary).mode & 0o777).toBe(0o400);
+    const startsBeforeRetry = readFileSync(fixture.dockerLog, 'utf8')
+      .split('\n')
+      .filter(line => line.startsWith('start ')).length;
+
+    const retry = fixture.resume();
+
+    expect(retry.status).not.toBe(0);
+    expect(retry.stderr).toMatch(/temporary residue.*recovery epoch/iu);
+    const startsAfterRetry = readFileSync(fixture.dockerLog, 'utf8')
+      .split('\n')
+      .filter(line => line.startsWith('start ')).length;
+    expect(startsAfterRetry).toBe(startsBeforeRetry);
+    expect(existsSync(terminalTemporary)).toBe(true);
+  });
+
+  it('removes only exact deterministic temporary residue beside an accepted terminal receipt', () => {
+    const fixture = writerResumeFixture('forward');
+    const first = fixture.resume();
+    expect(first.status, first.stderr).toBe(0);
+    const terminalTemporary = join(fixture.q12RunRoot, '.writer-resume-state.tmp');
+    writeFileSync(terminalTemporary, readFileSync(fixture.resumeState), { mode: 0o400 });
+
+    const retry = fixture.resume();
+
+    expect(retry.status, retry.stderr).toBe(0);
+    expect(existsSync(terminalTemporary)).toBe(false);
   });
 
   it('compensates a partial SIGKILL resume and requires the next recovery epoch', () => {
@@ -2453,6 +2806,22 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       expect(state[field]).toMatch(/^[a-f0-9]{64}$/u);
     }
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('never replaces a pre-existing non-exact immutable writer recovery receipt', () => {
+    const fixture = composeWriterFixture();
+    const existing = '{"preexisting":"must-not-be-replaced"}\n';
+    writeFileSync(fixture.recoveryState, existing, { mode: 0o400 });
+
+    const result = spawnSync('bash', [WRAPPER, '--stop-writers', ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/recovery.*already exists|recovery.*non-exact/iu);
+    expect(readFileSync(fixture.recoveryState, 'utf8')).toBe(existing);
+    expect(fixture.records().every(record => record.State.Running === false)).toBe(true);
   });
 
   it.each([
