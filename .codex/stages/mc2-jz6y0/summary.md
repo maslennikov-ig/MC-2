@@ -288,6 +288,36 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - `graph-reviewed: no-change-needed` — exact frozen docs, refs and producer
   absence determined the blocker; no accepted code/architecture was integrated.
 
+### D5 exact written candidate gate (2026-07-14)
+
+- The owner approved Option A at the architecture level: one immutable
+  byte-exact retained launcher-checkpoint copy per retained command execution
+  epoch, with no second claimed-input copy.
+- The complete non-normative candidate is
+  `docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md`
+  at SHA-256
+  `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`.
+- It freezes the selector/copy/capability lifecycle, direct recovery and
+  no-replay result completion, four rollback frontiers, install exclusion,
+  activation precommit classifier, crash continuations, Root/launcher/W
+  ownership and required TDD/adversarial coverage.
+- For a journal-less newest tip `T`, checkpointed non-authority row `R` is its
+  sole direct journal reference. The later final-writer-manifest intent and
+  accepted row carry exact pre-disposition `F.capability_manifest_sha256`;
+  retirement remains transitively bound through `intent.previous_hash` and the
+  exact `R` input-checkpoint hash.
+- Fresh correctness rereview-6 passed P0/P1/P2/P3 `0/0/0/0`, report SHA-256
+  `3907f56b16c52fae26f5eb299595c26678c1874cd9b996e1b798f37e5443b170`.
+  Fresh documentation rereview-6 also passed `0/0/0/0`, report SHA-256
+  `5e39597adf3b87db066755ccadeab7d359751cd9672a78cabc2fce67ad128cb4`.
+- Decision `.13.17` remains open until the owner approves this exact path/SHA.
+  No implementation planning, W integration, remote or live action is
+  authorized by the candidate or reviews.
+- `docs-reviewed: updated` — exact candidate and decision evidence are current.
+- `graph-reviewed: no-change-needed` — the candidate is intentionally
+  non-normative until exact-SHA approval; refresh after approval avoids
+  promoting unapproved product truth.
+
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
