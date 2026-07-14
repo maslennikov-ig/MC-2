@@ -1092,6 +1092,7 @@ interface ResumeJournalFixtureOptions {
   authorityLeaseEpoch?: string;
   commonPrefixTransform?: (phases: string[]) => string[];
   databaseExistingProofCompletionEpoch?: boolean;
+  databasePreIssuanceOrphan?: boolean;
   databaseRecoveryEpoch?: boolean;
   duplicateFinalPair?: boolean;
   entryMutator?: (entry: Record<string, any>) => void;
@@ -1109,6 +1110,44 @@ function databaseCompletionEpoch(
   existingProofCompletion: boolean | undefined
 ): string {
   return existingProofCompletion ? 'cutover-recovery-1' : executionEpoch;
+}
+
+type AppendJournalEntry = (
+  phase: string,
+  outcome: string,
+  acceptedObjectKind?: string,
+  acceptedObjectSha256?: string | null,
+  entryLeaseEpoch?: string,
+  overrides?: Record<string, any>
+) => Record<string, any>;
+
+function claimInitialDatabaseCapability(
+  preIssuanceOrphan: boolean | undefined,
+  issuedCapability: string,
+  claimedCapability: string,
+  commandId: string,
+  leaseEpoch: string,
+  capabilitySha256: string,
+  appendJournalEntry: AppendJournalEntry
+): Record<string, any> | null {
+  if (preIssuanceOrphan) return null;
+  appendJournalEntry('guard_cleanup_complete', 'capability_issued', 'none', null, leaseEpoch, {
+    command_id: commandId,
+    capability_manifest_sha256: capabilitySha256,
+  });
+  renameSync(issuedCapability, claimedCapability);
+  return appendJournalEntry(
+    'guard_cleanup_complete',
+    'capability_claimed',
+    'none',
+    null,
+    leaseEpoch,
+    { command_id: commandId, capability_manifest_sha256: capabilitySha256 }
+  );
+}
+
+function databaseRecoveryRequired(options: ResumeJournalFixtureOptions): boolean {
+  return Boolean(options.databaseRecoveryEpoch || options.databasePreIssuanceOrphan);
 }
 
 function writerRollbackRequiredReceipts(
@@ -1707,32 +1746,28 @@ function writerResumeFixture(
       supersedes_capability_sha256: null,
     });
     const hostCapabilitySha256 = fileSha256(issuedCapability);
-    appendJournalEntry('guard_cleanup_complete', 'capability_issued', 'none', null, leaseEpoch, {
-      command_id: commandId,
-      capability_manifest_sha256: hostCapabilitySha256,
-    });
     const claimedCapability = join(capabilityDirectories.claimed, databaseCapabilityBasename);
-    renameSync(issuedCapability, claimedCapability);
-    const claimed = appendJournalEntry(
-      'guard_cleanup_complete',
-      'capability_claimed',
-      'none',
-      null,
+    const claimed = claimInitialDatabaseCapability(
+      journalOptions.databasePreIssuanceOrphan,
+      issuedCapability,
+      claimedCapability,
+      commandId,
       leaseEpoch,
-      { command_id: commandId, capability_manifest_sha256: hostCapabilitySha256 }
+      hostCapabilitySha256,
+      appendJournalEntry
     );
     writeJournal(journal, journalEntries);
     let databaseExecutionEpoch = leaseEpoch;
     let currentCapabilityBasename = databaseCapabilityBasename;
-    let currentClaimedCapability = claimedCapability;
+    let currentClaimedCapability = claimed === null ? issuedCapability : claimedCapability;
     let currentHostCapabilitySha256 = hostCapabilitySha256;
     let currentClaimed = claimed;
-    if (journalOptions.databaseRecoveryEpoch) {
+    if (databaseRecoveryRequired(journalOptions)) {
       const supersededCapability = join(
         capabilityDirectories.superseded,
         databaseCapabilityBasename
       );
-      renameSync(claimedCapability, supersededCapability);
+      renameSync(currentClaimedCapability, supersededCapability);
       databaseExecutionEpoch = 'cutover-recovery-1';
       capabilityCheckpoint = join(
         fixture.q12RunRoot,
@@ -1814,7 +1849,7 @@ function writerResumeFixture(
     );
     writeProtectedJson(
       inputCheckpoint,
-      checkpointForJournalEntry(currentClaimed, journal, null),
+      checkpointForJournalEntry(currentClaimed!, journal, null),
       0o600
     );
     const terminalProof = join(
@@ -2695,6 +2730,73 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       });
     }
   );
+
+  it('accepts a recovery capability linked to an immutable pre-issuance database orphan', () => {
+    const fixture = writerResumeFixture('forward', 5, false, {
+      databasePreIssuanceOrphan: true,
+    });
+    const superseded = join(
+      fixture.capabilitiesRoot,
+      'superseded',
+      'barrier.cleanup--cutover.json'
+    );
+    const completed = join(
+      fixture.capabilitiesRoot,
+      'completed',
+      'barrier.cleanup--cutover-recovery-1.json'
+    );
+    const completedCapability = JSON.parse(readFileSync(completed, 'utf8')) as Record<string, any>;
+    const databaseGraph = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, any>)
+      .filter(
+        entry => entry.phase === 'guard_cleanup_complete' && entry.command_id === 'barrier.cleanup'
+      );
+
+    expect(databaseGraph.map(entry => [entry.lease_epoch, entry.outcome])).toEqual([
+      ['cutover', 'intent'],
+      ['cutover-recovery-1', 'recovery_reacquired'],
+      ['cutover-recovery-1', 'capability_claimed'],
+      ['cutover-recovery-1', 'capability_completed'],
+      ['cutover-recovery-1', 'accepted'],
+    ]);
+    expect(completedCapability.supersedes_capability_sha256).toBe(fileSha256(superseded));
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(fixture.resumeState, 'utf8'))).toMatchObject({
+      state: 'writers_resumed',
+      mode: 'forward',
+    });
+  });
+
+  it('accepts an unrelated canonical completed barrier install capability', () => {
+    const fixture = writerResumeFixture('forward');
+    const cleanupCapability = join(
+      fixture.capabilitiesRoot,
+      'completed',
+      'barrier.cleanup--cutover.json'
+    );
+    const installCapability = JSON.parse(readFileSync(cleanupCapability, 'utf8')) as Record<
+      string,
+      any
+    >;
+    installCapability.command_id = 'barrier.install';
+    writeCanonicalProtectedJson(
+      join(fixture.capabilitiesRoot, 'completed', 'barrier.install--cutover.json'),
+      installCapability
+    );
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(fixture.resumeState, 'utf8'))).toMatchObject({
+      state: 'writers_resumed',
+      mode: 'forward',
+    });
+  });
 
   it.each(['forward', 'rollback'] as const)(
     'accepts existing exact database proof from the old execution epoch before %s writer resume',

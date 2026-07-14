@@ -1615,9 +1615,11 @@ for location, directory in capability_directories.items():
     for directory_entry in os.scandir(directory):
         if not directory_entry.name.startswith("barrier."):
             continue
+        if not directory_entry.name.startswith(("barrier.cleanup", "barrier.rollback")):
+            continue
         require(
             directory_entry.name.startswith(f"barrier.{database_operation}--"),
-            "cross-operation database barrier capability exists",
+            "conflicting database barrier terminal capability exists",
         )
         match = re.fullmatch(
             re.escape(f"barrier.{database_operation}")
@@ -1670,29 +1672,76 @@ for epoch, group_hash in zip(database_epochs, database_group_capability_hashes):
         continue
     if not database_referenced_capabilities or database_referenced_capabilities[-1][0] != group_hash:
         database_referenced_capabilities.append((group_hash, epoch))
-require(
-    len(database_referenced_capabilities) == len(database_capability_records)
-    and all(
-        digest in database_capability_by_digest
-        for digest, _ in database_referenced_capabilities
-    ),
-    "orphan or unreferenced database barrier host capability exists",
-)
-database_capability_chain = [
-    database_capability_by_digest[digest]
-    for digest, _ in database_referenced_capabilities
+database_completed_capabilities = [
+    record for record in database_capability_records
+    if record["location"] == "completed"
 ]
-for index, (record, (digest, execution_epoch)) in enumerate(
-    zip(database_capability_chain, database_referenced_capabilities)
-):
+require(
+    len(database_completed_capabilities) == 1,
+    "database barrier completed execution capability is ambiguous",
+)
+database_capability_chain = []
+database_capability_chain_digests = set()
+database_capability_cursor = database_completed_capabilities[0]
+while database_capability_cursor is not None:
+    cursor_digest = database_capability_cursor["file"].digest
     require(
-        record["file"].digest == digest
-        and record["value"]["lease_epoch"] == execution_epoch
-        and record["value"]["supersedes_capability_sha256"]
-        == (database_referenced_capabilities[index - 1][0] if index else None)
+        cursor_digest not in database_capability_chain_digests,
+        "database barrier host capability supersession cycle exists",
+    )
+    database_capability_chain.append(database_capability_cursor)
+    database_capability_chain_digests.add(cursor_digest)
+    predecessor_digest = database_capability_cursor["value"]["supersedes_capability_sha256"]
+    if predecessor_digest is None:
+        database_capability_cursor = None
+    else:
+        require(
+            predecessor_digest in database_capability_by_digest,
+            "database barrier host capability supersession link is missing",
+        )
+        database_capability_cursor = database_capability_by_digest[predecessor_digest]
+database_capability_chain.reverse()
+require(
+    len(database_capability_chain) == len(database_capability_records),
+    "orphan, forked, or unreferenced database barrier host capability exists",
+)
+for index, record in enumerate(database_capability_chain):
+    require(
+        record["value"]["supersedes_capability_sha256"]
+        == (database_capability_chain[index - 1]["file"].digest if index else None)
         and record["location"]
         == ("completed" if index == len(database_capability_chain) - 1 else "superseded"),
         "database barrier host capability lifecycle location or supersession is invalid",
+    )
+
+database_referenced_capability_epochs = dict(database_referenced_capabilities)
+database_journal_capability_chain = [
+    (record["file"].digest, record["value"]["lease_epoch"])
+    for record in database_capability_chain
+    if record["file"].digest in database_referenced_capability_epochs
+]
+require(
+    database_journal_capability_chain == database_referenced_capabilities,
+    "database barrier journal capability chain is invalid",
+)
+database_journalless_capabilities = [
+    record for record in database_capability_chain
+    if record["file"].digest not in database_referenced_capability_epochs
+]
+database_preissuance_orphan = None
+if database_journalless_capabilities:
+    database_preissuance_orphan = database_journalless_capabilities[0]
+    require(
+        len(database_journalless_capabilities) == 1
+        and database_preissuance_orphan is database_capability_chain[0]
+        and len(database_capability_chain) > 1
+        and database_preissuance_orphan["location"] == "superseded"
+        and database_preissuance_orphan["value"]["lease_epoch"] == "cutover"
+        and [entry["outcome"] for entry in database_epoch_groups[0][1]] == ["intent"]
+        and database_capability_chain[1]["value"]["lease_epoch"] == "cutover-recovery-1"
+        and database_capability_chain[1]["file"].digest
+        in database_referenced_capability_epochs,
+        "database barrier pre-issuance orphan is invalid",
     )
 database_capability_file = database_capability_chain[-1]["file"]
 database_capability = database_capability_chain[-1]["value"]
@@ -1705,14 +1754,25 @@ require(
 database_capability_checkpoint_files = {}
 for record in database_capability_chain:
     capability_epoch = record["value"]["lease_epoch"]
-    capability_journal_entry = next(
+    capability_journal_entries = [
         entry for entry in database_lifecycle_entries
         if entry["capability_manifest_sha256"] == record["file"].digest
         and entry["outcome"] in {"capability_issued", "recovery_reacquired"}
+    ]
+    require(
+        len(capability_journal_entries) <= 1,
+        "database barrier capability issuance journal binding is ambiguous",
     )
-    if capability_epoch == "cutover":
+    if not capability_journal_entries:
+        require(
+            record is database_preissuance_orphan,
+            "unlisted database barrier host capability exists",
+        )
+        database_capability_anchor_entry = database_intent_entry
+    elif capability_epoch == "cutover":
         database_capability_anchor_entry = database_intent_entry
     else:
+        capability_journal_entry = capability_journal_entries[0]
         capability_journal_index = journal_lines.index(capability_journal_entry)
         database_accepted_predecessors = [
             entry for entry in journal_lines[:capability_journal_index]
