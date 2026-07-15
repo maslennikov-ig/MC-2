@@ -489,9 +489,10 @@ export interface JoinedRetainedBarrierFixtureSpec {
   /**
    * Amendment section 6 item 4: the sanctioned partial-durable-capture
    * crash-state profile. Rollback prefix 4 without a frontier only; the
-   * rollback manifest holds exactly this creation-order target prefix.
+   * rollback manifest holds exactly this creation-order target prefix
+   * (5 = full durable capture without a forward manifest or commit).
    */
-  partialCaptureTargets?: 1 | 2 | 3 | 4;
+  partialCaptureTargets?: 1 | 2 | 3 | 4 | 5;
 }
 
 export interface JoinedRetainedBarrierFixtureResult extends RootRetainedBarrierFixtureResult {

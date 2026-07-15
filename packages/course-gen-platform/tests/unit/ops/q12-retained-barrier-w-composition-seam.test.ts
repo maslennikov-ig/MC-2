@@ -1277,7 +1277,7 @@ describe('Joined rollback profiles', () => {
     return createHash('sha256').update(text, 'utf8').digest('hex');
   }
 
-  it.each([1, 2, 3, 4] as const)(
+  it.each([1, 2, 3, 4, 5] as const)(
     'composes the sanctioned partial-capture rollback with held prefix %s',
     async k => {
       const runRoot = root();
@@ -1352,7 +1352,7 @@ describe('Joined rollback profiles', () => {
         } as never)
       ).rejects.toThrow(/partial capture/i);
     await reject({ joinedProfile: 'rollback', completedPrefixLength: 4, partialCaptureTargets: 0 });
-    await reject({ joinedProfile: 'rollback', completedPrefixLength: 4, partialCaptureTargets: 5 });
+    await reject({ joinedProfile: 'rollback', completedPrefixLength: 4, partialCaptureTargets: 6 });
     await reject({ joinedProfile: 'rollback', completedPrefixLength: 3, partialCaptureTargets: 2 });
     await reject({ joinedProfile: 'forward', partialCaptureTargets: 2 });
     await reject({
