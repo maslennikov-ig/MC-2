@@ -1,8 +1,342 @@
+/* eslint-disable max-lines --
+ * The Q12 file-only migration credential contract and the same-transaction
+ * guard publication must be co-located with this approved migration CLI: the
+ * stream write zone is fixed to this file and the observability CLI, so the
+ * shared credential/guard logic cannot be extracted into a new module. */
+import { constants as fsConstants } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { lstat, open, readFile, readdir, realpath } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Client } from 'pg';
+import { Client, type ClientConfig } from 'pg';
+
+// ---------------------------------------------------------------------------
+// Q12 file-only migration credential contract (design section 8).
+//
+// In Q12 live mode the CLIs never accept an environment or argv URL. They read
+// the database URI, CA, and run-bound database barrier capability only from
+// owner-checked, non-symlink regular files, build a field-by-field pg
+// ClientConfig with the pinned CA and a fixed read-write startup opt-out, and
+// bind the barrier capability with `set_config(..., false)` on the same client
+// before any migration statement. Secrets stay in process memory: they never
+// reach argv, environment, errors, telemetry, logs, or artifacts.
+// ---------------------------------------------------------------------------
+
+export const Q12_MIGRATION_ENDPOINT = {
+  protocol: 'postgresql:',
+  user: 'postgres.diqooqbuchsliypgwksu',
+  host: 'aws-1-us-east-2.pooler.supabase.com',
+  port: 5432,
+  database: 'postgres',
+} as const;
+
+export const Q12_MIGRATION_CA_SHA256 =
+  '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7';
+
+export const Q12_MIGRATION_STARTUP_OPTIONS = '-c default_transaction_read_only=off';
+
+export const Q12_MIGRATION_SET_CAPABILITY_SQL =
+  "SELECT set_config('megacampus.q12_capability', $1, false)";
+
+export interface Q12MigrationCredentialPaths {
+  dbUrlFile: string;
+  caFile: string;
+  capabilityFile: string;
+}
+
+export interface Q12MigrationCredentials {
+  clientConfig: ClientConfig;
+  capability: string;
+}
+
+// Test-only affordances. Production CLI callers never pass these: the trust
+// boundary defaults to the filesystem root and the CA hash to the pinned
+// production anchor. Tests set a private 0700 boundary so files created under a
+// world-writable temp ancestor are still validatable, and pin a synthetic CA.
+export interface Q12MigrationCredentialTestOverrides {
+  trustBoundary?: string;
+  expectedCaSha256?: string;
+  afterOpen?: (label: string) => void | Promise<void>;
+}
+
+// node-postgres silently falls back to these libpq environment variables for any
+// ClientConfig field left unset (and PGSERVICE/PGSERVICEFILE/PGOPTIONS can inject
+// host, TLS, or startup options). Q12 mode fails closed on their mere presence
+// rather than relying on explicit-field precedence.
+export const Q12_REJECTED_LIBPQ_ENV_VARS = [
+  'PGHOST',
+  'PGHOSTADDR',
+  'PGPORT',
+  'PGDATABASE',
+  'PGUSER',
+  'PGPASSWORD',
+  'PGPASSFILE',
+  'PGSSLMODE',
+  'PGSSLROOTCERT',
+  'PGOPTIONS',
+  'PGSERVICE',
+  'PGSERVICEFILE',
+] as const;
+
+export function assertNoQ12UrlEnvironmentOrArgument(
+  env: NodeJS.ProcessEnv,
+  args: readonly string[]
+): void {
+  if (env.SUPABASE_DB_URL !== undefined && env.SUPABASE_DB_URL !== '') {
+    throw new Error('Q12 live migration mode rejects the SUPABASE_DB_URL environment variable');
+  }
+  for (const variable of Q12_REJECTED_LIBPQ_ENV_VARS) {
+    if (env[variable] !== undefined && env[variable] !== '') {
+      throw new Error(`Q12 live migration mode rejects the ${variable} environment variable`);
+    }
+  }
+  const urlFlags = new Set(['--db-url', '--url', '--database-url', '--connection-string']);
+  for (const arg of args) {
+    if (arg.includes('://') || urlFlags.has(arg)) {
+      throw new Error('Q12 live migration mode rejects any database URI argument');
+    }
+  }
+}
+
+type FileIdentity = string;
+
+function identityOf(stats: {
+  dev: number;
+  ino: number;
+  uid: number;
+  gid: number;
+  mode: number;
+  size: number;
+}): FileIdentity {
+  return [stats.dev, stats.ino, stats.uid, stats.gid, stats.mode & 0o777, stats.size].join(':');
+}
+
+function assertAbsoluteControlFree(label: string, path: string): void {
+  if (!path.startsWith('/') || path.includes('\n') || path.includes('\r')) {
+    throw new Error(`${label} must be an absolute control-free path`);
+  }
+}
+
+async function assertSafeParentChain(label: string, path: string, boundary: string): Promise<void> {
+  let current = dirname(path);
+  for (;;) {
+    let stats;
+    let canonical;
+    try {
+      stats = await lstat(current);
+      canonical = await realpath(current);
+    } catch {
+      throw new Error(`${label} parent chain must contain only canonical non-symlink directories`);
+    }
+    if (!stats.isDirectory() || stats.isSymbolicLink() || canonical !== current) {
+      throw new Error(`${label} parent chain must contain only canonical non-symlink directories`);
+    }
+    if (stats.uid !== 0 && stats.uid !== process.getuid?.()) {
+      throw new Error(`${label} parent has an unexpected owner`);
+    }
+    if ((stats.mode & 0o022) !== 0) {
+      throw new Error(`${label} parent must not be group/world writable`);
+    }
+    if (current === boundary) return;
+    const parent = dirname(current);
+    if (parent === current) {
+      throw new Error(`${label} is outside the trusted boundary`);
+    }
+    current = parent;
+  }
+}
+
+async function readOwnerCheckedFile(
+  label: string,
+  path: string,
+  allowedModes: readonly number[],
+  boundary: string,
+  afterOpen?: (label: string) => void | Promise<void>
+): Promise<Buffer> {
+  assertAbsoluteControlFree(label, path);
+  await assertSafeParentChain(label, path, boundary);
+  let before;
+  let canonical;
+  try {
+    before = await lstat(path);
+    canonical = await realpath(path);
+  } catch {
+    throw new Error(`${label} must be a canonical non-symlink regular file`);
+  }
+  if (before.isSymbolicLink() || !before.isFile() || canonical !== path) {
+    throw new Error(`${label} must be a canonical non-symlink regular file`);
+  }
+  let handle;
+  try {
+    handle = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch {
+    throw new Error(`${label} must be a canonical non-symlink regular file`);
+  }
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || identityOf(opened) !== identityOf(before)) {
+      throw new Error(`${label} identity changed while opening`);
+    }
+    if (opened.uid !== process.getuid?.() || opened.gid !== process.getgid?.()) {
+      throw new Error(`${label} must be owned by the current UID:GID`);
+    }
+    if (!allowedModes.includes(opened.mode & 0o777)) {
+      throw new Error(`${label} has an unsafe mode`);
+    }
+    const content = await handle.readFile();
+    if (afterOpen) await afterOpen(label);
+    let after;
+    try {
+      after = await lstat(path);
+    } catch {
+      throw new Error(`${label} identity changed after open`);
+    }
+    if (after.isSymbolicLink() || identityOf(after) !== identityOf(opened)) {
+      throw new Error(`${label} identity changed after open`);
+    }
+    return content;
+  } finally {
+    await handle.close();
+  }
+}
+
+function requireSingleLineValue(label: string, content: Buffer): string {
+  const raw = content.toString('utf8');
+  const value = raw.endsWith('\n') ? raw.slice(0, -1) : raw;
+  if (value.length === 0) {
+    throw new Error(`${label} must contain exactly one nonempty value`);
+  }
+  if (value.includes('\n') || value.includes('\r')) {
+    throw new Error(`${label} must contain exactly one single-line value`);
+  }
+  return value;
+}
+
+function parseQ12MigrationUri(uri: string): {
+  user: string;
+  password: string;
+  host: string;
+  port: number;
+  database: string;
+} {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    throw new Error('Q12 migration database URI is malformed');
+  }
+  if (url.protocol !== Q12_MIGRATION_ENDPOINT.protocol) {
+    throw new Error('Q12 migration database URI protocol is not accepted');
+  }
+  if (url.hostname !== Q12_MIGRATION_ENDPOINT.host) {
+    throw new Error('Q12 migration database URI host is not accepted');
+  }
+  if (url.port !== String(Q12_MIGRATION_ENDPOINT.port)) {
+    throw new Error('Q12 migration database URI port is not accepted');
+  }
+  if (url.pathname !== `/${Q12_MIGRATION_ENDPOINT.database}`) {
+    throw new Error('Q12 migration database URI database is not accepted');
+  }
+  if (decodeURIComponent(url.username) !== Q12_MIGRATION_ENDPOINT.user) {
+    throw new Error('Q12 migration database URI user is not accepted');
+  }
+  if (url.search !== '' || url.searchParams.size !== 0) {
+    throw new Error('Q12 migration database URI must have zero query parameters');
+  }
+  if (url.hash !== '') {
+    throw new Error('Q12 migration database URI must have no fragment');
+  }
+  const password = decodeURIComponent(url.password);
+  if (password.length === 0) {
+    throw new Error('Q12 migration database URI password is required');
+  }
+  return {
+    user: Q12_MIGRATION_ENDPOINT.user,
+    password,
+    host: Q12_MIGRATION_ENDPOINT.host,
+    port: Q12_MIGRATION_ENDPOINT.port,
+    database: Q12_MIGRATION_ENDPOINT.database,
+  };
+}
+
+export async function loadQ12MigrationCredentials(
+  paths: Q12MigrationCredentialPaths,
+  overrides: Q12MigrationCredentialTestOverrides = {}
+): Promise<Q12MigrationCredentials> {
+  const boundary = overrides.trustBoundary ?? '/';
+  const expectedCaSha256 = overrides.expectedCaSha256 ?? Q12_MIGRATION_CA_SHA256;
+  const urlContent = await readOwnerCheckedFile(
+    'database URL file',
+    paths.dbUrlFile,
+    [0o400, 0o600],
+    boundary,
+    overrides.afterOpen
+  );
+  const caContent = await readOwnerCheckedFile(
+    'CA file',
+    paths.caFile,
+    [0o644],
+    boundary,
+    overrides.afterOpen
+  );
+  const capabilityContent = await readOwnerCheckedFile(
+    'database capability file',
+    paths.capabilityFile,
+    [0o400],
+    boundary,
+    overrides.afterOpen
+  );
+
+  const fields = parseQ12MigrationUri(requireSingleLineValue('database URL file', urlContent));
+  if (createHash('sha256').update(caContent).digest('hex') !== expectedCaSha256) {
+    throw new Error('Q12 migration CA SHA-256 does not match the pinned trust anchor');
+  }
+  const capability = requireSingleLineValue('database capability file', capabilityContent);
+
+  const clientConfig: ClientConfig = {
+    host: fields.host,
+    port: fields.port,
+    database: fields.database,
+    user: fields.user,
+    password: fields.password,
+    ssl: {
+      ca: caContent,
+      rejectUnauthorized: true,
+      servername: fields.host,
+    },
+    options: Q12_MIGRATION_STARTUP_OPTIONS,
+  };
+  return { clientConfig, capability };
+}
+
+export async function bindQ12MigrationSession(client: Client, capability: string): Promise<void> {
+  const proof = await client.query<{
+    session_user: string;
+    current_database: string;
+    server_major: number;
+    transaction_read_only: string;
+  }>(
+    `SELECT session_user AS session_user,
+            current_database() AS current_database,
+            (current_setting('server_version_num')::int / 10000) AS server_major,
+            current_setting('transaction_read_only') AS transaction_read_only`
+  );
+  const row = proof.rows[0];
+  if (!row || row.session_user !== 'postgres') {
+    throw new Error('Q12 migration session must authenticate directly as postgres');
+  }
+  if (row.current_database !== 'postgres') {
+    throw new Error('Q12 migration session must target the postgres database');
+  }
+  if (Number(row.server_major) !== 17) {
+    throw new Error('Q12 migration session server identity is not accepted');
+  }
+  if (row.transaction_read_only !== 'off') {
+    throw new Error('Q12 migration session must start read-write');
+  }
+  await client.query(Q12_MIGRATION_SET_CAPABILITY_SQL, [capability]);
+}
 
 type Direction = 'apply' | 'rollback';
 type RemoteGate = { allowRemote?: boolean; confirmation?: string };
@@ -225,9 +559,48 @@ const DOCUMENT_EVIDENCE_ABSENT_SECURITY_MANIFEST_SHA256 = {
   ],
 } as const;
 
+// A Q12 run supplies an already-validated field-by-field ClientConfig plus the
+// run-bound database barrier capability. It is mutually exclusive with the
+// ordinary in-memory `databaseUrl`: Q12 mutation never routes through the
+// legacy `connectionString` connection.
+export interface Q12MigrationRunContext {
+  clientConfig: ClientConfig;
+  capability: string;
+}
+
 export interface DocumentEvidenceApprovedMigrationOptions extends RemoteGate {
-  databaseUrl: string;
+  databaseUrl?: string;
   direction: Direction;
+  q12?: Q12MigrationRunContext;
+}
+
+export type MigrationConnectionSource =
+  | { kind: 'url'; connectionString: string }
+  | { kind: 'q12'; context: Q12MigrationRunContext };
+
+// Fail closed unless exactly one connection source is present. This is the
+// single choke point that guarantees Q12 file-only mutation and an ordinary
+// programmatic URL can never be combined, and that Q12 never yields a
+// `connectionString`.
+export function resolveMigrationConnectionSource(options: {
+  databaseUrl?: string;
+  q12?: Q12MigrationRunContext;
+}): MigrationConnectionSource {
+  const hasUrl = typeof options.databaseUrl === 'string' && options.databaseUrl.length > 0;
+  const hasQ12 = options.q12 != null;
+  if (hasUrl && hasQ12) {
+    throw new Error(
+      'Document evidence migration rejects a combined Q12 file-only context and databaseUrl'
+    );
+  }
+  if (!hasUrl && !hasQ12) {
+    throw new Error(
+      'Document evidence migration requires exactly one of a Q12 file-only context or databaseUrl'
+    );
+  }
+  return hasQ12
+    ? { kind: 'q12', context: options.q12! }
+    : { kind: 'url', connectionString: options.databaseUrl! };
 }
 
 function isLoopback(hostname: string): boolean {
@@ -1166,14 +1539,118 @@ function combinedResult(results: MigrationResult[], direction: Direction): Migra
   return 'recovered';
 }
 
+// ---------------------------------------------------------------------------
+// Q12 same-transaction guard publication.
+//
+// The frozen W barrier (`q12_guard.extend_guard`) installs row/TRUNCATE guards
+// on the exact newly created relations recorded in the stored expected catalog
+// and appends a `migration_guards` row. The migration reads those exact
+// relations/hashes from `q12_guard.active_run` (owned by postgres, readable by
+// the direct migration session) and passes them back; `extend_guard`
+// re-validates them against `pg_class`. Guard installation happens inside the
+// same transaction as the migration DDL/data and grants, before COMMIT, so the
+// new tables and their guards become visible atomically — there is no committed
+// window in which a granted table lacks its write barrier.
+// ---------------------------------------------------------------------------
+
+export type Q12GuardMigrationKey = '20260711140000' | '20260711151000';
+
+export interface Q12GuardInputs {
+  relations: unknown;
+  migrationFileSha256: string;
+  catalogSha256: string;
+}
+
+export async function readQ12GuardInputs(
+  client: Client,
+  migrationKey: Q12GuardMigrationKey
+): Promise<Q12GuardInputs> {
+  const result = await client.query<{
+    relations: unknown;
+    file_sha256: string | null;
+    catalog_sha256: string | null;
+  }>(
+    `SELECT expected_catalog->'migrations'->$1->'relations' AS relations,
+            expected_catalog->'migrations'->$1->>'migration_file_sha256' AS file_sha256,
+            expected_catalog->'migrations'->$1->>'catalog_sha256' AS catalog_sha256
+     FROM q12_guard.active_run WHERE singleton`,
+    [migrationKey]
+  );
+  const row = result.rows[0];
+  if (!row || row.relations == null || !row.file_sha256 || !row.catalog_sha256) {
+    throw new Error(
+      `Q12 database barrier is missing the expected guard catalog for migration ${migrationKey}`
+    );
+  }
+  return {
+    relations: row.relations,
+    migrationFileSha256: row.file_sha256,
+    catalogSha256: row.catalog_sha256,
+  };
+}
+
+export async function extendQ12Guard(
+  client: Client,
+  migrationKey: Q12GuardMigrationKey,
+  inputs: Q12GuardInputs
+): Promise<void> {
+  await client.query('SELECT q12_guard.extend_guard($1, $2::jsonb, $3, $4)', [
+    migrationKey,
+    JSON.stringify(inputs.relations),
+    inputs.migrationFileSha256,
+    inputs.catalogSha256,
+  ]);
+}
+
+// Apply the three base migrations as one atomic transaction so the guard the W
+// barrier extends over their new tables becomes visible in the same commit as
+// their grants. Because the fixed migration files interleave grants with DDL,
+// statements run in file order and the guard is installed after them but before
+// COMMIT; the atomic commit is what prevents any observable granted-but-unguarded
+// window.
+export async function applyQ12BasePacket(
+  client: Client,
+  migrations: LoadedMigration[]
+): Promise<MigrationResult> {
+  const guardInputs = await readQ12GuardInputs(client, '20260711140000');
+  await client.query('BEGIN');
+  try {
+    for (const migration of migrations) {
+      await assertMigrationAbsent(client, migration.version);
+      for (const statement of migration.apply.statements) await client.query(statement);
+    }
+    await extendQ12Guard(client, '20260711140000', guardInputs);
+    for (const migration of migrations) {
+      await assertLiveMigration(client, migration.version);
+      await insertHistory(client, migration);
+    }
+    await client.query('COMMIT');
+    return 'applied';
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function runDocumentEvidenceApprovedMigrations(
   options: DocumentEvidenceApprovedMigrationOptions
 ): Promise<MigrationResult> {
-  validateDocumentEvidenceApprovedMigrationTarget(options.databaseUrl, options.direction, options);
+  const source = resolveMigrationConnectionSource(options);
+  if (source.kind === 'url') {
+    validateDocumentEvidenceApprovedMigrationTarget(
+      source.connectionString,
+      options.direction,
+      options
+    );
+  }
   const migrations = await loadDocumentEvidenceApprovedMigrations();
-  const client = new Client({ connectionString: options.databaseUrl });
+  const client =
+    source.kind === 'q12'
+      ? new Client(source.context.clientConfig)
+      : new Client({ connectionString: source.connectionString });
   await client.connect();
   try {
+    if (source.kind === 'q12') await bindQ12MigrationSession(client, source.context.capability);
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', ['20260711120000']);
     try {
@@ -1185,6 +1662,17 @@ export async function runDocumentEvidenceApprovedMigrations(
         );
       }
       if (options.direction === 'rollback') await assertNoDownstreamLiveObjects(client);
+      if (source.kind === 'q12' && options.direction === 'apply') {
+        return await applyQ12BasePacket(client, migrations);
+      }
+      // Q12 rollback reuses the ordinary per-migration path on the
+      // capability-bound client: it removes only the application tables and
+      // their history. It deliberately never touches q12_guard.*, because the W
+      // barrier's enforce trigger makes migration_guards INSERT-only and the
+      // frozen contract tears the guard schema down only through the
+      // q12-database-barrier.sh rollback/cleanup drop_schema=true path
+      // (DROP EVENT TRIGGER + DROP SCHEMA q12_guard CASCADE with a residue
+      // check), never from the migration.
       const ordered = options.direction === 'apply' ? migrations : [...migrations].reverse();
       const results: MigrationResult[] = [];
       for (const migration of ordered) {
@@ -1203,6 +1691,45 @@ export async function runDocumentEvidenceApprovedMigrations(
   }
 }
 
+export interface Q12MigrationCliFlags {
+  dbUrlFile: string;
+  caFile: string;
+  capabilityFile: string;
+}
+
+// Pure extraction of the Q12 file-only flags. Returns null when none are
+// present (ordinary URL mode) and throws fail-closed on a partial set or on any
+// URI-shaped argument supplied alongside them.
+export function parseQ12MigrationCliFlags(args: readonly string[]): Q12MigrationCliFlags | null {
+  const flagNames: Record<string, keyof Q12MigrationCliFlags> = {
+    '--db-url-file': 'dbUrlFile',
+    '--ca-file': 'caFile',
+    '--q12-db-capability-file': 'capabilityFile',
+  };
+  const collected: Partial<Q12MigrationCliFlags> = {};
+  for (let index = 0; index < args.length; index += 1) {
+    const key = flagNames[args[index]];
+    if (!key) continue;
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(`Q12 migration flag ${args[index]} requires a path value`);
+    }
+    collected[key] = value;
+    index += 1;
+  }
+  const present = Object.keys(collected).length;
+  if (present === 0) return null;
+  if (present < 3) {
+    throw new Error(
+      'Q12 migration mode requires --db-url-file, --ca-file, and --q12-db-capability-file together'
+    );
+  }
+  if (args.some(arg => arg.includes('://'))) {
+    throw new Error('Q12 migration mode rejects any database URI argument');
+  }
+  return collected as Q12MigrationCliFlags;
+}
+
 function parseCliArguments(args: string[]): {
   direction: Direction;
   allowRemote: boolean;
@@ -1218,17 +1745,71 @@ function parseCliArguments(args: string[]): {
     const flag = args.shift();
     if (flag === '--allow-remote') allowRemote = true;
     else if (flag === '--confirm' && args.length > 0) confirmation = args.shift();
-    else throw new Error('Approved document evidence migration received an unsupported argument');
+    else if (
+      flag === '--db-url-file' ||
+      flag === '--ca-file' ||
+      flag === '--q12-db-capability-file'
+    ) {
+      args.shift();
+    } else throw new Error('Approved document evidence migration received an unsupported argument');
   }
   return { direction: action, allowRemote, ...(confirmation ? { confirmation } : {}) };
 }
 
+export type DocumentEvidenceApprovedCliResolution =
+  | { mode: 'q12'; files: Q12MigrationCliFlags; direction: Direction }
+  | {
+      mode: 'url';
+      databaseUrl: string;
+      direction: Direction;
+      allowRemote: boolean;
+      confirmation?: string;
+    };
+
+// Pure CLI resolution (no filesystem, no connection): the seam the wiring is
+// tested through. Q12 file-only mode and an ordinary SUPABASE_DB_URL are
+// mutually exclusive and fail closed.
+export function resolveDocumentEvidenceApprovedCli(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): DocumentEvidenceApprovedCliResolution {
+  const parsed = parseCliArguments([...args]);
+  const q12Files = parseQ12MigrationCliFlags(args);
+  if (q12Files) {
+    assertNoQ12UrlEnvironmentOrArgument(env, args);
+    return { mode: 'q12', files: q12Files, direction: parsed.direction };
+  }
+  const databaseUrl = env.SUPABASE_DB_URL;
+  if (databaseUrl === undefined || databaseUrl === '') {
+    throw new Error('SUPABASE_DB_URL is required');
+  }
+  return {
+    mode: 'url',
+    databaseUrl,
+    direction: parsed.direction,
+    allowRemote: parsed.allowRemote,
+    ...(parsed.confirmation ? { confirmation: parsed.confirmation } : {}),
+  };
+}
+
 async function main(): Promise<void> {
-  const parsed = parseCliArguments(process.argv.slice(2));
-  const databaseUrl = process.env.SUPABASE_DB_URL;
-  if (!databaseUrl) throw new Error('SUPABASE_DB_URL is required');
-  const result = await runDocumentEvidenceApprovedMigrations({ databaseUrl, ...parsed });
-  process.stdout.write(`Approved document evidence migration ${parsed.direction}: ${result}\n`);
+  const resolution = resolveDocumentEvidenceApprovedCli(process.argv.slice(2), process.env);
+  let result: MigrationResult;
+  if (resolution.mode === 'q12') {
+    const { clientConfig, capability } = await loadQ12MigrationCredentials(resolution.files);
+    result = await runDocumentEvidenceApprovedMigrations({
+      q12: { clientConfig, capability },
+      direction: resolution.direction,
+    });
+  } else {
+    result = await runDocumentEvidenceApprovedMigrations({
+      databaseUrl: resolution.databaseUrl,
+      direction: resolution.direction,
+      allowRemote: resolution.allowRemote,
+      ...(resolution.confirmation ? { confirmation: resolution.confirmation } : {}),
+    });
+  }
+  process.stdout.write(`Approved document evidence migration ${resolution.direction}: ${result}\n`);
 }
 
 if (

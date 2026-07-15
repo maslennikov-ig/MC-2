@@ -4,6 +4,17 @@ import { fileURLToPath } from 'node:url';
 
 import { Client } from 'pg';
 
+import {
+  assertNoQ12UrlEnvironmentOrArgument,
+  bindQ12MigrationSession,
+  extendQ12Guard,
+  loadQ12MigrationCredentials,
+  parseQ12MigrationCliFlags,
+  readQ12GuardInputs,
+  resolveMigrationConnectionSource,
+  type Q12MigrationRunContext,
+} from './document-evidence-approved';
+
 export const DOCUMENT_EVIDENCE_INDEX_MIGRATION_VERSION = '20260711150000';
 export const DOCUMENT_EVIDENCE_INDEX_MIGRATION_NAME = 'document_evidence_observability_index';
 export const DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION = {
@@ -46,14 +57,61 @@ const ROLLBACK_STATEMENTS = ROLLBACK_SOURCE.split(';')
   .map(value => value.trim())
   .filter(Boolean);
 
+// Q12 defense-in-depth over the exact-source allowlist: the recoverable
+// nontransactional concurrent-index packet may contain only CONCURRENTLY index
+// creation/removal and index comments against already-guarded tables. A
+// table/schema/function/trigger/ACL/grant or non-CONCURRENTLY statement injected
+// into this packet is a hard stop before execution (design section 5).
+const CONCURRENT_INDEX_PACKET_ALLOWLIST: readonly RegExp[] = [
+  /^CREATE\s+INDEX\s+CONCURRENTLY\s+(?:IF\s+NOT\s+EXISTS\s+)?\S/iu,
+  /^DROP\s+INDEX\s+CONCURRENTLY\s+(?:IF\s+EXISTS\s+)?\S/iu,
+  /^COMMENT\s+ON\s+INDEX\s+\S/iu,
+];
+
+function stripLeadingSqlNoise(statement: string): string {
+  let text = statement;
+  for (;;) {
+    const trimmed = text.replace(/^\s+/u, '');
+    if (trimmed.startsWith('--')) {
+      const newlineIndex = trimmed.indexOf('\n');
+      text = newlineIndex === -1 ? '' : trimmed.slice(newlineIndex + 1);
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      const end = trimmed.indexOf('*/');
+      text = end === -1 ? '' : trimmed.slice(end + 2);
+      continue;
+    }
+    return trimmed;
+  }
+}
+
+export function assertConcurrentIndexPacketSafe(statements: readonly string[]): void {
+  for (const statement of statements) {
+    const normalized = stripLeadingSqlNoise(statement).replace(/\s+/gu, ' ').trim();
+    // Reject a smuggled second statement: after leading noise is stripped, each
+    // statement must wholly match the allowlist with no embedded `;` remainder
+    // (e.g. "CREATE INDEX CONCURRENTLY x ON t(a); DROP TABLE t").
+    if (
+      normalized.includes(';') ||
+      !CONCURRENT_INDEX_PACKET_ALLOWLIST.some(pattern => pattern.test(normalized))
+    ) {
+      throw new Error(
+        'Q12 concurrent observability index packet permits only single semicolon-free CONCURRENTLY index and index-comment statements'
+      );
+    }
+  }
+}
+
 type Direction = 'apply' | 'rollback';
 type RemoteGate = { allowRemote?: boolean; confirmation?: string };
 type RemoteConfirmations = Readonly<Record<Direction, string>>;
 type MigrationSpec = { version: string; name: string; statements: string[] };
 
 export interface DocumentEvidenceIndexMigrationOptions extends RemoteGate {
-  databaseUrl: string;
+  databaseUrl?: string;
   direction: Direction;
+  q12?: Q12MigrationRunContext;
 }
 
 export type DocumentEvidenceObservabilityMigrationOptions = DocumentEvidenceIndexMigrationOptions;
@@ -348,6 +406,7 @@ function assertExactIndex(index: IndexState, requireComment = true): void {
 }
 
 async function apply(client: Client): Promise<'applied' | 'reused' | 'recovered'> {
+  assertConcurrentIndexPacketSafe(FORWARD_STATEMENTS);
   const history = await readHistory(client, DOCUMENT_EVIDENCE_INDEX_MIGRATION_VERSION);
   let before = await readIndex(client);
   if (history) {
@@ -384,6 +443,7 @@ async function apply(client: Client): Promise<'applied' | 'reused' | 'recovered'
 }
 
 async function rollback(client: Client): Promise<'rolled_back' | 'recovered' | 'reused'> {
+  assertConcurrentIndexPacketSafe(ROLLBACK_STATEMENTS);
   const history = await readHistory(client, DOCUMENT_EVIDENCE_INDEX_MIGRATION_VERSION);
   const before = await readIndex(client);
   if (!history) {
@@ -552,6 +612,42 @@ async function assertExactTotals(client: Client): Promise<void> {
   }
 }
 
+// Q12 totals apply: the totals packet creates a new table, so it installs and
+// verifies that table's W-barrier guard inside the same transaction, after its
+// DDL/data/grants and before COMMIT, exactly like the base packet.
+async function applyTotalsQ12(
+  client: Client,
+  spec: MigrationSpec,
+  statements: string[]
+): Promise<'applied' | 'reused'> {
+  const history = await readHistory(client, spec.version);
+  if (history) {
+    assertExactHistory(history, spec);
+    await assertExactTotals(client);
+    return 'reused';
+  }
+  if (await totalsRelationExists(client)) {
+    throw new Error('Live totals singleton exists without matching migration history');
+  }
+  const guardInputs = await readQ12GuardInputs(client, '20260711151000');
+  await client.query('BEGIN');
+  try {
+    for (const statement of statements) await client.query(statement);
+    await extendQ12Guard(client, '20260711151000', guardInputs);
+    await assertExactTotals(client);
+    await client.query(
+      `INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
+       VALUES($1,$2,$3::text[])`,
+      [spec.version, spec.name, spec.statements]
+    );
+    await client.query('COMMIT');
+    return 'applied';
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  }
+}
+
 async function applyTotals(
   client: Client,
   spec: MigrationSpec,
@@ -641,11 +737,18 @@ async function assertUnifiedHistory(client: Client, totalsSpec: MigrationSpec): 
 export async function runDocumentEvidenceObservabilityIndexMigration(
   options: DocumentEvidenceIndexMigrationOptions
 ): Promise<'applied' | 'rolled_back' | 'reused' | 'recovered'> {
-  validateDocumentEvidenceMigrationTarget(options.databaseUrl, options.direction, options);
+  const source = resolveMigrationConnectionSource(options);
+  if (source.kind === 'url') {
+    validateDocumentEvidenceMigrationTarget(source.connectionString, options.direction, options);
+  }
   await assertAllowlistedSource(options.direction);
-  const client = new Client({ connectionString: options.databaseUrl });
+  const client =
+    source.kind === 'q12'
+      ? new Client(source.context.clientConfig)
+      : new Client({ connectionString: source.connectionString });
   await client.connect();
   try {
+    if (source.kind === 'q12') await bindQ12MigrationSession(client, source.context.capability);
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', [ADVISORY_LOCK_KEY]);
     try {
@@ -661,11 +764,14 @@ export async function runDocumentEvidenceObservabilityIndexMigration(
 export async function runDocumentEvidenceObservabilityMigration(
   options: DocumentEvidenceObservabilityMigrationOptions
 ): Promise<'applied' | 'rolled_back' | 'reused' | 'recovered'> {
-  validateDocumentEvidenceObservabilityMigrationTarget(
-    options.databaseUrl,
-    options.direction,
-    options
-  );
+  const source = resolveMigrationConnectionSource(options);
+  if (source.kind === 'url') {
+    validateDocumentEvidenceObservabilityMigrationTarget(
+      source.connectionString,
+      options.direction,
+      options
+    );
+  }
   await assertAllowlistedSource(options.direction);
   const totalsForward = await loadTotalsMigration('apply');
   const totalsRollback = await loadTotalsMigration('rollback');
@@ -674,16 +780,23 @@ export async function runDocumentEvidenceObservabilityMigration(
     name: DOCUMENT_EVIDENCE_TOTALS_MIGRATION_NAME,
     statements: totalsForward.statements,
   };
-  const client = new Client({ connectionString: options.databaseUrl });
+  const client =
+    source.kind === 'q12'
+      ? new Client(source.context.clientConfig)
+      : new Client({ connectionString: source.connectionString });
   await client.connect();
   try {
+    if (source.kind === 'q12') await bindQ12MigrationSession(client, source.context.capability);
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', [ADVISORY_LOCK_KEY]);
     try {
       await assertUnifiedHistory(client, totalsSpec);
       if (options.direction === 'apply') {
         const indexResult = await apply(client);
-        const totalsResult = await applyTotals(client, totalsSpec, totalsForward.statements);
+        const totalsResult =
+          source.kind === 'q12'
+            ? await applyTotalsQ12(client, totalsSpec, totalsForward.statements)
+            : await applyTotals(client, totalsSpec, totalsForward.statements);
         if (indexResult === 'reused' && totalsResult === 'reused') return 'reused';
         if (indexResult === 'applied' && totalsResult === 'applied') return 'applied';
         return 'recovered';
@@ -721,24 +834,39 @@ function parseCliArguments(args: string[]): {
     const flag = args.shift();
     if (flag === '--allow-remote') allowRemote = true;
     else if (flag === '--confirm' && args.length > 0) confirmation = args.shift();
-    else throw new Error('Document evidence migration received an unsupported argument');
+    else if (
+      flag === '--db-url-file' ||
+      flag === '--ca-file' ||
+      flag === '--q12-db-capability-file'
+    ) {
+      args.shift();
+    } else throw new Error('Document evidence migration received an unsupported argument');
   }
   return { direction, unified, allowRemote, ...(confirmation ? { confirmation } : {}) };
 }
 
 async function main(): Promise<void> {
-  const parsed = parseCliArguments(process.argv.slice(2));
-  const databaseUrl = process.env.SUPABASE_DB_URL;
-  if (!databaseUrl) throw new Error('SUPABASE_DB_URL is required');
+  const args = process.argv.slice(2);
+  const parsed = parseCliArguments([...args]);
+  const q12Files = parseQ12MigrationCliFlags(args);
   const runner = parsed.unified
     ? runDocumentEvidenceObservabilityMigration
     : runDocumentEvidenceObservabilityIndexMigration;
-  const result = await runner({
-    databaseUrl,
-    direction: parsed.direction,
-    allowRemote: parsed.allowRemote,
-    ...(parsed.confirmation ? { confirmation: parsed.confirmation } : {}),
-  });
+  let result: 'applied' | 'rolled_back' | 'reused' | 'recovered';
+  if (q12Files) {
+    assertNoQ12UrlEnvironmentOrArgument(process.env, args);
+    const { clientConfig, capability } = await loadQ12MigrationCredentials(q12Files);
+    result = await runner({ q12: { clientConfig, capability }, direction: parsed.direction });
+  } else {
+    const databaseUrl = process.env.SUPABASE_DB_URL;
+    if (!databaseUrl) throw new Error('SUPABASE_DB_URL is required');
+    result = await runner({
+      databaseUrl,
+      direction: parsed.direction,
+      allowRemote: parsed.allowRemote,
+      ...(parsed.confirmation ? { confirmation: parsed.confirmation } : {}),
+    });
+  }
   process.stdout.write(
     `Document evidence observability ${parsed.unified ? 'migration' : 'index'} ${parsed.direction}: ${result}\n`
   );
