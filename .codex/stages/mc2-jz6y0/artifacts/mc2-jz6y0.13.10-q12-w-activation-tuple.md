@@ -137,7 +137,8 @@ artifacts/mc2-jz6y0.13.4.*` and `.13.7-*`; `.13.14-managed-supabase-boundary.md`
   (`deploy/qdrant/q12-managed-session-inventory-schema.json`: top-level keys,
   contract-fixed scalars incl. `source_decision_sha256 = 7188d792…` the accepted D3
   recoverable-lifecycle-addendum SHA, and the 7-key identity item schema) is a
-  documented determination; reviewer ratifies the canonical form.
+  documented determination — ratified by the lead (provisional), pending independent
+  review of the tuple.
 - **File placement.** Artifact + repro in `.codex/stages/mc2-jz6y0/artifacts/`;
   mechanical test in `tests/unit/ops/`; catalog-bound assets named
   `*.test-reference.json` (per the naming condition) and the catalog-independent
