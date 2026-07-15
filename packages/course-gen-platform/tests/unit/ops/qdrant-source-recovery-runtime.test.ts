@@ -1816,7 +1816,10 @@ function installChainSpec(overrides: Record<string, unknown>): Record<string, un
 
 async function joinedWriterResumeFixture(
   mode: 'forward' | 'rollback',
-  installChain?: Record<string, unknown>
+  installChain?: Record<string, unknown>,
+  // Only W-suffix-affecting options are meaningful here (e.g. databasePreIssuanceOrphan);
+  // prefix-shaping options are owned by the Root materializer, not W.
+  journalOptions: ResumeJournalFixtureOptions = {}
 ): Promise<ResumeWriterFixture> {
   const runRoot = mkdtempSync('/tmp/mc2-q12-d5-root-');
   temporaryDirectories.push(runRoot);
@@ -1855,20 +1858,14 @@ async function joinedWriterResumeFixture(
     final_writers: Array<Record<string, any>>;
     held_writers: Array<Record<string, any>>;
   };
-  return writerResumeFixture(
-    mode,
-    mode === 'forward' ? 5 : 5,
-    false,
-    {},
-    {
-      runRoot,
-      runId,
-      quiescePath,
-      fwmPath,
-      fwm,
-      originalWriters,
-    }
-  );
+  return writerResumeFixture(mode, mode === 'forward' ? 5 : 5, false, journalOptions, {
+    runRoot,
+    runId,
+    quiescePath,
+    fwmPath,
+    fwm,
+    originalWriters,
+  });
 }
 
 function writerResumeFixture(
@@ -3213,8 +3210,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     }
   );
 
-  it('accepts a recovery capability linked to an immutable pre-issuance database orphan', () => {
-    const fixture = writerResumeFixture('forward', 5, false, {
+  it('accepts a recovery capability linked to an immutable pre-issuance database orphan', async () => {
+    const fixture = await joinedWriterResumeFixture('forward', undefined, {
       databasePreIssuanceOrphan: true,
     });
     const superseded = join(
