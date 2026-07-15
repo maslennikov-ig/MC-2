@@ -1584,7 +1584,7 @@ export async function extendQ12Guard(
 // statements run in file order and the guard is installed after them but before
 // COMMIT; the atomic commit is what prevents any observable granted-but-unguarded
 // window.
-async function applyQ12BasePacket(
+export async function applyQ12BasePacket(
   client: Client,
   migrations: LoadedMigration[]
 ): Promise<MigrationResult> {
@@ -1641,6 +1641,13 @@ export async function runDocumentEvidenceApprovedMigrations(
       if (source.kind === 'q12' && options.direction === 'apply') {
         return await applyQ12BasePacket(client, migrations);
       }
+      // Q12 rollback reuses the ordinary per-migration path on the
+      // capability-bound client: it removes only the application tables and
+      // their history. It deliberately never touches q12_guard.*, because the W
+      // barrier's enforce trigger makes migration_guards INSERT-only and the
+      // frozen contract tears the guard schema down through
+      // q12-database-barrier.sh rollback/cleanup (DROP EVENT TRIGGER + DROP
+      // SCHEMA q12_guard CASCADE with a residue check), not from the migration.
       const ordered = options.direction === 'apply' ? migrations : [...migrations].reverse();
       const results: MigrationResult[] = [];
       for (const migration of ordered) {

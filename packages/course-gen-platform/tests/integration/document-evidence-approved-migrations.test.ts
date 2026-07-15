@@ -9,6 +9,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  applyQ12BasePacket,
   DOCUMENT_EVIDENCE_APPROVED_MIGRATIONS,
   DOCUMENT_EVIDENCE_APPROVED_REMOTE_CONFIRMATION,
   loadDocumentEvidenceApprovedMigrations,
@@ -221,6 +222,133 @@ async function seedRepositoryHistoryBeforeApproved(): Promise<void> {
       [migration.version, migration.name]
     );
   }
+}
+
+const Q12_TEST_CAPABILITY = 'mc2-synthetic-q12-migration-test-capability';
+const Q12_TEST_CAPABILITY_SHA256 = createHash('sha256')
+  .update(Q12_TEST_CAPABILITY, 'utf8')
+  .digest('hex');
+const Q12_SYNTHETIC_HASH = 'a'.repeat(64);
+const Q12_BASE_GUARDED_RELATIONS = [
+  'document_evidence_batch_checkpoints',
+  'document_evidence_conflict_checkpoints',
+  'document_evidence_conflicts',
+  'document_evidence_decisions',
+  'document_evidence_items',
+  'document_evidence_retry_applications',
+  'document_evidence_runs',
+];
+
+function q12Relation(name: string): Record<string, unknown> {
+  return {
+    schema: 'public',
+    name,
+    relkind: 'r',
+    parent_schema: null,
+    parent_name: null,
+    owner: 'postgres',
+  };
+}
+
+const Q12_EXPECTED_CATALOG = {
+  migrations: {
+    '20260711140000': {
+      relations: Q12_BASE_GUARDED_RELATIONS.map(q12Relation),
+      migration_file_sha256: Q12_SYNTHETIC_HASH,
+      catalog_sha256: Q12_SYNTHETIC_HASH,
+    },
+    '20260711151000': {
+      relations: [q12Relation('document_evidence_observability_totals')],
+      migration_file_sha256: Q12_SYNTHETIC_HASH,
+      catalog_sha256: Q12_SYNTHETIC_HASH,
+    },
+  },
+};
+
+// Faithful minimal stand-in for the frozen W q12_guard barrier: exactly the
+// extend_guard / enforce_write_barrier / assert_capability contract the migration
+// depends on. Uses the sha256() builtin instead of extensions.digest so the
+// fixture does not depend on pgcrypto install ordering, and covers only
+// relkind='r' relations (the base and totals tables are unpartitioned).
+const Q12_SYNTHETIC_BARRIER_SQL = `
+CREATE SCHEMA q12_guard AUTHORIZATION postgres;
+CREATE TABLE q12_guard.active_run(singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),
+  capability_sha256 text NOT NULL, expected_catalog jsonb NOT NULL);
+CREATE TABLE q12_guard.migration_guards(migration text PRIMARY KEY, catalog_sha256 text NOT NULL,
+  migration_file_sha256 text NOT NULL, stable_expected jsonb NOT NULL, relation_set jsonb NOT NULL);
+CREATE FUNCTION q12_guard.assert_capability() RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path=pg_catalog,q12_guard AS $fn$
+DECLARE active q12_guard.active_run%ROWTYPE; supplied text;
+BEGIN
+  SELECT * INTO STRICT active FROM q12_guard.active_run WHERE singleton;
+  IF session_user='postgres' THEN supplied := current_setting('megacampus.q12_capability',true);
+  ELSE RAISE EXCEPTION 'Q12 database writes are maintenance-guarded'; END IF;
+  IF encode(sha256(convert_to(COALESCE(supplied,''),'UTF8')),'hex') IS DISTINCT FROM active.capability_sha256 THEN
+    RAISE EXCEPTION 'Q12 database writes require the active run capability'; END IF;
+END $fn$;
+CREATE FUNCTION q12_guard.enforce_write_barrier() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path=pg_catalog,q12_guard AS $fn$
+BEGIN
+  PERFORM q12_guard.assert_capability();
+  IF TG_OP='DELETE' THEN RETURN OLD; ELSIF TG_OP='TRUNCATE' THEN RETURN NULL; ELSE RETURN NEW; END IF;
+END $fn$;
+CREATE FUNCTION q12_guard.enforce_ddl_barrier() RETURNS event_trigger LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path=pg_catalog,q12_guard AS $fn$ BEGIN PERFORM q12_guard.assert_capability(); END $fn$;
+CREATE FUNCTION q12_guard.extend_guard(p_migration text,p_expected_relations jsonb,
+  p_migration_file_sha256 text,p_expected_catalog_sha256 text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path=pg_catalog,q12_guard AS $fn$
+DECLARE expected jsonb; relation record; captured jsonb;
+BEGIN
+  PERFORM q12_guard.assert_capability();
+  SELECT expected_catalog INTO expected FROM q12_guard.active_run WHERE singleton FOR UPDATE;
+  IF p_migration NOT IN ('20260711140000','20260711151000')
+     OR p_expected_relations IS DISTINCT FROM expected->'migrations'->p_migration->'relations'
+     OR p_migration_file_sha256 IS DISTINCT FROM expected->'migrations'->p_migration->>'migration_file_sha256'
+     OR p_expected_catalog_sha256 IS DISTINCT FROM expected->'migrations'->p_migration->>'catalog_sha256' THEN
+    RAISE EXCEPTION 'migration guard extension differs from the frozen catalog'; END IF;
+  IF p_migration='20260711151000' AND NOT EXISTS (
+    SELECT 1 FROM q12_guard.migration_guards WHERE migration='20260711140000') THEN
+    RAISE EXCEPTION 'observability guard extension requires the committed base guard'; END IF;
+  SELECT jsonb_agg(jsonb_build_object('schema',x.schema,'name',x.name) ORDER BY x.name) INTO captured
+  FROM jsonb_to_recordset(p_expected_relations) AS x(schema text,name text,relkind "char",owner text)
+  JOIN pg_namespace n ON n.nspname=x.schema
+  JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=x.name AND c.relkind=x.relkind
+  JOIN pg_roles owner ON owner.oid=c.relowner AND owner.rolname=x.owner;
+  IF captured IS NULL OR jsonb_array_length(captured)<>jsonb_array_length(p_expected_relations) THEN
+    RAISE EXCEPTION 'new migration stable relation catalog drift'; END IF;
+  FOR relation IN SELECT * FROM jsonb_to_recordset(p_expected_relations) AS x(schema text,name text) ORDER BY x.name LOOP
+    EXECUTE format('CREATE TRIGGER q12_guard_row BEFORE INSERT OR UPDATE OR DELETE ON %I.%I FOR EACH ROW EXECUTE FUNCTION q12_guard.enforce_write_barrier()',relation.schema,relation.name);
+    EXECUTE format('CREATE TRIGGER q12_guard_truncate BEFORE TRUNCATE ON %I.%I FOR EACH STATEMENT EXECUTE FUNCTION q12_guard.enforce_write_barrier()',relation.schema,relation.name);
+  END LOOP;
+  INSERT INTO q12_guard.migration_guards VALUES(p_migration,p_expected_catalog_sha256,p_migration_file_sha256,p_expected_relations,captured);
+END $fn$;
+`;
+
+async function installQ12Barrier(): Promise<void> {
+  await client.query(Q12_SYNTHETIC_BARRIER_SQL);
+  await client.query(
+    `INSERT INTO q12_guard.active_run(capability_sha256,expected_catalog) VALUES($1,$2::jsonb)`,
+    [Q12_TEST_CAPABILITY_SHA256, JSON.stringify(Q12_EXPECTED_CATALOG)]
+  );
+  await client.query(
+    `CREATE EVENT TRIGGER q12_guard_ddl_command_start ON ddl_command_start
+       EXECUTE FUNCTION q12_guard.enforce_ddl_barrier()`
+  );
+  // Direct postgres clients bind the capability before any migration statement,
+  // exactly as bindQ12MigrationSession does for the pooler in live mode.
+  await client.query(`SELECT set_config('megacampus.q12_capability',$1,false)`, [
+    Q12_TEST_CAPABILITY,
+  ]);
+}
+
+async function teardownQ12Barrier(): Promise<void> {
+  await client
+    .query(`SELECT set_config('megacampus.q12_capability',$1,false)`, [Q12_TEST_CAPABILITY])
+    .catch(() => undefined);
+  await client
+    .query(`DROP EVENT TRIGGER IF EXISTS q12_guard_ddl_command_start`)
+    .catch(() => undefined);
+  await client.query(`DROP SCHEMA IF EXISTS q12_guard CASCADE`).catch(() => undefined);
 }
 
 appliedDescribe('approved document evidence migrations applied', () => {
@@ -612,5 +740,46 @@ appliedDescribe('approved document evidence migrations applied', () => {
         direction: 'rollback',
       })
     ).rejects.toThrow(/security manifest|residue/iu);
+  });
+
+  it('publishes the base guard in the same commit as the migration via extend_guard', async () => {
+    await installQ12Barrier();
+    try {
+      const migrations = await loadDocumentEvidenceApprovedMigrations();
+      expect(await applyQ12BasePacket(client, migrations)).toBe('applied');
+
+      // The W barrier installs a row and a TRUNCATE guard on every new base table.
+      const guards = await client.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM pg_trigger t
+           JOIN pg_class c ON c.oid=t.tgrelid
+           JOIN pg_namespace ns ON ns.oid=c.relnamespace
+          WHERE ns.nspname='public' AND NOT t.tgisinternal
+            AND t.tgname LIKE 'q12_guard_%' AND c.relname LIKE 'document_evidence_%'`
+      );
+      expect(guards.rows[0].n).toBe(Q12_BASE_GUARDED_RELATIONS.length * 2);
+
+      // The tables, all three history rows, and the guard registration land atomically.
+      expect(
+        (await client.query(`SELECT to_regclass('public.document_evidence_runs')::text AS t`))
+          .rows[0].t
+      ).toBe('document_evidence_runs');
+      expect(
+        (
+          await client.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM supabase_migrations.schema_migrations
+               WHERE version IN ('20260711120000','20260711130000','20260711140000')`
+          )
+        ).rows[0].n
+      ).toBe(3);
+      expect(
+        (
+          await client.query<{ migration: string }>(
+            `SELECT migration FROM q12_guard.migration_guards`
+          )
+        ).rows.map(row => row.migration)
+      ).toEqual(['20260711140000']);
+    } finally {
+      await teardownQ12Barrier();
+    }
   });
 });
