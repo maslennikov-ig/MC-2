@@ -29,6 +29,49 @@ OPERATIONS = (
     "activate",
 )
 COMMANDS = {operation: f"barrier.{operation}" for operation in OPERATIONS}
+ORDINARY_COMMAND_IDS = (
+    "operator.self-check",
+    "writers.quiesce",
+    "pg.backup",
+    "pg.restore",
+    "migration.base.apply",
+    "migration.observability.apply",
+    "source.forward",
+    "reindex.plan",
+    "reindex.worker.create",
+    "reindex.execute",
+    "reindex.verify",
+    "deploy.prepare",
+    "deploy.commit",
+    "writers.resume.forward",
+    "writers.resume.rollback",
+)
+MANIFEST_COMMAND_IDS = tuple(COMMANDS.values()) + ORDINARY_COMMAND_IDS
+LEASE_FD_ENV_COMMAND_IDS = frozenset(
+    ("writers.quiesce", "writers.resume.forward", "writers.resume.rollback")
+)
+# Amendment section 5: ordinary command -> (selector phase, target phase).
+ORDINARY_ROW_GRAMMAR = {
+    "operator.self-check": ("preflight", "preflight"),
+    "pg.backup": ("snapshot_exported", "backup_committed"),
+    "pg.restore": ("restore_verified", "restore_verified"),
+    "migration.base.apply": ("restore_verified", "restore_verified"),
+    "migration.observability.apply": ("base_migration_guarded", "base_migration_guarded"),
+    "source.forward": ("source_recovered", "source_recovered"),
+    "reindex.plan": ("reindex_started", "reindex_started"),
+    "reindex.worker.create": ("reindex_started", "reindex_started"),
+    "reindex.execute": ("reindex_started", "reindex_started"),
+    "reindex.verify": ("qdrant_verified", "qdrant_verified"),
+    "deploy.prepare": ("qdrant_verified", "qdrant_verified"),
+    "deploy.commit": ("activation_ready", "activation_ready"),
+}
+# Amendment section 4 item 6: controller milestone phase -> sole witness command.
+MILESTONE_WITNESSES = {"migrations_applied": "migration.observability.apply"}
+# Amendment section 6 item 2: mode-bound FWM intent/accepted row phases.
+FWM_ROW_PHASES = {
+    "writers.resume.forward": "prepared_quiesced",
+    "writers.resume.rollback": "rollback_preparing",
+}
 
 
 @dataclass
@@ -175,7 +218,7 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
     if not (
         (accepted_kind == "none" and accepted_hash is None)
         or (
-            accepted_kind == "final_writer_manifest"
+            accepted_kind in ("final_writer_manifest", "writer_quiesce_manifest")
             and isinstance(accepted_hash, str)
             and re.fullmatch(r"[0-9a-f]{64}", accepted_hash)
         )
@@ -192,15 +235,39 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
             and entry["command_sha256"] == ZERO
             and accepted_kind == "none"
         )
-    elif command_id == "writers.resume.rollback":
+    elif command_id in FWM_ROW_PHASES:
         valid = (
-            phase == "rollback_preparing"
-            and entry["command_sha256"] == ZERO
+            phase == FWM_ROW_PHASES[command_id]
+            and entry["command_sha256"] != ZERO
             and (
                 (outcome == "intent" and accepted_kind == "none")
                 or (outcome == "accepted" and accepted_kind == "final_writer_manifest")
             )
         )
+    elif command_id == "writers.quiesce":
+        valid = phase == "quiesced" and entry["command_sha256"] != ZERO
+        if valid and outcome in (
+            "intent",
+            "capability_issued",
+            "capability_claimed",
+            "capability_completed",
+        ):
+            valid = accepted_kind == "none"
+        elif valid and outcome == "accepted":
+            valid = accepted_kind == "writer_quiesce_manifest"
+        else:
+            valid = False
+    elif command_id in ORDINARY_ROW_GRAMMAR:
+        selector_phase, target_phase = ORDINARY_ROW_GRAMMAR[command_id]
+        valid = entry["command_sha256"] != ZERO and accepted_kind == "none"
+        if valid and outcome == "intent":
+            valid = phase == selector_phase
+        elif valid and outcome in ("capability_issued", "capability_claimed"):
+            valid = phase == target_phase
+        elif valid and outcome == "completed":
+            valid = phase == target_phase or MILESTONE_WITNESSES.get(phase) == command_id
+        else:
+            valid = False
     else:
         operation = next(
             (name for name in OPERATIONS if COMMANDS[name] == command_id), None
@@ -221,6 +288,66 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
             valid = False
     if not valid:
         raise LifecycleError("journal outcome/phase/command grammar mismatch")
+
+
+def validate_stable_binding_walk(
+    entries: list[dict[str, Any]], request: dict[str, Any]
+) -> None:
+    """Amendment section 4 items 7-8: segment-bound quiesce binding with the
+    isolated request-global fallback, and the evidence-stepped resource
+    manifest binding; every other stable binding stays request-global."""
+    switched = False
+    previous_resource: str | None = None
+    for entry in entries:
+        if entry.get("run_id") != request["run_id"]:
+            raise LifecycleError("journal run binding mismatch")
+        for key in ("release_sha", "operator_digest", "rotation_required"):
+            if key in request and entry.get(key) != request[key]:
+                raise LifecycleError(f"journal stable binding mismatch: {key}")
+        if "quiesce_manifest_sha256" in request:
+            expected = request["quiesce_manifest_sha256"]
+            if (
+                entry.get("command_id") == "writers.quiesce"
+                and entry.get("outcome") == "accepted"
+            ):
+                switched = True
+            value = entry.get("quiesce_manifest_sha256")
+            if switched:
+                if value != expected:
+                    raise LifecycleError(
+                        "journal stable binding mismatch: quiesce_manifest_sha256"
+                    )
+            elif value not in (ZERO, expected):
+                raise LifecycleError(
+                    "journal stable binding mismatch: quiesce_manifest_sha256"
+                )
+        if "resource_manifest_sha256" in request:
+            value = entry.get("resource_manifest_sha256")
+            if previous_resource is not None and value != previous_resource:
+                stepping = (
+                    entry.get("command_id") == "pg.backup"
+                    and entry.get("outcome") == "intent"
+                ) or (
+                    entry.get("command_id") == "deploy.prepare"
+                    and entry.get("outcome") == "completed"
+                )
+                if not stepping:
+                    raise LifecycleError(
+                        "journal stable binding mismatch: resource_manifest_sha256"
+                    )
+            previous_resource = value
+    if (
+        entries
+        and "resource_manifest_sha256" in request
+        and request["resource_manifest_sha256"]
+        not in (
+            entries[0].get("resource_manifest_sha256"),
+            entries[-1].get("resource_manifest_sha256"),
+        )
+    ):
+        raise LifecycleError(
+            "journal stable binding mismatch: resource_manifest_sha256"
+        )
 
 
 def sha256(data: bytes) -> str:
@@ -490,10 +617,12 @@ def load_manifest() -> dict[str, Any]:
         raise LifecycleError("command manifest shape mismatch")
     if manifest["schema_version"] != "megacampus.q12.command-manifest/v1":
         raise LifecycleError("command manifest schema mismatch")
-    if tuple(manifest["commands"]) != tuple(COMMANDS.values()):
+    if tuple(manifest["commands"]) != MANIFEST_COMMAND_IDS:
         raise LifecycleError("command manifest exact set/order mismatch")
-    expected_env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C", "HOME": "/root"}
+    base_env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C", "HOME": "/root"}
+    lease_env = {**base_env, "Q12_EXTERNAL_QUIESCE_LEASE_FD": "9"}
     for command_id, command in manifest["commands"].items():
+        expected_env = lease_env if command_id in LEASE_FD_ENV_COMMAND_IDS else base_env
         if set(command) != {"argv", "argv_sha256", "env"} or command["env"] != expected_env:
             raise LifecycleError(f"command manifest entry mismatch: {command_id}")
         if command["argv_sha256"] != sha256(canonical(command["argv"])):
@@ -501,11 +630,62 @@ def load_manifest() -> dict[str, Any]:
     return manifest
 
 
-def resolved_command(manifest: dict[str, Any], command_id: str, request: dict[str, Any]) -> dict[str, Any]:
+SUBSTITUTION_PLACEHOLDERS = frozenset(
+    (
+        "<run-id>",
+        "<expected-post-migration-catalog-sha256>",
+        "<release-sha>",
+        "<quiesce-manifest>",
+        "<exported-id>",
+        "<immutable-generation>",
+        "<recovery-run-id>",
+        "<accepted-recovery-manifest-sha256>",
+        "<accepted-coverage-fingerprint>",
+        "<accepted-coverage-run>",
+    )
+)
+
+
+def derive_joined_fixture_values(run_id: str, quiesce_manifest_path: str) -> dict[str, str]:
+    """Amendment section 3 closed-fixture derivations; Root-only single authorities."""
+    rendered = str(uuid.UUID(run_id))
+
+    def digest(salt: str) -> str:
+        return sha256(f"q12:{salt}:{rendered}".encode("utf-8"))
+
+    def derived_uuid(name: str) -> str:
+        return str(uuid.uuid5(uuid.UUID(rendered), name))
+
+    snapshot = digest("snapshot-export")
+    return {
+        "<exported-id>": f"{snapshot[0:8]}-{snapshot[8:16]}-1",
+        "<immutable-generation>": "q12fixture-generation-" + digest("backup-generation")[0:16],
+        "<recovery-run-id>": derived_uuid("q12-source-recovery"),
+        "<accepted-recovery-manifest-sha256>": digest("recovery-manifest"),
+        "<accepted-coverage-fingerprint>": digest("coverage-fingerprint"),
+        "<accepted-coverage-run>": ":".join(
+            derived_uuid(name)
+            for name in ("q12-coverage-org", "q12-coverage-course", "q12-coverage-run")
+        ),
+        "<quiesce-manifest>": quiesce_manifest_path,
+    }
+
+
+def resolved_command(
+    manifest: dict[str, Any],
+    command_id: str,
+    request: dict[str, Any],
+    values: dict[str, str] | None = None,
+) -> dict[str, Any]:
     source = manifest["commands"][command_id]
+    extra = dict(values or {})
+    if not set(extra) <= SUBSTITUTION_PLACEHOLDERS:
+        raise LifecycleError("unknown substitution placeholder offered")
     substitutions = {
         "<run-id>": request["run_id"],
         "<expected-post-migration-catalog-sha256>": request["expected_catalog_sha256"],
+        "<release-sha>": request["release_sha"],
+        **extra,
     }
     argv = []
     for value in source["argv"]:
@@ -594,8 +774,12 @@ class Engine:
     inherited_journal_identity_validated: bool = False
     lease_reacquired: bool = False
     journal_fd: int = field(init=False)
+    current_resource_manifest_sha256: str = field(init=False)
+    current_quiesce_manifest_sha256: str = field(init=False)
 
     def __post_init__(self) -> None:
+        self.current_resource_manifest_sha256 = self.request["resource_manifest_sha256"]
+        self.current_quiesce_manifest_sha256 = self.request["quiesce_manifest_sha256"]
         self.run_root = pathlib.Path(self.request["run_root"])
         require_lexical_absolute(self.run_root)
         production_root = pathlib.Path("/opt/megacampus/backups/q12") / self.request["run_id"]
@@ -782,19 +966,9 @@ class Engine:
             digest = preimage.pop("entry_hash")
             if digest != sha256(canonical(preimage)):
                 raise LifecycleError("journal entry hash mismatch")
-            if entry.get("run_id") != self.request["run_id"]:
-                raise LifecycleError("journal run binding mismatch")
-            for key in (
-                "release_sha",
-                "operator_digest",
-                "resource_manifest_sha256",
-                "quiesce_manifest_sha256",
-                "rotation_required",
-            ):
-                if key in self.request and entry.get(key) != self.request[key]:
-                    raise LifecycleError(f"journal stable binding mismatch: {key}")
             previous = digest
             entries.append(entry)
+        validate_stable_binding_walk(entries, self.request)
         self.journal = entries
         entries_by_hash = {entry["entry_hash"]: entry for entry in entries}
 
@@ -886,7 +1060,11 @@ class Engine:
                     (item for item in OPERATIONS if COMMANDS[item] == capability["command_id"]),
                     None,
                 )
-                if operation is None:
+                ordinary = (
+                    operation is None
+                    and capability["command_id"] in ORDINARY_COMMAND_IDS
+                )
+                if operation is None and not ordinary:
                     raise LifecycleError("unknown capability command")
                 epoch = capability["lease_epoch"]
                 if not EPOCH_RE.fullmatch(epoch):
@@ -895,23 +1073,55 @@ class Engine:
                     "run_id": self.request["run_id"],
                     "release_sha": self.request["release_sha"],
                     "operator_digest": self.request["operator_digest"],
-                    "resource_manifest_sha256": self.request[
-                        "resource_manifest_sha256"
-                    ],
-                    "quiesce_manifest_sha256": self.request[
-                        "quiesce_manifest_sha256"
-                    ],
                     "resume_authority_sha256": None,
                 }
                 if any(capability[name] != value for name, value in stable.items()):
                     raise LifecycleError("capability stable binding mismatch")
-                key = f"{operation}:{epoch}"
+                if ordinary:
+                    # Segment-bound context: the capability must match its own
+                    # issuance row, which the stable-binding walk has already
+                    # validated against the amendment segment rules.
+                    issuance_rows = [
+                        entry
+                        for entry in entries
+                        if entry["command_id"] == capability["command_id"]
+                        and entry["outcome"] == "capability_issued"
+                        and entry["capability_manifest_sha256"] == sha256(data)
+                    ]
+                    if not issuance_rows or any(
+                        entry["resource_manifest_sha256"]
+                        != capability["resource_manifest_sha256"]
+                        or entry["quiesce_manifest_sha256"]
+                        != capability["quiesce_manifest_sha256"]
+                        for entry in issuance_rows
+                    ):
+                        raise LifecycleError(
+                            "ordinary capability issuance-row binding mismatch"
+                        )
+                else:
+                    # The walk has already validated the journal's segment and
+                    # stepped domains; a barrier capability must carry values
+                    # from that same validated domain (request-global in every
+                    # isolated run).
+                    allowed_resource = {self.request["resource_manifest_sha256"]} | {
+                        entry["resource_manifest_sha256"] for entry in entries
+                    }
+                    if capability["resource_manifest_sha256"] not in allowed_resource or (
+                        capability["quiesce_manifest_sha256"]
+                        not in (ZERO, self.request["quiesce_manifest_sha256"])
+                    ):
+                        raise LifecycleError("capability stable binding mismatch")
+                key = (
+                    f"ordinary:{capability['command_id']}:{epoch}"
+                    if ordinary
+                    else f"{operation}:{epoch}"
+                )
                 if key in seen_capabilities:
                     raise LifecycleError("capability present in multiple states")
                 expected_name = f"{capability['command_id']}--{epoch}.json"
                 if path.name != expected_name:
                     raise LifecycleError("capability filename mismatch")
-                if (
+                if not ordinary and (
                     key not in retained_digests
                     or capability["capability_input_checkpoint_sha256"]
                     != retained_digests[key]
@@ -950,6 +1160,35 @@ class Engine:
                     raise LifecycleError("unknown capability lifecycle residue")
 
         self.results = {}
+        for path in sorted(self.run_root.glob("ordinary-command-result-*.json")):
+            result_bytes = validate_regular_file(path, mode=0o600)
+            result = json.loads(result_bytes)
+            suffix = path.name.removeprefix("ordinary-command-result-").removesuffix(".json")
+            command_id = next(
+                (item for item in ORDINARY_COMMAND_IDS if suffix.startswith(f"{item}-")),
+                None,
+            )
+            if command_id is None:
+                raise LifecycleError("unknown ordinary result path")
+            epoch = suffix[len(command_id) + 1 :]
+            key = f"ordinary:{command_id}:{epoch}"
+            if (
+                not EPOCH_RE.fullmatch(epoch)
+                or key not in capability_digests
+                or capability_states[key] not in ("claimed", "completed")
+                or set(result) != RESULT_KEYS
+                or result.get("schema_version")
+                != "megacampus.q12.retained-command-result/v1"
+                or result.get("command_id") != command_id
+                or result.get("capability_sha256") != capability_digests[key]
+                or result.get("status") != "accepted"
+                or not isinstance(result.get("result_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", result["result_sha256"])
+            ):
+                raise LifecycleError("ordinary result shape/binding mismatch")
+            if key in self.results:
+                raise LifecycleError("duplicate ordinary result")
+            self.results[key] = str(path)
         for path in sorted(self.run_root.glob("retained-barrier-result-*.json")):
             result_bytes = validate_regular_file(path, mode=0o600)
             result = json.loads(result_bytes)
@@ -1163,8 +1402,8 @@ class Engine:
             "lease_epoch": epoch,
             "previous_hash": previous,
             "rotation_required": bool(self.request.get("rotation_required", False)),
-            "resource_manifest_sha256": self.request["resource_manifest_sha256"],
-            "quiesce_manifest_sha256": self.request["quiesce_manifest_sha256"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
             "capability_manifest_sha256": capability_hash,
             "accepted_object_kind": accepted_kind,
             "accepted_object_sha256": accepted_hash,
@@ -1225,6 +1464,20 @@ class Engine:
             "cutover",
             carried,
         )
+        return self.selector_intent_from_head(operation, command)
+
+    def append_retained_selector_from_current_head(
+        self, operation: str, command: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Joined-composition selector: the real current head is H; no synthetic anchor."""
+        if not self.journal or self.journal[-1]["phase"] != PREDECESSOR_PHASES[operation]:
+            raise LifecycleError("retained selector predecessor phase mismatch")
+        return self.selector_intent_from_head(operation, command)
+
+    def selector_intent_from_head(
+        self, operation: str, command: dict[str, Any]
+    ) -> dict[str, Any]:
+        carried = self.journal[-1]["capability_manifest_sha256"] if self.journal else ZERO
         if operation == "activate":
             h_bytes = self.checkpoint_path.read_bytes()
             previous = self.journal[-1]["entry_hash"]
@@ -1283,8 +1536,8 @@ class Engine:
             "command_sha256": command["command_sha256"],
             "release_sha": self.request["release_sha"],
             "operator_digest": self.request["operator_digest"],
-            "resource_manifest_sha256": self.request["resource_manifest_sha256"],
-            "quiesce_manifest_sha256": self.request["quiesce_manifest_sha256"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
             "resume_authority_sha256": None,
             "capability_input_checkpoint_sha256": sha256(copy_path.read_bytes()),
             "lease_epoch": epoch,
@@ -1307,6 +1560,382 @@ class Engine:
         fsync_directory(target.parent)
         self.capabilities[f"{operation}:{epoch}"] = str(target)
         return target
+
+    def publish_ordinary_capability(
+        self, command_id: str, command: dict[str, Any], checkpoint_hash: str
+    ) -> tuple[pathlib.Path, dict[str, Any], str]:
+        capability = {
+            "schema_version": "megacampus.q12.host-command-capability/v1",
+            "run_id": self.request["run_id"],
+            "command_id": command_id,
+            "command_sha256": command["command_sha256"],
+            "release_sha": self.request["release_sha"],
+            "operator_digest": self.request["operator_digest"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
+            "resume_authority_sha256": None,
+            "capability_input_checkpoint_sha256": checkpoint_hash,
+            "lease_epoch": "cutover",
+            "supersedes_capability_sha256": None,
+        }
+        if set(capability) != CAPABILITY_KEYS:
+            raise AssertionError("internal capability projection mismatch")
+        data = complete_object(capability)
+        path = self.run_root / "capabilities" / "issued" / f"{command_id}--cutover.json"
+        immutable_publish(path, data, 0o400, self.trace)
+        digest = sha256(data)
+        self.capabilities[f"ordinary:{command_id}:cutover"] = str(path)
+        return path, capability, digest
+
+    def move_ordinary_capability(
+        self, command_id: str, source_state: str, target_state: str
+    ) -> pathlib.Path:
+        source = self.run_root / "capabilities" / source_state / f"{command_id}--cutover.json"
+        target = self.run_root / "capabilities" / target_state / source.name
+        rename_noreplace(source, target)
+        fsync_directory(source.parent)
+        fsync_directory(target.parent)
+        self.capabilities[f"ordinary:{command_id}:cutover"] = str(target)
+        return target
+
+    def append_ordinary_lifecycle(
+        self,
+        manifest: dict[str, Any],
+        command_id: str,
+        values: dict[str, str],
+        *,
+        quiesce_object_sha256: str | None = None,
+        resource_step_before_completion: str | None = None,
+    ) -> dict[str, Any]:
+        """Amendment section 4 items 4-5: one ordinary command lifecycle.
+
+        Root emits the capability/claim/completion evidence directly through
+        the production serializer/object primitives; the delegated claim
+        launcher remains a D5-group and Task 9 controller concern.
+        """
+        command = resolved_command(manifest, command_id, self.request, values)
+        if command_id == "writers.quiesce":
+            selector_phase = target_phase = "quiesced"
+        else:
+            selector_phase, target_phase = ORDINARY_ROW_GRAMMAR[command_id]
+        carried = self.journal[-1]["capability_manifest_sha256"] if self.journal else ZERO
+        self.append(
+            selector_phase, "intent", command_id, command["command_sha256"], "cutover", carried
+        )
+        checkpoint_hash = sha256(self.checkpoint_path.read_bytes())
+        _, _, digest = self.publish_ordinary_capability(command_id, command, checkpoint_hash)
+        self.append(
+            target_phase,
+            "capability_issued",
+            command_id,
+            command["command_sha256"],
+            "cutover",
+            digest,
+        )
+        self.move_ordinary_capability(command_id, "issued", "claimed")
+        self.append(
+            target_phase,
+            "capability_claimed",
+            command_id,
+            command["command_sha256"],
+            "cutover",
+            digest,
+        )
+        result = {
+            "schema_version": "megacampus.q12.retained-command-result/v1",
+            "command_id": command_id,
+            "capability_sha256": digest,
+            "result_sha256": sha256(
+                canonical(
+                    {
+                        "command_id": command_id,
+                        "run_id": self.request["run_id"],
+                        "evidence": "q12-joined-fixture",
+                    }
+                )
+            ),
+            "status": "accepted",
+        }
+        if set(result) != RESULT_KEYS:
+            raise AssertionError("internal result projection mismatch")
+        result_path = self.run_root / f"ordinary-command-result-{command_id}-cutover.json"
+        immutable_publish(result_path, complete_object(result), 0o600, self.trace)
+        self.results[f"ordinary:{command_id}:cutover"] = str(result_path)
+        self.move_ordinary_capability(command_id, "claimed", "completed")
+        if resource_step_before_completion is not None:
+            if command_id != "deploy.prepare":
+                raise LifecycleError("resource step is frozen to deploy.prepare completion")
+            self.current_resource_manifest_sha256 = resource_step_before_completion
+        if command_id == "writers.quiesce":
+            if quiesce_object_sha256 is None:
+                raise LifecycleError("quiesce lifecycle requires the accepted manifest digest")
+            self.append(
+                target_phase,
+                "capability_completed",
+                command_id,
+                command["command_sha256"],
+                "cutover",
+                digest,
+            )
+            self.current_quiesce_manifest_sha256 = self.request["quiesce_manifest_sha256"]
+            return self.append(
+                target_phase,
+                "accepted",
+                command_id,
+                command["command_sha256"],
+                "cutover",
+                digest,
+                accepted_kind="writer_quiesce_manifest",
+                accepted_hash=quiesce_object_sha256,
+            )
+        return self.append(
+            target_phase,
+            "completed",
+            command_id,
+            command["command_sha256"],
+            "cutover",
+            digest,
+        )
+
+    def derive_root_writer_inventory(
+        self, quiesce_manifest_bytes: bytes, *, include_targets: bool
+    ) -> dict[str, Any]:
+        """Amendment section 6 item 3: Root-only writer inventory derivation.
+
+        The ten originals come read-only from the W-owned
+        megacampus.q12.writer-quiesce/v1 bytes; the five targets are the
+        frozen fixture derivations recorded by deploy.prepare evidence.
+        """
+        quiesce = json.loads(quiesce_manifest_bytes)
+        if (
+            set(quiesce) != {"schema_version", "run_id", "status", "barrier", "writers"}
+            or quiesce.get("schema_version") != "megacampus.q12.writer-quiesce/v1"
+            or quiesce.get("run_id") != self.request["run_id"]
+            or quiesce.get("status") != "quiesced"
+            or not isinstance(quiesce.get("writers"), list)
+            or len(quiesce["writers"]) != 10
+        ):
+            raise LifecycleError("writer quiesce manifest shape mismatch")
+        writer_fields = {
+            "class",
+            "id",
+            "name",
+            "project",
+            "service",
+            "config_files",
+            "working_dir",
+            "image_id",
+            "image_ref",
+            "prior_running",
+            "prior_status",
+            "healthcheck_present",
+            "prior_health_status",
+            "prior_restart_policy",
+            "temporary_restart_policy",
+        }
+        for writer in quiesce["writers"]:
+            if set(writer) != writer_fields:
+                raise LifecycleError("quiesced writer projection mismatch")
+        production = [
+            writer
+            for writer in quiesce["writers"]
+            if str(writer["class"]).startswith("production-")
+        ]
+        development = [
+            writer
+            for writer in quiesce["writers"]
+            if str(writer["class"]).startswith("development-")
+        ]
+        if len(production) != 5 or len(development) != 5:
+            raise LifecycleError("original writer class inventory mismatch")
+
+        def fwm_entry(
+            writer: dict[str, Any], intended_running: bool, intended_policy: dict[str, Any]
+        ) -> dict[str, Any]:
+            return {
+                "class": writer["class"],
+                "id": writer["id"],
+                "name": writer["name"],
+                "project": writer["project"],
+                "service": writer["service"],
+                "config_files": writer["config_files"],
+                "working_dir": writer["working_dir"],
+                "image_id": writer["image_id"],
+                "image_ref": writer["image_ref"],
+                "healthcheck_present": writer["healthcheck_present"],
+                "intended_running": intended_running,
+                "intended_restart_policy": intended_policy,
+                "temporary_restart_policy": {"name": "no", "maximum_retry_count": 0},
+            }
+
+        inventory: dict[str, Any] = {
+            "production_prior": [
+                fwm_entry(writer, bool(writer["prior_running"]), writer["prior_restart_policy"])
+                for writer in production
+            ],
+            "production_held": [
+                fwm_entry(writer, False, {"name": "no", "maximum_retry_count": 0})
+                for writer in production
+            ],
+            "development_prior": [
+                fwm_entry(writer, bool(writer["prior_running"]), writer["prior_restart_policy"])
+                for writer in development
+            ],
+            "targets": None,
+        }
+        if include_targets:
+            run_id = str(uuid.UUID(self.request["run_id"]))
+            targets = []
+            for service in ("api", "web", "worker", "worker-stage6", "worker-stage7"):
+                source = next(
+                    (writer for writer in production if writer["service"] == service), None
+                )
+                if source is None:
+                    raise LifecycleError("target derivation lacks a production writer")
+                image_digest = sha256(
+                    f"q12:fixture-target-image:{run_id}:{service}".encode("utf-8")
+                )
+                targets.append(
+                    {
+                        "class": source["class"],
+                        "id": sha256(f"q12:fixture-target:{run_id}:{service}".encode("utf-8")),
+                        "name": f"megacampus-{service}-q12fixture",
+                        "project": source["project"],
+                        "service": source["service"],
+                        "config_files": source["config_files"],
+                        "working_dir": source["working_dir"],
+                        "image_id": f"sha256:{image_digest}",
+                        "image_ref": f"q12fixture.invalid/megacampus-{service}@sha256:{image_digest}",
+                        "healthcheck_present": source["healthcheck_present"],
+                        "intended_running": True,
+                        "intended_restart_policy": {
+                            "name": "unless-stopped",
+                            "maximum_retry_count": 0,
+                        },
+                        "temporary_restart_policy": {"name": "no", "maximum_retry_count": 0},
+                    }
+                )
+            inventory["targets"] = targets
+        return inventory
+
+    @staticmethod
+    def sorted_writers(writers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(writers, key=lambda w: (w["project"], w["service"], w["id"]))
+
+    def publish_final_writer_manifest(
+        self,
+        mode: str,
+        inventory: dict[str, Any] | None,
+        command: dict[str, Any],
+        *,
+        checkpoint_predecessor: dict[str, Any] | None = None,
+        epoch: str = "cutover",
+        capability_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Amendment section 6: mode-bound immutable final-writer manifests.
+
+        With an inventory this publishes the normative eleven-key object
+        (joined path). With inventory=None it retains the pre-existing
+        isolated five-key fixture reduction, which knowingly shares the
+        schema id; the eleven-key shape is asserted by joined positives only.
+        """
+        if mode not in ("forward", "rollback"):
+            raise LifecycleError("final writer manifest mode mismatch")
+        manifest_path = (
+            self.run_root / f"final-writer-manifest-{mode}-{self.request['run_id']}.json"
+        )
+        if os.path.lexists(manifest_path):
+            raise LifecycleError("final writer manifest already published for this mode")
+        resume_id = f"writers.resume.{mode}"
+        if checkpoint_predecessor is None:
+            checkpoint_predecessor = self.journal[-1] if self.journal else None
+        carried = (
+            capability_hash
+            if capability_hash is not None
+            else (self.journal[-1]["capability_manifest_sha256"] if self.journal else ZERO)
+        )
+        intent = self.append(
+            FWM_ROW_PHASES[resume_id],
+            "intent",
+            resume_id,
+            command["command_sha256"],
+            epoch,
+            carried,
+            publish_fixed_checkpoint=False,
+        )
+        if inventory is None:
+            manifest_value: dict[str, Any] = {
+                "schema_version": "megacampus.q12.final-writer-manifest/v1",
+                "run_id": self.request["run_id"],
+                "publication_intent_journal_entry_hash": intent["entry_hash"],
+                "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
+                "mode": mode,
+            }
+            manifest_mode = 0o600
+        else:
+            if mode == "forward":
+                if inventory["targets"] is None:
+                    raise LifecycleError("forward manifest requires target identities")
+                final = inventory["targets"] + inventory["development_prior"]
+                held = inventory["production_held"]
+            else:
+                final = inventory["production_prior"] + inventory["development_prior"]
+                held = inventory["targets"] or []
+            manifest_value = {
+                "schema_version": "megacampus.q12.final-writer-manifest/v1",
+                "run_id": self.request["run_id"],
+                "mode": mode,
+                "release_sha": self.request["release_sha"],
+                "expected_catalog_sha256": self.request["expected_catalog_sha256"],
+                "writer_quiesce_manifest_sha256": self.request["quiesce_manifest_sha256"],
+                "publication_intent_journal_entry_hash": intent["entry_hash"],
+                "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
+                "lease_epoch": epoch,
+                "final_writers": self.sorted_writers(final),
+                "held_writers": self.sorted_writers(held),
+            }
+            manifest_mode = 0o400
+        data = complete_object(manifest_value)
+        immutable_publish(manifest_path, data, manifest_mode, self.trace)
+        manifest_hash = sha256(manifest_path.read_bytes())
+        return self.append(
+            FWM_ROW_PHASES[resume_id],
+            "accepted",
+            resume_id,
+            command["command_sha256"],
+            epoch,
+            carried,
+            accepted_kind="final_writer_manifest",
+            accepted_hash=manifest_hash,
+            checkpoint_predecessor=checkpoint_predecessor,
+        )
+
+    def append_controller_milestone(
+        self,
+        manifest: dict[str, Any],
+        phase: str,
+        witness_command_id: str,
+        values: dict[str, str],
+    ) -> dict[str, Any]:
+        """Amendment section 4 item 6: one Root milestone over a durable witness."""
+        if MILESTONE_WITNESSES.get(phase) != witness_command_id:
+            raise LifecycleError("controller milestone witness mismatch")
+        witness_rows = [
+            entry
+            for entry in self.journal
+            if entry["command_id"] == witness_command_id and entry["outcome"] == "completed"
+        ]
+        if not witness_rows:
+            raise LifecycleError("controller milestone witness lifecycle is absent")
+        command = resolved_command(manifest, witness_command_id, self.request, values)
+        return self.append(
+            phase,
+            "completed",
+            witness_command_id,
+            command["command_sha256"],
+            "cutover",
+            witness_rows[-1]["capability_manifest_sha256"],
+        )
 
     def delegate_claim(self, operation: str, epoch: str) -> dict[str, Any] | None:
         capability_path = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
@@ -1344,8 +1973,18 @@ class Engine:
             return None
         return json.loads(validate_regular_file(pathlib.Path(result_path), mode=0o600))
 
-    def retained_chain(self, operation: str, chain: dict[str, Any], command: dict[str, Any]) -> None:
-        self.bootstrap_selector(operation, command)
+    def retained_chain(
+        self,
+        operation: str,
+        chain: dict[str, Any],
+        command: dict[str, Any],
+        *,
+        from_current_head: bool = False,
+    ) -> None:
+        if from_current_head:
+            self.append_retained_selector_from_current_head(operation, command)
+        else:
+            self.bootstrap_selector(operation, command)
         selector_bytes = self.checkpoint_path.read_bytes()
         stop = chain["stopAfter"]
         if operation == "install" and stop == "selector":
@@ -1741,12 +2380,19 @@ class Engine:
         self.completions[operation] = completed["entry_hash"]
 
     def materialize_frontier_precondition(
-        self, frontier: dict[str, Any], manifest: dict[str, Any]
+        self,
+        frontier: dict[str, Any],
+        manifest: dict[str, Any],
+        *,
+        from_current_head: bool = False,
     ) -> None:
         """Fixture scheduler: create a durable boundary, then classify only disk state."""
         operation = frontier["operation"]
         command = resolved_command(manifest, COMMANDS[operation], self.request)
-        self.bootstrap_selector(operation, command)
+        if from_current_head:
+            self.append_retained_selector_from_current_head(operation, command)
+        else:
+            self.bootstrap_selector(operation, command)
         selector_bytes = self.checkpoint_path.read_bytes()
         carried = self.journal[-1]["capability_manifest_sha256"]
         form = frontier["form"]
@@ -1908,35 +2554,16 @@ class Engine:
             if current.parent.name in ("issued", "claimed"):
                 self.move_capability(operation, epoch, current.parent.name, "superseded")
                 self.trace.append("retire:predecessor")
-        intent = self.append(
-            "rollback_preparing",
-            "intent",
-            "writers.resume.rollback",
-            ZERO,
-            decision_epoch,
-            f_capability,
-            publish_fixed_checkpoint=False,
+        resume_command = resolved_command(
+            load_manifest(), "writers.resume.rollback", self.request
         )
-        final_manifest = {
-            "schema_version": "megacampus.q12.final-writer-manifest/v1",
-            "run_id": self.request["run_id"],
-            "publication_intent_journal_entry_hash": intent["entry_hash"],
-            "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
-            "mode": "rollback",
-        }
-        manifest_path = self.run_root / f"final-writer-manifest-{self.request['run_id']}.json"
-        immutable_publish(manifest_path, complete_object(final_manifest), 0o600, self.trace)
-        manifest_hash = sha256(manifest_path.read_bytes())
-        self.append(
-            "rollback_preparing",
-            "accepted",
-            "writers.resume.rollback",
-            ZERO,
-            decision_epoch,
-            f_capability,
-            accepted_kind="final_writer_manifest",
-            accepted_hash=manifest_hash,
+        self.publish_final_writer_manifest(
+            "rollback",
+            getattr(self, "joined_rollback_inventory", None),
+            resume_command,
             checkpoint_predecessor=disposition,
+            epoch=decision_epoch,
+            capability_hash=f_capability,
         )
 
     def output(self) -> dict[str, Any]:
@@ -2164,6 +2791,177 @@ def validate_request(request: dict[str, Any]) -> None:
         request["rotation_required"], bool
     ):
         raise LifecycleError("rotation_required must be boolean")
+
+
+def default_joined_chain(operation: str) -> dict[str, Any]:
+    return {
+        "operation": operation,
+        "rootEpoch": "cutover",
+        "cutoverCopyBeforeRecoveryRoot": "absent",
+        "recoveryReissues": 0,
+        "publicationWindowOrphans": 0,
+        "completionMode": "normal",
+        "faultAfter": "none",
+        "stopAfter": "completed",
+        "installTransaction": "normal" if operation == "install" else "not-applicable",
+    }
+
+
+def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
+    """Amendment sections 5-6: the Root-owned closed joined-fixture composer.
+
+    Every authority byte is produced through the production serializer,
+    capability, object, and checkpoint primitives; the caller supplies only
+    the closed profile and the W-owned quiesce manifest path.
+    """
+    profile = request.get("joined_profile")
+    if profile not in ("forward", "rollback"):
+        raise LifecycleError("joined profile mismatch")
+    quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
+    require_lexical_absolute(quiesce_path)
+    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+        raise LifecycleError("joined quiesce manifest digest mismatch")
+    manifest = load_manifest()
+    frontier = request.get("frontier")
+    prefix = request.get("completed_prefix_length")
+    if profile == "rollback":
+        if prefix not in (1, 2, 3, 4):
+            raise LifecycleError("rollback prefix must be 1..4")
+        expected_next = {
+            1: "verify-after-base",
+            2: "verify-after-observability",
+            3: "prepare-recovery",
+            4: "activate",
+        }[prefix]
+        if frontier is not None:
+            if frontier.get("operation") == "install":
+                raise LifecycleError("install cannot be an abandoned frontier")
+            if frontier.get("operation") != expected_next:
+                raise LifecycleError("frontier is not the exact next operation")
+    elif frontier is not None or prefix is not None:
+        raise LifecycleError("forward profile accepts no prefix or frontier")
+    values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
+    engine = Engine(request, executor)
+    if engine.journal:
+        raise LifecycleError("joined composition requires a fresh run root")
+    engine.current_quiesce_manifest_sha256 = ZERO
+    run_id = str(uuid.UUID(request["run_id"]))
+    chains = request.get("chains") or {}
+
+    def d5(operation: str) -> None:
+        command = resolved_command(manifest, COMMANDS[operation], request)
+        chain = chains.get(operation) or default_joined_chain(operation)
+        engine.retained_chain(operation, chain, command, from_current_head=True)
+
+    def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
+        return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
+
+    ordinary_heads: dict[str, str] = {}
+
+    def record(entry: dict[str, Any]) -> None:
+        ordinary_heads[entry["phase"]] = entry["entry_hash"]
+
+    activation_frontier = profile == "rollback" and prefix == 4 and frontier is not None
+    snapshot_step = sha256(f"q12:resource-step:snapshot:{run_id}".encode("utf-8"))
+    targets_step = sha256(f"q12:resource-step:targets:{run_id}".encode("utf-8"))
+
+    record(ordinary("operator.self-check"))
+    d5("install")
+    record(
+        ordinary(
+            "writers.quiesce",
+            quiesce_object_sha256=request["quiesce_manifest_sha256"],
+        )
+    )
+    include_targets = profile == "forward" or activation_frontier
+    inventory = engine.derive_root_writer_inventory(
+        quiesce_bytes, include_targets=include_targets
+    )
+
+    def snapshot_backup_restore_base() -> None:
+        engine.current_resource_manifest_sha256 = snapshot_step
+        record(ordinary("pg.backup"))
+        record(ordinary("pg.restore"))
+        ordinary("migration.base.apply")
+
+    def forward_tail_through_activation_ready() -> None:
+        record(ordinary("source.forward"))
+        ordinary("reindex.plan")
+        ordinary("reindex.worker.create")
+        record(ordinary("reindex.execute"))
+        record(ordinary("reindex.verify"))
+        ordinary("deploy.prepare", resource_step_before_completion=targets_step)
+        record(
+            engine.publish_final_writer_manifest(
+                "forward",
+                inventory,
+                resolved_command(manifest, "writers.resume.forward", request),
+            )
+        )
+        record(ordinary("deploy.commit"))
+
+    if profile == "forward":
+        snapshot_backup_restore_base()
+        d5("verify-after-base")
+        ordinary("migration.observability.apply")
+        d5("verify-after-observability")
+        record(
+            engine.append_controller_milestone(
+                manifest, "migrations_applied", "migration.observability.apply", values
+            )
+        )
+        d5("prepare-recovery")
+        forward_tail_through_activation_ready()
+        d5("activate")
+    else:
+        if prefix >= 2 or frontier is not None:
+            snapshot_backup_restore_base()
+        if prefix >= 2:
+            d5("verify-after-base")
+        if prefix >= 3 or (prefix == 2 and frontier is not None):
+            ordinary("migration.observability.apply")
+        if prefix >= 3:
+            d5("verify-after-observability")
+        if prefix == 4 or (prefix == 3 and frontier is not None):
+            record(
+                engine.append_controller_milestone(
+                    manifest,
+                    "migrations_applied",
+                    "migration.observability.apply",
+                    values,
+                )
+            )
+        if prefix >= 4:
+            d5("prepare-recovery")
+        if activation_frontier:
+            forward_tail_through_activation_ready()
+        if frontier is not None:
+            engine.joined_rollback_inventory = inventory
+            engine.materialize_frontier_precondition(
+                frontier, manifest, from_current_head=True
+            )
+        else:
+            record(
+                engine.publish_final_writer_manifest(
+                    "rollback",
+                    inventory,
+                    resolved_command(manifest, "writers.resume.rollback", request),
+                )
+            )
+
+    engine.reload_durable()
+    output = engine.output()
+    output["ordinaryHeadEntryHashes"] = ordinary_heads
+    forward_path = engine.run_root / f"final-writer-manifest-forward-{request['run_id']}.json"
+    rollback_path = engine.run_root / f"final-writer-manifest-rollback-{request['run_id']}.json"
+    output["forwardFinalWriterManifestPath"] = (
+        str(forward_path) if forward_path.exists() else None
+    )
+    output["rollbackFinalWriterManifestPath"] = (
+        str(rollback_path) if rollback_path.exists() else None
+    )
+    return output
 
 
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:

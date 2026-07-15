@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; exact Q12 D5 design and execution plan are owner/reviewer accepted; Root-D5 is the next local TDD dependency; remote/live activation remains NO-GO
+Status: all safe local Q6-Q11 and E1-E7 work accepted; D5/D5W are integrated; decision `.13.22` is closed by the accepted normative amendment and D5J `.13.21` is implemented, independently reviewed, and integrated at `66e41cb5`; W `.13.10` resumes next, then M/H, D6 and Root; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence before D5 plan publication: pushed head `09fe24ad`; accepted D5 design SHA `b5f63cd6…540e8`; accepted D5 plan SHA `8278bce9…a0ed`
+Current accepted integration evidence: D5J merged at `66e41cb5` from source tip `bf27f595`; approved D5J spec SHA `d7e86193…c75d`; accepted amendment SHA `d6c4d8e4…075c`; reviewed plan SHA `a05ba3c6…5a662`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
-Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
+Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation. The current sequential path is `.13.21 review/integration (done) -> W .13.10`; M/H follow W, D6 follows accepted W plus its reviewed plan, and Root joins them. Live execution remains fail-closed.
 
 ## Q12 D5 Plan Acceptance (2026-07-14)
 
@@ -330,10 +330,98 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   spacing and invalidates the independently reviewed byte SHA. The original
   reviewed blob was recovered exactly and its SHA reverified before delivery.
 
+## Q12 D5J Joined-Fixture Written Candidate
+
+- Architecture evidence SHA-256
+  `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379`
+  proved that accepted D5W bytes alone cannot join Root's D5-only anchors to
+  W's full source/backup/restore/reindex chronology without forbidden copying
+  or rehashing.
+- On 2026-07-15 the owner approved Option A for drafting: a Root-owned
+  test-only closed forward/rollback composer, one canonical journal, W
+  read-only consumption, and no deployed CLI test flag.
+- The tracked candidate is
+  `docs/superpowers/specs/2026-07-15-q12-joined-retained-barrier-fixture-design.md`
+  at SHA-256
+  `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d`.
+  It requires the real immutable W-owned quiesce preimage for every joined
+  profile, including clean rollback prefix 1, while `install` itself remains
+  bound to 64 zeroes.
+- Final correctness and documentation rereviews both passed P0/P1/P2/P3
+  `0/0/0/0`; ignored report SHA-256 values are
+  `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2`
+  and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`.
+- Baseline serialized Root verification passed 271/271 before drafting; the
+  tracked artifact validates. On 2026-07-15 the owner explicitly approved the
+  exact corrected candidate SHA and directed uninterrupted local continuation;
+  planning/TDD/review/integration are authorized. No remote/live action occurred.
+- Converting that accepted design into an executable plan stopped before
+  RED/code on a genuine product-truth gap. Independent command-binding audit
+  SHA-256 `17f61bc5681a8d19f0a237c6e72aca7a4ed89fbbbe02c28712190a64cbd1148e`
+  and architecture map SHA-256
+  `942b3423eea39c0fb08606eeb7ddbd32c2e4db11934b4d819f1c9b4898328469`
+  both returned `PRODUCT-TRUTH-GAP`: the current canonical manifest/core owns
+  only five retained `barrier.*` commands; accepted sources do not freeze the
+  ordinary phase/command/outcome/resolved-argv relation; and
+  `migrations_applied` is explicitly undefined. W's existing generic command
+  and `9*64` hash are nonnormative and were not reused.
+- The same preflight found a second independent contradiction at the activation
+  rollback frontier: forward and rollback FWM bytes differ but currently target
+  one immutable fixed path, and the approved D5J request has no authoritative
+  Root source for the full writer inventory. Beads decision `.13.22` now blocks
+  `.13.21`. The recommended minimum amendment moves only the required canonical
+  manifest slice forward from Task 9, freezes the exact binding/substitution
+  table, names the Root inventory producer, and defines collision-free immutable
+  FWM paths. No D5J implementation, W edit, or remote/live mutation occurred.
+- On 2026-07-15 the owner approved that recommended correction direction and
+  delegated all remaining safe local work to Fable, followed by Codex review.
+  This authorizes the exact normative amendment, independent reviews, plan,
+  TDD, local integration and verification without intermediate owner prompts;
+  remote/live actions remain separately gated. The tracked manual handoff is
+  `docs/superpowers/prompts/2026-07-15-q12-fable-local-completion-handoff.md`.
+- The same delegation supplies D6 `.13.19`'s previously separate local
+  implementation authorization after accepted W and an independently reviewed
+  D6 plan. It does not change any remote/live boundary. Canonical stage closeout
+  must run only when local readiness is true; otherwise the remote/live tail is
+  recorded as an explicit defer and Q12 remains open.
+- Final Fable handoff correctness and documentation rereviews passed
+  P0/P1/P2/P3 `0/0/0/0`; ignored report SHA-256 values are
+  `8c56c37720e25a5d213fdc2c1c6c7ea8b1da7f1795f34e9078069b257d306a6e`
+  and `b75dccbee85395372e350de79d304647388d8ad061e3b990a261aa9843e00bea`.
+- D6 Option A remains dependency-ordered after accepted W and a reviewed D6
+  plan. The current Fable delegation supplies local implementation authority;
+  the remote gate is unchanged.
+
+## Q12 D5J Amendment and Implementation (2026-07-15)
+
+- Decision `.13.22` closed: normative amendment
+  `docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md`
+  SHA-256 `d6c4d8e4b2b7f6c53d648fdf587a5520db45fa5d8f3c84668b48b09b6bbe075c`,
+  independent correctness and docs reviews both PASS P0-P3 `0/0/0/0`
+  (report SHA-256 `5b588dbd…4092` and `fd958193…be8b`). It freezes the
+  twenty-command canonical manifest subset moved forward from Task 9, the
+  closed substitution domain, every ordinary row binding, two-segment
+  quiesce/evidence-stepped resource rules, dual immutable FWM paths with real
+  `writers.resume.*` hashes, and the Root-owned deterministic writer inventory.
+- `.13.21` implemented under reviewed plan SHA-256 `a05ba3c6…5a662`
+  (final plan review PASS `0/0/0/0`) on `codex/q12-d5j-joined-fixture`
+  through `bf27f595`, integrated as merge `66e41cb5`. The closed joined
+  composer emits the exact 76-row forward chronology and all rollback
+  profiles (prefixes 1-4 clean/exact-next-frontier, activation frontier with
+  both mode-bound manifests and byte-identical target entries) solely through
+  production primitives; deployed wrappers/parser gain no switch.
+- Independent implementation reviews: correctness PASS `0/0/0/2` with both
+  suites rerun by the reviewer, docs PASS `0/0/1/2`; every P2/P3 finding
+  fixed and pushed. Evidence: focused four-file suite 300/300 file-parallel
+  and 300/300 serialized (baseline 271/271), static acceptance checks,
+  workspace type-check, synthetic build; validated stage artifact
+  `mc2-jz6y0.13.21-q12-d5j.md`. Integration rerun and process verification
+  recorded at the merged head. No remote/live mutation occurred.
+
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
-- `graph-reviewed: used` — the existing report and a focused query were consulted, but the graph predates the new Q12 shell lifecycle. Safe local refresh remains a closeout gate after the active dirty isolated worktrees are integrated; no external model/API mode or Git hook is authorized.
+- `graph-reviewed: updated` — Graphify 0.9.14 local code graph refreshed with `graphify update .` and `graphify cluster-only . --no-viz --no-label`; no external model/API mode or Git hook was used.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while accepted correction code, a truthful fresh backup/restore,
   and the complete local verification matrix remain hard stops.
