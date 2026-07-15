@@ -384,14 +384,18 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   D6 plan. It does not change any remote/live boundary. Canonical stage closeout
   must run only when local readiness is true; otherwise the remote/live tail is
   recorded as an explicit defer and Q12 remains open.
-- D6 Option A is approved only as a written-contract direction. Implementation
-  remains after accepted W, a reviewed D6 plan, and separate local
-  authorization; the remote gate is unchanged.
+- Final Fable handoff correctness and documentation rereviews passed
+  P0/P1/P2/P3 `0/0/0/0`; ignored report SHA-256 values are
+  `8c56c37720e25a5d213fdc2c1c6c7ea8b1da7f1795f34e9078069b257d306a6e`
+  and `b75dccbee85395372e350de79d304647388d8ad061e3b990a261aa9843e00bea`.
+- D6 Option A remains dependency-ordered after accepted W and a reviewed D6
+  plan. The current Fable delegation supplies local implementation authority;
+  the remote gate is unchanged.
 
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
-- `graph-reviewed: used` — the existing report and a focused query were consulted, but the graph predates the new Q12 shell lifecycle. Safe local refresh remains a closeout gate after the active dirty isolated worktrees are integrated; no external model/API mode or Git hook is authorized.
+- `graph-reviewed: updated` — Graphify 0.9.14 local code graph refreshed with `graphify update .` and `graphify cluster-only . --no-viz --no-label`; no external model/API mode or Git hook was used.
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while accepted correction code, a truthful fresh backup/restore,
   and the complete local verification matrix remain hard stops.
