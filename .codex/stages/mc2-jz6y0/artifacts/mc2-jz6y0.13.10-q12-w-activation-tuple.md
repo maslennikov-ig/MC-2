@@ -17,7 +17,7 @@ cleanup_notes: worktree retained pending independent review; no accepted-W code 
 risk_level: high
 verification:
   - 'node .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs -> fields 5-10 reproduce byte-identically; emits the three tracked JSON assets deterministically'
-  - 'git rev-parse HEAD -> 60910053… (field 1); sha256sum deploy/qdrant/q12-command-manifest.json -> aaec6fc2… (field 2); sha256sum deploy/qdrant/q12-database-barrier.sh -> 134255ce… (field 4)'
+  - 'git rev-parse 60910053 (the accepted W integration base commit) -> 60910053… (field 1); sha256sum deploy/qdrant/q12-command-manifest.json -> aaec6fc2… (field 2); sha256sum deploy/qdrant/q12-database-barrier.sh -> 134255ce… (field 4)'
   - 'MC2_Q12_REAL_PG17=1 pnpm exec vitest run tests/unit/ops/q12-w-activation-lock-proof-pg17.test.ts -> 2 passed (structural + mechanical PG17 lock proof); catalog-parametric via MC2_Q12_ACTIVATION_CATALOG_FILE'
   - 'pnpm exec vitest run (no flag) -> 1 passed | 1 skipped; prettier --check clean; new files add zero type errors; git diff --check clean'
 changed_files:
@@ -51,7 +51,7 @@ permanent production-faithful truth, proven by the mechanical PG17 test.
 
 | #   | Field                              | Value                                                              | Provenance / disposition                                                                                                                                                                                                                                                                                                        |
 | --- | ---------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `w_integration_commit`             | `60910053455ac9af978c7951a562172e39623ca2`                         | `git rev-parse HEAD`; the accepted W integration commit.                                                                                                                                                                                                                                                                        |
+| 1   | `w_integration_commit`             | `60910053455ac9af978c7951a562172e39623ca2`                         | `git merge-base HEAD origin/codex/self-hosted-qdrant-platform` = the accepted W integration base commit (60910053), not the addendum branch HEAD.                                                                                                                                                                               |
 | 2   | `command_manifest_sha256`          | `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841` | `sha256(deploy/qdrant/q12-command-manifest.json)` at `60910053`. Contract-conflict RESOLVED (Risks a): historical `af9b21cb…` = sha256 at `c93d766d` (five-command manifest); superseded by the accepted D5J twenty-command expansion at `1817c5e9` → `aaec6fc2…`, i.e. the contract's `:178` "accepted integration successor". |
 | 3   | `activation_barrier_path`          | `deploy/qdrant/q12-database-barrier.sh`                            | Contract line 149; file present at `60910053`.                                                                                                                                                                                                                                                                                  |
 | 4   | `activation_barrier_sha256`        | `134255cecfb4361d5e9f1922d98f889ab7d3e01898b197dee096ab720039ed68` | `sha256(deploy/qdrant/q12-database-barrier.sh)` at `60910053`.                                                                                                                                                                                                                                                                  |
@@ -90,7 +90,7 @@ Fresh runs at `60910053` (worktree clean):
 - `node .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs`
   reproduces fields 5-10 byte-identically and (idempotently) emits the three tracked
   JSON assets; confirms the SQL embeds neither `run_id` nor `catalog_sha256`.
-- `git rev-parse HEAD` → field 1; `sha256sum` of the manifest/barrier → fields 2/4.
+- the accepted W integration base commit (60910053, the branch base — not this addendum branch HEAD) → field 1; `sha256sum` of the manifest/barrier → fields 2/4.
 - `MC2_Q12_REAL_PG17=1 pnpm exec vitest run tests/unit/ops/q12-w-activation-lock-proof-pg17.test.ts`
   → 2 passed (structural lock-before-mutation + live `AccessExclusiveLock` on all 79
   guarded relations via `pg_locks` + concurrent `SHARE` conflict). Without the flag:
