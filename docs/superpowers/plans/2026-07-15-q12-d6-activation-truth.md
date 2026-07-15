@@ -114,11 +114,16 @@ probe:db_locked -> Root:host_projection -> probe:host_bound
    are named bound inputs copied verbatim into the request fixture and plan
    constants at execution time — they are contract-mandated inputs, not
    free-form placeholders, and no step invents them.
-4. The five retained commands and their manifest SHA-256
-   `af9b21cb9bebfd0d48a213ceba76c6bf92eb3f6f758fafa3b2c8fef8c353c92b` are
-   immutable (`barrier.install`, `barrier.verify-after-base`,
-   `barrier.verify-after-observability`, `barrier.prepare-recovery`,
-   `barrier.activate`). D6 is a private child of the Root supervisor, never a
+4. The five retained barrier commands (`barrier.install`,
+   `barrier.verify-after-base`, `barrier.verify-after-observability`,
+   `barrier.prepare-recovery`, `barrier.activate`) stay byte-stable —
+   identical argv, argv_sha256, and env — INSIDE the accepted command
+   manifest, whose SHA-256 is the accepted `command_manifest_sha256` from the
+   W tuple (historically
+   `af9b21cb9bebfd0d48a213ceba76c6bf92eb3f6f758fafa3b2c8fef8c353c92b`; on the
+   current baseline its accepted twenty-command amendment successor
+   `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`). D6
+   adds no command and is a private child of the Root supervisor, never a
    sixth command / systemd unit / cron job / Compose service / operator argv.
 5. Write zone is fixed by the ownership table (contract "Disjoint implementation
    ownership"); do not touch any file outside your stream's exclusive zone. The
@@ -742,15 +747,20 @@ tests.
 Contract: "Fixed retained commands and production process", Global Constraint 4.
 
 RED: in `q12-command-manifest.test.ts` and `q12-live-cutover.test.ts`, add
-assertions that the command manifest is byte-for-byte the five entries
-(`barrier.install`, `barrier.verify-after-base`,
+assertions that INSIDE the accepted command manifest (the frozen twenty-command
+amendment successor: `Object.keys(manifest.commands)` equals the accepted
+`ALL_IDS` in amendment order; the manifest SHA-256 equals the accepted
+`command_manifest_sha256` from the W tuple — historically
+`af9b21cb9bebfd0d48a213ceba76c6bf92eb3f6f758fafa3b2c8fef8c353c92b`, on the
+current baseline the successor
+`aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`) the FIVE
+retained barrier entries (`barrier.install`, `barrier.verify-after-base`,
 `barrier.verify-after-observability`, `barrier.prepare-recovery`,
-`barrier.activate`), its SHA-256 equals
-`af9b21cb9bebfd0d48a213ceba76c6bf92eb3f6f758fafa3b2c8fef8c353c92b` (or the exact
-accepted integration successor from the W tuple), shorthand IDs are rejected, and
-no sixth command / systemd unit / cron job / Compose service / operator argv is
-introduced by the D6 changes. These edits ONLY prove immutability; they do not
-add a command.
+`barrier.activate`) stay byte-stable — identical argv, argv_sha256, and env —
+and D6 introduces no command, systemd unit, cron job, Compose service, or
+operator argv. Shorthand IDs are rejected. These edits ONLY prove the
+immutability of the five retained entries and of the whole command set under
+D6; they never add, remove, or reorder a command.
 
 GREEN: no manifest change (the point is unchanged bytes). If the assertions fail,
 the D6 Root changes are wrong — fix them, never the manifest.
