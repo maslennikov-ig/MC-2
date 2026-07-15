@@ -355,6 +355,24 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   tracked artifact validates. On 2026-07-15 the owner explicitly approved the
   exact corrected candidate SHA and directed uninterrupted local continuation;
   planning/TDD/review/integration are authorized. No remote/live action occurred.
+- Converting that accepted design into an executable plan stopped before
+  RED/code on a genuine product-truth gap. Independent command-binding audit
+  SHA-256 `17f61bc5681a8d19f0a237c6e72aca7a4ed89fbbbe02c28712190a64cbd1148e`
+  and architecture map SHA-256
+  `942b3423eea39c0fb08606eeb7ddbd32c2e4db11934b4d819f1c9b4898328469`
+  both returned `PRODUCT-TRUTH-GAP`: the current canonical manifest/core owns
+  only five retained `barrier.*` commands; accepted sources do not freeze the
+  ordinary phase/command/outcome/resolved-argv relation; and
+  `migrations_applied` is explicitly undefined. W's existing generic command
+  and `9*64` hash are nonnormative and were not reused.
+- The same preflight found a second independent contradiction at the activation
+  rollback frontier: forward and rollback FWM bytes differ but currently target
+  one immutable fixed path, and the approved D5J request has no authoritative
+  Root source for the full writer inventory. Beads decision `.13.22` now blocks
+  `.13.21`. The recommended minimum amendment moves only the required canonical
+  manifest slice forward from Task 9, freezes the exact binding/substitution
+  table, names the Root inventory producer, and defines collision-free immutable
+  FWM paths. No D5J implementation, W edit, or remote/live mutation occurred.
 - D6 Option A is approved only as a written-contract direction. Implementation
   remains after accepted W, a reviewed D6 plan, and separate local
   authorization; the remote gate is unchanged.

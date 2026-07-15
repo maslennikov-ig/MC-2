@@ -1,9 +1,9 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-14
+Updated: 2026-07-15
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: pushed `codex/self-hosted-qdrant-platform`; current head is
-`c150a4c2`. The preserved W branch is pushed at `7b7cc6b9` with exactly two
+Integration branch: pushed `codex/self-hosted-qdrant-platform`; its accepted
+D5J approval history includes `0356098b`. The preserved W branch is pushed at `7b7cc6b9` with exactly two
 W-owned uncommitted files. The dedicated integration worktree remains
 authoritative for Q12.
 
@@ -47,6 +47,7 @@ authoritative for Q12.
 - Publisher `.13.9`, G7 `.13.7.2`, D5 decision `.13.17`, and Root producer `.13.18` are accepted/integrated. D5W seam `.13.20` is closed: source `3dd9ad53`, correctness/docs delta reviews P0-P3 zero, integration/W reruns 271/271, cleanup evidence `c150a4c2`, source worktree/local branch removed. The preserved W branch is `7b7cc6b9` and retains exactly its two allowed uncommitted files. W remains blocked by joined-fixture chronology task `.13.21`; M `.13.11`, H `.13.12`, and Root `.13.13` remain dependency-ordered and local-only. No remote/live mutation occurred.
 - D6 decision `.13.19` has an ignored owner-ready candidate SHA-256 `2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5`; final independent review SHA-256 `948982d99895489c6fefa1fb831791f7e02bb524bb268713e712629a6bdab5a7` is PASS with P0-P3 zero. On 2026-07-15 the owner approved Option A as the written-contract direction, including its sole narrow post-`R` closed-terminal exception. D6 implementation still waits for accepted W, a reviewed plan, and separate local implementation authorization; remote/live authority remains separate.
 - Read-only architecture report SHA-256 `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379` found that D5W real-preimage binding is insufficient for W chronology: Root D5-only anchors and W's full source/backup/restore/reindex graph cannot be joined by copying or rehashing authority. The owner approved the Root-owned test-only architecture/drafting direction and, on 2026-07-15, explicitly approved the exact tracked candidate SHA-256 `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d`. It closed the clean-prefix-1 quiesce-preimage gap and passed final correctness/docs rereviews P0-P3 `0/0/0/0` (report SHA-256 `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2` and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`). Local planning/TDD/review/integration are authorized; production CLI and W ownership stay unchanged, and remote/live authority remains separate.
+- The authorized D5J plan preflight found a product-truth gap before RED/code. Two independent read-only audits, SHA-256 `17f61bc5681a8d19f0a237c6e72aca7a4ed89fbbbe02c28712190a64cbd1148e` and `942b3423eea39c0fb08606eeb7ddbd32c2e4db11934b4d819f1c9b4898328469`, agree that the canonical manifest/core contains only the five retained `barrier.*` commands and the accepted sources do not freeze exact ordinary `phase -> command/outcome/resolved argv` bindings. `migrations_applied` is explicitly undefined, and W's `barrier.prepare-recovery` / `9*64` values are test fabrications. They also found an activation-frontier collision: distinct forward and rollback final-writer manifests are required in one run but both target the same immutable path, with no approved Root inventory source. Decision `.13.22` now blocks `.13.21`; no D5J implementation or W edit started.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -69,9 +70,14 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: write/review the exact `.13.21` implementation plan,
-execute strict TDD in the isolated worktree, resume and independently accept W
-`.13.10`, run M/H in parallel, and finish the root supervisor/journal join. D6
+Recommended action: resolve `.13.22` with one narrow normative D5J amendment:
+move only the required canonical ordinary-command manifest slice forward from
+Task 9, freeze the exact phase/command/outcome/substitution table, define the
+Root-owned deterministic FWM inventory, and give forward/rollback manifests a
+collision-free immutable path rule. After independent review and owner
+acceptance, write/review the exact `.13.21` implementation plan, execute strict
+TDD in the isolated worktree, resume and independently accept W `.13.10`, run
+M/H in parallel, and finish the root supervisor/journal join. D6
 direction is approved, but its implementation remains after accepted W plus its
 own reviewed plan and local authorization. Run the
 joined local release matrix before presenting the separate GHCR publication and
@@ -130,8 +136,9 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - D6 `.13.19` written-contract direction is owner-approved but not implemented;
   it still waits for accepted W, a reviewed plan, and separate local
   implementation authorization. D5J `.13.21` architecture/drafting is approved
-  and its exact independently rereviewed written SHA is owner-approved; local
-  planning/TDD/review/integration are active. Neither state permits server,
+  and its exact independently rereviewed written SHA is owner-approved, but
+  executable planning is blocked by the newly discovered normative decision
+  `.13.22`; no implementation started. Neither state permits server,
   Supabase, service, container, Qdrant, deployment, or live actions.
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
@@ -141,9 +148,9 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: updated — D6 direction approval and the D5J drafted exact-SHA
-approval now match Beads and the isolated candidate branch; local D5J planning
-is the active next step.
+docs-reviewed: updated — the independently confirmed D5J command/FWM
+product-truth gap, decision `.13.22`, and unchanged remote boundary now match
+Beads; the prior instruction to begin implementation planning is superseded.
 graph-reviewed: used — focused read-only query was consulted; the graph remains
 stale at pre-D5 HEAD and must be refreshed after the next accepted tracked
 implementation boundary with zero model/API modes and no Git hooks.
