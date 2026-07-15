@@ -2452,16 +2452,29 @@ genesis_joined_prefix = (
 )
 final_phase = "prepared_quiesced" if mode == "forward" else "rollback_preparing"
 if genesis_joined_prefix:
-    suffix_phase = (
-        "handoff_ready_writers_quiesced"
-        if mode == "forward"
-        else "rollback_ready_writers_quiesced"
-    )
+    # The W suffix is everything the controller itself appends after the Root
+    # prefix: forward = handoff -> db cleanup -> authority -> resume; rollback =
+    # reverse receipts -> db rollback -> rollback-state -> authority -> resume.
+    # The boundary is the first row that enters one of those W-owned phases.
+    if mode == "forward":
+        w_suffix_phases = {
+            "handoff_ready_writers_quiesced",
+            "guard_cleanup_complete",
+            "resume_authority_forward",
+            "resume_committing_forward",
+        }
+    else:
+        w_suffix_phases = set(ROLLBACK_CONDITIONAL_PHASES) | {
+            "guard_cleanup_complete",
+            "rollback_ready_writers_quiesced",
+            "resume_authority_rollback",
+            "resume_committing_rollback",
+        }
     joined_suffix_start = next(
         (
             index
             for index, entry in enumerate(journal_lines)
-            if entry["phase"] == suffix_phase
+            if entry["phase"] in w_suffix_phases
         ),
         None,
     )

@@ -1817,9 +1817,7 @@ async function joinedWriterResumeFixture(
     runRoot,
     joinedProfile: mode,
     quiesceManifestPath: quiescePath,
-    ...(mode === 'rollback'
-      ? { completedPrefixLength: 4 as const, frontier: activationFrontierSpec() }
-      : {}),
+    ...(mode === 'rollback' ? { completedPrefixLength: 4 as const } : {}),
   } as never);
   const fwmPath =
     mode === 'forward'
@@ -1843,18 +1841,6 @@ async function joinedWriterResumeFixture(
       originalWriters,
     }
   );
-}
-
-function activationFrontierSpec(): Record<string, unknown> {
-  return {
-    operation: 'activate',
-    form: 'issued',
-    history: 'initial',
-    lease: 'continuous',
-    copySet: 'cutover',
-    exactSuccessBeforeDisposition: false,
-    activationCommitRace: 'none',
-  };
 }
 
 function writerResumeFixture(
@@ -4105,6 +4091,27 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
         record => record.State.Running === false && record.HostConfig.RestartPolicy.Name === 'no'
       )
     ).toBe(true);
+  });
+
+  it('resumes rollback over the real Root joined prefix (D5J clean prefix 4)', async () => {
+    const fixture = await joinedWriterResumeFixture('rollback');
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(fixture.q12Capability)).toBe(false);
+    const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
+    expect(receipt).toMatchObject({
+      schema_version: 'megacampus.q12.writer-resume-state/v1',
+      run_id: fixture.runId,
+      state: 'writers_resumed',
+      mode: 'rollback',
+      lease_epoch: 'cutover',
+    });
+    // Clean rollback holds no targets (no deploy.prepare completion): the ten
+    // originals are the final set and there are zero held writers.
+    expect(fixture.heldIds).toHaveLength(0);
+    expect(fixture.finalIds).toHaveLength(10);
   });
 
   function invokeResumeWrapper(
