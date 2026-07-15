@@ -3979,8 +3979,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('resumes the exact forward final ten in workers, API, Web order and leaves held five stopped', () => {
-    const fixture = writerResumeFixture('forward');
+  it('resumes the exact forward final ten in workers, API, Web order and leaves held five stopped', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const checkpointBefore = readFileSync(fixture.checkpoint, 'utf8');
     const checkpoint = JSON.parse(checkpointBefore) as Record<string, any>;
     expect(Object.keys(checkpoint).sort()).toEqual(
@@ -4001,7 +4001,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     );
     expect(checkpoint).toMatchObject({
       schema_version: 'megacampus.q12.cutover-checkpoint/v1',
-      run_id: Q12_RUN_ID,
+      run_id: fixture.runId,
       phase: 'resume_committing_forward',
       accepted_object_kind: 'none',
       accepted_object_sha256: null,
@@ -4079,7 +4079,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     );
     expect(receipt).toMatchObject({
       schema_version: 'megacampus.q12.writer-resume-state/v1',
-      run_id: Q12_RUN_ID,
+      run_id: fixture.runId,
       state: 'writers_resumed',
       mode: 'forward',
       lease_epoch: 'cutover',
@@ -4588,8 +4588,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(existsSync(terminalTemporary)).toBe(true);
   });
 
-  it('removes only exact deterministic temporary residue beside an accepted terminal receipt', () => {
-    const fixture = writerResumeFixture('forward');
+  it('removes only exact deterministic temporary residue beside an accepted terminal receipt', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const first = fixture.resume();
     expect(first.status, first.stderr).toBe(0);
     const terminalTemporary = join(fixture.q12RunRoot, '.writer-resume-state.tmp');
