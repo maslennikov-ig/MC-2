@@ -397,3 +397,104 @@ describe('Q12 file-only mode and databaseUrl are mutually exclusive', () => {
     expect(() => resolveMigrationConnectionSource({ databaseUrl: '' })).toThrow(/exactly one/iu);
   });
 });
+
+const APPROVED_MODULE = '../../../scripts/migrations/document-evidence-approved';
+const Q12_CLI_FLAGS = [
+  '--db-url-file',
+  '/opt/megacampus/secrets/supabase_db_url',
+  '--ca-file',
+  '/opt/megacampus/secrets/prod-ca-2021.crt',
+  '--q12-db-capability-file',
+  '/opt/megacampus/backups/q12/run/secrets/db-capability',
+];
+
+describe('Q12 migration CLI flag parsing', () => {
+  it('returns null when no Q12 flags are present', async () => {
+    const { parseQ12MigrationCliFlags } = await import(APPROVED_MODULE);
+    expect(parseQ12MigrationCliFlags(['apply', '--allow-remote'])).toBeNull();
+  });
+
+  it('parses the full file trio', async () => {
+    const { parseQ12MigrationCliFlags } = await import(APPROVED_MODULE);
+    expect(parseQ12MigrationCliFlags(['apply', ...Q12_CLI_FLAGS])).toEqual({
+      dbUrlFile: '/opt/megacampus/secrets/supabase_db_url',
+      caFile: '/opt/megacampus/secrets/prod-ca-2021.crt',
+      capabilityFile: '/opt/megacampus/backups/q12/run/secrets/db-capability',
+    });
+  });
+
+  it('fails closed on a partial flag set', async () => {
+    const { parseQ12MigrationCliFlags } = await import(APPROVED_MODULE);
+    expect(() =>
+      parseQ12MigrationCliFlags([
+        'apply',
+        '--db-url-file',
+        '/opt/megacampus/secrets/supabase_db_url',
+      ])
+    ).toThrow(/together/iu);
+  });
+
+  it('fails closed on a flag missing its value', async () => {
+    const { parseQ12MigrationCliFlags } = await import(APPROVED_MODULE);
+    expect(() => parseQ12MigrationCliFlags(['apply', '--db-url-file'])).toThrow(/path value/iu);
+  });
+
+  it('fails closed on a database URI argument alongside the flags', async () => {
+    const { parseQ12MigrationCliFlags } = await import(APPROVED_MODULE);
+    expect(() =>
+      parseQ12MigrationCliFlags([
+        'apply',
+        ...Q12_CLI_FLAGS,
+        'postgresql://postgres:x@h:5432/postgres',
+      ])
+    ).toThrow(/URI/iu);
+  });
+});
+
+describe('Q12 migration CLI resolution keeps file-only and databaseUrl exclusive', () => {
+  it('resolves the Q12 file-only mode with no databaseUrl', async () => {
+    const { resolveDocumentEvidenceApprovedCli } = await import(APPROVED_MODULE);
+    const resolution = resolveDocumentEvidenceApprovedCli(['apply', ...Q12_CLI_FLAGS], {});
+    expect(resolution.mode).toBe('q12');
+    expect(resolution).not.toHaveProperty('databaseUrl');
+  });
+
+  it('resolves ordinary URL mode from SUPABASE_DB_URL', async () => {
+    const { resolveDocumentEvidenceApprovedCli } = await import(APPROVED_MODULE);
+    const resolution = resolveDocumentEvidenceApprovedCli(['apply'], {
+      SUPABASE_DB_URL: 'postgresql://postgres:x@127.0.0.1:5432/postgres',
+    } as NodeJS.ProcessEnv);
+    expect(resolution).toMatchObject({ mode: 'url' });
+  });
+
+  it('fails closed when Q12 flags and SUPABASE_DB_URL are combined', async () => {
+    const { resolveDocumentEvidenceApprovedCli } = await import(APPROVED_MODULE);
+    expect(() =>
+      resolveDocumentEvidenceApprovedCli(['apply', ...Q12_CLI_FLAGS], {
+        SUPABASE_DB_URL: 'postgresql://postgres:x@127.0.0.1:5432/postgres',
+      } as NodeJS.ProcessEnv)
+    ).toThrow(/SUPABASE_DB_URL/u);
+  });
+
+  it('fails closed when no connection source is available', async () => {
+    const { resolveDocumentEvidenceApprovedCli } = await import(APPROVED_MODULE);
+    expect(() => resolveDocumentEvidenceApprovedCli(['apply'], {})).toThrow(/SUPABASE_DB_URL/u);
+  });
+
+  it('delivers a Q12 context to the runner as kind q12 without a connectionString', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const runner = (options: Record<string, unknown>): Promise<string> => {
+      calls.push(options);
+      return Promise.resolve('applied');
+    };
+    const q12: Q12MigrationRunContext = {
+      clientConfig: { host: '127.0.0.1' },
+      capability: 'synthetic-capability',
+    };
+    await runner({ q12, direction: 'apply' });
+    expect(calls[0]).toMatchObject({ q12 });
+    expect(calls[0]).not.toHaveProperty('databaseUrl');
+    expect(JSON.stringify(calls[0])).not.toContain('connectionString');
+    expect(resolveMigrationConnectionSource({ q12 })).toMatchObject({ kind: 'q12' });
+  });
+});

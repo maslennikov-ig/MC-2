@@ -1645,9 +1645,10 @@ export async function runDocumentEvidenceApprovedMigrations(
       // capability-bound client: it removes only the application tables and
       // their history. It deliberately never touches q12_guard.*, because the W
       // barrier's enforce trigger makes migration_guards INSERT-only and the
-      // frozen contract tears the guard schema down through
-      // q12-database-barrier.sh rollback/cleanup (DROP EVENT TRIGGER + DROP
-      // SCHEMA q12_guard CASCADE with a residue check), not from the migration.
+      // frozen contract tears the guard schema down only through the
+      // q12-database-barrier.sh rollback/cleanup drop_schema=true path
+      // (DROP EVENT TRIGGER + DROP SCHEMA q12_guard CASCADE with a residue
+      // check), never from the migration.
       const ordered = options.direction === 'apply' ? migrations : [...migrations].reverse();
       const results: MigrationResult[] = [];
       for (const migration of ordered) {
@@ -1666,6 +1667,45 @@ export async function runDocumentEvidenceApprovedMigrations(
   }
 }
 
+export interface Q12MigrationCliFlags {
+  dbUrlFile: string;
+  caFile: string;
+  capabilityFile: string;
+}
+
+// Pure extraction of the Q12 file-only flags. Returns null when none are
+// present (ordinary URL mode) and throws fail-closed on a partial set or on any
+// URI-shaped argument supplied alongside them.
+export function parseQ12MigrationCliFlags(args: readonly string[]): Q12MigrationCliFlags | null {
+  const flagNames: Record<string, keyof Q12MigrationCliFlags> = {
+    '--db-url-file': 'dbUrlFile',
+    '--ca-file': 'caFile',
+    '--q12-db-capability-file': 'capabilityFile',
+  };
+  const collected: Partial<Q12MigrationCliFlags> = {};
+  for (let index = 0; index < args.length; index += 1) {
+    const key = flagNames[args[index]];
+    if (!key) continue;
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(`Q12 migration flag ${args[index]} requires a path value`);
+    }
+    collected[key] = value;
+    index += 1;
+  }
+  const present = Object.keys(collected).length;
+  if (present === 0) return null;
+  if (present < 3) {
+    throw new Error(
+      'Q12 migration mode requires --db-url-file, --ca-file, and --q12-db-capability-file together'
+    );
+  }
+  if (args.some(arg => arg.includes('://'))) {
+    throw new Error('Q12 migration mode rejects any database URI argument');
+  }
+  return collected as Q12MigrationCliFlags;
+}
+
 function parseCliArguments(args: string[]): {
   direction: Direction;
   allowRemote: boolean;
@@ -1681,17 +1721,71 @@ function parseCliArguments(args: string[]): {
     const flag = args.shift();
     if (flag === '--allow-remote') allowRemote = true;
     else if (flag === '--confirm' && args.length > 0) confirmation = args.shift();
-    else throw new Error('Approved document evidence migration received an unsupported argument');
+    else if (
+      flag === '--db-url-file' ||
+      flag === '--ca-file' ||
+      flag === '--q12-db-capability-file'
+    ) {
+      args.shift();
+    } else throw new Error('Approved document evidence migration received an unsupported argument');
   }
   return { direction: action, allowRemote, ...(confirmation ? { confirmation } : {}) };
 }
 
+export type DocumentEvidenceApprovedCliResolution =
+  | { mode: 'q12'; files: Q12MigrationCliFlags; direction: Direction }
+  | {
+      mode: 'url';
+      databaseUrl: string;
+      direction: Direction;
+      allowRemote: boolean;
+      confirmation?: string;
+    };
+
+// Pure CLI resolution (no filesystem, no connection): the seam the wiring is
+// tested through. Q12 file-only mode and an ordinary SUPABASE_DB_URL are
+// mutually exclusive and fail closed.
+export function resolveDocumentEvidenceApprovedCli(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): DocumentEvidenceApprovedCliResolution {
+  const parsed = parseCliArguments([...args]);
+  const q12Files = parseQ12MigrationCliFlags(args);
+  if (q12Files) {
+    assertNoQ12UrlEnvironmentOrArgument(env, args);
+    return { mode: 'q12', files: q12Files, direction: parsed.direction };
+  }
+  const databaseUrl = env.SUPABASE_DB_URL;
+  if (databaseUrl === undefined || databaseUrl === '') {
+    throw new Error('SUPABASE_DB_URL is required');
+  }
+  return {
+    mode: 'url',
+    databaseUrl,
+    direction: parsed.direction,
+    allowRemote: parsed.allowRemote,
+    ...(parsed.confirmation ? { confirmation: parsed.confirmation } : {}),
+  };
+}
+
 async function main(): Promise<void> {
-  const parsed = parseCliArguments(process.argv.slice(2));
-  const databaseUrl = process.env.SUPABASE_DB_URL;
-  if (!databaseUrl) throw new Error('SUPABASE_DB_URL is required');
-  const result = await runDocumentEvidenceApprovedMigrations({ databaseUrl, ...parsed });
-  process.stdout.write(`Approved document evidence migration ${parsed.direction}: ${result}\n`);
+  const resolution = resolveDocumentEvidenceApprovedCli(process.argv.slice(2), process.env);
+  let result: MigrationResult;
+  if (resolution.mode === 'q12') {
+    const { clientConfig, capability } = await loadQ12MigrationCredentials(resolution.files);
+    result = await runDocumentEvidenceApprovedMigrations({
+      q12: { clientConfig, capability },
+      direction: resolution.direction,
+    });
+  } else {
+    result = await runDocumentEvidenceApprovedMigrations({
+      databaseUrl: resolution.databaseUrl,
+      direction: resolution.direction,
+      allowRemote: resolution.allowRemote,
+      ...(resolution.confirmation ? { confirmation: resolution.confirmation } : {}),
+    });
+  }
+  process.stdout.write(`Approved document evidence migration ${resolution.direction}: ${result}\n`);
 }
 
 if (

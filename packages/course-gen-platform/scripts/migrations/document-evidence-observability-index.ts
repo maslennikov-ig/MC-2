@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 
 import {
+  assertNoQ12UrlEnvironmentOrArgument,
   bindQ12MigrationSession,
   extendQ12Guard,
+  loadQ12MigrationCredentials,
+  parseQ12MigrationCliFlags,
   readQ12GuardInputs,
   resolveMigrationConnectionSource,
   type Q12MigrationRunContext,
@@ -825,24 +828,39 @@ function parseCliArguments(args: string[]): {
     const flag = args.shift();
     if (flag === '--allow-remote') allowRemote = true;
     else if (flag === '--confirm' && args.length > 0) confirmation = args.shift();
-    else throw new Error('Document evidence migration received an unsupported argument');
+    else if (
+      flag === '--db-url-file' ||
+      flag === '--ca-file' ||
+      flag === '--q12-db-capability-file'
+    ) {
+      args.shift();
+    } else throw new Error('Document evidence migration received an unsupported argument');
   }
   return { direction, unified, allowRemote, ...(confirmation ? { confirmation } : {}) };
 }
 
 async function main(): Promise<void> {
-  const parsed = parseCliArguments(process.argv.slice(2));
-  const databaseUrl = process.env.SUPABASE_DB_URL;
-  if (!databaseUrl) throw new Error('SUPABASE_DB_URL is required');
+  const args = process.argv.slice(2);
+  const parsed = parseCliArguments([...args]);
+  const q12Files = parseQ12MigrationCliFlags(args);
   const runner = parsed.unified
     ? runDocumentEvidenceObservabilityMigration
     : runDocumentEvidenceObservabilityIndexMigration;
-  const result = await runner({
-    databaseUrl,
-    direction: parsed.direction,
-    allowRemote: parsed.allowRemote,
-    ...(parsed.confirmation ? { confirmation: parsed.confirmation } : {}),
-  });
+  let result: 'applied' | 'rolled_back' | 'reused' | 'recovered';
+  if (q12Files) {
+    assertNoQ12UrlEnvironmentOrArgument(process.env, args);
+    const { clientConfig, capability } = await loadQ12MigrationCredentials(q12Files);
+    result = await runner({ q12: { clientConfig, capability }, direction: parsed.direction });
+  } else {
+    const databaseUrl = process.env.SUPABASE_DB_URL;
+    if (!databaseUrl) throw new Error('SUPABASE_DB_URL is required');
+    result = await runner({
+      databaseUrl,
+      direction: parsed.direction,
+      allowRemote: parsed.allowRemote,
+      ...(parsed.confirmation ? { confirmation: parsed.confirmation } : {}),
+    });
+  }
   process.stdout.write(
     `Document evidence observability ${parsed.unified ? 'migration' : 'index'} ${parsed.direction}: ${result}\n`
   );
