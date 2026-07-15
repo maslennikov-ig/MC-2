@@ -351,7 +351,10 @@ The final-writer-manifest contract is corrected as follows:
      ten originals; held = empty (no `deploy.prepare` completion exists);
    - rollback at the activation frontier: final = the ten originals; held = the
      exact five targets already durably recorded by `deploy.prepare`,
-     byte-identical to the forward manifest's target entries.
+     identity-identical to the forward manifest's target entries and projected
+     to the held never-resumable intent (`intended_running=false`,
+     `intended_restart_policy={name:"no",maximum_retry_count:0}`), per the
+     accepted rule that a held writer may not be resumable.
      The caller can supply or override none of these bytes; a request carrying
      any writer identity, policy, or inventory field fails before producer state.
 

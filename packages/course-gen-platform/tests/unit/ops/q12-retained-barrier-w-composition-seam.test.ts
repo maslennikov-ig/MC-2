@@ -768,7 +768,8 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
         'rollback_value = json.loads(rollback_path.read_bytes())',
         'forward_targets = [w for w in forward_value["final_writers"] if w["name"].endswith("-q12fixture")]',
         'held_targets = rollback_value["held_writers"]',
-        'print(json.dumps({"both_exist": forward_path.exists() and rollback_path.exists(), "held_equal_targets": held_targets == forward_targets, "rollback_final": [(w["class"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in rollback_value["final_writers"]]}))',
+        'held_projection = [dict(w, intended_running=False, intended_restart_policy={"name": "no", "maximum_retry_count": 0}) for w in forward_targets]',
+        'print(json.dumps({"both_exist": forward_path.exists() and rollback_path.exists(), "held_equal_targets": held_targets == held_projection, "held_never_resumable": all((not w["intended_running"]) and w["intended_restart_policy"] == {"name": "no", "maximum_retry_count": 0} for w in held_targets), "rollback_final": [(w["class"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in rollback_value["final_writers"]]}))',
       ].join('\n')
     );
     expect(probe.stderr).toBe('');
@@ -778,10 +779,12 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
     const output = JSON.parse(lines[1]) as {
       both_exist: boolean;
       held_equal_targets: boolean;
+      held_never_resumable: boolean;
       rollback_final: [string, boolean, string][];
     };
     expect(output.both_exist).toBe(true);
     expect(output.held_equal_targets).toBe(true);
+    expect(output.held_never_resumable).toBe(true);
     expect(output.rollback_final).toHaveLength(10);
     expect(
       output.rollback_final.every(([, running, policy]) => running && policy === 'unless-stopped')
@@ -1233,7 +1236,13 @@ describe('Joined rollback profiles', () => {
     const forwardTargets = forward.final_writers.filter(writer =>
       writer.name.endsWith('-q12fixture')
     );
-    expect(rollback.held_writers).toEqual(forwardTargets);
+    expect(rollback.held_writers).toEqual(
+      forwardTargets.map(writer => ({
+        ...writer,
+        intended_running: false,
+        intended_restart_policy: { name: 'no', maximum_retry_count: 0 },
+      }))
+    );
     expect(rollback.final_writers).toHaveLength(10);
   });
 

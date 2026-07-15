@@ -1925,7 +1925,19 @@ class Engine:
                 final = self.sorted_writers(
                     inventory["production_prior"] + inventory["development_prior"]
                 )
-                held = inventory["targets"] or []
+                # Held writers are never resumable: identity-identical to the
+                # forward target entries, projected to stopped/no intent.
+                held = [
+                    {
+                        **target,
+                        "intended_running": False,
+                        "intended_restart_policy": {
+                            "name": "no",
+                            "maximum_retry_count": 0,
+                        },
+                    }
+                    for target in (inventory["targets"] or [])
+                ]
             manifest_value = {
                 "schema_version": "megacampus.q12.final-writer-manifest/v1",
                 "run_id": self.request["run_id"],
