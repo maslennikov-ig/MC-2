@@ -1,10 +1,29 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import {
+  canonical,
+  deriveRootRetainedBarrierFixtureRunId,
+  materializeJoinedRetainedBarrierFixture,
+} from './fixtures/q12-retained-barrier-contract.js';
 
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
+const roots: string[] = [];
+
+afterEach(() => {
+  for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
+});
+
+function root(): string {
+  const value = mkdtempSync('/tmp/mc2-q12-d5-root-');
+  roots.push(value);
+  return value;
+}
 describe('Ordinary-row journal grammar', () => {
   const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
   const REAL = 'c'.repeat(64);
@@ -748,5 +767,258 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
     expect(
       output.rollback_final.every(([, running, policy]) => running && policy === 'unless-stopped')
     ).toBe(true);
+  });
+});
+
+describe('Joined forward composition', () => {
+  const MANIFEST_PATH = join(repoRoot, 'deploy/qdrant/q12-command-manifest.json');
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as {
+    commands: Record<string, { argv: string[] }>;
+  };
+  const CATALOG_SHA = createHash('sha256')
+    .update('{"schema_version":"fixture/v1"}\n', 'utf8')
+    .digest('hex');
+  const RELEASE = '0123456789abcdef0123456789abcdef01234567';
+  const ZERO64 = '0'.repeat(64);
+
+  function sha256Hex(text: string): string {
+    return createHash('sha256').update(text, 'utf8').digest('hex');
+  }
+
+  function uuid5(namespace: string, name: string): string {
+    const ns = Buffer.from(namespace.replace(/-/g, ''), 'hex');
+    const hash = createHash('sha1')
+      .update(Buffer.concat([ns, Buffer.from(name, 'utf8')]))
+      .digest();
+    const bytes = Buffer.from(hash.subarray(0, 16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x50;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  function substitutions(runId: string, quiescePath: string): Record<string, string> {
+    const digest = (salt: string) => sha256Hex(`q12:${salt}:${runId}`);
+    const snapshot = digest('snapshot-export');
+    return {
+      '<run-id>': runId,
+      '<expected-post-migration-catalog-sha256>': CATALOG_SHA,
+      '<release-sha>': RELEASE,
+      '<quiesce-manifest>': quiescePath,
+      '<exported-id>': `${snapshot.slice(0, 8)}-${snapshot.slice(8, 16)}-1`,
+      '<immutable-generation>': `q12fixture-generation-${digest('backup-generation').slice(0, 16)}`,
+      '<recovery-run-id>': uuid5(runId, 'q12-source-recovery'),
+      '<accepted-recovery-manifest-sha256>': digest('recovery-manifest'),
+      '<accepted-coverage-fingerprint>': digest('coverage-fingerprint'),
+      '<accepted-coverage-run>': [
+        uuid5(runId, 'q12-coverage-org'),
+        uuid5(runId, 'q12-coverage-course'),
+        uuid5(runId, 'q12-coverage-run'),
+      ].join(':'),
+    };
+  }
+
+  function resolvedHash(commandId: string, subs: Record<string, string>): string {
+    const argv = manifest.commands[commandId].argv.map(value => {
+      let rendered = value;
+      for (const [token, replacement] of Object.entries(subs)) {
+        rendered = rendered.split(token).join(replacement);
+      }
+      return rendered;
+    });
+    return createHash('sha256').update(JSON.stringify(argv)).digest('hex');
+  }
+
+  function quiesceWriter(klass: string, service: string, index: number): Record<string, unknown> {
+    const digit = String(index % 10);
+    return {
+      class: klass,
+      id: digit.repeat(64),
+      name: `megacampus-${service}${klass.startsWith('development') ? '-dev' : ''}`,
+      project: klass.startsWith('development') ? 'megacampus-dev' : 'megacampus',
+      service,
+      config_files: '/opt/megacampus/docker-compose.production.yml',
+      working_dir: '/opt/megacampus',
+      image_id: `sha256:${digit.repeat(64)}`,
+      image_ref: `ghcr.io/megacampus/${service}@sha256:${digit.repeat(64)}`,
+      prior_running: true,
+      prior_status: 'running',
+      healthcheck_present: service === 'api' || service === 'web',
+      prior_health_status: service === 'api' || service === 'web' ? 'healthy' : null,
+      prior_restart_policy: { name: 'unless-stopped', maximum_retry_count: 0 },
+      temporary_restart_policy: { name: 'no', maximum_retry_count: 0 },
+    };
+  }
+
+  function writeQuiesceManifest(runRoot: string, runId: string): string {
+    const services = ['api', 'web', 'worker', 'worker-stage6', 'worker-stage7'];
+    const kind = (service: string) =>
+      service === 'api' ? 'api' : service === 'web' ? 'web' : 'worker';
+    const writers = [
+      ...services.map((service, index) =>
+        quiesceWriter(`production-${kind(service)}`, service, index + 1)
+      ),
+      ...services.map((service, index) =>
+        quiesceWriter(`development-${kind(service)}`, service, index + 6)
+      ),
+    ];
+    const value = {
+      schema_version: 'megacampus.q12.writer-quiesce/v1',
+      run_id: runId,
+      status: 'quiesced',
+      barrier: {
+        state: 'recovery_ready_guarded',
+        zero_guard_residue: false,
+        expected_catalog_sha256: 'a'.repeat(64),
+        probe_receipt_sha256: 'b'.repeat(64),
+      },
+      writers,
+    };
+    const path = join(runRoot, `writer-quiesce-${runId}.json`);
+    writeFileSync(path, `${canonical(value)}\n`, { mode: 0o400 });
+    return path;
+  }
+
+  function lifecycle4(
+    command: string,
+    selector: string,
+    target: string
+  ): [string, string, string][] {
+    return [
+      [selector, 'intent', command],
+      [target, 'capability_issued', command],
+      [target, 'capability_claimed', command],
+      [target, 'completed', command],
+    ];
+  }
+
+  it('emits the exact amendment forward chronology through one canonical journal', async () => {
+    const runRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+    const quiescePath = writeQuiesceManifest(runRoot, runId);
+    const fixture = await materializeJoinedRetainedBarrierFixture({
+      runRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const quiesceSha = createHash('sha256').update(readFileSync(quiescePath)).digest('hex');
+    const subs = substitutions(runId, quiescePath);
+    const expected: [string, string, string][] = [
+      ...lifecycle4('operator.self-check', 'preflight', 'preflight'),
+      ...lifecycle4('barrier.install', 'maintenance_guarded', 'maintenance_guarded'),
+      ['quiesced', 'intent', 'writers.quiesce'],
+      ['quiesced', 'capability_issued', 'writers.quiesce'],
+      ['quiesced', 'capability_claimed', 'writers.quiesce'],
+      ['quiesced', 'capability_completed', 'writers.quiesce'],
+      ['quiesced', 'accepted', 'writers.quiesce'],
+      ['snapshot_exported', 'intent', 'pg.backup'],
+      ['backup_committed', 'capability_issued', 'pg.backup'],
+      ['backup_committed', 'capability_claimed', 'pg.backup'],
+      ['backup_committed', 'completed', 'pg.backup'],
+      ...lifecycle4('pg.restore', 'restore_verified', 'restore_verified'),
+      ...lifecycle4('migration.base.apply', 'restore_verified', 'restore_verified'),
+      ...lifecycle4(
+        'barrier.verify-after-base',
+        'base_migration_guarded',
+        'base_migration_guarded'
+      ),
+      ...lifecycle4(
+        'migration.observability.apply',
+        'base_migration_guarded',
+        'base_migration_guarded'
+      ),
+      ...lifecycle4(
+        'barrier.verify-after-observability',
+        'observability_migration_guarded',
+        'observability_migration_guarded'
+      ),
+      ['migrations_applied', 'completed', 'migration.observability.apply'],
+      ...lifecycle4('barrier.prepare-recovery', 'recovery_ready_guarded', 'recovery_ready_guarded'),
+      ...lifecycle4('source.forward', 'source_recovered', 'source_recovered'),
+      ...lifecycle4('reindex.plan', 'reindex_started', 'reindex_started'),
+      ...lifecycle4('reindex.worker.create', 'reindex_started', 'reindex_started'),
+      ...lifecycle4('reindex.execute', 'reindex_started', 'reindex_started'),
+      ...lifecycle4('reindex.verify', 'qdrant_verified', 'qdrant_verified'),
+      ...lifecycle4('deploy.prepare', 'qdrant_verified', 'qdrant_verified'),
+      ['prepared_quiesced', 'intent', 'writers.resume.forward'],
+      ['prepared_quiesced', 'accepted', 'writers.resume.forward'],
+      ...lifecycle4('deploy.commit', 'activation_ready', 'activation_ready'),
+      ['activation_committing', 'intent', 'barrier.activate'],
+      ['activated', 'capability_issued', 'barrier.activate'],
+      ['activated', 'capability_claimed', 'barrier.activate'],
+      ['activated', 'completed', 'barrier.activate'],
+    ];
+    expect(
+      fixture.journalEntries.map(entry => [entry.phase, entry.outcome, entry.command_id])
+    ).toEqual(expected);
+    for (const entry of fixture.journalEntries) {
+      expect(entry.command_id, `${entry.seq}`).not.toBe('root.advance');
+      expect(entry.command_sha256, `${entry.seq} ${entry.command_id}`).toBe(
+        resolvedHash(String(entry.command_id), subs)
+      );
+    }
+    const acceptedIndex = fixture.journalEntries.findIndex(
+      entry => entry.command_id === 'writers.quiesce' && entry.outcome === 'accepted'
+    );
+    for (const [index, entry] of fixture.journalEntries.entries()) {
+      expect(entry.quiesce_manifest_sha256, `${index}`).toBe(
+        index < acceptedIndex ? ZERO64 : quiesceSha
+      );
+    }
+    const step1 = sha256Hex(`q12:resource-step:snapshot:${runId}`);
+    const step2 = sha256Hex(`q12:resource-step:targets:${runId}`);
+    const backupIntent = fixture.journalEntries.findIndex(
+      entry => entry.command_id === 'pg.backup' && entry.outcome === 'intent'
+    );
+    const prepareCompleted = fixture.journalEntries.findIndex(
+      entry => entry.command_id === 'deploy.prepare' && entry.outcome === 'completed'
+    );
+    for (const [index, entry] of fixture.journalEntries.entries()) {
+      const expectedResource =
+        index < backupIntent ? '2'.repeat(64) : index < prepareCompleted ? step1 : step2;
+      expect(entry.resource_manifest_sha256, `${index}`).toBe(expectedResource);
+    }
+    expect(fixture.forwardFinalWriterManifestPath).toBe(
+      join(runRoot, `final-writer-manifest-forward-${runId}.json`)
+    );
+    expect(fixture.rollbackFinalWriterManifestPath).toBeNull();
+    const fwm = JSON.parse(readFileSync(fixture.forwardFinalWriterManifestPath!, 'utf8')) as {
+      final_writers: { id: string }[];
+      held_writers: unknown[];
+      writer_quiesce_manifest_sha256: string;
+    };
+    expect(fwm.final_writers).toHaveLength(10);
+    expect(fwm.held_writers).toHaveLength(5);
+    expect(fwm.writer_quiesce_manifest_sha256).toBe(quiesceSha);
+    expect(fixture.ordinaryHeadEntryHashes.get('migrations_applied')).toBeDefined();
+  });
+
+  it('fails closed before producer state on unknown keys, caller authority, and a missing quiesce path', async () => {
+    const runRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+    const quiescePath = writeQuiesceManifest(runRoot, runId);
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'forward',
+        quiesceManifestPath: quiescePath,
+        commandSha256: 'f'.repeat(64),
+      } as never)
+    ).rejects.toThrow(/unknown joined fixture key/);
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'forward',
+      } as never)
+    ).rejects.toThrow(/requires the W quiesce manifest path/);
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'forward',
+        quiesceManifestPath: quiescePath,
+        quiesce_manifest_sha256: 'f'.repeat(64),
+      } as never)
+    ).rejects.toThrow(/caller quiesce digest override is forbidden/);
+    expect(existsSync(join(runRoot, 'phase.jsonl'))).toBe(false);
   });
 });
