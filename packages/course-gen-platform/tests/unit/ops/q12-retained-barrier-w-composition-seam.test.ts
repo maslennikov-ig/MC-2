@@ -1270,6 +1270,99 @@ describe('Joined rollback profiles', () => {
     ).rejects.toThrow();
     expect(existsSync(join(runRoot, 'phase.jsonl'))).toBe(false);
   });
+
+  const CAPTURE_SERVICES = ['api', 'web', 'worker', 'worker-stage6', 'worker-stage7'] as const;
+
+  function captureSha(text: string): string {
+    return createHash('sha256').update(text, 'utf8').digest('hex');
+  }
+
+  it.each([1, 2, 3, 4] as const)(
+    'composes the sanctioned partial-capture rollback with held prefix %s',
+    async k => {
+      const runRoot = root();
+      const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+      const quiescePath = writeQuiesce(runRoot, runId);
+      const fixture = await materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'rollback',
+        completedPrefixLength: 4,
+        quiesceManifestPath: quiescePath,
+        partialCaptureTargets: k,
+      } as never);
+      const rows = fixture.journalEntries;
+      const completedD5 = rows
+        .filter(
+          entry => String(entry.command_id).startsWith('barrier.') && entry.outcome === 'completed'
+        )
+        .map(entry => String(entry.command_id).replace('barrier.', ''));
+      expect(completedD5).toEqual(D5_ORDER);
+      expect(
+        rows.some(entry => entry.command_id === 'deploy.prepare' && entry.outcome === 'completed')
+      ).toBe(true);
+      expect(rows.some(entry => entry.command_id === 'deploy.commit')).toBe(false);
+      expect(rows.some(entry => entry.command_id === 'writers.resume.forward')).toBe(false);
+      const acceptances = rows.filter(
+        entry => entry.accepted_object_kind === 'final_writer_manifest'
+      );
+      expect(acceptances).toHaveLength(1);
+      expect(acceptances[0].command_id).toBe('writers.resume.rollback');
+      const targetsStep = captureSha(`q12:resource-step:targets:${runId}`);
+      const prepare = rows.find(
+        entry => entry.command_id === 'deploy.prepare' && entry.outcome === 'completed'
+      );
+      expect(prepare?.resource_manifest_sha256).toBe(targetsStep);
+      expect(rows[rows.length - 1].resource_manifest_sha256).toBe(targetsStep);
+      expect(fixture.forwardFinalWriterManifestPath).toBeNull();
+      const fwm = JSON.parse(readFileSync(fixture.rollbackFinalWriterManifestPath!, 'utf8')) as {
+        mode: string;
+        final_writers: unknown[];
+        held_writers: Array<Record<string, unknown>>;
+      };
+      expect(fwm.mode).toBe('rollback');
+      expect(fwm.final_writers).toHaveLength(10);
+      expect(fwm.held_writers).toHaveLength(k);
+      fwm.held_writers.forEach((held, index) => {
+        const service = CAPTURE_SERVICES[index];
+        const image = captureSha(`q12:fixture-target-image:${runId}:${service}`);
+        expect(held).toMatchObject({
+          id: captureSha(`q12:fixture-target:${runId}:${service}`),
+          name: `megacampus-${service}-q12fixture`,
+          service,
+          project: service === 'api' || service === 'web' ? 'megacampus-green' : 'megacampus',
+          image_id: `sha256:${image}`,
+          intended_running: false,
+          intended_restart_policy: { name: 'no', maximum_retry_count: 0 },
+          temporary_restart_policy: { name: 'no', maximum_retry_count: 0 },
+        });
+      });
+    }
+  );
+
+  it('fails the partial-capture lever closed outside its exact validity window', async () => {
+    const runRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+    const quiescePath = writeQuiesce(runRoot, runId);
+    const reject = (spec: Record<string, unknown>) =>
+      expect(
+        materializeJoinedRetainedBarrierFixture({
+          runRoot,
+          quiesceManifestPath: quiescePath,
+          ...spec,
+        } as never)
+      ).rejects.toThrow(/partial capture/i);
+    await reject({ joinedProfile: 'rollback', completedPrefixLength: 4, partialCaptureTargets: 0 });
+    await reject({ joinedProfile: 'rollback', completedPrefixLength: 4, partialCaptureTargets: 5 });
+    await reject({ joinedProfile: 'rollback', completedPrefixLength: 3, partialCaptureTargets: 2 });
+    await reject({ joinedProfile: 'forward', partialCaptureTargets: 2 });
+    await reject({
+      joinedProfile: 'rollback',
+      completedPrefixLength: 4,
+      partialCaptureTargets: 2,
+      frontier: frontierFor(4),
+    });
+    expect(existsSync(join(runRoot, 'phase.jsonl'))).toBe(false);
+  });
 });
 
 describe('Closure coverage', () => {
