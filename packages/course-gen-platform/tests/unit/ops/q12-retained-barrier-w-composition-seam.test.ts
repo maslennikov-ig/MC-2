@@ -1022,3 +1022,301 @@ describe('Joined forward composition', () => {
     expect(existsSync(join(runRoot, 'phase.jsonl'))).toBe(false);
   });
 });
+
+describe('Joined rollback profiles', () => {
+  function quiesceWriterR(klass: string, service: string, index: number): Record<string, unknown> {
+    const digit = String(index % 10);
+    return {
+      class: klass,
+      id: digit.repeat(64),
+      name: `megacampus-${service}${klass.startsWith('development') ? '-dev' : ''}`,
+      project: klass.startsWith('development') ? 'megacampus-dev' : 'megacampus',
+      service,
+      config_files: '/opt/megacampus/docker-compose.production.yml',
+      working_dir: '/opt/megacampus',
+      image_id: `sha256:${digit.repeat(64)}`,
+      image_ref: `ghcr.io/megacampus/${service}@sha256:${digit.repeat(64)}`,
+      prior_running: true,
+      prior_status: 'running',
+      healthcheck_present: service === 'api' || service === 'web',
+      prior_health_status: service === 'api' || service === 'web' ? 'healthy' : null,
+      prior_restart_policy: { name: 'unless-stopped', maximum_retry_count: 0 },
+      temporary_restart_policy: { name: 'no', maximum_retry_count: 0 },
+    };
+  }
+
+  function writeQuiesce(runRoot: string, runId: string): string {
+    const services = ['api', 'web', 'worker', 'worker-stage6', 'worker-stage7'];
+    const kind = (service: string) =>
+      service === 'api' ? 'api' : service === 'web' ? 'web' : 'worker';
+    const writers = [
+      ...services.map((service, index) =>
+        quiesceWriterR(`production-${kind(service)}`, service, index + 1)
+      ),
+      ...services.map((service, index) =>
+        quiesceWriterR(`development-${kind(service)}`, service, index + 6)
+      ),
+    ];
+    const value = {
+      schema_version: 'megacampus.q12.writer-quiesce/v1',
+      run_id: runId,
+      status: 'quiesced',
+      barrier: {
+        state: 'recovery_ready_guarded',
+        zero_guard_residue: false,
+        expected_catalog_sha256: 'a'.repeat(64),
+        probe_receipt_sha256: 'b'.repeat(64),
+      },
+      writers,
+    };
+    const path = join(runRoot, `writer-quiesce-${runId}.json`);
+    writeFileSync(path, `${canonical(value)}\n`, { mode: 0o400 });
+    return path;
+  }
+
+  const NEXT: Record<number, string> = {
+    1: 'verify-after-base',
+    2: 'verify-after-observability',
+    3: 'prepare-recovery',
+    4: 'activate',
+  };
+
+  function frontierFor(prefix: number): Record<string, unknown> {
+    return {
+      operation: NEXT[prefix],
+      form: 'issued',
+      history: 'initial',
+      lease: 'continuous',
+      copySet: 'cutover',
+      exactSuccessBeforeDisposition: false,
+      activationCommitRace: 'none',
+    };
+  }
+
+  async function materializeRollback(prefix: number, withFrontier: boolean) {
+    const runRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+    const quiescePath = writeQuiesce(runRoot, runId);
+    const spec = {
+      runRoot,
+      joinedProfile: 'rollback' as const,
+      completedPrefixLength: prefix as 1 | 2 | 3 | 4,
+      quiesceManifestPath: quiescePath,
+      ...(withFrontier ? { frontier: frontierFor(prefix) } : {}),
+    };
+    const fixture = await materializeJoinedRetainedBarrierFixture(spec as never);
+    return { fixture, runRoot, runId };
+  }
+
+  const D5_ORDER = [
+    'install',
+    'verify-after-base',
+    'verify-after-observability',
+    'prepare-recovery',
+  ];
+
+  it.each([1, 2, 3, 4] as const)('composes the clean rollback prefix %s', async prefix => {
+    const { fixture, runRoot, runId } = await materializeRollback(prefix, false);
+    const rows = fixture.journalEntries;
+    const completedD5 = rows
+      .filter(
+        entry => String(entry.command_id).startsWith('barrier.') && entry.outcome === 'completed'
+      )
+      .map(entry => String(entry.command_id).replace('barrier.', ''));
+    expect(completedD5).toEqual(D5_ORDER.slice(0, prefix));
+    expect(rows.some(entry => entry.outcome === 'retained_attempt_abandoning')).toBe(false);
+    expect(rows.some(entry => entry.command_id === 'root.advance')).toBe(false);
+    const tail = rows.slice(-2);
+    expect(tail.map(entry => [entry.phase, entry.outcome, entry.command_id])).toEqual([
+      ['rollback_preparing', 'intent', 'writers.resume.rollback'],
+      ['rollback_preparing', 'accepted', 'writers.resume.rollback'],
+    ]);
+    expect(fixture.forwardFinalWriterManifestPath).toBeNull();
+    expect(fixture.rollbackFinalWriterManifestPath).toBe(
+      join(runRoot, `final-writer-manifest-rollback-${runId}.json`)
+    );
+    const fwm = JSON.parse(readFileSync(fixture.rollbackFinalWriterManifestPath!, 'utf8')) as {
+      final_writers: unknown[];
+      held_writers: unknown[];
+      mode: string;
+    };
+    expect(fwm.mode).toBe('rollback');
+    expect(fwm.final_writers).toHaveLength(10);
+    expect(fwm.held_writers).toHaveLength(0);
+    const hasMigrationBase = rows.some(
+      entry => entry.command_id === 'migration.base.apply' && entry.outcome === 'completed'
+    );
+    const hasMigrationObs = rows.some(
+      entry =>
+        entry.command_id === 'migration.observability.apply' &&
+        entry.outcome === 'completed' &&
+        entry.phase === 'base_migration_guarded'
+    );
+    expect(hasMigrationBase).toBe(prefix >= 2);
+    expect(hasMigrationObs).toBe(prefix >= 3);
+    const hasMilestone = rows.some(entry => entry.phase === 'migrations_applied');
+    expect(hasMilestone).toBe(prefix >= 4);
+  });
+
+  it.each([1, 2, 3] as const)(
+    'composes rollback prefix %s with its exact next frontier and immediate FWM ancestry',
+    async prefix => {
+      const { fixture, runRoot, runId } = await materializeRollback(prefix, true);
+      const rows = fixture.journalEntries;
+      const rIndex = rows.findIndex(entry => entry.outcome === 'retained_attempt_abandoning');
+      expect(rIndex).toBeGreaterThan(0);
+      expect(rows[rIndex].command_id).toBe(`barrier.${NEXT[prefix]}`);
+      const after = rows.slice(rIndex + 1);
+      expect(after.map(entry => [entry.phase, entry.outcome, entry.command_id])).toEqual([
+        ['rollback_preparing', 'intent', 'writers.resume.rollback'],
+        ['rollback_preparing', 'accepted', 'writers.resume.rollback'],
+      ]);
+      expect(fixture.forwardFinalWriterManifestPath).toBeNull();
+      const fwm = JSON.parse(
+        readFileSync(join(runRoot, `final-writer-manifest-rollback-${runId}.json`), 'utf8')
+      ) as { final_writers: unknown[]; held_writers: unknown[] };
+      expect(fwm.final_writers).toHaveLength(10);
+      expect(fwm.held_writers).toHaveLength(0);
+    }
+  );
+
+  it('composes the activation frontier with both manifests at distinct immutable paths', async () => {
+    const { fixture, runRoot, runId } = await materializeRollback(4, true);
+    const rows = fixture.journalEntries;
+    expect(
+      rows.some(
+        entry => entry.command_id === 'writers.resume.forward' && entry.outcome === 'accepted'
+      )
+    ).toBe(true);
+    expect(
+      rows.some(entry => entry.command_id === 'deploy.commit' && entry.outcome === 'completed')
+    ).toBe(true);
+    const rIndex = rows.findIndex(entry => entry.outcome === 'retained_attempt_abandoning');
+    expect(rows[rIndex].command_id).toBe('barrier.activate');
+    const after = rows.slice(rIndex + 1);
+    expect(after.map(entry => [entry.phase, entry.outcome, entry.command_id])).toEqual([
+      ['rollback_preparing', 'intent', 'writers.resume.rollback'],
+      ['rollback_preparing', 'accepted', 'writers.resume.rollback'],
+    ]);
+    const forwardPath = join(runRoot, `final-writer-manifest-forward-${runId}.json`);
+    const rollbackPath = join(runRoot, `final-writer-manifest-rollback-${runId}.json`);
+    expect(fixture.forwardFinalWriterManifestPath).toBe(forwardPath);
+    expect(fixture.rollbackFinalWriterManifestPath).toBe(rollbackPath);
+    const forward = JSON.parse(readFileSync(forwardPath, 'utf8')) as {
+      final_writers: { name: string }[];
+    };
+    const rollback = JSON.parse(readFileSync(rollbackPath, 'utf8')) as {
+      final_writers: unknown[];
+      held_writers: { name: string }[];
+    };
+    const forwardTargets = forward.final_writers.filter(writer =>
+      writer.name.endsWith('-q12fixture')
+    );
+    expect(rollback.held_writers).toEqual(forwardTargets);
+    expect(rollback.final_writers).toHaveLength(10);
+  });
+
+  it('rejects a wrong or non-next frontier and an install frontier', async () => {
+    const runRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+    const quiescePath = writeQuiesce(runRoot, runId);
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'rollback',
+        completedPrefixLength: 1,
+        quiesceManifestPath: quiescePath,
+        frontier: { ...frontierFor(2) },
+      } as never)
+    ).rejects.toThrow();
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'rollback',
+        completedPrefixLength: 1,
+        quiesceManifestPath: quiescePath,
+        frontier: { ...frontierFor(1), operation: 'install' },
+      } as never)
+    ).rejects.toThrow();
+    expect(existsSync(join(runRoot, 'phase.jsonl'))).toBe(false);
+  });
+});
+
+describe('Closure coverage', () => {
+  const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
+  const SUPERVISOR = join(repoRoot, 'deploy/qdrant/q12-live-cutover.sh');
+  const LAUNCHER = join(repoRoot, 'deploy/qdrant/q12-capability-run.sh');
+
+  it('deployed wrappers and the core parser reject every joined/profile switch', () => {
+    for (const wrapper of [SUPERVISOR, LAUNCHER]) {
+      for (const flag of ['--joined', '--joined-profile', '--profile', '--fixture']) {
+        const rejected = spawnSync('/usr/bin/bash', [wrapper, flag, 'forward'], {
+          encoding: 'utf8',
+          env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+        });
+        expect(rejected.status, `${wrapper} ${flag}`).not.toBe(0);
+      }
+      const source = readFileSync(wrapper, 'utf8');
+      expect(source).not.toMatch(/joined|profile/i);
+    }
+    const help = spawnSync('/usr/bin/python3', [CORE_PATH, '--help'], { encoding: 'utf8' });
+    expect(help.status).toBe(0);
+    expect(help.stdout).not.toMatch(/joined|profile|fixture/i);
+  });
+
+  it('fails composition before any producer state when a manifest entry is missing', () => {
+    const script = [
+      'import importlib.util, json, sys, tempfile, uuid, pathlib',
+      `spec = importlib.util.spec_from_file_location('q12core', ${JSON.stringify(CORE_PATH)})`,
+      'core = importlib.util.module_from_spec(spec)',
+      "sys.modules['q12core'] = core",
+      'spec.loader.exec_module(core)',
+      "root = tempfile.mkdtemp(prefix='mc2-q12-d5-root-', dir='/tmp')",
+      'manifest = json.loads(core.MANIFEST_PATH.read_text())',
+      "del manifest['commands']['pg.backup']",
+      "tampered = pathlib.Path(root, 'tampered-manifest.json')",
+      'tampered.write_text(json.dumps(manifest))',
+      'core.MANIFEST_PATH = tampered',
+      'run_id = str(uuid.uuid5(uuid.NAMESPACE_URL, root))',
+      "quiesce_path = pathlib.Path(root, 'w.json')",
+      "quiesce_path.write_bytes(b'{}\\n')",
+      'quiesce_path.chmod(0o400)',
+      "request = {'run_root': root, 'run_id': run_id, 'release_sha': '0123456789abcdef0123456789abcdef01234567', 'operator_digest': '1' * 64, 'resource_manifest_sha256': '2' * 64, 'quiesce_manifest_sha256': core.sha256(quiesce_path.read_bytes()), 'expected_catalog_sha256': 'a' * 64, 'rotation_required': False, 'joined_profile': 'forward', 'quiesce_manifest_path': str(quiesce_path)}",
+      'try:',
+      '    core.run_joined_composer(request, object())',
+      "    print('accepted')",
+      'except core.LifecycleError as error:',
+      "    print(f'rejected: {error}')",
+      "print(json.dumps({'journal_exists': pathlib.Path(root, 'phase.jsonl').exists()}))",
+    ].join('\n');
+    const probe = spawnSync('/usr/bin/python3', ['-c', script], { encoding: 'utf8' });
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const lines = probe.stdout.trim().split('\n');
+    expect(lines[0]).toContain('rejected: command manifest exact set/order mismatch');
+    expect(JSON.parse(lines[1])).toEqual({ journal_exists: false });
+  });
+
+  it('rejects a non-fresh run root and a missing quiesce manifest before producer state', async () => {
+    const runRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'forward',
+        quiesceManifestPath: join(runRoot, 'missing.json'),
+      })
+    ).rejects.toThrow();
+    expect(existsSync(join(runRoot, 'phase.jsonl'))).toBe(false);
+    writeFileSync(join(runRoot, 'phase.jsonl'), '', { mode: 0o600 });
+    const quiescePath = join(runRoot, `writer-quiesce-${runId}.json`);
+    writeFileSync(quiescePath, '{}\n', { mode: 0o400 });
+    await expect(
+      materializeJoinedRetainedBarrierFixture({
+        runRoot,
+        joinedProfile: 'forward',
+        quiesceManifestPath: quiescePath,
+      })
+    ).rejects.toThrow();
+  });
+});

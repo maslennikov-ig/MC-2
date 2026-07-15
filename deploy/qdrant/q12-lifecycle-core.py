@@ -2380,12 +2380,19 @@ class Engine:
         self.completions[operation] = completed["entry_hash"]
 
     def materialize_frontier_precondition(
-        self, frontier: dict[str, Any], manifest: dict[str, Any]
+        self,
+        frontier: dict[str, Any],
+        manifest: dict[str, Any],
+        *,
+        from_current_head: bool = False,
     ) -> None:
         """Fixture scheduler: create a durable boundary, then classify only disk state."""
         operation = frontier["operation"]
         command = resolved_command(manifest, COMMANDS[operation], self.request)
-        self.bootstrap_selector(operation, command)
+        if from_current_head:
+            self.append_retained_selector_from_current_head(operation, command)
+        else:
+            self.bootstrap_selector(operation, command)
         selector_bytes = self.checkpoint_path.read_bytes()
         carried = self.journal[-1]["capability_manifest_sha256"]
         form = frontier["form"]
@@ -2552,7 +2559,7 @@ class Engine:
         )
         self.publish_final_writer_manifest(
             "rollback",
-            None,
+            getattr(self, "joined_rollback_inventory", None),
             resume_command,
             checkpoint_predecessor=disposition,
             epoch=decision_epoch,
@@ -2816,6 +2823,24 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
     if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
         raise LifecycleError("joined quiesce manifest digest mismatch")
     manifest = load_manifest()
+    frontier = request.get("frontier")
+    prefix = request.get("completed_prefix_length")
+    if profile == "rollback":
+        if prefix not in (1, 2, 3, 4):
+            raise LifecycleError("rollback prefix must be 1..4")
+        expected_next = {
+            1: "verify-after-base",
+            2: "verify-after-observability",
+            3: "prepare-recovery",
+            4: "activate",
+        }[prefix]
+        if frontier is not None:
+            if frontier.get("operation") == "install":
+                raise LifecycleError("install cannot be an abandoned frontier")
+            if frontier.get("operation") != expected_next:
+                raise LifecycleError("frontier is not the exact next operation")
+    elif frontier is not None or prefix is not None:
+        raise LifecycleError("forward profile accepts no prefix or frontier")
     values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
     engine = Engine(request, executor)
     if engine.journal:
@@ -2837,8 +2862,9 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
     def record(entry: dict[str, Any]) -> None:
         ordinary_heads[entry["phase"]] = entry["entry_hash"]
 
-    if profile != "forward":
-        raise LifecycleError("joined rollback composition is not implemented")
+    activation_frontier = profile == "rollback" and prefix == 4 and frontier is not None
+    snapshot_step = sha256(f"q12:resource-step:snapshot:{run_id}".encode("utf-8"))
+    targets_step = sha256(f"q12:resource-step:targets:{run_id}".encode("utf-8"))
 
     record(ordinary("operator.self-check"))
     d5("install")
@@ -2848,42 +2874,81 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
             quiesce_object_sha256=request["quiesce_manifest_sha256"],
         )
     )
-    inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
-    engine.current_resource_manifest_sha256 = sha256(
-        f"q12:resource-step:snapshot:{run_id}".encode("utf-8")
+    include_targets = profile == "forward" or activation_frontier
+    inventory = engine.derive_root_writer_inventory(
+        quiesce_bytes, include_targets=include_targets
     )
-    record(ordinary("pg.backup"))
-    record(ordinary("pg.restore"))
-    ordinary("migration.base.apply")
-    d5("verify-after-base")
-    ordinary("migration.observability.apply")
-    d5("verify-after-observability")
-    record(
-        engine.append_controller_milestone(
-            manifest, "migrations_applied", "migration.observability.apply", values
+
+    def snapshot_backup_restore_base() -> None:
+        engine.current_resource_manifest_sha256 = snapshot_step
+        record(ordinary("pg.backup"))
+        record(ordinary("pg.restore"))
+        ordinary("migration.base.apply")
+
+    def forward_tail_through_activation_ready() -> None:
+        record(ordinary("source.forward"))
+        ordinary("reindex.plan")
+        ordinary("reindex.worker.create")
+        record(ordinary("reindex.execute"))
+        record(ordinary("reindex.verify"))
+        ordinary("deploy.prepare", resource_step_before_completion=targets_step)
+        record(
+            engine.publish_final_writer_manifest(
+                "forward",
+                inventory,
+                resolved_command(manifest, "writers.resume.forward", request),
+            )
         )
-    )
-    d5("prepare-recovery")
-    record(ordinary("source.forward"))
-    ordinary("reindex.plan")
-    ordinary("reindex.worker.create")
-    record(ordinary("reindex.execute"))
-    record(ordinary("reindex.verify"))
-    ordinary(
-        "deploy.prepare",
-        resource_step_before_completion=sha256(
-            f"q12:resource-step:targets:{run_id}".encode("utf-8")
-        ),
-    )
-    record(
-        engine.publish_final_writer_manifest(
-            "forward",
-            inventory,
-            resolved_command(manifest, "writers.resume.forward", request),
+        record(ordinary("deploy.commit"))
+
+    if profile == "forward":
+        snapshot_backup_restore_base()
+        d5("verify-after-base")
+        ordinary("migration.observability.apply")
+        d5("verify-after-observability")
+        record(
+            engine.append_controller_milestone(
+                manifest, "migrations_applied", "migration.observability.apply", values
+            )
         )
-    )
-    record(ordinary("deploy.commit"))
-    d5("activate")
+        d5("prepare-recovery")
+        forward_tail_through_activation_ready()
+        d5("activate")
+    else:
+        if prefix >= 2 or frontier is not None:
+            snapshot_backup_restore_base()
+        if prefix >= 2:
+            d5("verify-after-base")
+        if prefix >= 3 or (prefix == 2 and frontier is not None):
+            ordinary("migration.observability.apply")
+        if prefix >= 3:
+            d5("verify-after-observability")
+        if prefix == 4 or (prefix == 3 and frontier is not None):
+            record(
+                engine.append_controller_milestone(
+                    manifest,
+                    "migrations_applied",
+                    "migration.observability.apply",
+                    values,
+                )
+            )
+        if prefix >= 4:
+            d5("prepare-recovery")
+        if activation_frontier:
+            forward_tail_through_activation_ready()
+        if frontier is not None:
+            engine.joined_rollback_inventory = inventory
+            engine.materialize_frontier_precondition(
+                frontier, manifest, from_current_head=True
+            )
+        else:
+            record(
+                engine.publish_final_writer_manifest(
+                    "rollback",
+                    inventory,
+                    resolved_command(manifest, "writers.resume.rollback", request),
+                )
+            )
 
     engine.reload_durable()
     output = engine.output()
