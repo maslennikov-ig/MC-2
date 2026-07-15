@@ -4088,6 +4088,27 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     }
   );
 
+  // D4 (genesis gate): the fabricated legacy prefix is no longer an accepted
+  // journal shape. A well-formed fabricated forward run (the exact input that used
+  // to ride the removed common_phase_graph path to exit 0) now clears every earlier
+  // structural check and is rejected at the genesis gate — the sole acceptance is a
+  // genesis-rooted real Root joined prefix. Rejection is total and pre-mutation:
+  // exit != 0, the genesis-gate stderr, zero Docker inspect/start, no resume-state
+  // file, and the journal bytes are untouched.
+  it('rejects a fabricated legacy prefix at the genesis gate before any Docker, database, or writer mutation', () => {
+    const fixture = writerResumeFixture('forward');
+    const journalPath = join(fixture.q12RunRoot, 'phase.jsonl');
+    const journalBefore = readFileSync(journalPath);
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/genesis-rooted joined journal prefix/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+    expect(existsSync(fixture.resumeState)).toBe(false);
+    expect(readFileSync(journalPath)).toEqual(journalBefore);
+  });
+
   it('resumes the exact forward final ten in workers, API, Web order and leaves held five stopped', async () => {
     const fixture = await joinedWriterResumeFixture('forward');
     const checkpointBefore = readFileSync(fixture.checkpoint, 'utf8');

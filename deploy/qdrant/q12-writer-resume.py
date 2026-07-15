@@ -2298,14 +2298,14 @@ require_published_object(
 )
 
 # Amendment sections 4-6 (D5J command-binding-and-FWM amendment,
-# SHA-256 425dcc4578147c48f84e466309b430e3f7f0b352aedfc4e71a68271178d5f936):
+# SHA-256 e952f72410c9d49555cd780108e2b94c47284872da69e506b6c2e9ab86fcd4b1):
 # the closed ordinary-row grammar for the real Root joined prefix. Transcribed
 # from the frozen tables; the deployed core q12-lifecycle-core.py validates the
 # same literals in validate_journal_entry_grammar / validate_stable_binding_walk.
-# This is the MIGRATION acceptance path: it is selected only for a genuine Root
-# prefix (genesis operator.self-check row) and coexists with the fabricated
-# common_phase_graph path until the final tightening increment flips the
-# discriminator to reject the fabricated prefix outright.
+# This is the SOLE acceptance path: it is selected only for a genuine Root
+# prefix (genesis operator.self-check row). The former fabricated common_phase_graph
+# path has been removed — a non-genesis prefix is rejected outright at the genesis
+# gate below.
 JOINED_ORDINARY_GRAMMAR = {
     "operator.self-check": ("preflight", "preflight"),
     "pg.backup": ("snapshot_exported", "backup_committed"),
@@ -2450,105 +2450,69 @@ genesis_joined_prefix = (
     and journal_lines[0]["outcome"] == "intent"
     and journal_lines[0]["seq"] == 1
 )
-final_phase = "prepared_quiesced" if mode == "forward" else "rollback_preparing"
-if genesis_joined_prefix:
-    # The W suffix is everything the controller itself appends after the Root
-    # prefix: forward = handoff -> db cleanup -> authority -> resume; rollback =
-    # reverse receipts -> db rollback -> rollback-state -> authority -> resume.
-    # The boundary is the first row that enters one of those W-owned phases.
-    if mode == "forward":
-        w_suffix_phases = {
-            "handoff_ready_writers_quiesced",
-            "guard_cleanup_complete",
-            "resume_authority_forward",
-            "resume_committing_forward",
-        }
-    else:
-        w_suffix_phases = set(ROLLBACK_CONDITIONAL_PHASES) | {
-            "guard_cleanup_complete",
-            "rollback_ready_writers_quiesced",
-            "resume_authority_rollback",
-            "resume_committing_rollback",
-        }
-    joined_suffix_start = next(
-        (
-            index
-            for index, entry in enumerate(journal_lines)
-            if entry["phase"] in w_suffix_phases
-        ),
-        None,
-    )
-    require(joined_suffix_start is not None, "joined prefix has no writer state suffix")
-    validate_joined_prefix(journal_lines[:joined_suffix_start], quiesce_file.digest)
-    expected_phase_graph = [
-        (
-            entry["phase"],
-            entry["outcome"],
-            entry["accepted_object_kind"],
-            entry["accepted_object_sha256"],
-        )
-        for entry in journal_lines[:joined_suffix_start]
-    ]
-    if mode == "forward":
-        expected_phase_graph.extend([
-            ("handoff_ready_writers_quiesced", "intent", "none", None),
-            (
-                "handoff_ready_writers_quiesced",
-                "accepted",
-                "writer_handoff_state",
-                handoff_file.digest,
-            ),
-        ])
-    else:
-        required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
-        expected_phase_graph.extend([
-            (phase, "completed", "none", None)
-            for phase in ROLLBACK_CONDITIONAL_PHASES
-            if phase in required_phase_set
-        ])
+# The genesis-rooted real Root joined prefix is the sole accepted journal shape:
+# a writer resume must run against a genuine materialized run (operator.self-check
+# genesis row), and section 5 is the only acceptance. A fabricated legacy prefix
+# is rejected here at the genesis gate, before any Docker, database, or writer
+# mutation (see the D4 genesis-gate negative in the runtime suite).
+require(
+    genesis_joined_prefix,
+    "writer resume requires a genesis-rooted joined journal prefix",
+)
+# The W suffix is everything the controller itself appends after the Root
+# prefix: forward = handoff -> db cleanup -> authority -> resume; rollback =
+# reverse receipts -> db rollback -> rollback-state -> authority -> resume.
+# The boundary is the first row that enters one of those W-owned phases.
+if mode == "forward":
+    w_suffix_phases = {
+        "handoff_ready_writers_quiesced",
+        "guard_cleanup_complete",
+        "resume_authority_forward",
+        "resume_committing_forward",
+    }
 else:
-    common_phase_graph = [
-        "preflight",
-        "maintenance_guarded",
-        "quiesced",
-        "snapshot_exported",
-        "backup_committed",
-        "restore_verified",
-        "base_migration_guarded",
-        "observability_migration_guarded",
-        "migrations_applied",
-        "recovery_ready_guarded",
-        "source_recovered",
-        "reindex_started",
-        "qdrant_verified",
-    ]
-    expected_phase_graph = [
-        (phase, "completed", "none", None) for phase in common_phase_graph
-    ]
+    w_suffix_phases = set(ROLLBACK_CONDITIONAL_PHASES) | {
+        "guard_cleanup_complete",
+        "rollback_ready_writers_quiesced",
+        "resume_authority_rollback",
+        "resume_committing_rollback",
+    }
+joined_suffix_start = next(
+    (
+        index
+        for index, entry in enumerate(journal_lines)
+        if entry["phase"] in w_suffix_phases
+    ),
+    None,
+)
+require(joined_suffix_start is not None, "joined prefix has no writer state suffix")
+validate_joined_prefix(journal_lines[:joined_suffix_start], quiesce_file.digest)
+expected_phase_graph = [
+    (
+        entry["phase"],
+        entry["outcome"],
+        entry["accepted_object_kind"],
+        entry["accepted_object_sha256"],
+    )
+    for entry in journal_lines[:joined_suffix_start]
+]
+if mode == "forward":
     expected_phase_graph.extend([
-        (final_phase, "intent", "none", None),
-        (final_phase, "accepted", "final_writer_manifest", final_file.digest),
+        ("handoff_ready_writers_quiesced", "intent", "none", None),
+        (
+            "handoff_ready_writers_quiesced",
+            "accepted",
+            "writer_handoff_state",
+            handoff_file.digest,
+        ),
     ])
-    if mode == "forward":
-        expected_phase_graph.extend([
-            ("activation_ready", "completed", "none", None),
-            ("activation_committing", "completed", "none", None),
-            ("activated", "completed", "none", None),
-            ("handoff_ready_writers_quiesced", "intent", "none", None),
-            (
-                "handoff_ready_writers_quiesced",
-                "accepted",
-                "writer_handoff_state",
-                handoff_file.digest,
-            ),
-        ])
-    else:
-        required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
-        expected_phase_graph.extend([
-            (phase, "completed", "none", None)
-            for phase in ROLLBACK_CONDITIONAL_PHASES
-            if phase in required_phase_set
-        ])
+else:
+    required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
+    expected_phase_graph.extend([
+        (phase, "completed", "none", None)
+        for phase in ROLLBACK_CONDITIONAL_PHASES
+        if phase in required_phase_set
+    ])
 expected_phase_graph.extend([
     (
         entry["phase"], entry["outcome"],
