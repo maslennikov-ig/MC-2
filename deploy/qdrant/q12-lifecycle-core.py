@@ -767,8 +767,12 @@ class Engine:
     inherited_journal_identity_validated: bool = False
     lease_reacquired: bool = False
     journal_fd: int = field(init=False)
+    current_resource_manifest_sha256: str = field(init=False)
+    current_quiesce_manifest_sha256: str = field(init=False)
 
     def __post_init__(self) -> None:
+        self.current_resource_manifest_sha256 = self.request["resource_manifest_sha256"]
+        self.current_quiesce_manifest_sha256 = self.request["quiesce_manifest_sha256"]
         self.run_root = pathlib.Path(self.request["run_root"])
         require_lexical_absolute(self.run_root)
         production_root = pathlib.Path("/opt/megacampus/backups/q12") / self.request["run_id"]
@@ -1049,7 +1053,11 @@ class Engine:
                     (item for item in OPERATIONS if COMMANDS[item] == capability["command_id"]),
                     None,
                 )
-                if operation is None:
+                ordinary = (
+                    operation is None
+                    and capability["command_id"] in ORDINARY_COMMAND_IDS
+                )
+                if operation is None and not ordinary:
                     raise LifecycleError("unknown capability command")
                 epoch = capability["lease_epoch"]
                 if not EPOCH_RE.fullmatch(epoch):
@@ -1058,23 +1066,50 @@ class Engine:
                     "run_id": self.request["run_id"],
                     "release_sha": self.request["release_sha"],
                     "operator_digest": self.request["operator_digest"],
-                    "resource_manifest_sha256": self.request[
-                        "resource_manifest_sha256"
-                    ],
-                    "quiesce_manifest_sha256": self.request[
-                        "quiesce_manifest_sha256"
-                    ],
                     "resume_authority_sha256": None,
                 }
                 if any(capability[name] != value for name, value in stable.items()):
                     raise LifecycleError("capability stable binding mismatch")
-                key = f"{operation}:{epoch}"
+                if ordinary:
+                    # Segment-bound context: the capability must match its own
+                    # issuance row, which the stable-binding walk has already
+                    # validated against the amendment segment rules.
+                    issuance_rows = [
+                        entry
+                        for entry in entries
+                        if entry["command_id"] == capability["command_id"]
+                        and entry["outcome"] == "capability_issued"
+                        and entry["capability_manifest_sha256"] == sha256(data)
+                    ]
+                    if not issuance_rows or any(
+                        entry["resource_manifest_sha256"]
+                        != capability["resource_manifest_sha256"]
+                        or entry["quiesce_manifest_sha256"]
+                        != capability["quiesce_manifest_sha256"]
+                        for entry in issuance_rows
+                    ):
+                        raise LifecycleError(
+                            "ordinary capability issuance-row binding mismatch"
+                        )
+                else:
+                    if (
+                        capability["resource_manifest_sha256"]
+                        != self.request["resource_manifest_sha256"]
+                        or capability["quiesce_manifest_sha256"]
+                        != self.request["quiesce_manifest_sha256"]
+                    ):
+                        raise LifecycleError("capability stable binding mismatch")
+                key = (
+                    f"ordinary:{capability['command_id']}:{epoch}"
+                    if ordinary
+                    else f"{operation}:{epoch}"
+                )
                 if key in seen_capabilities:
                     raise LifecycleError("capability present in multiple states")
                 expected_name = f"{capability['command_id']}--{epoch}.json"
                 if path.name != expected_name:
                     raise LifecycleError("capability filename mismatch")
-                if (
+                if not ordinary and (
                     key not in retained_digests
                     or capability["capability_input_checkpoint_sha256"]
                     != retained_digests[key]
@@ -1113,6 +1148,35 @@ class Engine:
                     raise LifecycleError("unknown capability lifecycle residue")
 
         self.results = {}
+        for path in sorted(self.run_root.glob("ordinary-command-result-*.json")):
+            result_bytes = validate_regular_file(path, mode=0o600)
+            result = json.loads(result_bytes)
+            suffix = path.name.removeprefix("ordinary-command-result-").removesuffix(".json")
+            command_id = next(
+                (item for item in ORDINARY_COMMAND_IDS if suffix.startswith(f"{item}-")),
+                None,
+            )
+            if command_id is None:
+                raise LifecycleError("unknown ordinary result path")
+            epoch = suffix[len(command_id) + 1 :]
+            key = f"ordinary:{command_id}:{epoch}"
+            if (
+                not EPOCH_RE.fullmatch(epoch)
+                or key not in capability_digests
+                or capability_states[key] not in ("claimed", "completed")
+                or set(result) != RESULT_KEYS
+                or result.get("schema_version")
+                != "megacampus.q12.retained-command-result/v1"
+                or result.get("command_id") != command_id
+                or result.get("capability_sha256") != capability_digests[key]
+                or result.get("status") != "accepted"
+                or not isinstance(result.get("result_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", result["result_sha256"])
+            ):
+                raise LifecycleError("ordinary result shape/binding mismatch")
+            if key in self.results:
+                raise LifecycleError("duplicate ordinary result")
+            self.results[key] = str(path)
         for path in sorted(self.run_root.glob("retained-barrier-result-*.json")):
             result_bytes = validate_regular_file(path, mode=0o600)
             result = json.loads(result_bytes)
@@ -1326,8 +1390,8 @@ class Engine:
             "lease_epoch": epoch,
             "previous_hash": previous,
             "rotation_required": bool(self.request.get("rotation_required", False)),
-            "resource_manifest_sha256": self.request["resource_manifest_sha256"],
-            "quiesce_manifest_sha256": self.request["quiesce_manifest_sha256"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
             "capability_manifest_sha256": capability_hash,
             "accepted_object_kind": accepted_kind,
             "accepted_object_sha256": accepted_hash,
@@ -1388,6 +1452,20 @@ class Engine:
             "cutover",
             carried,
         )
+        return self.selector_intent_from_head(operation, command)
+
+    def append_retained_selector_from_current_head(
+        self, operation: str, command: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Joined-composition selector: the real current head is H; no synthetic anchor."""
+        if not self.journal or self.journal[-1]["phase"] != PREDECESSOR_PHASES[operation]:
+            raise LifecycleError("retained selector predecessor phase mismatch")
+        return self.selector_intent_from_head(operation, command)
+
+    def selector_intent_from_head(
+        self, operation: str, command: dict[str, Any]
+    ) -> dict[str, Any]:
+        carried = self.journal[-1]["capability_manifest_sha256"] if self.journal else ZERO
         if operation == "activate":
             h_bytes = self.checkpoint_path.read_bytes()
             previous = self.journal[-1]["entry_hash"]
@@ -1446,8 +1524,8 @@ class Engine:
             "command_sha256": command["command_sha256"],
             "release_sha": self.request["release_sha"],
             "operator_digest": self.request["operator_digest"],
-            "resource_manifest_sha256": self.request["resource_manifest_sha256"],
-            "quiesce_manifest_sha256": self.request["quiesce_manifest_sha256"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
             "resume_authority_sha256": None,
             "capability_input_checkpoint_sha256": sha256(copy_path.read_bytes()),
             "lease_epoch": epoch,
@@ -1470,6 +1548,164 @@ class Engine:
         fsync_directory(target.parent)
         self.capabilities[f"{operation}:{epoch}"] = str(target)
         return target
+
+    def publish_ordinary_capability(
+        self, command_id: str, command: dict[str, Any], checkpoint_hash: str
+    ) -> tuple[pathlib.Path, dict[str, Any], str]:
+        capability = {
+            "schema_version": "megacampus.q12.host-command-capability/v1",
+            "run_id": self.request["run_id"],
+            "command_id": command_id,
+            "command_sha256": command["command_sha256"],
+            "release_sha": self.request["release_sha"],
+            "operator_digest": self.request["operator_digest"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
+            "resume_authority_sha256": None,
+            "capability_input_checkpoint_sha256": checkpoint_hash,
+            "lease_epoch": "cutover",
+            "supersedes_capability_sha256": None,
+        }
+        if set(capability) != CAPABILITY_KEYS:
+            raise AssertionError("internal capability projection mismatch")
+        data = complete_object(capability)
+        path = self.run_root / "capabilities" / "issued" / f"{command_id}--cutover.json"
+        immutable_publish(path, data, 0o400, self.trace)
+        digest = sha256(data)
+        self.capabilities[f"ordinary:{command_id}:cutover"] = str(path)
+        return path, capability, digest
+
+    def move_ordinary_capability(
+        self, command_id: str, source_state: str, target_state: str
+    ) -> pathlib.Path:
+        source = self.run_root / "capabilities" / source_state / f"{command_id}--cutover.json"
+        target = self.run_root / "capabilities" / target_state / source.name
+        rename_noreplace(source, target)
+        fsync_directory(source.parent)
+        fsync_directory(target.parent)
+        self.capabilities[f"ordinary:{command_id}:cutover"] = str(target)
+        return target
+
+    def append_ordinary_lifecycle(
+        self,
+        manifest: dict[str, Any],
+        command_id: str,
+        values: dict[str, str],
+        *,
+        quiesce_object_sha256: str | None = None,
+    ) -> dict[str, Any]:
+        """Amendment section 4 items 4-5: one ordinary command lifecycle.
+
+        Root emits the capability/claim/completion evidence directly through
+        the production serializer/object primitives; the delegated claim
+        launcher remains a D5-group and Task 9 controller concern.
+        """
+        command = resolved_command(manifest, command_id, self.request, values)
+        if command_id == "writers.quiesce":
+            selector_phase = target_phase = "quiesced"
+        else:
+            selector_phase, target_phase = ORDINARY_ROW_GRAMMAR[command_id]
+        carried = self.journal[-1]["capability_manifest_sha256"] if self.journal else ZERO
+        self.append(
+            selector_phase, "intent", command_id, command["command_sha256"], "cutover", carried
+        )
+        checkpoint_hash = sha256(self.checkpoint_path.read_bytes())
+        _, _, digest = self.publish_ordinary_capability(command_id, command, checkpoint_hash)
+        self.append(
+            target_phase,
+            "capability_issued",
+            command_id,
+            command["command_sha256"],
+            "cutover",
+            digest,
+        )
+        self.move_ordinary_capability(command_id, "issued", "claimed")
+        self.append(
+            target_phase,
+            "capability_claimed",
+            command_id,
+            command["command_sha256"],
+            "cutover",
+            digest,
+        )
+        result = {
+            "schema_version": "megacampus.q12.retained-command-result/v1",
+            "command_id": command_id,
+            "capability_sha256": digest,
+            "result_sha256": sha256(
+                canonical(
+                    {
+                        "command_id": command_id,
+                        "run_id": self.request["run_id"],
+                        "evidence": "q12-joined-fixture",
+                    }
+                )
+            ),
+            "status": "accepted",
+        }
+        if set(result) != RESULT_KEYS:
+            raise AssertionError("internal result projection mismatch")
+        result_path = self.run_root / f"ordinary-command-result-{command_id}-cutover.json"
+        immutable_publish(result_path, complete_object(result), 0o600, self.trace)
+        self.results[f"ordinary:{command_id}:cutover"] = str(result_path)
+        self.move_ordinary_capability(command_id, "claimed", "completed")
+        if command_id == "writers.quiesce":
+            if quiesce_object_sha256 is None:
+                raise LifecycleError("quiesce lifecycle requires the accepted manifest digest")
+            self.append(
+                target_phase,
+                "capability_completed",
+                command_id,
+                command["command_sha256"],
+                "cutover",
+                digest,
+            )
+            self.current_quiesce_manifest_sha256 = self.request["quiesce_manifest_sha256"]
+            return self.append(
+                target_phase,
+                "accepted",
+                command_id,
+                command["command_sha256"],
+                "cutover",
+                digest,
+                accepted_kind="writer_quiesce_manifest",
+                accepted_hash=quiesce_object_sha256,
+            )
+        return self.append(
+            target_phase,
+            "completed",
+            command_id,
+            command["command_sha256"],
+            "cutover",
+            digest,
+        )
+
+    def append_controller_milestone(
+        self,
+        manifest: dict[str, Any],
+        phase: str,
+        witness_command_id: str,
+        values: dict[str, str],
+    ) -> dict[str, Any]:
+        """Amendment section 4 item 6: one Root milestone over a durable witness."""
+        if MILESTONE_WITNESSES.get(phase) != witness_command_id:
+            raise LifecycleError("controller milestone witness mismatch")
+        witness_rows = [
+            entry
+            for entry in self.journal
+            if entry["command_id"] == witness_command_id and entry["outcome"] == "completed"
+        ]
+        if not witness_rows:
+            raise LifecycleError("controller milestone witness lifecycle is absent")
+        command = resolved_command(manifest, witness_command_id, self.request, values)
+        return self.append(
+            phase,
+            "completed",
+            witness_command_id,
+            command["command_sha256"],
+            "cutover",
+            witness_rows[-1]["capability_manifest_sha256"],
+        )
 
     def delegate_claim(self, operation: str, epoch: str) -> dict[str, Any] | None:
         capability_path = pathlib.Path(self.capabilities[f"{operation}:{epoch}"])
