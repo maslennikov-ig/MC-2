@@ -9,6 +9,191 @@ set -e
 #   Blue:  web:3001, api:4001
 #   Green: web:3002, api:4002
 
+# ============================================================================
+# Q12 phase-aware rollback (fail-closed).
+#
+# Activated only when `--q12-run-id` is present; the normal rollback path below
+# is left byte-for-command unchanged. Before the durable database activation
+# receipt, Q12 rollback is safe: it starts no writer and, if commit already
+# moved Nginx to the target color, restores Nginx to the previously serving
+# color. After the activation commit the release is finish-forward only, so any
+# Q12 rollback request fails closed rather than resurrecting the old color.
+# ============================================================================
+if printf '%s\n' "$@" | grep -qx -- '--q12-run-id'; then
+    set -euo pipefail
+
+    Q12_BASE_PATH="${BASE_PATH:-/opt/megacampus}"
+    Q12_NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}"
+    Q12_NGINX_CMD="${Q12_NGINX_CMD:-sudo nginx}"
+    Q12_NGINX_TEE="${Q12_NGINX_TEE:-sudo tee}"
+    Q12_RECEIPT_SCHEMA='megacampus.q12.database-barrier-receipt/v1'
+    Q12_QUIESCE_SCHEMA='megacampus.q12.writer-quiesce/v1'
+    Q12_RECOVERY_SCHEMA='megacampus.q12.deploy-handoff-recovery/v1'
+
+    q12_fail() { echo "ERROR: $*" >&2; exit 1; }
+    q12_require_value() { [ -n "${2:-}" ] || q12_fail "$1 requires a value"; }
+
+    Q12_ENV_ARG=""
+    Q12_PREVIOUS_SHA=""
+    Q12_RUN_ID=""
+    Q12_QUIESCE_MANIFEST=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --q12-run-id) q12_require_value "$1" "${2:-}"; Q12_RUN_ID="$2"; shift 2 ;;
+            --external-quiesce-manifest) q12_require_value "$1" "${2:-}"; Q12_QUIESCE_MANIFEST="$2"; shift 2 ;;
+            --*) q12_fail "unexpected Q12 rollback argument: $1" ;;
+            *)
+                if [ -z "$Q12_ENV_ARG" ]; then
+                    Q12_ENV_ARG="$1"
+                elif [ -z "$Q12_PREVIOUS_SHA" ]; then
+                    Q12_PREVIOUS_SHA="$1"
+                else
+                    q12_fail "unexpected Q12 rollback positional argument: $1"
+                fi
+                shift ;;
+        esac
+    done
+
+    [ -n "$Q12_ENV_ARG" ] || q12_fail "Q12 rollback requires the environment argument"
+    [[ "$Q12_PREVIOUS_SHA" =~ ^[0-9a-f]{40}$ ]] \
+        || q12_fail "Q12 rollback requires the exact 40-character previous release commit"
+    [[ "$Q12_RUN_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] \
+        || q12_fail "run-id must be a canonical lowercase UUID"
+    [[ "$Q12_QUIESCE_MANIFEST" == /* ]] \
+        || q12_fail "external-quiesce-manifest must be an absolute path"
+
+    Q12_RUN_ROOT="$Q12_BASE_PATH/backups/q12/$Q12_RUN_ID"
+    [ -d "$Q12_RUN_ROOT" ] || q12_fail "Q12 run root is missing: $Q12_RUN_ROOT"
+    Q12_EXPECTED_MANIFEST="$Q12_RUN_ROOT/writer-quiesce-$Q12_RUN_ID.json"
+    [ "$Q12_QUIESCE_MANIFEST" = "$Q12_EXPECTED_MANIFEST" ] \
+        || q12_fail "external-quiesce-manifest is not the run's writer-quiesce manifest"
+    [ -f "$Q12_QUIESCE_MANIFEST" ] || q12_fail "external-quiesce-manifest file is missing"
+    python3 - "$Q12_QUIESCE_MANIFEST" "$Q12_RUN_ID" "$Q12_QUIESCE_SCHEMA" <<'PY' \
+        || q12_fail "external-quiesce-manifest is not a bound, quiesced writer-quiesce manifest"
+import json, sys
+path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, "rb") as handle:
+    data = json.loads(handle.read())
+ok = (
+    isinstance(data, dict)
+    and data.get("schema_version") == schema
+    and data.get("run_id") == run_id
+    and data.get("status") == "quiesced"
+)
+sys.exit(0 if ok else 1)
+PY
+
+    Q12_RECEIPT="$Q12_RUN_ROOT/database-barrier-receipt.json"
+    Q12_RECOVERY="$Q12_RUN_ROOT/deploy-handoff-recovery-$Q12_RUN_ID.json"
+
+    q12_activation_committed() {
+        [ -f "$Q12_RECEIPT" ] || return 1
+        python3 - "$Q12_RECEIPT" "$Q12_RUN_ID" "$Q12_RECEIPT_SCHEMA" <<'PY'
+import json, sys
+path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    with open(path, "rb") as handle:
+        data = json.loads(handle.read())
+except Exception:
+    sys.exit(1)
+ok = (
+    isinstance(data, dict)
+    and data.get("schema_version") == schema
+    and data.get("run_id") == run_id
+    and data.get("state") == "activated"
+    and data.get("last_command") == "activate"
+)
+sys.exit(0 if ok else 1)
+PY
+    }
+
+    if q12_activation_committed; then
+        q12_fail "database activation is committed; Q12 rollback is finish-forward only and cannot resurrect the previous color"
+    fi
+
+    # Pre-activation safe rollback. Read the durable handoff recovery state to
+    # decide whether commit already moved Nginx.
+    Q12_STATE=""
+    Q12_PREVIOUS_COLOR=""
+    Q12_NGINX_SWITCHED="false"
+    if [ -f "$Q12_RECOVERY" ]; then
+        read -r Q12_STATE Q12_PREVIOUS_COLOR Q12_NGINX_SWITCHED < <(python3 - "$Q12_RECOVERY" "$Q12_RUN_ID" "$Q12_RECOVERY_SCHEMA" <<'PY'
+import json, sys
+path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, "rb") as handle:
+    data = json.loads(handle.read())
+assert isinstance(data, dict)
+assert data.get("schema_version") == schema
+assert data.get("run_id") == run_id
+print(
+    data.get("state", ""),
+    data.get("previous_active_color", ""),
+    str(data.get("nginx_switched", False)).lower(),
+)
+PY
+)
+    fi
+
+    if [ "$Q12_NGINX_SWITCHED" = "true" ]; then
+        [ -n "$Q12_PREVIOUS_COLOR" ] || q12_fail "handoff recovery is missing the previous active color"
+        case "$Q12_PREVIOUS_COLOR" in
+            blue) Q12_PREVIOUS_WEB_PORT=3001; Q12_PREVIOUS_API_PORT=4001 ;;
+            green) Q12_PREVIOUS_WEB_PORT=3002; Q12_PREVIOUS_API_PORT=4002 ;;
+            *) q12_fail "unknown previous active color: $Q12_PREVIOUS_COLOR" ;;
+        esac
+        echo "Q12 rollback: commit had moved nginx; restoring nginx to $Q12_PREVIOUS_COLOR"
+        template="$Q12_BASE_PATH/nginx.conf.template"
+        [ -f "$template" ] || q12_fail "nginx template not found at $template"
+        sed -e "s/{{WEB_PORT}}/$Q12_PREVIOUS_WEB_PORT/g" \
+            -e "s/{{API_PORT}}/$Q12_PREVIOUS_API_PORT/g" \
+            -e "s/{{COLOR}}/$Q12_PREVIOUS_COLOR/g" \
+            "$template" | $Q12_NGINX_TEE "$Q12_NGINX_CONFIG_PATH" > /dev/null
+        $Q12_NGINX_CMD -t || q12_fail "nginx configuration test failed; Q12 rollback did not move traffic"
+        $Q12_NGINX_CMD -s reload || q12_fail "nginx reload failed; Q12 rollback did not move traffic"
+        echo "$Q12_PREVIOUS_COLOR" > "$Q12_BASE_PATH/active_color"
+    else
+        echo "Q12 rollback: commit had not moved nginx; no traffic change required"
+    fi
+
+    python3 - "$Q12_RECOVERY" "$Q12_RUN_ID" "$Q12_RECOVERY_SCHEMA" "$Q12_PREVIOUS_SHA" <<'PY'
+import json, os, sys, tempfile
+path, run_id, schema, previous_sha = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+existing = {}
+if os.path.exists(path):
+    with open(path, "rb") as handle:
+        existing = json.loads(handle.read())
+document = dict(existing)
+document.update(
+    {
+        "schema_version": schema,
+        "run_id": run_id,
+        "state": "rollback_preparing",
+        "rollback_previous_release_sha": previous_sha,
+    }
+)
+directory = os.path.dirname(path)
+handle = tempfile.NamedTemporaryFile(
+    mode="w", dir=directory, prefix=".deploy-handoff-recovery.", delete=False
+)
+try:
+    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+finally:
+    handle.close()
+os.chmod(handle.name, 0o600)
+os.replace(handle.name, path)
+directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+PY
+    echo "Q12 rollback complete: pre-activation state safe, no writer started"
+    exit 0
+fi
+
 ENV=${1:-production}
 EXPECTED_COMMIT=${2:-}
 BASE_PATH=${BASE_PATH:-/opt/megacampus}

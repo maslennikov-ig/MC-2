@@ -8,6 +8,339 @@ set -e
 #   Blue:  web:3001, api:4001
 #   Green: web:3002, api:4002
 
+# ============================================================================
+# Q12 quiesce-aware blue/green handoff (fail-closed).
+#
+# Activated only by `--q12-mode`; the normal deployment path below is left
+# byte-for-command unchanged. Q12 handoff creates the target containers with
+# `--no-start`, pins them to restart=no, switches Nginx only at commit, and
+# never starts a writer before the durable database activation receipt exists.
+# Final writer resume is left to the supervisor-owned resume path, not this
+# wrapper. This wrapper produces its own durable `deploy-handoff-recovery`
+# evidence and never writes the controller-owned journal, checkpoint, or
+# final-writer manifest.
+# ============================================================================
+if [ "${1:-}" = "--q12-mode" ]; then
+    set -euo pipefail
+
+    Q12_BASE_PATH="${BASE_PATH:-/opt/megacampus}"
+    Q12_ENV="${Q12_ENV:-production}"
+    Q12_NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}"
+    Q12_NGINX_CMD="${Q12_NGINX_CMD:-sudo nginx}"
+    Q12_NGINX_TEE="${Q12_NGINX_TEE:-sudo tee}"
+    Q12_INFRA_COMPOSE="$Q12_BASE_PATH/docker-compose.infra.yml"
+    Q12_APP_COMPOSE="$Q12_BASE_PATH/docker-compose.app.yml"
+    Q12_WORKER_COMPOSE="$Q12_BASE_PATH/docker-compose.production.yml"
+    Q12_RECEIPT_SCHEMA='megacampus.q12.database-barrier-receipt/v1'
+    Q12_QUIESCE_SCHEMA='megacampus.q12.writer-quiesce/v1'
+    Q12_RECOVERY_SCHEMA='megacampus.q12.deploy-handoff-recovery/v1'
+
+    q12_fail() { echo "ERROR: $*" >&2; exit 1; }
+
+    q12_require_value() {
+        [ -n "${2:-}" ] || q12_fail "$1 requires a value"
+    }
+
+    Q12_MODE=""
+    Q12_RUN_ID=""
+    Q12_RELEASE_SHA=""
+    Q12_QUIESCE_MANIFEST=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --q12-mode) q12_require_value "$1" "${2:-}"; Q12_MODE="$2"; shift 2 ;;
+            --run-id) q12_require_value "$1" "${2:-}"; Q12_RUN_ID="$2"; shift 2 ;;
+            --release-sha) q12_require_value "$1" "${2:-}"; Q12_RELEASE_SHA="$2"; shift 2 ;;
+            --external-quiesce-manifest) q12_require_value "$1" "${2:-}"; Q12_QUIESCE_MANIFEST="$2"; shift 2 ;;
+            *) q12_fail "unexpected Q12 handoff argument: $1" ;;
+        esac
+    done
+
+    case "$Q12_MODE" in
+        prepare-quiesced | commit-quiesced | finalize-quiesced) ;;
+        retire-old-observed)
+            q12_fail "retire-old-observed is a supervisor-gated post-observation action and is not handled by the handoff wrapper" ;;
+        *) q12_fail "unknown Q12 handoff mode: $Q12_MODE" ;;
+    esac
+
+    [[ "$Q12_RUN_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] \
+        || q12_fail "run-id must be a canonical lowercase UUID"
+    [[ "$Q12_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+        || q12_fail "release-sha must be 40 lowercase hexadecimal characters"
+    [[ "$Q12_QUIESCE_MANIFEST" == /* ]] \
+        || q12_fail "external-quiesce-manifest must be an absolute path"
+
+    Q12_RUN_ROOT="$Q12_BASE_PATH/backups/q12/$Q12_RUN_ID"
+    [ -d "$Q12_RUN_ROOT" ] || q12_fail "Q12 run root is missing: $Q12_RUN_ROOT"
+
+    Q12_EXPECTED_MANIFEST="$Q12_RUN_ROOT/writer-quiesce-$Q12_RUN_ID.json"
+    [ "$Q12_QUIESCE_MANIFEST" = "$Q12_EXPECTED_MANIFEST" ] \
+        || q12_fail "external-quiesce-manifest is not the run's writer-quiesce manifest"
+    [ -f "$Q12_QUIESCE_MANIFEST" ] || q12_fail "external-quiesce-manifest file is missing"
+    python3 - "$Q12_QUIESCE_MANIFEST" "$Q12_RUN_ID" "$Q12_QUIESCE_SCHEMA" <<'PY' \
+        || q12_fail "external-quiesce-manifest is not a bound, quiesced writer-quiesce manifest"
+import json, sys
+path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, "rb") as handle:
+    data = json.loads(handle.read())
+ok = (
+    isinstance(data, dict)
+    and data.get("schema_version") == schema
+    and data.get("run_id") == run_id
+    and data.get("status") == "quiesced"
+    and isinstance(data.get("writers"), list)
+    and len(data["writers"]) == 10
+)
+sys.exit(0 if ok else 1)
+PY
+
+    Q12_RECEIPT="$Q12_RUN_ROOT/database-barrier-receipt.json"
+    Q12_RECOVERY="$Q12_RUN_ROOT/deploy-handoff-recovery-$Q12_RUN_ID.json"
+
+    q12_activation_committed() {
+        [ -f "$Q12_RECEIPT" ] || return 1
+        python3 - "$Q12_RECEIPT" "$Q12_RUN_ID" "$Q12_RECEIPT_SCHEMA" <<'PY'
+import json, sys
+path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    with open(path, "rb") as handle:
+        data = json.loads(handle.read())
+except Exception:
+    sys.exit(1)
+ok = (
+    isinstance(data, dict)
+    and data.get("schema_version") == schema
+    and data.get("run_id") == run_id
+    and data.get("state") == "activated"
+    and data.get("last_command") == "activate"
+)
+sys.exit(0 if ok else 1)
+PY
+    }
+
+    q12_recovery_state() {
+        [ -f "$Q12_RECOVERY" ] || { echo ""; return 0; }
+        python3 - "$Q12_RECOVERY" "$Q12_RUN_ID" "$Q12_RECOVERY_SCHEMA" <<'PY'
+import json, sys
+path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, "rb") as handle:
+    data = json.loads(handle.read())
+assert isinstance(data, dict)
+assert data.get("schema_version") == schema
+assert data.get("run_id") == run_id
+print(data.get("state", ""))
+PY
+    }
+
+    # Emit a durable, fsynced deploy-handoff-recovery manifest. Extra key/value
+    # pairs are passed as NAME=VALUE positional arguments and stored verbatim.
+    q12_write_recovery() {
+        local state="$1"; shift
+        python3 - "$Q12_RECOVERY" "$Q12_RUN_ID" "$Q12_RELEASE_SHA" \
+            "$Q12_RECOVERY_SCHEMA" "$state" "$@" <<'PY'
+import json, os, sys, tempfile
+path, run_id, release_sha, schema, state = sys.argv[1:6]
+extra = {}
+for pair in sys.argv[6:]:
+    key, _, value = pair.partition("=")
+    extra[key] = value
+existing = {}
+if os.path.exists(path):
+    with open(path, "rb") as handle:
+        existing = json.loads(handle.read())
+document = dict(existing)
+document.update(
+    {
+        "schema_version": schema,
+        "run_id": run_id,
+        "release_sha": release_sha,
+        "state": state,
+    }
+)
+document.update(extra)
+directory = os.path.dirname(path)
+handle = tempfile.NamedTemporaryFile(
+    mode="w", dir=directory, prefix=".deploy-handoff-recovery.", delete=False
+)
+try:
+    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+finally:
+    handle.close()
+os.chmod(handle.name, 0o600)
+os.replace(handle.name, path)
+directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+PY
+    }
+
+    # Record a captured target identity into a JSON-array file used only to
+    # accumulate the recovery manifest's `targets` list before it is published.
+    Q12_TARGETS_FILE="$(mktemp "$Q12_RUN_ROOT/.deploy-handoff-targets.XXXXXX")"
+    trap 'rm -f "$Q12_TARGETS_FILE"' EXIT
+    printf '[]\n' > "$Q12_TARGETS_FILE"
+
+    q12_capture_target() {
+        local class="$1" name="$2"
+        local inspected id image restart_name restart_count
+        inspected="$(docker inspect --format \
+            '{{.Id}} {{.Image}} {{.HostConfig.RestartPolicy.Name}} {{.HostConfig.RestartPolicy.MaximumRetryCount}}' \
+            "$name")" || q12_fail "failed to inspect target container $name"
+        read -r id image restart_name restart_count <<<"$inspected"
+        [ "$restart_name" = "no" ] && [ "$restart_count" = "0" ] \
+            || q12_fail "target $name did not reach restart=no policy"
+        python3 - "$Q12_TARGETS_FILE" "$class" "$name" "$id" "$image" <<'PY'
+import json, sys
+path, cls, name, cid, image = sys.argv[1:6]
+with open(path) as handle:
+    targets = json.load(handle)
+targets.append(
+    {
+        "class": cls,
+        "name": name,
+        "id": cid,
+        "image_id": image,
+        "intended_restart_policy": {"name": "unless-stopped", "maximum_retry_count": 0},
+        "temporary_restart_policy": {"name": "no", "maximum_retry_count": 0},
+    }
+)
+with open(path, "w") as handle:
+    json.dump(targets, handle)
+PY
+    }
+
+    q12_create_no_start_and_pin() {
+        # Create the named target container without starting it, then pin it to
+        # restart=no and verify the pinned policy.
+        local class="$1" name="$2"
+        docker update --restart=no "$name" > /dev/null \
+            || q12_fail "failed to pin $name to restart=no"
+        q12_capture_target "$class" "$name"
+    }
+
+    q12_active_color() {
+        if [ -f "$Q12_BASE_PATH/active_color" ]; then
+            cat "$Q12_BASE_PATH/active_color"
+        else
+            echo "blue"
+        fi
+    }
+
+    Q12_ACTIVE_COLOR="$(q12_active_color)"
+    case "$Q12_ACTIVE_COLOR" in
+        blue) Q12_TARGET_COLOR="green"; Q12_TARGET_WEB_PORT=3002; Q12_TARGET_API_PORT=4002 ;;
+        green) Q12_TARGET_COLOR="blue"; Q12_TARGET_WEB_PORT=3001; Q12_TARGET_API_PORT=4001 ;;
+        *) q12_fail "unknown active color: $Q12_ACTIVE_COLOR" ;;
+    esac
+
+    q12_switch_nginx() {
+        local color="$1" web_port="$2" api_port="$3"
+        local template="$Q12_BASE_PATH/nginx.conf.template"
+        [ -f "$template" ] || q12_fail "nginx template not found at $template"
+        sed -e "s/{{WEB_PORT}}/$web_port/g" \
+            -e "s/{{API_PORT}}/$api_port/g" \
+            -e "s/{{COLOR}}/$color/g" \
+            "$template" | $Q12_NGINX_TEE "$Q12_NGINX_CONFIG_PATH" > /dev/null
+        $Q12_NGINX_CMD -t || q12_fail "nginx configuration test failed; Q12 traffic not moved"
+        $Q12_NGINX_CMD -s reload || q12_fail "nginx reload failed; Q12 traffic not moved"
+    }
+
+    case "$Q12_MODE" in
+        prepare-quiesced)
+            q12_activation_committed \
+                && q12_fail "run is already activated; prepare-quiesced is a pre-activation step"
+            echo "Q12 prepare: creating target $Q12_TARGET_COLOR web/api without starting them"
+            docker compose -f "$Q12_INFRA_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_ENV" \
+                up -d redis qdrant prometheus grafana docling-mcp-internal docling-mcp notebooklm-bridge \
+                || q12_fail "shared infrastructure did not come up"
+            docker compose -f "$Q12_APP_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_TARGET_COLOR" \
+                up --no-start web api \
+                || q12_fail "target web/api were not created"
+            q12_create_no_start_and_pin "production-web" "megacampus-web-$Q12_TARGET_COLOR"
+            q12_create_no_start_and_pin "production-api" "megacampus-api-$Q12_TARGET_COLOR"
+            q12_write_recovery prepared \
+                "target_color=$Q12_TARGET_COLOR" \
+                "previous_active_color=$Q12_ACTIVE_COLOR" \
+                "quiesce_manifest_path=$Q12_QUIESCE_MANIFEST" \
+                "nginx_switched=false" \
+                "targets_file=$Q12_TARGETS_FILE"
+            # Fold the captured targets into the recovery manifest.
+            python3 - "$Q12_RECOVERY" "$Q12_TARGETS_FILE" <<'PY'
+import json, os, sys
+recovery_path, targets_path = sys.argv[1], sys.argv[2]
+with open(recovery_path) as handle:
+    document = json.load(handle)
+with open(targets_path) as handle:
+    document["targets"] = json.load(handle)
+document.pop("targets_file", None)
+fd = os.open(recovery_path, os.O_WRONLY | os.O_TRUNC)
+with os.fdopen(fd, "w") as handle:
+    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+            echo "Q12 prepare complete: target $Q12_TARGET_COLOR web/api created (restart=no), Nginx unchanged"
+            ;;
+        commit-quiesced)
+            q12_activation_committed \
+                && q12_fail "run is already activated; commit-quiesced is a pre-activation step"
+            [ "$(q12_recovery_state)" = "prepared" ] \
+                || q12_fail "commit-quiesced requires a durable prepared handoff recovery state"
+            echo "Q12 commit: moving nginx to $Q12_TARGET_COLOR and creating production workers without starting them"
+            q12_switch_nginx "$Q12_TARGET_COLOR" "$Q12_TARGET_WEB_PORT" "$Q12_TARGET_API_PORT"
+            echo "$Q12_TARGET_COLOR" > "$Q12_BASE_PATH/active_color"
+            docker compose -f "$Q12_WORKER_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_TARGET_COLOR" \
+                up --no-start worker worker-stage6 \
+                || q12_fail "target production workers were not created"
+            docker compose -f "$Q12_INFRA_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_ENV" \
+                up --no-start worker-stage7 \
+                || q12_fail "target worker-stage7 was not created"
+            printf '[]\n' > "$Q12_TARGETS_FILE"
+            q12_create_no_start_and_pin "production-worker" "megacampus-worker"
+            q12_create_no_start_and_pin "production-worker" "megacampus-worker-stage6"
+            q12_create_no_start_and_pin "production-worker" "megacampus-worker-stage7"
+            q12_write_recovery activation_ready \
+                "nginx_switched=true" \
+                "active_color=$Q12_TARGET_COLOR"
+            python3 - "$Q12_RECOVERY" "$Q12_TARGETS_FILE" <<'PY'
+import json, os, sys
+recovery_path, targets_path = sys.argv[1], sys.argv[2]
+with open(recovery_path) as handle:
+    document = json.load(handle)
+with open(targets_path) as handle:
+    workers = json.load(handle)
+document["workers"] = workers
+fd = os.open(recovery_path, os.O_WRONLY | os.O_TRUNC)
+with os.fdopen(fd, "w") as handle:
+    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+            echo "Q12 commit complete: nginx on $Q12_TARGET_COLOR, workers created (restart=no), none started"
+            ;;
+        finalize-quiesced)
+            [ "$(q12_recovery_state)" = "activation_ready" ] \
+                || q12_fail "finalize-quiesced requires a durable activation_ready handoff recovery state"
+            q12_activation_committed \
+                || q12_fail "database activation receipt is absent; refusing to finalize before supervisor activation"
+            # No container is started, no restart policy is restored, and no live
+            # discovery is performed here: writer resume belongs to the
+            # supervisor-owned resume path.
+            q12_write_recovery handoff_ready \
+                "database_activation_receipt=verified"
+            echo "Q12 finalize complete: activation receipt verified, handoff ready, no writer started"
+            ;;
+    esac
+
+    exit 0
+fi
+
 ENV=${1:-production}
 TAG=${2:-}
 BASE_PATH=${BASE_PATH:-/opt/megacampus}
