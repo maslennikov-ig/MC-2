@@ -513,6 +513,7 @@ JOINED_SPEC_KEYS = {
     "frontier",
     "quiesceManifestPath",
     "chains",
+    "partialCaptureTargets",
 }
 
 
@@ -559,6 +560,7 @@ def run_joined_fixture(spec: dict) -> int:
         "chains": spec.get("chains"),
         "completed_prefix_length": spec.get("completedPrefixLength"),
         "frontier": spec.get("frontier"),
+        "partial_capture_target_count": spec.get("partialCaptureTargets"),
     }
     try:
         output = CORE.run_joined_composer(request, executor)

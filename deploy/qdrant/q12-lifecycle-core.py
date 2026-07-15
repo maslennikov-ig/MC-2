@@ -2898,6 +2898,22 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
                 raise LifecycleError("frontier is not the exact next operation")
     elif frontier is not None or prefix is not None:
         raise LifecycleError("forward profile accepts no prefix or frontier")
+    # Amendment section 6 item 4: the sanctioned partial-durable-capture
+    # crash-state profile is the only lever that widens rollback held beyond
+    # the {0, 5} closed profiles, and only inside this exact validity window.
+    partial_capture = request.get("partial_capture_target_count")
+    if partial_capture is not None and (
+        profile != "rollback"
+        or prefix != 4
+        or frontier is not None
+        or isinstance(partial_capture, bool)
+        or not isinstance(partial_capture, int)
+        or not 1 <= partial_capture <= 4
+    ):
+        raise LifecycleError(
+            "partial capture requires rollback prefix 4 without a frontier"
+            " and a target count in 1..4"
+        )
     values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
     engine = Engine(request, executor)
     if engine.journal:
@@ -2931,7 +2947,9 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
             quiesce_object_sha256=request["quiesce_manifest_sha256"],
         )
     )
-    include_targets = profile == "forward" or activation_frontier
+    include_targets = (
+        profile == "forward" or activation_frontier or partial_capture is not None
+    )
     inventory = engine.derive_root_writer_inventory(
         quiesce_bytes, include_targets=include_targets
     )
@@ -2942,13 +2960,16 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
         record(ordinary("pg.restore"))
         ordinary("migration.base.apply")
 
-    def forward_tail_through_activation_ready() -> None:
+    def forward_tail_through_deploy_prepare() -> None:
         record(ordinary("source.forward"))
         ordinary("reindex.plan")
         ordinary("reindex.worker.create")
         record(ordinary("reindex.execute"))
         record(ordinary("reindex.verify"))
         ordinary("deploy.prepare", resource_step_before_completion=targets_step)
+
+    def forward_tail_through_activation_ready() -> None:
+        forward_tail_through_deploy_prepare()
         record(
             engine.publish_final_writer_manifest(
                 "forward",
@@ -2999,6 +3020,12 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
                 frontier, manifest, from_current_head=True
             )
         else:
+            if partial_capture is not None:
+                # Section 6 item 4: the run reached deploy.prepare, whose
+                # durable one-at-a-time capture created exactly this
+                # creation-order target prefix before the interruption.
+                forward_tail_through_deploy_prepare()
+                inventory["targets"] = inventory["targets"][:partial_capture]
             record(
                 engine.publish_final_writer_manifest(
                     "rollback",

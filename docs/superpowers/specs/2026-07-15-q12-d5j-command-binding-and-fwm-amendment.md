@@ -357,6 +357,33 @@ The final-writer-manifest contract is corrected as follows:
      accepted rule that a held writer may not be resumable.
      The caller can supply or override none of these bytes; a request carrying
      any writer identity, policy, or inventory field fails before producer state.
+4. **Sanctioned partial-durable-capture rollback profile (test-only).** The
+   closed profiles of item 3 keep rollback held frozen to `{0, 5}`. One
+   additional Root-owned closed profile is sanctioned solely to exercise the
+   accepted W held-prefix contract (rollback `held_writers` may be any
+   creation-order prefix of the five targets; the accepted W controller
+   validates `len(held_writers) <= 5` and
+   `target_topology == expected_target_topology[:len(target_topology)]`):
+   profile `rollback`, `completed_prefix_length = 4`, no frontier, plus
+   `partial_capture_target_count = k` with `k` in `1..4` (runner spec key
+   `partialCaptureTargets`). Its composition is the prefix-4 rollback base
+   followed by the forward tail through the completed `deploy.prepare`
+   lifecycle (including the frozen `targets` resource-manifest step) —
+   publishing no forward manifest and no `deploy.commit` — and then the
+   rollback final-writer manifest whose `held_writers` are exactly the first
+   `k` targets of item 3's creation order, identity-identical to the forward
+   derivation and projected to the held never-resumable intent. The modeled
+   production state is a cutover interrupted during `deploy.prepare`'s durable
+   one-at-a-time target creation after `k` creations (the lifecycle addendum's
+   durable-capture prefix rule). Deliberate, documented simplification: the
+   fixture emits the complete `deploy.prepare` row group rather than an
+   abandoned mid-lifecycle row set, because section 5 acceptance and the W
+   held contract bind only the manifest contents and the two resource-step
+   anchors; incomplete ordinary lifecycles would add reload semantics without
+   adding W-contract coverage. The caller still supplies no writer bytes —
+   only the count. Item 3's `{0, 5}` narrowing is otherwise unchanged; `k`
+   outside `1..4`, a forward profile, a prefix below 4, or a coexisting
+   frontier fails before producer state.
 
 ## 7. Authorized production-core and grammar deltas
 
@@ -387,6 +414,11 @@ existing D5J write zone:
    D5J already authorizes, now able to emit the ordinary groups above through
    the same production serializer, capability, object, and checkpoint
    primitives.
+7. The section 6 item 4 partial-durable-capture lever: the composer request
+   key `partial_capture_target_count` with its closed validity rule, the
+   test-runner spec key `partialCaptureTargets`, and the matching optional
+   field of the TypeScript fixture contract. The lever truncates only the
+   already-derived target list; inventory derivation itself stays frozen.
 
 No deployed wrapper, CLI parser, child interface, or W-owned file gains any
 change or flag. No command beyond section 2 and no phase, outcome literal, or
@@ -410,7 +442,8 @@ validation fail before returning or accepting a positive for any of:
   a second `intent` for an already-open FWM phase;
 - an FWM published at the wrong mode path, both modes at one path, a forward
   object in a prefix 1-4 rollback, a rollback held set that is not exactly the
-  frozen cardinality, or any writer entry not derived per section 6;
+  frozen cardinality of its profile (section 6 item 3's `{0, 5}`, or item 4's
+  exact `k`-prefix), or any writer entry not derived per section 6;
 - a manifest whose key set/order/env/hash deviates from section 2.
 
 ## 9. TDD deltas for `.13.21`
@@ -435,7 +468,12 @@ stays:
 6. the genesis row is the `operator.self-check` intent and a journal beginning
    with any other row fails;
 7. a controller milestone without its witness lifecycle fails;
-8. manifest set/order/env mutations fail `load_manifest()`.
+8. manifest set/order/env mutations fail `load_manifest()`;
+9. the partial-capture profile composes a section 5-valid journal whose
+   rollback manifest holds exactly the creation-order `k`-prefix of targets
+   with the never-resumable projection and exactly one FWM acceptance, while
+   `partial_capture_target_count` outside `1..4`, on a forward profile, on a
+   prefix below 4, or with a coexisting frontier fails before producer state.
 
 ## 10. What remains Task 9
 
