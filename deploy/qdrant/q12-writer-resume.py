@@ -2297,49 +2297,245 @@ require_published_object(
     authority["lease_epoch"],
 )
 
-common_phase_graph = [
-    "preflight",
-    "maintenance_guarded",
-    "quiesced",
-    "snapshot_exported",
-    "backup_committed",
-    "restore_verified",
-    "base_migration_guarded",
-    "observability_migration_guarded",
-    "migrations_applied",
-    "recovery_ready_guarded",
-    "source_recovered",
-    "reindex_started",
-    "qdrant_verified",
-]
-expected_phase_graph = [
-    (phase, "completed", "none", None) for phase in common_phase_graph
-]
+# Amendment sections 4-6 (D5J command-binding-and-FWM amendment,
+# SHA-256 425dcc4578147c48f84e466309b430e3f7f0b352aedfc4e71a68271178d5f936):
+# the closed ordinary-row grammar for the real Root joined prefix. Transcribed
+# from the frozen tables; the deployed core q12-lifecycle-core.py validates the
+# same literals in validate_journal_entry_grammar / validate_stable_binding_walk.
+# This is the MIGRATION acceptance path: it is selected only for a genuine Root
+# prefix (genesis operator.self-check row) and coexists with the fabricated
+# common_phase_graph path until the final tightening increment flips the
+# discriminator to reject the fabricated prefix outright.
+JOINED_ORDINARY_GRAMMAR = {
+    "operator.self-check": ("preflight", "preflight"),
+    "pg.backup": ("snapshot_exported", "backup_committed"),
+    "pg.restore": ("restore_verified", "restore_verified"),
+    "migration.base.apply": ("restore_verified", "restore_verified"),
+    "migration.observability.apply": ("base_migration_guarded", "base_migration_guarded"),
+    "source.forward": ("source_recovered", "source_recovered"),
+    "reindex.plan": ("reindex_started", "reindex_started"),
+    "reindex.worker.create": ("reindex_started", "reindex_started"),
+    "reindex.execute": ("reindex_started", "reindex_started"),
+    "reindex.verify": ("qdrant_verified", "qdrant_verified"),
+    "deploy.prepare": ("qdrant_verified", "qdrant_verified"),
+    "deploy.commit": ("activation_ready", "activation_ready"),
+}
+JOINED_MILESTONE_WITNESSES = {"migrations_applied": "migration.observability.apply"}
+JOINED_FWM_ROW_PHASES = {
+    "writers.resume.forward": "prepared_quiesced",
+    "writers.resume.rollback": "rollback_preparing",
+}
+JOINED_BARRIER_TARGET_PHASES = {
+    "barrier.install": "maintenance_guarded",
+    "barrier.verify-after-base": "base_migration_guarded",
+    "barrier.verify-after-observability": "observability_migration_guarded",
+    "barrier.prepare-recovery": "recovery_ready_guarded",
+    "barrier.activate": "activated",
+}
+JOINED_BARRIER_SELECTOR_PHASES = {
+    **JOINED_BARRIER_TARGET_PHASES,
+    "barrier.activate": "activation_committing",
+}
+
+def validate_joined_prefix(prefix, quiesce_digest):
+    require(prefix, "joined prefix is empty")
+    genesis = prefix[0]
+    require(
+        genesis["command_id"] == "operator.self-check"
+        and genesis["phase"] == "preflight"
+        and genesis["outcome"] == "intent"
+        and genesis["seq"] == 1,
+        "joined prefix genesis row is invalid",
+    )
+    switched = False
+    previous_resource = None
+    final_manifest_acceptances = 0
+    for entry in prefix:
+        command_id = entry["command_id"]
+        outcome = entry["outcome"]
+        phase = entry["phase"]
+        accepted_kind = entry["accepted_object_kind"]
+        command_sha256 = entry["command_sha256"]
+        require(command_id != "root.advance", "joined prefix rejects root.advance")
+        # Amendment section 8: no zero or 9*64 sentinel command hash in a joined positive.
+        require(
+            command_sha256 not in ("0" * 64, "9" * 64),
+            "joined prefix rejects a sentinel command hash",
+        )
+        if command_id in JOINED_FWM_ROW_PHASES:
+            valid = phase == JOINED_FWM_ROW_PHASES[command_id] and (
+                (outcome == "intent" and accepted_kind == "none")
+                or (outcome == "accepted" and accepted_kind == "final_writer_manifest")
+            )
+            if outcome == "accepted":
+                final_manifest_acceptances += 1
+        elif command_id == "writers.quiesce":
+            valid = phase == "quiesced"
+            if valid and outcome in ("intent", "capability_issued", "capability_claimed", "capability_completed"):
+                valid = accepted_kind == "none"
+            elif valid and outcome == "accepted":
+                valid = accepted_kind == "writer_quiesce_manifest"
+            else:
+                valid = False
+        elif command_id in JOINED_ORDINARY_GRAMMAR:
+            selector_phase, target_phase = JOINED_ORDINARY_GRAMMAR[command_id]
+            valid = accepted_kind == "none"
+            if valid and outcome == "intent":
+                valid = phase == selector_phase
+            elif valid and outcome in ("capability_issued", "capability_claimed"):
+                valid = phase == target_phase
+            elif valid and outcome == "completed":
+                valid = phase == target_phase or JOINED_MILESTONE_WITNESSES.get(phase) == command_id
+            else:
+                valid = False
+        elif command_id in JOINED_BARRIER_TARGET_PHASES:
+            valid = accepted_kind == "none"
+            if valid and outcome == "intent":
+                valid = phase == JOINED_BARRIER_SELECTOR_PHASES[command_id]
+            elif valid and outcome in ("capability_issued", "recovery_reacquired", "capability_claimed", "completed"):
+                valid = phase == JOINED_BARRIER_TARGET_PHASES[command_id]
+            else:
+                valid = False
+        else:
+            valid = False
+        require(valid, "joined prefix outcome/phase/command grammar mismatch")
+        # Amendment section 4 item 8: two-segment quiesce binding with the
+        # request-value fallback before the sole accepted switch.
+        if command_id == "writers.quiesce" and outcome == "accepted":
+            switched = True
+        quiesce_value = entry["quiesce_manifest_sha256"]
+        if switched:
+            require(quiesce_value == quiesce_digest, "joined prefix quiesce binding mismatch")
+        else:
+            require(
+                quiesce_value in ("0" * 64, quiesce_digest),
+                "joined prefix quiesce binding mismatch",
+            )
+        # Amendment section 4 item 8: resource manifest steps only at the two
+        # frozen evidence rows (pg.backup selector intent, deploy.prepare completion).
+        resource_value = entry["resource_manifest_sha256"]
+        if previous_resource is not None and resource_value != previous_resource:
+            stepping = (command_id == "pg.backup" and outcome == "intent") or (
+                command_id == "deploy.prepare" and outcome == "completed"
+            )
+            require(stepping, "joined prefix resource-manifest step is invalid")
+        previous_resource = resource_value
+    require(
+        final_manifest_acceptances == 1,
+        "joined prefix must publish exactly one final writer manifest",
+    )
+    # Amendment section 4 item 6 / section 5 group 9: the migrations_applied
+    # milestone requires its durable witness lifecycle earlier in the same run.
+    for entry in prefix:
+        if entry["phase"] == "migrations_applied":
+            require(
+                entry["outcome"] == "completed"
+                and entry["command_id"] == "migration.observability.apply",
+                "joined prefix milestone binding is invalid",
+            )
+            require(
+                any(
+                    row["command_id"] == "migration.observability.apply"
+                    and row["outcome"] == "completed"
+                    and row["phase"] == "base_migration_guarded"
+                    for row in prefix
+                ),
+                "joined prefix milestone witness lifecycle is missing",
+            )
+
+genesis_joined_prefix = (
+    bool(journal_lines)
+    and journal_lines[0]["command_id"] == "operator.self-check"
+    and journal_lines[0]["phase"] == "preflight"
+    and journal_lines[0]["outcome"] == "intent"
+    and journal_lines[0]["seq"] == 1
+)
 final_phase = "prepared_quiesced" if mode == "forward" else "rollback_preparing"
-expected_phase_graph.extend([
-    (final_phase, "intent", "none", None),
-    (final_phase, "accepted", "final_writer_manifest", final_file.digest),
-])
-if mode == "forward":
-    expected_phase_graph.extend([
-        ("activation_ready", "completed", "none", None),
-        ("activation_committing", "completed", "none", None),
-        ("activated", "completed", "none", None),
-        ("handoff_ready_writers_quiesced", "intent", "none", None),
+if genesis_joined_prefix:
+    suffix_phase = (
+        "handoff_ready_writers_quiesced"
+        if mode == "forward"
+        else "rollback_ready_writers_quiesced"
+    )
+    joined_suffix_start = next(
         (
-            "handoff_ready_writers_quiesced",
-            "accepted",
-            "writer_handoff_state",
-            handoff_file.digest,
+            index
+            for index, entry in enumerate(journal_lines)
+            if entry["phase"] == suffix_phase
         ),
-    ])
+        None,
+    )
+    require(joined_suffix_start is not None, "joined prefix has no writer state suffix")
+    validate_joined_prefix(journal_lines[:joined_suffix_start], quiesce_file.digest)
+    expected_phase_graph = [
+        (
+            entry["phase"],
+            entry["outcome"],
+            entry["accepted_object_kind"],
+            entry["accepted_object_sha256"],
+        )
+        for entry in journal_lines[:joined_suffix_start]
+    ]
+    if mode == "forward":
+        expected_phase_graph.extend([
+            ("handoff_ready_writers_quiesced", "intent", "none", None),
+            (
+                "handoff_ready_writers_quiesced",
+                "accepted",
+                "writer_handoff_state",
+                handoff_file.digest,
+            ),
+        ])
+    else:
+        required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
+        expected_phase_graph.extend([
+            (phase, "completed", "none", None)
+            for phase in ROLLBACK_CONDITIONAL_PHASES
+            if phase in required_phase_set
+        ])
 else:
-    required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
+    common_phase_graph = [
+        "preflight",
+        "maintenance_guarded",
+        "quiesced",
+        "snapshot_exported",
+        "backup_committed",
+        "restore_verified",
+        "base_migration_guarded",
+        "observability_migration_guarded",
+        "migrations_applied",
+        "recovery_ready_guarded",
+        "source_recovered",
+        "reindex_started",
+        "qdrant_verified",
+    ]
+    expected_phase_graph = [
+        (phase, "completed", "none", None) for phase in common_phase_graph
+    ]
     expected_phase_graph.extend([
-        (phase, "completed", "none", None)
-        for phase in ROLLBACK_CONDITIONAL_PHASES
-        if phase in required_phase_set
+        (final_phase, "intent", "none", None),
+        (final_phase, "accepted", "final_writer_manifest", final_file.digest),
     ])
+    if mode == "forward":
+        expected_phase_graph.extend([
+            ("activation_ready", "completed", "none", None),
+            ("activation_committing", "completed", "none", None),
+            ("activated", "completed", "none", None),
+            ("handoff_ready_writers_quiesced", "intent", "none", None),
+            (
+                "handoff_ready_writers_quiesced",
+                "accepted",
+                "writer_handoff_state",
+                handoff_file.digest,
+            ),
+        ])
+    else:
+        required_phase_set = {entry["phase"] for entry in rollback["required_phase_receipts"]}
+        expected_phase_graph.extend([
+            (phase, "completed", "none", None)
+            for phase in ROLLBACK_CONDITIONAL_PHASES
+            if phase in required_phase_set
+        ])
 expected_phase_graph.extend([
     (
         entry["phase"], entry["outcome"],
