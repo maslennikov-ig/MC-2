@@ -139,6 +139,13 @@ was committed together with Task 7 (`47c7c897`) rather than as a separate
 minimum-necessary updates but ultimately needed no modification (the
 grammar/segment probes moved to the new seam test file before commit).
 
+Traceability note (correctness review P3-2): the reload capability-context
+validation delta (walk-validated value domain for barrier capabilities,
+issuance-row binding for ordinary capabilities) is the necessary companion of
+the amendment §7 item 4 stable-binding delta — capabilities carry the same two
+segment-bound fields as journal rows — and was independently verified to
+accept nothing the prior request-global rule rejected in isolated runs.
+
 Strengthening updates to existing pins, each deliberate: the
 `writers.resume.rollback` rows now carry the real resolved manifest hash (was
 ZERO); the rollback FWM reduction moved to the mode-bound

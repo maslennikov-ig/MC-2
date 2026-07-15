@@ -492,6 +492,8 @@ describe('Serializer primitives for joined composition', () => {
       'manifest = core.load_manifest()',
       "values = core.derive_joined_fixture_values(run_id, root + '/w.json')",
       'rows = lambda: [(entry["phase"], entry["outcome"], entry["command_id"], entry["quiesce_manifest_sha256"]) for entry in engine.journal]',
+      'import atexit, shutil',
+      'atexit.register(shutil.rmtree, root, ignore_errors=True)',
     ].join('\n');
   }
 
@@ -660,6 +662,8 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
       "    'writers': writers,",
       '}',
       'quiesce_bytes = core.complete_object(quiesce)',
+      'import atexit, shutil',
+      'atexit.register(shutil.rmtree, root, ignore_errors=True)',
       "request = {'run_root': root, 'run_id': run_id, 'release_sha': '0123456789abcdef0123456789abcdef01234567', 'operator_digest': '1' * 64, 'resource_manifest_sha256': '2' * 64, 'quiesce_manifest_sha256': core.sha256(quiesce_bytes), 'expected_catalog_sha256': 'a' * 64, 'rotation_required': False}",
       'engine = core.Engine(request, object())',
       'manifest = core.load_manifest()',
@@ -1272,6 +1276,8 @@ describe('Closure coverage', () => {
       "sys.modules['q12core'] = core",
       'spec.loader.exec_module(core)',
       "root = tempfile.mkdtemp(prefix='mc2-q12-d5-root-', dir='/tmp')",
+      'import atexit, shutil',
+      'atexit.register(shutil.rmtree, root, ignore_errors=True)',
       'manifest = json.loads(core.MANIFEST_PATH.read_text())',
       "del manifest['commands']['pg.backup']",
       "tampered = pathlib.Path(root, 'tampered-manifest.json')",
