@@ -1,8 +1,313 @@
+import { constants as fsConstants } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { lstat, open, readFile, readdir, realpath } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Client } from 'pg';
+import { Client, type ClientConfig } from 'pg';
+
+// ---------------------------------------------------------------------------
+// Q12 file-only migration credential contract (design section 8).
+//
+// In Q12 live mode the CLIs never accept an environment or argv URL. They read
+// the database URI, CA, and run-bound database barrier capability only from
+// owner-checked, non-symlink regular files, build a field-by-field pg
+// ClientConfig with the pinned CA and a fixed read-write startup opt-out, and
+// bind the barrier capability with `set_config(..., false)` on the same client
+// before any migration statement. Secrets stay in process memory: they never
+// reach argv, environment, errors, telemetry, logs, or artifacts.
+// ---------------------------------------------------------------------------
+
+export const Q12_MIGRATION_ENDPOINT = {
+  protocol: 'postgresql:',
+  user: 'postgres.diqooqbuchsliypgwksu',
+  host: 'aws-1-us-east-2.pooler.supabase.com',
+  port: 5432,
+  database: 'postgres',
+} as const;
+
+export const Q12_MIGRATION_CA_SHA256 =
+  '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7';
+
+export const Q12_MIGRATION_STARTUP_OPTIONS = '-c default_transaction_read_only=off';
+
+export const Q12_MIGRATION_SET_CAPABILITY_SQL =
+  "SELECT set_config('megacampus.q12_capability', $1, false)";
+
+export interface Q12MigrationCredentialPaths {
+  dbUrlFile: string;
+  caFile: string;
+  capabilityFile: string;
+}
+
+export interface Q12MigrationCredentials {
+  clientConfig: ClientConfig;
+  capability: string;
+}
+
+// Test-only affordances. Production CLI callers never pass these: the trust
+// boundary defaults to the filesystem root and the CA hash to the pinned
+// production anchor. Tests set a private 0700 boundary so files created under a
+// world-writable temp ancestor are still validatable, and pin a synthetic CA.
+export interface Q12MigrationCredentialTestOverrides {
+  trustBoundary?: string;
+  expectedCaSha256?: string;
+  afterOpen?: (label: string) => void | Promise<void>;
+}
+
+export function assertNoQ12UrlEnvironmentOrArgument(
+  env: NodeJS.ProcessEnv,
+  args: readonly string[]
+): void {
+  if (env.SUPABASE_DB_URL !== undefined && env.SUPABASE_DB_URL !== '') {
+    throw new Error('Q12 live migration mode rejects the SUPABASE_DB_URL environment variable');
+  }
+  const urlFlags = new Set(['--db-url', '--url', '--database-url', '--connection-string']);
+  for (const arg of args) {
+    if (arg.includes('://') || urlFlags.has(arg)) {
+      throw new Error('Q12 live migration mode rejects any database URI argument');
+    }
+  }
+}
+
+type FileIdentity = string;
+
+function identityOf(stats: {
+  dev: number;
+  ino: number;
+  uid: number;
+  gid: number;
+  mode: number;
+  size: number;
+}): FileIdentity {
+  return [stats.dev, stats.ino, stats.uid, stats.gid, stats.mode & 0o777, stats.size].join(':');
+}
+
+function assertAbsoluteControlFree(label: string, path: string): void {
+  if (!path.startsWith('/') || path.includes('\n') || path.includes('\r')) {
+    throw new Error(`${label} must be an absolute control-free path`);
+  }
+}
+
+async function assertSafeParentChain(label: string, path: string, boundary: string): Promise<void> {
+  let current = dirname(path);
+  for (;;) {
+    let stats;
+    let canonical;
+    try {
+      stats = await lstat(current);
+      canonical = await realpath(current);
+    } catch {
+      throw new Error(`${label} parent chain must contain only canonical non-symlink directories`);
+    }
+    if (!stats.isDirectory() || stats.isSymbolicLink() || canonical !== current) {
+      throw new Error(`${label} parent chain must contain only canonical non-symlink directories`);
+    }
+    if (stats.uid !== 0 && stats.uid !== process.getuid?.()) {
+      throw new Error(`${label} parent has an unexpected owner`);
+    }
+    if ((stats.mode & 0o022) !== 0) {
+      throw new Error(`${label} parent must not be group/world writable`);
+    }
+    if (current === boundary) return;
+    const parent = dirname(current);
+    if (parent === current) {
+      throw new Error(`${label} is outside the trusted boundary`);
+    }
+    current = parent;
+  }
+}
+
+async function readOwnerCheckedFile(
+  label: string,
+  path: string,
+  allowedModes: readonly number[],
+  boundary: string,
+  afterOpen?: (label: string) => void | Promise<void>
+): Promise<Buffer> {
+  assertAbsoluteControlFree(label, path);
+  await assertSafeParentChain(label, path, boundary);
+  let before;
+  let canonical;
+  try {
+    before = await lstat(path);
+    canonical = await realpath(path);
+  } catch {
+    throw new Error(`${label} must be a canonical non-symlink regular file`);
+  }
+  if (before.isSymbolicLink() || !before.isFile() || canonical !== path) {
+    throw new Error(`${label} must be a canonical non-symlink regular file`);
+  }
+  let handle;
+  try {
+    handle = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch {
+    throw new Error(`${label} must be a canonical non-symlink regular file`);
+  }
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || identityOf(opened) !== identityOf(before)) {
+      throw new Error(`${label} identity changed while opening`);
+    }
+    if (opened.uid !== process.getuid?.() || opened.gid !== process.getgid?.()) {
+      throw new Error(`${label} must be owned by the current UID:GID`);
+    }
+    if (!allowedModes.includes(opened.mode & 0o777)) {
+      throw new Error(`${label} has an unsafe mode`);
+    }
+    const content = await handle.readFile();
+    if (afterOpen) await afterOpen(label);
+    let after;
+    try {
+      after = await lstat(path);
+    } catch {
+      throw new Error(`${label} identity changed after open`);
+    }
+    if (after.isSymbolicLink() || identityOf(after) !== identityOf(opened)) {
+      throw new Error(`${label} identity changed after open`);
+    }
+    return content;
+  } finally {
+    await handle.close();
+  }
+}
+
+function requireSingleLineValue(label: string, content: Buffer): string {
+  const raw = content.toString('utf8');
+  const value = raw.endsWith('\n') ? raw.slice(0, -1) : raw;
+  if (value.length === 0) {
+    throw new Error(`${label} must contain exactly one nonempty value`);
+  }
+  if (value.includes('\n') || value.includes('\r')) {
+    throw new Error(`${label} must contain exactly one single-line value`);
+  }
+  return value;
+}
+
+function parseQ12MigrationUri(uri: string): {
+  user: string;
+  password: string;
+  host: string;
+  port: number;
+  database: string;
+} {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    throw new Error('Q12 migration database URI is malformed');
+  }
+  if (url.protocol !== Q12_MIGRATION_ENDPOINT.protocol) {
+    throw new Error('Q12 migration database URI protocol is not accepted');
+  }
+  if (url.hostname !== Q12_MIGRATION_ENDPOINT.host) {
+    throw new Error('Q12 migration database URI host is not accepted');
+  }
+  if (url.port !== String(Q12_MIGRATION_ENDPOINT.port)) {
+    throw new Error('Q12 migration database URI port is not accepted');
+  }
+  if (url.pathname !== `/${Q12_MIGRATION_ENDPOINT.database}`) {
+    throw new Error('Q12 migration database URI database is not accepted');
+  }
+  if (decodeURIComponent(url.username) !== Q12_MIGRATION_ENDPOINT.user) {
+    throw new Error('Q12 migration database URI user is not accepted');
+  }
+  if (url.search !== '' || url.searchParams.size !== 0) {
+    throw new Error('Q12 migration database URI must have zero query parameters');
+  }
+  if (url.hash !== '') {
+    throw new Error('Q12 migration database URI must have no fragment');
+  }
+  const password = decodeURIComponent(url.password);
+  if (password.length === 0) {
+    throw new Error('Q12 migration database URI password is required');
+  }
+  return {
+    user: Q12_MIGRATION_ENDPOINT.user,
+    password,
+    host: Q12_MIGRATION_ENDPOINT.host,
+    port: Q12_MIGRATION_ENDPOINT.port,
+    database: Q12_MIGRATION_ENDPOINT.database,
+  };
+}
+
+export async function loadQ12MigrationCredentials(
+  paths: Q12MigrationCredentialPaths,
+  overrides: Q12MigrationCredentialTestOverrides = {}
+): Promise<Q12MigrationCredentials> {
+  const boundary = overrides.trustBoundary ?? '/';
+  const expectedCaSha256 = overrides.expectedCaSha256 ?? Q12_MIGRATION_CA_SHA256;
+  const urlContent = await readOwnerCheckedFile(
+    'database URL file',
+    paths.dbUrlFile,
+    [0o400, 0o600],
+    boundary,
+    overrides.afterOpen
+  );
+  const caContent = await readOwnerCheckedFile(
+    'CA file',
+    paths.caFile,
+    [0o644],
+    boundary,
+    overrides.afterOpen
+  );
+  const capabilityContent = await readOwnerCheckedFile(
+    'database capability file',
+    paths.capabilityFile,
+    [0o400],
+    boundary,
+    overrides.afterOpen
+  );
+
+  const fields = parseQ12MigrationUri(requireSingleLineValue('database URL file', urlContent));
+  if (createHash('sha256').update(caContent).digest('hex') !== expectedCaSha256) {
+    throw new Error('Q12 migration CA SHA-256 does not match the pinned trust anchor');
+  }
+  const capability = requireSingleLineValue('database capability file', capabilityContent);
+
+  const clientConfig: ClientConfig = {
+    host: fields.host,
+    port: fields.port,
+    database: fields.database,
+    user: fields.user,
+    password: fields.password,
+    ssl: {
+      ca: caContent,
+      rejectUnauthorized: true,
+      servername: fields.host,
+    },
+    options: Q12_MIGRATION_STARTUP_OPTIONS,
+  };
+  return { clientConfig, capability };
+}
+
+export async function bindQ12MigrationSession(client: Client, capability: string): Promise<void> {
+  const proof = await client.query<{
+    session_user: string;
+    current_database: string;
+    server_major: number;
+    transaction_read_only: string;
+  }>(
+    `SELECT session_user AS session_user,
+            current_database() AS current_database,
+            (current_setting('server_version_num')::int / 10000) AS server_major,
+            current_setting('transaction_read_only') AS transaction_read_only`
+  );
+  const row = proof.rows[0];
+  if (!row || row.session_user !== 'postgres') {
+    throw new Error('Q12 migration session must authenticate directly as postgres');
+  }
+  if (row.current_database !== 'postgres') {
+    throw new Error('Q12 migration session must target the postgres database');
+  }
+  if (Number(row.server_major) !== 17) {
+    throw new Error('Q12 migration session server identity is not accepted');
+  }
+  if (row.transaction_read_only !== 'off') {
+    throw new Error('Q12 migration session must start read-write');
+  }
+  await client.query(Q12_MIGRATION_SET_CAPABILITY_SQL, [capability]);
+}
 
 type Direction = 'apply' | 'rollback';
 type RemoteGate = { allowRemote?: boolean; confirmation?: string };
