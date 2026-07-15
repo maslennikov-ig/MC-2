@@ -79,7 +79,16 @@ const orderBytes = JSON.stringify({ schema_version: 'megacampus.q12.activation-l
 const catalogBytes = JSON.stringify({ schema_version: 'megacampus.q12.activation-lock-catalog/v1', lock_mode: 'ACCESS EXCLUSIVE', relations: catalogSet }, null, 2) + '\n';
 const schemaBytes = JSON.stringify({ schema_version: 'megacampus.q12.managed-session-inventory/v1', top_level_keys: ['schema_version', 'project_ref', 'database', 'source_decision_sha256', 'provider_plane_trusted', 'identities'], fixed_scalars: { project_ref: 'diqooqbuchsliypgwksu', database: 'postgres', source_decision_sha256: D3_SOURCE_DECISION_SHA256, provider_plane_trusted: true }, identity_item_keys: ['role', 'database', 'backend_type', 'application_identity', 'client_class', 'allowed_states', 'transaction_free_required'], identity_sort: 'byte-ascending by the first five identity fields' }, null, 2) + '\n';
 
-process.stdout.write(`run_id/catalog-embedded in SQL? run_id=${sql.includes(RUN_ID)} catalog_sha=${sql.includes(catalogSha)} (both false => barrier-byte deterministic)\n`);
+// Emit the tracked assets (idempotent): catalog-bound ones carry an explicit
+// .test-reference suffix so they cannot be mistaken for production; the schema
+// asset is catalog-independent and gets a normal name.
+const { writeFileSync: writeAsset } = require('fs');
+const assetsDir = resolve(REPO, 'deploy/qdrant');
+writeAsset(join(assetsDir, 'q12-activation-lock-order.test-reference.json'), orderBytes);
+writeAsset(join(assetsDir, 'q12-activation-lock-catalog.test-reference.json'), catalogBytes);
+writeAsset(join(assetsDir, 'q12-managed-session-inventory-schema.json'), schemaBytes);
+
+process.stdout.write(`run_id/catalog-embedded in SQL? run_id=${sql.includes(RUN_ID)} catalog_sha=${sql.includes(catalogSha)} (both false => barrier-byte deterministic; re-freeze is pure catalog substitution)\n`);
 process.stdout.write(`5 activation_sql_projection_sha256   = ${sha(sql)}  (${Buffer.byteLength(sql)} bytes, TEST-CATALOG-bound)\n`);
 process.stdout.write(`6 activation_normal_slice_sha256     = ${sha(normal)}  (${Buffer.byteLength(normal)} bytes, TEST-CATALOG-bound)\n`);
 process.stdout.write(`7 activation_recovery_slice_sha256   = ${sha(recovery)}  (${Buffer.byteLength(recovery)} bytes, catalog-INDEPENDENT)\n`);

@@ -204,7 +204,13 @@ function generateActivateNormalSlice(): string {
   );
   writeFileSync(ca, 'synthetic-ca\n', { mode: 0o644 });
   writeFileSync(capability, 'q12-capability-synthetic-sentinel\n', { mode: 0o400 });
-  const catalogBody = `${JSON.stringify(expectedCatalog(), null, 2)}\n`;
+  // Catalog-parametric: defaults to the accepted-W test-reference catalog; at the
+  // live re-freeze boundary, MC2_Q12_ACTIVATION_CATALOG_FILE points to the accepted
+  // production expected-post-migration-catalog so the same invariant runs unchanged.
+  const catalogOverride = process.env.MC2_Q12_ACTIVATION_CATALOG_FILE;
+  const catalogBody = catalogOverride
+    ? readFileSync(catalogOverride, 'utf8')
+    : `${JSON.stringify(expectedCatalog(), null, 2)}\n`;
   writeFileSync(catalog, catalogBody, { mode: 0o400 });
   const catalogSha = createHash('sha256').update(catalogBody).digest('hex');
   writeFileSync(

@@ -1,0 +1,27 @@
+{
+  "schema_version": "megacampus.q12.managed-session-inventory/v1",
+  "top_level_keys": [
+    "schema_version",
+    "project_ref",
+    "database",
+    "source_decision_sha256",
+    "provider_plane_trusted",
+    "identities"
+  ],
+  "fixed_scalars": {
+    "project_ref": "diqooqbuchsliypgwksu",
+    "database": "postgres",
+    "source_decision_sha256": "7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27",
+    "provider_plane_trusted": true
+  },
+  "identity_item_keys": [
+    "role",
+    "database",
+    "backend_type",
+    "application_identity",
+    "client_class",
+    "allowed_states",
+    "transaction_free_required"
+  ],
+  "identity_sort": "byte-ascending by the first five identity fields"
+}
