@@ -443,6 +443,7 @@ interface WrapperFixture {
 
 interface ComposeWriterFixture extends WrapperFixture {
   barrierReceipt: string;
+  runId: string;
   q12RunRoot: string;
   curlLog: string;
   oldCrossedQuiesceManifest: string;
@@ -687,18 +688,21 @@ fi
   };
 }
 
-function composeWriterFixture(): ComposeWriterFixture {
+function composeWriterFixture(
+  runId: string = Q12_RUN_ID,
+  q12RunRootOverride?: string
+): ComposeWriterFixture {
   const fixture = wrapperFixture();
   const recordsPath = join(fixture.directory, 'docker-records.json');
   const curlLog = join(fixture.directory, 'curl.log');
   const curl = join(fixture.directory, 'bin/curl');
   const progress = fixture.args[fixture.args.indexOf('--progress-directory') + 1];
-  const q12RunRoot = join(fixture.directory, `backups/q12/${Q12_RUN_ID}`);
+  const q12RunRoot = q12RunRootOverride ?? join(fixture.directory, `backups/q12/${runId}`);
   const barrierReceipt = join(q12RunRoot, 'database-barrier-receipt.json');
   const q12Capability = join(q12RunRoot, 'secrets/db-capability');
-  const quiesceManifest = join(q12RunRoot, `writer-quiesce-${Q12_RUN_ID}.json`);
-  const recoveryState = join(q12RunRoot, `writer-recovery-state-${Q12_RUN_ID}.json`);
-  const oldCrossedQuiesceManifest = join(progress, `writer-quiesce-${Q12_RUN_ID}.json`);
+  const quiesceManifest = join(q12RunRoot, `writer-quiesce-${runId}.json`);
+  const recoveryState = join(q12RunRoot, `writer-recovery-state-${runId}.json`);
+  const oldCrossedQuiesceManifest = join(progress, `writer-quiesce-${runId}.json`);
   const probeReceipt = join(q12RunRoot, 'database-barrier-probe-receipt.json');
   const identities = [
     ['megacampus-blue', 'api', true],
@@ -746,7 +750,7 @@ function composeWriterFixture(): ComposeWriterFixture {
     barrierReceipt,
     `${JSON.stringify({
       schema_version: 'megacampus.q12.database-barrier-receipt/v1',
-      run_id: Q12_RUN_ID,
+      run_id: runId,
       state: 'recovery_ready_guarded',
       zero_guard_residue: false,
       expected_catalog_sha256: 'b'.repeat(64),
@@ -762,7 +766,7 @@ function composeWriterFixture(): ComposeWriterFixture {
     probeReceipt,
     `${JSON.stringify({
       schema_version: 'megacampus.q12.database-barrier-probes/v1',
-      run_id: Q12_RUN_ID,
+      run_id: runId,
       expected_catalog_sha256: 'b'.repeat(64),
       completed_at: '2026-07-13T12:00:00.000Z',
       probes: {
@@ -888,6 +892,7 @@ printf '%s' "$status"
   return {
     ...fixture,
     barrierReceipt,
+    runId,
     q12RunRoot,
     curlLog,
     oldCrossedQuiesceManifest,
