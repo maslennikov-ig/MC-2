@@ -2925,7 +2925,7 @@ function resumeChild(
       '--resume-mode',
       mode,
       '--run-id',
-      Q12_RUN_ID,
+      fixture.runId,
     ],
     {
       env: {
@@ -4380,8 +4380,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('compensates every final writer to stopped/no after an ordered resume start failure', () => {
-    const fixture = writerResumeFixture('forward');
+  it('compensates every final writer to stopped/no after an ordered resume start failure', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
 
     const result = fixture.resume('forward', {
       SOURCE_RECOVERY_TEST_FAIL_START_AFTER: '2',
@@ -4401,8 +4401,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     ).toBe(true);
   });
 
-  it('compensates every final writer when restart-policy restoration fails', () => {
-    const fixture = writerResumeFixture('forward');
+  it('compensates every final writer when restart-policy restoration fails', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
 
     const result = fixture.resume('forward', {
       SOURCE_RECOVERY_TEST_FAIL_RESTORE_POLICY_AFTER: '2',
@@ -4423,8 +4423,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     ).toBe(true);
   });
 
-  it('does not start Web after API health verification fails and compensates all final writers', () => {
-    const fixture = writerResumeFixture('forward');
+  it('does not start Web after API health verification fails and compensates all final writers', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const manifest = JSON.parse(readFileSync(fixture.finalManifest, 'utf8')) as Record<string, any>;
     const firstApi = (manifest.final_writers as Array<Record<string, any>>).find(writer =>
       String(writer.class).endsWith('-api')
@@ -4453,8 +4453,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     ).toBe(true);
   });
 
-  it('compensates when Docker reports a successful start without a running writer', () => {
-    const fixture = writerResumeFixture('forward');
+  it('compensates when Docker reports a successful start without a running writer', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const manifest = JSON.parse(readFileSync(fixture.finalManifest, 'utf8')) as Record<string, any>;
     const firstRunning = (manifest.final_writers as Array<Record<string, any>>).find(
       writer => writer.intended_running
@@ -4470,8 +4470,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expectResumeCompensated(fixture);
   });
 
-  it('compensates a final restart-policy drift after every ordered start', () => {
-    const fixture = writerResumeFixture('forward');
+  it('compensates a final restart-policy drift after every ordered start', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const manifest = JSON.parse(readFileSync(fixture.finalManifest, 'utf8')) as Record<string, any>;
     const target = (manifest.final_writers as Array<Record<string, any>>).find(
       writer => writer.intended_restart_policy.name !== 'always'
@@ -4488,7 +4488,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
   });
 
   it('compensates every final writer when isolated resume receives SIGTERM', async () => {
-    const fixture = writerResumeFixture('forward');
+    const fixture = await joinedWriterResumeFixture('forward');
     const child = resumeChild(fixture, 'forward', {
       SOURCE_RECOVERY_TEST_SLEEP_AFTER_START: '2',
     });
@@ -4510,8 +4510,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expectResumeCompensated(fixture);
   }, 15_000);
 
-  it('detects an atomic authority-input swap and compensates before receipt publication', () => {
-    const fixture = writerResumeFixture('forward');
+  it('detects an atomic authority-input swap and compensates before receipt publication', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const replacement = join(fixture.directory, 'swapped-resume-barrier.json');
     writeFileSync(replacement, readFileSync(fixture.barrierReceipt), { mode: 0o400 });
 
@@ -4587,8 +4587,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(controller).toMatch(/os\.fchown\(fd, uid, gid\)[\s\S]*rename_noreplace/);
   });
 
-  it('fails closed on a deterministic terminal temporary symlink before writer start', () => {
-    const fixture = writerResumeFixture('forward');
+  it('fails closed on a deterministic terminal temporary symlink before writer start', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const target = join(fixture.directory, 'terminal-temp-target');
     writeFileSync(target, 'attacker-controlled\n', { mode: 0o400 });
     symlinkSync(target, join(fixture.q12RunRoot, '.writer-resume-state.tmp'));
@@ -4600,8 +4600,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('retains a durable deterministic terminal temporary after fsync crash and blocks same-epoch replay', () => {
-    const fixture = writerResumeFixture('forward');
+  it('retains a durable deterministic terminal temporary after fsync crash and blocks same-epoch replay', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const terminalTemporary = join(fixture.q12RunRoot, '.writer-resume-state.tmp');
 
     const interrupted = fixture.resume('forward', {
@@ -4640,8 +4640,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(existsSync(terminalTemporary)).toBe(false);
   });
 
-  it('compensates a partial SIGKILL resume and requires the next recovery epoch', () => {
-    const fixture = writerResumeFixture('forward');
+  it('compensates a partial SIGKILL resume and requires the next recovery epoch', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
 
     const interrupted = fixture.resume('forward', {
       SOURCE_RECOVERY_RESUME_FAULT_POINT: 'after-first-start',
@@ -4684,8 +4684,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     });
   });
 
-  it('rejects an extra release_sha in the exact fourteen-key terminal receipt', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects an extra release_sha in the exact fourteen-key terminal receipt', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const initial = fixture.resume();
     expect(initial.status, initial.stderr).toBe(0);
     const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
