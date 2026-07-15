@@ -30,10 +30,18 @@ const COMMAND_MANIFEST = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-command-manifest.json'), 'utf8')
 ) as { commands: Record<string, { argv: string[] }> };
 
-function resolvedCommandSha256(commandId: string, runId: string): string {
-  const argv = COMMAND_MANIFEST.commands[commandId].argv.map(value =>
-    value.split('<run-id>').join(runId)
-  );
+function resolvedCommandSha256(
+  commandId: string,
+  runId: string,
+  extraSubstitutions: Record<string, string> = {}
+): string {
+  const argv = COMMAND_MANIFEST.commands[commandId].argv.map(value => {
+    let rendered = value.split('<run-id>').join(runId);
+    for (const [token, replacement] of Object.entries(extraSubstitutions)) {
+      rendered = rendered.split(token).join(replacement);
+    }
+    return rendered;
+  });
   return createHash('sha256').update(JSON.stringify(argv)).digest('hex');
 }
 const ENTRYPOINT = resolve(
@@ -3265,14 +3273,18 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
     // Real Root artifacts: install binds the zero quiesce digest (amendment 3)
     // and a real resolved command hash (never the 0*64/9*64 sentinels).
+    // install binds the zero quiesce digest (amendment 3) and the EXACT resolved
+    // command hash: barrier.install argv substitutes <run-id> and the expected
+    // catalog sha, so resolvedCommandSha256 recomputes it — a wrong-command hash
+    // must fail, not just a wrong shape.
     expect(installCapability).toMatchObject({
       command_id: 'barrier.install',
+      command_sha256: resolvedCommandSha256('barrier.install', fixture.runId, {
+        '<expected-post-migration-catalog-sha256>': JOINED_CATALOG_SHA,
+      }),
       quiesce_manifest_sha256: '0'.repeat(64),
       lease_epoch: 'cutover',
     });
-    expect(installCapability.command_sha256).toMatch(/^[a-f0-9]{64}$/u);
-    expect(installCapability.command_sha256).not.toBe('9'.repeat(64));
-    expect(installCapability.command_sha256).not.toBe('0'.repeat(64));
     expect(installJournalEntry).toMatchObject({
       phase: 'maintenance_guarded',
       outcome: 'completed',
@@ -3314,6 +3326,9 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     // row moved into the first recovery epoch — the exact old-result contract.
     expect(capability).toMatchObject({
       command_id: 'barrier.install',
+      command_sha256: resolvedCommandSha256('barrier.install', fixture.runId, {
+        '<expected-post-migration-catalog-sha256>': JOINED_CATALOG_SHA,
+      }),
       lease_epoch: 'cutover',
       supersedes_capability_sha256: null,
       quiesce_manifest_sha256: '0'.repeat(64),
