@@ -3306,8 +3306,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it.each(['forward', 'rollback'] as const)(
     'accepts the exact terminal database recovery lifecycle before %s writer resume',
-    mode => {
-      const fixture = writerResumeFixture(mode, mode === 'forward' ? 5 : 3, false, {
+    async mode => {
+      const fixture = await joinedWriterResumeFixture(mode, undefined, {
         databaseRecoveryEpoch: true,
       });
 
@@ -3742,8 +3742,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it.each(['forward', 'rollback'] as const)(
     'accepts existing exact database proof from the old execution epoch before %s writer resume',
-    mode => {
-      const fixture = writerResumeFixture(mode, mode === 'forward' ? 5 : 3, false, {
+    async mode => {
+      const fixture = await joinedWriterResumeFixture(mode, undefined, {
         databaseExistingProofCompletionEpoch: true,
       });
       const databaseOperation = mode === 'forward' ? 'cleanup' : 'rollback';
@@ -4002,8 +4002,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
   it.each(['issued-file', 'claimed-file'] as const)(
     'accepts a superseded resume capability recovered from the %s durable boundary',
-    boundary => {
-      const fixture = writerResumeFixture('forward');
+    async boundary => {
+      const fixture = await joinedWriterResumeFixture('forward');
       rewindWriterResumeToOrphanBoundary(fixture, 'forward', boundary);
       advanceWriterResumeRecoveryEpoch(fixture, 'forward');
 
@@ -4449,8 +4449,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
         ],
       },
     },
-  ])('rejects an $label before rollback writer start', ({ options }) => {
-    const fixture = writerResumeFixture('rollback', 3, false, options);
+  ])('rejects an $label before rollback writer start', async ({ options }) => {
+    const fixture = await joinedWriterResumeFixture('rollback', undefined, options);
 
     const result = fixture.resume();
 
@@ -4986,8 +4986,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     }
   );
 
-  it('rejects a recreated final writer identity before any start', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects a recreated final writer identity before any start', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const records = fixture.records();
     records.find(record => record.Id === fixture.finalIds[0])!.Image = `sha256:${'f'.repeat(64)}`;
     writeFileSync(fixture.recordsPath, `${JSON.stringify(records, null, 2)}\n`, { mode: 0o600 });
