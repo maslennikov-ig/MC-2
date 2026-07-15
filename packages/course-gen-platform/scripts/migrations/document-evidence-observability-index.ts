@@ -46,6 +46,46 @@ const ROLLBACK_STATEMENTS = ROLLBACK_SOURCE.split(';')
   .map(value => value.trim())
   .filter(Boolean);
 
+// Q12 defense-in-depth over the exact-source allowlist: the recoverable
+// nontransactional concurrent-index packet may contain only CONCURRENTLY index
+// creation/removal and index comments against already-guarded tables. A
+// table/schema/function/trigger/ACL/grant or non-CONCURRENTLY statement injected
+// into this packet is a hard stop before execution (design section 5).
+const CONCURRENT_INDEX_PACKET_ALLOWLIST: readonly RegExp[] = [
+  /^CREATE\s+INDEX\s+CONCURRENTLY\s+(?:IF\s+NOT\s+EXISTS\s+)?\S/iu,
+  /^DROP\s+INDEX\s+CONCURRENTLY\s+(?:IF\s+EXISTS\s+)?\S/iu,
+  /^COMMENT\s+ON\s+INDEX\s+\S/iu,
+];
+
+function stripLeadingSqlNoise(statement: string): string {
+  let text = statement;
+  for (;;) {
+    const trimmed = text.replace(/^\s+/u, '');
+    if (trimmed.startsWith('--')) {
+      const newlineIndex = trimmed.indexOf('\n');
+      text = newlineIndex === -1 ? '' : trimmed.slice(newlineIndex + 1);
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      const end = trimmed.indexOf('*/');
+      text = end === -1 ? '' : trimmed.slice(end + 2);
+      continue;
+    }
+    return trimmed;
+  }
+}
+
+export function assertConcurrentIndexPacketSafe(statements: readonly string[]): void {
+  for (const statement of statements) {
+    const normalized = stripLeadingSqlNoise(statement).replace(/\s+/gu, ' ').trim();
+    if (!CONCURRENT_INDEX_PACKET_ALLOWLIST.some(pattern => pattern.test(normalized))) {
+      throw new Error(
+        'Q12 concurrent observability index packet permits only CONCURRENTLY index and index-comment statements'
+      );
+    }
+  }
+}
+
 type Direction = 'apply' | 'rollback';
 type RemoteGate = { allowRemote?: boolean; confirmation?: string };
 type RemoteConfirmations = Readonly<Record<Direction, string>>;
@@ -348,6 +388,7 @@ function assertExactIndex(index: IndexState, requireComment = true): void {
 }
 
 async function apply(client: Client): Promise<'applied' | 'reused' | 'recovered'> {
+  assertConcurrentIndexPacketSafe(FORWARD_STATEMENTS);
   const history = await readHistory(client, DOCUMENT_EVIDENCE_INDEX_MIGRATION_VERSION);
   let before = await readIndex(client);
   if (history) {
@@ -384,6 +425,7 @@ async function apply(client: Client): Promise<'applied' | 'reused' | 'recovered'
 }
 
 async function rollback(client: Client): Promise<'rolled_back' | 'recovered' | 'reused'> {
+  assertConcurrentIndexPacketSafe(ROLLBACK_STATEMENTS);
   const history = await readHistory(client, DOCUMENT_EVIDENCE_INDEX_MIGRATION_VERSION);
   const before = await readIndex(client);
   if (!history) {

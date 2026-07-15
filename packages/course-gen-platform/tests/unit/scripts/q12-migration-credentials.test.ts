@@ -16,6 +16,7 @@ import {
   assertNoQ12UrlEnvironmentOrArgument,
   type Q12MigrationCredentialPaths,
 } from '../../../scripts/migrations/document-evidence-approved';
+import { assertConcurrentIndexPacketSafe } from '../../../scripts/migrations/document-evidence-observability-index';
 
 const SYNTHETIC_PASSWORD = 'syn-p@ss/w?rd:#42';
 const SYNTHETIC_CAPABILITY = 'mc2-synthetic-db-capability-do-not-log-0000';
@@ -316,5 +317,51 @@ describe('Q12 file-only migration credential contract', () => {
       await expect(bindQ12MigrationSession(client, SYNTHETIC_CAPABILITY)).rejects.toThrow();
       expect(queries.some(entry => /set_config/u.test(entry.text))).toBe(false);
     });
+  });
+});
+
+describe('Q12 concurrent observability index packet preflight', () => {
+  it('accepts the real comment-prefixed CONCURRENTLY index and index-comment statements', () => {
+    // The observability packet splits its fixed source naively on ';', so each
+    // statement retains its leading -- comment lines; the preflight must strip
+    // those before matching.
+    expect(() =>
+      assertConcurrentIndexPacketSafe([
+        `-- Bound the global unresolved-critical evidence reconciliation used by textfile metrics.
+-- This migration must be executed statement-by-statement in autocommit mode.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_clarifying_pending_critical_evidence_created_at
+  ON public.clarifying_questions (created_at)
+  WHERE question_category = 'document_conflicts'
+    AND question_priority = 'critical'
+    AND status = 'pending'`,
+        `COMMENT ON INDEX public.idx_clarifying_pending_critical_evidence_created_at IS
+  'Covers exact count and oldest-first reconciliation for pending critical document conflicts.'`,
+      ])
+    ).not.toThrow();
+    expect(() =>
+      assertConcurrentIndexPacketSafe([
+        `-- This rollback must be executed statement-by-statement in autocommit mode.
+DROP INDEX CONCURRENTLY IF EXISTS public.idx_clarifying_pending_critical_evidence_created_at`,
+      ])
+    ).not.toThrow();
+  });
+
+  it.each([
+    ['a non-concurrent index', 'CREATE INDEX idx_x ON public.clarifying_questions (created_at)'],
+    ['a table statement', 'CREATE TABLE public.injected (id uuid PRIMARY KEY)'],
+    ['a schema statement', 'CREATE SCHEMA injected'],
+    [
+      'a function statement',
+      'CREATE FUNCTION public.injected() RETURNS void LANGUAGE sql AS $$ $$',
+    ],
+    [
+      'a trigger statement',
+      'CREATE TRIGGER injected BEFORE INSERT ON public.x EXECUTE FUNCTION f()',
+    ],
+    ['a grant statement', 'GRANT SELECT ON public.clarifying_questions TO service_role'],
+    ['a revoke statement', 'REVOKE ALL ON public.clarifying_questions FROM authenticated'],
+    ['an ALTER statement', 'ALTER TABLE public.clarifying_questions ADD COLUMN injected text'],
+  ])('rejects %s injected into the concurrent packet', (_label, statement) => {
+    expect(() => assertConcurrentIndexPacketSafe([statement])).toThrow(/CONCURRENTLY|index/iu);
   });
 });
