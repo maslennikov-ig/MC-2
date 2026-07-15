@@ -29,6 +29,27 @@ OPERATIONS = (
     "activate",
 )
 COMMANDS = {operation: f"barrier.{operation}" for operation in OPERATIONS}
+ORDINARY_COMMAND_IDS = (
+    "operator.self-check",
+    "writers.quiesce",
+    "pg.backup",
+    "pg.restore",
+    "migration.base.apply",
+    "migration.observability.apply",
+    "source.forward",
+    "reindex.plan",
+    "reindex.worker.create",
+    "reindex.execute",
+    "reindex.verify",
+    "deploy.prepare",
+    "deploy.commit",
+    "writers.resume.forward",
+    "writers.resume.rollback",
+)
+MANIFEST_COMMAND_IDS = tuple(COMMANDS.values()) + ORDINARY_COMMAND_IDS
+LEASE_FD_ENV_COMMAND_IDS = frozenset(
+    ("writers.quiesce", "writers.resume.forward", "writers.resume.rollback")
+)
 
 
 @dataclass
@@ -490,10 +511,12 @@ def load_manifest() -> dict[str, Any]:
         raise LifecycleError("command manifest shape mismatch")
     if manifest["schema_version"] != "megacampus.q12.command-manifest/v1":
         raise LifecycleError("command manifest schema mismatch")
-    if tuple(manifest["commands"]) != tuple(COMMANDS.values()):
+    if tuple(manifest["commands"]) != MANIFEST_COMMAND_IDS:
         raise LifecycleError("command manifest exact set/order mismatch")
-    expected_env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C", "HOME": "/root"}
+    base_env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C", "HOME": "/root"}
+    lease_env = {**base_env, "Q12_EXTERNAL_QUIESCE_LEASE_FD": "9"}
     for command_id, command in manifest["commands"].items():
+        expected_env = lease_env if command_id in LEASE_FD_ENV_COMMAND_IDS else base_env
         if set(command) != {"argv", "argv_sha256", "env"} or command["env"] != expected_env:
             raise LifecycleError(f"command manifest entry mismatch: {command_id}")
         if command["argv_sha256"] != sha256(canonical(command["argv"])):
