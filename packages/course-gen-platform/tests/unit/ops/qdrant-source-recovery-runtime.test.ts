@@ -3246,10 +3246,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     });
   });
 
-  it('accepts a separately journal-bound completed barrier install capability', () => {
-    const fixture = writerResumeFixture('forward', 5, false, {
-      historicalInstallScenario: 'valid',
-    });
+  it('accepts a separately journal-bound completed barrier install capability', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const installCapabilityPath = join(
       fixture.capabilitiesRoot,
       'completed',
@@ -3263,15 +3261,18 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       .trimEnd()
       .split('\n')
       .map(line => JSON.parse(line) as Record<string, any>)
-      .find(entry => entry.command_id === 'barrier.install');
+      .find(entry => entry.command_id === 'barrier.install' && entry.outcome === 'completed');
 
+    // Real Root artifacts: install binds the zero quiesce digest (amendment 3)
+    // and a real resolved command hash (never the 0*64/9*64 sentinels).
     expect(installCapability).toMatchObject({
       command_id: 'barrier.install',
-      command_sha256: '4'.repeat(64),
       quiesce_manifest_sha256: '0'.repeat(64),
       lease_epoch: 'cutover',
     });
+    expect(installCapability.command_sha256).toMatch(/^[a-f0-9]{64}$/u);
     expect(installCapability.command_sha256).not.toBe('9'.repeat(64));
+    expect(installCapability.command_sha256).not.toBe('0'.repeat(64));
     expect(installJournalEntry).toMatchObject({
       phase: 'maintenance_guarded',
       outcome: 'completed',
@@ -3291,10 +3292,11 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     });
   });
 
-  it('accepts an old immutable install result completed in the first recovery journal epoch', () => {
-    const fixture = writerResumeFixture('forward', 5, false, {
-      historicalInstallScenario: 'completion-recovery',
-    });
+  it('accepts an old immutable install result completed in the first recovery journal epoch', async () => {
+    const fixture = await joinedWriterResumeFixture(
+      'forward',
+      installChainSpec({ completionMode: 'move-no-row-reacquired' })
+    );
     const capabilityPath = join(
       fixture.capabilitiesRoot,
       'completed',
@@ -3302,29 +3304,30 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     );
     const capability = JSON.parse(readFileSync(capabilityPath, 'utf8')) as Record<string, any>;
     const capabilityDigest = fileSha256(capabilityPath);
-    const installJournalEntries = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
+    const installCompleted = readFileSync(join(fixture.q12RunRoot, 'phase.jsonl'), 'utf8')
       .trimEnd()
       .split('\n')
       .map(line => JSON.parse(line) as Record<string, any>)
-      .filter(entry => entry.command_id === 'barrier.install');
+      .filter(entry => entry.command_id === 'barrier.install' && entry.outcome === 'completed');
 
+    // The execution capability stays in cutover (no reissue), but its completion
+    // row moved into the first recovery epoch — the exact old-result contract.
     expect(capability).toMatchObject({
       command_id: 'barrier.install',
       lease_epoch: 'cutover',
       supersedes_capability_sha256: null,
       quiesce_manifest_sha256: '0'.repeat(64),
     });
-    expect(installJournalEntries).toEqual([
-      expect.objectContaining({
-        phase: 'maintenance_guarded',
-        outcome: 'completed',
-        command_id: 'barrier.install',
-        command_sha256: capability.command_sha256,
-        capability_manifest_sha256: capabilityDigest,
-        quiesce_manifest_sha256: capability.quiesce_manifest_sha256,
-        lease_epoch: 'cutover-recovery-1',
-      }),
-    ]);
+    expect(installCompleted).toHaveLength(1);
+    expect(installCompleted[0]).toMatchObject({
+      phase: 'maintenance_guarded',
+      outcome: 'completed',
+      command_id: 'barrier.install',
+      command_sha256: capability.command_sha256,
+      capability_manifest_sha256: capabilityDigest,
+      quiesce_manifest_sha256: capability.quiesce_manifest_sha256,
+      lease_epoch: 'cutover-recovery-1',
+    });
 
     const result = fixture.resume();
 
