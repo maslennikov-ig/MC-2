@@ -1716,6 +1716,10 @@ interface JoinedResumeSetup {
     held_writers: Array<Record<string, any>>;
   };
   originalWriters: Array<Record<string, any>>;
+  // Id of an original writer captured in the never-run 'created' state (a real
+  // production shape: a writer that was created but never started); its docker
+  // record must report Status 'created', not 'exited'.
+  createdNoHealthId?: string;
 }
 
 // Amendment section 6: the W-owned megacampus.q12.writer-quiesce/v1 topology
@@ -1819,13 +1823,24 @@ async function joinedWriterResumeFixture(
   installChain?: Record<string, unknown>,
   // Only W-suffix-affecting options are meaningful here (e.g. databasePreIssuanceOrphan);
   // prefix-shaping options are owned by the Root materializer, not W.
-  journalOptions: ResumeJournalFixtureOptions = {}
+  journalOptions: ResumeJournalFixtureOptions = {},
+  createdNoHealth = false
 ): Promise<ResumeWriterFixture> {
   const runRoot = mkdtempSync('/tmp/mc2-q12-d5-root-');
   temporaryDirectories.push(runRoot);
   const runId = deriveRootRetainedBarrierFixtureRunId(runRoot);
   const quiescePath = join(runRoot, `writer-quiesce-${runId}.json`);
   const originalWriters = joinedQuiesceWriters();
+  let createdNoHealthId: string | undefined;
+  if (createdNoHealth) {
+    // A healthcheck-less dev worker that was created but never run — a real
+    // production shape W must resume without starting or mutating it.
+    const created = originalWriters.find(writer => writer.service === 'worker-stage7-dev')!;
+    created.prior_running = false;
+    created.prior_status = 'created';
+    created.prior_health_status = null;
+    createdNoHealthId = String(created.id);
+  }
   writeFileSync(
     quiescePath,
     `${canonicalJson({
@@ -1858,13 +1873,14 @@ async function joinedWriterResumeFixture(
     final_writers: Array<Record<string, any>>;
     held_writers: Array<Record<string, any>>;
   };
-  return writerResumeFixture(mode, mode === 'forward' ? 5 : 5, false, journalOptions, {
+  return writerResumeFixture(mode, mode === 'forward' ? 5 : 5, createdNoHealth, journalOptions, {
     runRoot,
     runId,
     quiescePath,
     fwmPath,
     fwm,
     originalWriters,
+    createdNoHealthId,
   });
 }
 
@@ -1939,7 +1955,10 @@ function writerResumeFixture(
     const isTarget = (writer: Record<string, any>): boolean =>
       String(writer.name).endsWith('-q12fixture');
     const records = [...finalWriters, ...heldWriters].map(writer =>
-      stoppedWriterRecord(writer, isTarget(writer) ? 'created' : 'exited')
+      stoppedWriterRecord(
+        writer,
+        isTarget(writer) || String(writer.id) === joined.createdNoHealthId ? 'created' : 'exited'
+      )
     );
     writeFileSync(fixture.recordsPath, `${JSON.stringify(records, null, 2)}\n`, { mode: 0o600 });
   }
@@ -2985,8 +3004,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     );
   });
 
-  it('sanitizes an unapproved launcher variable before entering the exact controller environment', () => {
-    const fixture = writerResumeFixture('forward');
+  it('sanitizes an unapproved launcher variable before entering the exact controller environment', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
 
     const result = fixture.resume('forward', {
       UNAPPROVED_WRITER_RESUME_ENVIRONMENT: 'must-not-reach-controller',
@@ -4640,11 +4659,13 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expectResumeCompensated(fixture);
   });
 
-  it('preserves a created writer without a healthcheck through rollback resume', () => {
-    const fixture = writerResumeFixture('rollback', 0, true);
+  it('preserves a created writer without a healthcheck through rollback resume', async () => {
+    const fixture = await joinedWriterResumeFixture('rollback', undefined, {}, true);
     const manifest = JSON.parse(readFileSync(fixture.finalManifest, 'utf8')) as Record<string, any>;
+    // The joined topology has several healthcheck-less workers; the created one
+    // is uniquely the never-run entry (intended_running=false + no healthcheck).
     const created = (manifest.final_writers as Array<Record<string, any>>).find(
-      writer => writer.healthcheck_present === false
+      writer => writer.healthcheck_present === false && writer.intended_running === false
     );
     expect(created).toMatchObject({ intended_running: false, healthcheck_present: false });
 
