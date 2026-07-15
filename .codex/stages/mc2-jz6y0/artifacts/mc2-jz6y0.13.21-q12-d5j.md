@@ -76,7 +76,7 @@ verification:
   - 'prettier --check contract + seam + live-cutover: passed'
   - 'git diff --check: passed'
   - 'pnpm type-check (workspace): passed'
-  - 'pnpm build (workspace, synthetic env per D5J acceptance): recorded below'
+  - 'pnpm build (workspace, synthetic Supabase env per the D5J acceptance contract): passed, exit 0'
 changed_files:
   - docs/superpowers/specs/2026-07-15-q12-joined-retained-barrier-fixture-design.md
   - docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md
@@ -131,6 +131,13 @@ acceptance commands pass; workspace `pnpm type-check` passes. The workspace
 worktree's untracked `packages/web/.env`; per the D5J acceptance contract the
 build runs with synthetic values (result recorded in Beads with the final
 gate evidence).
+
+Plan deviations, each equivalent and deliberate: the Task 8 closure coverage
+was committed together with Task 7 (`47c7c897`) rather than as a separate
+`test(q12)` commit; `q12-live-cutover.test.ts` and
+`q12-retained-barrier-quiesce-seam.test.ts` were allowed by the write zone as
+minimum-necessary updates but ultimately needed no modification (the
+grammar/segment probes moved to the new seam test file before commit).
 
 Strengthening updates to existing pins, each deliberate: the
 `writers.resume.rollback` rows now carry the real resolved manifest hash (was
