@@ -111,13 +111,25 @@ PY
         q12_fail "database activation is committed; Q12 rollback is finish-forward only and cannot resurrect the previous color"
     fi
 
+    # NOTE: deploy.rollback is not yet wired into the frozen
+    # q12-command-manifest.json; per D5J 2026-07-15 §10 the supervisor binding
+    # for finalize/rollback is Task 9 scope. This wrapper mode is implemented and
+    # fail-closed so the controller can adopt it there.
+    #
     # Pre-activation safe rollback. Read the durable handoff recovery state to
-    # decide whether commit already moved Nginx.
+    # decide whether commit already moved (or may have moved) Nginx. Each field is
+    # printed on its own line so an empty middle field never collapses.
     Q12_STATE=""
     Q12_PREVIOUS_COLOR=""
     Q12_NGINX_SWITCHED="false"
+    Q12_NGINX_INTENT="false"
     if [ -f "$Q12_RECOVERY" ]; then
-        read -r Q12_STATE Q12_PREVIOUS_COLOR Q12_NGINX_SWITCHED < <(python3 - "$Q12_RECOVERY" "$Q12_RUN_ID" "$Q12_RECOVERY_SCHEMA" <<'PY'
+        {
+            IFS= read -r Q12_STATE
+            IFS= read -r Q12_PREVIOUS_COLOR
+            IFS= read -r Q12_NGINX_SWITCHED
+            IFS= read -r Q12_NGINX_INTENT
+        } < <(python3 - "$Q12_RECOVERY" "$Q12_RUN_ID" "$Q12_RECOVERY_SCHEMA" <<'PY'
 import json, sys
 path, run_id, schema = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path, "rb") as handle:
@@ -125,23 +137,37 @@ with open(path, "rb") as handle:
 assert isinstance(data, dict)
 assert data.get("schema_version") == schema
 assert data.get("run_id") == run_id
-print(
-    data.get("state", ""),
-    data.get("previous_active_color", ""),
-    str(data.get("nginx_switched", False)).lower(),
-)
+print(data.get("state", ""))
+print(data.get("previous_active_color", ""))
+print(str(data.get("nginx_switched", False)).lower())
+print(str(data.get("nginx_switch_intent", False)).lower())
 PY
 )
     fi
 
-    if [ "$Q12_NGINX_SWITCHED" = "true" ]; then
-        [ -n "$Q12_PREVIOUS_COLOR" ] || q12_fail "handoff recovery is missing the previous active color"
+    # Cross-check the actual serving color against the recorded previous color so
+    # a crash in commit's switch window (intent recorded, nginx_switched not yet
+    # durable, active_color already advanced) is still fully rolled back.
+    Q12_ACTUAL_COLOR=""
+    if [ -f "$Q12_BASE_PATH/active_color" ]; then
+        Q12_ACTUAL_COLOR="$(tr -d '[:space:]' < "$Q12_BASE_PATH/active_color")"
+    fi
+
+    Q12_NEED_RESTORE="false"
+    if [ -n "$Q12_PREVIOUS_COLOR" ]; then
+        if [ "$Q12_NGINX_SWITCHED" = "true" ] || [ "$Q12_NGINX_INTENT" = "true" ] \
+            || { [ -n "$Q12_ACTUAL_COLOR" ] && [ "$Q12_ACTUAL_COLOR" != "$Q12_PREVIOUS_COLOR" ]; }; then
+            Q12_NEED_RESTORE="true"
+        fi
+    fi
+
+    if [ "$Q12_NEED_RESTORE" = "true" ]; then
         case "$Q12_PREVIOUS_COLOR" in
             blue) Q12_PREVIOUS_WEB_PORT=3001; Q12_PREVIOUS_API_PORT=4001 ;;
             green) Q12_PREVIOUS_WEB_PORT=3002; Q12_PREVIOUS_API_PORT=4002 ;;
             *) q12_fail "unknown previous active color: $Q12_PREVIOUS_COLOR" ;;
         esac
-        echo "Q12 rollback: commit had moved nginx; restoring nginx to $Q12_PREVIOUS_COLOR"
+        echo "Q12 rollback: commit may have moved nginx; restoring nginx to $Q12_PREVIOUS_COLOR"
         template="$Q12_BASE_PATH/nginx.conf.template"
         [ -f "$template" ] || q12_fail "nginx template not found at $template"
         sed -e "s/{{WEB_PORT}}/$Q12_PREVIOUS_WEB_PORT/g" \

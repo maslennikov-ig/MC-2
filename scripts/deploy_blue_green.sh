@@ -131,6 +131,49 @@ print(data.get("state", ""))
 PY
     }
 
+    q12_recovery_field() {
+        [ -f "$Q12_RECOVERY" ] || { echo ""; return 0; }
+        python3 - "$Q12_RECOVERY" "$1" <<'PY'
+import json, sys
+with open(sys.argv[1], "rb") as handle:
+    data = json.loads(handle.read())
+print(data.get(sys.argv[2], ""))
+PY
+    }
+
+    # Atomically fold a captured-identity JSON array file into the recovery
+    # manifest under KEY (tmp + rename + fsync; never an O_TRUNC in-place write).
+    q12_fold_array() {
+        local key="$1" array_file="$2"
+        python3 - "$Q12_RECOVERY" "$array_file" "$key" <<'PY'
+import json, os, sys, tempfile
+recovery_path, array_path, key = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(recovery_path) as handle:
+    document = json.load(handle)
+with open(array_path) as handle:
+    document[key] = json.load(handle)
+document.pop("targets_file", None)
+directory = os.path.dirname(recovery_path)
+handle = tempfile.NamedTemporaryFile(
+    mode="w", dir=directory, prefix=".deploy-handoff-recovery.", delete=False
+)
+try:
+    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+finally:
+    handle.close()
+os.chmod(handle.name, 0o600)
+os.replace(handle.name, recovery_path)
+directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+PY
+    }
+
     # Emit a durable, fsynced deploy-handoff-recovery manifest. Extra key/value
     # pairs are passed as NAME=VALUE positional arguments and stored verbatim.
     q12_write_recovery() {
@@ -253,6 +296,18 @@ PY
         prepare-quiesced)
             q12_activation_committed \
                 && q12_fail "run is already activated; prepare-quiesced is a pre-activation step"
+            # Re-prepare guard: a durable recovery manifest that has advanced past
+            # `prepared` (commit/finalize/rollback) must never be recomputed onto a
+            # fresh target color or clobbered. Re-prepare is idempotent only over a
+            # matching `prepared` manifest with byte-identical target and release.
+            Q12_EXISTING_STATE="$(q12_recovery_state)"
+            if [ -n "$Q12_EXISTING_STATE" ]; then
+                [ "$Q12_EXISTING_STATE" = "prepared" ] \
+                    || q12_fail "a durable handoff recovery already exists in state '$Q12_EXISTING_STATE'; re-prepare is refused after commit"
+                [ "$(q12_recovery_field target_color)" = "$Q12_TARGET_COLOR" ] \
+                    && [ "$(q12_recovery_field release_sha)" = "$Q12_RELEASE_SHA" ] \
+                    || q12_fail "re-prepare parameters differ from the existing prepared handoff recovery"
+            fi
             echo "Q12 prepare: creating target $Q12_TARGET_COLOR web/api without starting them"
             docker compose -f "$Q12_INFRA_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_ENV" \
                 up -d redis qdrant prometheus grafana docling-mcp-internal docling-mcp notebooklm-bridge \
@@ -268,22 +323,8 @@ PY
                 "quiesce_manifest_path=$Q12_QUIESCE_MANIFEST" \
                 "nginx_switched=false" \
                 "targets_file=$Q12_TARGETS_FILE"
-            # Fold the captured targets into the recovery manifest.
-            python3 - "$Q12_RECOVERY" "$Q12_TARGETS_FILE" <<'PY'
-import json, os, sys
-recovery_path, targets_path = sys.argv[1], sys.argv[2]
-with open(recovery_path) as handle:
-    document = json.load(handle)
-with open(targets_path) as handle:
-    document["targets"] = json.load(handle)
-document.pop("targets_file", None)
-fd = os.open(recovery_path, os.O_WRONLY | os.O_TRUNC)
-with os.fdopen(fd, "w") as handle:
-    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
-    handle.write("\n")
-    handle.flush()
-    os.fsync(handle.fileno())
-PY
+            # Fold the captured targets into the recovery manifest atomically.
+            q12_fold_array targets "$Q12_TARGETS_FILE"
             echo "Q12 prepare complete: target $Q12_TARGET_COLOR web/api created (restart=no), Nginx unchanged"
             ;;
         commit-quiesced)
@@ -291,7 +332,14 @@ PY
                 && q12_fail "run is already activated; commit-quiesced is a pre-activation step"
             [ "$(q12_recovery_state)" = "prepared" ] \
                 || q12_fail "commit-quiesced requires a durable prepared handoff recovery state"
+            [ "$(q12_recovery_field release_sha)" = "$Q12_RELEASE_SHA" ] \
+                || q12_fail "commit-quiesced release-sha does not match the prepared handoff recovery"
             echo "Q12 commit: moving nginx to $Q12_TARGET_COLOR and creating production workers without starting them"
+            # P1-1(a): durably record the switch intent BEFORE mutating Nginx so a
+            # crash in the switch window (config on target, active_color advanced)
+            # is recoverable — rollback keys off this marker, not only the
+            # post-switch nginx_switched=true flag written below.
+            q12_write_recovery prepared "nginx_switch_intent=true"
             q12_switch_nginx "$Q12_TARGET_COLOR" "$Q12_TARGET_WEB_PORT" "$Q12_TARGET_API_PORT"
             echo "$Q12_TARGET_COLOR" > "$Q12_BASE_PATH/active_color"
             docker compose -f "$Q12_WORKER_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_TARGET_COLOR" \
@@ -307,26 +355,18 @@ PY
             q12_write_recovery activation_ready \
                 "nginx_switched=true" \
                 "active_color=$Q12_TARGET_COLOR"
-            python3 - "$Q12_RECOVERY" "$Q12_TARGETS_FILE" <<'PY'
-import json, os, sys
-recovery_path, targets_path = sys.argv[1], sys.argv[2]
-with open(recovery_path) as handle:
-    document = json.load(handle)
-with open(targets_path) as handle:
-    workers = json.load(handle)
-document["workers"] = workers
-fd = os.open(recovery_path, os.O_WRONLY | os.O_TRUNC)
-with os.fdopen(fd, "w") as handle:
-    json.dump(document, handle, sort_keys=True, separators=(",", ":"))
-    handle.write("\n")
-    handle.flush()
-    os.fsync(handle.fileno())
-PY
+            q12_fold_array workers "$Q12_TARGETS_FILE"
             echo "Q12 commit complete: nginx on $Q12_TARGET_COLOR, workers created (restart=no), none started"
             ;;
         finalize-quiesced)
+            # NOTE: deploy.finalize is not yet wired into the frozen
+            # q12-command-manifest.json; per D5J 2026-07-15 §10 the supervisor
+            # binding for finalize/rollback is Task 9 scope. The wrapper mode is
+            # implemented and fail-closed so the controller can adopt it there.
             [ "$(q12_recovery_state)" = "activation_ready" ] \
                 || q12_fail "finalize-quiesced requires a durable activation_ready handoff recovery state"
+            [ "$(q12_recovery_field release_sha)" = "$Q12_RELEASE_SHA" ] \
+                || q12_fail "finalize-quiesced release-sha does not match the activation_ready handoff recovery"
             q12_activation_committed \
                 || q12_fail "database activation receipt is absent; refusing to finalize before supervisor activation"
             # No container is started, no restart policy is restored, and no live

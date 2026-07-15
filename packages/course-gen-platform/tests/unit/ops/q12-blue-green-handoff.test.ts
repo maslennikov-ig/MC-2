@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -103,7 +104,17 @@ function harness(activeColor?: 'blue' | 'green'): Harness {
       '',
     ].join('\n')
   );
-  writeExecutable(join(binDir, 'nginx'), ['#!/usr/bin/env bash', 'exit 0', ''].join('\n'));
+  writeExecutable(
+    join(binDir, 'nginx'),
+    [
+      '#!/usr/bin/env bash',
+      // Fault injection: when NGINX_FAIL is set, `nginx -s reload` fails so the
+      // switch window (config written, reload failing) can be exercised.
+      'if [ -n "${NGINX_FAIL:-}" ] && [ "$1" = "-s" ]; then exit 1; fi',
+      'exit 0',
+      '',
+    ].join('\n')
+  );
   const nginxConfig = join(base, 'nginx.conf.installed');
 
   const env: NodeJS.ProcessEnv = {
@@ -153,13 +164,38 @@ function runDeploy(h: Harness, mode: string): ReturnType<typeof spawnSync> {
   );
 }
 
+function recoveryPath(h: Harness): string {
+  return join(h.runRoot, `deploy-handoff-recovery-${RUN_ID}.json`);
+}
+
 function recoveryState(h: Harness): Record<string, unknown> {
-  const path = join(h.runRoot, `deploy-handoff-recovery-${RUN_ID}.json`);
-  return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+  return JSON.parse(readFileSync(recoveryPath(h), 'utf8')) as Record<string, unknown>;
 }
 
 function dockerLog(h: Harness): string {
   return existsSync(h.dockerLog) ? readFileSync(h.dockerLog, 'utf8') : '';
+}
+
+function recoveryTempResidue(h: Harness): string[] {
+  return readdirSync(h.runRoot).filter(name => name.startsWith('.deploy-handoff-recovery.'));
+}
+
+function runDeployWithSha(h: Harness, mode: string, sha: string): ReturnType<typeof spawnSync> {
+  return spawnSync(
+    'bash',
+    [
+      DEPLOY,
+      '--q12-mode',
+      mode,
+      '--run-id',
+      RUN_ID,
+      '--release-sha',
+      sha,
+      '--external-quiesce-manifest',
+      h.quiesceManifest,
+    ],
+    { env: h.env, encoding: 'utf8' }
+  );
 }
 
 describe('Q12 quiesce-aware blue/green handoff wrapper', () => {
@@ -204,6 +240,8 @@ describe('Q12 quiesce-aware blue/green handoff wrapper', () => {
       expect(recovery.nginx_switched).toBe('false');
       expect(Array.isArray(recovery.targets)).toBe(true);
       expect((recovery.targets as unknown[]).length).toBe(2);
+      // The recovery manifest is published atomically: no temp residue remains.
+      expect(recoveryTempResidue(h)).toHaveLength(0);
     });
 
     it('refuses to prepare once the run is already activated', () => {
@@ -212,6 +250,19 @@ describe('Q12 quiesce-aware blue/green handoff wrapper', () => {
       const result = runDeploy(h, 'prepare-quiesced');
       expect(result.status).not.toBe(0);
       expect(result.stderr).toContain('already activated');
+    });
+
+    it('refuses to re-prepare once commit has advanced the run', () => {
+      const h = harness('blue');
+      expect(runDeploy(h, 'prepare-quiesced').status).toBe(0);
+      expect(runDeploy(h, 'commit-quiesced').status).toBe(0);
+      const logAfterCommit = dockerLog(h);
+      const result = runDeploy(h, 'prepare-quiesced');
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('already exists');
+      // No fresh docker mutation and the advanced manifest is not clobbered.
+      expect(dockerLog(h)).toBe(logAfterCommit);
+      expect(recoveryState(h).state).toBe('activation_ready');
     });
   });
 
@@ -235,6 +286,45 @@ describe('Q12 quiesce-aware blue/green handoff wrapper', () => {
       expect(recovery.state).toBe('activation_ready');
       expect(recovery.nginx_switched).toBe('true');
       expect((recovery.workers as unknown[]).length).toBe(3);
+      expect(recoveryTempResidue(h)).toHaveLength(0);
+    });
+
+    it('durably records the Nginx switch intent before moving Nginx', () => {
+      const h = harness('blue');
+      expect(runDeploy(h, 'prepare-quiesced').status).toBe(0);
+      // Inject a reload failure so commit aborts inside the switch window.
+      const result = spawnSync(
+        'bash',
+        [
+          DEPLOY,
+          '--q12-mode',
+          'commit-quiesced',
+          '--run-id',
+          RUN_ID,
+          '--release-sha',
+          RELEASE_SHA,
+          '--external-quiesce-manifest',
+          h.quiesceManifest,
+        ],
+        { env: { ...h.env, NGINX_FAIL: '1' }, encoding: 'utf8' }
+      );
+      expect(result.status).not.toBe(0);
+      // The intent marker must be durable even though the switch failed, so a
+      // later rollback can recognise that Nginx may already be on the target.
+      const recovery = recoveryState(h);
+      expect(recovery.nginx_switch_intent).toBe('true');
+      expect(recovery.nginx_switched).not.toBe('true');
+    });
+
+    it('refuses to commit when release-sha differs from the prepared manifest', () => {
+      const h = harness('blue');
+      expect(runDeploy(h, 'prepare-quiesced').status).toBe(0);
+      const result = runDeployWithSha(h, 'commit-quiesced', 'd'.repeat(40));
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('release-sha');
+      // Fails before any Nginx mutation.
+      expect(existsSync(h.nginxConfig)).toBe(false);
+      expect(readFileSync(join(h.base, 'active_color'), 'utf8').trim()).toBe('blue');
     });
 
     it('refuses to commit without a durable prepared state', () => {
@@ -408,6 +498,35 @@ describe('Q12 quiesce-aware blue/green handoff wrapper', () => {
       const result = runRollback(h);
       expect(result.status, result.stderr).toBe(0);
       expect(result.stdout).toContain('no traffic change required');
+      expect(recoveryState(h).state).toBe('rollback_preparing');
+    });
+
+    it('restores Nginx when the active color diverges even without a durable switch flag', () => {
+      const h = harness('blue');
+      // Model a commit that moved Nginx to green and advanced active_color, then
+      // crashed before durably recording nginx_switched=true (only the intent
+      // marker survived).
+      writeFileSync(
+        recoveryPath(h),
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.deploy-handoff-recovery/v1',
+          run_id: RUN_ID,
+          release_sha: RELEASE_SHA,
+          state: 'prepared',
+          target_color: 'green',
+          previous_active_color: 'blue',
+          nginx_switched: 'false',
+          nginx_switch_intent: 'true',
+        })}\n`
+      );
+      writeFileSync(join(h.base, 'active_color'), 'green\n');
+      const result = runRollback(h);
+      expect(result.status, result.stderr).toBe(0);
+      // The diverged active color is corrected back to the serving color and
+      // Nginx is rewritten; no writer is started.
+      expect(readFileSync(join(h.base, 'active_color'), 'utf8').trim()).toBe('blue');
+      expect(existsSync(h.nginxConfig)).toBe(true);
+      expect(dockerLog(h)).not.toMatch(/^start /m);
       expect(recoveryState(h).state).toBe('rollback_preparing');
     });
 
