@@ -498,3 +498,104 @@ describe('Q12 migration CLI resolution keeps file-only and databaseUrl exclusive
     expect(resolveMigrationConnectionSource({ q12 })).toMatchObject({ kind: 'q12' });
   });
 });
+
+describe('Q12 hardening: concurrent packet rejects embedded statements (P2-1)', () => {
+  it('rejects a second statement smuggled after a semicolon', () => {
+    expect(() =>
+      assertConcurrentIndexPacketSafe([
+        'CREATE INDEX CONCURRENTLY x ON public.t (a); DROP TABLE public.t',
+      ])
+    ).toThrow(/CONCURRENTLY|index|semicolon/iu);
+  });
+
+  it('rejects a privileged statement after a drop-index semicolon', () => {
+    expect(() =>
+      assertConcurrentIndexPacketSafe([
+        'DROP INDEX CONCURRENTLY IF EXISTS public.x; GRANT SELECT ON public.t TO service_role',
+      ])
+    ).toThrow(/CONCURRENTLY|index|semicolon/iu);
+  });
+});
+
+describe('Q12 hardening: file-only mode rejects PG* environment fallbacks (P2-2)', () => {
+  it('fails closed when any libpq PG* environment fallback is set', () => {
+    const variables = [
+      'PGHOST',
+      'PGHOSTADDR',
+      'PGPORT',
+      'PGDATABASE',
+      'PGUSER',
+      'PGPASSWORD',
+      'PGPASSFILE',
+      'PGSSLMODE',
+      'PGSSLROOTCERT',
+      'PGOPTIONS',
+      'PGSERVICE',
+      'PGSERVICEFILE',
+    ];
+    for (const variable of variables) {
+      expect(() =>
+        assertNoQ12UrlEnvironmentOrArgument({ [variable]: 'attacker' } as NodeJS.ProcessEnv, [])
+      ).toThrow();
+    }
+  });
+
+  it('still passes with no libpq environment fallbacks', () => {
+    expect(() =>
+      assertNoQ12UrlEnvironmentOrArgument({} as NodeJS.ProcessEnv, ['apply'])
+    ).not.toThrow();
+  });
+});
+
+describe('Q12 hardening: secret hygiene across fail-closed branches (P2-3)', () => {
+  async function assertNoLeak(load: Promise<unknown>, extras: string[] = []): Promise<void> {
+    const error = await load.then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (reason: unknown) => reason
+    );
+    const text = error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
+    for (const secret of [SYNTHETIC_PASSWORD, SYNTHETIC_CAPABILITY, ...extras]) {
+      expect(text).not.toContain(secret);
+    }
+  }
+
+  it('leaks no secret on an unsafe file mode', async () => {
+    const fixture = await makeFixture({ urlMode: 0o644 });
+    await assertNoLeak(loadQ12MigrationCredentials(fixture.paths, fixture.overrides));
+  });
+
+  it('leaks no secret on a wrong CA hash', async () => {
+    const fixture = await makeFixture({ caBytes: Buffer.from('different-ca\n') });
+    await assertNoLeak(loadQ12MigrationCredentials(fixture.paths, fixture.overrides));
+  });
+
+  it('leaks no secret on a rejected URI query parameter', async () => {
+    const url = `${canonicalUri()}?sslmode=verify-full`;
+    const fixture = await makeFixture({ url });
+    await assertNoLeak(loadQ12MigrationCredentials(fixture.paths, fixture.overrides), [url]);
+  });
+
+  it('leaks no secret on a multiline value', async () => {
+    const url = `${canonicalUri()}\n${canonicalUri()}`;
+    const fixture = await makeFixture({ url });
+    await assertNoLeak(loadQ12MigrationCredentials(fixture.paths, fixture.overrides), [
+      canonicalUri(),
+    ]);
+  });
+
+  it('leaks no secret on an inode swap after open', async () => {
+    const fixture = await makeFixture();
+    const swap = async (label: string): Promise<void> => {
+      if (label !== 'database URL file') return;
+      const replacement = `${fixture.paths.dbUrlFile}.swap`;
+      await writeFile(replacement, `${canonicalUri()}\n`, { mode: 0o600 });
+      await rm(fixture.paths.dbUrlFile);
+      await symlink(replacement, fixture.paths.dbUrlFile);
+    };
+    await assertNoLeak(
+      loadQ12MigrationCredentials(fixture.paths, { ...fixture.overrides, afterOpen: swap })
+    );
+  });
+});

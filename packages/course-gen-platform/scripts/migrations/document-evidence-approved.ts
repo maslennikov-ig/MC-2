@@ -60,12 +60,36 @@ export interface Q12MigrationCredentialTestOverrides {
   afterOpen?: (label: string) => void | Promise<void>;
 }
 
+// node-postgres silently falls back to these libpq environment variables for any
+// ClientConfig field left unset (and PGSERVICE/PGSERVICEFILE/PGOPTIONS can inject
+// host, TLS, or startup options). Q12 mode fails closed on their mere presence
+// rather than relying on explicit-field precedence.
+export const Q12_REJECTED_LIBPQ_ENV_VARS = [
+  'PGHOST',
+  'PGHOSTADDR',
+  'PGPORT',
+  'PGDATABASE',
+  'PGUSER',
+  'PGPASSWORD',
+  'PGPASSFILE',
+  'PGSSLMODE',
+  'PGSSLROOTCERT',
+  'PGOPTIONS',
+  'PGSERVICE',
+  'PGSERVICEFILE',
+] as const;
+
 export function assertNoQ12UrlEnvironmentOrArgument(
   env: NodeJS.ProcessEnv,
   args: readonly string[]
 ): void {
   if (env.SUPABASE_DB_URL !== undefined && env.SUPABASE_DB_URL !== '') {
     throw new Error('Q12 live migration mode rejects the SUPABASE_DB_URL environment variable');
+  }
+  for (const variable of Q12_REJECTED_LIBPQ_ENV_VARS) {
+    if (env[variable] !== undefined && env[variable] !== '') {
+      throw new Error(`Q12 live migration mode rejects the ${variable} environment variable`);
+    }
   }
   const urlFlags = new Set(['--db-url', '--url', '--database-url', '--connection-string']);
   for (const arg of args) {

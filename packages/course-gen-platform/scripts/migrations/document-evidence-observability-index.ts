@@ -89,9 +89,15 @@ function stripLeadingSqlNoise(statement: string): string {
 export function assertConcurrentIndexPacketSafe(statements: readonly string[]): void {
   for (const statement of statements) {
     const normalized = stripLeadingSqlNoise(statement).replace(/\s+/gu, ' ').trim();
-    if (!CONCURRENT_INDEX_PACKET_ALLOWLIST.some(pattern => pattern.test(normalized))) {
+    // Reject a smuggled second statement: after leading noise is stripped, each
+    // statement must wholly match the allowlist with no embedded `;` remainder
+    // (e.g. "CREATE INDEX CONCURRENTLY x ON t(a); DROP TABLE t").
+    if (
+      normalized.includes(';') ||
+      !CONCURRENT_INDEX_PACKET_ALLOWLIST.some(pattern => pattern.test(normalized))
+    ) {
       throw new Error(
-        'Q12 concurrent observability index packet permits only CONCURRENTLY index and index-comment statements'
+        'Q12 concurrent observability index packet permits only single semicolon-free CONCURRENTLY index and index-comment statements'
       );
     }
   }
