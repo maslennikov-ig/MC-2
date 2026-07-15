@@ -50,6 +50,28 @@ MANIFEST_COMMAND_IDS = tuple(COMMANDS.values()) + ORDINARY_COMMAND_IDS
 LEASE_FD_ENV_COMMAND_IDS = frozenset(
     ("writers.quiesce", "writers.resume.forward", "writers.resume.rollback")
 )
+# Amendment section 5: ordinary command -> (selector phase, target phase).
+ORDINARY_ROW_GRAMMAR = {
+    "operator.self-check": ("preflight", "preflight"),
+    "pg.backup": ("snapshot_exported", "backup_committed"),
+    "pg.restore": ("restore_verified", "restore_verified"),
+    "migration.base.apply": ("restore_verified", "restore_verified"),
+    "migration.observability.apply": ("base_migration_guarded", "base_migration_guarded"),
+    "source.forward": ("source_recovered", "source_recovered"),
+    "reindex.plan": ("reindex_started", "reindex_started"),
+    "reindex.worker.create": ("reindex_started", "reindex_started"),
+    "reindex.execute": ("reindex_started", "reindex_started"),
+    "reindex.verify": ("qdrant_verified", "qdrant_verified"),
+    "deploy.prepare": ("qdrant_verified", "qdrant_verified"),
+    "deploy.commit": ("activation_ready", "activation_ready"),
+}
+# Amendment section 4 item 6: controller milestone phase -> sole witness command.
+MILESTONE_WITNESSES = {"migrations_applied": "migration.observability.apply"}
+# Amendment section 6 item 2: mode-bound FWM intent/accepted row phases.
+FWM_ROW_PHASES = {
+    "writers.resume.forward": "prepared_quiesced",
+    "writers.resume.rollback": "rollback_preparing",
+}
 
 
 @dataclass
@@ -196,7 +218,7 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
     if not (
         (accepted_kind == "none" and accepted_hash is None)
         or (
-            accepted_kind == "final_writer_manifest"
+            accepted_kind in ("final_writer_manifest", "writer_quiesce_manifest")
             and isinstance(accepted_hash, str)
             and re.fullmatch(r"[0-9a-f]{64}", accepted_hash)
         )
@@ -213,15 +235,39 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
             and entry["command_sha256"] == ZERO
             and accepted_kind == "none"
         )
-    elif command_id == "writers.resume.rollback":
+    elif command_id in FWM_ROW_PHASES:
         valid = (
-            phase == "rollback_preparing"
-            and entry["command_sha256"] == ZERO
+            phase == FWM_ROW_PHASES[command_id]
+            and entry["command_sha256"] != ZERO
             and (
                 (outcome == "intent" and accepted_kind == "none")
                 or (outcome == "accepted" and accepted_kind == "final_writer_manifest")
             )
         )
+    elif command_id == "writers.quiesce":
+        valid = phase == "quiesced" and entry["command_sha256"] != ZERO
+        if valid and outcome in (
+            "intent",
+            "capability_issued",
+            "capability_claimed",
+            "capability_completed",
+        ):
+            valid = accepted_kind == "none"
+        elif valid and outcome == "accepted":
+            valid = accepted_kind == "writer_quiesce_manifest"
+        else:
+            valid = False
+    elif command_id in ORDINARY_ROW_GRAMMAR:
+        selector_phase, target_phase = ORDINARY_ROW_GRAMMAR[command_id]
+        valid = entry["command_sha256"] != ZERO and accepted_kind == "none"
+        if valid and outcome == "intent":
+            valid = phase == selector_phase
+        elif valid and outcome in ("capability_issued", "capability_claimed"):
+            valid = phase == target_phase
+        elif valid and outcome == "completed":
+            valid = phase == target_phase or MILESTONE_WITNESSES.get(phase) == command_id
+        else:
+            valid = False
     else:
         operation = next(
             (name for name in OPERATIONS if COMMANDS[name] == command_id), None
@@ -242,6 +288,59 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
             valid = False
     if not valid:
         raise LifecycleError("journal outcome/phase/command grammar mismatch")
+
+
+def validate_stable_binding_walk(
+    entries: list[dict[str, Any]], request: dict[str, Any]
+) -> None:
+    """Amendment section 4 items 7-8: segment-bound quiesce binding with the
+    isolated request-global fallback, and the evidence-stepped resource
+    manifest binding; every other stable binding stays request-global."""
+    switched = False
+    previous_resource: str | None = None
+    for entry in entries:
+        if entry.get("run_id") != request["run_id"]:
+            raise LifecycleError("journal run binding mismatch")
+        for key in ("release_sha", "operator_digest", "rotation_required"):
+            if key in request and entry.get(key) != request[key]:
+                raise LifecycleError(f"journal stable binding mismatch: {key}")
+        if "quiesce_manifest_sha256" in request:
+            expected = request["quiesce_manifest_sha256"]
+            if (
+                entry.get("command_id") == "writers.quiesce"
+                and entry.get("outcome") == "accepted"
+            ):
+                switched = True
+            value = entry.get("quiesce_manifest_sha256")
+            if switched:
+                if value != expected:
+                    raise LifecycleError(
+                        "journal stable binding mismatch: quiesce_manifest_sha256"
+                    )
+            elif value not in (ZERO, expected):
+                raise LifecycleError(
+                    "journal stable binding mismatch: quiesce_manifest_sha256"
+                )
+        if "resource_manifest_sha256" in request:
+            value = entry.get("resource_manifest_sha256")
+            if previous_resource is None:
+                if value != request["resource_manifest_sha256"]:
+                    raise LifecycleError(
+                        "journal stable binding mismatch: resource_manifest_sha256"
+                    )
+            elif value != previous_resource:
+                stepping = (
+                    entry.get("command_id") == "pg.backup"
+                    and entry.get("outcome") == "intent"
+                ) or (
+                    entry.get("command_id") == "deploy.prepare"
+                    and entry.get("outcome") == "completed"
+                )
+                if not stepping:
+                    raise LifecycleError(
+                        "journal stable binding mismatch: resource_manifest_sha256"
+                    )
+            previous_resource = value
 
 
 def sha256(data: bytes) -> str:
@@ -856,19 +955,9 @@ class Engine:
             digest = preimage.pop("entry_hash")
             if digest != sha256(canonical(preimage)):
                 raise LifecycleError("journal entry hash mismatch")
-            if entry.get("run_id") != self.request["run_id"]:
-                raise LifecycleError("journal run binding mismatch")
-            for key in (
-                "release_sha",
-                "operator_digest",
-                "resource_manifest_sha256",
-                "quiesce_manifest_sha256",
-                "rotation_required",
-            ):
-                if key in self.request and entry.get(key) != self.request[key]:
-                    raise LifecycleError(f"journal stable binding mismatch: {key}")
             previous = digest
             entries.append(entry)
+        validate_stable_binding_walk(entries, self.request)
         self.journal = entries
         entries_by_hash = {entry["entry_hash"]: entry for entry in entries}
 
@@ -1982,11 +2071,14 @@ class Engine:
             if current.parent.name in ("issued", "claimed"):
                 self.move_capability(operation, epoch, current.parent.name, "superseded")
                 self.trace.append("retire:predecessor")
+        resume_command = resolved_command(
+            load_manifest(), "writers.resume.rollback", self.request
+        )
         intent = self.append(
             "rollback_preparing",
             "intent",
             "writers.resume.rollback",
-            ZERO,
+            resume_command["command_sha256"],
             decision_epoch,
             f_capability,
             publish_fixed_checkpoint=False,
@@ -2005,7 +2097,7 @@ class Engine:
             "rollback_preparing",
             "accepted",
             "writers.resume.rollback",
-            ZERO,
+            resume_command["command_sha256"],
             decision_epoch,
             f_capability,
             accepted_kind="final_writer_manifest",
