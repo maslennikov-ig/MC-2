@@ -4,6 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 import { Client } from 'pg';
 
+import {
+  bindQ12MigrationSession,
+  extendQ12Guard,
+  readQ12GuardInputs,
+  resolveMigrationConnectionSource,
+  type Q12MigrationRunContext,
+} from './document-evidence-approved';
+
 export const DOCUMENT_EVIDENCE_INDEX_MIGRATION_VERSION = '20260711150000';
 export const DOCUMENT_EVIDENCE_INDEX_MIGRATION_NAME = 'document_evidence_observability_index';
 export const DOCUMENT_EVIDENCE_INDEX_REMOTE_CONFIRMATION = {
@@ -92,8 +100,9 @@ type RemoteConfirmations = Readonly<Record<Direction, string>>;
 type MigrationSpec = { version: string; name: string; statements: string[] };
 
 export interface DocumentEvidenceIndexMigrationOptions extends RemoteGate {
-  databaseUrl: string;
+  databaseUrl?: string;
   direction: Direction;
+  q12?: Q12MigrationRunContext;
 }
 
 export type DocumentEvidenceObservabilityMigrationOptions = DocumentEvidenceIndexMigrationOptions;
@@ -594,6 +603,42 @@ async function assertExactTotals(client: Client): Promise<void> {
   }
 }
 
+// Q12 totals apply: the totals packet creates a new table, so it installs and
+// verifies that table's W-barrier guard inside the same transaction, after its
+// DDL/data/grants and before COMMIT, exactly like the base packet.
+async function applyTotalsQ12(
+  client: Client,
+  spec: MigrationSpec,
+  statements: string[]
+): Promise<'applied' | 'reused'> {
+  const history = await readHistory(client, spec.version);
+  if (history) {
+    assertExactHistory(history, spec);
+    await assertExactTotals(client);
+    return 'reused';
+  }
+  if (await totalsRelationExists(client)) {
+    throw new Error('Live totals singleton exists without matching migration history');
+  }
+  const guardInputs = await readQ12GuardInputs(client, '20260711151000');
+  await client.query('BEGIN');
+  try {
+    for (const statement of statements) await client.query(statement);
+    await extendQ12Guard(client, '20260711151000', guardInputs);
+    await assertExactTotals(client);
+    await client.query(
+      `INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
+       VALUES($1,$2,$3::text[])`,
+      [spec.version, spec.name, spec.statements]
+    );
+    await client.query('COMMIT');
+    return 'applied';
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  }
+}
+
 async function applyTotals(
   client: Client,
   spec: MigrationSpec,
@@ -683,11 +728,18 @@ async function assertUnifiedHistory(client: Client, totalsSpec: MigrationSpec): 
 export async function runDocumentEvidenceObservabilityIndexMigration(
   options: DocumentEvidenceIndexMigrationOptions
 ): Promise<'applied' | 'rolled_back' | 'reused' | 'recovered'> {
-  validateDocumentEvidenceMigrationTarget(options.databaseUrl, options.direction, options);
+  const source = resolveMigrationConnectionSource(options);
+  if (source.kind === 'url') {
+    validateDocumentEvidenceMigrationTarget(source.connectionString, options.direction, options);
+  }
   await assertAllowlistedSource(options.direction);
-  const client = new Client({ connectionString: options.databaseUrl });
+  const client =
+    source.kind === 'q12'
+      ? new Client(source.context.clientConfig)
+      : new Client({ connectionString: source.connectionString });
   await client.connect();
   try {
+    if (source.kind === 'q12') await bindQ12MigrationSession(client, source.context.capability);
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', [ADVISORY_LOCK_KEY]);
     try {
@@ -703,11 +755,14 @@ export async function runDocumentEvidenceObservabilityIndexMigration(
 export async function runDocumentEvidenceObservabilityMigration(
   options: DocumentEvidenceObservabilityMigrationOptions
 ): Promise<'applied' | 'rolled_back' | 'reused' | 'recovered'> {
-  validateDocumentEvidenceObservabilityMigrationTarget(
-    options.databaseUrl,
-    options.direction,
-    options
-  );
+  const source = resolveMigrationConnectionSource(options);
+  if (source.kind === 'url') {
+    validateDocumentEvidenceObservabilityMigrationTarget(
+      source.connectionString,
+      options.direction,
+      options
+    );
+  }
   await assertAllowlistedSource(options.direction);
   const totalsForward = await loadTotalsMigration('apply');
   const totalsRollback = await loadTotalsMigration('rollback');
@@ -716,16 +771,23 @@ export async function runDocumentEvidenceObservabilityMigration(
     name: DOCUMENT_EVIDENCE_TOTALS_MIGRATION_NAME,
     statements: totalsForward.statements,
   };
-  const client = new Client({ connectionString: options.databaseUrl });
+  const client =
+    source.kind === 'q12'
+      ? new Client(source.context.clientConfig)
+      : new Client({ connectionString: source.connectionString });
   await client.connect();
   try {
+    if (source.kind === 'q12') await bindQ12MigrationSession(client, source.context.capability);
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', [ADVISORY_LOCK_KEY]);
     try {
       await assertUnifiedHistory(client, totalsSpec);
       if (options.direction === 'apply') {
         const indexResult = await apply(client);
-        const totalsResult = await applyTotals(client, totalsSpec, totalsForward.statements);
+        const totalsResult =
+          source.kind === 'q12'
+            ? await applyTotalsQ12(client, totalsSpec, totalsForward.statements)
+            : await applyTotals(client, totalsSpec, totalsForward.statements);
         if (indexResult === 'reused' && totalsResult === 'reused') return 'reused';
         if (indexResult === 'applied' && totalsResult === 'applied') return 'applied';
         return 'recovered';

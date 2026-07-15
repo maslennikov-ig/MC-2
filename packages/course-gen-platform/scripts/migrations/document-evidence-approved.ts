@@ -1,3 +1,8 @@
+/* eslint-disable max-lines --
+ * The Q12 file-only migration credential contract and the same-transaction
+ * guard publication must be co-located with this approved migration CLI: the
+ * stream write zone is fixed to this file and the observability CLI, so the
+ * shared credential/guard logic cannot be extracted into a new module. */
 import { constants as fsConstants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { lstat, open, readFile, readdir, realpath } from 'node:fs/promises';
@@ -530,9 +535,48 @@ const DOCUMENT_EVIDENCE_ABSENT_SECURITY_MANIFEST_SHA256 = {
   ],
 } as const;
 
+// A Q12 run supplies an already-validated field-by-field ClientConfig plus the
+// run-bound database barrier capability. It is mutually exclusive with the
+// ordinary in-memory `databaseUrl`: Q12 mutation never routes through the
+// legacy `connectionString` connection.
+export interface Q12MigrationRunContext {
+  clientConfig: ClientConfig;
+  capability: string;
+}
+
 export interface DocumentEvidenceApprovedMigrationOptions extends RemoteGate {
-  databaseUrl: string;
+  databaseUrl?: string;
   direction: Direction;
+  q12?: Q12MigrationRunContext;
+}
+
+export type MigrationConnectionSource =
+  | { kind: 'url'; connectionString: string }
+  | { kind: 'q12'; context: Q12MigrationRunContext };
+
+// Fail closed unless exactly one connection source is present. This is the
+// single choke point that guarantees Q12 file-only mutation and an ordinary
+// programmatic URL can never be combined, and that Q12 never yields a
+// `connectionString`.
+export function resolveMigrationConnectionSource(options: {
+  databaseUrl?: string;
+  q12?: Q12MigrationRunContext;
+}): MigrationConnectionSource {
+  const hasUrl = typeof options.databaseUrl === 'string' && options.databaseUrl.length > 0;
+  const hasQ12 = options.q12 != null;
+  if (hasUrl && hasQ12) {
+    throw new Error(
+      'Document evidence migration rejects a combined Q12 file-only context and databaseUrl'
+    );
+  }
+  if (!hasUrl && !hasQ12) {
+    throw new Error(
+      'Document evidence migration requires exactly one of a Q12 file-only context or databaseUrl'
+    );
+  }
+  return hasQ12
+    ? { kind: 'q12', context: options.q12! }
+    : { kind: 'url', connectionString: options.databaseUrl! };
 }
 
 function isLoopback(hostname: string): boolean {
@@ -1471,14 +1515,118 @@ function combinedResult(results: MigrationResult[], direction: Direction): Migra
   return 'recovered';
 }
 
+// ---------------------------------------------------------------------------
+// Q12 same-transaction guard publication.
+//
+// The frozen W barrier (`q12_guard.extend_guard`) installs row/TRUNCATE guards
+// on the exact newly created relations recorded in the stored expected catalog
+// and appends a `migration_guards` row. The migration reads those exact
+// relations/hashes from `q12_guard.active_run` (owned by postgres, readable by
+// the direct migration session) and passes them back; `extend_guard`
+// re-validates them against `pg_class`. Guard installation happens inside the
+// same transaction as the migration DDL/data and grants, before COMMIT, so the
+// new tables and their guards become visible atomically — there is no committed
+// window in which a granted table lacks its write barrier.
+// ---------------------------------------------------------------------------
+
+export type Q12GuardMigrationKey = '20260711140000' | '20260711151000';
+
+export interface Q12GuardInputs {
+  relations: unknown;
+  migrationFileSha256: string;
+  catalogSha256: string;
+}
+
+export async function readQ12GuardInputs(
+  client: Client,
+  migrationKey: Q12GuardMigrationKey
+): Promise<Q12GuardInputs> {
+  const result = await client.query<{
+    relations: unknown;
+    file_sha256: string | null;
+    catalog_sha256: string | null;
+  }>(
+    `SELECT expected_catalog->'migrations'->$1->'relations' AS relations,
+            expected_catalog->'migrations'->$1->>'migration_file_sha256' AS file_sha256,
+            expected_catalog->'migrations'->$1->>'catalog_sha256' AS catalog_sha256
+     FROM q12_guard.active_run WHERE singleton`,
+    [migrationKey]
+  );
+  const row = result.rows[0];
+  if (!row || row.relations == null || !row.file_sha256 || !row.catalog_sha256) {
+    throw new Error(
+      `Q12 database barrier is missing the expected guard catalog for migration ${migrationKey}`
+    );
+  }
+  return {
+    relations: row.relations,
+    migrationFileSha256: row.file_sha256,
+    catalogSha256: row.catalog_sha256,
+  };
+}
+
+export async function extendQ12Guard(
+  client: Client,
+  migrationKey: Q12GuardMigrationKey,
+  inputs: Q12GuardInputs
+): Promise<void> {
+  await client.query('SELECT q12_guard.extend_guard($1, $2::jsonb, $3, $4)', [
+    migrationKey,
+    JSON.stringify(inputs.relations),
+    inputs.migrationFileSha256,
+    inputs.catalogSha256,
+  ]);
+}
+
+// Apply the three base migrations as one atomic transaction so the guard the W
+// barrier extends over their new tables becomes visible in the same commit as
+// their grants. Because the fixed migration files interleave grants with DDL,
+// statements run in file order and the guard is installed after them but before
+// COMMIT; the atomic commit is what prevents any observable granted-but-unguarded
+// window.
+async function applyQ12BasePacket(
+  client: Client,
+  migrations: LoadedMigration[]
+): Promise<MigrationResult> {
+  const guardInputs = await readQ12GuardInputs(client, '20260711140000');
+  await client.query('BEGIN');
+  try {
+    for (const migration of migrations) {
+      await assertMigrationAbsent(client, migration.version);
+      for (const statement of migration.apply.statements) await client.query(statement);
+    }
+    await extendQ12Guard(client, '20260711140000', guardInputs);
+    for (const migration of migrations) {
+      await assertLiveMigration(client, migration.version);
+      await insertHistory(client, migration);
+    }
+    await client.query('COMMIT');
+    return 'applied';
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function runDocumentEvidenceApprovedMigrations(
   options: DocumentEvidenceApprovedMigrationOptions
 ): Promise<MigrationResult> {
-  validateDocumentEvidenceApprovedMigrationTarget(options.databaseUrl, options.direction, options);
+  const source = resolveMigrationConnectionSource(options);
+  if (source.kind === 'url') {
+    validateDocumentEvidenceApprovedMigrationTarget(
+      source.connectionString,
+      options.direction,
+      options
+    );
+  }
   const migrations = await loadDocumentEvidenceApprovedMigrations();
-  const client = new Client({ connectionString: options.databaseUrl });
+  const client =
+    source.kind === 'q12'
+      ? new Client(source.context.clientConfig)
+      : new Client({ connectionString: source.connectionString });
   await client.connect();
   try {
+    if (source.kind === 'q12') await bindQ12MigrationSession(client, source.context.capability);
     await requireSupabaseHistory(client);
     await client.query('SELECT pg_advisory_lock($1::bigint)', ['20260711120000']);
     try {
@@ -1490,6 +1638,9 @@ export async function runDocumentEvidenceApprovedMigrations(
         );
       }
       if (options.direction === 'rollback') await assertNoDownstreamLiveObjects(client);
+      if (source.kind === 'q12' && options.direction === 'apply') {
+        return await applyQ12BasePacket(client, migrations);
+      }
       const ordered = options.direction === 'apply' ? migrations : [...migrations].reverse();
       const results: MigrationResult[] = [];
       for (const migration of ordered) {

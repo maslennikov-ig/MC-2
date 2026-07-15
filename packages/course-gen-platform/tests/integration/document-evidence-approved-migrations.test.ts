@@ -12,8 +12,10 @@ import {
   DOCUMENT_EVIDENCE_APPROVED_MIGRATIONS,
   DOCUMENT_EVIDENCE_APPROVED_REMOTE_CONFIRMATION,
   loadDocumentEvidenceApprovedMigrations,
+  resolveMigrationConnectionSource,
   runDocumentEvidenceApprovedMigrations,
   validateDocumentEvidenceApprovedMigrationTarget,
+  type Q12MigrationRunContext,
 } from '../../scripts/migrations/document-evidence-approved';
 import { runDocumentEvidenceObservabilityMigration } from '../../scripts/migrations/document-evidence-observability-index';
 
@@ -116,6 +118,36 @@ describe('approved document evidence migration runner', () => {
     ).rejects.toMatchObject({
       stderr: expect.not.stringContaining(secret),
     });
+  });
+});
+
+describe('Q12 file-only mode and databaseUrl are mutually exclusive', () => {
+  const q12: Q12MigrationRunContext = {
+    clientConfig: { host: '127.0.0.1' },
+    capability: 'synthetic-capability',
+  };
+  const url = 'postgresql://postgres:x@127.0.0.1:5432/postgres';
+
+  it('routes a Q12 context to its ClientConfig and never a connectionString', () => {
+    const source = resolveMigrationConnectionSource({ q12 });
+    expect(source).toEqual({ kind: 'q12', context: q12 });
+    expect(source).not.toHaveProperty('connectionString');
+  });
+
+  it('routes an ordinary databaseUrl to the connectionString path', () => {
+    expect(resolveMigrationConnectionSource({ databaseUrl: url })).toEqual({
+      kind: 'url',
+      connectionString: url,
+    });
+  });
+
+  it('fails closed when both a Q12 context and databaseUrl are supplied', () => {
+    expect(() => resolveMigrationConnectionSource({ q12, databaseUrl: url })).toThrow(/combined/iu);
+  });
+
+  it('fails closed when neither connection source is supplied', () => {
+    expect(() => resolveMigrationConnectionSource({})).toThrow(/exactly one/iu);
+    expect(() => resolveMigrationConnectionSource({ databaseUrl: '' })).toThrow(/exactly one/iu);
   });
 });
 
