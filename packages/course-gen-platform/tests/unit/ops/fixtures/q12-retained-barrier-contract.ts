@@ -474,3 +474,67 @@ export const r3NegativeMutationFixture = {
   claimAfterCompletion: materializeTerminalClaimAfterCompletionForNegativeTest,
   issuedPredecessor: materializeIssuedRecoveryPredecessorForNegativeTest,
 } as const;
+
+export interface JoinedRetainedBarrierFixtureSpec {
+  runRoot: string;
+  joinedProfile: 'forward' | 'rollback';
+  /** rollback only */
+  completedPrefixLength?: 1 | 2 | 3 | 4;
+  /** rollback only; must be the exact next operation for the reached prefix */
+  frontier?: RetainedFrontierSpec;
+  /** mandatory for every joined profile, including clean rollback prefix 1 */
+  quiesceManifestPath: string;
+  /** approved D5 per-chain scenario dimensions, unchanged semantics */
+  chains?: Readonly<Partial<Record<RetainedBarrierOperation, RetainedChainSpec>>>;
+}
+
+export interface JoinedRetainedBarrierFixtureResult extends RootRetainedBarrierFixtureResult {
+  ordinaryHeadEntryHashes: ReadonlyMap<string, string>;
+  forwardFinalWriterManifestPath: string | null;
+  rollbackFinalWriterManifestPath: string | null;
+}
+
+export async function materializeJoinedRetainedBarrierFixture(
+  spec: JoinedRetainedBarrierFixtureSpec
+): Promise<JoinedRetainedBarrierFixtureResult> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+    input: JSON.stringify(spec),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status !== 0) {
+    throw new Error(`joined fixture runner failed (${child.status}): ${child.stderr.trim()}`);
+  }
+  const output = JSON.parse(child.stdout) as {
+    journalEntries: Record<string, unknown>[];
+    fixedCheckpointPath: string;
+    retainedCopyPaths: [string, string][];
+    capabilityPaths: [string, string][];
+    resultPaths: [string, string][];
+    selectorEntryHashes: [RetainedBarrierOperation, string][];
+    completionEntryHashes: [RetainedBarrierOperation, string][];
+    frontierDispositionEntryHash: string | null;
+    checkpointPaths: string[];
+    ordinaryHeadEntryHashes: Record<string, string>;
+    forwardFinalWriterManifestPath: string | null;
+    rollbackFinalWriterManifestPath: string | null;
+  };
+  return {
+    journalEntries: output.journalEntries,
+    fixedCheckpointPath: output.fixedCheckpointPath,
+    retainedCopyPaths: pairs(output.retainedCopyPaths),
+    capabilityPaths: pairs(output.capabilityPaths),
+    resultPaths: pairs(output.resultPaths),
+    selectorEntryHashes: pairs(output.selectorEntryHashes) as Map<RetainedBarrierOperation, string>,
+    completionEntryHashes: pairs(output.completionEntryHashes) as Map<
+      RetainedBarrierOperation,
+      string
+    >,
+    frontierDispositionEntryHash: output.frontierDispositionEntryHash,
+    ordinaryHeadEntryHashes: new Map(Object.entries(output.ordinaryHeadEntryHashes)),
+    forwardFinalWriterManifestPath: output.forwardFinalWriterManifestPath,
+    rollbackFinalWriterManifestPath: output.rollbackFinalWriterManifestPath,
+  };
+}

@@ -506,6 +506,71 @@ def existing_quiesce_manifest_sha256(
         os.close(directory_fd)
 
 
+JOINED_SPEC_KEYS = {
+    "runRoot",
+    "joinedProfile",
+    "completedPrefixLength",
+    "frontier",
+    "quiesceManifestPath",
+    "chains",
+}
+
+
+def run_joined_fixture(spec: dict) -> int:
+    unknown = set(spec) - JOINED_SPEC_KEYS
+    if unknown:
+        raise RuntimeError(f"unknown joined fixture key: {sorted(unknown)}")
+    if "quiesceManifestPath" not in spec:
+        raise RuntimeError("joined fixture requires the W quiesce manifest path")
+    root = fixture_root(spec["runRoot"])
+    quiesce_manifest_sha256 = existing_quiesce_manifest_sha256(
+        root, spec["quiesceManifestPath"], None
+    )
+    acquire_fixture_coordination_lock()
+    canonical_lock_path = root.parent / "cutover.lock"
+    if canonical_lock_path.exists():
+        canonical_lock_path.chmod(0o600)
+    lease_fd = os.open(canonical_lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    if lease_fd != 9:
+        os.dup2(lease_fd, 9)
+        os.close(lease_fd)
+        lease_fd = 9
+    fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lock_stat = os.fstat(lease_fd)
+    executor = NoIoExecutor()
+    executor.root = root
+    expected_catalog = root / "expected-post-migration-catalog.json"
+    if not expected_catalog.exists():
+        expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
+        expected_catalog.chmod(0o400)
+    request = {
+        "run_root": str(root),
+        "run_id": derive_run_id(root),
+        "release_sha": "0123456789abcdef0123456789abcdef01234567",
+        "operator_digest": "1" * 64,
+        "resource_manifest_sha256": "2" * 64,
+        "quiesce_manifest_sha256": quiesce_manifest_sha256,
+        "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
+        "rotation_required": False,
+        "lease_fd": 9,
+        "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
+        "joined_profile": spec["joinedProfile"],
+        "quiesce_manifest_path": spec["quiesceManifestPath"],
+        "chains": spec.get("chains"),
+        "completed_prefix_length": spec.get("completedPrefixLength"),
+        "frontier": spec.get("frontier"),
+    }
+    try:
+        output = CORE.run_joined_composer(request, executor)
+    except Exception as error:
+        write_audit(root, executor)
+        print(str(error), file=sys.stderr)
+        return 2
+    write_audit(root, executor, output)
+    sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--derive-run-id":
         if len(sys.argv) != 2:
@@ -543,6 +608,8 @@ def main() -> int:
     spec = json.load(sys.stdin)
     if "quiesceManifestSha256" in spec or "quiesce_manifest_sha256" in spec:
         raise RuntimeError("caller quiesce digest override is forbidden")
+    if "joinedProfile" in spec:
+        return run_joined_fixture(spec)
     root = fixture_root(spec["runRoot"])
     frontier = spec.get("abandonedFrontier")
     has_later_four = any(
