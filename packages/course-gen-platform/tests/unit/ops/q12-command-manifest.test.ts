@@ -268,6 +268,57 @@ function argvHash(argv: readonly string[]): string {
   return createHash('sha256').update(JSON.stringify(argv)).digest('hex');
 }
 
+function sha256Hex(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+function uuid5(namespace: string, name: string): string {
+  const ns = Buffer.from(namespace.replace(/-/g, ''), 'hex');
+  const hash = createHash('sha1')
+    .update(Buffer.concat([ns, Buffer.from(name, 'utf8')]))
+    .digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+const PROBE_RUN_ID = '3b241101-e2bb-4255-8caf-4136c566a962';
+const PROBE_QUIESCE = '/tmp/q12-probe-writer-quiesce.json';
+const PROBE_RELEASE = '0123456789abcdef0123456789abcdef01234567';
+const PROBE_CATALOG = 'a'.repeat(64);
+
+function expectedDerivedValues(): Record<string, string> {
+  const digest = (salt: string) => sha256Hex(`q12:${salt}:${PROBE_RUN_ID}`);
+  const snapshot = digest('snapshot-export');
+  return {
+    '<exported-id>': `${snapshot.slice(0, 8)}-${snapshot.slice(8, 16)}-1`,
+    '<immutable-generation>': `q12fixture-generation-${digest('backup-generation').slice(0, 16)}`,
+    '<recovery-run-id>': uuid5(PROBE_RUN_ID, 'q12-source-recovery'),
+    '<accepted-recovery-manifest-sha256>': digest('recovery-manifest'),
+    '<accepted-coverage-fingerprint>': digest('coverage-fingerprint'),
+    '<accepted-coverage-run>': [
+      uuid5(PROBE_RUN_ID, 'q12-coverage-org'),
+      uuid5(PROBE_RUN_ID, 'q12-coverage-course'),
+      uuid5(PROBE_RUN_ID, 'q12-coverage-run'),
+    ].join(':'),
+    '<quiesce-manifest>': PROBE_QUIESCE,
+  };
+}
+
+function resolveProbe(script: string): { status: number | null; stdout: string; stderr: string } {
+  const preamble = [
+    'import importlib.util, json, sys',
+    `spec = importlib.util.spec_from_file_location('q12core', ${JSON.stringify(CORE)})`,
+    'core = importlib.util.module_from_spec(spec)',
+    "sys.modules['q12core'] = core",
+    'spec.loader.exec_module(core)',
+    `REQUEST = {'run_id': '${PROBE_RUN_ID}', 'expected_catalog_sha256': '${PROBE_CATALOG}', 'release_sha': '${PROBE_RELEASE}'}`,
+  ].join('\n');
+  return spawnSync('/usr/bin/python3', ['-c', `${preamble}\n${script}`], { encoding: 'utf8' });
+}
+
 describe('Q12 canonical command manifest', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as {
     schema_version: string;
@@ -315,6 +366,77 @@ describe('Q12 canonical command manifest', () => {
         id
       ).toBe(true);
     }
+  });
+
+  it('resolves every ordinary command through the one manifest with derived single authorities', () => {
+    const probe = resolveProbe(
+      [
+        'manifest = core.load_manifest()',
+        `values = core.derive_joined_fixture_values(REQUEST['run_id'], ${JSON.stringify(PROBE_QUIESCE)})`,
+        'resolved = {command_id: core.resolved_command(manifest, command_id, REQUEST, values) for command_id in core.MANIFEST_COMMAND_IDS}',
+        "print(json.dumps({'values': values, 'resolved': resolved}))",
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const output = JSON.parse(probe.stdout) as {
+      values: Record<string, string>;
+      resolved: Record<string, { argv: string[]; command_sha256: string }>;
+    };
+    expect(output.values).toEqual(expectedDerivedValues());
+    const substitutions: Record<string, string> = {
+      '<run-id>': PROBE_RUN_ID,
+      '<expected-post-migration-catalog-sha256>': PROBE_CATALOG,
+      '<release-sha>': PROBE_RELEASE,
+      ...expectedDerivedValues(),
+    };
+    for (const id of ALL_IDS) {
+      const resolved = output.resolved[id];
+      expect(resolved, id).toBeDefined();
+      const source = manifest.commands[id].argv;
+      const expected = source.map(value => {
+        let rendered = value;
+        for (const [token, replacement] of Object.entries(substitutions)) {
+          rendered = rendered.split(token).join(replacement);
+        }
+        return rendered;
+      });
+      expect(resolved.argv, id).toEqual(expected);
+      expect(
+        resolved.argv.every(value => !value.includes('<') && !value.includes('>')),
+        id
+      ).toBe(true);
+      expect(resolved.command_sha256, id).toBe(argvHash(resolved.argv));
+    }
+  });
+
+  it('fails closed on unresolved placeholders and caller-offered substitutions', () => {
+    const unresolved = resolveProbe(
+      [
+        'manifest = core.load_manifest()',
+        'try:',
+        "    core.resolved_command(manifest, 'pg.backup', REQUEST, {})",
+        "    print('accepted')",
+        'except core.LifecycleError as error:',
+        '    print(f"rejected: {error}")',
+      ].join('\n')
+    );
+    expect(unresolved.status).toBe(0);
+    expect(unresolved.stdout).toContain('rejected: unresolved command placeholder');
+    const foreign = resolveProbe(
+      [
+        'manifest = core.load_manifest()',
+        `values = core.derive_joined_fixture_values(REQUEST['run_id'], ${JSON.stringify(PROBE_QUIESCE)})`,
+        "values['<caller-injected>'] = 'attack'",
+        'try:',
+        "    core.resolved_command(manifest, 'pg.backup', REQUEST, values)",
+        "    print('accepted')",
+        'except core.LifecycleError as error:',
+        '    print(f"rejected: {error}")',
+      ].join('\n')
+    );
+    expect(foreign.status).toBe(0);
+    expect(foreign.stdout).toContain('rejected: unknown substitution placeholder');
   });
 
   it('deployed wrappers enter only the production core and expose no test bypass', () => {

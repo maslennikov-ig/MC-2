@@ -524,11 +524,62 @@ def load_manifest() -> dict[str, Any]:
     return manifest
 
 
-def resolved_command(manifest: dict[str, Any], command_id: str, request: dict[str, Any]) -> dict[str, Any]:
+SUBSTITUTION_PLACEHOLDERS = frozenset(
+    (
+        "<run-id>",
+        "<expected-post-migration-catalog-sha256>",
+        "<release-sha>",
+        "<quiesce-manifest>",
+        "<exported-id>",
+        "<immutable-generation>",
+        "<recovery-run-id>",
+        "<accepted-recovery-manifest-sha256>",
+        "<accepted-coverage-fingerprint>",
+        "<accepted-coverage-run>",
+    )
+)
+
+
+def derive_joined_fixture_values(run_id: str, quiesce_manifest_path: str) -> dict[str, str]:
+    """Amendment section 3 closed-fixture derivations; Root-only single authorities."""
+    rendered = str(uuid.UUID(run_id))
+
+    def digest(salt: str) -> str:
+        return sha256(f"q12:{salt}:{rendered}".encode("utf-8"))
+
+    def derived_uuid(name: str) -> str:
+        return str(uuid.uuid5(uuid.UUID(rendered), name))
+
+    snapshot = digest("snapshot-export")
+    return {
+        "<exported-id>": f"{snapshot[0:8]}-{snapshot[8:16]}-1",
+        "<immutable-generation>": "q12fixture-generation-" + digest("backup-generation")[0:16],
+        "<recovery-run-id>": derived_uuid("q12-source-recovery"),
+        "<accepted-recovery-manifest-sha256>": digest("recovery-manifest"),
+        "<accepted-coverage-fingerprint>": digest("coverage-fingerprint"),
+        "<accepted-coverage-run>": ":".join(
+            derived_uuid(name)
+            for name in ("q12-coverage-org", "q12-coverage-course", "q12-coverage-run")
+        ),
+        "<quiesce-manifest>": quiesce_manifest_path,
+    }
+
+
+def resolved_command(
+    manifest: dict[str, Any],
+    command_id: str,
+    request: dict[str, Any],
+    values: dict[str, str] | None = None,
+) -> dict[str, Any]:
     source = manifest["commands"][command_id]
+    extra = dict(values or {})
+    if not set(extra) <= SUBSTITUTION_PLACEHOLDERS:
+        raise LifecycleError("unknown substitution placeholder offered")
     substitutions = {
         "<run-id>": request["run_id"],
         "<expected-post-migration-catalog-sha256>": request["expected_catalog_sha256"],
+        "<release-sha>": request["release_sha"],
+        **extra,
     }
     argv = []
     for value in source["argv"]:
