@@ -365,7 +365,7 @@ The final-writer-manifest contract is corrected as follows:
    validates `len(held_writers) <= 5` and
    `target_topology == expected_target_topology[:len(target_topology)]`):
    profile `rollback`, `completed_prefix_length = 4`, no frontier, plus
-   `partial_capture_target_count = k` with `k` in `1..4` (runner spec key
+   `partial_capture_target_count = k` with `k` in `1..5` (runner spec key
    `partialCaptureTargets`). Its composition is the prefix-4 rollback base
    followed by the forward tail through the completed `deploy.prepare`
    lifecycle (including the frozen `targets` resource-manifest step) —
@@ -375,14 +375,19 @@ The final-writer-manifest contract is corrected as follows:
    derivation and projected to the held never-resumable intent. The modeled
    production state is a cutover interrupted during `deploy.prepare`'s durable
    one-at-a-time target creation after `k` creations (the lifecycle addendum's
-   durable-capture prefix rule). Deliberate, documented simplification: the
+   durable-capture prefix rule); `k = 5` models the full durable capture
+   interrupted after the last creation, before any forward manifest or
+   `deploy.commit`. It is also the only W-consumable held-5 journal: the
+   item 3 activation-frontier profile leaves an issued-but-uncompleted
+   `barrier.activate` authority, which the accepted W controller rejects as an
+   ambiguous historical barrier authority. Deliberate, documented simplification: the
    fixture emits the complete `deploy.prepare` row group rather than an
    abandoned mid-lifecycle row set, because section 5 acceptance and the W
    held contract bind only the manifest contents and the two resource-step
    anchors; incomplete ordinary lifecycles would add reload semantics without
    adding W-contract coverage. The caller still supplies no writer bytes —
    only the count. Item 3's `{0, 5}` narrowing is otherwise unchanged; `k`
-   outside `1..4`, a forward profile, a prefix below 4, or a coexisting
+   outside `1..5`, a forward profile, a prefix below 4, or a coexisting
    frontier fails before producer state.
 
 ## 7. Authorized production-core and grammar deltas
@@ -472,7 +477,7 @@ stays:
 9. the partial-capture profile composes a section 5-valid journal whose
    rollback manifest holds exactly the creation-order `k`-prefix of targets
    with the never-resumable projection and exactly one FWM acceptance, while
-   `partial_capture_target_count` outside `1..4`, on a forward profile, on a
+   `partial_capture_target_count` outside `1..5`, on a forward profile, on a
    prefix below 4, or with a coexisting frontier fails before producer state.
 
 ## 10. What remains Task 9

@@ -2908,11 +2908,11 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
         or frontier is not None
         or isinstance(partial_capture, bool)
         or not isinstance(partial_capture, int)
-        or not 1 <= partial_capture <= 4
+        or not 1 <= partial_capture <= 5
     ):
         raise LifecycleError(
             "partial capture requires rollback prefix 4 without a frontier"
-            " and a target count in 1..4"
+            " and a target count in 1..5"
         )
     values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
     engine = Engine(request, executor)
