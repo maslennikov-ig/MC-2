@@ -222,8 +222,10 @@ done
 [[ -z $external_quiesce_manifest || $stop_writers -eq 0 ]] ||
   fail '--external-quiesce-manifest cannot be combined with --stop-writers'
 
-[[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
-  fail '--run-id must be a UUIDv4'
+# Production runs are UUIDv4; the accepted D5J joined fixture freezes UUIDv5 run
+# ids derived from the run-root path (q12-writer-resume.py:21-23), so accept both.
+[[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
+  fail '--run-id must be a UUIDv4 or UUIDv5'
 case "$operation" in
   forward|rollback|resume-writers-only|quiesce-writers-only) ;;
   *) fail '--operation must be forward, rollback, resume-writers-only, or quiesce-writers-only' ;;
@@ -262,7 +264,10 @@ run_writer_resume_only() {
   local resume_run_root
   if [[ $local_test == 1 ]]; then
     resume_run_root="$Q12_RUN_ROOT_OVERRIDE"
-    [[ $resume_run_root == /tmp/mc2-source-recovery-wrapper-*/backups/q12/$run_id ]] ||
+    # The accepted D5J joined fixture roots at the materializer's /tmp/mc2-q12-d5-root-*
+    # directory (q12-retained-barrier-runner.py); the production branch is untouched.
+    [[ $resume_run_root == /tmp/mc2-source-recovery-wrapper-*/backups/q12/$run_id ||
+       $resume_run_root == /tmp/mc2-q12-d5-root-* ]] ||
       fail 'protected resume test run root is invalid'
     case "$resume_fault_point" in ''|after-first-start|before-receipt|after-terminal-before-receipt|after-terminal-temp-fsync|after-terminal-rename) ;; *) fail 'unknown protected resume fault point' ;; esac
   else

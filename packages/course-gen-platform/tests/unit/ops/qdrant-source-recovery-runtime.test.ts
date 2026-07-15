@@ -26,13 +26,6 @@ import {
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const WRAPPER = resolve(REPO_ROOT, 'deploy/qdrant/source-recovery-run.sh');
-// The security-critical resume unit-under-test. The deployed wrapper only routes
-// production UUIDv4 runs rooted at backups/q12/<id>; the D5J joined positive uses
-// the materializer's /tmp/mc2-q12-d5-root-* root and its UUIDv5 id (which the
-// controller explicitly accepts, q12-writer-resume.py:21-23), so it exercises the
-// controller directly with the wrapper's exact env/fd/arg discipline (source-
-// recovery-run.sh:288-293).
-const RESUME_CONTROLLER = resolve(REPO_ROOT, 'deploy/qdrant/q12-writer-resume.py');
 const COMMAND_MANIFEST = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-command-manifest.json'), 'utf8')
 ) as { commands: Record<string, { argv: string[] }> };
@@ -2638,34 +2631,6 @@ function writerResumeFixture(
     env: NodeJS.ProcessEnv = {}
   ): ReturnType<typeof spawnSync> => {
     writeResumeTestDockerEnvironment(fixture, env);
-    if (joined) {
-      const uid = String(process.getuid?.() ?? 1000);
-      const gid = String(process.getgid?.() ?? 1000);
-      const dockerBin = String(fixture.env.SOURCE_RECOVERY_DOCKER_BIN);
-      return spawnSync(
-        'bash',
-        [
-          '-c',
-          'exec 9<>"$1"; flock -n 9; shift; exec /usr/bin/env -i ' +
-            "PATH='/usr/sbin:/usr/bin:/sbin:/bin' LC_ALL='C' LANG='C' HOME='/root' " +
-            'Q12_EXTERNAL_QUIESCE_LEASE_FD=9 "$@" </dev/null',
-          'q12-joined-resume-lease',
-          cutoverLock,
-          'python3',
-          RESUME_CONTROLLER,
-          modeOverride,
-          runId,
-          fixture.q12RunRoot,
-          dockerBin,
-          cutoverLock,
-          uid,
-          gid,
-          '1',
-          '',
-        ],
-        { env: { PATH: process.env.PATH }, encoding: 'utf8' }
-      );
-    }
     return spawnSync(
       'bash',
       [
@@ -4140,6 +4105,65 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
         record => record.State.Running === false && record.HostConfig.RestartPolicy.Name === 'no'
       )
     ).toBe(true);
+  });
+
+  function invokeResumeWrapper(
+    fixture: ComposeWriterFixture,
+    runIdArg: string,
+    runRootEnv: string
+  ): ReturnType<typeof spawnSync> {
+    const cutoverLock = join(fixture.directory, 'q12-cutover.lock');
+    writeFileSync(cutoverLock, '', { mode: 0o600 });
+    chmodSync(cutoverLock, 0o600);
+    writeResumeTestDockerEnvironment(fixture, {});
+    return spawnSync(
+      'bash',
+      [
+        '-c',
+        'exec 9<>"$1"; flock -n 9; shift; exec bash "$@"',
+        'q12-resume-lease',
+        cutoverLock,
+        WRAPPER,
+        '--operation',
+        'resume-writers-only',
+        '--resume-mode',
+        'forward',
+        '--run-id',
+        runIdArg,
+      ],
+      {
+        env: {
+          ...fixture.env,
+          SOURCE_RECOVERY_Q12_RUN_ROOT: runRootEnv,
+          SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE: cutoverLock,
+          Q12_EXTERNAL_QUIESCE_LEASE_FD: '9',
+        },
+        encoding: 'utf8',
+      }
+    );
+  }
+
+  it('wrapper rejects a resume run-id that is neither UUIDv4 nor UUIDv5', () => {
+    const fixture = composeWriterFixture();
+    // Version nibble 3 is neither v4 nor v5.
+    const result = invokeResumeWrapper(
+      fixture,
+      '223e4567-e89b-32d3-a456-426614174000',
+      fixture.q12RunRoot
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('--run-id must be a UUIDv4 or UUIDv5');
+  });
+
+  it('wrapper rejects a resume run root matching neither the wrapper nor the joined pattern', () => {
+    const fixture = composeWriterFixture();
+    const bogusRoot = mkdtempSync('/tmp/mc2-bogus-resume-root-');
+    temporaryDirectories.push(bogusRoot);
+    // A valid UUIDv5 run id passes the id gate; the run root must still match a
+    // known test pattern (wrapper backups/q12 or the joined /tmp/mc2-q12-d5-root-*).
+    const result = invokeResumeWrapper(fixture, '223e4567-e89b-52d3-a456-426614174000', bogusRoot);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('protected resume test run root is invalid');
   });
 
   it.each([0, 3, 5])(
