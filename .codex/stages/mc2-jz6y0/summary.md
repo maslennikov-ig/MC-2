@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; D5/D5W are integrated; owner-approved decision `.13.22` now precedes D5J `.13.21`, W, M/H, D6 and Root; remaining local work is delegated to Fable; remote/live activation remains NO-GO
+Status: all safe local Q6-Q11 and E1-E7 work accepted; D5/D5W are integrated; decision `.13.22` is closed by the accepted normative amendment and D5J `.13.21` is implemented, independently reviewed, and integrated at `66e41cb5`; W `.13.10` resumes next, then M/H, D6 and Root; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence before this Fable handoff: pushed head `038ed4c5`; approved D5J spec SHA `d7e86193…c75d`; D5J source branch was pushed at `e2c8bfbd` before handoff sync
+Current accepted integration evidence: D5J merged at `66e41cb5` from source tip `bf27f595`; approved D5J spec SHA `d7e86193…c75d`; accepted amendment SHA `d6c4d8e4…075c`; reviewed plan SHA `a05ba3c6…5a662`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
-Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation. The current sequential path is `.13.22 -> .13.21 -> W`; M/H follow W, D6 follows accepted W plus its reviewed plan, and Root joins them. Live execution remains fail-closed.
+Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation. The current sequential path is `.13.21 review/integration (done) -> W .13.10`; M/H follow W, D6 follows accepted W plus its reviewed plan, and Root joins them. Live execution remains fail-closed.
 
 ## Q12 D5 Plan Acceptance (2026-07-14)
 
@@ -391,6 +391,32 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
 - D6 Option A remains dependency-ordered after accepted W and a reviewed D6
   plan. The current Fable delegation supplies local implementation authority;
   the remote gate is unchanged.
+
+## Q12 D5J Amendment and Implementation (2026-07-15)
+
+- Decision `.13.22` closed: normative amendment
+  `docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md`
+  SHA-256 `d6c4d8e4b2b7f6c53d648fdf587a5520db45fa5d8f3c84668b48b09b6bbe075c`,
+  independent correctness and docs reviews both PASS P0-P3 `0/0/0/0`
+  (report SHA-256 `5b588dbd…4092` and `fd958193…be8b`). It freezes the
+  twenty-command canonical manifest subset moved forward from Task 9, the
+  closed substitution domain, every ordinary row binding, two-segment
+  quiesce/evidence-stepped resource rules, dual immutable FWM paths with real
+  `writers.resume.*` hashes, and the Root-owned deterministic writer inventory.
+- `.13.21` implemented under reviewed plan SHA-256 `a05ba3c6…5a662`
+  (final plan review PASS `0/0/0/0`) on `codex/q12-d5j-joined-fixture`
+  through `bf27f595`, integrated as merge `66e41cb5`. The closed joined
+  composer emits the exact 76-row forward chronology and all rollback
+  profiles (prefixes 1-4 clean/exact-next-frontier, activation frontier with
+  both mode-bound manifests and byte-identical target entries) solely through
+  production primitives; deployed wrappers/parser gain no switch.
+- Independent implementation reviews: correctness PASS `0/0/0/2` with both
+  suites rerun by the reviewer, docs PASS `0/0/1/2`; every P2/P3 finding
+  fixed and pushed. Evidence: focused four-file suite 300/300 file-parallel
+  and 300/300 serialized (baseline 271/271), static acceptance checks,
+  workspace type-check, synthetic build; validated stage artifact
+  `mc2-jz6y0.13.21-q12-d5j.md`. Integration rerun and process verification
+  recorded at the merged head. No remote/live mutation occurred.
 
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
