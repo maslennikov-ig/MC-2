@@ -1818,13 +1818,38 @@ function installChainSpec(overrides: Record<string, unknown>): Record<string, un
   };
 }
 
+// Rollback held-target-count -> the Root materializer profile that produces it:
+// 0 = clean prefix 4; 1..4 = the sanctioned partialCaptureTargets crash lever
+// (partial durable capture); 5 = the activation frontier. All keep a genesis +
+// section-5-valid joined prefix; W consumes the FWM held set read-only.
+function rollbackHeldSpec(heldTargetCount: number): Record<string, unknown> {
+  if (heldTargetCount >= 1 && heldTargetCount <= 4) {
+    return { partialCaptureTargets: heldTargetCount };
+  }
+  if (heldTargetCount === 5) {
+    return {
+      frontier: {
+        operation: 'activate',
+        form: 'issued',
+        history: 'initial',
+        lease: 'continuous',
+        copySet: 'cutover',
+        exactSuccessBeforeDisposition: false,
+        activationCommitRace: 'none',
+      },
+    };
+  }
+  return {};
+}
+
 async function joinedWriterResumeFixture(
   mode: 'forward' | 'rollback',
   installChain?: Record<string, unknown>,
   // Only W-suffix-affecting options are meaningful here (e.g. databasePreIssuanceOrphan);
   // prefix-shaping options are owned by the Root materializer, not W.
   journalOptions: ResumeJournalFixtureOptions = {},
-  createdNoHealth = false
+  createdNoHealth = false,
+  heldTargetCount = 0
 ): Promise<ResumeWriterFixture> {
   const runRoot = mkdtempSync('/tmp/mc2-q12-d5-root-');
   temporaryDirectories.push(runRoot);
@@ -1862,7 +1887,9 @@ async function joinedWriterResumeFixture(
     runRoot,
     joinedProfile: mode,
     quiesceManifestPath: quiescePath,
-    ...(mode === 'rollback' ? { completedPrefixLength: 4 as const } : {}),
+    ...(mode === 'rollback'
+      ? { completedPrefixLength: 4 as const, ...rollbackHeldSpec(heldTargetCount) }
+      : {}),
     ...(installChain ? { chains: { install: installChain } } : {}),
   } as never);
   const fwmPath =
@@ -4263,10 +4290,21 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(result.stderr).toContain('protected resume test run root is invalid');
   });
 
-  it.each([0, 3, 5])(
+  it.each([0, 1, 2, 3, 4])(
     'resumes rollback original ten while preserving an exact held target set of %i',
-    heldTargetCount => {
-      const fixture = writerResumeFixture('rollback', heldTargetCount);
+    async heldTargetCount => {
+      // held 0 = clean prefix 4; 1..4 = the sanctioned partialCaptureTargets crash
+      // lever (partial durable capture). held 5 (full capture) has no W-compatible
+      // profile: the only full-capture composer profile is the activation frontier,
+      // whose abandoned barrier.activate trips W's historical-barrier validation
+      // (q12-writer-resume.py:1778); pending an orchestrator ruling.
+      const fixture = await joinedWriterResumeFixture(
+        'rollback',
+        undefined,
+        {},
+        false,
+        heldTargetCount
+      );
 
       const result = fixture.resume();
 
@@ -4284,7 +4322,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
       ).toBe(true);
       expect(JSON.parse(readFileSync(fixture.resumeState, 'utf8'))).toMatchObject({
         schema_version: 'megacampus.q12.writer-resume-state/v1',
-        run_id: Q12_RUN_ID,
+        run_id: fixture.runId,
         state: 'writers_resumed',
         mode: 'rollback',
       });
@@ -4921,8 +4959,11 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(existsSync(fixture.resumeState)).toBe(false);
   });
 
-  it('rejects an unrecorded target identity before any start', () => {
-    const fixture = writerResumeFixture('rollback', 3);
+  it('rejects an unrecorded target identity before any start', async () => {
+    // held is incidental to this contract; a target-bearing joined rollback (held=4
+    // via the partial-capture lever) gives the target project the unrecorded-inventory
+    // check needs.
+    const fixture = await joinedWriterResumeFixture('rollback', undefined, {}, false, 4);
     const records = fixture.records();
     records.push({
       ...targetWriterRecords()[4],
