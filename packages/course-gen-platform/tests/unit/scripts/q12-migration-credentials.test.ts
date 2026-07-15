@@ -14,7 +14,9 @@ import {
   Q12_MIGRATION_STARTUP_OPTIONS,
   Q12_MIGRATION_SET_CAPABILITY_SQL,
   assertNoQ12UrlEnvironmentOrArgument,
+  resolveMigrationConnectionSource,
   type Q12MigrationCredentialPaths,
+  type Q12MigrationRunContext,
 } from '../../../scripts/migrations/document-evidence-approved';
 import { assertConcurrentIndexPacketSafe } from '../../../scripts/migrations/document-evidence-observability-index';
 
@@ -363,5 +365,35 @@ DROP INDEX CONCURRENTLY IF EXISTS public.idx_clarifying_pending_critical_evidenc
     ['an ALTER statement', 'ALTER TABLE public.clarifying_questions ADD COLUMN injected text'],
   ])('rejects %s injected into the concurrent packet', (_label, statement) => {
     expect(() => assertConcurrentIndexPacketSafe([statement])).toThrow(/CONCURRENTLY|index/iu);
+  });
+});
+
+describe('Q12 file-only mode and databaseUrl are mutually exclusive', () => {
+  const q12: Q12MigrationRunContext = {
+    clientConfig: { host: '127.0.0.1' },
+    capability: 'synthetic-capability',
+  };
+  const url = 'postgresql://postgres:x@127.0.0.1:5432/postgres';
+
+  it('routes a Q12 context to its ClientConfig and never a connectionString', () => {
+    const source = resolveMigrationConnectionSource({ q12 });
+    expect(source).toEqual({ kind: 'q12', context: q12 });
+    expect(source).not.toHaveProperty('connectionString');
+  });
+
+  it('routes an ordinary databaseUrl to the connectionString path', () => {
+    expect(resolveMigrationConnectionSource({ databaseUrl: url })).toEqual({
+      kind: 'url',
+      connectionString: url,
+    });
+  });
+
+  it('fails closed when both a Q12 context and databaseUrl are supplied', () => {
+    expect(() => resolveMigrationConnectionSource({ q12, databaseUrl: url })).toThrow(/combined/iu);
+  });
+
+  it('fails closed when neither connection source is supplied', () => {
+    expect(() => resolveMigrationConnectionSource({})).toThrow(/exactly one/iu);
+    expect(() => resolveMigrationConnectionSource({ databaseUrl: '' })).toThrow(/exactly one/iu);
   });
 });
