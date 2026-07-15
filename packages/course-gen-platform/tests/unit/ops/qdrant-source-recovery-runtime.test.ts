@@ -1849,7 +1849,14 @@ async function joinedWriterResumeFixture(
   // prefix-shaping options are owned by the Root materializer, not W.
   journalOptions: ResumeJournalFixtureOptions = {},
   createdNoHealth = false,
-  heldTargetCount = 0
+  heldTargetCount = 0,
+  // mutate-then-build hook: tamper the Root prefix journal AFTER the composer
+  // emits it but BEFORE W builds its suffix, so every suffix checkpoint / db
+  // terminal proof / capability binding derives against the tampered journal
+  // naturally (no post-hoc rehash cascade). Used only by joined-mutation negatives,
+  // and only for defects appended after the last prefix row (barrier.activate) so
+  // no Root-owned retained checkpoint shifts.
+  tamperPrefix?: (runRoot: string) => void
 ): Promise<ResumeWriterFixture> {
   const runRoot = mkdtempSync('/tmp/mc2-q12-d5-root-');
   temporaryDirectories.push(runRoot);
@@ -1892,6 +1899,7 @@ async function joinedWriterResumeFixture(
       : {}),
     ...(installChain ? { chains: { install: installChain } } : {}),
   } as never);
+  if (tamperPrefix) tamperPrefix(runRoot);
   const fwmPath =
     mode === 'forward'
       ? materialized.forwardFinalWriterManifestPath!
@@ -3135,6 +3143,45 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/checkpoint projection|journal\/checkpoint binding/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+  });
+
+  it('rejects a second final-writer-manifest pair in the joined prefix before any writer start', async () => {
+    // mutate-then-build: append a duplicate prepared_quiesced intent/accepted pair
+    // AFTER the last prefix row (barrier.activate) so no Root retained checkpoint
+    // shifts, then let W build its suffix over the tampered prefix. The section-5
+    // grammar rejects the second FWM acceptance with its native pin.
+    const fixture = await joinedWriterResumeFixture('forward', undefined, {}, false, 0, runRoot => {
+      const journal = join(runRoot, 'phase.jsonl');
+      const entries = readFileSync(journal, 'utf8')
+        .trimEnd()
+        .split('\n')
+        .map(line => JSON.parse(line) as Record<string, any>);
+      const intent = entries.find(
+        e => e.command_id === 'writers.resume.forward' && e.outcome === 'intent'
+      )!;
+      const accepted = entries.find(
+        e => e.command_id === 'writers.resume.forward' && e.outcome === 'accepted'
+      )!;
+      const last = entries[entries.length - 1];
+      const intentPreimage = { ...intent };
+      delete intentPreimage.entry_hash;
+      intentPreimage.seq = entries.length + 1;
+      intentPreimage.previous_hash = last.entry_hash;
+      const dupIntent = withJournalEntryHash(intentPreimage);
+      const acceptedPreimage = { ...accepted };
+      delete acceptedPreimage.entry_hash;
+      acceptedPreimage.seq = entries.length + 2;
+      acceptedPreimage.previous_hash = dupIntent.entry_hash;
+      const dupAccepted = withJournalEntryHash(acceptedPreimage);
+      entries.push(dupIntent, dupAccepted);
+      writeJournal(journal, entries);
+    });
+
+    const result = fixture.resume();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/exactly one final writer manifest/iu);
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
