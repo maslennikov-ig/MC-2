@@ -317,9 +317,15 @@ The final-writer-manifest contract is corrected as follows:
      `image_id` = `sha256:` + SHA-256 of UTF-8
      `q12:fixture-target-image:<run-id>:<svc>`; `image_ref` =
      `q12fixture.invalid/megacampus-<svc>@` + that `image_id`; `name` =
-     `megacampus-<svc>-q12fixture`; `class`/`project`/`service`/`config_files`/
+     `megacampus-<svc>-q12fixture`; `class`/`service`/`config_files`/
      `working_dir` copy the corresponding production writer's values from the
-     quiesce manifest; `healthcheck_present` copies the corresponding original;
+     quiesce manifest; `project` copies the corresponding production writer
+     for the three workers, while the `api` and `web` targets take the
+     opposite blue/green color of the active production frontends (the
+     quiesce manifest's `production-api`/`production-web` project, which must
+     be exactly one of `megacampus-blue`/`megacampus-green`) — the accepted W
+     cutover truth that new frontends never land on the serving color;
+     `healthcheck_present` copies the corresponding original;
      `intended_running=true`;
      `intended_restart_policy={name:"unless-stopped",maximum_retry_count:0}`,
      the frozen fixture value of the lifecycle addendum's "new release's
@@ -331,7 +337,14 @@ The final-writer-manifest contract is corrected as follows:
      The mode-specific composition is a closed-fixture specialization of the
      lifecycle addendum's frozen cardinalities (forward ten/five; rollback held
      `0..5` narrows to exactly `{0, 5}` because the closed profiles either never
-     run `deploy.prepare` or run it to completion):
+     run `deploy.prepare` or run it to completion). Array ordering is frozen
+     to the accepted W topology contract: the five targets lead their array in
+     the creation order `api`, `web`, `worker`, `worker-stage6`,
+     `worker-stage7` (the forward `final_writers` head and the
+     activation-frontier rollback `held_writers`), and every originals group
+     follows in the deterministic `project`, `service`, `id` sort; the
+     lifecycle addendum's array-sort rule remains the authority for the
+     terminal receipt inventory hashes only:
    - forward: final = five targets plus five development originals; held = five
      production originals;
    - rollback for prefixes 1-4 (clean or non-activation frontier): final = the
