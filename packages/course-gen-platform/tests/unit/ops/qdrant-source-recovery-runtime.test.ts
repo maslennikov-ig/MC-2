@@ -2722,7 +2722,7 @@ function rewriteWriterResumeEpoch(
   );
   writeProtectedJson(
     capabilityCheckpoint,
-    checkpointForJournalEntry(acceptedPredecessor, journal, authoritySha256),
+    checkpointForJournalEntry(acceptedPredecessor, journal, authoritySha256, fixture.runId),
     0o600
   );
   const capabilityBasename = `writers.resume.${mode}--${leaseEpoch}.json`;
@@ -2771,7 +2771,12 @@ function rewriteWriterResumeEpoch(
   });
   journalEntries.push(recoveryReacquired, capabilityClaimed);
   writeJournal(journal, journalEntries);
-  const currentCheckpoint = checkpointForJournalEntry(capabilityClaimed, journal, authoritySha256);
+  const currentCheckpoint = checkpointForJournalEntry(
+    capabilityClaimed,
+    journal,
+    authoritySha256,
+    fixture.runId
+  );
   const inputCheckpoint = join(
     fixture.q12RunRoot,
     `writer-resume-input-checkpoint-${mode}-${leaseEpoch}.json`
@@ -3752,8 +3757,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
   });
 
-  it('binds one immutable claimed capability to distinct capability and child-input checkpoints', () => {
-    const fixture = writerResumeFixture('forward');
+  it('binds one immutable claimed capability to distinct capability and child-input checkpoints', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const capability = JSON.parse(readFileSync(fixture.capability, 'utf8')) as Record<string, any>;
 
     expect(Object.keys(capability).sort()).toEqual(
@@ -3774,7 +3779,7 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     );
     expect(capability).toMatchObject({
       schema_version: 'megacampus.q12.host-command-capability/v1',
-      run_id: Q12_RUN_ID,
+      run_id: fixture.runId,
       command_id: 'writers.resume.forward',
       lease_epoch: 'cutover',
       supersedes_capability_sha256: null,
@@ -3903,8 +3908,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     }
   );
 
-  it('starts normally from an exact stopped/no recovery boundary without compensation', () => {
-    const fixture = writerResumeFixture('forward');
+  it('starts normally from an exact stopped/no recovery boundary without compensation', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     advanceWriterResumeRecoveryEpoch(fixture, 'forward');
 
     const result = fixture.resume();
@@ -4503,8 +4508,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expectResumeCompensated(fixture);
   });
 
-  it('publishes a missing terminal receipt without replay after an exact-terminal crash', () => {
-    const fixture = writerResumeFixture('forward');
+  it('publishes a missing terminal receipt without replay after an exact-terminal crash', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
 
     const interrupted = fixture.resume('forward', {
       SOURCE_RECOVERY_RESUME_FAULT_POINT: 'after-terminal-before-receipt',
@@ -4532,8 +4537,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     });
   });
 
-  it('leaves one owned terminal receipt and no hard-link temporary residue after rename crash', () => {
-    const fixture = writerResumeFixture('forward');
+  it('leaves one owned terminal receipt and no hard-link temporary residue after rename crash', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
 
     const interrupted = fixture.resume('forward', {
       SOURCE_RECOVERY_RESUME_FAULT_POINT: 'after-terminal-rename',
