@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; D5/D5W are integrated; decision `.13.22` is closed by the accepted normative amendment and D5J `.13.21` is implemented, independently reviewed, and integrated at `66e41cb5`; W `.13.10` resumes next, then M/H, D6 and Root; remote/live activation remains NO-GO
+Status: ALL safe local Q12 correction work complete — W `.13.10`, M `.13.11`, H `.13.12`, D5J `.13.21`/`.13.22` closed and integrated at `a73a3651`; D6 `.13.19` and Root `.13.13` are blocked explicit defers on the live-only W-tuple field 11; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: D5J merged at `66e41cb5` from source tip `bf27f595`; approved D5J spec SHA `d7e86193…c75d`; accepted amendment SHA `d6c4d8e4…075c`; reviewed plan SHA `a05ba3c6…5a662`
+Current accepted integration evidence: integration HEAD `a73a3651` carries D5J `66e41cb5`, W FLIP `60910053`, H `70bf6103`, tuple addendum `3da324d8`, D6 contract/plan docs `d1627f1c`, M merge `a73a3651` from tip `29d73d04`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
-Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation. The current sequential path is `.13.21 review/integration (done) -> W .13.10`; M/H follow W, D6 follows accepted W plus its reviewed plan, and Root joins them. Live execution remains fail-closed.
+Implementation scope: Q1-Q11, E1-E7, and the full Q12 local correction wave are accepted. The remaining Q12 tail is remote/live only: `.13.7` backup/restore drill (plus the PG17 digest), `.13.8` rotation, field-11/RE-FREEZE + D6 + Root in the live window, `.13.6` S3. Live execution remains fail-closed.
 
 ## Q12 D5 Plan Acceptance (2026-07-14)
 
@@ -417,6 +417,51 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   workspace type-check, synthetic build; validated stage artifact
   `mc2-jz6y0.13.21-q12-d5j.md`. Integration rerun and process verification
   recorded at the merged head. No remote/live mutation occurred.
+
+## Q12 W/M/H/D6 Local Completion (2026-07-15)
+
+- W `.13.10` CLOSED at `60910053` (FLIP): the genesis-rooted joined journal
+  prefix is the sole resume acceptance; the fabricated `common_phase_graph`
+  branch is removed; the D4 negative is pinned five ways. The composer
+  `partial_capture_target_count` lever covers held 1..5 (rollback+prefix-4,
+  frontier-free; the frontier held-5 profile is rejected by W at `:1778`).
+  Migration suites A 11/11 and B 11/11, D3 6+4 append, three X drops, native
+  §5 via D2 (`:2482`), 22 deliberately fabricated C categories, and D4 pass;
+  acceptance matrix plus independent P0/P1-zero review recorded. Current
+  amendment SHA `e952f724…fcd4b1`; twenty-command manifest SHA
+  `aaec6fc2…87a841` (historical `af9b21cb…` = five-command `c93d766d`-era).
+  Ruling Z: mutate-then-build reaches §5; in-position stops at the Root-owned
+  retained checkpoint (`:1745`).
+- Tuple addendum integrated at `3da324d8`: 10/11 W-tuple fields materialized
+  (field 10 owner-ratified; 5/6/8/9 catalog-bound), artifact
+  `mc2-jz6y0.13.10-q12-w-activation-tuple.md` plus deterministic repro
+  validate; the mechanical lock proof passes 2/2 under `MC2_Q12_REAL_PG17=1`.
+  Field 11 (managed session roster) is live-only by contract line `:160`.
+- H `.13.12` CLOSED at `70bf6103`: three-phase `--q12-mode` quiesced handoff
+  with phase-aware rollback, durable `nginx_switch_intent` before reload,
+  truthful re-prepare, activation receipt contract; 24 Vitest + 15 shell
+  cases; FAIL review → RED-first fixes → delta PASS.
+- M `.13.11` CLOSED at merge `a73a3651` from `29d73d04`: file-only Q12
+  migration credentials, same-transaction guards, connection-source mutual
+  exclusion, concurrent index preflight, and the P2 hardening batch (twelve
+  libpq `PG*` variables fail-closed, embedded `;` rejection, five-branch leak
+  asserts). Security review PASS P0=0/P1=0, delta PASS; 64/64 focused units;
+  e2e 20/20 on the disposable stack. Residual informational P2-4 (five
+  client-side libpq TLS/auth variables) is documented in the handoff.
+- D6 `.13.19` BLOCKED as an explicit defer: the activation-truth contract is
+  frozen (candidate byte-identity `2a2251ac…`, financial review
+  `948982d9…ab7a`), the plan is reviewed PASS (successor-aware Task 15/GC4),
+  and Task 0 stops on field 11 per the frozen contract. Root `.13.13` is
+  transitively blocked. Both resume in the live window via the LIVE-BOUNDARY
+  RE-FREEZE CHECKLIST (field 11 roster + production re-freeze of 5/6/8/9).
+- Full local release matrix at `a73a3651`: Q12 unit battery 748 passed / 1
+  known environment failure (`qdrant-observability-contract.test.ts:223`,
+  fails identically on the pre-Q12 base) / 36 skipped; blue/green shell suite
+  15/15; `pnpm type-check` exit 0; `pnpm build` exit 0 (synthetic web env).
+- Cleaned worktrees/local branches with content integrated: q12-h-handoff,
+  q12-d6-activation-truth, q12-w-activation-tuple, q12-p-operator-publisher,
+  q12-m-migration-cli (remote evidence branches retained).
+  `codex/q12-w-writer-barrier` is preserved by mandate, clean at `60910053`.
 
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.

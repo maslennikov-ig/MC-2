@@ -1,12 +1,15 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-15
+Updated: 2026-07-15 (evening)
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: pushed `codex/self-hosted-qdrant-platform`; D5J is
-integrated at merge `66e41cb5` from `codex/q12-d5j-joined-fixture` tip
-`bf27f595`. The preserved W branch is pushed at `7b7cc6b9` with exactly two
-W-owned uncommitted files. The dedicated integration worktree remains
-authoritative for Q12.
+Integration branch: pushed `codex/self-hosted-qdrant-platform` at `a73a3651`.
+It carries the full accepted correction wave: D5J `66e41cb5`, W FLIP
+`60910053`, H blue/green handoff `70bf6103`, the W activation-tuple addendum
+`3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
+credential merge `a73a3651`. The preserved W branch/worktree
+`codex/q12-w-writer-barrier` is clean and pushed at `60910053` (its two
+formerly uncommitted files are committed and integrated). The dedicated
+integration worktree remains authoritative for Q12.
 
 ## Product Truth
 
@@ -16,8 +19,6 @@ authoritative for Q12.
 - Every uploaded document must receive a durable `assessed`, `degraded`, or `failed` coverage outcome; none may disappear through context truncation.
 - Documents supplement the baseline structure. They may add facts, terminology, constraints, examples, and source-backed topics but cannot silently replace baseline curriculum requirements.
 - Material document conflicts use a distinct required-question block. Manual mode pauses at the existing Phase 0.5 boundary. Automatic mode selects the recommendation and appends `resolved_by: system` / `answer_source: system` with rationale.
-- Large corpora use deterministic bounded batches, hierarchical summaries, claim reduction, and targeted Qdrant verification.
-- Stage 5 is two-pass: baseline first, bounded advisory enrichment second. Stage 6 consumes the same accepted decisions and evidence refs.
 
 ## Read First
 
@@ -45,66 +46,96 @@ authoritative for Q12.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
 - The downloaded Supabase Root 2021 CA is valid through 2031 and a current owner-supplied Session pooler URI passed PostgreSQL `17.6` `verify-full` read-only inventory. The credential exists only in the owner-only local session file and is never copied into Git, artifacts, argv, environment, logs, or worker prompts. The owner authorized its temporary use for this staging window; terminal rotation remains a separate mutation under `.13.8`. The server still has 12/12 invalid 20-byte legacy backups and zero usable generations, so `.13.7` remains open until the new fail-closed operator creates a fresh four-file generation and its Supabase-compatible isolated restore succeeds. No live mutation has occurred.
 - The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
-- Publisher `.13.9`, G7 `.13.7.2`, D5 decision `.13.17`, and Root producer `.13.18` are accepted/integrated. D5W seam `.13.20` is closed: source `3dd9ad53`, correctness/docs delta reviews P0-P3 zero, integration/W reruns 271/271, cleanup evidence `c150a4c2`, source worktree/local branch removed. The preserved W branch is `7b7cc6b9` and retains exactly its two allowed uncommitted files. The joined-fixture task `.13.21` is implemented, independently reviewed, and integrated; W `.13.10` is unblocked to import the joined materializer. M `.13.11`, H `.13.12`, and Root `.13.13` remain dependency-ordered and local-only. No remote/live mutation occurred.
+- Publisher `.13.9`, G7 `.13.7.2`, D5 decision `.13.17`, and Root producer `.13.18` are accepted/integrated. D5W seam `.13.20` is closed: source `3dd9ad53`, correctness/docs delta reviews P0-P3 zero, integration/W reruns 271/271, cleanup evidence `c150a4c2`, source worktree/local branch removed. The preserved W branch is clean and pushed at `60910053`. The joined-fixture task `.13.21` is implemented, independently reviewed, and integrated; W `.13.10`, M `.13.11`, and H `.13.12` are closed and integrated (see below); Root `.13.13` is blocked on the live-only tuple field 11. No remote/live mutation occurred.
 - D6 decision `.13.19` has an ignored owner-ready candidate SHA-256 `2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5`; final independent review SHA-256 `948982d99895489c6fefa1fb831791f7e02bb524bb268713e712629a6bdab5a7` is PASS with P0-P3 zero. On 2026-07-15 the owner approved Option A as the written-contract direction, including its sole narrow post-`R` closed-terminal exception. D6 implementation waits for accepted W and a reviewed plan; the current Fable delegation supplies local implementation authority, while remote/live authority remains separate.
 - Read-only architecture report SHA-256 `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379` found that D5W real-preimage binding is insufficient for W chronology: Root D5-only anchors and W's full source/backup/restore/reindex graph cannot be joined by copying or rehashing authority. The owner approved the Root-owned test-only architecture/drafting direction and, on 2026-07-15, explicitly approved the exact tracked candidate SHA-256 `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d`. It closed the clean-prefix-1 quiesce-preimage gap and passed final correctness/docs rereviews P0-P3 `0/0/0/0` (report SHA-256 `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2` and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`). Local planning/TDD/review/integration are authorized; production CLI and W ownership stay unchanged, and remote/live authority remains separate.
 - The D5J product-truth gap is resolved. Decision `.13.22` is closed by the normative amendment `docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md` SHA-256 `d6c4d8e4b2b7f6c53d648fdf587a5520db45fa5d8f3c84668b48b09b6bbe075c` (independent correctness/docs reviews PASS P0-P3 `0/0/0/0`): one canonical twenty-command manifest (the enumerated D5J subset moved forward from Task 9), a closed ten-placeholder substitution domain with single authorities, exact phase/command/outcome bindings for every ordinary row (genesis `operator.self-check`, `pg.backup` selector/target split, phase-internal migrations preserving the D5 predecessor heads, the `migrations_applied` witness milestone), two-segment quiesce and evidence-stepped resource bindings, distinct immutable `final-writer-manifest-forward|rollback-<run-id>.json` paths with real `writers.resume.*` hashes, and the Root-owned deterministic thirteen-key writer inventory.
 - `.13.21` is implemented under the reviewed plan SHA-256 `a05ba3c60e1a1a714e7d0ce30298f8124949e67c9dbacc00677a7fc414805b4a` (plan review PASS `0/0/0/0`) and integrated at `66e41cb5`: the Root-owned closed joined composer emits the exact 76-row forward chronology and every rollback profile (prefixes 1-4 clean and exact-next-frontier, activation frontier with both mode-bound manifests and byte-identical target entries) through the production serializer/capability/object/checkpoint primitives; the runner/TS surface is closed; deployed wrappers/parser gain no switch. Independent implementation reviews: correctness PASS `0/0/0/2`, docs PASS `0/0/1/2`, every finding fixed. Evidence: focused four-file suite 300/300 in both file-parallel and serialized modes, static acceptance checks, workspace type-check, synthetic build; stage artifact `mc2-jz6y0.13.21-q12-d5j.md` validated.
 - On 2026-07-15 the owner approved the recommended `.13.22` correction and delegated the remaining local work to Fable, followed by Codex review. Fable is authorized to draft and independently review the narrow normative amendment, freeze the exact canonical bindings/inventory/path rule, plan, implement with TDD, integrate and verify locally without intermediate owner confirmations. Remote/live exclusions are unchanged. The tracked copyable handoff is `docs/superpowers/prompts/2026-07-15-q12-fable-local-completion-handoff.md`.
 - Final handoff correctness and documentation rereviews passed P0/P1/P2/P3 `0/0/0/0`; report SHA-256 values are `8c56c37720e25a5d213fdc2c1c6c7ea8b1da7f1795f34e9078069b257d306a6e` and `b75dccbee85395372e350de79d304647388d8ad061e3b990a261aa9843e00bea`.
+- W `.13.10` is CLOSED. The FLIP is integrated at `60910053`: the
+  genesis-rooted joined journal prefix is the sole resume acceptance in
+  `q12-writer-resume.py`; the fabricated `common_phase_graph` branch is
+  removed; the D4 negative is pinned five ways. Held-capture lever, ruling Z,
+  and the full acceptance matrix are recorded in the stage summary and on the
+  bead. Current amendment SHA
+  `e952f72410c9d49555cd780108e2b94c47284872da69e506b6c2e9ab86fcd4b1`;
+  twenty-command manifest SHA
+  `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841` (the
+  historical five-command `af9b21cb…` value belongs to `c93d766d`-era bytes).
+- H `.13.12` is CLOSED and integrated at `70bf6103`: `--q12-mode`
+  prepare/commit/finalize-quiesced with phase-aware rollback, the durable
+  `nginx_switch_intent` marker written before reload (review P1-1), truthful
+  re-prepare (P1-2), and the activation receipt contract
+  (`<run-root>/database-barrier-receipt.json` `state=activated`). Evidence:
+  24 Vitest + 15 shell cases; FAIL→RED-first fixes→delta PASS.
+- M `.13.11` is CLOSED and integrated at merge `a73a3651` from
+  `codex/q12-m-migration-cli` tip `29d73d04`: file-only Q12 migration
+  credentials (O_NOFOLLOW + inode/device recheck, field-built ClientConfig, no
+  connectionString on the Q12 path), same-transaction guards, connection-source
+  mutual exclusion, concurrent index packet preflight, plus the hardening batch
+  (fail-closed on twelve libpq `PG*` variables via
+  `Q12_REJECTED_LIBPQ_ENV_VARS`, embedded `;` rejection, widened leak asserts
+  across five fail-closed branches). Security review PASS P0=0/P1=0 and delta
+  PASS on `29d73d04`; 64/64 focused units; formal e2e 20/20 on the disposable
+  stack. Residual informational P2-4: `PGSSLCERT`/`PGSSLKEY`/`PGSSLPASSWORD`/
+  `PGCHANNELBINDING`/`PGGSSENCMODE` are outside the reject list — proven
+  non-exploitable while `ssl` is an explicit object; optional completeness-only
+  addition.
+- The W activation tuple `.13.10` addendum materialized 10/11 fields
+  (field 10 owner-ratified; fields 5/6/8/9 catalog-bound). Field 11 (managed
+  session roster) is live-only by contract line `:160`, so D6 `.13.19` Task 0
+  and transitively Root `.13.13` are BLOCKED as explicit defers until the live
+  window. The frozen D6 activation-truth contract byte-identity is
+  `2a2251ac…`; its reviewed plan (successor-aware Task 15/GC4) is
+  `docs/superpowers/plans/2026-07-15-q12-d6-activation-truth.md`. The
+  LIVE-BOUNDARY RE-FREEZE CHECKLIST (field 11 roster + production re-freeze of
+  fields 5/6/8/9) is recorded in the D6 plan and on the beads.
+- Full local release matrix at `a73a3651`: Q12 unit battery 748 passed /
+  1 known environment failure (`qdrant-observability-contract.test.ts:223`,
+  fails identically on the pre-Q12 base) / 36 skipped; blue/green shell suite
+  15/15; `pnpm type-check` exit 0; `pnpm build` exit 0 with the synthetic web
+  env. PG17-gated suites run under `MC2_Q12_REAL_PG17=1`.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
-- Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
-- E1 `.18` is reviewed, integrated as `528fdfc2`, verified at shared 11/11, repository 11/11 and applied PostgreSQL 15.18 9/9, and its disposable DB/container plus dedicated local worktree/branch are cleaned.
-- E2 `.19` is reviewed and integrated through `14277d8a`: focused Stage 4 117/117, shared 11/11, applied PostgreSQL 15.18 9/9, both type-checks and process verification pass. Exact full-ledger resume, per-card/cross-card hierarchy, claim-scoped verification and exact cl100k safety bounds are accepted. Its disposable DB/container and dedicated local worktree/branch are cleaned.
-- E3 `.20` is reviewed and integrated through `89a7948e`: focused 136/136, shared 13/13, PostgreSQL 15.18 static/applied 36/36, both type-checks and process verification pass. Material conflicts, degraded/capacity decisions, manual/system atomicity, full snapshots, approval guards and plural retry recovery are accepted. Its disposable containers/symlinks and dedicated local worktree/branch are cleaned.
-- E5 `.22` is reviewed and integrated through `cf438826`: focused 52/52, shared 20/20, full Stage5/Qdrant 532/532, workspace type-check/build and process verification pass. Baseline-first live enrichment, exact chunk grounding, fallback audit and CAS persistence are accepted. Its worktree/local branch are cleaned.
-- E4 `.21` is reviewed and integrated through rebased equivalent `2538bb5c`: web 20/20, shared 2/2, real-panel Chromium/mobile/dark E2E 4 pass/2 expected skips, type-check/build/process pass. Distinct conflict UI, CAS edit semantics, localized system audit, fail-closed metadata and accessibility are accepted. Its worktree/local branch are cleaned.
-- E6 `.23` is reviewed and integrated linearly through `5201a786` from final recovery commit `a6c39e7a`; the rebased tree is byte-identical to reviewed merge `1e681027`. Fresh integration evidence: shared 21/21, joined E5/E6 111/111, Stage4 267/267, migrations 14/14, PostgreSQL 15.18 E3 26/26 and side identity 8/8; independent merged-tree review additionally passed E4 20/20, E5 35/35, Qdrant 14/14, E6 76/76, Stage4 evidence 49/49 and type-check. Its disposable containers and dedicated worktree/local branch are cleaned.
-- E7 `.24` is accepted locally. Owner decision `.24.2` closed on 2026-07-12 with exact local/development values `enabled=true`, `mode=active`, and Stage 5 cohort `100`; the final combined branch at `d3417610` passed independent review with no P0-P3 findings and merged as `ea183d83`. Parent acceptance passed 5/5 files and 24/24 tests, package type-check, process verification, and canonical closeout dry-run. Q12 remains the boundary for every staging/production or other remote mutation.
-- Q6 `.7` final branch commits `bd6237b3` + `14322c8f` are independently approved and integrated as `f7930913`. Exact Qdrant index/amd64 child locks, fail-closed file secrets, loopback services, native S3 mapping, Stage 7 isolation and pre-recreate verification gates are accepted. Branch evidence: focused 8/8, Compose 8/8, pinned auth smoke `200/401/200/403/200/200`, type-check/build/process pass and disposable cleanup; integration focused 8/8 plus process verification pass. Its dedicated worktree/local branch are cleaned; the remote evidence branch remains.
-- Q8 `.9` is independently approved and integrated as `da126a8a`: recovery relevance/isolation, checksum/manifest/retention, cleanup postconditions, shared metrics and systemd schedules pass unit 26/26 plus exact Qdrant restore 5/5. Q9 `.10` is independently approved and integrated as `5d4282ee`: approved LTS/extended-support monitoring pins, authenticated scrape, alerts, persistent notification path, dashboard and shared UID/GID textfile contract pass focused 33/33 and local service smokes. Combined Q6/Q8/Q9 integration passed 59/59, type-check, pinned promtool/amtool and process verification. Both worktrees/local branches are cleaned; remote evidence branches remain.
-- Final `.13.7` execution documentation correction `7b446d7d` is integrated and independently rereviewed at `0b7ffe67` (integration `a0c12554`) with P0-P3 zero. The runbooks identify one sole executable PG17 packet, require the fresh custom-format backup and isolated restore before migrations, place source recovery before reindex, preserve guarded rollback, and reject the observed 20-byte empty backup artifacts. Both docs review worktrees are cleaned; pushed evidence branches remain, and no remote runtime was touched.
-
-## Completed Recovery Gate
-
-Q7 recovery is complete. Both pinned integration retrievals use `generatePointId(document_id, chunk_id)`; independent review passed; the integration rerun passed 19/19 and the dedicated worktree/local branch were safely cleaned after push.
+- Design `.17` is approved/closed; grouping `.16` closed as superseded. E1-E7
+  (`.18`-`.24`), Q6 `.7`, Q8 `.9`, Q9 `.10` are reviewed, integrated, and
+  verified; evidence lives in `.codex/stages/mc2-jz6y0/summary.md`.
+- Final `.13.7` execution documentation correction `7b446d7d` is integrated and independently rereviewed at `0b7ffe67` (integration `a0c12554`) with P0-P3 zero. The runbooks identify one sole executable PG17 packet, require the fresh custom-format backup and isolated restore before migrations, place source recovery before reindex, preserve guarded rollback, and reject the observed 20-byte empty backup artifacts.
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: resume W `.13.10` from its preserved branch/worktree
-(`7b7cc6b9` plus exactly its two uncommitted files): import the joined
-materializer for W's forward and rollback positives, keep the old fabricated
-graph as a mandatory negative, replace the fabricated suffix bindings with the
-frozen real `writers.resume.*` hashes, run W's complete accepted focused
-runtime/database/isolation matrix, and take W through independent P0/P1-zero
-acceptance. Then run M `.13.11` and H `.13.12` per dependencies, write/review
-the D6 `.13.19` implementation plan (local implementation is authorized by the
-current Fable delegation after accepted W), and finish the Root join `.13.13`.
-Run the joined local release matrix before presenting the separate GHCR
-publication and live-cutover packet. Keep Q12 remote execution NO-GO until the
-frozen supervisor, truthful four-file backup, Supabase-compatible isolated
-restore, ten-writer barrier, migrations, handoff and recovery tests all pass.
-Do not rotate the database password without the separate `.13.8`
-effects/rollback packet and current authorization.
+All safe LOCAL Q12 correction work is COMPLETE: W `.13.10`, M `.13.11`,
+H `.13.12`, D5J `.13.21`/`.13.22` are closed and integrated at `a73a3651`
+with the full local release matrix green.
+
+Recommended action: present the remote/live Q12 tail to the owner as an
+explicit effects/secrets/observation/rollback packet; it stays NO-GO without
+current authorization:
+
+1. `.13.7` — fresh truthful four-file server backup plus Supabase-compatible
+   isolated PG17 restore drill; compute and record the PG17 security-manifest
+   digest during that drill (the allowlist currently covers PG15/16 only).
+2. `.13.8` — database password rotation via its separate effects/rollback
+   packet.
+3. Live window — materialize W-tuple field 11 (managed session roster), run
+   the LIVE-BOUNDARY RE-FREEZE CHECKLIST (re-freeze fields 5/6/8/9 against
+   production), then execute D6 `.13.19` Tasks 0-20 and the Root join
+   `.13.13` local acceptance, GHCR publication, and the live-cutover packet.
+4. `.13.6` — off-host S3 remains the production-gate defer.
+
+Before any of these, present exact effects, secrets, observation, rollback
+and downtime/data impact, and obtain owner approval.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage.
 
-Use `docs/superpowers/prompts/2026-07-15-q12-fable-local-completion-handoff.md`
-from the resolved SHA of `origin/codex/q12-d5j-joined-fixture`.
-
-## Parallel Execution After Q7
-
-- E1-E6 and Q7 are accepted and integrated.
-- Q8/Q9 are accepted and integrated; their shared metrics-directory contract is reconciled and executable.
-- E7, Q10, Q11, and the earlier Q12 foundation/source-recovery work are
-  accepted. The correction wave W/G7/M/H/Root remains open locally; only after
-  its independent acceptance and joined release matrix may the separate Q12
-  live execution/observation boundary be presented.
+Resume from this handoff plus `.codex/stages/mc2-jz6y0/summary.md` at the
+resolved SHA of `origin/codex/self-hosted-qdrant-platform`; the remaining Q12
+work is the remote/live tail listed above.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
@@ -113,7 +144,6 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Orchestration: `orchestrator-stage`, `task-router`, `subagent-driven-development`.
 - Behavior changes: `brainstorming` where decisions remain, `test-driven-development`, `verification-before-completion`.
 - Risk/closeout: `senior-architect`, `senior-devops`, `test-pass`, `orchestration-closeout`.
-- E4 UI: mandatory Lazyweb quick search/report with synthetic content, then frontend/browser verification.
 - Specialists: `docs_researcher`, search/data worker, `deploy_specialist`, `correctness_reviewer`, and `docs_reviewer`.
 
 ## Verification and Delivery
@@ -132,19 +162,25 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   publication and password rotation retain their separate secret/effects gates.
   Missing-source product truth is resolved by the approved six failed plus
   eighteen retained-derived-only dispositions. Do not partially activate.
-- Retained barrier recovery provenance design SHA-256
-  `b5f63cd6afd64f47822e9534f8193ecb57f471421c9cf8a8f05e7902d85540e8`
-  is owner-approved and independently P0-P3-zero. Implementation must follow
-  the exact contract; W, M/H, and Root still require their own TDD, review,
-  integration, and verification before any live action.
-- D6 `.13.19` written-contract direction is owner-approved but not implemented;
-  it still waits for accepted W and a reviewed plan; the current Fable
-  delegation supplies its previously required local implementation
-  authorization. D5J `.13.21` is fully implemented and integrated under the
-  accepted `.13.22` amendment; W `.13.10` resumes next by importing the joined
-  materializer and replacing its fabricated suffix bindings with the frozen
-  real `writers.resume.*` hashes. None of this permits server, Supabase,
-  service, container, Qdrant, deployment, or live actions.
+- D6 `.13.19` and Root `.13.13` are BLOCKED explicit defers: D6 Task 0
+  requires W-tuple field 11 (managed session roster), which is live-only by
+  the frozen contract; Root joins after D6. Both resume in the live window via
+  the LIVE-BOUNDARY RE-FREEZE CHECKLIST. The frozen contract, reviewed plan,
+  and 10/11 materialized tuple fields are integrated and pushed. None of this
+  permits server, Supabase, service, container, Qdrant, deployment, or live
+  actions.
+- Known accepted boundaries (documented by design, not debt): the joined
+  composer's partial-capture fixture is truthful only while W validates held
+  checkpoints as a creation-order prefix without a journaled counter (review
+  P2-3); §5 tamper-append of a fully valid row is outside the tamper
+  protection by design (append of VALID bytes is indistinguishable from
+  authorship — the guarded property is prefix integrity); M's residual P2-4
+  libpq variables (`PGSSLCERT`/`PGSSLKEY`/`PGSSLPASSWORD`/`PGCHANNELBINDING`/
+  `PGGSSENCMODE`) are proven non-exploitable with the explicit `ssl` object.
+- The PG17 security-manifest digest is intentionally not computed locally: it
+  must come from the real restore drill and is routed into gate `.13.7` (the
+  allowlist `DOCUMENT_EVIDENCE_SECURITY_MANIFEST_SHA256` covers PG15/16 only;
+  manifest hashes FAIL on vanilla PG17.10).
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
@@ -153,13 +189,12 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
-docs-reviewed: updated — the Fable handoff, owner-approved `.13.22` correction
-direction, current worktrees and unchanged remote boundary now match Beads and
-the stage summary; final correctness/docs handoff reviews are P0-P3 zero.
-project-index: reviewed-no-change — the handoff adds no stable runtime or
-repository entrypoint.
-graph-reviewed: updated — Graphify 0.9.14 local code graph refreshed with
-`graphify update .` and `graphify cluster-only . --no-viz --no-label`; no
-external model/API mode or Git hook was used.
-Optional SQL AST enrichment is deferred: 283 SQL files require the uninstalled
-`tree_sitter_sql` extra; this docs-only slice did not install global tooling.
+docs-reviewed: updated — W/H/M/D5J closures, the frozen D6 contract/plan, the
+10/11 tuple, the full local release matrix, and the blocked live tail now
+match Beads and the stage summary.
+project-index: reviewed-no-change — this slice changes stage evidence inside
+existing entrypoints, not stable navigation.
+graph-reviewed: updated — Graphify local code graph refreshed at the delivered
+integration HEAD with `graphify update .` and
+`graphify cluster-only . --no-viz --no-label`; no external model/API mode or
+Git hook was used.
