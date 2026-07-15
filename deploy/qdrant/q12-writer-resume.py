@@ -164,7 +164,15 @@ class Opened:
         try:
             opened = os.fstat(fd)
             after = os.lstat(path)
-            identity = lambda value: (value.st_dev, value.st_ino, value.st_uid, value.st_gid, stat.S_IMODE(value.st_mode), value.st_size)
+            identity = lambda value: (
+                value.st_dev,
+                value.st_ino,
+                value.st_uid,
+                value.st_gid,
+                stat.S_IMODE(value.st_mode),
+                value.st_size,
+                value.st_nlink,
+            )
             require(identity(before) == identity(opened) == identity(after), f"{label} identity changed while opening")
             require(opened.st_uid == uid and opened.st_gid == gid and stat.S_IMODE(opened.st_mode) == expected_mode, f"{label} owner or mode is invalid")
             chunks = []
@@ -1703,6 +1711,64 @@ for record in historical_barrier_capability_records:
         record["value"]["command_id"], []
     ).append(record)
 for historical_command_id, historical_records in historical_barrier_capabilities_by_command.items():
+    historical_operation = historical_command_id.removeprefix("barrier.")
+    for historical_record in historical_records:
+        historical_value = historical_record["value"]
+        historical_copy_path = os.path.join(
+            run_root,
+            "retained-barrier-capability-checkpoint-"
+            f"{historical_operation}-{historical_value['lease_epoch']}.json",
+        )
+        require(
+            os.path.lexists(historical_copy_path),
+            "retained barrier checkpoint provenance is invalid",
+        )
+        historical_copy_file = Opened(
+            historical_copy_path,
+            f"retained barrier checkpoint {historical_command_id} "
+            f"{historical_value['lease_epoch']}",
+            0o600,
+        )
+        historical_copy = historical_copy_file.json()
+        exact(
+            historical_copy,
+            CHECKPOINT_KEYS,
+            f"retained barrier checkpoint {historical_command_id}",
+        )
+        historical_copy_entries = [
+            entry
+            for entry in journal_lines
+            if entry["entry_hash"] == historical_copy["journal_entry_hash"]
+        ]
+        require(
+            historical_copy_file.identity[6] == 1
+            and historical_copy_file.digest
+            == historical_value["capability_input_checkpoint_sha256"]
+            and historical_copy_file.identity[:2] != checkpoint_file.identity[:2]
+            and historical_copy["schema_version"]
+            == "megacampus.q12.cutover-checkpoint/v1"
+            and historical_copy["run_id"] == run_id
+            and historical_copy["journal_device"] == str(journal_file.identity[0])
+            and historical_copy["journal_inode"] == str(journal_file.identity[1])
+            and historical_copy["resume_authority_sha256"] is None
+            and len(historical_copy_entries) == 1,
+            "retained barrier checkpoint provenance is invalid",
+        )
+        historical_copy_entry = historical_copy_entries[0]
+        require(
+            historical_copy["seq"] == historical_copy_entry["seq"]
+            and historical_copy["phase"] == historical_copy_entry["phase"]
+            and historical_copy["previous_journal_entry_hash"]
+            == historical_copy_entry["previous_hash"]
+            and historical_copy["accepted_object_kind"]
+            == historical_copy_entry["accepted_object_kind"]
+            and historical_copy["accepted_object_sha256"]
+            == historical_copy_entry["accepted_object_sha256"]
+            and historical_copy["lease_epoch"]
+            == historical_copy_entry["lease_epoch"],
+            "retained barrier checkpoint journal projection is invalid",
+        )
+        historical_record["checkpoint_file"] = historical_copy_file
     historical_completed_records = [
         record for record in historical_records
         if record["location"] == "completed"

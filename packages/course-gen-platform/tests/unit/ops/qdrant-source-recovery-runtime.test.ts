@@ -1241,12 +1241,29 @@ function appendResumeCommonPrefix(
       }
     );
   }
-  const historicalInstallJournalBindings = new Map<
-    string,
-    { leaseEpoch: string; overrides: Record<string, any> }
-  >();
+  const runRoot = join(completedCapabilities, '..', '..');
+  const journalPath = join(runRoot, 'phase.jsonl');
+  if (!existsSync(journalPath)) writeFileSync(journalPath, '', { mode: 0o600 });
   let previousHistoricalInstallDigest: string | null = null;
+  const definitionsByPhase = new Map<string, (typeof historicalInstallDefinitions)[number]>();
+  const prefixDefinitions: typeof historicalInstallDefinitions = [];
   for (const definition of historicalInstallDefinitions) {
+    if (definition.journalPhase) definitionsByPhase.set(definition.journalPhase, definition);
+    else prefixDefinitions.push(definition);
+  }
+  const publishHistoricalInstall = (
+    definition: (typeof historicalInstallDefinitions)[number],
+    projectionEntry: Record<string, any>
+  ): string => {
+    const copyPath = join(
+      runRoot,
+      `retained-barrier-capability-checkpoint-install-${definition.capabilityLeaseEpoch}.json`
+    );
+    writeProtectedJson(
+      copyPath,
+      checkpointForJournalEntry(projectionEntry, journalPath, null),
+      0o600
+    );
     const historicalInstallCapabilityPath = join(
       completedCapabilities,
       '..',
@@ -1262,7 +1279,7 @@ function appendResumeCommonPrefix(
       operator_digest: '8'.repeat(64),
       resource_manifest_sha256: resourceManifestSha,
       quiesce_manifest_sha256: definition.quiesceSha,
-      capability_input_checkpoint_sha256: definition.inputCheckpointSha,
+      capability_input_checkpoint_sha256: fileSha256(copyPath),
       resume_authority_sha256: null,
       lease_epoch: definition.capabilityLeaseEpoch,
       supersedes_capability_sha256: definition.supersedesPrevious
@@ -1270,28 +1287,27 @@ function appendResumeCommonPrefix(
         : null,
     });
     previousHistoricalInstallDigest = fileSha256(historicalInstallCapabilityPath);
-    if (definition.journalPhase) {
-      historicalInstallJournalBindings.set(definition.journalPhase, {
-        leaseEpoch: definition.journalLeaseEpoch,
-        overrides: {
-          command_id: 'barrier.install',
-          command_sha256: definition.commandSha,
-          capability_manifest_sha256: previousHistoricalInstallDigest,
-          quiesce_manifest_sha256: definition.quiesceSha,
-        },
-      });
-    }
-  }
+    return previousHistoricalInstallDigest;
+  };
+  let lastEntry: Record<string, any> | null = null;
   for (const phase of phases) {
-    const historicalBinding = historicalInstallJournalBindings.get(phase);
-    appendJournalEntry(
-      phase,
-      'completed',
-      'none',
-      null,
-      historicalBinding?.leaseEpoch ?? 'cutover',
-      historicalBinding?.overrides ?? {}
-    );
+    const definition = definitionsByPhase.get(phase);
+    let overrides: Record<string, any> = {};
+    let leaseEpoch = 'cutover';
+    if (definition && lastEntry) {
+      for (const prefixDefinition of prefixDefinitions.splice(0)) {
+        publishHistoricalInstall(prefixDefinition, lastEntry);
+      }
+      const digest = publishHistoricalInstall(definition, lastEntry);
+      leaseEpoch = definition.journalLeaseEpoch;
+      overrides = {
+        command_id: 'barrier.install',
+        command_sha256: definition.commandSha,
+        capability_manifest_sha256: digest,
+        quiesce_manifest_sha256: definition.quiesceSha,
+      };
+    }
+    lastEntry = appendJournalEntry(phase, 'completed', 'none', null, leaseEpoch, overrides);
   }
 }
 
@@ -3016,10 +3032,15 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     });
   });
 
-  it('accepts one directly linked retained install recovery capability chain', () => {
+  it('rejects the fabricated retained install recovery chain without Root checkpoint provenance', () => {
     const fixture = writerResumeFixture('forward', 5, false, {
       historicalInstallScenario: 'linked-recovery',
     });
+    for (const epoch of ['cutover', 'cutover-recovery-1']) {
+      rmSync(
+        join(fixture.q12RunRoot, `retained-barrier-capability-checkpoint-install-${epoch}.json`)
+      );
+    }
     const predecessorPath = join(
       fixture.capabilitiesRoot,
       'superseded',
@@ -3067,14 +3088,12 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 
     const result = fixture.resume();
 
-    expect(result.status, result.stderr).toBe(0);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/retained barrier.*(?:checkpoint|provenance).*invalid/iu);
     expect(fileSha256(predecessorPath)).toBe(predecessorDigest);
     expect(fileSha256(tipPath)).toBe(tipDigest);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/barrier\.install/iu);
-    expect(JSON.parse(readFileSync(fixture.resumeState, 'utf8'))).toMatchObject({
-      state: 'writers_resumed',
-      mode: 'forward',
-    });
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^inspect |^start /mu);
+    expect(existsSync(fixture.resumeState)).toBe(false);
   });
 
   it('rejects a retained install recovery chain whose command hash changes before Docker', () => {
