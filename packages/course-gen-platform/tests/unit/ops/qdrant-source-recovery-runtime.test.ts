@@ -3052,8 +3052,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('rejects non-canonical whitespace in any stored journal line before Docker inspection', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects non-canonical whitespace in any stored journal line before Docker inspection', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const journal = join(fixture.q12RunRoot, 'phase.jsonl');
     writeFileSync(journal, readFileSync(journal, 'utf8').replace('\n', ' \n'));
 
@@ -3064,8 +3064,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('rejects a recomputed middle journal entry whose successor no longer chains to it', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects a recomputed middle journal entry whose successor no longer chains to it', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const journal = join(fixture.q12RunRoot, 'phase.jsonl');
     const entries = readFileSync(journal, 'utf8')
       .trimEnd()
@@ -3084,8 +3084,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('rejects a canonically rehashed resume head with the wrong command ID', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects a canonically rehashed resume head with the wrong command ID', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     rewriteResumeJournalHead(fixture, head => {
       head.command_id = 'barrier.prepare-recovery';
     });
@@ -3097,8 +3097,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('rejects accepted-object data in a resume-committing head even when checkpoint-bound', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects accepted-object data in a resume-committing head even when checkpoint-bound', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     rewriteResumeJournalHead(fixture, head => {
       head.accepted_object_kind = 'final_writer_manifest';
       head.accepted_object_sha256 = fileSha256(fixture.finalManifest);
@@ -3111,8 +3111,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('rejects a non-safe numeric journal value before chain acceptance', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects a non-safe numeric journal value before chain acceptance', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const journal = join(fixture.q12RunRoot, 'phase.jsonl');
     const entries = readFileSync(journal, 'utf8')
       .trimEnd()
@@ -3131,8 +3131,8 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
   });
 
-  it('rejects escaped non-ASCII bytes when the same journal value has a literal UTF-8 canonical form', () => {
-    const fixture = writerResumeFixture('forward');
+  it('rejects escaped non-ASCII bytes when the same journal value has a literal UTF-8 canonical form', async () => {
+    const fixture = await joinedWriterResumeFixture('forward');
     const journal = join(fixture.q12RunRoot, 'phase.jsonl');
     const entries = readFileSync(journal, 'utf8')
       .trimEnd()
