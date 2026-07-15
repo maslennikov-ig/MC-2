@@ -1832,6 +1832,29 @@ function rollbackHeldSpec(heldTargetCount: number): Record<string, unknown> {
   return {};
 }
 
+// A tamperPrefix that appends one row (a deploy.commit/completed template with
+// overrides) after the last prefix row (barrier.activate) — the section-5
+// grammar validates it in position without shifting any Root retained checkpoint.
+function appendMalformedPrefixRow(overrides: Record<string, unknown>): (runRoot: string) => void {
+  return runRoot => {
+    const journal = join(runRoot, 'phase.jsonl');
+    const entries = readFileSync(journal, 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, any>);
+    const last = entries[entries.length - 1];
+    const template =
+      entries.find(e => e.command_id === 'deploy.commit' && e.outcome === 'completed') ?? last;
+    const preimage = { ...template };
+    delete preimage.entry_hash;
+    Object.assign(preimage, overrides);
+    preimage.seq = entries.length + 1;
+    preimage.previous_hash = last.entry_hash;
+    entries.push(withJournalEntryHash(preimage));
+    writeJournal(journal, entries);
+  };
+}
+
 async function joinedWriterResumeFixture(
   mode: 'forward' | 'rollback',
   installChain?: Record<string, unknown>,
@@ -4002,85 +4025,68 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(existsSync(fixture.resumeState)).toBe(true);
   });
 
+  // Reshape-to-append (orchestrator ruling): a grammatically porous row appended
+  // after the last prefix row (barrier.activate) presents validate_joined_prefix
+  // the same per-row defect an in-position row would, without shifting any Root
+  // retained checkpoint. These four exercise the four per-row §5 grammar branches
+  // (unknown phase for a known command, a rollback phase in a forward run, a
+  // non-milestone outcome at migrations_applied, and an accepted-object on an
+  // ordinary row); all reject at the native §5 pin.
+  //
+  // The former phase-ORDER cases (missing / out-of-order / repeated phase) are NOT
+  // reshaped: they are graph properties Root guarantees for the joined prefix, and
+  // appending a well-formed extra row is accepted (verified: resume exits 0), so an
+  // append cannot express them. Their coverage is the Root-side composition-seam
+  // 'emits the exact amendment forward chronology' test (order/no-repeat/no-missing)
+  // plus the D4 genesis-gate negative for a fabricated prefix. The former 'second
+  // object publication pair' case is replaced by the dedicated D2 negative
+  // 'rejects a second final-writer-manifest pair in the joined prefix'.
   it.each([
-    {
-      label: 'missing phase',
-      options: {
-        commonPrefixTransform: (phases: string[]) =>
-          phases.filter(phase => phase !== 'restore_verified'),
+    [
+      'an unknown ordinary phase',
+      { command_id: 'deploy.commit', outcome: 'completed', phase: 'cutover_prepared' },
+    ],
+    [
+      'a cross-mode phase',
+      { command_id: 'deploy.commit', outcome: 'completed', phase: 'rollback_preparing' },
+    ],
+    [
+      'a non-milestone outcome at migrations_applied',
+      {
+        command_id: 'migration.observability.apply',
+        outcome: 'intent',
+        phase: 'migrations_applied',
       },
-    },
-    {
-      label: 'out-of-order phase',
-      options: {
-        commonPrefixTransform: (phases: string[]) => {
-          const changed = [...phases];
-          const backup = changed.indexOf('backup_committed');
-          const restore = changed.indexOf('restore_verified');
-          [changed[backup], changed[restore]] = [changed[restore], changed[backup]];
-          return changed;
-        },
+    ],
+    [
+      'an accepted object on an ordinary phase',
+      {
+        command_id: 'migration.observability.apply',
+        outcome: 'completed',
+        phase: 'migrations_applied',
+        accepted_object_kind: 'writer_resume_state',
+        accepted_object_sha256: 'f'.repeat(64),
       },
-    },
-    {
-      label: 'repeated phase',
-      options: {
-        commonPrefixTransform: (phases: string[]) => [
-          ...phases.slice(0, 6),
-          'restore_verified',
-          ...phases.slice(6),
-        ],
-      },
-    },
-    {
-      label: 'unknown phase',
-      options: {
-        commonPrefixTransform: (phases: string[]) =>
-          phases.map(phase => (phase === 'restore_verified' ? 'cutover_prepared' : phase)),
-      },
-    },
-    {
-      label: 'cross-mode phase',
-      options: {
-        commonPrefixTransform: (phases: string[]) => [
-          ...phases.slice(0, 6),
-          'rollback_complete',
-          ...phases.slice(6),
-        ],
-      },
-    },
-    {
-      label: 'wrong ordinary outcome',
-      options: {
-        entryMutator: (entry: Record<string, any>) => {
-          if (entry.phase === 'migrations_applied') entry.outcome = 'accepted';
-        },
-      },
-    },
-    {
-      label: 'accepted object on an ordinary phase',
-      options: {
-        entryMutator: (entry: Record<string, any>) => {
-          if (entry.phase === 'migrations_applied') {
-            entry.accepted_object_kind = 'writer_resume_state';
-            entry.accepted_object_sha256 = 'f'.repeat(64);
-          }
-        },
-      },
-    },
-    {
-      label: 'second object publication pair',
-      options: { duplicateFinalPair: true },
-    },
-  ])('rejects a $label in the exact forward journal prefix', ({ options }) => {
-    const fixture = writerResumeFixture('forward', 5, false, options);
+    ],
+  ] as const)(
+    'rejects %s appended to the joined prefix at the section-5 grammar before any start',
+    async (_label, overrides) => {
+      const fixture = await joinedWriterResumeFixture(
+        'forward',
+        undefined,
+        {},
+        false,
+        0,
+        appendMalformedPrefixRow(overrides)
+      );
 
-    const result = fixture.resume();
+      const result = fixture.resume();
 
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/phase graph|journal prefix/iu);
-    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
-  });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/outcome\/phase\/command grammar mismatch/iu);
+      expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^start /mu);
+    }
+  );
 
   it('resumes the exact forward final ten in workers, API, Web order and leaves held five stopped', async () => {
     const fixture = await joinedWriterResumeFixture('forward');
