@@ -632,8 +632,8 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
       '    return {',
       "        'class': klass,",
       "        'id': (digit * 64)[:64],",
-      "        'name': ('megacampus-' + service + ('-dev' if klass.startswith('development') else '')),",
-      "        'project': 'megacampus-dev' if klass.startswith('development') else 'megacampus',",
+      "        'name': 'megacampus-' + service,",
+      "        'project': 'megacampus-blue' if klass in ('production-api', 'production-web') else 'megacampus',",
       "        'service': service,",
       "        'config_files': '/opt/megacampus/docker-compose.production.yml',",
       "        'working_dir': '/opt/megacampus',",
@@ -653,7 +653,7 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
       "    writers.append(quiesce_writer('production-' + kind, service, index + 1))",
       'for index, service in enumerate(services):',
       "    kind = 'api' if service == 'api' else ('web' if service == 'web' else 'worker')",
-      "    writers.append(quiesce_writer('development-' + kind, service, index + 6))",
+      "    writers.append(quiesce_writer('development-' + kind, service + '-dev', index + 6))",
       'quiesce = {',
       "    'schema_version': 'megacampus.q12.writer-quiesce/v1',",
       "    'run_id': run_id,",
@@ -684,7 +684,7 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
         "path = pathlib.Path(root, 'final-writer-manifest-forward-' + run_id + '.json')",
         'value = json.loads(path.read_bytes())',
         'rows = [(e["phase"], e["outcome"], e["command_id"], e["command_sha256"]) for e in engine.journal[-2:]]',
-        'print(json.dumps({"keys": sorted(value), "mode": value["mode"], "final": [(w["class"], w["service"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in value["final_writers"]], "held": [(w["class"], w["intended_running"]) for w in value["held_writers"]], "target_ids": [w["id"] for w in value["final_writers"] if w["name"].endswith("-q12fixture")], "rows": rows, "expected_hash": command["command_sha256"]}))',
+        'print(json.dumps({"keys": sorted(value), "mode": value["mode"], "final": [(w["class"], w["service"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in value["final_writers"]], "held": [(w["class"], w["intended_running"]) for w in value["held_writers"]], "target_ids": [w["id"] for w in value["final_writers"] if w["name"].endswith("-q12fixture")], "target_projects": [w["project"] for w in value["final_writers"][:5]], "rows": rows, "expected_hash": command["command_sha256"]}))',
       ].join('\n')
     );
     expect(probe.stderr).toBe('');
@@ -695,6 +695,7 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
       final: [string, string, boolean, string][];
       held: [string, boolean][];
       target_ids: string[];
+      target_projects: string[];
       rows: [string, string, string, string][];
       expected_hash: string;
     };
@@ -720,13 +721,27 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
       output.final.filter(([, , running, policy]) => running && policy === 'unless-stopped')
     ).toHaveLength(10);
     expect(output.held).toEqual([
+      ['production-worker', false],
+      ['production-worker', false],
+      ['production-worker', false],
       ['production-api', false],
       ['production-web', false],
-      ['production-worker', false],
-      ['production-worker', false],
-      ['production-worker', false],
     ]);
     expect(output.target_ids).toHaveLength(5);
+    expect(output.target_projects).toEqual([
+      'megacampus-green',
+      'megacampus-green',
+      'megacampus',
+      'megacampus',
+      'megacampus',
+    ]);
+    expect(output.final.slice(0, 5)).toEqual([
+      ['production-api', 'api', true, 'unless-stopped'],
+      ['production-web', 'web', true, 'unless-stopped'],
+      ['production-worker', 'worker', true, 'unless-stopped'],
+      ['production-worker', 'worker-stage6', true, 'unless-stopped'],
+      ['production-worker', 'worker-stage7', true, 'unless-stopped'],
+    ]);
     expect(output.rows).toEqual([
       ['prepared_quiesced', 'intent', 'writers.resume.forward', output.expected_hash],
       ['prepared_quiesced', 'accepted', 'writers.resume.forward', output.expected_hash],
@@ -753,7 +768,8 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
         'rollback_value = json.loads(rollback_path.read_bytes())',
         'forward_targets = [w for w in forward_value["final_writers"] if w["name"].endswith("-q12fixture")]',
         'held_targets = rollback_value["held_writers"]',
-        'print(json.dumps({"both_exist": forward_path.exists() and rollback_path.exists(), "held_equal_targets": held_targets == forward_targets, "rollback_final": [(w["class"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in rollback_value["final_writers"]]}))',
+        'held_projection = [dict(w, intended_running=False, intended_restart_policy={"name": "no", "maximum_retry_count": 0}) for w in forward_targets]',
+        'print(json.dumps({"both_exist": forward_path.exists() and rollback_path.exists(), "held_equal_targets": held_targets == held_projection, "held_never_resumable": all((not w["intended_running"]) and w["intended_restart_policy"] == {"name": "no", "maximum_retry_count": 0} for w in held_targets), "rollback_final": [(w["class"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in rollback_value["final_writers"]]}))',
       ].join('\n')
     );
     expect(probe.stderr).toBe('');
@@ -763,10 +779,12 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
     const output = JSON.parse(lines[1]) as {
       both_exist: boolean;
       held_equal_targets: boolean;
+      held_never_resumable: boolean;
       rollback_final: [string, boolean, string][];
     };
     expect(output.both_exist).toBe(true);
     expect(output.held_equal_targets).toBe(true);
+    expect(output.held_never_resumable).toBe(true);
     expect(output.rollback_final).toHaveLength(10);
     expect(
       output.rollback_final.every(([, running, policy]) => running && policy === 'unless-stopped')
@@ -838,8 +856,9 @@ describe('Joined forward composition', () => {
     return {
       class: klass,
       id: digit.repeat(64),
-      name: `megacampus-${service}${klass.startsWith('development') ? '-dev' : ''}`,
-      project: klass.startsWith('development') ? 'megacampus-dev' : 'megacampus',
+      name: `megacampus-${service}`,
+      project:
+        klass === 'production-api' || klass === 'production-web' ? 'megacampus-blue' : 'megacampus',
       service,
       config_files: '/opt/megacampus/docker-compose.production.yml',
       working_dir: '/opt/megacampus',
@@ -863,7 +882,7 @@ describe('Joined forward composition', () => {
         quiesceWriter(`production-${kind(service)}`, service, index + 1)
       ),
       ...services.map((service, index) =>
-        quiesceWriter(`development-${kind(service)}`, service, index + 6)
+        quiesceWriter(`development-${kind(service)}`, `${service}-dev`, index + 6)
       ),
     ];
     const value = {
@@ -1033,8 +1052,9 @@ describe('Joined rollback profiles', () => {
     return {
       class: klass,
       id: digit.repeat(64),
-      name: `megacampus-${service}${klass.startsWith('development') ? '-dev' : ''}`,
-      project: klass.startsWith('development') ? 'megacampus-dev' : 'megacampus',
+      name: `megacampus-${service}`,
+      project:
+        klass === 'production-api' || klass === 'production-web' ? 'megacampus-blue' : 'megacampus',
       service,
       config_files: '/opt/megacampus/docker-compose.production.yml',
       working_dir: '/opt/megacampus',
@@ -1058,7 +1078,7 @@ describe('Joined rollback profiles', () => {
         quiesceWriterR(`production-${kind(service)}`, service, index + 1)
       ),
       ...services.map((service, index) =>
-        quiesceWriterR(`development-${kind(service)}`, service, index + 6)
+        quiesceWriterR(`development-${kind(service)}`, `${service}-dev`, index + 6)
       ),
     ];
     const value = {
@@ -1216,7 +1236,13 @@ describe('Joined rollback profiles', () => {
     const forwardTargets = forward.final_writers.filter(writer =>
       writer.name.endsWith('-q12fixture')
     );
-    expect(rollback.held_writers).toEqual(forwardTargets);
+    expect(rollback.held_writers).toEqual(
+      forwardTargets.map(writer => ({
+        ...writer,
+        intended_running: false,
+        intended_restart_policy: { name: 'no', maximum_retry_count: 0 },
+      }))
+    );
     expect(rollback.final_writers).toHaveLength(10);
   });
 
