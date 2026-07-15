@@ -79,4 +79,45 @@ API_IMAGE=ghcr.io/maslennikov-ig/mc-2/api@sha256:$DIGEST
 EOF
 expect_failure "WEB_IMAGE is missing or mutable" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" production "$CURRENT_COMMIT"
 
+# --- Q12 quiesce-aware handoff fail-closed cases ---------------------------
+Q12_RUN_ID='123e4567-e89b-42d3-a456-426614174000'
+Q12_SHA="$(printf 'a%.0s' {1..40})"
+Q12_MANIFEST="$TEMP_DIR/backups/q12/$Q12_RUN_ID/writer-quiesce-$Q12_RUN_ID.json"
+
+expect_failure "run-id must be a canonical" env BASE_PATH="$TEMP_DIR" "$DEPLOY" \
+  --q12-mode prepare-quiesced --run-id not-a-uuid --release-sha "$Q12_SHA" \
+  --external-quiesce-manifest "$Q12_MANIFEST"
+
+expect_failure "release-sha must be 40" env BASE_PATH="$TEMP_DIR" "$DEPLOY" \
+  --q12-mode prepare-quiesced --run-id "$Q12_RUN_ID" --release-sha short \
+  --external-quiesce-manifest "$Q12_MANIFEST"
+
+expect_failure "unknown Q12 handoff mode" env BASE_PATH="$TEMP_DIR" "$DEPLOY" \
+  --q12-mode teleport --run-id "$Q12_RUN_ID" --release-sha "$Q12_SHA" \
+  --external-quiesce-manifest "$Q12_MANIFEST"
+
+expect_failure "unexpected Q12 handoff argument" env BASE_PATH="$TEMP_DIR" "$DEPLOY" \
+  --q12-mode prepare-quiesced --run-id "$Q12_RUN_ID" --release-sha "$Q12_SHA" --surprise x
+
+expect_failure "must be an absolute path" env BASE_PATH="$TEMP_DIR" "$DEPLOY" \
+  --q12-mode prepare-quiesced --run-id "$Q12_RUN_ID" --release-sha "$Q12_SHA" \
+  --external-quiesce-manifest relative/manifest.json
+
+# Run root absent: prepare must fail before touching Docker.
+expect_failure "run root is missing" env BASE_PATH="$TEMP_DIR" "$DEPLOY" \
+  --q12-mode prepare-quiesced --run-id "$Q12_RUN_ID" --release-sha "$Q12_SHA" \
+  --external-quiesce-manifest "$Q12_MANIFEST"
+
+# Build a bound run root plus a durable activation receipt for the
+# finish-forward rollback guard.
+mkdir -p "$TEMP_DIR/backups/q12/$Q12_RUN_ID"
+cat > "$Q12_MANIFEST" <<EOF
+{"schema_version":"megacampus.q12.writer-quiesce/v1","run_id":"$Q12_RUN_ID","status":"quiesced","writers":[]}
+EOF
+cat > "$TEMP_DIR/backups/q12/$Q12_RUN_ID/database-barrier-receipt.json" <<EOF
+{"schema_version":"megacampus.q12.database-barrier-receipt/v1","run_id":"$Q12_RUN_ID","state":"activated","last_command":"activate"}
+EOF
+expect_failure "finish-forward only" env BASE_PATH="$TEMP_DIR" "$ROLLBACK" \
+  production "$Q12_SHA" --q12-run-id "$Q12_RUN_ID" --external-quiesce-manifest "$Q12_MANIFEST"
+
 echo "blue/green fail-closed tests passed"
