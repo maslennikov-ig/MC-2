@@ -46,7 +46,7 @@ authoritative for Q12.
 - The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
 - Publisher `.13.9`, G7 `.13.7.2`, D5 decision `.13.17`, and Root producer `.13.18` are accepted/integrated. D5W seam `.13.20` is closed: source `3dd9ad53`, correctness/docs delta reviews P0-P3 zero, integration/W reruns 271/271, cleanup evidence `c150a4c2`, source worktree/local branch removed. The preserved W branch is `7b7cc6b9` and retains exactly its two allowed uncommitted files. W remains blocked by joined-fixture chronology task `.13.21`; M `.13.11`, H `.13.12`, and Root `.13.13` remain dependency-ordered and local-only. No remote/live mutation occurred.
 - D6 decision `.13.19` has an ignored owner-ready candidate SHA-256 `2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5`; final independent review SHA-256 `948982d99895489c6fefa1fb831791f7e02bb524bb268713e712629a6bdab5a7` is PASS with P0-P3 zero. On 2026-07-15 the owner approved Option A as the written-contract direction, including its sole narrow post-`R` closed-terminal exception. D6 implementation still waits for accepted W, a reviewed plan, and separate local implementation authorization; remote/live authority remains separate.
-- Read-only architecture report SHA-256 `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379` found that D5W real-preimage binding is insufficient for W chronology: Root D5-only anchors and W's full source/backup/restore/reindex graph cannot be joined by copying or rehashing authority. The owner approved the Root-owned test-only architecture/drafting direction on 2026-07-15. Tracked candidate `docs/superpowers/specs/2026-07-15-q12-joined-retained-barrier-fixture-design.md` at SHA-256 `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d` closed the clean-prefix-1 quiesce-preimage gap and passed final correctness/docs rereviews P0-P3 `0/0/0/0` (report SHA-256 `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2` and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`). Exact corrected-SHA approval is still required before planning or code. Production CLI and W ownership stay unchanged.
+- Read-only architecture report SHA-256 `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379` found that D5W real-preimage binding is insufficient for W chronology: Root D5-only anchors and W's full source/backup/restore/reindex graph cannot be joined by copying or rehashing authority. The owner approved the Root-owned test-only architecture/drafting direction and, on 2026-07-15, explicitly approved the exact tracked candidate SHA-256 `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d`. It closed the clean-prefix-1 quiesce-preimage gap and passed final correctness/docs rereviews P0-P3 `0/0/0/0` (report SHA-256 `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2` and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`). Local planning/TDD/review/integration are authorized; production CLI and W ownership stay unchanged, and remote/live authority remains separate.
 - The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed. Grouping `.16` is closed as superseded by live-path tasks E5/E6.
@@ -69,12 +69,11 @@ Q7 recovery is complete. Both pinned integration retrievals use `generatePointId
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: obtain owner approval of the exact independently rereviewed
-`.13.21` joined-fixture candidate SHA. Only then write/review its implementation
-plan, execute strict TDD in the isolated worktree, resume and independently
-accept W `.13.10`, run M/H in parallel, and finish the root supervisor/journal
-join. D6 direction is approved, but its implementation remains after accepted W
-plus its own reviewed plan and local authorization. Run the
+Recommended action: write/review the exact `.13.21` implementation plan,
+execute strict TDD in the isolated worktree, resume and independently accept W
+`.13.10`, run M/H in parallel, and finish the root supervisor/journal join. D6
+direction is approved, but its implementation remains after accepted W plus its
+own reviewed plan and local authorization. Run the
 joined local release matrix before presenting the separate GHCR publication and
 live-cutover packet. Keep Q12 remote execution NO-GO until the frozen
 supervisor, truthful four-file backup, Supabase-compatible isolated restore,
@@ -131,10 +130,9 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - D6 `.13.19` written-contract direction is owner-approved but not implemented;
   it still waits for accepted W, a reviewed plan, and separate local
   implementation authorization. D5J `.13.21` architecture/drafting is approved
-  and its tracked written candidate exists, but plan/code remain blocked until
-  the owner approves the exact independently rereviewed corrected SHA. Neither
-  state permits server, Supabase, service, container, Qdrant, deployment, or
-  live actions.
+  and its exact independently rereviewed written SHA is owner-approved; local
+  planning/TDD/review/integration are active. Neither state permits server,
+  Supabase, service, container, Qdrant, deployment, or live actions.
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
@@ -144,8 +142,8 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — D6 direction approval and the D5J drafted exact-SHA
-gate now match Beads and the isolated candidate branch; only owner approval of
-the independently rereviewed exact SHA remains before planning.
+approval now match Beads and the isolated candidate branch; local D5J planning
+is the active next step.
 graph-reviewed: used — focused read-only query was consulted; the graph remains
 stale at pre-D5 HEAD and must be refreshed after the next accepted tracked
 implementation boundary with zero model/API modes and no Git hooks.

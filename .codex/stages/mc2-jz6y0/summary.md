@@ -352,8 +352,9 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2`
   and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`.
 - Baseline serialized Root verification passed 271/271 before drafting; the
-  tracked artifact validates. Planning/code remain blocked until the owner
-  approves the exact corrected candidate SHA. No remote/live action occurred.
+  tracked artifact validates. On 2026-07-15 the owner explicitly approved the
+  exact corrected candidate SHA and directed uninterrupted local continuation;
+  planning/TDD/review/integration are authorized. No remote/live action occurred.
 - D6 Option A is approved only as a written-contract direction. Implementation
   remains after accepted W, a reviewed D6 plan, and separate local
   authorization; the remote gate is unchanged.
