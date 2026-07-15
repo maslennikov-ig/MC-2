@@ -445,3 +445,308 @@ describe('Segment-aware stable bindings', () => {
     ).toContain('rejected');
   });
 });
+
+describe('Serializer primitives for joined composition', () => {
+  const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
+
+  function enginePreamble(quiesceInit: 'request' | 'zero'): string {
+    return [
+      'import importlib.util, json, sys, tempfile, uuid, pathlib',
+      `spec = importlib.util.spec_from_file_location('q12core', ${JSON.stringify(CORE_PATH)})`,
+      'core = importlib.util.module_from_spec(spec)',
+      "sys.modules['q12core'] = core",
+      'spec.loader.exec_module(core)',
+      "root = tempfile.mkdtemp(prefix='mc2-q12-d5-root-', dir='/tmp')",
+      'run_id = str(uuid.uuid5(uuid.NAMESPACE_URL, root))',
+      'request = {',
+      "    'run_root': root,",
+      "    'run_id': run_id,",
+      "    'release_sha': '0123456789abcdef0123456789abcdef01234567',",
+      "    'operator_digest': '1' * 64,",
+      "    'resource_manifest_sha256': '2' * 64,",
+      "    'quiesce_manifest_sha256': 'e' * 64,",
+      "    'expected_catalog_sha256': 'a' * 64,",
+      "    'rotation_required': False,",
+      '}',
+      'engine = core.Engine(request, object())',
+      quiesceInit === 'zero' ? "engine.current_quiesce_manifest_sha256 = '0' * 64" : 'pass',
+      'manifest = core.load_manifest()',
+      "values = core.derive_joined_fixture_values(run_id, root + '/w.json')",
+      'rows = lambda: [(entry["phase"], entry["outcome"], entry["command_id"], entry["quiesce_manifest_sha256"]) for entry in engine.journal]',
+    ].join('\n');
+  }
+
+  function primitiveProbe(script: string): {
+    status: number | null;
+    stdout: string;
+    stderr: string;
+  } {
+    return spawnSync('/usr/bin/python3', ['-c', script], { encoding: 'utf8' });
+  }
+
+  it('emits one complete ordinary lifecycle through the production serializer', () => {
+    const probe = primitiveProbe(
+      [
+        enginePreamble('request'),
+        "engine.append_ordinary_lifecycle(manifest, 'pg.restore', values)",
+        'engine.reload_durable()',
+        'capability_states = sorted(p.name for p in pathlib.Path(root, "capabilities", "completed").iterdir())',
+        'result_files = sorted(p.name for p in pathlib.Path(root).glob("ordinary-command-result-*.json"))',
+        'print(json.dumps({"rows": rows(), "completed": capability_states, "results": result_files}))',
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const output = JSON.parse(probe.stdout) as {
+      rows: [string, string, string, string][];
+      completed: string[];
+      results: string[];
+    };
+    expect(output.rows.map(row => row.slice(0, 3))).toEqual([
+      ['restore_verified', 'intent', 'pg.restore'],
+      ['restore_verified', 'capability_issued', 'pg.restore'],
+      ['restore_verified', 'capability_claimed', 'pg.restore'],
+      ['restore_verified', 'completed', 'pg.restore'],
+    ]);
+    expect(output.completed).toEqual(['pg.restore--cutover.json']);
+    expect(output.results).toEqual(['ordinary-command-result-pg.restore-cutover.json']);
+  });
+
+  it('switches the quiesce binding exactly at the accepted quiesce row', () => {
+    const probe = primitiveProbe(
+      [
+        enginePreamble('zero'),
+        "engine.append_ordinary_lifecycle(manifest, 'writers.quiesce', values, quiesce_object_sha256='b' * 64)",
+        'engine.reload_durable()',
+        'print(json.dumps({"rows": rows()}))',
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const output = JSON.parse(probe.stdout) as { rows: [string, string, string, string][] };
+    expect(output.rows.map(row => [row[1], row[3]])).toEqual([
+      ['intent', '0'.repeat(64)],
+      ['capability_issued', '0'.repeat(64)],
+      ['capability_claimed', '0'.repeat(64)],
+      ['capability_completed', '0'.repeat(64)],
+      ['accepted', 'e'.repeat(64)],
+    ]);
+  });
+
+  it('appends a controller milestone only over its durable witness', () => {
+    const withWitness = primitiveProbe(
+      [
+        enginePreamble('request'),
+        "engine.append_ordinary_lifecycle(manifest, 'migration.observability.apply', values)",
+        "engine.append_controller_milestone(manifest, 'migrations_applied', 'migration.observability.apply', values)",
+        'engine.reload_durable()',
+        'witness = [entry for entry in engine.journal if entry["outcome"] == "completed"][0]',
+        'milestone = engine.journal[-1]',
+        'print(json.dumps({"phase": milestone["phase"], "command": milestone["command_id"], "carried": milestone["capability_manifest_sha256"] == witness["capability_manifest_sha256"]}))',
+      ].join('\n')
+    );
+    expect(withWitness.stderr).toBe('');
+    expect(withWitness.status).toBe(0);
+    expect(JSON.parse(withWitness.stdout)).toEqual({
+      phase: 'migrations_applied',
+      command: 'migration.observability.apply',
+      carried: true,
+    });
+    const withoutWitness = primitiveProbe(
+      [
+        enginePreamble('request'),
+        'try:',
+        "    engine.append_controller_milestone(manifest, 'migrations_applied', 'migration.observability.apply', values)",
+        "    print('accepted')",
+        'except core.LifecycleError as error:',
+        "    print(f'rejected: {error}')",
+      ].join('\n')
+    );
+    expect(withoutWitness.status).toBe(0);
+    expect(withoutWitness.stdout).toContain('rejected');
+  });
+
+  it('appends a retained selector only from a matching current head', () => {
+    const probe = primitiveProbe(
+      [
+        enginePreamble('request'),
+        "command = core.resolved_command(manifest, 'barrier.install', request)",
+        'try:',
+        "    engine.append_retained_selector_from_current_head('install', command)",
+        "    print('accepted-empty')",
+        'except core.LifecycleError:',
+        "    print('rejected-empty')",
+        "engine.append_ordinary_lifecycle(manifest, 'operator.self-check', values)",
+        "entry = engine.append_retained_selector_from_current_head('install', command)",
+        'anchors = [row for row in engine.journal if row["command_id"] == "root.advance"]',
+        'print(json.dumps({"phase": entry["phase"], "outcome": entry["outcome"], "anchors": len(anchors)}))',
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const lines = probe.stdout.trim().split('\n');
+    expect(lines[0]).toBe('rejected-empty');
+    expect(JSON.parse(lines[1])).toEqual({
+      phase: 'maintenance_guarded',
+      outcome: 'intent',
+      anchors: 0,
+    });
+  });
+});
+
+describe('Dual-path final-writer manifests with Root inventory', () => {
+  const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
+
+  function fwmProbe(body: string): { status: number | null; stdout: string; stderr: string } {
+    const script = [
+      'import importlib.util, json, sys, tempfile, uuid, pathlib',
+      `spec = importlib.util.spec_from_file_location('q12core', ${JSON.stringify(CORE_PATH)})`,
+      'core = importlib.util.module_from_spec(spec)',
+      "sys.modules['q12core'] = core",
+      'spec.loader.exec_module(core)',
+      "root = tempfile.mkdtemp(prefix='mc2-q12-d5-root-', dir='/tmp')",
+      'run_id = str(uuid.uuid5(uuid.NAMESPACE_URL, root))',
+      'def quiesce_writer(klass, service, index):',
+      '    digit = str(index % 10)',
+      '    return {',
+      "        'class': klass,",
+      "        'id': (digit * 64)[:64],",
+      "        'name': ('megacampus-' + service + ('-dev' if klass.startswith('development') else '')),",
+      "        'project': 'megacampus-dev' if klass.startswith('development') else 'megacampus',",
+      "        'service': service,",
+      "        'config_files': '/opt/megacampus/docker-compose.production.yml',",
+      "        'working_dir': '/opt/megacampus',",
+      "        'image_id': 'sha256:' + (digit * 64)[:64],",
+      "        'image_ref': 'ghcr.io/megacampus/' + service + '@sha256:' + (digit * 64)[:64],",
+      "        'prior_running': True,",
+      "        'prior_status': 'running',",
+      "        'healthcheck_present': service in ('api', 'web'),",
+      "        'prior_health_status': 'healthy' if service in ('api', 'web') else None,",
+      "        'prior_restart_policy': {'name': 'unless-stopped', 'maximum_retry_count': 0},",
+      "        'temporary_restart_policy': {'name': 'no', 'maximum_retry_count': 0},",
+      '    }',
+      "services = ['api', 'web', 'worker', 'worker-stage6', 'worker-stage7']",
+      'writers = []',
+      'for index, service in enumerate(services):',
+      "    kind = 'api' if service == 'api' else ('web' if service == 'web' else 'worker')",
+      "    writers.append(quiesce_writer('production-' + kind, service, index + 1))",
+      'for index, service in enumerate(services):',
+      "    kind = 'api' if service == 'api' else ('web' if service == 'web' else 'worker')",
+      "    writers.append(quiesce_writer('development-' + kind, service, index + 6))",
+      'quiesce = {',
+      "    'schema_version': 'megacampus.q12.writer-quiesce/v1',",
+      "    'run_id': run_id,",
+      "    'status': 'quiesced',",
+      "    'barrier': {'state': 'recovery_ready_guarded', 'zero_guard_residue': False, 'expected_catalog_sha256': 'a' * 64, 'probe_receipt_sha256': 'b' * 64},",
+      "    'writers': writers,",
+      '}',
+      'quiesce_bytes = core.complete_object(quiesce)',
+      "request = {'run_root': root, 'run_id': run_id, 'release_sha': '0123456789abcdef0123456789abcdef01234567', 'operator_digest': '1' * 64, 'resource_manifest_sha256': '2' * 64, 'quiesce_manifest_sha256': core.sha256(quiesce_bytes), 'expected_catalog_sha256': 'a' * 64, 'rotation_required': False}",
+      'engine = core.Engine(request, object())',
+      'manifest = core.load_manifest()',
+      "values = core.derive_joined_fixture_values(run_id, root + '/w.json')",
+      body,
+    ].join('\n');
+    return spawnSync('/usr/bin/python3', ['-c', script], { encoding: 'utf8' });
+  }
+
+  it('publishes the eleven-key forward manifest at the forward path from Root authority only', () => {
+    const probe = fwmProbe(
+      [
+        "engine.append_ordinary_lifecycle(manifest, 'operator.self-check', values)",
+        'inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)',
+        "command = core.resolved_command(manifest, 'writers.resume.forward', request)",
+        "entry = engine.publish_final_writer_manifest('forward', inventory, command)",
+        'engine.reload_durable()',
+        "path = pathlib.Path(root, 'final-writer-manifest-forward-' + run_id + '.json')",
+        'value = json.loads(path.read_bytes())',
+        'rows = [(e["phase"], e["outcome"], e["command_id"], e["command_sha256"]) for e in engine.journal[-2:]]',
+        'print(json.dumps({"keys": sorted(value), "mode": value["mode"], "final": [(w["class"], w["service"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in value["final_writers"]], "held": [(w["class"], w["intended_running"]) for w in value["held_writers"]], "target_ids": [w["id"] for w in value["final_writers"] if w["name"].endswith("-q12fixture")], "rows": rows, "expected_hash": command["command_sha256"]}))',
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const output = JSON.parse(probe.stdout) as {
+      keys: string[];
+      mode: string;
+      final: [string, string, boolean, string][];
+      held: [string, boolean][];
+      target_ids: string[];
+      rows: [string, string, string, string][];
+      expected_hash: string;
+    };
+    expect(output.keys).toEqual(
+      [
+        'expected_catalog_sha256',
+        'final_writers',
+        'held_writers',
+        'input_checkpoint_sha256',
+        'lease_epoch',
+        'mode',
+        'publication_intent_journal_entry_hash',
+        'release_sha',
+        'run_id',
+        'schema_version',
+        'writer_quiesce_manifest_sha256',
+      ].sort()
+    );
+    expect(output.mode).toBe('forward');
+    expect(output.final).toHaveLength(10);
+    expect(output.final.filter(([klass]) => klass.startsWith('development-'))).toHaveLength(5);
+    expect(
+      output.final.filter(([, , running, policy]) => running && policy === 'unless-stopped')
+    ).toHaveLength(10);
+    expect(output.held).toEqual([
+      ['production-api', false],
+      ['production-web', false],
+      ['production-worker', false],
+      ['production-worker', false],
+      ['production-worker', false],
+    ]);
+    expect(output.target_ids).toHaveLength(5);
+    expect(output.rows).toEqual([
+      ['prepared_quiesced', 'intent', 'writers.resume.forward', output.expected_hash],
+      ['prepared_quiesced', 'accepted', 'writers.resume.forward', output.expected_hash],
+    ]);
+  });
+
+  it('refuses a second publication at either mode path and wrong-mode reuse', () => {
+    const probe = fwmProbe(
+      [
+        "engine.append_ordinary_lifecycle(manifest, 'operator.self-check', values)",
+        'inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)',
+        "forward_command = core.resolved_command(manifest, 'writers.resume.forward', request)",
+        "engine.publish_final_writer_manifest('forward', inventory, forward_command)",
+        'try:',
+        "    engine.publish_final_writer_manifest('forward', inventory, forward_command)",
+        "    print('duplicate-accepted')",
+        'except core.LifecycleError:',
+        "    print('duplicate-rejected')",
+        "rollback_command = core.resolved_command(manifest, 'writers.resume.rollback', request)",
+        "engine.publish_final_writer_manifest('rollback', inventory, rollback_command)",
+        "forward_path = pathlib.Path(root, 'final-writer-manifest-forward-' + run_id + '.json')",
+        "rollback_path = pathlib.Path(root, 'final-writer-manifest-rollback-' + run_id + '.json')",
+        'forward_value = json.loads(forward_path.read_bytes())',
+        'rollback_value = json.loads(rollback_path.read_bytes())',
+        'forward_targets = [w for w in forward_value["final_writers"] if w["name"].endswith("-q12fixture")]',
+        'held_targets = rollback_value["held_writers"]',
+        'print(json.dumps({"both_exist": forward_path.exists() and rollback_path.exists(), "held_equal_targets": held_targets == forward_targets, "rollback_final": [(w["class"], w["intended_running"], w["intended_restart_policy"]["name"]) for w in rollback_value["final_writers"]]}))',
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const lines = probe.stdout.trim().split('\n');
+    expect(lines[0]).toBe('duplicate-rejected');
+    const output = JSON.parse(lines[1]) as {
+      both_exist: boolean;
+      held_equal_targets: boolean;
+      rollback_final: [string, boolean, string][];
+    };
+    expect(output.both_exist).toBe(true);
+    expect(output.held_equal_targets).toBe(true);
+    expect(output.rollback_final).toHaveLength(10);
+    expect(
+      output.rollback_final.every(([, running, policy]) => running && policy === 'unless-stopped')
+    ).toBe(true);
+  });
+});

@@ -1680,6 +1680,219 @@ class Engine:
             digest,
         )
 
+    def derive_root_writer_inventory(
+        self, quiesce_manifest_bytes: bytes, *, include_targets: bool
+    ) -> dict[str, Any]:
+        """Amendment section 6 item 3: Root-only writer inventory derivation.
+
+        The ten originals come read-only from the W-owned
+        megacampus.q12.writer-quiesce/v1 bytes; the five targets are the
+        frozen fixture derivations recorded by deploy.prepare evidence.
+        """
+        quiesce = json.loads(quiesce_manifest_bytes)
+        if (
+            set(quiesce) != {"schema_version", "run_id", "status", "barrier", "writers"}
+            or quiesce.get("schema_version") != "megacampus.q12.writer-quiesce/v1"
+            or quiesce.get("run_id") != self.request["run_id"]
+            or quiesce.get("status") != "quiesced"
+            or not isinstance(quiesce.get("writers"), list)
+            or len(quiesce["writers"]) != 10
+        ):
+            raise LifecycleError("writer quiesce manifest shape mismatch")
+        writer_fields = {
+            "class",
+            "id",
+            "name",
+            "project",
+            "service",
+            "config_files",
+            "working_dir",
+            "image_id",
+            "image_ref",
+            "prior_running",
+            "prior_status",
+            "healthcheck_present",
+            "prior_health_status",
+            "prior_restart_policy",
+            "temporary_restart_policy",
+        }
+        for writer in quiesce["writers"]:
+            if set(writer) != writer_fields:
+                raise LifecycleError("quiesced writer projection mismatch")
+        production = [
+            writer
+            for writer in quiesce["writers"]
+            if str(writer["class"]).startswith("production-")
+        ]
+        development = [
+            writer
+            for writer in quiesce["writers"]
+            if str(writer["class"]).startswith("development-")
+        ]
+        if len(production) != 5 or len(development) != 5:
+            raise LifecycleError("original writer class inventory mismatch")
+
+        def fwm_entry(
+            writer: dict[str, Any], intended_running: bool, intended_policy: dict[str, Any]
+        ) -> dict[str, Any]:
+            return {
+                "class": writer["class"],
+                "id": writer["id"],
+                "name": writer["name"],
+                "project": writer["project"],
+                "service": writer["service"],
+                "config_files": writer["config_files"],
+                "working_dir": writer["working_dir"],
+                "image_id": writer["image_id"],
+                "image_ref": writer["image_ref"],
+                "healthcheck_present": writer["healthcheck_present"],
+                "intended_running": intended_running,
+                "intended_restart_policy": intended_policy,
+                "temporary_restart_policy": {"name": "no", "maximum_retry_count": 0},
+            }
+
+        inventory: dict[str, Any] = {
+            "production_prior": [
+                fwm_entry(writer, bool(writer["prior_running"]), writer["prior_restart_policy"])
+                for writer in production
+            ],
+            "production_held": [
+                fwm_entry(writer, False, {"name": "no", "maximum_retry_count": 0})
+                for writer in production
+            ],
+            "development_prior": [
+                fwm_entry(writer, bool(writer["prior_running"]), writer["prior_restart_policy"])
+                for writer in development
+            ],
+            "targets": None,
+        }
+        if include_targets:
+            run_id = str(uuid.UUID(self.request["run_id"]))
+            targets = []
+            for service in ("api", "web", "worker", "worker-stage6", "worker-stage7"):
+                source = next(
+                    (writer for writer in production if writer["service"] == service), None
+                )
+                if source is None:
+                    raise LifecycleError("target derivation lacks a production writer")
+                image_digest = sha256(
+                    f"q12:fixture-target-image:{run_id}:{service}".encode("utf-8")
+                )
+                targets.append(
+                    {
+                        "class": source["class"],
+                        "id": sha256(f"q12:fixture-target:{run_id}:{service}".encode("utf-8")),
+                        "name": f"megacampus-{service}-q12fixture",
+                        "project": source["project"],
+                        "service": source["service"],
+                        "config_files": source["config_files"],
+                        "working_dir": source["working_dir"],
+                        "image_id": f"sha256:{image_digest}",
+                        "image_ref": f"q12fixture.invalid/megacampus-{service}@sha256:{image_digest}",
+                        "healthcheck_present": source["healthcheck_present"],
+                        "intended_running": True,
+                        "intended_restart_policy": {
+                            "name": "unless-stopped",
+                            "maximum_retry_count": 0,
+                        },
+                        "temporary_restart_policy": {"name": "no", "maximum_retry_count": 0},
+                    }
+                )
+            inventory["targets"] = targets
+        return inventory
+
+    @staticmethod
+    def sorted_writers(writers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(writers, key=lambda w: (w["project"], w["service"], w["id"]))
+
+    def publish_final_writer_manifest(
+        self,
+        mode: str,
+        inventory: dict[str, Any] | None,
+        command: dict[str, Any],
+        *,
+        checkpoint_predecessor: dict[str, Any] | None = None,
+        epoch: str = "cutover",
+        capability_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Amendment section 6: mode-bound immutable final-writer manifests.
+
+        With an inventory this publishes the normative eleven-key object
+        (joined path). With inventory=None it retains the pre-existing
+        isolated five-key fixture reduction, which knowingly shares the
+        schema id; the eleven-key shape is asserted by joined positives only.
+        """
+        if mode not in ("forward", "rollback"):
+            raise LifecycleError("final writer manifest mode mismatch")
+        manifest_path = (
+            self.run_root / f"final-writer-manifest-{mode}-{self.request['run_id']}.json"
+        )
+        if os.path.lexists(manifest_path):
+            raise LifecycleError("final writer manifest already published for this mode")
+        resume_id = f"writers.resume.{mode}"
+        if checkpoint_predecessor is None:
+            checkpoint_predecessor = self.journal[-1] if self.journal else None
+        carried = (
+            capability_hash
+            if capability_hash is not None
+            else (self.journal[-1]["capability_manifest_sha256"] if self.journal else ZERO)
+        )
+        intent = self.append(
+            FWM_ROW_PHASES[resume_id],
+            "intent",
+            resume_id,
+            command["command_sha256"],
+            epoch,
+            carried,
+            publish_fixed_checkpoint=False,
+        )
+        if inventory is None:
+            manifest_value: dict[str, Any] = {
+                "schema_version": "megacampus.q12.final-writer-manifest/v1",
+                "run_id": self.request["run_id"],
+                "publication_intent_journal_entry_hash": intent["entry_hash"],
+                "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
+                "mode": mode,
+            }
+            manifest_mode = 0o600
+        else:
+            if mode == "forward":
+                if inventory["targets"] is None:
+                    raise LifecycleError("forward manifest requires target identities")
+                final = inventory["targets"] + inventory["development_prior"]
+                held = inventory["production_held"]
+            else:
+                final = inventory["production_prior"] + inventory["development_prior"]
+                held = inventory["targets"] or []
+            manifest_value = {
+                "schema_version": "megacampus.q12.final-writer-manifest/v1",
+                "run_id": self.request["run_id"],
+                "mode": mode,
+                "release_sha": self.request["release_sha"],
+                "expected_catalog_sha256": self.request["expected_catalog_sha256"],
+                "writer_quiesce_manifest_sha256": self.request["quiesce_manifest_sha256"],
+                "publication_intent_journal_entry_hash": intent["entry_hash"],
+                "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
+                "lease_epoch": epoch,
+                "final_writers": self.sorted_writers(final),
+                "held_writers": self.sorted_writers(held),
+            }
+            manifest_mode = 0o400
+        data = complete_object(manifest_value)
+        immutable_publish(manifest_path, data, manifest_mode, self.trace)
+        manifest_hash = sha256(manifest_path.read_bytes())
+        return self.append(
+            FWM_ROW_PHASES[resume_id],
+            "accepted",
+            resume_id,
+            command["command_sha256"],
+            epoch,
+            carried,
+            accepted_kind="final_writer_manifest",
+            accepted_hash=manifest_hash,
+            checkpoint_predecessor=checkpoint_predecessor,
+        )
+
     def append_controller_milestone(
         self,
         manifest: dict[str, Any],
@@ -2310,35 +2523,13 @@ class Engine:
         resume_command = resolved_command(
             load_manifest(), "writers.resume.rollback", self.request
         )
-        intent = self.append(
-            "rollback_preparing",
-            "intent",
-            "writers.resume.rollback",
-            resume_command["command_sha256"],
-            decision_epoch,
-            f_capability,
-            publish_fixed_checkpoint=False,
-        )
-        final_manifest = {
-            "schema_version": "megacampus.q12.final-writer-manifest/v1",
-            "run_id": self.request["run_id"],
-            "publication_intent_journal_entry_hash": intent["entry_hash"],
-            "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
-            "mode": "rollback",
-        }
-        manifest_path = self.run_root / f"final-writer-manifest-{self.request['run_id']}.json"
-        immutable_publish(manifest_path, complete_object(final_manifest), 0o600, self.trace)
-        manifest_hash = sha256(manifest_path.read_bytes())
-        self.append(
-            "rollback_preparing",
-            "accepted",
-            "writers.resume.rollback",
-            resume_command["command_sha256"],
-            decision_epoch,
-            f_capability,
-            accepted_kind="final_writer_manifest",
-            accepted_hash=manifest_hash,
+        self.publish_final_writer_manifest(
+            "rollback",
+            None,
+            resume_command,
             checkpoint_predecessor=disposition,
+            epoch=decision_epoch,
+            capability_hash=f_capability,
         )
 
     def output(self) -> dict[str, Any]:
