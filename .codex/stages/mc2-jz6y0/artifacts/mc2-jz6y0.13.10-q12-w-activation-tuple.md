@@ -20,13 +20,15 @@ verification:
   - 'sha256sum deploy/qdrant/q12-command-manifest.json -> aaec6fc2… (field 2)'
   - 'sha256sum deploy/qdrant/q12-database-barrier.sh -> 134255ce… (field 4)'
   - 'git rev-parse HEAD -> 60910053… (field 1)'
+  - 'MC2_Q12_REAL_PG17=1 pnpm exec vitest run tests/unit/ops/q12-w-activation-lock-proof-pg17.test.ts -> 2 passed (structural + mechanical PG17 lock proof)'
+  - 'pnpm exec vitest run (no flag) -> 1 passed | 1 skipped (mechanical gated); prettier --check clean; type-check introduces no errors in the new file'
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-q12-w-activation-tuple.md
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs
+  - packages/course-gen-platform/tests/unit/ops/q12-w-activation-lock-proof-pg17.test.ts
 explicit_defers:
   - 'Field 11 managed_inventory_sha256: STOP — managed identity roster not enumerated in any accepted source (owner/live gate).'
   - 'Fields 5/6/8/9 catalog binding: awaiting orchestrator A/B ruling (test-reference-catalog projection vs production-catalog gate).'
-  - 'Mechanical PG17 control-flow test (fields 8-9 invariant): next increment; approach documented below.'
   - 'deploy/qdrant/ lock-catalog/order JSON assets: held pending the A/B ruling to avoid freezing test-catalog data as production assets.'
 ---
 
@@ -133,12 +135,22 @@ mc2-jz6y0.13.4.*` and `.13.7-*`; `.13.14-managed-supabase-boundary.md` (trust-
    session/background inventory" — that reviewed enumeration does not yet exist in
    accepted bytes. Per the derivation-only rule it is NOT synthesized; it becomes a
    separate owner/live gate.
-5. **Mechanical PG17 test (next increment).** Docker + `postgres:17.10-bookworm`
-   confirmed available. Planned: disposable container, install the guard schema via
-   the barrier `install` slice, apply the `activate` normal slice while a concurrent
-   `SHARE`-holding session and `pg_locks` observation prove the ACCESS EXCLUSIVE
-   lock-before-mutation predecessor and the SHARE conflict, and prove no bypass
-   branch. Mirrors `q12-structural-catalog-pg17.test.ts`. Additive test only.
+5. **Mechanical PG17 test (DONE — `q12-w-activation-lock-proof-pg17.test.ts`,
+   commit 2143bfd0).** Running the FULL real `install`→`activate` slices against a
+   vanilla `postgres:17.10-bookworm` is infeasible (they assume the Supabase role /
+   auth / storage / cron / net environment; the accepted-W suite deliberately tests
+   the barrier via a fake node, not live execution). The mechanical proof therefore
+   targets the contract's actual control-flow property directly: (a) STRUCTURAL
+   (always-on) — exactly one `LOCK TABLE ... IN ACCESS EXCLUSIVE MODE` after the
+   controller binding and before `verify_expected_guards`, the `DO $restore$`
+   mutation block, and `ALTER DATABASE`, with no `IF/CASE/EXCEPTION/LOOP` before the
+   lock; (b) MECHANICAL (gated `MC2_Q12_REAL_PG17=1`, disposable container) — a
+   controller session running the exact accepted `LOCK TABLE` holds
+   `AccessExclusiveLock` on ALL guarded relations (verified via `pg_locks`), and a
+   concurrent `SHARE` on a guarded relation conflicts (lock timeout). The slice is
+   generated live from the accepted barrier bytes. Verified: 2 passed with the flag;
+   1 passed / 1 skipped without it. This proves the catalog-INDEPENDENT invariant;
+   the specific relation LIST is the flagged test-reference catalog (see item 2).
 
 ## File placement (proposed; orchestrator finalizes)
 
