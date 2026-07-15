@@ -1788,8 +1788,27 @@ function stoppedWriterRecord(
   };
 }
 
+// Approved D5 install-chain recovery dimensions (RetainedChainSpec), used to
+// exercise the barrier.install recovery-epoch lifecycle over the real Root
+// prefix instead of the fabricated historicalInstallScenario builder.
+function installChainSpec(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    operation: 'install',
+    rootEpoch: 'cutover',
+    cutoverCopyBeforeRecoveryRoot: 'absent',
+    recoveryReissues: 0,
+    publicationWindowOrphans: 0,
+    completionMode: 'normal',
+    faultAfter: 'none',
+    stopAfter: 'completed',
+    installTransaction: 'normal',
+    ...overrides,
+  };
+}
+
 async function joinedWriterResumeFixture(
-  mode: 'forward' | 'rollback'
+  mode: 'forward' | 'rollback',
+  installChain?: Record<string, unknown>
 ): Promise<ResumeWriterFixture> {
   const runRoot = mkdtempSync('/tmp/mc2-q12-d5-root-');
   temporaryDirectories.push(runRoot);
@@ -1818,6 +1837,7 @@ async function joinedWriterResumeFixture(
     joinedProfile: mode,
     quiesceManifestPath: quiescePath,
     ...(mode === 'rollback' ? { completedPrefixLength: 4 as const } : {}),
+    ...(installChain ? { chains: { install: installChain } } : {}),
   } as never);
   const fwmPath =
     mode === 'forward'
@@ -4112,6 +4132,37 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     // originals are the final set and there are zero held writers.
     expect(fixture.heldIds).toHaveLength(0);
     expect(fixture.finalIds).toHaveLength(10);
+  });
+
+  it('resumes forward over a real Root install recovery-reissue chain (was linked-recovery)', async () => {
+    const fixture = await joinedWriterResumeFixture(
+      'forward',
+      installChainSpec({ recoveryReissues: 1 })
+    );
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
+    expect(receipt).toMatchObject({ state: 'writers_resumed', mode: 'forward' });
+    // The install lifecycle superseded its cutover capability into a recovery
+    // epoch, so the completed barrier.install authority is journal-bound in
+    // cutover-recovery-1 with Root checkpoint provenance for both epochs.
+    const capabilities = readdirSync(join(fixture.q12RunRoot, 'capabilities', 'superseded'));
+    expect(capabilities).toContain('barrier.install--cutover.json');
+  });
+
+  it.each([
+    ['orphan-recovery', { recoveryReissues: 1 as const, publicationWindowOrphans: 1 as const }],
+    ['completion-recovery', { completionMode: 'move-no-row-reacquired' as const }],
+  ])('resumes forward over a real Root install %s chain', async (_label, overrides) => {
+    const fixture = await joinedWriterResumeFixture('forward', installChainSpec(overrides));
+
+    const result = fixture.resume();
+
+    expect(result.status, result.stderr).toBe(0);
+    const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
+    expect(receipt).toMatchObject({ state: 'writers_resumed', mode: 'forward' });
   });
 
   function invokeResumeWrapper(
