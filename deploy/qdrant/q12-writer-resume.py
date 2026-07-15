@@ -18,7 +18,9 @@ uid = int(uid_raw)
 gid = int(gid_raw)
 local_test = local_test_raw == "1"
 HEX64 = re.compile(r"^[a-f0-9]{64}$")
-UUID4 = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+# Production run ids are UUIDv4; the accepted D5J joined fixture freezes
+# UUIDv5 run ids derived from the run-root path, so both versions are legal.
+UUID4 = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 RESUME_LEASE = re.compile(r"^(?:cutover|cutover-recovery-[1-9][0-9]*)$")
 JOURNAL_LEASE = re.compile(r"^(?:cutover|cutover-recovery-[1-9][0-9]*|postcutover_schedule|credential_rotation)$")
 CLASSES = {
@@ -1030,7 +1032,7 @@ paths = {
     "probe": os.path.join(run_root, "database-barrier-probe-receipt.json"),
     "quiesce": os.path.join(run_root, f"writer-quiesce-{run_id}.json"),
     "recovery": os.path.join(run_root, f"writer-recovery-state-{run_id}.json"),
-    "final": os.path.join(run_root, f"final-writer-manifest-{run_id}.json"),
+    "final": os.path.join(run_root, f"final-writer-manifest-{mode}-{run_id}.json"),
     "handoff": os.path.join(run_root, f"writer-handoff-state-{run_id}.json"),
     "rollback": os.path.join(run_root, f"writer-rollback-state-{run_id}.json"),
     "authority": os.path.join(run_root, f"writer-resume-authority-{run_id}.json"),

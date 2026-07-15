@@ -21,6 +21,16 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const WRAPPER = resolve(REPO_ROOT, 'deploy/qdrant/source-recovery-run.sh');
+const COMMAND_MANIFEST = JSON.parse(
+  readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-command-manifest.json'), 'utf8')
+) as { commands: Record<string, { argv: string[] }> };
+
+function resolvedCommandSha256(commandId: string, runId: string): string {
+  const argv = COMMAND_MANIFEST.commands[commandId].argv.map(value =>
+    value.split('<run-id>').join(runId)
+  );
+  return createHash('sha256').update(JSON.stringify(argv)).digest('hex');
+}
 const ENTRYPOINT = resolve(
   REPO_ROOT,
   'packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh'
@@ -1747,7 +1757,10 @@ function writerResumeFixture(
     );
   });
   const heldWriters = heldRecords.map(record => manifestWriter(record, false));
-  const finalManifest = join(fixture.q12RunRoot, `final-writer-manifest-${Q12_RUN_ID}.json`);
+  const finalManifest = join(
+    fixture.q12RunRoot,
+    `final-writer-manifest-${mode}-${Q12_RUN_ID}.json`
+  );
   const handoffState = join(fixture.q12RunRoot, `writer-handoff-state-${Q12_RUN_ID}.json`);
   const rollbackState = join(fixture.q12RunRoot, `writer-rollback-state-${Q12_RUN_ID}.json`);
   const authority = join(fixture.q12RunRoot, `writer-resume-authority-${Q12_RUN_ID}.json`);
@@ -2126,7 +2139,12 @@ function writerResumeFixture(
     appendJournalEntry
   );
   const finalPhase = mode === 'forward' ? 'prepared_quiesced' : 'rollback_preparing';
-  const finalIntent = appendJournalEntry(finalPhase, 'intent');
+  const resumeCommandId = `writers.resume.${mode}`;
+  const resumeCommandSha = resolvedCommandSha256(resumeCommandId, Q12_RUN_ID);
+  const resumeBinding = { command_id: resumeCommandId, command_sha256: resumeCommandSha };
+  const finalIntent = appendJournalEntry(finalPhase, 'intent', 'none', null, leaseEpoch, {
+    ...resumeBinding,
+  });
   writeProtectedJson(finalManifest, {
     schema_version: 'megacampus.q12.final-writer-manifest/v1',
     run_id: Q12_RUN_ID,
@@ -2141,10 +2159,26 @@ function writerResumeFixture(
     held_writers: heldWriters,
   });
   const finalManifestSha = fileSha256(finalManifest);
-  appendJournalEntry(finalPhase, 'accepted', 'final_writer_manifest', finalManifestSha);
+  appendJournalEntry(
+    finalPhase,
+    'accepted',
+    'final_writer_manifest',
+    finalManifestSha,
+    leaseEpoch,
+    {
+      ...resumeBinding,
+    }
+  );
   if (journalOptions.duplicateFinalPair) {
-    appendJournalEntry(finalPhase, 'intent');
-    appendJournalEntry(finalPhase, 'accepted', 'final_writer_manifest', finalManifestSha);
+    appendJournalEntry(finalPhase, 'intent', 'none', null, leaseEpoch, { ...resumeBinding });
+    appendJournalEntry(
+      finalPhase,
+      'accepted',
+      'final_writer_manifest',
+      finalManifestSha,
+      leaseEpoch,
+      { ...resumeBinding }
+    );
   }
   let handoffStateSha: string | null = null;
   let rollbackStateSha: string | null = null;
@@ -2155,7 +2189,9 @@ function writerResumeFixture(
     for (const phase of ['activation_ready', 'activation_committing', 'activated']) {
       appendJournalEntry(phase, 'completed');
     }
-    stateIntent = appendJournalEntry(statePhase, 'intent');
+    stateIntent = appendJournalEntry(statePhase, 'intent', 'none', null, leaseEpoch, {
+      ...resumeBinding,
+    });
     writeProtectedJson(handoffState, {
       schema_version: 'megacampus.q12.writer-handoff-state/v1',
       run_id: Q12_RUN_ID,
@@ -2171,7 +2207,16 @@ function writerResumeFixture(
       lease_epoch: leaseEpoch,
     });
     handoffStateSha = fileSha256(handoffState);
-    appendJournalEntry(statePhase, 'accepted', 'writer_handoff_state', handoffStateSha);
+    appendJournalEntry(
+      statePhase,
+      'accepted',
+      'writer_handoff_state',
+      handoffStateSha,
+      leaseEpoch,
+      {
+        ...resumeBinding,
+      }
+    );
     appendDatabaseTerminalLifecycle('cleanup', []);
   } else {
     const rollbackPhaseOrder = [
@@ -2191,7 +2236,9 @@ function writerResumeFixture(
       if (requiredPhaseNames.includes(phase)) appendJournalEntry(phase, 'completed');
     }
     appendDatabaseTerminalLifecycle('rollback', requiredPhaseReceipts);
-    stateIntent = appendJournalEntry(statePhase, 'intent');
+    stateIntent = appendJournalEntry(statePhase, 'intent', 'none', null, leaseEpoch, {
+      ...resumeBinding,
+    });
     const rollbackStateRequiredReceipts = writerRollbackRequiredReceipts(
       requiredPhaseReceipts,
       journalOptions.rollbackStateRequiredReceiptsTransform
@@ -2216,7 +2263,16 @@ function writerResumeFixture(
       lease_epoch: leaseEpoch,
     });
     rollbackStateSha = fileSha256(rollbackState);
-    appendJournalEntry(statePhase, 'accepted', 'writer_rollback_state', rollbackStateSha);
+    appendJournalEntry(
+      statePhase,
+      'accepted',
+      'writer_rollback_state',
+      rollbackStateSha,
+      leaseEpoch,
+      {
+        ...resumeBinding,
+      }
+    );
   }
   const barrierSha = fileSha256(fixture.barrierReceipt);
   const authorityPhase = `resume_authority_${mode}`;
@@ -2226,7 +2282,8 @@ function writerResumeFixture(
     'intent',
     'none',
     null,
-    authorityLeaseEpoch
+    authorityLeaseEpoch,
+    { ...resumeBinding }
   );
   const authorityValue = {
     schema_version: 'megacampus.q12.writer-resume-authority/v1',
@@ -2253,7 +2310,8 @@ function writerResumeFixture(
     'accepted',
     'writer_resume_authority',
     authoritySha,
-    authorityLeaseEpoch
+    authorityLeaseEpoch,
+    { ...resumeBinding }
   );
   const resumeIntent = appendJournalEntry(
     `resume_committing_${mode}`,
@@ -2261,7 +2319,7 @@ function writerResumeFixture(
     'none',
     null,
     authorityLeaseEpoch,
-    { command_id: `writers.resume.${mode}` }
+    { ...resumeBinding }
   );
   writeJournal(journal, journalEntries);
   const capabilityCheckpoint = join(
@@ -2278,8 +2336,8 @@ function writerResumeFixture(
   const capabilityValue = {
     schema_version: 'megacampus.q12.host-command-capability/v1',
     run_id: Q12_RUN_ID,
-    command_id: `writers.resume.${mode}`,
-    command_sha256: '9'.repeat(64),
+    command_id: resumeCommandId,
+    command_sha256: resumeCommandSha,
     release_sha: releaseSha,
     operator_digest: '8'.repeat(64),
     resource_manifest_sha256: resourceManifestSha,
@@ -2299,7 +2357,7 @@ function writerResumeFixture(
     null,
     authorityLeaseEpoch,
     {
-      command_id: `writers.resume.${mode}`,
+      ...resumeBinding,
       capability_manifest_sha256: capabilitySha256,
     }
   );
@@ -2312,7 +2370,7 @@ function writerResumeFixture(
     null,
     authorityLeaseEpoch,
     {
-      command_id: `writers.resume.${mode}`,
+      ...resumeBinding,
       capability_manifest_sha256: capabilitySha256,
     }
   );
