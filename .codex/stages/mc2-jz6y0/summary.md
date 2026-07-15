@@ -330,6 +330,35 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   spacing and invalidates the independently reviewed byte SHA. The original
   reviewed blob was recovered exactly and its SHA reverified before delivery.
 
+## Q12 D5J Joined-Fixture Written Candidate
+
+- Architecture evidence SHA-256
+  `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379`
+  proved that accepted D5W bytes alone cannot join Root's D5-only anchors to
+  W's full source/backup/restore/reindex chronology without forbidden copying
+  or rehashing.
+- On 2026-07-15 the owner approved Option A for drafting: a Root-owned
+  test-only closed forward/rollback composer, one canonical journal, W
+  read-only consumption, and no deployed CLI test flag.
+- The tracked candidate is
+  `docs/superpowers/specs/2026-07-15-q12-joined-retained-barrier-fixture-design.md`
+  at SHA-256
+  `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d`.
+  It requires the real immutable W-owned quiesce preimage for every joined
+  profile, including clean rollback prefix 1, while `install` itself remains
+  bound to 64 zeroes.
+- Final correctness and documentation rereviews both passed P0/P1/P2/P3
+  `0/0/0/0`; ignored report SHA-256 values are
+  `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2`
+  and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`.
+- Baseline serialized Root verification passed 271/271 before drafting; the
+  tracked artifact validates. On 2026-07-15 the owner explicitly approved the
+  exact corrected candidate SHA and directed uninterrupted local continuation;
+  planning/TDD/review/integration are authorized. No remote/live action occurred.
+- D6 Option A is approved only as a written-contract direction. Implementation
+  remains after accepted W, a reviewed D6 plan, and separate local
+  authorization; the remote gate is unchanged.
+
 - `docs-reviewed: updated` — final independent `.13.7` rereview found P0-P3 zero after sole-packet, PG17 path, metadata, backup/restore, and activation-order corrections.
 - `project-index: reviewed-no-change` — this slice changes task evidence and wording inside existing operations entrypoints, not stable navigation or ownership boundaries.
 - `project-index: updated` — stable Qdrant/operations entrypoints are current.
