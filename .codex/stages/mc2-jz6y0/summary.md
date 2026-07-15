@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: all safe local Q6-Q11 and E1-E7 work accepted; exact Q12 D5 design and execution plan are owner/reviewer accepted; Root-D5 is the next local TDD dependency; remote/live activation remains NO-GO
+Status: all safe local Q6-Q11 and E1-E7 work accepted; D5/D5W are integrated; owner-approved decision `.13.22` now precedes D5J `.13.21`, W, M/H, D6 and Root; remaining local work is delegated to Fable; remote/live activation remains NO-GO
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence before D5 plan publication: pushed head `09fe24ad`; accepted D5 design SHA `b5f63cd6…540e8`; accepted D5 plan SHA `8278bce9…a0ed`
+Current accepted integration evidence before this Fable handoff: pushed head `038ed4c5`; approved D5J spec SHA `d7e86193…c75d`; D5J source branch was pushed at `e2c8bfbd` before handoff sync
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
-Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation, while the correction streams now reconcile real Supabase PostgreSQL 17 backup/restore, ten Compose writers, file-only migration/handoff, and the sole supervisor. W `.13.10` is the current sequential critical path; live execution remains fail-closed.
+Implementation scope: Q1-Q11 and E1-E7 are locally accepted. Q12 guarded migration/operator/rollback/local snapshots and source recovery remain the accepted foundation. The current sequential path is `.13.22 -> .13.21 -> W`; M/H follow W, D6 follows accepted W plus its reviewed plan, and Root joins them. Live execution remains fail-closed.
 
 ## Q12 D5 Plan Acceptance (2026-07-14)
 
@@ -373,6 +373,17 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   manifest slice forward from Task 9, freezes the exact binding/substitution
   table, names the Root inventory producer, and defines collision-free immutable
   FWM paths. No D5J implementation, W edit, or remote/live mutation occurred.
+- On 2026-07-15 the owner approved that recommended correction direction and
+  delegated all remaining safe local work to Fable, followed by Codex review.
+  This authorizes the exact normative amendment, independent reviews, plan,
+  TDD, local integration and verification without intermediate owner prompts;
+  remote/live actions remain separately gated. The tracked manual handoff is
+  `docs/superpowers/prompts/2026-07-15-q12-fable-local-completion-handoff.md`.
+- The same delegation supplies D6 `.13.19`'s previously separate local
+  implementation authorization after accepted W and an independently reviewed
+  D6 plan. It does not change any remote/live boundary. Canonical stage closeout
+  must run only when local readiness is true; otherwise the remote/live tail is
+  recorded as an explicit defer and Q12 remains open.
 - D6 Option A is approved only as a written-contract direction. Implementation
   remains after accepted W, a reviewed D6 plan, and separate local
   authorization; the remote gate is unchanged.
