@@ -1748,6 +1748,39 @@ class Engine:
         ]
         if len(production) != 5 or len(development) != 5:
             raise LifecycleError("original writer class inventory mismatch")
+        frontends = [
+            writer
+            for writer in production
+            if writer["class"] in ("production-api", "production-web")
+        ]
+        active_projects = {writer["project"] for writer in frontends}
+        if len(frontends) != 2 or len(active_projects) != 1:
+            raise LifecycleError("original writer topology has no exact active color")
+        active_project = frontends[0]["project"]
+        if active_project not in ("megacampus-blue", "megacampus-green"):
+            raise LifecycleError("original writer topology has an invalid active color")
+        target_project = (
+            "megacampus-green"
+            if active_project == "megacampus-blue"
+            else "megacampus-blue"
+        )
+        expected_topology = {
+            (active_project, "api", "production-api"),
+            (active_project, "web", "production-web"),
+            ("megacampus", "worker", "production-worker"),
+            ("megacampus", "worker-stage6", "production-worker"),
+            ("megacampus", "worker-stage7", "production-worker"),
+            ("megacampus", "api-dev", "development-api"),
+            ("megacampus", "web-dev", "development-web"),
+            ("megacampus", "worker-dev", "development-worker"),
+            ("megacampus", "worker-stage6-dev", "development-worker"),
+            ("megacampus", "worker-stage7-dev", "development-worker"),
+        }
+        if {
+            (writer["project"], writer["service"], writer["class"])
+            for writer in quiesce["writers"]
+        } != expected_topology:
+            raise LifecycleError("original writer topology projection mismatch")
 
         def fwm_entry(
             writer: dict[str, Any], intended_running: bool, intended_policy: dict[str, Any]
@@ -1800,7 +1833,12 @@ class Engine:
                         "class": source["class"],
                         "id": sha256(f"q12:fixture-target:{run_id}:{service}".encode("utf-8")),
                         "name": f"megacampus-{service}-q12fixture",
-                        "project": source["project"],
+                        # Blue/green cutover truth: new api/web targets take the
+                        # opposite color of the active frontends; workers keep
+                        # the uncolored project.
+                        "project": target_project
+                        if service in ("api", "web")
+                        else source["project"],
                         "service": source["service"],
                         "config_files": source["config_files"],
                         "working_dir": source["working_dir"],
@@ -1876,11 +1914,30 @@ class Engine:
             if mode == "forward":
                 if inventory["targets"] is None:
                     raise LifecycleError("forward manifest requires target identities")
-                final = inventory["targets"] + inventory["development_prior"]
-                held = inventory["production_held"]
+                # Targets lead the array in the frozen creation order
+                # api, web, worker, worker-stage6, worker-stage7; the captured
+                # originals follow in the deterministic project/service/id sort.
+                final = inventory["targets"] + self.sorted_writers(
+                    inventory["development_prior"]
+                )
+                held = self.sorted_writers(inventory["production_held"])
             else:
-                final = inventory["production_prior"] + inventory["development_prior"]
-                held = inventory["targets"] or []
+                final = self.sorted_writers(
+                    inventory["production_prior"] + inventory["development_prior"]
+                )
+                # Held writers are never resumable: identity-identical to the
+                # forward target entries, projected to stopped/no intent.
+                held = [
+                    {
+                        **target,
+                        "intended_running": False,
+                        "intended_restart_policy": {
+                            "name": "no",
+                            "maximum_retry_count": 0,
+                        },
+                    }
+                    for target in (inventory["targets"] or [])
+                ]
             manifest_value = {
                 "schema_version": "megacampus.q12.final-writer-manifest/v1",
                 "run_id": self.request["run_id"],
@@ -1891,8 +1948,8 @@ class Engine:
                 "publication_intent_journal_entry_hash": intent["entry_hash"],
                 "input_checkpoint_sha256": sha256(self.checkpoint_path.read_bytes()),
                 "lease_epoch": epoch,
-                "final_writers": self.sorted_writers(final),
-                "held_writers": self.sorted_writers(held),
+                "final_writers": final,
+                "held_writers": held,
             }
             manifest_mode = 0o400
         data = complete_object(manifest_value)
