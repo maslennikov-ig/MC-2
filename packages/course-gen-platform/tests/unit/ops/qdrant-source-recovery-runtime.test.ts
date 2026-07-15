@@ -1819,25 +1819,15 @@ function installChainSpec(overrides: Record<string, unknown>): Record<string, un
 }
 
 // Rollback held-target-count -> the Root materializer profile that produces it:
-// 0 = clean prefix 4; 1..4 = the sanctioned partialCaptureTargets crash lever
-// (partial durable capture); 5 = the activation frontier. All keep a genesis +
-// section-5-valid joined prefix; W consumes the FWM held set read-only.
+// 0 = clean prefix 4; 1..5 = the sanctioned partialCaptureTargets crash lever
+// (partial durable capture; k=5 is full capture, no activate/deploy.commit). All
+// keep a genesis + section-5-valid joined prefix; W consumes the FWM held set
+// read-only. The activation frontier is NOT used for held=5: it abandons
+// barrier.activate, which W's historical-barrier validation rejects
+// (q12-writer-resume.py:1778) — the lever's full-capture profile is the correct one.
 function rollbackHeldSpec(heldTargetCount: number): Record<string, unknown> {
-  if (heldTargetCount >= 1 && heldTargetCount <= 4) {
+  if (heldTargetCount >= 1 && heldTargetCount <= 5) {
     return { partialCaptureTargets: heldTargetCount };
-  }
-  if (heldTargetCount === 5) {
-    return {
-      frontier: {
-        operation: 'activate',
-        form: 'issued',
-        history: 'initial',
-        lease: 'continuous',
-        copySet: 'cutover',
-        exactSuccessBeforeDisposition: false,
-        activationCommitRace: 'none',
-      },
-    };
   }
   return {};
 }
@@ -4337,14 +4327,12 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
     expect(result.stderr).toContain('protected resume test run root is invalid');
   });
 
-  it.each([0, 1, 2, 3, 4])(
+  it.each([0, 1, 2, 3, 4, 5])(
     'resumes rollback original ten while preserving an exact held target set of %i',
     async heldTargetCount => {
-      // held 0 = clean prefix 4; 1..4 = the sanctioned partialCaptureTargets crash
-      // lever (partial durable capture). held 5 (full capture) has no W-compatible
-      // profile: the only full-capture composer profile is the activation frontier,
-      // whose abandoned barrier.activate trips W's historical-barrier validation
-      // (q12-writer-resume.py:1778); pending an orchestrator ruling.
+      // held 0 = clean prefix 4; 1..5 = the sanctioned partialCaptureTargets crash
+      // lever (partial durable capture; k=5 = full capture, no activate). All over
+      // the real Root joined prefix; W reads the FWM held set read-only.
       const fixture = await joinedWriterResumeFixture(
         'rollback',
         undefined,
