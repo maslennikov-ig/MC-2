@@ -447,8 +447,15 @@ function main(): void {
     if (!sourceMembershipKeys.has(canonical(membership))) fail('image membership drift');
   }
   const imageMembershipKeys = new Set(imageMemberships.map(canonical));
-  for (const membership of sourceMemberships.sort((left, right) =>
-    canonical(left).localeCompare(canonical(right))
+  // PostgreSQL 16+ verifies the named grantor's ADMIN OPTION at grant time,
+  // and on the live plane postgres receives ADMIN on the custom roles from
+  // supabase_admin before acting as a grantor itself, so superuser-granted
+  // memberships must replay first.
+  const grantorPhase = (membership: Membership): number =>
+    membership.grantor === 'supabase_admin' ? 0 : 1;
+  for (const membership of sourceMemberships.sort(
+    (left, right) =>
+      grantorPhase(left) - grantorPhase(right) || canonical(left).localeCompare(canonical(right))
   )) {
     for (const participant of [membership.member, membership.role, membership.grantor]) {
       if (!isAvailableParticipant(participant, targetRoles, availablePgParticipants))
