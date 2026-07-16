@@ -994,7 +994,12 @@ main() {
     "$PG_DUMP" --format=custom --no-password --snapshot="$SNAPSHOT" --file="$archive" 2>"$dump_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_dump failed with status $status" "$status"
+  if [[ $status -ne 0 ]]; then
+    # pg_dump diagnostics never contain the credential; surface them so a
+    # scheduled failure is attributable from the service log.
+    /usr/bin/cat -- "$dump_stderr" >&2 || true
+    fail "pg_dump failed with status $status" "$status"
+  fi
   [[ ! -s "$dump_stderr" ]] || fail 'pg_dump stderr is not allowlisted'
   /usr/bin/chmod 600 -- "$archive"
 
