@@ -808,6 +808,57 @@ function verifyGrantedLocks(input) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 6 — common-lock proof against W activation slices (contract "Accepted W
+// dependency and common-lock proof"). D6 binds the exact accepted slice/catalog/
+// order digests (any W byte/slice/catalog/order/control-flow digest change
+// invalidates D6), and the probe's SHARE on the common catalog conflicts with
+// activation's accepted incompatible lock (wait-winner ordering).
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert the provided activation slice/catalog/order digests equal the accepted
+ * W tuple. Any mismatch invalidates D6.
+ * @param {{normal_slice: string, recovery_slice: string, lock_catalog: string, lock_order: string}} provided
+ * @param {{activation_normal_slice_sha256: string, activation_recovery_slice_sha256: string,
+ *          activation_lock_catalog_sha256: string, activation_lock_order_sha256: string}} wtuple
+ */
+function assertActivationDigestsBound(provided, wtuple) {
+  const pairs = [
+    ['normal_slice', provided.normal_slice, wtuple.activation_normal_slice_sha256],
+    ['recovery_slice', provided.recovery_slice, wtuple.activation_recovery_slice_sha256],
+    ['lock_catalog', provided.lock_catalog, wtuple.activation_lock_catalog_sha256],
+    ['lock_order', provided.lock_order, wtuple.activation_lock_order_sha256],
+  ];
+  for (const [name, got, expected] of pairs) {
+    if (typeof got !== 'string' || !HEX64.test(got) || got !== expected) {
+      throw new Error(`assertActivationDigestsBound: ${name} digest does not match accepted W`);
+    }
+  }
+}
+
+/**
+ * Assert the observed race outcome proves the common-lock conflict and ordering:
+ * the probe held SHARE, activation blocked before any mutation, activation only
+ * acquired the incompatible lock after the probe released, and then committed.
+ * @param {{probe_share_held: boolean, activation_blocked_while_share_held: boolean,
+ *          activation_acquired_after_release: boolean, activation_committed: boolean}} outcome
+ */
+function assertCommonLockConflict(outcome) {
+  if (outcome.probe_share_held !== true) {
+    throw new Error('assertCommonLockConflict: probe did not hold SHARE');
+  }
+  if (outcome.activation_blocked_while_share_held !== true) {
+    throw new Error('assertCommonLockConflict: activation was not blocked while SHARE was held');
+  }
+  if (outcome.activation_acquired_after_release !== true) {
+    throw new Error('assertCommonLockConflict: activation did not acquire only after release');
+  }
+  if (outcome.activation_committed !== true) {
+    throw new Error('assertCommonLockConflict: activation did not commit after acquiring');
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -836,6 +887,8 @@ module.exports = {
   buildCapabilityObject,
   assertTemplateAllowed,
   verifyGrantedLocks,
+  assertActivationDigestsBound,
+  assertCommonLockConflict,
 };
 
 // ---------------------------------------------------------------------------
