@@ -572,3 +572,18 @@ describe('Correction — validated secret descriptor is rewound for the child re
     expect(result.matches).toBe(true);
   });
 });
+
+describe('Correction — restart authority enforces seal↔predecision binding', () => {
+  it('selects a correctly bound epoch as the terminal-seal chain tip', () => {
+    const result = runScenario({ scenario: 'restart_binding' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.lease_epoch).toBe('cutover');
+    expect(result.authority).toBe('finish_forward');
+  });
+
+  it('rejects an epoch whose persisted seal binds a tampered predecision', () => {
+    const result = runScenario({ scenario: 'restart_binding', tamper: true });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/predecision|bind|incident|unbound/i);
+  });
+});
