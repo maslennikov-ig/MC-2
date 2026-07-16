@@ -3253,6 +3253,92 @@ def d6_validate_secret_source(
         os.close(parent_fd)
 
 
+# --------------------------------------------------------------------------- #
+# Task 17 — pidfd / ptrace / proc / OFD capability gates.
+#
+# Each gate is mandatory: any failed capability blocks classification with no test
+# override.  Local checks are read-only.  The pinned server's
+# PTRACE_MODE_ATTACH_REALCREDS / Yama acceptance of pidfd_getfd stays behind the
+# separately authorized remote observation gate.
+# --------------------------------------------------------------------------- #
+
+# pidfd_getfd is syscall 438 on the generic Linux syscall table (x86_64/aarch64).
+D6_SYS_PIDFD_GETFD = 438
+
+
+def d6_pidfd_open(pid: int) -> int:
+    """Open a pidfd for the spawned probe immediately (identity anchor)."""
+    return os.pidfd_open(pid)
+
+
+def d6_pidfd_getfd(pidfd: int, target_fd: int) -> int:
+    """Retrieve one descriptor from the target via pidfd_getfd (SYS 438).
+
+    Acceptance on the pinned server depends on its PTRACE_MODE_ATTACH_REALCREDS /
+    Yama policy — a remote capability gate.  Locally the parent may retrieve from
+    its own child."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.syscall.restype = ctypes.c_long
+    result = libc.syscall(
+        ctypes.c_long(D6_SYS_PIDFD_GETFD),
+        ctypes.c_int(pidfd),
+        ctypes.c_int(target_fd),
+        ctypes.c_uint(0),
+    )
+    if result < 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), f"pidfd_getfd fd {target_fd}")
+    return int(result)
+
+
+def d6_verify_fd9_ofd_contention(fd9: int, lock_path: pathlib.Path) -> bool:
+    """Prove the retrieved child FD 9 is the canonical held-lock open-file description.
+
+    The descriptor must be the exact regular 0600 lock file (device/inode identity),
+    and the exclusive lock it inherited must still contend: a fresh open of the same
+    path from a distinct open-file description cannot take LOCK_EX."""
+    stat = os.fstat(fd9)
+    path_stat = os.stat(lock_path, follow_symlinks=False)
+    if (
+        not stat_module.S_ISREG(stat.st_mode)
+        or stat_module.S_IMODE(stat.st_mode) != 0o600
+        or stat.st_nlink != 1
+        or (stat.st_dev, stat.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+    ):
+        raise LifecycleError("D6 FD 9 is not the canonical cutover.lock identity")
+    probe_fd = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    else:
+        fcntl.flock(probe_fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(probe_fd)
+
+
+def d6_proc_identity(pid: int) -> tuple[str, str, str]:
+    """Return (/proc/<pid>/stat start-time, /proc/<pid>/exe target, boot-id)."""
+    with open(f"/proc/{pid}/stat", "rb") as handle:
+        raw = handle.read().decode("latin-1")
+    # comm (field 2) is parenthesised and may contain spaces/parens; parse after
+    # the final ')'.  Field 22 (start-time) is index 19 of the remaining fields.
+    tail = raw[raw.rindex(")") + 2 :].split()
+    start_time = tail[19]
+    exe = os.readlink(f"/proc/{pid}/exe")
+    with open("/proc/sys/kernel/random/boot_id", "rb") as handle:
+        boot_id = handle.read().decode("ascii").strip()
+    return start_time, exe, boot_id
+
+
+def d6_assert_proc_continuity(pid: int, baseline: tuple[str, str, str]) -> None:
+    """Fail closed when start-time / exe / boot-id drift from the spawn baseline."""
+    current = d6_proc_identity(pid)
+    if tuple(current) != tuple(baseline):
+        raise LifecycleError("D6 probe process identity is not continuous")
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Q12 retained barrier lifecycle")
     commands = root.add_subparsers(dest="mode", required=True)
