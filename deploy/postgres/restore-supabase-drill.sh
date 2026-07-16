@@ -662,9 +662,12 @@ PY
   # as its own statement.
   run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
     "ALTER DATABASE restore_test SET default_transaction_read_only='on';" >/dev/null
-  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
+  # ALTER SYSTEM requires superuser rights, which only supabase_admin holds.
+  write_pgpass "$TEMP_ROOT/system-overrides.pgpass" "$port" postgres supabase_admin "$restore_password"
+  write_service "$TEMP_ROOT/system-overrides.service" mc2_restore_system "$port" postgres supabase_admin "$TEMP_ROOT/system-overrides.pgpass"
+  run_service_psql "$TEMP_ROOT/system-overrides.service" mc2_restore_system --command \
     "ALTER SYSTEM SET cron.database_name='restore_test';" >/dev/null
-  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
+  run_service_psql "$TEMP_ROOT/system-overrides.service" mc2_restore_system --command \
     "ALTER SYSTEM SET cron.launch_active_jobs='off';" >/dev/null
   [[ "$("$DOCKER" inspect --format '{{.Id}}' "$CONTAINER_ID")" == "$CONTAINER_ID" ]] || fail 'isolated container identity drift'
   "$DOCKER" restart "$CONTAINER_ID" >/dev/null
