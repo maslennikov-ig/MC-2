@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- single-file D6 probe suite fixed by the contract write zone */
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -208,7 +209,31 @@ interface ProbeModule {
   projectDockerObservation(input: {
     inspect: Array<Record<string, unknown>>;
     composePs: Array<Record<string, unknown>>;
-  }): { sha256: string; total: number; final: number; held: number };
+  }): { sha256: string; total: number; held: number; final: number };
+  // Task 11
+  REQUEST_KEYS: readonly string[];
+  validateRequest(request: Record<string, unknown>): Record<string, unknown>;
+  assertRequestMatchesHostProjection(
+    request: Record<string, unknown>,
+    hostProjection: Record<string, unknown>
+  ): void;
+  buildDbLockedPayload(input: Record<string, unknown>): Record<string, unknown>;
+  buildHostBoundPayload(input: Record<string, unknown>): Record<string, unknown>;
+  buildSealedPayload(input: Record<string, unknown>): Record<string, unknown>;
+  buildClosedPayload(input: Record<string, unknown>): Record<string, unknown>;
+  validateHostProjectionPayload(payload: Record<string, unknown>): void;
+  validatePredecisionPayload(payload: Record<string, unknown>): void;
+  validateReleasePayload(payload: Record<string, unknown>): void;
+  FRAME_SCHEMA_VERSION: string;
+  ProbeProtocol: new (
+    schemaVersion: string,
+    runId: string
+  ) => {
+    emit(kind: string, payload: Record<string, unknown>): Record<string, unknown>;
+    receive(frame: Record<string, unknown>): void;
+    readonly done: boolean;
+    readonly headHash: string | null;
+  };
 }
 
 interface RunnerModule {
@@ -1081,6 +1106,256 @@ function makeHostFields(overrides: Record<string, unknown> = {}): Record<string,
     ...overrides,
   };
 }
+
+describe('Task 11 — request + frame payloads + protocol (unit)', () => {
+  const HX = 'e'.repeat(64);
+  function makeRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      schema_version: 'megacampus.q12.activation-truth-request/v1',
+      run_id: 'run-0001',
+      release_sha: HX,
+      lease_epoch: 7,
+      predecessor_journal_entry_hash: HX,
+      predecessor_checkpoint_sha256: HX,
+      previous_terminal_seal_sha256: null,
+      abandoned_predecision_sha256: null,
+      expected_catalog_sha256: HX,
+      expected_post_migration_catalog_sha256: HX,
+      database_capability_sha256: HX,
+      activation_capability_sha256: HX,
+      prepared_quiesced_predecessor_sha256: HX,
+      writer_quiesce_manifest_sha256: HX,
+      activation_evidence_state: 'prepared_guarded',
+      barrier_receipt_sha256: HX,
+      probe_receipt_sha256: HX,
+      activation_result_sha256: null,
+      activation_process_projection_sha256: HX,
+      process_manifest_sha256: null,
+      w_activation_tuple_sha256: HX,
+      projection_sql_sha256: HX,
+      spawn_capability_sha256: HX,
+      runtime_fd_baseline_sha256: HX,
+      ...overrides,
+    };
+  }
+
+  it('validates a request with the exact 24-key set and hash-or-null restart fields', () => {
+    expect(Object.keys(probe.validateRequest(makeRequest())).sort()).toEqual(
+      [...probe.REQUEST_KEYS].sort()
+    );
+    expect(probe.REQUEST_KEYS.length).toBe(24);
+    // previous_terminal_seal / abandoned_predecision may be a hash or null.
+    expect(() =>
+      probe.validateRequest(makeRequest({ previous_terminal_seal_sha256: HX }))
+    ).not.toThrow();
+    const missing = makeRequest();
+    delete missing.projection_sql_sha256;
+    expect(() => probe.validateRequest(missing)).toThrow();
+    expect(() => probe.validateRequest(makeRequest({ extra: 1 }))).toThrow();
+  });
+
+  it('enforces the request evidence H/N table for its evidence state', () => {
+    // prepared_guarded requires activation_result=N; providing H is a violation.
+    expect(() => probe.validateRequest(makeRequest({ activation_result_sha256: HX }))).toThrow();
+  });
+
+  it('requires the request evidence to equal the host projection byte-for-byte', () => {
+    const request = makeRequest();
+    const host = makeHostFields({
+      activation_evidence_state: 'prepared_guarded',
+      barrier_receipt_sha256: HX,
+      probe_receipt_sha256: HX,
+      activation_result_sha256: null,
+      activation_process_projection_sha256: HX,
+      process_manifest_sha256: null,
+    });
+    expect(() => probe.assertRequestMatchesHostProjection(request, host)).not.toThrow();
+    expect(() =>
+      probe.assertRequestMatchesHostProjection(
+        request,
+        makeHostFields({
+          activation_evidence_state: 'prepared_guarded',
+          barrier_receipt_sha256: 'f'.repeat(64),
+          probe_receipt_sha256: HX,
+          activation_result_sha256: null,
+          activation_process_projection_sha256: HX,
+          process_manifest_sha256: null,
+        })
+      )
+    ).toThrow(/drift|mismatch/i);
+  });
+
+  it('builds the four probe payloads with exactly the contract keys', () => {
+    const db = probe.buildDbLockedPayload({
+      request_sha256: HX,
+      initial_database_projection_sha256: HX,
+      capability_projection_sha256: HX,
+      lock_projection_sha256: HX,
+      fd9_identity_sha256: HX,
+    });
+    expect(Object.keys(db).sort()).toEqual(
+      [
+        'capability_projection_sha256',
+        'fd9_identity_sha256',
+        'initial_database_projection_sha256',
+        'lock_projection_sha256',
+        'request_sha256',
+      ].sort()
+    );
+    const closed = probe.buildClosedPayload({
+      request_sha256: HX,
+      predecision_sha256: HX,
+      sealed_frame_sha256: HX,
+      release_frame_sha256: HX,
+      actual_r_journal_entry_hash: HX,
+      actual_r_checkpoint_sha256: HX,
+      fd9_identity_sha256: HX,
+    });
+    expect(closed.transaction_end).toBe('read_only_commit');
+    expect(closed.connection_closed).toBe(true);
+    expect(() => probe.buildHostBoundPayload({ request_sha256: HX })).toThrow();
+    expect(() =>
+      probe.buildSealedPayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        initial_database_projection_sha256: HX,
+        final_database_projection_sha256: HX,
+        host_projection_sha256: HX,
+        actual_r_journal_entry_hash: HX,
+        actual_r_checkpoint_sha256: HX,
+        fd9_identity_sha256: HX,
+      })
+    ).not.toThrow();
+  });
+
+  it('validates Root payloads incl. predecision pairing and release literals', () => {
+    expect(() =>
+      probe.validateHostProjectionPayload({
+        request_sha256: HX,
+        initial_database_projection_sha256: HX,
+        host_projection_sha256: HX,
+        proposed_classification: 'precommit_rollback',
+        prepared_quiesced_predecessor_sha256: HX,
+      })
+    ).not.toThrow();
+    // precommit requires both planned R hashes non-null.
+    expect(() =>
+      probe.validatePredecisionPayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        classification: 'precommit_rollback',
+        action: 'append_r_then_seal',
+        planned_r_journal_entry_hash: HX,
+        planned_r_checkpoint_sha256: HX,
+        predecessor_journal_entry_hash: HX,
+        predecessor_checkpoint_sha256: HX,
+      })
+    ).not.toThrow();
+    // precommit with null planned hashes is invalid.
+    expect(() =>
+      probe.validatePredecisionPayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        classification: 'precommit_rollback',
+        action: 'append_r_then_seal',
+        planned_r_journal_entry_hash: null,
+        planned_r_checkpoint_sha256: null,
+        predecessor_journal_entry_hash: HX,
+        predecessor_checkpoint_sha256: HX,
+      })
+    ).toThrow();
+    // wrong classification/action pairing.
+    expect(() =>
+      probe.validatePredecisionPayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        classification: 'precommit_rollback',
+        action: 'seal_finish_forward',
+        planned_r_journal_entry_hash: HX,
+        planned_r_checkpoint_sha256: HX,
+        predecessor_journal_entry_hash: HX,
+        predecessor_checkpoint_sha256: HX,
+      })
+    ).toThrow();
+    // finish-forward requires null planned hashes.
+    expect(() =>
+      probe.validatePredecisionPayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        classification: 'committed_finish_forward',
+        action: 'seal_finish_forward',
+        planned_r_journal_entry_hash: null,
+        planned_r_checkpoint_sha256: null,
+        predecessor_journal_entry_hash: HX,
+        predecessor_checkpoint_sha256: HX,
+      })
+    ).not.toThrow();
+    expect(() =>
+      probe.validateReleasePayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        sealed_frame_sha256: HX,
+        actual_r_journal_entry_hash: HX,
+        actual_r_checkpoint_sha256: HX,
+        expected_transaction_end: 'read_only_commit',
+        expected_connection_close: true,
+      })
+    ).not.toThrow();
+    expect(() =>
+      probe.validateReleasePayload({
+        request_sha256: HX,
+        predecision_sha256: HX,
+        sealed_frame_sha256: HX,
+        actual_r_journal_entry_hash: HX,
+        actual_r_checkpoint_sha256: HX,
+        expected_transaction_end: 'rollback',
+        expected_connection_close: true,
+      })
+    ).toThrow();
+  });
+
+  it('drives the probe protocol through a chained precommit sequence', () => {
+    const p = new probe.ProbeProtocol(probe.FRAME_SCHEMA_VERSION, 'run-0001');
+    const chain = new probe.FrameChain(probe.FRAME_SCHEMA_VERSION, 'run-0001');
+    const dbLocked = p.emit('db_locked', { request_sha256: HX });
+    expect(dbLocked.sequence).toBe(1);
+    // Root replies with a properly chained host_projection frame (seq 2).
+    const hostProjection = chain.append('db_locked', { request_sha256: HX }); // seq1 mirror
+    // Build the root frame manually chained on the probe's db_locked frame.
+    const rootHost = probe.makeFrame({
+      schema_version: probe.FRAME_SCHEMA_VERSION,
+      sequence: 2,
+      kind: 'host_projection',
+      run_id: 'run-0001',
+      payload: { host_projection_sha256: HX },
+      previous_frame_sha256: dbLocked.frame_sha256 as string,
+    });
+    void hostProjection;
+    expect(() => p.receive(rootHost)).not.toThrow();
+    const hostBound = p.emit('host_bound', { request_sha256: HX });
+    expect(hostBound.sequence).toBe(3);
+    expect(hostBound.previous_frame_sha256).toBe(rootHost.frame_sha256);
+    // Out-of-order / wrong-chain frames are rejected.
+    const badChain = probe.makeFrame({
+      schema_version: probe.FRAME_SCHEMA_VERSION,
+      sequence: 4,
+      kind: 'predecision',
+      run_id: 'run-0001',
+      payload: {},
+      previous_frame_sha256: 'a'.repeat(64),
+    });
+    expect(() => p.receive(badChain)).toThrow(/chain|previous/i);
+    const wrongKind = probe.makeFrame({
+      schema_version: probe.FRAME_SCHEMA_VERSION,
+      sequence: 4,
+      kind: 'release',
+      run_id: 'run-0001',
+      payload: {},
+      previous_frame_sha256: hostBound.frame_sha256 as string,
+    });
+    expect(() => p.receive(wrongKind)).toThrow(/kind|order|expected/i);
+  });
+});
 
 describe('Task 10 — writer ancestry + 10+5 Docker truth (unit)', () => {
   const runner = require(RUNNER_PATH) as RunnerModule;
