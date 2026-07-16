@@ -1318,6 +1318,67 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     }
   });
 
+  it('F2 — coalesces provider nulls to inventory sentinels; background rows are not drift', () => {
+    const { psql } = dockerFns;
+    const template = PROJECTION_TEMPLATES.get('session_activity') ?? '';
+    const out = psql(
+      `SELECT pg_catalog.pg_stat_clear_snapshot();
+       SELECT pg_catalog.jsonb_build_object(
+         'probe_pid', pg_catalog.pg_backend_pid(),
+         'rows', pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t) ORDER BY t.pid)
+       )
+       FROM ( ${template.replace(/;\s*$/, '')} ) t
+       WHERE t.backend_type IN
+             ('autovacuum launcher', 'background writer', 'checkpointer', 'walwriter')
+          OR t.pid = pg_catalog.pg_backend_pid();`,
+      'megacampus-q12-activation-truth'
+    );
+    const line = out.split('\n').find(l => l.trim().startsWith('{')) as string;
+    const parsed = JSON.parse(line) as {
+      probe_pid: number;
+      rows: Array<Record<string, unknown>>;
+    };
+    const backgroundRows = parsed.rows.filter(r => r.backend_type !== 'client backend');
+    expect(backgroundRows.length).toBeGreaterThan(0);
+    // Real background workers report NULL usename/datname/application_name/state;
+    // the template must coalesce them to the inventory sentinels.
+    for (const row of backgroundRows) {
+      expect(row.role, JSON.stringify(row)).toBe('');
+      expect(row.database).toBe('');
+      expect(row.application_identity).toBe('');
+      expect(row.state).toBe('none');
+    }
+    // The full observation (background rows + the probe backend) is NOT drift.
+    const inventory = probe.consumeManagedInventory(
+      readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-managed-session-inventory.json'), 'utf8'),
+      { expectedInventorySha256: W_TUPLE.managed_inventory_sha256 }
+    );
+    expect(() =>
+      probe.buildSessionObservation(inventory, parsed.rows, { probePid: parsed.probe_pid })
+    ).not.toThrow();
+  });
+
+  it('F3 — the real capability template output feeds normalizeLockRow correctly', () => {
+    const { psql } = dockerFns;
+    const capTemplate = PROJECTION_TEMPLATES.get('capability_lock_rows') ?? '';
+    const out = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SELECT pg_catalog.jsonb_build_object(
+         'qualified_name', s.qualified_name, 'oid', s.oid,
+         'maintain', s.priv_maintain, 'update', s.priv_update,
+         'delete', s.priv_delete, 'truncate', s.priv_truncate
+       )::text
+       FROM ( ${capTemplate.replace(/;\s*$/, '')} ) s
+       LIMIT 1;
+       COMMIT;`
+    );
+    const rowLine = out.split('\n').find(l => l.trim().startsWith('{')) as string;
+    const raw = JSON.parse(rowLine) as Record<string, unknown>;
+    const normalized = probe.normalizeLockRow(raw);
+    expect(normalized.lock_authorized).toBe(true);
+    expect(typeof normalized.oid).toBe('number');
+  });
+
   // @@CONTAINER_TESTS_END
 });
 
