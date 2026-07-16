@@ -494,7 +494,14 @@ verify_extensions_and_toc() {
 import json, pathlib, sys
 source = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["cutover_snapshot"]["extensions"]
 available = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+# The two frozen pgTLE packages become available only when pg_restore has
+# replayed their pgtle.* functions (which precede CREATE EXTENSION in the
+# archive), so the fresh image cannot list them before the restore; the
+# offline archive scan already pinned their control/default versions.
+PGTLE_PACKAGES = {"basejump-supabase_test_helpers", "supabase-dbdev"}
 for extension in source:
+    if extension["name"] in PGTLE_PACKAGES:
+        continue
     if extension["version"] not in available.get(extension["name"], []):
         raise SystemExit(f"extension version unavailable: {extension['name']}={extension['version']}")
 for name, version in {"pg_net":"0.19.5","pgtap":"1.2.0","pg_cron":"1.6.4","pg_tle":"1.4.0"}.items():
