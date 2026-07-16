@@ -464,6 +464,13 @@ No remote mutation has occurred. Activation remains NO-GO until:
 9. real firing/resolved notification, 60-minute observation, one complete
    normal course cycle, cleanup, and retained rollback evidence pass.
 
+These acceptance thresholds are also encoded as the joined Root controller's
+synthetic observation-gate evaluator (`q12-live-smoke.sh observe`), which
+fail-closed evaluates the §13 gate over an observation projection and records
+`rotation_required=true` on every terminal verdict. It is a local proof surface
+only and takes no live/remote action; see the joined-controller subsection in
+[`Self-hosted Qdrant runbook`](./qdrant-self-hosted.md).
+
 The local/development design remains recorded in
 [`Document Evidence: 100% Dev Activation Design`](../superpowers/specs/2026-07-12-document-evidence-dev-activation-design.md),
 but it is no longer the staging authorization source. A nonzero cohort never
