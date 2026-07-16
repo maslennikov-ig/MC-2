@@ -265,6 +265,16 @@ interface ProbeModule {
     dbProjection: Record<string, unknown>;
     hostProjection: Record<string, unknown>;
   };
+  // F1 — production inspect entrypoint + raw-I/O assembly + connection seam
+  EXIT_REJECTED: number;
+  main(runtime: Record<string, unknown>): Promise<number>;
+  assembleInspect(io: Record<string, unknown>): Promise<{
+    frames: Array<Record<string, unknown>>;
+    classification: string;
+    dbProjection: Record<string, unknown>;
+    capability: Record<string, unknown>;
+    sessionObservation: { rows: Array<Record<string, unknown>>; sha256: string };
+  }>;
 }
 
 interface RunnerModule {
@@ -608,6 +618,9 @@ let dockerFns: {
   waitForOutput: (session: AsyncPsql, marker: string, timeout?: number) => Promise<void>;
   waitForExit: (session: AsyncPsql, timeout?: number) => Promise<number | null>;
 };
+// Host loopback port the disposable PG17 publishes 5432 on (set in beforeAll);
+// used only by the F1 end-to-end test's injected pg connection seam.
+const pgPort = 0;
 
 describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => {
   beforeAll(async () => {
@@ -1379,6 +1392,121 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     expect(typeof normalized.oid).toBe('number');
   });
 
+  it('F1 — assembleInspect runs the full raw-I/O flow end-to-end against PG17', async () => {
+    const runner = require(RUNNER_PATH) as RunnerModule;
+    const { Client } = require('pg') as typeof import('pg');
+    const HH = 'a'.repeat(64);
+    const projectionSqlText = readFileSync(PROJECTION_SQL, 'utf8');
+    const inventory = probe.consumeManagedInventory(
+      readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-managed-session-inventory.json'), 'utf8'),
+      { expectedInventorySha256: W_TUPLE.managed_inventory_sha256 }
+    );
+    const request = {
+      schema_version: 'megacampus.q12.activation-truth-request/v1',
+      run_id: 'run-f1e2e',
+      release_sha: HH,
+      lease_epoch: 7,
+      predecessor_journal_entry_hash: HH,
+      predecessor_checkpoint_sha256: HH,
+      previous_terminal_seal_sha256: null,
+      abandoned_predecision_sha256: null,
+      expected_catalog_sha256: HH,
+      expected_post_migration_catalog_sha256: HH,
+      database_capability_sha256: HH,
+      activation_capability_sha256: HH,
+      prepared_quiesced_predecessor_sha256: HH,
+      writer_quiesce_manifest_sha256: HH,
+      activation_evidence_state: 'prepared_guarded',
+      barrier_receipt_sha256: HH,
+      probe_receipt_sha256: HH,
+      activation_result_sha256: null,
+      activation_process_projection_sha256: HH,
+      process_manifest_sha256: null,
+      w_activation_tuple_sha256: HH,
+      projection_sql_sha256: PROJECTION_SQL_SHA256,
+      spawn_capability_sha256: HH,
+      runtime_fd_baseline_sha256: HH,
+    };
+    // Synthetic Root frames chained reactively on each probe frame (the FD-6
+    // control-pipe seam stands in for the Root coordinator, precommit path).
+    const rootResponder = (prevSha: string, kind: string, seq: number): Record<string, unknown> => {
+      let payload: Record<string, unknown>;
+      if (kind === 'host_projection') {
+        payload = runner.buildRootHostProjectionPayload({
+          classification: 'precommit_rollback',
+          request_sha256: HH,
+          initial_database_projection_sha256: HH,
+          host_projection_sha256: HH,
+          prepared_quiesced_predecessor_sha256: HH,
+        });
+      } else if (kind === 'predecision') {
+        payload = runner.buildRootPredecisionPayload({
+          classification: 'precommit_rollback',
+          request_sha256: HH,
+          predecision_sha256: HH,
+          planned_r_journal_entry_hash: HH,
+          planned_r_checkpoint_sha256: HH,
+          predecessor_journal_entry_hash: HH,
+          predecessor_checkpoint_sha256: HH,
+        });
+      } else {
+        payload = runner.buildRootReleasePayload({
+          request_sha256: HH,
+          predecision_sha256: HH,
+          sealed_frame_sha256: HH,
+          actual_r_journal_entry_hash: HH,
+          actual_r_checkpoint_sha256: HH,
+        });
+      }
+      return probe.makeFrame({
+        schema_version: probe.FRAME_SCHEMA_VERSION,
+        sequence: seq,
+        kind,
+        run_id: request.run_id,
+        payload,
+        previous_frame_sha256: prevSha,
+      });
+    };
+
+    const client = new Client({
+      host: '127.0.0.1',
+      port: pgPort,
+      user: 'postgres',
+      password: POSTGRES_PASSWORD,
+      database: 'postgres',
+      application_name: 'megacampus-q12-activation-truth',
+    });
+    await client.connect();
+    try {
+      const result = await probe.assembleInspect({
+        request,
+        projectionSql: projectionSqlText,
+        connection: client,
+        expectedRelations: ORDER_RELATIONS,
+        inventory,
+        rootResponder,
+        identities: { fd9_identity_sha256: HH },
+        closeConnection: () => Promise.resolve(),
+      });
+      expect(result.frames.length).toBe(7);
+      for (let i = 1; i < result.frames.length; i += 1) {
+        expect(result.frames[i].previous_frame_sha256).toBe(result.frames[i - 1].frame_sha256);
+        expect(result.frames[i].sequence).toBe(i + 1);
+      }
+      expect(result.classification).toBe('precommit_rollback');
+      expect(result.dbProjection.global_pg_net_queue_count).toBe(0);
+      expect(result.dbProjection.prepared_xact_count).toBe(0);
+      expect(result.dbProjection.active_cron_count as number).toBe(8);
+      expect(result.sessionObservation.rows.length).toBeGreaterThan(0);
+      expect(result.capability.lock_relation_count).toBe(ORDER_RELATIONS.length);
+      const closed = result.frames[6].payload as Record<string, unknown>;
+      expect(closed.transaction_end).toBe('read_only_commit');
+      expect(closed.connection_closed).toBe(true);
+    } finally {
+      await client.end();
+    }
+  }, 60_000);
+
   // @@CONTAINER_TESTS_END
 });
 
@@ -1432,6 +1560,114 @@ function makeHostFields(overrides: Record<string, unknown> = {}): Record<string,
     ...overrides,
   };
 }
+
+describe('F1 — production inspect entrypoint + connection seam (unit)', () => {
+  const HH = 'a'.repeat(64);
+  const projectionSqlText = readFileSync(PROJECTION_SQL, 'utf8');
+  function makeF1Request(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      schema_version: 'megacampus.q12.activation-truth-request/v1',
+      run_id: 'run-f1',
+      release_sha: HH,
+      lease_epoch: 7,
+      predecessor_journal_entry_hash: HH,
+      predecessor_checkpoint_sha256: HH,
+      previous_terminal_seal_sha256: null,
+      abandoned_predecision_sha256: null,
+      expected_catalog_sha256: HH,
+      expected_post_migration_catalog_sha256: HH,
+      database_capability_sha256: HH,
+      activation_capability_sha256: HH,
+      prepared_quiesced_predecessor_sha256: HH,
+      writer_quiesce_manifest_sha256: HH,
+      activation_evidence_state: 'prepared_guarded',
+      barrier_receipt_sha256: HH,
+      probe_receipt_sha256: HH,
+      activation_result_sha256: null,
+      activation_process_projection_sha256: HH,
+      process_manifest_sha256: null,
+      w_activation_tuple_sha256: HH,
+      projection_sql_sha256: PROJECTION_SQL_SHA256,
+      spawn_capability_sha256: HH,
+      runtime_fd_baseline_sha256: HH,
+      ...overrides,
+    };
+  }
+  const FDMAP = {
+    3: { access: 'read' },
+    4: { access: 'read' },
+    5: { access: 'read' },
+    6: { access: 'read' },
+    7: { access: 'write' },
+    9: { access: 'lock', lock_identity: HH },
+    10: { access: 'read' },
+    11: { access: 'read' },
+  };
+
+  it('is a real child-process entrypoint (not a stub) that rejects a non-production invocation', () => {
+    const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
+    const result = spawnSync(process.execPath, [PROBE_PATH, 'inspect'], {
+      encoding: 'utf8',
+      env: { PATH: '/usr/bin', LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8', HOME: '/nonexistent' },
+      timeout: 20_000,
+    });
+    // A defined non-zero exit (rejection), never the old "not yet assembled" stub (2).
+    expect(result.status).toBe(probe.EXIT_REJECTED);
+    expect(result.status).not.toBe(2);
+    expect(`${result.stderr}`).toContain('q12-activation-truth-probe');
+  });
+
+  it('runs argv/env/FD/request/SQL-hash preflight, then rejects a non-production URL with zero DB work', async () => {
+    let connectCalls = 0;
+    const runtime = {
+      argv: [...probe.PRODUCTION_ARGV],
+      env: { PATH: '/usr/bin', LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8', HOME: '/nonexistent' },
+      fdMap: FDMAP,
+      readFd: (fd: number) => {
+        if (fd === 5) return Buffer.from(JSON.stringify(makeF1Request()), 'utf8');
+        if (fd === 11) return Buffer.from(projectionSqlText, 'utf8');
+        if (fd === 3) return Buffer.from('postgresql://postgres@localhost:5432/postgres', 'utf8');
+        if (fd === 4) return Buffer.from('synthetic-ca-bytes', 'utf8');
+        throw new Error(`unexpected fd ${fd}`);
+      },
+      connect: () => {
+        connectCalls += 1;
+        throw new Error('connect must not be reached for a non-production URL');
+      },
+      log: () => {},
+    };
+    const code = await probe.main(runtime);
+    expect(code).toBe(probe.EXIT_REJECTED);
+    expect(connectCalls).toBe(0);
+  });
+
+  it('rejects a request whose projection_sql_sha256 does not match the FD-11 bytes before connecting', async () => {
+    let connectCalls = 0;
+    const runtime = {
+      argv: [...probe.PRODUCTION_ARGV],
+      env: { PATH: '/usr/bin', LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8', HOME: '/nonexistent' },
+      fdMap: FDMAP,
+      readFd: (fd: number) => {
+        if (fd === 5)
+          return Buffer.from(JSON.stringify(makeF1Request({ projection_sql_sha256: HH })));
+        if (fd === 11) return Buffer.from(projectionSqlText, 'utf8');
+        if (fd === 3)
+          return Buffer.from(
+            'postgresql://postgres.diqooqbuchsliypgwksu@aws-1-us-east-2.pooler.supabase.com:5432/postgres'
+          );
+        if (fd === 4) return Buffer.from('synthetic-ca-bytes');
+        throw new Error(`unexpected fd ${fd}`);
+      },
+      connect: () => {
+        connectCalls += 1;
+        throw new Error('connect must not be reached on SQL-hash mismatch');
+      },
+      log: () => {},
+    };
+    expect(await probe.main(runtime)).toBe(probe.EXIT_REJECTED);
+    expect(connectCalls).toBe(0);
+  });
+});
 
 describe('Task 13 — runtime FD baseline (unit)', () => {
   const baseline = {
