@@ -3225,6 +3225,37 @@ def d6_spawn_probe(sources: dict[int, int]) -> int:
     return d6_posix_spawn(list(D6_PROBE_ARGV), dict(D6_PROBE_ENV), sources)
 
 
+def d6_assert_secret_identity_stable(
+    descriptor: int,
+    before: list[int],
+    path: pathlib.Path,
+    *,
+    mode_set: frozenset[int],
+    owner_uid: int,
+    owner_gid: int,
+) -> None:
+    """Re-prove the descriptor's owner/mode/type/device/inode after the bytes are read.
+
+    ``before`` is the pre-read fstat tuple ``[uid, gid, mode, dev, ino]``.  A chmod,
+    chown, type change, or inode swap between open and this check fails closed — the
+    contract requires identity proof both before and after open/read."""
+    after = os.fstat(descriptor)
+    path_stat = os.stat(path, follow_symlinks=False)
+    before_uid, before_gid, before_mode, before_dev, before_ino = before
+    if (
+        not stat_module.S_ISREG(after.st_mode)
+        or after.st_uid != owner_uid
+        or after.st_gid != owner_gid
+        or stat_module.S_IMODE(after.st_mode) not in mode_set
+        or after.st_nlink != 1
+        or (after.st_uid, after.st_gid, after.st_mode, after.st_dev, after.st_ino)
+        != (before_uid, before_gid, before_mode, before_dev, before_ino)
+        or (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+        or not stat_module.S_ISREG(path_stat.st_mode)
+    ):
+        raise LifecycleError(f"unsafe file identity changed after read: {path}")
+
+
 def d6_validate_secret_source(
     path: pathlib.Path,
     *,
@@ -3254,14 +3285,24 @@ def d6_validate_secret_source(
             or before.st_nlink != 1
         ):
             raise LifecycleError(f"unsafe file identity: {path}")
-        path_stat = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
-        after = os.fstat(descriptor)
-        if (
-            (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino)
-            or (before.st_dev, before.st_ino) != (path_stat.st_dev, path_stat.st_ino)
-            or not stat_module.S_ISREG(path_stat.st_mode)
-        ):
-            raise LifecycleError(f"file path identity changed: {path}")
+        before_identity = [
+            before.st_uid,
+            before.st_gid,
+            before.st_mode,
+            before.st_dev,
+            before.st_ino,
+        ]
+        # Read the bytes (FD 3 password decode / FD 4 CA read); FD 3 is never hashed.
+        while os.read(descriptor, 1024 * 1024):
+            pass
+        d6_assert_secret_identity_stable(
+            descriptor,
+            before_identity,
+            path,
+            mode_set=mode_set,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
         keep = descriptor
         descriptor = -1
         return keep, before.st_dev, before.st_ino
