@@ -108,7 +108,7 @@ if [[ "\${1:-}" == --version && "$#" -eq 1 ]]; then
 fi
 printf '%s\\n' "$*" > "$FAKE_ARGS_LOG"
 [[ -z "\${FAKE_DUMP_STDERR:-}" ]] || printf '%s\\n' "$FAKE_DUMP_STDERR" >&2
-[[ "\${PGSSLROOTCERT:-}" == /proc/self/fd/* ]] || exit 94
+[[ "\${PGSSLROOTCERT:-}" == *"/.ca.crt" ]] || exit 94
 [[ -r "$PGSSLROOTCERT" ]] || exit 95
 [[ -z "\${PGDATABASE:-}" ]] || exit 96
 [[ "\${PGSERVICE:-}" == mc2_supabase_backup ]] || exit 97
@@ -890,7 +890,10 @@ describe('Q12 immutable Supabase backup generations', () => {
     expect(lines).toContain('password=synthetic-password-never-log');
     expect(lines).toContain('dbname=postgres');
     expect(lines).toContain('sslmode=verify-full');
-    expect(lines.some(line => /^sslrootcert=\/proc\/self\/fd\/\d+$/.test(line))).toBe(true);
+    // The run-private materialized CA copy survives the pnpm/node spawn
+    // chain, unlike a /proc/self/fd path.
+    expect(lines.some(line => /^sslrootcert=\/.+\/\.ca\.crt$/.test(line))).toBe(true);
+    expect(lines.some(line => line.includes('/proc/self/fd/'))).toBe(false);
     expect(lines).toHaveLength(8);
   });
 

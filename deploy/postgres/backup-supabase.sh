@@ -507,17 +507,20 @@ parse_arguments() {
 create_service_file() {
   local effective_database_url=$1
   local service_file=$2
+  local ca_path=$3
   # libpq never URI-expands dbname inside a service file, so the effective URL
-  # must be decomposed into discrete connection parameters.
+  # must be decomposed into discrete connection parameters. The trust anchor
+  # is the materialized run-private CA path, not the adopted descriptor.
   ( umask 077; : >"$service_file" )
   /usr/bin/chmod 600 -- "$service_file"
-  /usr/bin/python3 - "$service_file" 3<<<"$effective_database_url" <<'PY' || \
+  /usr/bin/python3 - "$service_file" "$ca_path" 3<<<"$effective_database_url" <<'PY' || \
     fail 'connection service file composition failed'
 import os
 import sys
 from urllib.parse import parse_qs, unquote, urlsplit
 
 service_path = sys.argv[1]
+ca_path = sys.argv[2]
 with os.fdopen(3, encoding="utf-8") as source:
     value = source.readline().rstrip("\n")
 parsed = urlsplit(value)
@@ -538,7 +541,7 @@ entries = (
     ("password", decoded("password", parsed.password or "")),
     ("dbname", decoded("dbname", parsed.path.lstrip("/"))),
     ("sslmode", (query.get("sslmode") or [""])[0]),
-    ("sslrootcert", (query.get("sslrootcert") or [""])[0]),
+    ("sslrootcert", ca_path),
 )
 lines = ["[mc2_supabase_backup]"]
 for keyword, parameter in entries:
@@ -954,8 +957,13 @@ main() {
   local dump_stderr="$TEMP_GENERATION/.pg_dump.stderr"
   local command_stderr="$TEMP_GENERATION/.command.stderr"
   local toc="$TEMP_GENERATION/.archive.toc"
-  local ca_fd_path="/proc/self/fd/$CA_FD"
-  create_service_file "$effective_database_url" "$service_file"
+  # A /proc/self/fd path does not survive the pnpm/node spawn chain of the
+  # manifest generator, so the adopted verified CA bytes are materialized into
+  # the private generation directory for every TLS consumer of this run.
+  local ca_fd_path="$TEMP_GENERATION/.ca.crt"
+  ( umask 077; /usr/bin/cat "/proc/self/fd/$CA_FD" >"$ca_fd_path" ) || fail 'CA materialization failed'
+  /usr/bin/chmod 600 -- "$ca_fd_path"
+  create_service_file "$effective_database_url" "$service_file" "$ca_fd_path"
   unset effective_database_url
 
   if [[ "$BACKUP_MODE" == scheduled ]]; then
@@ -1031,7 +1039,7 @@ main() {
   [[ "$before_hash" == "$after_hash" ]] || fail 'normalized role exports changed across the shared snapshot'
 
   /usr/bin/rm -- "$roles_after" "$roles_before_normalized" "$roles_after_normalized" \
-    "$service_file" "$dump_stderr" "$command_stderr" "$toc"
+    "$service_file" "$ca_fd_path" "$dump_stderr" "$command_stderr" "$toc"
   scan_generation_secrets "$URL_FILE" "$archive" "$roles_before" "$manifest" || \
     fail 'generation secret scan failed'
   create_checksums "$TEMP_GENERATION" "$final_name" "$SNAPSHOT"
