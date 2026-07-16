@@ -595,18 +595,23 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
 
   it('Task 3 — proves PG17 identity, read-only, isolation, and version bounds', () => {
     const { psql } = dockerFns;
-    const identityTemplate = PROJECTION_TEMPLATES.get('connection_identity') ?? '';
-    const row = psql(
+    // Prove the transaction actually enters READ ONLY / read committed, then
+    // read the identity as a single delimited row (psql prints BEGIN/SET/COMMIT
+    // command tags on other lines, so select the line that carries the row).
+    const output = psql(
       `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
        SET LOCAL lock_timeout = '120s';
-       ${identityTemplate.replace(/;\s*$/, '')}
-       \\gset q12_
-       COMMIT;
-       SELECT :'q12_session_user' || '|' || :'q12_current_database' || '|' ||
-              :'q12_server_version_num' || '|' || :'q12_transaction_isolation' || '|' ||
-              :'q12_transaction_read_only';`
+       SELECT 'Q12ROW|' || session_user || '|' || current_database() || '|' ||
+              current_setting('server_version_num') || '|' ||
+              current_setting('transaction_isolation') || '|' ||
+              current_setting('transaction_read_only');
+       COMMIT;`
     );
-    const [session_user, current_database, versionStr, isolation, readOnly] = row.split('|');
+    const rowLine = output.split('\n').find(line => line.startsWith('Q12ROW|'));
+    expect(rowLine, output).toBeDefined();
+    const [, session_user, current_database, versionStr, isolation, readOnly] = (
+      rowLine as string
+    ).split('|');
     expect(session_user).toBe('postgres');
     expect(current_database).toBe('postgres');
     expect(isolation).toBe('read committed');

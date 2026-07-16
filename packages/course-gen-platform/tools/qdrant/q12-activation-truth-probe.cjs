@@ -477,6 +477,142 @@ function assertProjectionAllowlist(sql) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 3 — immutable database and TLS identity (contract "Immutable database
+// and TLS identity"). The production endpoint is fixed; TLS is verify-full with
+// the pinned CA digest; post-connect identity/read-only/isolation/version must
+// all hold or the run fails. A disconnect or pooler backend change invalidates
+// the epoch and forbids transparent reconnect.
+// ---------------------------------------------------------------------------
+
+const PRODUCTION_ENDPOINT = Object.freeze({
+  scheme: 'postgresql',
+  host: 'aws-1-us-east-2.pooler.supabase.com',
+  port: 5432,
+  user: 'postgres.diqooqbuchsliypgwksu',
+  database: 'postgres',
+});
+
+const PROD_CA_SHA256 = '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7';
+
+/**
+ * Strictly parse the production DSN and reject any deviation from the frozen
+ * endpoint. Returns only endpoint identity; the FD-3 password is never returned
+ * here (contract: FD 3 is never hashed or logged).
+ * @param {string} url
+ * @returns {{scheme: string, host: string, port: number, user: string, database: string}}
+ */
+function parseProductionUrl(url) {
+  if (typeof url !== 'string' || url.length === 0) {
+    throw new Error('parseProductionUrl: url must be a non-empty string');
+  }
+  const schemeSep = url.indexOf('://');
+  if (schemeSep < 0) throw new Error('parseProductionUrl: missing scheme separator');
+  const scheme = url.slice(0, schemeSep);
+  if (scheme !== PRODUCTION_ENDPOINT.scheme) {
+    throw new Error(`parseProductionUrl: scheme must be '${PRODUCTION_ENDPOINT.scheme}'`);
+  }
+  const rest = url.slice(schemeSep + 3);
+  if (rest.includes('?')) throw new Error('parseProductionUrl: query component is forbidden');
+  if (rest.includes('#')) throw new Error('parseProductionUrl: fragment component is forbidden');
+  const at = rest.lastIndexOf('@');
+  if (at < 0) throw new Error('parseProductionUrl: missing userinfo');
+  const userinfo = rest.slice(0, at);
+  const hostPortPath = rest.slice(at + 1);
+  const user = userinfo.includes(':') ? userinfo.slice(0, userinfo.indexOf(':')) : userinfo;
+  if (user !== PRODUCTION_ENDPOINT.user) {
+    throw new Error('parseProductionUrl: URL user does not match the frozen endpoint');
+  }
+  const slash = hostPortPath.indexOf('/');
+  if (slash < 0) throw new Error('parseProductionUrl: missing database path');
+  const hostPort = hostPortPath.slice(0, slash);
+  const path = hostPortPath.slice(slash);
+  const colon = hostPort.lastIndexOf(':');
+  if (colon < 0) throw new Error('parseProductionUrl: missing port');
+  const host = hostPort.slice(0, colon);
+  const portText = hostPort.slice(colon + 1);
+  if (host !== PRODUCTION_ENDPOINT.host) {
+    throw new Error('parseProductionUrl: host does not match the frozen endpoint');
+  }
+  if (!/^[0-9]+$/.test(portText)) throw new Error('parseProductionUrl: invalid port');
+  const port = parseInt(portText, 10);
+  if (port !== PRODUCTION_ENDPOINT.port) {
+    throw new Error('parseProductionUrl: port does not match the frozen endpoint');
+  }
+  if (path !== `/${PRODUCTION_ENDPOINT.database}`) {
+    throw new Error('parseProductionUrl: database path does not match the frozen endpoint');
+  }
+  return {
+    scheme,
+    host,
+    port,
+    user,
+    database: PRODUCTION_ENDPOINT.database,
+  };
+}
+
+/**
+ * Build the verify-full TLS config. Refuses any CA whose SHA-256 is not the
+ * pinned digest (a synthetic CA fails against PROD_CA_SHA256 by design).
+ * @param {string | Uint8Array} caPem
+ * @param {{serverName: string, expectedCaSha256: string}} options
+ * @returns {{rejectUnauthorized: true, servername: string, ca: string | Uint8Array}}
+ */
+function buildTlsConfig(caPem, options) {
+  const { serverName, expectedCaSha256 } = options;
+  if (typeof serverName !== 'string' || serverName.length === 0) {
+    throw new Error('buildTlsConfig: serverName must be a non-empty string');
+  }
+  if (typeof expectedCaSha256 !== 'string' || !HEX64.test(expectedCaSha256)) {
+    throw new Error('buildTlsConfig: expectedCaSha256 must be lowercase 64-hex');
+  }
+  const actual = sha256Hex(caPem);
+  if (actual !== expectedCaSha256) {
+    throw new Error('buildTlsConfig: CA SHA-256 does not match the pinned digest');
+  }
+  return { rejectUnauthorized: true, servername: serverName, ca: caPem };
+}
+
+/**
+ * Assert the post-connect identity holds (contract "Immutable database and TLS
+ * identity" post-connect block). Throws on any deviation.
+ * @param {{session_user: string, current_database: string, transaction_read_only: string,
+ *          transaction_isolation: string, server_version_num: number}} observed
+ */
+function assertPostConnect(observed) {
+  if (observed.session_user !== 'postgres') {
+    throw new Error("assertPostConnect: session_user must be 'postgres'");
+  }
+  if (observed.current_database !== 'postgres') {
+    throw new Error("assertPostConnect: current_database must be 'postgres'");
+  }
+  if (observed.transaction_read_only !== 'on') {
+    throw new Error("assertPostConnect: transaction_read_only must be 'on'");
+  }
+  if (observed.transaction_isolation !== 'read committed') {
+    throw new Error("assertPostConnect: transaction_isolation must be 'read committed'");
+  }
+  const version = observed.server_version_num;
+  if (!Number.isInteger(version) || version < 170000 || version >= 180000) {
+    throw new Error('assertPostConnect: server_version_num must be >= 170000 and < 180000');
+  }
+}
+
+/**
+ * Assert the backend epoch is continuous. A changed backend PID or backend
+ * start invalidates the epoch; transparent reconnect is forbidden.
+ * @param {{backend_pid: number, backend_start_utc: string}} expected
+ * @param {{backend_pid: number, backend_start_utc: string}} observed
+ */
+function assertBackendContinuity(expected, observed) {
+  if (
+    expected.backend_pid !== observed.backend_pid ||
+    expected.backend_start_utc !== observed.backend_start_utc
+  ) {
+    throw new Error('assertBackendContinuity: backend/pooler epoch changed; reconnect forbidden');
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -490,6 +626,12 @@ module.exports = {
   splitProjectionTemplates,
   stripSqlLiterals,
   assertProjectionAllowlist,
+  PRODUCTION_ENDPOINT,
+  PROD_CA_SHA256,
+  parseProductionUrl,
+  buildTlsConfig,
+  assertPostConnect,
+  assertBackendContinuity,
 };
 
 // ---------------------------------------------------------------------------
