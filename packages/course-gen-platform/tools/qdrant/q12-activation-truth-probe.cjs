@@ -1236,6 +1236,129 @@ function assertProjectionPreamble(input) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 9 — H/N classification evidence table (contract "Database and host
+// projections" evidence table + "Classifications"). H means one lowercase
+// 64-hex SHA-256 over the exact safely-opened canonical bytes; N means JSON
+// null. The validator is a pure function of (classification, safely-revalidated
+// object presence) and refuses any H/N free choice. An unsafe present object
+// stops before terminal-seal publication rather than converting to null.
+// ---------------------------------------------------------------------------
+
+const EVIDENCE_STATES_BY_CLASSIFICATION = Object.freeze({
+  precommit_rollback: ['prepared_guarded'],
+  committed_finish_forward: ['complete_receipt', 'committed_receipt_pending'],
+  drift_incident: ['incident_observed'],
+});
+
+// Deterministic H/N patterns for the non-incident evidence states.
+const DETERMINISTIC_EVIDENCE_PATTERNS = Object.freeze({
+  prepared_guarded: {
+    barrier_receipt_sha256: 'H',
+    probe_receipt_sha256: 'H',
+    activation_result_sha256: 'N',
+    activation_process_projection_sha256: 'H',
+    process_manifest_sha256: 'N',
+  },
+  complete_receipt: {
+    barrier_receipt_sha256: 'H',
+    probe_receipt_sha256: 'H',
+    activation_result_sha256: 'H',
+    activation_process_projection_sha256: 'H',
+    process_manifest_sha256: 'H',
+  },
+  committed_receipt_pending: {
+    barrier_receipt_sha256: 'H',
+    probe_receipt_sha256: 'H',
+    activation_result_sha256: 'N',
+    activation_process_projection_sha256: 'H',
+    process_manifest_sha256: 'H',
+  },
+});
+
+// Map of the four presence-driven incident fields to their presence keys.
+const INCIDENT_PRESENCE_FIELDS = Object.freeze({
+  barrier_receipt_sha256: 'barrier_receipt',
+  probe_receipt_sha256: 'probe_receipt',
+  activation_result_sha256: 'activation_result',
+  process_manifest_sha256: 'process_manifest',
+});
+
+function isH(value) {
+  return typeof value === 'string' && HEX64.test(value);
+}
+
+function assertHnField(fieldName, value, expected) {
+  if (expected === 'H') {
+    if (!isH(value)) throw new Error(`validateEvidenceTable: ${fieldName} must be H (64-hex)`);
+  } else if (value !== null) {
+    throw new Error(`validateEvidenceTable: ${fieldName} must be N (null)`);
+  }
+}
+
+/**
+ * Validate the host evidence fields against the exact H/N table for the given
+ * classification/state.
+ * @param {{classification: string, activation_evidence_state: string,
+ *          barrier_receipt_sha256: string | null, probe_receipt_sha256: string | null,
+ *          activation_result_sha256: string | null,
+ *          activation_process_projection_sha256: string | null,
+ *          process_manifest_sha256: string | null,
+ *          presence?: Record<string, 'present' | 'absent' | 'unsafe'>}} input
+ */
+function validateEvidenceTable(input) {
+  const allowedStates = EVIDENCE_STATES_BY_CLASSIFICATION[input.classification];
+  if (!allowedStates || !allowedStates.includes(input.activation_evidence_state)) {
+    throw new Error('validateEvidenceTable: classification/evidence-state mismatch');
+  }
+  // activation_process_projection_sha256 is H in every classification.
+  assertHnField(
+    'activation_process_projection_sha256',
+    input.activation_process_projection_sha256,
+    'H'
+  );
+  if (input.activation_evidence_state === 'incident_observed') {
+    const presence = input.presence;
+    if (presence === undefined) {
+      throw new Error('validateEvidenceTable: incident requires a safe-presence map');
+    }
+    for (const [field, presenceKey] of Object.entries(INCIDENT_PRESENCE_FIELDS)) {
+      const state = presence[presenceKey];
+      if (state === 'unsafe') {
+        throw new Error(
+          `validateEvidenceTable: ${field} object is unsafe; stop before terminal seal (incident)`
+        );
+      }
+      if (state !== 'present' && state !== 'absent') {
+        throw new Error(`validateEvidenceTable: missing safe-presence for ${presenceKey}`);
+      }
+      assertHnField(field, input[field], state === 'present' ? 'H' : 'N');
+    }
+    return;
+  }
+  const pattern = DETERMINISTIC_EVIDENCE_PATTERNS[input.activation_evidence_state];
+  for (const field of Object.keys(pattern)) {
+    assertHnField(field, input[field], pattern[field]);
+  }
+}
+
+/**
+ * committed_receipt_pending is legal only with the exact predecessor
+ * recovery_ready_guarded barrier receipt, the exact process manifest, and a
+ * zero-live projection; any absence/mismatch reclassifies to drift_incident.
+ * @param {{barrier_is_predecessor_recovery_ready_guarded: boolean,
+ *          process_manifest_present: boolean, zero_live_projection: boolean}} input
+ */
+function assertCommittedReceiptPendingLegal(input) {
+  if (
+    input.barrier_is_predecessor_recovery_ready_guarded !== true ||
+    input.process_manifest_present !== true ||
+    input.zero_live_projection !== true
+  ) {
+    throw new Error('assertCommittedReceiptPendingLegal: conditions unmet -> drift_incident');
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -1282,6 +1405,9 @@ module.exports = {
   buildDatabaseProjection,
   buildHostProjection,
   assertProjectionPreamble,
+  EVIDENCE_STATES_BY_CLASSIFICATION,
+  validateEvidenceTable,
+  assertCommittedReceiptPendingLegal,
 };
 
 // ---------------------------------------------------------------------------
