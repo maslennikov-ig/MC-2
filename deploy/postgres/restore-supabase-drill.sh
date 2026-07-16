@@ -510,7 +510,10 @@ if set(value) != set(expected):
     raise SystemExit("restored pgTLE package set mismatch")
 for name, version in expected.items():
     item = value[name]
-    if item.get("versions") != [version]:
+    # pg_tle exposes the whole installed version chain; the frozen default
+    # version must be present, and the exact chain is pinned by the
+    # source-versus-restored catalog equality.
+    if version not in (item.get("versions") or []):
         raise SystemExit(f"restored pgTLE available version mismatch: {name}")
     versions = re.findall(r"(?m)^\s*default_version\s*=\s*'([^']+)'\s*$", item.get("control", ""))
     if versions != [version]:

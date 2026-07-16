@@ -36,15 +36,11 @@ with tempfile.TemporaryFile() as archive_sql:
                 fail(f"expected exactly one {control.decode()} function")
             if identities.count(sql) != 1:
                 fail(f"expected exactly one {sql.decode()} function")
-            conflicting = [
-                identity.decode(errors="replace")
-                for identity in identities
-                if identity.startswith(package + b"--")
-                and identity.endswith(b".sql")
-                and identity != sql
-            ]
-            if conflicting:
-                fail(f"conflicting SQL package versions for {package.decode()}")
+            # pg_tle retains every installed version and upgrade script as
+            # additional "<package>--<from>[--<to>].sql" functions; the exact
+            # function set is pinned by the source-versus-restored equality,
+            # so only the control uniqueness, the pinned version presence,
+            # and the control default_version are asserted here.
 
             control_index = identities.index(control)
             start = matches[control_index].start()

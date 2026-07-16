@@ -1386,6 +1386,28 @@ CREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text LANGUAGE sql AS
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it('accepts the real installed pgTLE version chain and upgrade scripts', () => {
+    // pg_tle retains every installed version plus upgrade scripts; the live
+    // source carries basejump 0.0.1..0.0.6 and dbdev 0.0.2..0.0.5 chains.
+    const sql = `CREATE FUNCTION pgtle."basejump-supabase_test_helpers.control"() RETURNS text
+LANGUAGE sql AS $body$
+default_version = '0.0.6'
+$body$;
+CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.1.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
+CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.1--0.0.2.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
+CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.4--0.0.6.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
+CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.6.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
+CREATE FUNCTION pgtle."supabase-dbdev.control"() RETURNS text
+LANGUAGE sql AS $body$
+default_version = '0.0.5'
+$body$;
+CREATE FUNCTION pgtle."supabase-dbdev--0.0.2.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
+CREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
+`;
+    const result = spawnSync('/usr/bin/python3', [PGTLE_SCANNER], { input: sql, encoding: 'utf8' });
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it.each([
     ['unrelated comment', `-- basejump-supabase_test_helpers 0.0.6\n-- supabase-dbdev 0.0.5\n`],
     [
@@ -1393,8 +1415,8 @@ CREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text LANGUAGE sql AS
       `CREATE FUNCTION pgtle."basejump-supabase_test_helpers.control"() RETURNS text LANGUAGE sql AS $x$default_version = '0.0.6'$x$;\nCREATE FUNCTION pgtle."basejump-supabase_test_helpers.control"() RETURNS text LANGUAGE sql AS $x$default_version = '0.0.6'$x$;\nCREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.6.sql"() RETURNS text LANGUAGE sql AS $x$x$;\nCREATE FUNCTION pgtle."supabase-dbdev.control"() RETURNS text LANGUAGE sql AS $x$default_version = '0.0.5'$x$;\nCREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text LANGUAGE sql AS $x$x$;\n`,
     ],
     [
-      'conflicting version',
-      `CREATE FUNCTION pgtle."basejump-supabase_test_helpers.control"() RETURNS text\ndefault_version = '0.0.6';\nCREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.6.sql"() RETURNS text;\nCREATE FUNCTION pgtle."basejump-supabase_test_helpers--9.9.9.sql"() RETURNS text;\nCREATE FUNCTION pgtle."supabase-dbdev.control"() RETURNS text\ndefault_version = '0.0.5';\nCREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text;\n`,
+      'duplicate pinned version script',
+      `CREATE FUNCTION pgtle."basejump-supabase_test_helpers.control"() RETURNS text LANGUAGE sql AS $x$default_version = '0.0.6'$x$;\nCREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.6.sql"() RETURNS text LANGUAGE sql AS $x$x$;\nCREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.6.sql"() RETURNS text LANGUAGE sql AS $x$x$;\nCREATE FUNCTION pgtle."supabase-dbdev.control"() RETURNS text LANGUAGE sql AS $x$default_version = '0.0.5'$x$;\nCREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text LANGUAGE sql AS $x$x$;\n`,
     ],
     [
       'context confusion',
