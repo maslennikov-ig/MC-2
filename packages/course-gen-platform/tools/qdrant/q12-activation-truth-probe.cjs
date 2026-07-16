@@ -2001,6 +2001,59 @@ function assertFd3NeverHashed(hashedFds) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 13 — probe runtime-created FD baseline (contract "Root spawn boundary,
+// FDs and capability gates" probe side). The probe validates an approved
+// runtime-created FD baseline keyed by node SHA-256, Node major/minor, libuv
+// version, and kernel generation, allowing only the pinned anonymous epoll/
+// eventfd/pipe descriptor classes and access modes; unknown descriptors fail.
+// ---------------------------------------------------------------------------
+
+const RUNTIME_FD_ALLOWED = Object.freeze({
+  epoll: ['read', 'readwrite'],
+  eventfd: ['read', 'readwrite'],
+  pipe: ['read', 'write', 'readwrite'],
+});
+
+/**
+ * @param {{kind: string, access: string}} entry
+ * @returns {boolean}
+ */
+function classifyRuntimeFd(entry) {
+  const allowed = RUNTIME_FD_ALLOWED[entry.kind];
+  return allowed !== undefined && allowed.includes(entry.access);
+}
+
+/**
+ * Assert the runtime-created FD baseline: the runtime identity must equal the
+ * immutable baseline (node SHA-256 + Node major/minor + libuv + kernel gen), and
+ * every runtime-created descriptor must be an allowed anonymous class/access.
+ * @param {{node_sha256: string, node_major: number, node_minor: number,
+ *          libuv_version: string, kernel_generation: string,
+ *          descriptors: Array<{kind: string, access: string}>,
+ *          baseline: {node_sha256: string, node_major: number, node_minor: number,
+ *                     libuv_version: string, kernel_generation: string}}} input
+ */
+function assertRuntimeFdBaseline(input) {
+  const b = input.baseline;
+  if (
+    input.node_sha256 !== b.node_sha256 ||
+    input.node_major !== b.node_major ||
+    input.node_minor !== b.node_minor ||
+    input.libuv_version !== b.libuv_version ||
+    input.kernel_generation !== b.kernel_generation
+  ) {
+    throw new Error('assertRuntimeFdBaseline: runtime identity does not match the approved baseline');
+  }
+  for (const entry of input.descriptors) {
+    if (!classifyRuntimeFd(entry)) {
+      throw new Error(
+        `assertRuntimeFdBaseline: unknown runtime-created descriptor ${entry.kind}/${entry.access}`
+      );
+    }
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -2072,6 +2125,9 @@ module.exports = {
   assertProductionEnv,
   assertRequiredFds,
   assertFd3NeverHashed,
+  RUNTIME_FD_ALLOWED,
+  classifyRuntimeFd,
+  assertRuntimeFdBaseline,
 };
 
 // ---------------------------------------------------------------------------
