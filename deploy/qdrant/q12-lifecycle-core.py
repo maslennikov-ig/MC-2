@@ -3557,9 +3557,9 @@ def d6_verify_seal_binding(
 ) -> str:
     """Reject a terminal seal whose predecision_sha256 does not hash its predecision.
 
-    Invoked wherever a seal is validated against the predecision it claims (restart
-    authority and chain selection), so a seal cannot smuggle in a mismatched
-    predecision.  Returns the verified hash."""
+    Enforced by ``d6_select_restart_authority`` when an epoch carries its loaded
+    ``seal`` and ``predecision`` objects: a mismatch makes the epoch unbound and it
+    cannot become a restart chain tip.  Returns the verified hash."""
     expected = d6_predecision_sha256(predecision)
     if seal["predecision_sha256"] != expected:
         raise LifecycleError(
@@ -3745,6 +3745,13 @@ def d6_select_restart_authority(
         seen.add(lease_epoch)
         if not epoch.get("chain_ok"):
             raise LifecycleError("D6 restart: unbound or broken hash chain")
+        # When the loaded seal and predecision objects are present, the seal must
+        # bind the exact predecision it claims or the epoch is unbound (incident) and
+        # cannot become a chain tip.
+        seal = epoch.get("seal")
+        predecision = epoch.get("predecision")
+        if epoch.get("terminal_seal") and seal is not None and predecision is not None:
+            d6_verify_seal_binding(seal, predecision)
     ordered = sorted(epochs, key=lambda item: d6_lease_ordinal(item["lease_epoch"]))
     seals = [item for item in ordered if item.get("terminal_seal")]
     lineage = [
