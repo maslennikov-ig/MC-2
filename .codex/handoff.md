@@ -138,7 +138,7 @@ Full completion program authored (prompt-check pass): copy
 (authority: spec `…specs/2026-07-16-q12-full-completion-design.md` + plan
 `…plans/2026-07-16-q12-full-completion.md`; Phase A local D6/Root → B GHCR
 publish → C live cutover → D closeout; every remote/live and credentialed step
-owner-gated). Fallback: $orchestrator-stage from this handoff plus the stage
+owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
 summary at the resolved `origin/codex/self-hosted-qdrant-platform`.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
