@@ -101,7 +101,7 @@ integration worktree remains authoritative for Q12.
 - Design `.17` is approved/closed; grouping `.16` closed as superseded. E1-E7
   (`.18`-`.24`), Q6 `.7`, Q8 `.9`, Q9 `.10` are reviewed, integrated, and
   verified; evidence lives in `.codex/stages/mc2-jz6y0/summary.md`.
-- Final `.13.7` execution documentation correction `7b446d7d` is integrated and independently rereviewed at `0b7ffe67` (integration `a0c12554`) with P0-P3 zero. The runbooks identify one sole executable PG17 packet, require the fresh custom-format backup and isolated restore before migrations, place source recovery before reindex, preserve guarded rollback, and reject the observed 20-byte empty backup artifacts.
+- Historical `.13.7` doc correction `7b446d7d` (rereview `0b7ffe67`, P0-P3 zero) is superseded by the delivered gate; runbook state lives in `docs/operations/qdrant-self-hosted.md`.
 
 ## Next recommended
 
@@ -179,10 +179,8 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   authorship — the guarded property is prefix integrity); M's residual P2-4
   libpq variables (`PGSSLCERT`/`PGSSLKEY`/`PGSSLPASSWORD`/`PGCHANNELBINDING`/
   `PGGSSENCMODE`) are proven non-exploitable with the explicit `ssl` object.
-- The PG17 security-manifest digest is intentionally not computed locally: it
-  must come from the real restore drill and is routed into gate `.13.7` (the
-  allowlist `DOCUMENT_EVIDENCE_SECURITY_MANIFEST_SHA256` covers PG15/16 only;
-  manifest hashes FAIL on vanilla PG17.10).
+- PG17 security-manifest digests are DONE: computed on the `.13.7` isolated
+  restore and integrated into the allowlists at `b8204cde`.
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
