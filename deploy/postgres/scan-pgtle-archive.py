@@ -53,6 +53,9 @@ with tempfile.TemporaryFile() as archive_sql:
             if body_end < 0:
                 fail(f"unterminated control function body for {package.decode()}")
             body = restored[body_start.end():body_end]
-            versions = re.findall(rb"(?m)^\s*default_version\s*=\s*'([^']+)'\s*$", body)
+            # pg_dump renders the control function as
+            # "SELECT $_pgtle_i_$default_version = '...'" so the first control
+            # line starts mid-line and a line-start anchor never matches.
+            versions = re.findall(rb"\bdefault_version\s*=\s*'([^']+)'", body)
             if versions != [version]:
                 fail(f"control default_version mismatch for {package.decode()}")

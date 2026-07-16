@@ -1388,11 +1388,15 @@ CREATE FUNCTION pgtle."supabase-dbdev--0.0.5.sql"() RETURNS text LANGUAGE sql AS
 
   it('accepts the real installed pgTLE version chain and upgrade scripts', () => {
     // pg_tle retains every installed version plus upgrade scripts; the live
-    // source carries basejump 0.0.1..0.0.6 and dbdev 0.0.2..0.0.5 chains.
+    // source carries basejump 0.0.1..0.0.6 and dbdev 0.0.2..0.0.5 chains, and
+    // pg_dump renders control bodies as a mid-line nested dollar quote.
     const sql = `CREATE FUNCTION pgtle."basejump-supabase_test_helpers.control"() RETURNS text
-LANGUAGE sql AS $body$
-default_version = '0.0.6'
-$body$;
+    LANGUAGE sql
+    AS $_X$SELECT $_pgtle_i_$default_version = '0.0.6'
+comment = 'A collection of functions designed to make testing easier'
+relocatable = false
+requires = 'pgtap,pg_tle'
+$_pgtle_i_$$_X$;
 CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.1.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
 CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.1--0.0.2.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
 CREATE FUNCTION pgtle."basejump-supabase_test_helpers--0.0.4--0.0.6.sql"() RETURNS text LANGUAGE sql AS $body$SELECT 'ok'$body$;
