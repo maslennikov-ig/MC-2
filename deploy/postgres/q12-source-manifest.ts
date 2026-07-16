@@ -147,9 +147,12 @@ function decodeCopyText(value: string): string {
 }
 
 function catalogSql(snapshot: string | null): string {
+  // pg_get_*def qualification depends on the session search_path, so it is
+  // pinned empty to force deterministic full qualification on both the
+  // source and the restored target.
   const begin = snapshot
-    ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)};`
-    : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;';
+    ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)}; SET LOCAL search_path TO '';`
+    : `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path TO '';`;
   return `${begin}
 COPY (
 WITH database_row AS (
@@ -697,8 +700,34 @@ function writeOwnerOnly(path: string, value: unknown): void {
   }
 }
 
+function canonicalizeDeparsedDefinitions(view: JsonObject): void {
+  // A dump/restore reparses expressions, so a source database that lived
+  // through a major upgrade deparses array-element casts differently from
+  // its own restored copy (ARRAY[...]::text[] versus per-element ::text).
+  // Both renderings collapse to one canonical form before comparison, and
+  // the derived per-section digests are dropped alongside.
+  const catalog = view.catalog;
+  if (catalog === null || typeof catalog !== 'object' || Array.isArray(catalog)) return;
+  const catalogObject = catalog as JsonObject;
+  for (const section of ['constraints', 'indexes', 'triggers'] as const) {
+    const entries = catalogObject[section];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (entry === null || typeof entry !== 'object') continue;
+      const item = entry as JsonObject;
+      if (typeof item.definition === 'string') {
+        item.definition = item.definition.replaceAll('::text[]', '').replaceAll('::text', '');
+      }
+    }
+  }
+  for (const key of Object.keys(catalogObject)) {
+    if (key.endsWith('_sha256')) delete catalogObject[key];
+  }
+}
+
 function normalizeForTarget(value: JsonObject, targetDatabase: string): JsonObject {
   const normalized = structuredClone(value);
+  canonicalizeDeparsedDefinitions(normalized);
   const database = object(normalized.database, 'database');
   if (database.name !== targetDatabase) fail(`target database must be ${targetDatabase}`);
   database.name = 'postgres';
@@ -716,6 +745,7 @@ function normalizeForTarget(value: JsonObject, targetDatabase: string): JsonObje
 
 function normalizeSource(value: JsonObject): JsonObject {
   const normalized = structuredClone(value);
+  canonicalizeDeparsedDefinitions(normalized);
   const database = object(normalized.database, 'database');
   delete database.size_bytes;
   normalizePhysicalRelationOids(normalized, 'source');
