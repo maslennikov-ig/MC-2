@@ -1308,17 +1308,18 @@ function reportManifestDiff(expected: unknown, actual: unknown): void {
     const rightIsObject = right !== null && typeof right === 'object';
     if (Array.isArray(left) && Array.isArray(right)) {
       // Arrays are compared as canonical sets so one missing element does
-      // not cascade into index-shifted noise.
+      // not cascade into index-shifted noise; a bounded sample of each side
+      // is reported with the totals.
       const leftSet = new Map(left.map(item => [canonical(item), item]));
       const rightSet = new Map(right.map(item => [canonical(item), item]));
-      for (const [key, item] of leftSet) {
-        if (!rightSet.has(key))
-          lines.push(`${path}: source-only ${JSON.stringify(item)?.slice(0, 220)}`);
-      }
-      for (const [key, item] of rightSet) {
-        if (!leftSet.has(key))
-          lines.push(`${path}: target-only ${JSON.stringify(item)?.slice(0, 220)}`);
-      }
+      const sourceOnly = [...leftSet.entries()].filter(([key]) => !rightSet.has(key));
+      const targetOnly = [...rightSet.entries()].filter(([key]) => !leftSet.has(key));
+      if (sourceOnly.length === 0 && targetOnly.length === 0) return;
+      lines.push(`${path}: source-only=${sourceOnly.length} target-only=${targetOnly.length}`);
+      for (const [, item] of sourceOnly.slice(0, 4))
+        lines.push(`${path}: source-only ${JSON.stringify(item)?.slice(0, 300)}`);
+      for (const [, item] of targetOnly.slice(0, 4))
+        lines.push(`${path}: target-only ${JSON.stringify(item)?.slice(0, 300)}`);
       return;
     }
     if (leftIsObject && rightIsObject) {
