@@ -3779,6 +3779,215 @@ def d6_select_restart_authority(
 
 
 # --------------------------------------------------------------------------- #
+# Task 9 join — D6 real frame envelope, R-handshake chain, and validation-at-load.
+#
+# The Root supervisor emits and validates the real chained frame transcript of
+# the activation-truth R handshake and binds it to the immutable predecision and
+# terminal-seal objects.  Consumes the accepted D6 coordinator objects
+# (``d6_build_predecision``/``d6_build_terminal_seal``/``d6_terminal_seal_authority``)
+# without rewriting them.  All hashing is over the in-memory canonical form (never
+# raw file/JSONL bytes), so validation-at-load parses each stored frame, re-derives
+# ``frame_sha256`` from ``canonical()``, and re-verifies the chain.  A validated
+# ``precommit_rollback_sealed`` seal hands the post-R frontier to Task 9 retirement.
+# --------------------------------------------------------------------------- #
+
+D6_FRAME_KEYS = (
+    "schema_version",
+    "sequence",
+    "kind",
+    "run_id",
+    "payload",
+    "previous_frame_sha256",
+    "frame_sha256",
+)
+D6_HANDSHAKE_KINDS = {
+    "precommit_rollback": (
+        "db_locked",
+        "host_projection",
+        "host_bound",
+        "predecision_precommit",
+        "sealed",
+        "release",
+        "closed",
+    ),
+    "committed_finish_forward": (
+        "db_locked",
+        "host_projection",
+        "host_bound",
+        "predecision_finish_forward",
+        "sealed",
+        "release",
+        "closed",
+    ),
+    "drift_incident": (
+        "db_locked",
+        "host_projection",
+        "host_bound",
+        "abort_incident",
+    ),
+}
+D6_CLASSIFICATION_FRAME_KIND = {
+    "precommit_rollback": "predecision_precommit",
+    "committed_finish_forward": "predecision_finish_forward",
+    "drift_incident": "abort_incident",
+}
+D6_FRAME_KINDS = frozenset(
+    kind for kinds in D6_HANDSHAKE_KINDS.values() for kind in kinds
+)
+
+
+def _d6_check_sequence(sequence: Any) -> int:
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
+        raise LifecycleError("D6 frame sequence must be a positive integer")
+    return sequence
+
+
+def d6_frame_sha256(frame: dict[str, Any]) -> str:
+    """Hash the canonical frame object excluding its own ``frame_sha256`` field."""
+    body = {key: frame[key] for key in frame if key != "frame_sha256"}
+    return sha256(canonical(body))
+
+
+def d6_build_frame(
+    schema_version: str,
+    sequence: int,
+    kind: str,
+    run_id: str,
+    payload: dict[str, Any],
+    previous_frame_sha256: str | None,
+) -> dict[str, Any]:
+    """Build one complete chained frame with a self-consistent ``frame_sha256``."""
+    if kind not in D6_FRAME_KINDS:
+        raise LifecycleError(f"D6 unknown frame kind: {kind}")
+    _d6_check_sequence(sequence)
+    body = {
+        "schema_version": schema_version,
+        "sequence": sequence,
+        "kind": kind,
+        "run_id": run_id,
+        "payload": payload,
+        "previous_frame_sha256": previous_frame_sha256,
+    }
+    return {**body, "frame_sha256": sha256(canonical(body))}
+
+
+def d6_emit_frame_chain(
+    schema_version: str, run_id: str, steps: list[tuple[str, dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    """Emit an ordered, hash-chained frame list from ``(kind, payload)`` steps.
+
+    The genesis frame chains from null; every later frame chains the prior
+    ``frame_sha256`` and increments the sequence."""
+    frames: list[dict[str, Any]] = []
+    previous: str | None = None
+    for index, (kind, payload) in enumerate(steps):
+        frame = d6_build_frame(schema_version, index + 1, kind, run_id, payload, previous)
+        frames.append(frame)
+        previous = frame["frame_sha256"]
+    return frames
+
+
+def d6_validate_frame(frame: dict[str, Any]) -> str:
+    """Validate one frame's exact key set and self-consistent hash; return it."""
+    if set(frame) != set(D6_FRAME_KEYS):
+        raise LifecycleError("D6 frame key set mismatch")
+    if frame["kind"] not in D6_FRAME_KINDS:
+        raise LifecycleError(f"D6 unknown frame kind: {frame['kind']}")
+    _d6_check_sequence(frame["sequence"])
+    expected = d6_frame_sha256(frame)
+    if frame["frame_sha256"] != expected:
+        raise LifecycleError("D6 frame_sha256 does not match its canonical body")
+    return expected
+
+
+def d6_validate_frame_chain(
+    frames: list[dict[str, Any]], expected_kinds: tuple[str, ...] | None = None
+) -> str:
+    """Validate a full frame chain and return the transcript head (tip hash).
+
+    The genesis frame chains from null.  Sequence starts at 1 and increments by
+    one; every frame's ``previous_frame_sha256`` equals the prior tip and its
+    ``frame_sha256`` re-derives from its canonical body.  When ``expected_kinds``
+    is given the kinds must match exactly in order."""
+    if not frames:
+        raise LifecycleError("D6 frame chain is empty")
+    if expected_kinds is not None and len(frames) != len(expected_kinds):
+        raise LifecycleError("D6 frame chain length does not match expected kinds")
+    previous: str | None = None
+    run_id = frames[0]["run_id"]
+    for index, frame in enumerate(frames):
+        d6_validate_frame(frame)
+        if frame["sequence"] != index + 1:
+            raise LifecycleError("D6 frame chain sequence is not monotonic from 1")
+        if frame["run_id"] != run_id:
+            raise LifecycleError("D6 frame chain run_id drift")
+        if frame["previous_frame_sha256"] != previous:
+            raise LifecycleError("D6 frame chain previous_frame_sha256 mismatch")
+        if expected_kinds is not None and frame["kind"] != expected_kinds[index]:
+            raise LifecycleError("D6 frame chain kind order mismatch")
+        previous = frame["frame_sha256"]
+    return previous  # type: ignore[return-value]
+
+
+def d6_load_transcript(path: pathlib.Path) -> tuple[list[dict[str, Any]], str]:
+    """Validation-at-load for the append-only frame transcript.
+
+    Parses each JSONL line to an object, then re-derives every ``frame_sha256``
+    from ``canonical()`` and re-verifies the chain.  It never hashes the raw file
+    bytes, so a semantically identical but differently serialized line still
+    validates, while any content drift fails closed.  Returns the frames and the
+    validated transcript head."""
+    require_lexical_absolute(path)
+    raw = path.read_bytes()
+    if raw and not raw.endswith(b"\n"):
+        raise LifecycleError("D6 transcript is not newline-terminated")
+    frames = [json.loads(line) for line in raw.splitlines()]
+    head = d6_validate_frame_chain(frames)
+    return frames, head
+
+
+def d6_bind_handshake_authority(
+    frames: list[dict[str, Any]],
+    predecision: dict[str, Any],
+    seal: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Bind a completed R-handshake frame chain to its predecision and seal.
+
+    Validates the chain against the contract kind order for the predecision
+    classification, requires the predecision to bind the transcript head
+    immediately before its frame, and (for the sealed classifications) requires
+    the seal to bind both its predecision and the final transcript head.  Returns
+    the sole authority: Task 9 post-R frontier retirement for a precommit seal,
+    finish-forward for a committed seal, and incident-only for a drift abort."""
+    classification = predecision["classification"]
+    expected_kinds = D6_HANDSHAKE_KINDS.get(classification)
+    if expected_kinds is None:
+        raise LifecycleError(f"D6 handshake unknown classification: {classification}")
+    head = d6_validate_frame_chain(frames, expected_kinds)
+    predecision_index = expected_kinds.index(D6_CLASSIFICATION_FRAME_KIND[classification])
+    head_before = frames[predecision_index - 1]["frame_sha256"]
+    if predecision["transcript_head_before_predecision_sha256"] != head_before:
+        raise LifecycleError("D6 predecision transcript head does not match the frame chain")
+    predecision_sha256 = d6_predecision_sha256(predecision)
+    if classification == "drift_incident":
+        if seal is not None:
+            raise LifecycleError("D6 drift incident abort has no terminal seal authority")
+        authority = d6_authority_without_seal(predecision)
+    else:
+        if seal is None:
+            raise LifecycleError("D6 sealed handshake requires a terminal seal")
+        d6_verify_seal_binding(seal, predecision)
+        if seal["final_transcript_head_sha256"] != head:
+            raise LifecycleError("D6 terminal seal final transcript head mismatch")
+        authority = d6_terminal_seal_authority(seal)
+    return {
+        "transcript_head": head,
+        "predecision_sha256": predecision_sha256,
+        "authority": authority,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Task 9 — smoke / activation observation gate evaluator.
 #
 # The deployed ``q12-live-smoke.sh`` wrapper dispatches here.  The ``observe``
