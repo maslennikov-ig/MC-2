@@ -2182,6 +2182,333 @@ function runProbeInspect(ctx) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// F1 — production `inspect` entrypoint + raw-I/O assembly + connection seam.
+//
+// `main(runtime)` performs the full runtime assembly itself: argv/env/FD
+// preflight, request parse/validate from FD 5, FD-11 SQL allowlist + bytes-hash
+// equality against request.projection_sql_sha256, the pinned production URL/CA
+// checks, then the pinned TLS connection and `assembleInspect`. The production
+// endpoint/CA pins are never weakened or env-switched; the ONLY injectable seam
+// is the `runtime` object (I/O + connection factory), which tests fill with a
+// local disposable PG17 while production fills it with the pinned connect. A
+// non-production URL therefore rejects with EXIT_REJECTED and zero DB work.
+//
+// `assembleInspect(io)` consumes raw I/O — a query-capable connection and the
+// FD-11 SQL text — and builds every projection from live reads (with the
+// mandatory pg_stat_clear_snapshot() discipline), then drives the chained
+// db_locked -> host_bound -> sealed -> closed protocol against Root frames.
+// ---------------------------------------------------------------------------
+
+const EXIT_OK = 0;
+const EXIT_REJECTED = 3;
+
+async function assembleInspect(io) {
+  const request = validateRequest(io.request);
+  const projectionSql = io.projectionSql;
+  assertProjectionAllowlist(projectionSql);
+  if (sha256Hex(projectionSql) !== request.projection_sql_sha256) {
+    throw new Error('assembleInspect: FD-11 SQL bytes do not match request.projection_sql_sha256');
+  }
+  const templates = splitProjectionTemplates(projectionSql);
+  const conn = io.connection;
+  const run = async name => conn.query(templates.get(name));
+  const rows = async name => (await run(name)).rows;
+
+  await run('transaction_begin');
+  await run('clear_snapshot');
+  const id = (await rows('connection_identity'))[0];
+  const server_version_num = Number(id.server_version_num);
+  assertPostConnect({
+    session_user: id.session_user,
+    current_database: id.current_database,
+    transaction_read_only: id.transaction_read_only,
+    transaction_isolation: id.transaction_isolation,
+    server_version_num,
+  });
+  const backend_pid = Number(id.backend_pid);
+
+  const capRows = (await rows('capability_lock_rows')).map(r => ({
+    qualified_name: r.qualified_name,
+    oid: Number(r.oid),
+    maintain: r.priv_maintain,
+    update: r.priv_update,
+    delete: r.priv_delete,
+    truncate: r.priv_truncate,
+  }));
+  const vis = (await rows('activity_visibility'))[0];
+  const capability = buildCapabilityObject({
+    session_user: id.session_user,
+    current_database: id.current_database,
+    server_version_num,
+    rows: capRows,
+    visibility: { member: vis.pg_read_all_stats_member === true },
+    clear_snapshot_executed: true,
+  });
+
+  await run('full_catalog_share_lock');
+  const lockObserved = (await rows('lock_projection')).map(r => ({
+    qualified_name: r.qualified_name,
+    lock_mode: r.lock_mode,
+    granted: r.granted,
+  }));
+  verifyGrantedLocks({ observed: lockObserved, expectedRelations: io.expectedRelations });
+
+  await run('clear_snapshot');
+  const sessionObservation = buildSessionObservation(io.inventory, await rows('session_activity'), {
+    probePid: backend_pid,
+  });
+
+  const structural = (await rows('structural_catalog'))[0].structural_catalog_sha256;
+  const databaseDefault = (await rows('database_default'))[0].database_default;
+  const activeRun = (await rows('active_run_singleton'))[0].active_run;
+  const cronRows = await rows('cron_jobs');
+  const net = Number((await rows('global_pg_net_queue'))[0].global_pg_net_queue_count);
+  const preparedRows = await rows('prepared_xacts');
+
+  const dbProjection = buildDatabaseProjection({
+    schema_version: 'megacampus.q12.activation-truth-db-projection/v1',
+    run_id: request.run_id,
+    server_version_num,
+    session_user: id.session_user,
+    current_database: id.current_database,
+    transaction_isolation: id.transaction_isolation,
+    transaction_read_only: id.transaction_read_only,
+    backend_pid,
+    connection_identity_sha256: canonicalHash(id),
+    capability_projection_sha256: canonicalHash(capability),
+    active_run_sha256: canonicalHash(activeRun),
+    guard_projection_sha256: canonicalHash(activeRun),
+    structural_catalog_sha256: String(structural),
+    database_default_sha256: canonicalHash(databaseDefault),
+    cron_jobs_sha256: canonicalHash(cronRows),
+    active_cron_count: cronRows.length,
+    global_pg_net_queue_count: net,
+    prepared_xact_count: preparedRows.length,
+    session_inventory_sha256: canonicalHash(io.inventory),
+    session_observation_sha256: sessionObservation.sha256,
+    lock_projection_sha256: canonicalHash(lockObserved),
+  });
+
+  const proto = new ProbeProtocol(FRAME_SCHEMA_VERSION, request.run_id);
+  const request_sha256 = canonicalHash(request);
+  const initialDbSha = canonicalHash(dbProjection);
+  const fd9 = io.identities.fd9_identity_sha256;
+  const frames = [];
+  const emit = (kind, payload) => {
+    const frame = proto.emit(kind, payload);
+    frames.push(frame);
+    return frame;
+  };
+  const receive = (kind, seq, validate) => {
+    const frame = io.rootResponder(proto.headHash, kind, seq);
+    validate(frame.payload);
+    proto.receive(frame);
+    frames.push(frame);
+    return frame;
+  };
+
+  emit(
+    'db_locked',
+    buildDbLockedPayload({
+      request_sha256,
+      initial_database_projection_sha256: initialDbSha,
+      capability_projection_sha256: canonicalHash(capability),
+      lock_projection_sha256: dbProjection.lock_projection_sha256,
+      fd9_identity_sha256: fd9,
+    })
+  );
+  const hostProjFrame = receive('host_projection', 2, validateHostProjectionPayload);
+  const hostProjectionSha = hostProjFrame.payload.host_projection_sha256;
+  emit(
+    'host_bound',
+    buildHostBoundPayload({
+      request_sha256,
+      initial_database_projection_sha256: initialDbSha,
+      bound_database_projection_sha256: initialDbSha,
+      host_projection_sha256: hostProjectionSha,
+      session_observation_sha256: sessionObservation.sha256,
+      fd9_identity_sha256: fd9,
+    })
+  );
+  const predecisionFrame = receive('predecision', 4, validatePredecisionPayload);
+  const predecision_sha256 = predecisionFrame.payload.predecision_sha256;
+  const classification = predecisionFrame.payload.classification;
+  const actualR =
+    classification === 'precommit_rollback'
+      ? {
+          journal: predecisionFrame.payload.planned_r_journal_entry_hash,
+          checkpoint: predecisionFrame.payload.planned_r_checkpoint_sha256,
+        }
+      : { journal: null, checkpoint: null };
+  const sealed = emit(
+    'sealed',
+    buildSealedPayload({
+      request_sha256,
+      predecision_sha256,
+      initial_database_projection_sha256: initialDbSha,
+      final_database_projection_sha256: initialDbSha,
+      host_projection_sha256: hostProjectionSha,
+      actual_r_journal_entry_hash: actualR.journal,
+      actual_r_checkpoint_sha256: actualR.checkpoint,
+      fd9_identity_sha256: fd9,
+    })
+  );
+  const releaseFrame = receive('release', 6, validateReleasePayload);
+
+  // Post-`R` (or post-predecision) the sole transaction-end: the read-only
+  // COMMIT that ends the transaction and releases the SHARE locks, then the
+  // connection closes, then `closed` is emitted.
+  await run('transaction_commit');
+  if (io.closeConnection) await io.closeConnection();
+
+  emit(
+    'closed',
+    buildClosedPayload({
+      request_sha256,
+      predecision_sha256,
+      sealed_frame_sha256: sealed.frame_sha256,
+      release_frame_sha256: releaseFrame.frame_sha256,
+      actual_r_journal_entry_hash: actualR.journal,
+      actual_r_checkpoint_sha256: actualR.checkpoint,
+      fd9_identity_sha256: fd9,
+    })
+  );
+  if (!proto.done) {
+    throw new Error('assembleInspect: protocol did not complete');
+  }
+  return { frames, classification, dbProjection, capability, sessionObservation };
+}
+
+/**
+ * Build the FD map from the runtime's fstat seam, assigning each required FD its
+ * contract access and deriving the FD 9 lock identity from its device/inode.
+ * @param {{fdStat: (fd: number) => {dev: number, ino: number}}} rt
+ */
+function buildFdMap(rt) {
+  const map = {};
+  for (const fd of Object.keys(FD_ACCESS_CONTRACT).map(Number)) {
+    const st = rt.fdStat(fd);
+    const entry = { access: FD_ACCESS_CONTRACT[fd] };
+    if (fd === 9) entry.lock_identity = sha256Hex(`${st.dev}:${st.ino}`);
+    map[fd] = entry;
+  }
+  return map;
+}
+
+/**
+ * A synchronous newline-delimited frame reader over a raw descriptor (FD 6
+ * control pipe). Used by the production runtime's rootResponder.
+ */
+function makeFdFrameReader(fd) {
+  const fs = require('node:fs');
+  let buffer = '';
+  return () => {
+    for (;;) {
+      const nl = buffer.indexOf('\n');
+      if (nl >= 0) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+        return parseCanonicalJson(line);
+      }
+      const chunk = Buffer.alloc(65536);
+      const read = fs.readSync(fd, chunk, 0, chunk.length, null);
+      if (read === 0) throw new Error('makeFdFrameReader: control pipe closed');
+      buffer += chunk.subarray(0, read).toString('utf8');
+    }
+  };
+}
+
+/**
+ * Default production runtime: real process argv/env, real FD reads, and the
+ * pinned pg connection. The post-connect sources (FD 10 catalog bundle + managed
+ * inventory, FD 6 Root control frames) are the production wiring exercised only
+ * behind the separately authorized remote observation gate — the frozen host/
+ * CA/PG17 pins make a live local connection impossible by construction.
+ */
+function buildProductionRuntime() {
+  const fs = require('node:fs');
+  return {
+    argv: process.argv.slice(0),
+    env: process.env,
+    fdStat: fd => fs.fstatSync(fd),
+    readFd: fd => fs.readFileSync(fd),
+    connect: async (url, tls) => {
+      const { Client } = require('pg');
+      const client = new Client({
+        connectionString: url,
+        ssl: tls,
+        application_name: PROBE_APP_IDENTITY,
+      });
+      await client.connect();
+      return client;
+    },
+    postConnectSources: () => {
+      const bundle = parseCanonicalJson(fs.readFileSync(10).toString('utf8'));
+      const reader = makeFdFrameReader(6);
+      return {
+        expectedRelations: bundle.relations,
+        inventory: bundle.managed_session_inventory,
+        rootResponder: () => reader(),
+      };
+    },
+    log: message => process.stderr.write(`${message}\n`),
+  };
+}
+
+/**
+ * Production `inspect` entrypoint. Returns EXIT_OK on a complete run, or
+ * EXIT_REJECTED (with a stderr note and zero DB work) on any preflight/pin
+ * rejection.
+ * @param {Record<string, unknown>} [runtime]
+ * @returns {Promise<number>}
+ */
+async function main(runtime) {
+  const rt = runtime || buildProductionRuntime();
+  const hashedFds = [];
+  try {
+    assertProductionArgv(rt.argv);
+    assertProductionEnv(rt.env);
+    const fdMap = rt.fdMap || buildFdMap(rt);
+    assertRequiredFds(fdMap);
+    const request = validateRequest(parseCanonicalJson(Buffer.from(rt.readFd(5)).toString('utf8')));
+    const projectionSql = Buffer.from(rt.readFd(11)).toString('utf8');
+    assertProjectionAllowlist(projectionSql);
+    hashedFds.push(11);
+    if (sha256Hex(projectionSql) !== request.projection_sql_sha256) {
+      throw new Error('main: FD-11 SQL bytes do not match request.projection_sql_sha256');
+    }
+    assertFd3NeverHashed(hashedFds);
+    const url = Buffer.from(rt.readFd(3)).toString('utf8').trim();
+    const endpoint = parseProductionUrl(url);
+    const caPem = rt.readFd(4);
+    const tls = buildTlsConfig(caPem, {
+      serverName: endpoint.host,
+      expectedCaSha256: PROD_CA_SHA256,
+    });
+    const connection = await rt.connect(url, tls);
+    const sources = rt.postConnectSources ? rt.postConnectSources() : {};
+    await assembleInspect({
+      request,
+      projectionSql,
+      connection,
+      expectedRelations: rt.expectedRelations || sources.expectedRelations,
+      inventory: rt.inventory || sources.inventory,
+      rootResponder: rt.rootResponder || sources.rootResponder,
+      identities: rt.identities || {
+        fd9_identity_sha256: fdMap[9].lock_identity,
+        spawn_capability_sha256: request.spawn_capability_sha256,
+        runtime_fd_baseline_sha256: request.runtime_fd_baseline_sha256,
+      },
+      closeConnection: () => connection.end(),
+    });
+    return EXIT_OK;
+  } catch (error) {
+    rt.log(`q12-activation-truth-probe: ${error && error.message ? error.message : error}`);
+    return EXIT_REJECTED;
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -2257,13 +2584,26 @@ module.exports = {
   classifyRuntimeFd,
   assertRuntimeFdBaseline,
   runProbeInspect,
+  EXIT_OK,
+  EXIT_REJECTED,
+  assembleInspect,
+  buildFdMap,
+  makeFdFrameReader,
+  buildProductionRuntime,
+  main,
 };
 
 // ---------------------------------------------------------------------------
-// CLI entrypoint (driven only under `require.main === module`). The full
-// `inspect` main flow is assembled in Task 14.
+// CLI entrypoint (driven only under `require.main === module`). Runs the real
+// production assembly and exits with the returned code.
 // ---------------------------------------------------------------------------
 if (require.main === module) {
-  process.stderr.write('q12-activation-truth-probe: inspect flow not yet assembled\n');
-  process.exit(2);
+  main()
+    .then(code => process.exit(code))
+    .catch(error => {
+      process.stderr.write(
+        `q12-activation-truth-probe: ${error && error.message ? error.message : error}\n`
+      );
+      process.exit(EXIT_REJECTED);
+    });
 }

@@ -403,7 +403,7 @@ describe('Task 1 — canonical JSON + frame envelope + hashing', () => {
 // plan imprecision — field 5 is incompatible with a read-only allowlist. The
 // contract separates the two hashes; projection_sql_sha256 is this file's hash.
 const PROJECTION_SQL = resolve(REPO_ROOT, 'deploy/qdrant/q12-activation-truth-projection.sql');
-const PROJECTION_SQL_SHA256 = 'b4558ec09f67b663540e53f8a24b28030661bcca9daa74cab7321564798e9bad';
+const PROJECTION_SQL_SHA256 = '36d280347650689de1d6c613f164c2eaa622f0eb567b134dd5b3b2cdad5332af';
 
 // Accepted W lock catalog/order (fields 8/9) — the sole authority for the
 // full-catalog SHARE lock relation set and order.
@@ -620,7 +620,7 @@ let dockerFns: {
 };
 // Host loopback port the disposable PG17 publishes 5432 on (set in beforeAll);
 // used only by the F1 end-to-end test's injected pg connection seam.
-const pgPort = 0;
+let pgPort = 0;
 
 describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => {
   beforeAll(async () => {
@@ -736,9 +736,19 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
       CONTAINER,
       '-e',
       `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+      // Publish 5432 on a random host loopback port for the F1 end-to-end pg
+      // connection seam; disable the logical replication launcher so the bare
+      // PG17 session set matches the frozen managed-session inventory.
+      '-p',
+      '127.0.0.1::5432',
       POSTGRES_IMAGE,
+      '-c',
+      'max_logical_replication_workers=0',
     ]);
     expect(started.status, started.stderr).toBe(0);
+    const portOut = docker(['port', CONTAINER, '5432/tcp']);
+    const portMatch = portOut.stdout.trim().match(/:(\d+)\s*$/);
+    pgPort = portMatch ? Number(portMatch[1]) : 0;
     let ready = false;
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const probeReady = psqlResult("SELECT current_setting('server_version_num')");

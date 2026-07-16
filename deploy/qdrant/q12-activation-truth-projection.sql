@@ -311,16 +311,16 @@ SELECT pg_catalog.encode(
     pg_catalog.convert_to(
       pg_catalog.jsonb_build_object(
         'schema_version', 'megacampus.q12.structural-catalog/v1',
-        'namespaces', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname), '[]'::jsonb) FROM namespaces x),
-        'relations', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname, x.relname), '[]'::jsonb) FROM relations x),
-        'columns', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.attrelid, x.attnum), '[]'::jsonb) FROM columns x),
-        'constraints', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.conrelid, x.conname), '[]'::jsonb) FROM constraints x),
-        'indexes', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.indrelid, x.indexname), '[]'::jsonb) FROM indexes x),
-        'functions', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname, x.proname), '[]'::jsonb) FROM functions x),
-        'types', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname, x.typname), '[]'::jsonb) FROM types x),
-        'triggers', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.tgrelid, x.tgname), '[]'::jsonb) FROM triggers x),
-        'event_triggers', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.evtname), '[]'::jsonb) FROM event_triggers x),
-        'default_acls', (SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.defaclobjtype, x.nspname), '[]'::jsonb) FROM default_acls x)
+        'namespaces', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname), '[]'::jsonb) FROM namespaces x),
+        'relations', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname, x.relname), '[]'::jsonb) FROM relations x),
+        'columns', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.attrelid, x.attnum), '[]'::jsonb) FROM columns x),
+        'constraints', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.conrelid, x.conname), '[]'::jsonb) FROM constraints x),
+        'indexes', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.indrelid, x.indexname), '[]'::jsonb) FROM indexes x),
+        'functions', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname, x.proname), '[]'::jsonb) FROM functions x),
+        'types', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.nspname, x.typname), '[]'::jsonb) FROM types x),
+        'triggers', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.tgrelid, x.tgname), '[]'::jsonb) FROM triggers x),
+        'event_triggers', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.evtname), '[]'::jsonb) FROM event_triggers x),
+        'default_acls', (SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY x.defaclobjtype, x.nspname), '[]'::jsonb) FROM default_acls x)
       )::text,
       'UTF8'
     )
@@ -332,7 +332,7 @@ SELECT pg_catalog.encode(
 --@template database_default
 SELECT pg_catalog.jsonb_build_object(
   'datname', d.datname,
-  'settings', pg_catalog.coalesce(s.setconfig, ARRAY[]::text[])
+  'settings', COALESCE(s.setconfig, ARRAY[]::text[])
 ) AS database_default
 FROM pg_catalog.pg_database d
 LEFT JOIN pg_catalog.pg_db_role_setting s
