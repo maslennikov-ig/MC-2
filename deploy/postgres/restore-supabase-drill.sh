@@ -385,9 +385,15 @@ write_service() {
 }
 
 wait_ready() {
-  local attempt
+  # The image entrypoint first runs a socket-only temporary initialization
+  # server, so an in-container unix-socket probe reports ready while the
+  # published TCP port still refuses connections. Readiness is proven on the
+  # kernel-assigned loopback port that the drill actually uses.
+  local attempt port
   for attempt in $(/usr/bin/seq 1 120); do
-    if "$DOCKER" exec "$CONTAINER_ID" /usr/bin/pg_isready -q -U postgres -d postgres; then
+    if port=$("$DOCKER" port "$CONTAINER_ID" 5432/tcp 2>/dev/null) \
+      && [[ "$port" =~ ^127\.0\.0\.1:([0-9]+)$ ]] \
+      && /usr/lib/postgresql/17/bin/pg_isready -q -h 127.0.0.1 -p "${BASH_REMATCH[1]}" -U postgres -d postgres; then
       return 0
     fi
     /usr/bin/sleep 1
