@@ -657,8 +657,15 @@ PY
   verify_extensions_and_toc "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup
 
   # Required isolated cluster overrides: cron.database_name=restore_test and cron.launch_active_jobs=off.
+  # One multi-statement command string runs as a single implicit transaction
+  # and ALTER SYSTEM refuses transaction blocks, so each override is issued
+  # as its own statement.
   run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
-    "ALTER DATABASE restore_test SET default_transaction_read_only='on'; ALTER SYSTEM SET cron.database_name='restore_test'; ALTER SYSTEM SET cron.launch_active_jobs='off';" >/dev/null
+    "ALTER DATABASE restore_test SET default_transaction_read_only='on';" >/dev/null
+  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
+    "ALTER SYSTEM SET cron.database_name='restore_test';" >/dev/null
+  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
+    "ALTER SYSTEM SET cron.launch_active_jobs='off';" >/dev/null
   [[ "$("$DOCKER" inspect --format '{{.Id}}' "$CONTAINER_ID")" == "$CONTAINER_ID" ]] || fail 'isolated container identity drift'
   "$DOCKER" restart "$CONTAINER_ID" >/dev/null
   wait_ready
