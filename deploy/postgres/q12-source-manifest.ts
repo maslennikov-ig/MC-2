@@ -706,9 +706,10 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
   // its own restored copy (ARRAY[...]::text[] versus per-element ::text).
   // Both renderings collapse to one canonical form before comparison, and
   // the derived per-section digests are dropped alongside.
-  const extensions = view.extensions;
-  if (Array.isArray(extensions)) {
-    for (const entry of extensions) {
+  for (const viewSection of ['extensions', 'schemas'] as const) {
+    const entries = view[viewSection];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
       if (entry === null || typeof entry !== 'object') continue;
       const item = entry as JsonObject;
       if (
@@ -718,6 +719,7 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
         item.owner = 'platform-owner';
     }
   }
+  delete view.schemas_sha256;
   const catalog = view.catalog;
   if (catalog === null || typeof catalog !== 'object' || Array.isArray(catalog)) return;
   const catalogObject = catalog as JsonObject;
