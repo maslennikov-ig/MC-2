@@ -503,10 +503,59 @@ def scenario_seal_binding(payload: dict) -> dict:
     return {"ok": True, "bound": True}
 
 
+def scenario_secret_read_bytes(payload: dict) -> dict:
+    """The descriptor returned by d6_validate_secret_source is rewound to offset 0,
+    so the child's sequential read of FD3/FD4 sees the full bytes, not EOF."""
+    sandbox = pathlib.Path(tempfile.mkdtemp(prefix="q12-d6-readback-"))
+    content = b"postgresql://user:secret@host:5432/postgres\n"
+    path = _make_secret(sandbox, "supabase_db_url", content, 0o600)
+    fd, _dev, _ino = CORE.d6_validate_secret_source(
+        path,
+        mode_set=frozenset((0o400, 0o600)),
+        owner_uid=os.getuid(),
+        owner_gid=os.getgid(),
+    )
+    try:
+        data = os.read(fd, 65536)
+    finally:
+        os.close(fd)
+    return {"ok": True, "read_len": len(data), "matches": data == content}
+
+
+def _bound_epoch(lease_epoch: str, head: str, tamper: bool) -> dict:
+    predecision = CORE.d6_build_predecision(_predecision_fields("committed_finish_forward"))
+    predecision_sha = _sha("tampered") if tamper else CORE.d6_predecision_sha256(predecision)
+    seal = CORE.d6_build_terminal_seal(
+        _seal_fields(
+            "committed_finish_forward", predecision, {"predecision_sha256": predecision_sha}
+        ),
+        predecision,
+    )
+    return {
+        "lease_epoch": lease_epoch,
+        "chain_ok": True,
+        "terminal_seal": True,
+        "seal_outcome": "committed_finish_forward_sealed",
+        "previous_terminal_seal": None,
+        "predecessor_head": head,
+        "actual_r_head": None,
+        "seal": seal,
+        "predecision": predecision,
+    }
+
+
+def scenario_restart_binding(payload: dict) -> dict:
+    epoch = _bound_epoch("cutover", "HEAD", bool(payload.get("tamper")))
+    result = CORE.d6_select_restart_authority([epoch], "HEAD")
+    return {"ok": True, **result}
+
+
 CORRECTIONS = {
     "canonical_nfc": scenario_canonical_nfc,
     "secret_after_read": scenario_secret_after_read,
+    "secret_read_bytes": scenario_secret_read_bytes,
     "seal_binding": scenario_seal_binding,
+    "restart_binding": scenario_restart_binding,
 }
 
 

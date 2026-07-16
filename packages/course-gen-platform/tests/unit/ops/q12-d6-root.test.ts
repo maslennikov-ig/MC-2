@@ -563,3 +563,12 @@ describe('Correction — terminal seal binds the hash of its own predecision', (
     expect(result.error).toMatch(/predecision|bind/i);
   });
 });
+
+describe('Correction — validated secret descriptor is rewound for the child read', () => {
+  it('returns a descriptor a sequential read sees in full (not EOF after revalidation)', () => {
+    const result = runScenario({ scenario: 'secret_read_bytes' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.read_len).toBeGreaterThan(0);
+    expect(result.matches).toBe(true);
+  });
+});
