@@ -481,12 +481,15 @@ function main(): void {
     if (!targetRoles.has(setting.role))
       fail(`role setting references unavailable role ${setting.role}`);
     if (setting.database !== null) continue;
-    // The stored setconfig string is replayed verbatim: quoting it as one
-    // literal would collapse list-valued GUCs such as search_path into a
-    // single quoted element and break source equality. This is safe because
-    // every name=value pair was matched against the exact allowlist above.
+    // search_path is a list-input GUC: quoting the stored setconfig string
+    // as one literal collapses the list into a single quoted element and
+    // breaks source equality, so its elements are replayed verbatim (safe:
+    // the exact allowlist above pinned the full name=value pair). Scalar
+    // GUCs keep literal quoting, which reproduces their storage exactly.
     sql.push(
-      `ALTER ROLE ${identifier(setting.role)} SET ${identifier(setting.name)} TO ${setting.value};`
+      `ALTER ROLE ${identifier(setting.role)} SET ${identifier(setting.name)} TO ${
+        setting.name === 'search_path' ? setting.value : literal(setting.value)
+      };`
     );
   }
 
