@@ -14,6 +14,7 @@ import re
 import stat as stat_module
 import subprocess
 import sys
+import unicodedata
 import uuid
 import weakref
 from dataclasses import dataclass, field
@@ -171,9 +172,25 @@ class Executor(Protocol):
     def launch_claim(self, argv: list[str], journal_fd: int) -> dict[str, Any]: ...
 
 
+def _nfc(value: Any) -> Any:
+    """Recursively NFC-normalize every string key and value.
+
+    The canonical object convention (shared with the Stream 1 probe) is UTF-8 NFC,
+    compact, recursively key-sorted, with no trailing LF.  Normalizing here keeps
+    cross-stream frame/object hashes byte-identical on non-ASCII input; it is a
+    no-op on ASCII and already-composed data."""
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value)
+    if isinstance(value, dict):
+        return {_nfc(key): _nfc(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_nfc(item) for item in value]
+    return value
+
+
 def canonical(value: Any) -> bytes:
     return json.dumps(
-        value, ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
+        _nfc(value), ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
     ).encode("utf-8")
 
 
