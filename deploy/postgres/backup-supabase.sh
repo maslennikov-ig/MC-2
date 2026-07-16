@@ -507,8 +507,52 @@ parse_arguments() {
 create_service_file() {
   local effective_database_url=$1
   local service_file=$2
-  ( umask 077; printf '[mc2_supabase_backup]\ndbname=%s\n' "$effective_database_url" >"$service_file" )
+  # libpq never URI-expands dbname inside a service file, so the effective URL
+  # must be decomposed into discrete connection parameters.
+  ( umask 077; : >"$service_file" )
   /usr/bin/chmod 600 -- "$service_file"
+  /usr/bin/python3 - "$service_file" 3<<<"$effective_database_url" <<'PY' || \
+    fail 'connection service file composition failed'
+import os
+import sys
+from urllib.parse import parse_qs, unquote, urlsplit
+
+service_path = sys.argv[1]
+with os.fdopen(3, encoding="utf-8") as source:
+    value = source.readline().rstrip("\n")
+parsed = urlsplit(value)
+query = parse_qs(parsed.query, keep_blank_values=True)
+
+
+def decoded(keyword, encoded):
+    try:
+        return unquote(encoded, errors="strict")
+    except UnicodeDecodeError:
+        raise SystemExit(f"service parameter {keyword} is not valid UTF-8")
+
+
+entries = (
+    ("host", parsed.hostname or ""),
+    ("port", str(parsed.port or "")),
+    ("user", decoded("user", parsed.username or "")),
+    ("password", decoded("password", parsed.password or "")),
+    ("dbname", decoded("dbname", parsed.path.lstrip("/"))),
+    ("sslmode", (query.get("sslmode") or [""])[0]),
+    ("sslrootcert", (query.get("sslrootcert") or [""])[0]),
+)
+lines = ["[mc2_supabase_backup]"]
+for keyword, parameter in entries:
+    if not parameter:
+        raise SystemExit(f"service parameter {keyword} is empty")
+    if parameter != parameter.strip() or any(ch in parameter for ch in "\n\r"):
+        raise SystemExit(f"service parameter {keyword} is unsafe")
+    lines.append(f"{keyword}={parameter}")
+fd = os.open(service_path, os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW)
+with os.fdopen(fd, "w", encoding="utf-8") as stream:
+    stream.write("\n".join(lines) + "\n")
+    stream.flush()
+    os.fsync(stream.fileno())
+PY
 }
 
 run_manifest_generator() {

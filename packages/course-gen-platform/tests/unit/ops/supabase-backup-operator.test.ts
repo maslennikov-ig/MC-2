@@ -115,6 +115,7 @@ printf '%s\\n' "$*" > "$FAKE_ARGS_LOG"
 [[ -r "\${PGSERVICEFILE:-}" ]] || exit 99
 /usr/bin/grep -Fq "sslrootcert=$PGSSLROOTCERT" "$PGSERVICEFILE" || exit 100
 ! /usr/bin/grep -Fq "$FAKE_ORIGINAL_CA_PATH" "$PGSERVICEFILE" || exit 101
+[[ -z "\${FAKE_SERVICE_FILE_COPY:-}" ]] || /usr/bin/cp "$PGSERVICEFILE" "$FAKE_SERVICE_FILE_COPY"
 printf 'ca_fd=yes\\nurl_ca_fd=yes\\nca_content=%s\\n' "$(/usr/bin/cat "$PGSSLROOTCERT")" > "$FAKE_IDENTITY_LOG"
 output=''
 for argument in "$@"; do
@@ -868,6 +869,80 @@ describe('Q12 immutable Supabase backup generations', () => {
       expect(lstatSync(join(generation, name)).mode & 0o777).toBe(0o600);
     }
     expect(lstatSync(generation).mode & 0o777).toBe(0o700);
+  });
+
+  it('decomposes the connection service file into discrete libpq parameters', () => {
+    const item = fixture();
+    const serviceCopy = join(item.root, 'service-file-copy');
+
+    const result = run(item, { FAKE_SERVICE_FILE_COPY: serviceCopy });
+
+    expect(result.status).toBe(0);
+    const serviceFile = readFileSync(serviceCopy, 'utf8');
+    // libpq never URI-expands dbname inside a service file, so an embedded
+    // postgresql:// URI silently falls back to the local unix socket.
+    expect(serviceFile).not.toContain('postgresql://');
+    const lines = serviceFile.trim().split('\n');
+    expect(lines[0]).toBe('[mc2_supabase_backup]');
+    expect(lines).toContain('host=db.example.test');
+    expect(lines).toContain('port=5432');
+    expect(lines).toContain('user=postgres.test');
+    expect(lines).toContain('password=synthetic-password-never-log');
+    expect(lines).toContain('dbname=postgres');
+    expect(lines).toContain('sslmode=verify-full');
+    expect(lines.some(line => /^sslrootcert=\/proc\/self\/fd\/\d+$/.test(line))).toBe(true);
+    expect(lines).toHaveLength(8);
+  });
+
+  it('refuses a password that percent-decodes to leading or trailing whitespace', () => {
+    const item = fixture();
+    writeFileSync(
+      item.urlFile,
+      `postgresql://postgres.test:secret%20@db.example.test:5432/postgres` +
+        `?sslmode=verify-full&sslrootcert=${item.caFile}\n`,
+      { mode: 0o600 }
+    );
+    chmodSync(item.urlFile, 0o600);
+
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('connection service file composition failed');
+    expect(`${result.stdout}${result.stderr}`).not.toContain('secret');
+  });
+
+  it('refuses a password whose percent-encoding is not valid UTF-8', () => {
+    const item = fixture();
+    writeFileSync(
+      item.urlFile,
+      `postgresql://postgres.test:bad%FFbad@db.example.test:5432/postgres` +
+        `?sslmode=verify-full&sslrootcert=${item.caFile}\n`,
+      { mode: 0o600 }
+    );
+    chmodSync(item.urlFile, 0o600);
+
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('connection service file composition failed');
+  });
+
+  it('percent-decodes service parameters into libpq-literal values', () => {
+    const item = fixture();
+    const serviceCopy = join(item.root, 'service-file-copy');
+    writeFileSync(
+      item.urlFile,
+      `postgresql://postgres.test:p%40ss%3Dw%20rd%23x@db.example.test:5432/postgres` +
+        `?sslmode=verify-full&sslrootcert=${item.caFile}\n`,
+      { mode: 0o600 }
+    );
+    chmodSync(item.urlFile, 0o600);
+
+    const result = run(item, { FAKE_SERVICE_FILE_COPY: serviceCopy });
+
+    expect(result.status).toBe(0);
+    const lines = readFileSync(serviceCopy, 'utf8').trim().split('\n');
+    expect(lines).toContain('password=p@ss=w rd#x');
   });
 
   it('fails closed when normalized password-free role exports drift', () => {
