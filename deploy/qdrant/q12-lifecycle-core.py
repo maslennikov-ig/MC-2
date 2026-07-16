@@ -3778,6 +3778,167 @@ def d6_select_restart_authority(
     }
 
 
+# --------------------------------------------------------------------------- #
+# Task 9 — smoke / activation observation gate evaluator.
+#
+# The deployed ``q12-live-smoke.sh`` wrapper dispatches here.  The ``observe``
+# action evaluates the §13 activation observation gate over a synthetic
+# observation projection and takes no live/remote action: it opens no database,
+# container, socket, or service.  Every terminal live-window result sets
+# ``rotation_required=true``; any threshold breach keeps Q12 open and selects the
+# phase-aware rollback/incident path.  Elapsed observation time never converts a
+# failed metric into acceptance.
+# --------------------------------------------------------------------------- #
+
+SMOKE_SCHEMA_VERSION = "q12-smoke-observation/v1"
+SMOKE_MIN_OBSERVATION_MINUTES = 60
+SMOKE_REQUIRED_COVERAGE_PERCENT = 100
+SMOKE_REQUIRED_BASELINE_PERCENT = 100
+SMOKE_MAX_REST_ERROR_RATIO = 0.02
+SMOKE_MAX_HYBRID_FALLBACK_RATIO = 0.05
+SMOKE_MAX_MEMORY_RATIO = 0.85
+SMOKE_MAX_POINT_DROP_RATIO = 0.10
+SMOKE_INITIAL_CUTOVER_POINTS = 12114
+SMOKE_MAX_DEGRADED_DECISIONS = 3
+SMOKE_INT_FIELDS = (
+    "observation_minutes",
+    "document_outcome_coverage_percent",
+    "baseline_preservation_percent",
+    "isolation_violations",
+    "unresolved_p0_p1_incidents",
+    "qdrant_points",
+    "degraded_automatic_decisions_30min",
+)
+SMOKE_RATIO_FIELDS = (
+    "qdrant_rest_error_ratio",
+    "hybrid_fallback_ratio",
+    "qdrant_memory_ratio",
+    "point_count_drop_ratio",
+)
+SMOKE_BOOL_FIELDS = (
+    "course_cycle_complete",
+    "is_initial_cutover",
+    "notification_firing_observed",
+    "notification_resolved_observed",
+)
+SMOKE_ACTIVATION_ROW_KEYS = {"enabled", "status", "rollout_percentage"}
+SMOKE_OBSERVATION_KEYS = frozenset(
+    SMOKE_INT_FIELDS + SMOKE_RATIO_FIELDS + SMOKE_BOOL_FIELDS + ("activation_rows",)
+)
+
+
+def _smoke_int(observation: dict[str, Any], key: str) -> int:
+    value = observation[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise LifecycleError(f"smoke observation {key} must be an integer")
+    return value
+
+
+def _smoke_ratio(observation: dict[str, Any], key: str) -> float:
+    value = observation[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise LifecycleError(f"smoke observation {key} must be a number")
+    return value
+
+
+def _smoke_bool(observation: dict[str, Any], key: str) -> bool:
+    value = observation[key]
+    if not isinstance(value, bool):
+        raise LifecycleError(f"smoke observation {key} must be a boolean")
+    return value
+
+
+def evaluate_smoke_observation(observation: Any, run_id: str) -> dict[str, Any]:
+    """Evaluate the §13 activation observation gate over a synthetic projection.
+
+    Returns a fail-closed verdict.  Acceptance requires every threshold met, at
+    least 60 observed minutes, and one complete course cycle; any breach keeps
+    Q12 open on the phase-aware rollback/incident path.  ``rotation_required`` is
+    always true."""
+    if not isinstance(observation, dict):
+        raise LifecycleError("smoke observation must be a JSON object")
+    keys = set(observation)
+    missing = SMOKE_OBSERVATION_KEYS - keys
+    if missing:
+        raise LifecycleError(f"smoke observation missing keys: {sorted(missing)}")
+    unknown = keys - SMOKE_OBSERVATION_KEYS
+    if unknown:
+        raise LifecycleError(f"smoke observation unknown keys: {sorted(unknown)}")
+
+    for key in SMOKE_INT_FIELDS:
+        _smoke_int(observation, key)
+    for key in SMOKE_RATIO_FIELDS:
+        _smoke_ratio(observation, key)
+    for key in SMOKE_BOOL_FIELDS:
+        _smoke_bool(observation, key)
+
+    rows = observation["activation_rows"]
+    if not isinstance(rows, list) or not rows:
+        raise LifecycleError("smoke observation activation_rows must be a non-empty list")
+
+    breaches: set[str] = set()
+    if observation["observation_minutes"] < SMOKE_MIN_OBSERVATION_MINUTES:
+        breaches.add("observation_window_too_short")
+    if not observation["course_cycle_complete"]:
+        breaches.add("course_cycle_incomplete")
+    if observation["document_outcome_coverage_percent"] != SMOKE_REQUIRED_COVERAGE_PERCENT:
+        breaches.add("document_outcome_coverage")
+    if observation["baseline_preservation_percent"] != SMOKE_REQUIRED_BASELINE_PERCENT:
+        breaches.add("baseline_preservation")
+    if observation["isolation_violations"] != 0:
+        breaches.add("isolation_violation")
+    if observation["unresolved_p0_p1_incidents"] != 0:
+        breaches.add("unresolved_incident")
+    if observation["qdrant_rest_error_ratio"] > SMOKE_MAX_REST_ERROR_RATIO:
+        breaches.add("qdrant_rest_error_ratio")
+    if observation["hybrid_fallback_ratio"] > SMOKE_MAX_HYBRID_FALLBACK_RATIO:
+        breaches.add("hybrid_fallback_ratio")
+    if observation["qdrant_memory_ratio"] > SMOKE_MAX_MEMORY_RATIO:
+        breaches.add("qdrant_memory")
+    if observation["point_count_drop_ratio"] > SMOKE_MAX_POINT_DROP_RATIO:
+        breaches.add("point_count_drop")
+    if (
+        observation["is_initial_cutover"]
+        and observation["qdrant_points"] != SMOKE_INITIAL_CUTOVER_POINTS
+    ):
+        breaches.add("initial_cutover_point_count")
+    if observation["degraded_automatic_decisions_30min"] >= SMOKE_MAX_DEGRADED_DECISIONS:
+        breaches.add("degraded_decisions")
+    if not (
+        observation["notification_firing_observed"]
+        and observation["notification_resolved_observed"]
+    ):
+        breaches.add("notification_cycle")
+    for row in rows:
+        if (
+            not isinstance(row, dict)
+            or set(row) != SMOKE_ACTIVATION_ROW_KEYS
+            or row["enabled"] is not True
+            or row["status"] != "active"
+            or row["rollout_percentage"] != 100
+        ):
+            breaches.add("activation_row_drift")
+            break
+
+    accepted = not breaches
+    return {
+        "schema_version": SMOKE_SCHEMA_VERSION,
+        "run_id": run_id,
+        "accepted": accepted,
+        "breaches": sorted(breaches),
+        "selected_path": "accept" if accepted else "phase_aware_rollback_incident",
+        "q12_open": not accepted,
+        "rotation_required": True,
+    }
+
+
+def run_smoke(arguments: argparse.Namespace) -> dict[str, Any]:
+    fixture = pathlib.Path(arguments.observation_fixture)
+    require_lexical_absolute(fixture)
+    observation = json.loads(fixture.read_bytes())
+    return evaluate_smoke_observation(observation, arguments.run_id)
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Q12 retained barrier lifecycle")
     commands = root.add_subparsers(dest="mode", required=True)
@@ -3796,11 +3957,19 @@ def parser() -> argparse.ArgumentParser:
     claim.add_argument("--lease-fd", required=True, type=int, choices=(9,))
     claim.add_argument("--checkpoint", required=True, type=lambda value: value if re.fullmatch(r"[0-9a-f]{64}", value) else (_ for _ in ()).throw(argparse.ArgumentTypeError("checkpoint must be lowercase SHA-256")))
     claim.add_argument("--capability", required=True)
+    smoke = commands.add_parser("smoke")
+    smoke.add_argument("action", choices=("observe",))
+    smoke.add_argument("--run-id", required=True)
+    smoke.add_argument("--observation-fixture", required=True)
     return root
 
 
 def main() -> int:
     arguments = parser().parse_args()
+    if arguments.mode == "smoke":
+        output = run_smoke(arguments)
+        sys.stdout.buffer.write(complete_object(output))
+        return 0
     if arguments.mode == "supervisor":
         operation = arguments.operation
         run_root = pathlib.Path(f"/opt/megacampus/backups/q12/{arguments.run_id}")
