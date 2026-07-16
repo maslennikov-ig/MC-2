@@ -133,11 +133,13 @@ and downtime/data impact, and obtain owner approval.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage.
-
-Resume from this handoff plus `.codex/stages/mc2-jz6y0/summary.md` at the
-resolved SHA of `origin/codex/self-hosted-qdrant-platform`; the remaining Q12
-work is the remote/live tail listed above.
+Full completion program authored (prompt-check pass): copy
+`docs/superpowers/prompts/2026-07-16-q12-full-completion-orchestrator.md`
+(authority: spec `…specs/2026-07-16-q12-full-completion-design.md` + plan
+`…plans/2026-07-16-q12-full-completion.md`; Phase A local D6/Root → B GHCR
+publish → C live cutover → D closeout; every remote/live and credentialed step
+owner-gated). Fallback: $orchestrator-stage from this handoff plus the stage
+summary at the resolved `origin/codex/self-hosted-qdrant-platform`.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
