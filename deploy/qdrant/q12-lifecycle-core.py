@@ -3545,6 +3545,148 @@ def d6_append_transcript(
     return path
 
 
+# --------------------------------------------------------------------------- #
+# Task 19 — sole D5 post-R narrowing, precommit race closure, restart authority.
+# --------------------------------------------------------------------------- #
+
+# After R the D6 probe (the sole exception to the D5 stop) may only finish its
+# already-started read-only protocol; Root may only extend its two D6 audit
+# objects.  Everything else — spawn/exec, mutation-capable connections, journal
+# rows, rollback/resource mutation, capabilities, receipts, final-writer state,
+# new children/sessions — stays forbidden between R and complete retirement.
+D6_POST_R_PROBE_ALLOWED = frozenset(
+    (
+        "emit_sealed",
+        "receive_release",
+        "read_only_commit",
+        "close_connection",
+        "emit_closed",
+        "exit",
+    )
+)
+D6_POST_R_ROOT_ALLOWED = frozenset(
+    (
+        "append_transcript",
+        "fsync_transcript",
+        "publish_terminal_seal",
+        "fsync_terminal_seal",
+        "prove_probe_exit",
+        "close_pipes",
+        "permit_task9_retirement",
+    )
+)
+# The precommit race hold: the probe keeps full SHARE + FD9 across this exact Root
+# ordering, so no W-bound activation path can pass its common incompatible lock.
+D6_PRECOMMIT_RACE_ORDER = (
+    "publish_predecision",
+    "append_r",
+    "fsync_r",
+    "obtain_sealed",
+    "release",
+    "receive_closed",
+    "observe_clean_exit",
+    "fsync_transcript",
+    "publish_terminal_seal",
+)
+
+
+def d6_post_r_allowed(actor: str, action: str) -> bool:
+    """Whether ``action`` by ``actor`` is inside the sole post-R narrowing."""
+    if actor == "probe":
+        return action in D6_POST_R_PROBE_ALLOWED
+    if actor == "root":
+        return action in D6_POST_R_ROOT_ALLOWED
+    raise LifecycleError(f"D6 unknown post-R actor: {actor}")
+
+
+def d6_precommit_race_order() -> list[str]:
+    """The exact ordered Root actions of the precommit race-closure interval."""
+    return list(D6_PRECOMMIT_RACE_ORDER)
+
+
+def d6_crash_authority(state: dict[str, Any]) -> str:
+    """Map a recovered durable state to its sole authority, per the crash rules.
+
+    - predecision, no R, continuous original transaction -> may continue;
+    - predecision, no R, not continuous -> abandoned (bind only as
+      abandoned_predecision_sha256, no reuse of classification/projections);
+    - durable R, no valid terminal seal -> incident-only;
+    - terminal seal, no R, committed, unique chain tip -> finish-forward only;
+    - terminal seal with exact R -> Task 9 post-R retirement/rollback prep only;
+    - incident terminal seal -> no mutation."""
+    if state.get("has_terminal_seal"):
+        outcome = state.get("seal_outcome")
+        if outcome == "drift_incident_sealed":
+            return "none"
+        if outcome == "precommit_rollback_sealed":
+            if not state.get("has_durable_r"):
+                raise LifecycleError("D6 precommit seal without durable R is incident")
+            return "task9_retirement_rollback_preparation"
+        if outcome == "committed_finish_forward_sealed":
+            if state.get("has_durable_r"):
+                raise LifecycleError("D6 committed finish-forward seal must not carry durable R")
+            if not state.get("unique_chain_tip"):
+                raise LifecycleError("D6 committed finish-forward seal is not the unique chain tip")
+            return "finish_forward"
+        raise LifecycleError(f"D6 unknown terminal seal outcome: {outcome}")
+    if state.get("has_durable_r"):
+        return "incident_only"
+    if state.get("has_predecision"):
+        return "continue" if state.get("continuity") else "abandoned"
+    return "none"
+
+
+def d6_lease_ordinal(epoch: str) -> int:
+    """Numeric lease order (`cutover`=0, `cutover-recovery-N`=N)."""
+    if not EPOCH_RE.match(epoch):
+        raise LifecycleError(f"D6 illegal lease epoch: {epoch}")
+    if epoch == "cutover":
+        return 0
+    return int(epoch.rsplit("-", 1)[1])
+
+
+def d6_select_restart_authority(
+    epochs: list[dict[str, Any]], canonical_head: str
+) -> dict[str, Any]:
+    """Select the unique terminal-seal chain tip bound to the canonical head.
+
+    Multiple tips, forked lineage, reused epochs, unbound/broken chains, or a stale
+    head (no tip matching the current journal/checkpoint head) are all incidents."""
+    seen: set[str] = set()
+    for epoch in epochs:
+        lease_epoch = epoch["lease_epoch"]
+        d6_lease_ordinal(lease_epoch)
+        if lease_epoch in seen:
+            raise LifecycleError("D6 restart: reused lease epoch")
+        seen.add(lease_epoch)
+        if not epoch.get("chain_ok"):
+            raise LifecycleError("D6 restart: unbound or broken hash chain")
+    ordered = sorted(epochs, key=lambda item: d6_lease_ordinal(item["lease_epoch"]))
+    seals = [item for item in ordered if item.get("terminal_seal")]
+    lineage = [
+        item["previous_terminal_seal"]
+        for item in seals
+        if item.get("previous_terminal_seal") is not None
+    ]
+    if len(lineage) != len(set(lineage)):
+        raise LifecycleError("D6 restart: forked terminal seal lineage")
+    tips = [
+        item
+        for item in seals
+        if item.get("predecessor_head") == canonical_head
+        or item.get("actual_r_head") == canonical_head
+    ]
+    if not tips:
+        raise LifecycleError("D6 restart: stale head, no terminal seal tip matches canonical head")
+    if len(tips) > 1:
+        raise LifecycleError("D6 restart: multiple terminal seal tips")
+    tip = tips[0]
+    return {
+        "lease_epoch": tip["lease_epoch"],
+        "authority": d6_terminal_seal_authority({"outcome": tip["seal_outcome"]}),
+    }
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Q12 retained barrier lifecycle")
     commands = root.add_subparsers(dest="mode", required=True)
