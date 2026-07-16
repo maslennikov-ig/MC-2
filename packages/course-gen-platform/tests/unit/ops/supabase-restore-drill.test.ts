@@ -965,7 +965,10 @@ describe('source manifest exact comparison', () => {
       catalog: Record<string, Array<Record<string, unknown>>>;
     };
     targetView.database.name = 'restore_test';
-    targetView.catalog.object_owners[0].owner = 'supabase_admin';
+    // postgres and supabase_admin collapse into one platform-actor token
+    // (.13.14 trusted provider plane), so the detected drift must target a
+    // non-platform role.
+    targetView.catalog.object_owners[0].owner = 'anon';
     writeJson(sourcePath, source);
     writeJson(targetPath, target);
 
@@ -983,6 +986,41 @@ describe('source manifest exact comparison', () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('manifest mismatch');
+  });
+
+  it('tolerates owner drift between the two platform-admin actors', () => {
+    const root = tempRoot();
+    const sourcePath = join(root, 'source-catalog.json');
+    const targetPath = join(root, 'target-catalog.json');
+    const source = sourceManifest();
+    const view = source.cutover_snapshot as { catalog: Record<string, unknown[]> };
+    view.catalog.object_owners = [
+      { object_type: 'index', schema: 'public', identity: 'courses_pkey', owner: 'postgres' },
+    ];
+    source.baseline = structuredClone(source.cutover_snapshot);
+    const target = structuredClone(source);
+    const targetView = target.cutover_snapshot as {
+      database: Record<string, unknown>;
+      catalog: Record<string, Array<Record<string, unknown>>>;
+    };
+    targetView.database.name = 'restore_test';
+    targetView.catalog.object_owners[0].owner = 'supabase_admin';
+    writeJson(sourcePath, source);
+    writeJson(targetPath, target);
+
+    const result = runTs(MANIFEST, [
+      'compare',
+      '--source',
+      sourcePath,
+      '--target',
+      targetPath,
+      '--view',
+      'cutover_snapshot',
+      '--target-database',
+      'restore_test',
+    ]);
+
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it('requires exact cluster-global role, setting, membership, and parameter ACL equality before restore', () => {

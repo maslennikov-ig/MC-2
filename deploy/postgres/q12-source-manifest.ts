@@ -732,6 +732,32 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
       return item.grantee !== item.owner;
     });
   }
+  // supautils switches privileged CREATE EXTENSION to the image superuser,
+  // so extension members restored on the pinned image are owned and
+  // self-granted by supabase_admin while the managed source recorded
+  // postgres. Both roles sit inside the accepted .13.14 provider-plane
+  // trust boundary, so they collapse to one actor token before comparison
+  // (drift to any other role is still detected), and the token-mapped rows
+  // are deduplicated because the two planes record the same grant once each.
+  const PLATFORM_OWNERS = new Set(['postgres', 'supabase_admin']);
+  const normalizeActor = (value: unknown): unknown =>
+    typeof value === 'string' && PLATFORM_OWNERS.has(value) ? 'platform-owner' : value;
+  for (const section of ['functions', 'object_owners', 'object_acls', 'default_acls'] as const) {
+    const entries = catalogObject[section];
+    if (!Array.isArray(entries)) continue;
+    const mapped = entries.map(entry => {
+      if (entry === null || typeof entry !== 'object') return entry;
+      const item = { ...(entry as JsonObject) };
+      for (const field of ['owner', 'grantor', 'grantee'] as const) {
+        if (field in item) item[field] = normalizeActor(item[field]);
+      }
+      return item;
+    });
+    const unique = new Map(mapped.map(item => [canonical(item), item] as const));
+    catalogObject[section] = [...unique.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([, item]) => item);
+  }
   for (const key of Object.keys(catalogObject)) {
     if (key.endsWith('_sha256')) delete catalogObject[key];
   }
