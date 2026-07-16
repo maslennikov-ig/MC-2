@@ -234,6 +234,29 @@ interface ProbeModule {
     readonly done: boolean;
     readonly headHash: string | null;
   };
+  // Task 12
+  PRODUCTION_ARGV: readonly string[];
+  assertProductionArgv(argv: readonly string[]): void;
+  assertProductionEnv(env: Record<string, string>): void;
+  assertRequiredFds(fdMap: Record<number, { access: string; lock_identity?: string }>): void;
+  assertFd3NeverHashed(hashedFds: readonly number[]): void;
+  // Task 13
+  classifyRuntimeFd(entry: { kind: string; access: string }): boolean;
+  assertRuntimeFdBaseline(input: {
+    node_sha256: string;
+    node_major: number;
+    node_minor: number;
+    libuv_version: string;
+    kernel_generation: string;
+    descriptors: Array<{ kind: string; access: string }>;
+    baseline: {
+      node_sha256: string;
+      node_major: number;
+      node_minor: number;
+      libuv_version: string;
+      kernel_generation: string;
+    };
+  }): void;
 }
 
 interface RunnerModule {
@@ -1106,6 +1129,65 @@ function makeHostFields(overrides: Record<string, unknown> = {}): Record<string,
     ...overrides,
   };
 }
+
+describe('Task 12 — production CLI/env/FD negatives (unit)', () => {
+  const ARGV = [
+    '/usr/bin/node',
+    '/opt/megacampus/packages/course-gen-platform/tools/qdrant/q12-activation-truth-probe.cjs',
+    'inspect',
+  ];
+  const ENV = { PATH: '/usr/bin', LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8', HOME: '/nonexistent' };
+  const FDS = {
+    3: { access: 'read' },
+    4: { access: 'read' },
+    5: { access: 'read' },
+    6: { access: 'read' },
+    7: { access: 'write' },
+    9: { access: 'lock', lock_identity: 'a'.repeat(64) },
+    10: { access: 'read' },
+    11: { access: 'read' },
+  };
+
+  it('accepts only the exact production argv', () => {
+    expect(probe.PRODUCTION_ARGV).toEqual(ARGV);
+    expect(() => probe.assertProductionArgv(ARGV)).not.toThrow();
+    expect(() => probe.assertProductionArgv([...ARGV, 'extra'])).toThrow();
+    expect(() => probe.assertProductionArgv(ARGV.slice(0, 2))).toThrow();
+    expect(() => probe.assertProductionArgv([ARGV[0], ARGV[1], 'observe'])).toThrow();
+  });
+
+  it('rejects NODE_OPTIONS, inherited env, and wrong locale', () => {
+    expect(() => probe.assertProductionEnv(ENV)).not.toThrow();
+    expect(() => probe.assertProductionEnv({ ...ENV, NODE_OPTIONS: '--inspect' })).toThrow(
+      /NODE_OPTIONS/i
+    );
+    expect(() => probe.assertProductionEnv({ ...ENV, INHERITED: 'x' })).toThrow();
+    expect(() => probe.assertProductionEnv({ ...ENV, LC_ALL: 'en_US.UTF-8' })).toThrow();
+    const noHome = { ...ENV } as Record<string, string>;
+    delete noHome.HOME;
+    expect(() => probe.assertProductionEnv(noHome)).toThrow(/HOME/i);
+  });
+
+  it('validates FD 3-7 and 9-11 identities/access and the FD9 lock identity', () => {
+    expect(() => probe.assertRequiredFds(FDS)).not.toThrow();
+    const missing = { ...FDS } as Record<number, { access: string; lock_identity?: string }>;
+    delete missing[5];
+    expect(() => probe.assertRequiredFds(missing)).toThrow(/fd\s*5|required/i);
+    expect(() => probe.assertRequiredFds({ ...FDS, 7: { access: 'read' } })).toThrow(
+      /fd\s*7|access/i
+    );
+    // FD 8 is closed/reserved; it must not appear.
+    expect(() => probe.assertRequiredFds({ ...FDS, 8: { access: 'read' } })).toThrow(
+      /fd\s*8|extra|reserved/i
+    );
+    expect(() => probe.assertRequiredFds({ ...FDS, 9: { access: 'lock' } })).toThrow(/lock/i);
+  });
+
+  it('forbids ever hashing FD 3 (the password-bearing URL)', () => {
+    expect(() => probe.assertFd3NeverHashed([4, 5, 9, 10, 11])).not.toThrow();
+    expect(() => probe.assertFd3NeverHashed([3, 4])).toThrow(/fd\s*3|secret|hash/i);
+  });
+});
 
 describe('Task 11 — request + frame payloads + protocol (unit)', () => {
   const HX = 'e'.repeat(64);
