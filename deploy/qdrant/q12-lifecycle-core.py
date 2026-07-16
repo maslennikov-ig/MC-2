@@ -3102,8 +3102,9 @@ def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any
 # D6 activation-truth Root coordinator.
 #
 # D6 is a private child of the Root lifecycle supervisor: it adds no manifest
-# command, systemd unit, cron job, Compose service, shell command, or operator
-# argv.  Everything below drives the Root spawn boundary, pidfd/proc/OFD gates,
+# command, no scheduled unit, no periodic job, no compose target, no shell
+# command, and no operator argv.  Everything below drives the Root spawn
+# boundary, pidfd/proc/OFD gates,
 # the predecision -> optional durable R -> final transcript -> terminal seal
 # authority graph, and the sole post-R D5 narrowing.  No live/remote action is
 # taken here; the pinned-server capability observations (atomic
