@@ -367,22 +367,24 @@ Only
 is executable for the `.13.7` database backup/restore gate. Command snippets in
 older `.13.7` stage artifacts are historical evidence and must not be run.
 
-1. the downloaded Supabase Root 2021 CA is valid, but exhaustive read-only
-   discovery found zero working credentials among 16 unique candidates and six
-   complete external URIs. The only plausible server file, `.env.backup`, is
-   stale. An authorized Supabase owner must supply or rotate a current URL that
-   passes the required `sslmode=verify-full` and `sslrootcert` preflight;
-2. database-backup gate `mc2-jz6y0.13.7` remains open. The observed
-   `/opt/megacampus/backups` parent is mode `0775`, and every scheduled file
-   produced since 2026-06-28 is a 20-byte fail-open empty stream, not valid
-   backup evidence. The previous substantive 2026-06-27 file has aged out, so
-   retained usable backups are zero. Before any migration, correct the parent
-   ownership/mode, install the reviewed `deploy/postgres/backup-supabase.sh`
-   operator and its owner-only URL/CA inputs, and publish a complete immutable
-   four-file generation bound to one exported snapshot. The generation is
-   accepted only after its custom archive, password-free roles export, source
-   verification manifest, checksum manifest, and exact pinned-image isolated
-   restore all pass;
+1. RESOLVED 2026-07-16: the owner-authorized Session pooler DSN is installed
+   owner-only at `/opt/megacampus/secrets/supabase_db_url` (0600) together
+   with the hash-pinned Supabase Root 2021 CA, and passed the
+   `sslmode=verify-full` preflight against PostgreSQL `17.6`;
+2. RESOLVED 2026-07-16: database-backup gate `mc2-jz6y0.13.7` is COMPLETE.
+   The backup parent is corrected, the reviewed operator plus helpers are
+   installed root-owned under `/opt/megacampus/deploy`, the legacy fail-open
+   cron is suspended with root-owned rollback evidence, and the fixed-hash
+   installer finished its canonical proof cycle: a fresh scheduled four-file
+   generation (`generation-20260716T105950Z-11196fff-…`) published under the
+   full systemd hardening, the isolated Supabase-PG17 restore drill passed
+   (cluster-global, cutover, and baseline manifest equality; size ratio
+   0.724; zero residue), and the daily `00:30 Europe/Amsterdam` timer is
+   enabled and active. Host prerequisites installed for the operators:
+   Node.js 22 (`/usr/local/bin/node`), standalone pnpm 8.15.0 at
+   `/usr/bin/pnpm`, and a tsx 4.21.0 project at `/opt/megacampus`. The
+   PG17 document-evidence security-manifest digests were computed on the
+   isolated restore and added to the live-gate allowlists;
 3. the accepted read-only source audit found 261 catalog rows: 240 are
    Qdrant-eligible and 21 are `missing_course`. Forty-two exact no-replace
    copies can raise recoverable eligible sources from 109 to 234; exact
@@ -500,13 +502,28 @@ unlabelled name collisions are never removed. Cleanup failure overrides
 restore success. The authoritative Docker lifecycle is defined inside the
 restore entrypoint itself; it never sources mutable sibling shell code before
 argument, capability, or tracked-byte validation.
-The offline archive scan and the restored database both prove the exact pgTLE
-control/SQL function pairs `basejump-supabase_test_helpers=0.0.6` and
-`supabase-dbdev=0.0.5`. This representation is pinned to AWS `pg_tle` v1.4.0
+The offline archive scan and the restored database both prove the frozen
+pgTLE packages `basejump-supabase_test_helpers=0.0.6` and
+`supabase-dbdev=0.0.5`: exactly one control function per package, the pinned
+version script present, and the control `default_version` equal to the pin.
+pg_tle retains the whole installed version chain plus upgrade scripts as
+additional `"<package>--<from>[--<to>].sql"` functions; the exact function
+set is pinned by the source-versus-restored catalog equality. This representation is pinned to AWS `pg_tle` v1.4.0
 (released 2025-03-19), whose extension implementation stores packages as
 `<name>.control` and `<name>--<version>.sql` functions; reviewed sources:
 `https://github.com/aws/pg_tle/releases/tag/v1.4.0` and
 `https://github.com/aws/pg_tle/blob/v1.4.0/src/tleextension.c#L4508-L4589`.
+
+A real disaster-recovery restore (as opposed to the drill's equality proof)
+has two documented manual follow-ups on the restored copy, both excluded from
+the automated comparison because dump/restore cannot carry them: re-grant the
+`graphql`/`graphql_public` schema USAGE to `anon`/`authenticated` (their ACLs
+belong to extension-managed schemas), and note that extension members restored
+on the pinned image are owned by `supabase_admin` while the managed plane
+records `postgres` — an accepted `.13.14` provider-plane residual. The live
+managed `postgres` role also literally stores a backslash-escaped
+`search_path="\$user", …` setting (an old escaping artifact) that the restore
+reproduces byte-for-byte.
 
 The broken cron line remains disabled. Its only replacement is the tracked
 `megacampus-supabase-backup.service` and `.timer`: execution identity
