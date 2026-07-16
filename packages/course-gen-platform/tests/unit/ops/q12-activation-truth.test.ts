@@ -105,6 +105,32 @@ interface ProbeModule {
     expected: { backend_pid: number; backend_start_utc: string },
     observed: { backend_pid: number; backend_start_utc: string }
   ): void;
+  // Task 4
+  CAPABILITY_SCHEMA_VERSION: string;
+  VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH: string;
+  normalizeLockRow(raw: Record<string, unknown>): {
+    qualified_name: string;
+    oid: number;
+    maintain: boolean;
+    update: boolean;
+    delete: boolean;
+    truncate: boolean;
+    lock_authorized: boolean;
+  };
+  assertLockRowsAuthorized(rows: Array<Record<string, unknown>>): void;
+  resolveActivityVisibility(input: {
+    member: boolean;
+    wEquivalentDefinitionHash?: string | null;
+  }): { mode: string; definition_hash: string };
+  assertClearSnapshotExecuted(flag: unknown): void;
+  buildCapabilityObject(input: {
+    session_user: string;
+    current_database: string;
+    server_version_num: number;
+    rows: Array<Record<string, unknown>>;
+    visibility: { member: boolean; wEquivalentDefinitionHash?: string | null };
+    clear_snapshot_executed: boolean;
+  }): Record<string, unknown>;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -640,5 +666,193 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     ).toThrow();
   });
 
+  it('Task 4 — projects capability + per-OID lock privilege over the fixture catalog', () => {
+    const { psql } = dockerFns;
+    const template = PROJECTION_TEMPLATES.get('capability_lock_rows') ?? '';
+    const json = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SELECT pg_catalog.pg_stat_clear_snapshot();
+       SELECT pg_catalog.jsonb_agg(t.row ORDER BY (t.row->>'qualified_name'))
+       FROM (
+         SELECT pg_catalog.jsonb_build_object(
+           'qualified_name', s.qualified_name,
+           'oid', s.oid,
+           'maintain', s.priv_maintain,
+           'update', s.priv_update,
+           'delete', s.priv_delete,
+           'truncate', s.priv_truncate
+         ) AS row
+         FROM (
+           ${template.replace(/;\s*$/, '')}
+         ) s
+       ) t;
+       COMMIT;`
+    );
+    const rowLine = json.split('\n').find(line => line.trim().startsWith('['));
+    expect(rowLine, json).toBeDefined();
+    const rawRows = JSON.parse(rowLine as string) as Array<Record<string, unknown>>;
+    expect(rawRows.length).toBe(ORDER_RELATIONS.length);
+    // As the owning superuser postgres, every relation is lock-authorized.
+    const capability = probe.buildCapabilityObject({
+      session_user: 'postgres',
+      current_database: 'postgres',
+      server_version_num: 170010,
+      rows: rawRows,
+      visibility: { member: true },
+      clear_snapshot_executed: true,
+    });
+    expect(Object.keys(capability).sort()).toEqual(
+      [
+        'activity_visibility_mode',
+        'activity_visibility_sha256',
+        'clear_snapshot_executed',
+        'current_database',
+        'lock_privilege_sha256',
+        'lock_relation_count',
+        'schema_version',
+        'server_version_num',
+        'session_user',
+      ].sort()
+    );
+    expect(capability.lock_relation_count).toBe(ORDER_RELATIONS.length);
+    expect(capability.schema_version).toBe(probe.CAPABILITY_SCHEMA_VERSION);
+    expect(capability.activity_visibility_mode).toBe('pg_read_all_stats_member');
+  });
+
+  it('Task 4 — a revoked strong privilege makes a relation fail the lock gate', () => {
+    const { psql } = dockerFns;
+    const target = ORDER_RELATIONS.find(r => r.startsWith('public.')) as string;
+    psql(`
+      DROP ROLE IF EXISTS q12_unpriv;
+      CREATE ROLE q12_unpriv NOLOGIN;
+      GRANT MAINTAIN, UPDATE, DELETE, TRUNCATE ON ${target} TO q12_unpriv;
+    `);
+    try {
+      const authorized = psql(
+        `SELECT pg_catalog.has_table_privilege('q12_unpriv', '${target}', 'UPDATE');`
+      );
+      expect(authorized).toBe('t');
+      psql(`REVOKE MAINTAIN, UPDATE, DELETE, TRUNCATE ON ${target} FROM q12_unpriv;`);
+      const rowJson = psql(
+        `SELECT pg_catalog.jsonb_build_object(
+           'qualified_name', '${target}',
+           'oid', ('${target}')::regclass::oid::int8,
+           'maintain', pg_catalog.has_table_privilege('q12_unpriv', '${target}', 'MAINTAIN'),
+           'update', pg_catalog.has_table_privilege('q12_unpriv', '${target}', 'UPDATE'),
+           'delete', pg_catalog.has_table_privilege('q12_unpriv', '${target}', 'DELETE'),
+           'truncate', pg_catalog.has_table_privilege('q12_unpriv', '${target}', 'TRUNCATE')
+         )::text;`
+      );
+      const rowLine = rowJson.split('\n').find(line => line.trim().startsWith('{')) as string;
+      const raw = JSON.parse(rowLine) as Record<string, unknown>;
+      const normalized = probe.normalizeLockRow(raw);
+      expect(normalized.lock_authorized).toBe(false);
+      expect(() => probe.assertLockRowsAuthorized([raw])).toThrow(/authorized/i);
+    } finally {
+      psql('DROP ROLE IF EXISTS q12_unpriv;');
+    }
+  });
+
+  it('Task 4 — clears the stats snapshot and proves pg_read_all_stats membership', () => {
+    const { psql } = dockerFns;
+    expect(psql('SELECT pg_catalog.pg_stat_clear_snapshot() IS NULL;')).toBe('t');
+    const member = psql(
+      "SELECT pg_catalog.pg_has_role('postgres', 'pg_read_all_stats', 'MEMBER');"
+    );
+    expect(member).toBe('t');
+    const resolved = probe.resolveActivityVisibility({ member: member === 't' });
+    expect(resolved.mode).toBe('pg_read_all_stats_member');
+    expect(resolved.definition_hash).toBe(probe.VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH);
+  });
+
   // @@CONTAINER_TESTS_END
+});
+
+describe('Task 4 — capability projection + visibility (unit)', () => {
+  const baseRow = {
+    qualified_name: 'public.q12_relation',
+    oid: 16384,
+    maintain: false,
+    update: true,
+    delete: false,
+    truncate: false,
+  };
+
+  it('normalizes a lock row and derives lock_authorized as the OR of strong privileges', () => {
+    expect(probe.normalizeLockRow(baseRow).lock_authorized).toBe(true);
+    expect(
+      probe.normalizeLockRow({ ...baseRow, update: false, maintain: true }).lock_authorized
+    ).toBe(true);
+    expect(
+      probe.normalizeLockRow({
+        ...baseRow,
+        maintain: false,
+        update: false,
+        delete: false,
+        truncate: false,
+      }).lock_authorized
+    ).toBe(false);
+  });
+
+  it('rejects a security-restricted null in any required privilege field', () => {
+    expect(() => probe.normalizeLockRow({ ...baseRow, update: null })).toThrow(/null/i);
+    expect(() => probe.normalizeLockRow({ ...baseRow, maintain: undefined })).toThrow();
+  });
+
+  it('fails the lock gate on an unauthorized, duplicate, or empty row set', () => {
+    expect(() => probe.assertLockRowsAuthorized([baseRow])).not.toThrow();
+    expect(() =>
+      probe.assertLockRowsAuthorized([
+        { ...baseRow, maintain: false, update: false, delete: false, truncate: false },
+      ])
+    ).toThrow(/authorized/i);
+    expect(() => probe.assertLockRowsAuthorized([baseRow, baseRow])).toThrow(/duplicate/i);
+    expect(() => probe.assertLockRowsAuthorized([])).toThrow(/empty|no rows/i);
+  });
+
+  it('resolves visibility only via pg_read_all_stats or a W-accepted equivalent digest', () => {
+    expect(probe.resolveActivityVisibility({ member: true }).mode).toBe('pg_read_all_stats_member');
+    const wHash = 'b'.repeat(64);
+    expect(
+      probe.resolveActivityVisibility({ member: false, wEquivalentDefinitionHash: wHash })
+    ).toEqual({ mode: 'w_accepted_equivalent', definition_hash: wHash });
+    // No membership and no accepted equivalent is a hard stop (D6 cannot invent).
+    expect(() => probe.resolveActivityVisibility({ member: false })).toThrow(/visibility/i);
+    expect(() =>
+      probe.resolveActivityVisibility({ member: false, wEquivalentDefinitionHash: 'not-hex' })
+    ).toThrow();
+  });
+
+  it('blocks when the snapshot clear did not execute', () => {
+    expect(() => probe.assertClearSnapshotExecuted(true)).not.toThrow();
+    expect(() => probe.assertClearSnapshotExecuted(false)).toThrow(/snapshot/i);
+  });
+
+  it('builds the 9-key capability object with derived hashes', () => {
+    const capability = probe.buildCapabilityObject({
+      session_user: 'postgres',
+      current_database: 'postgres',
+      server_version_num: 170010,
+      rows: [baseRow],
+      visibility: { member: true },
+      clear_snapshot_executed: true,
+    });
+    expect(capability.lock_relation_count).toBe(1);
+    expect(capability.activity_visibility_sha256).toBe(
+      probe.VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH
+    );
+    expect(capability.lock_privilege_sha256).toBe(
+      probe.canonicalHash([probe.normalizeLockRow(baseRow)])
+    );
+    expect(() =>
+      probe.buildCapabilityObject({
+        session_user: 'postgres',
+        current_database: 'postgres',
+        server_version_num: 170010,
+        rows: [{ ...baseRow, update: false, maintain: false, delete: false, truncate: false }],
+        visibility: { member: true },
+        clear_snapshot_executed: true,
+      })
+    ).toThrow(/authorized/i);
+  });
 });
