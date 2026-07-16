@@ -1306,7 +1306,22 @@ function reportManifestDiff(expected: unknown, actual: unknown): void {
     if (canonical(left) === canonical(right)) return;
     const leftIsObject = left !== null && typeof left === 'object';
     const rightIsObject = right !== null && typeof right === 'object';
-    if (leftIsObject && rightIsObject && Array.isArray(left) === Array.isArray(right)) {
+    if (Array.isArray(left) && Array.isArray(right)) {
+      // Arrays are compared as canonical sets so one missing element does
+      // not cascade into index-shifted noise.
+      const leftSet = new Map(left.map(item => [canonical(item), item]));
+      const rightSet = new Map(right.map(item => [canonical(item), item]));
+      for (const [key, item] of leftSet) {
+        if (!rightSet.has(key))
+          lines.push(`${path}: source-only ${JSON.stringify(item)?.slice(0, 220)}`);
+      }
+      for (const [key, item] of rightSet) {
+        if (!leftSet.has(key))
+          lines.push(`${path}: target-only ${JSON.stringify(item)?.slice(0, 220)}`);
+      }
+      return;
+    }
+    if (leftIsObject && rightIsObject) {
       const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
       for (const key of [...keys].sort()) {
         walk((left as JsonObject)[key], (right as JsonObject)[key], `${path}/${key}`);
