@@ -40,11 +40,11 @@ status: returned
 delivery_method: not accepted
 accepted_by_orchestrator: no
 cleanup_status: not_applicable
-cleanup_notes: Implementation stream returned to the orchestrator for Step 3 (independent correctness + docs review, integration, and workspace cleanup). The q12-root-join worktree/branch are retained until the orchestrator reviews and integrates base..head; no cleanup was performed by this stream.
+cleanup_notes: Step 3 complete — independent correctness review PASS 0/0/0/5 (mc2-jz6y0.13.13-join-review.md) and docs review PASS 0/0/0/1 (mc2-jz6y0.13.13-docs-review.md); integrated at merge fcd05e27 with two orchestrator integration deltas (runbook genesis-null clause per docs F1; probe raw-NUL sort-separator escaped to \u0000 for text-tooling health, suites re-green). The five correctness P3s are accepted informational notes recorded in the join review artifact. Worktrees q12-root-join/q12-d6-probe/q12-d6-root and local branches removed after integration.
 risk_level: high
 docs_impact: ops-deploy
 docs_reviewed: updated
-docs_review_notes: Added the joined-controller subsection (smoke/observation gate and activation-truth handshake, local synthetic only, no live claims) to docs/operations/qdrant-self-hosted.md and a cross-reference in docs/operations/document-evidence.md. Independent docs review is Step 3.
+docs_review_notes: Added the joined-controller subsection (smoke/observation gate and activation-truth handshake, local synthetic only, no live claims) to docs/operations/qdrant-self-hosted.md and a cross-reference in docs/operations/document-evidence.md. Independent docs review PASS 0/0/0/1; its sole P3 (genesis-null clause) fixed at integration.
 graph_reviewed: no-change-needed
 graph_review_notes: Graphify refresh is deferred to the stage-closeout boundary per the accepted plan; this isolated worktree performs read/query only and the write zone forbids graph changes.
 verification:

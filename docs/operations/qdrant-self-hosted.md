@@ -567,8 +567,10 @@ The activation-truth R handshake is a chained frame transcript
 closed` for a completed handshake, ending at `abort_incident` for a drift
 abort). Each frame carries `schema_version, sequence, kind, run_id, payload,
 previous_frame_sha256, frame_sha256`; `frame_sha256` is the SHA-256 over the
-frame's canonical body excluding that field, the sequence starts at 1, and every
-frame chains the prior tip. All hashing is over the in-memory canonical form, so
+frame's canonical body excluding that field, the sequence starts at 1 with the
+genesis frame's `previous_frame_sha256` being JSON `null` (the probe and the
+controller both enforce this sentinel), and every subsequent frame chains the
+prior tip. All hashing is over the in-memory canonical form, so
 validation-at-load parses each stored frame, re-derives `frame_sha256` from the
 canonical object, and re-verifies the chain — it never hashes raw file bytes.
 The controller binds the transcript head immediately before the predecision into

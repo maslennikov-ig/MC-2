@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: ALL safe local Q12 correction work complete, and D6 `.13.19` is implemented and integrated at `3d70eaf2` on the ratified 11/11 W tuple (field 11 ratified `72af414c`); Root `.13.13` join is the next local stream; remote/live activation remains NO-GO until the owner-gated window
+Status: Phase A of the Q12 Full Completion program is COMPLETE — D6 `.13.19` (integrated `3d70eaf2`, closed) and Root `.13.13` join (integrated `fcd05e27`, reviews PASS) on the ratified 11/11 W tuple; next is Phase B GHCR publication (owner-gated); remote/live activation remains NO-GO until the owner-gated window
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: integration HEAD `3d70eaf2` (D6 merges `7f511691`+`3d70eaf2`, field-11 ratification `72af414c`) on top of `a73a3651`, which carries D5J `66e41cb5`, W FLIP `60910053`, H `70bf6103`, tuple addendum `3da324d8`, D6 contract/plan docs `d1627f1c`, M merge from tip `29d73d04`
+Current accepted integration evidence: integration HEAD `fcd05e27` (Root-join merge on D6 merges `7f511691`+`3d70eaf2`, field-11 ratification `72af414c`, docs slice `8717f7ac`) on top of `a73a3651`, which carries D5J `66e41cb5`, W FLIP `60910053`, H `70bf6103`, tuple addendum `3da324d8`, D6 contract/plan docs `d1627f1c`, M merge from tip `29d73d04`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
-Implementation scope: Q1-Q11, E1-E7, the full Q12 local correction wave, `.13.7` (delivered), field-11 ratification, and D6 `.13.19` are accepted. The remaining tail: Root `.13.13` join (local), then GHCR publication, the live-cutover window (incl. the C7 fields-5/6/8/9 re-freeze), `.13.8` rotation (owner-deferred), `.13.6` S3. Live execution remains fail-closed.
+Implementation scope: Q1-Q11, E1-E7, the full Q12 local correction wave, `.13.7` (delivered), field-11 ratification, and D6 `.13.19` are accepted. The remaining tail: GHCR publication, the live-cutover window (incl. the C7 fields-5/6/8/9 re-freeze), `.13.8` rotation (owner-deferred), `.13.6` S3, `.25` retention YAML. Live execution remains fail-closed.
 
 ## Q12 D5 Plan Acceptance (2026-07-14)
 
@@ -533,6 +533,27 @@ closed. Local evidence at `b97a827b`: ops+scripts battery 761 passed /
 - Remote-gate scope unchanged: pinned-server capability gates
   (POSIX_SPAWN_CLOSEFROM, pidfd/ptrace/Yama, production CA acceptance) are
   flagged, never faked; no live/remote action occurred.
+
+## Q12 Root .13.13 Join (2026-07-16)
+
+- Integrated at `fcd05e27` from `codex/q12-root-join` (`dc6c2093`): the
+  smoke/observation gate (`deploy/qdrant/q12-live-smoke.sh` → core
+  `smoke observe`; 13 thresholds byte-sourced from the 2026-07-13
+  cutover-corrections §13, fail-closed, every terminal verdict sets
+  `rotation_required=true`) and the D6 real frame envelope + R-handshake
+  join (d6_build_frame/emit/validate/load/bind; validation-at-load parses →
+  canonical() → hash per the Named convention; genesis
+  `previous_frame_sha256=null` verified consistent with the probe).
+- Reviews: correctness PASS 0/0/0/5 (`mc2-jz6y0.13.13-join-review.md`),
+  docs PASS 0/0/0/1 (`mc2-jz6y0.13.13-docs-review.md`, drove the evaluator
+  live on accept/breach fixtures). Integration deltas: runbook genesis-null
+  clause; probe raw-NUL sort separator escaped to `\u0000`.
+- Frozen bytes unchanged: manifest `aaec6fc2…`, barrier `134255ce…`,
+  wrappers and `q12-live-cutover.test.ts` byte-identical.
+- Final Phase A matrix at the join head: focused battery 463/463
+  (`MC2_Q12_REAL_PG17=1`, 10 files), broad ops+scripts 952/953 (sole
+  failure = known `QDRANT_METRICS_GID` env case), `pnpm type-check` 0,
+  `pnpm build` 75/75, process verification OK.
 
 ## Explicit Defers
 

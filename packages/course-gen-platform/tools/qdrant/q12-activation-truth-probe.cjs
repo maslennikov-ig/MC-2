@@ -1042,7 +1042,7 @@ function observedSortKey(row) {
     row.backend_type,
     row.application_identity,
     row.client_class,
-  ].join(' ');
+  ].join('\u0000');
 }
 
 /**
