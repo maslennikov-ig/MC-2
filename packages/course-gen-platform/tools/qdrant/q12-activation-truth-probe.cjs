@@ -1899,6 +1899,108 @@ class ProbeProtocol {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 12 — production CLI negatives (contract "Fixed retained commands and
+// production process", "Root spawn boundary", "Secrets, observability and
+// recovery limits"). The only accepted argv/env are fixed; the probe validates
+// FD 3-7 and 9-11 identities/access and the FD 9 lock identity before any DB
+// work; FD 3 (the password-bearing URL) is never hashed or logged.
+// ---------------------------------------------------------------------------
+
+const PRODUCTION_ARGV = Object.freeze([
+  '/usr/bin/node',
+  '/opt/megacampus/packages/course-gen-platform/tools/qdrant/q12-activation-truth-probe.cjs',
+  'inspect',
+]);
+
+const PRODUCTION_ENV_KEYS = Object.freeze(['HOME', 'LANG', 'LC_ALL', 'PATH']);
+
+const FD_ACCESS_CONTRACT = Object.freeze({
+  3: 'read',
+  4: 'read',
+  5: 'read',
+  6: 'read',
+  7: 'write',
+  9: 'lock',
+  10: 'read',
+  11: 'read',
+});
+
+/**
+ * @param {readonly string[]} argv
+ */
+function assertProductionArgv(argv) {
+  if (
+    !Array.isArray(argv) ||
+    argv.length !== PRODUCTION_ARGV.length ||
+    argv.some((token, index) => token !== PRODUCTION_ARGV[index])
+  ) {
+    throw new Error('assertProductionArgv: argv is not the exact accepted production argv');
+  }
+}
+
+/**
+ * @param {Record<string, string>} env
+ */
+function assertProductionEnv(env) {
+  if (env === null || typeof env !== 'object') {
+    throw new Error('assertProductionEnv: env must be an object');
+  }
+  if ('NODE_OPTIONS' in env) {
+    throw new Error('assertProductionEnv: NODE_OPTIONS must be absent');
+  }
+  const keys = Object.keys(env).sort();
+  if (keys.length !== PRODUCTION_ENV_KEYS.length || keys.some((k, i) => k !== PRODUCTION_ENV_KEYS[i])) {
+    throw new Error('assertProductionEnv: only PATH, LC_ALL, LANG, and HOME are accepted');
+  }
+  if (env.LC_ALL !== 'C.UTF-8') throw new Error("assertProductionEnv: LC_ALL must be 'C.UTF-8'");
+  if (env.LANG !== 'C.UTF-8') throw new Error("assertProductionEnv: LANG must be 'C.UTF-8'");
+  if (typeof env.PATH !== 'string' || env.PATH.length === 0) {
+    throw new Error('assertProductionEnv: PATH must be a non-empty string');
+  }
+  if (typeof env.HOME !== 'string' || env.HOME.length === 0) {
+    throw new Error('assertProductionEnv: HOME must be a fixed non-writable path');
+  }
+}
+
+/**
+ * Validate the required FD 3-7 and 9-11 identities/access modes and the FD 9
+ * lock identity. FD 8 is closed/reserved and must not appear.
+ * @param {Record<number, {access: string, lock_identity?: string}>} fdMap
+ */
+function assertRequiredFds(fdMap) {
+  const required = Object.keys(FD_ACCESS_CONTRACT).map(Number);
+  const provided = Object.keys(fdMap).map(Number);
+  for (const fd of provided) {
+    if (!(fd in FD_ACCESS_CONTRACT)) {
+      throw new Error(`assertRequiredFds: FD ${fd} is extra/reserved and must not be present`);
+    }
+  }
+  for (const fd of required) {
+    const entry = fdMap[fd];
+    if (entry === undefined) {
+      throw new Error(`assertRequiredFds: required FD ${fd} is missing`);
+    }
+    if (entry.access !== FD_ACCESS_CONTRACT[fd]) {
+      throw new Error(`assertRequiredFds: FD ${fd} access must be '${FD_ACCESS_CONTRACT[fd]}'`);
+    }
+    if (fd === 9 && (typeof entry.lock_identity !== 'string' || !HEX64.test(entry.lock_identity))) {
+      throw new Error('assertRequiredFds: FD 9 must carry a lock identity (64-hex)');
+    }
+  }
+}
+
+/**
+ * Assert FD 3 is never among the hashed descriptors (the password-bearing URL
+ * hash would be an offline oracle).
+ * @param {readonly number[]} hashedFds
+ */
+function assertFd3NeverHashed(hashedFds) {
+  if (Array.isArray(hashedFds) && hashedFds.includes(3)) {
+    throw new Error('assertFd3NeverHashed: FD 3 (secret URL) must never be hashed or logged');
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -1963,6 +2065,13 @@ module.exports = {
   validatePredecisionPayload,
   validateReleasePayload,
   ProbeProtocol,
+  PRODUCTION_ARGV,
+  PRODUCTION_ENV_KEYS,
+  FD_ACCESS_CONTRACT,
+  assertProductionArgv,
+  assertProductionEnv,
+  assertRequiredFds,
+  assertFd3NeverHashed,
 };
 
 // ---------------------------------------------------------------------------
