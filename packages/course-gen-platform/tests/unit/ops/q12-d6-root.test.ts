@@ -160,3 +160,158 @@ describe('Task 17 — D6 pidfd / ptrace / proc / OFD gates', () => {
     expect(result.contention).toBe(false);
   });
 });
+
+const PREDECISION_KEYS = [
+  'abandoned_predecision_sha256',
+  'action',
+  'bound_database_projection_sha256',
+  'classification',
+  'host_projection_sha256',
+  'initial_database_projection_sha256',
+  'lease_epoch',
+  'planned_r_checkpoint_sha256',
+  'planned_r_journal_entry_hash',
+  'predecessor_checkpoint_sha256',
+  'predecessor_journal_entry_hash',
+  'previous_terminal_seal_sha256',
+  'request_sha256',
+  'run_id',
+  'schema_version',
+  'transcript_head_before_predecision_sha256',
+];
+
+const TERMINAL_SEAL_KEYS = [
+  'activation_evidence_state',
+  'activation_process_projection_sha256',
+  'activation_result_sha256',
+  'actual_r_checkpoint_sha256',
+  'actual_r_journal_entry_hash',
+  'barrier_receipt_sha256',
+  'connection_closed',
+  'fd9_identity_sha256',
+  'final_database_projection_sha256',
+  'final_transcript_head_sha256',
+  'host_projection_sha256',
+  'initial_database_projection_sha256',
+  'lease_epoch',
+  'outcome',
+  'predecision_sha256',
+  'prepared_quiesced_predecessor_sha256',
+  'probe_exit_status',
+  'probe_pidfd_identity_sha256',
+  'probe_receipt_sha256',
+  'process_manifest_sha256',
+  'request_sha256',
+  'run_id',
+  'schema_version',
+  'spawn_capability_sha256',
+  'transaction_end',
+  'writer_quiesce_manifest_sha256',
+];
+
+describe('Task 18 — D6 predecision / optional-R / terminal-seal authority', () => {
+  it('builds the exact 16-key predecision with the exact classification/action pair', () => {
+    for (const [classification, action] of [
+      ['precommit_rollback', 'append_r_then_seal'],
+      ['committed_finish_forward', 'seal_finish_forward'],
+      ['drift_incident', 'abort_incident'],
+    ] as const) {
+      const result = runScenario({ scenario: 'predecision', classification });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.keys).toEqual(PREDECISION_KEYS);
+      const predecision = result.predecision as Record<string, unknown>;
+      expect(predecision.action).toBe(action);
+      if (classification === 'precommit_rollback') {
+        expect(predecision.planned_r_journal_entry_hash).not.toBeNull();
+        expect(predecision.planned_r_checkpoint_sha256).not.toBeNull();
+      } else {
+        expect(predecision.planned_r_journal_entry_hash).toBeNull();
+        expect(predecision.planned_r_checkpoint_sha256).toBeNull();
+      }
+    }
+  });
+
+  it('rejects an unknown classification, a wrong action, and illegal planned-R nullability', () => {
+    expect(runScenario({ scenario: 'predecision', classification: 'made_up' }).ok).toBe(false);
+    expect(
+      runScenario({
+        scenario: 'predecision',
+        classification: 'precommit_rollback',
+        overrides: { action: 'seal_finish_forward' },
+      }).ok
+    ).toBe(false);
+    // finish-forward must have null planned R
+    expect(
+      runScenario({
+        scenario: 'predecision',
+        classification: 'committed_finish_forward',
+        overrides: { planned_r_journal_entry_hash: 'a'.repeat(64) },
+      }).ok
+    ).toBe(false);
+  });
+
+  it('builds the exact 26-key terminal seal with the correct outcome and authority', () => {
+    for (const [classification, outcome, authority] of [
+      ['precommit_rollback', 'precommit_rollback_sealed', 'task9_retirement_rollback_preparation'],
+      ['committed_finish_forward', 'committed_finish_forward_sealed', 'finish_forward'],
+      ['drift_incident', 'drift_incident_sealed', 'none'],
+    ] as const) {
+      const result = runScenario({ scenario: 'terminal_seal', classification });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.keys).toEqual(TERMINAL_SEAL_KEYS);
+      expect(result.outcome).toBe(outcome);
+      expect(result.authority).toBe(authority);
+    }
+  });
+
+  it('rejects a terminal seal with a non-zero exit, wrong end literals, or bad actual-R nullability', () => {
+    const bad = (overrides: Record<string, unknown>) =>
+      runScenario({ scenario: 'terminal_seal', classification: 'precommit_rollback', overrides })
+        .ok;
+    expect(bad({ probe_exit_status: 1 })).toBe(false);
+    expect(bad({ transaction_end: 'rollback' })).toBe(false);
+    expect(bad({ connection_closed: false })).toBe(false);
+    // committed outcome must carry null actual R
+    expect(
+      runScenario({
+        scenario: 'terminal_seal',
+        classification: 'committed_finish_forward',
+        overrides: { actual_r_journal_entry_hash: 'a'.repeat(64) },
+      }).ok
+    ).toBe(false);
+    // evidence state must match the classification
+    expect(
+      runScenario({
+        scenario: 'terminal_seal',
+        classification: 'drift_incident',
+        overrides: { activation_evidence_state: 'complete_receipt' },
+      }).ok
+    ).toBe(false);
+  });
+
+  it('publishes request/predecision/seal 0400 and transcript 0600 with seal-last, incident-only R', () => {
+    const result = runScenario({
+      scenario: 'publish_authority',
+      classification: 'precommit_rollback',
+    });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.request_mode).toBe('0o400');
+    expect(result.predecision_mode).toBe('0o400');
+    expect(result.seal_mode).toBe('0o400');
+    expect(result.transcript_mode).toBe('0o600');
+    const trace = result.trace as string[];
+    const req = trace.indexOf('request:published');
+    const pre = trace.indexOf('predecision:published');
+    const seal = trace.indexOf('terminal-seal:published');
+    const fsync = trace.lastIndexOf('transcript:fsynced');
+    expect(req).toBeGreaterThanOrEqual(0);
+    expect(pre).toBeGreaterThan(req);
+    expect(seal).toBeGreaterThan(pre);
+    // the append-only transcript is fsynced before the terminal seal is published
+    expect(fsync).toBeGreaterThan(-1);
+    expect(fsync).toBeLessThan(seal);
+    // a durable R with no valid terminal seal is incident-only, never finish-forward
+    expect(result.authority_without_seal).toBe('incident_only');
+    expect(result.authority_with_seal).toBe('task9_retirement_rollback_preparation');
+  });
+});

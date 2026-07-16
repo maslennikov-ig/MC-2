@@ -17,11 +17,13 @@ and print exactly one JSON object ``{"ok": true, ...}`` or ``{"ok": false,
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
 import pathlib
 import signal
+import stat as stat_module
 import sys
 import tempfile
 
@@ -271,7 +273,142 @@ TASK17 = {
 }
 
 
-DISPATCH = {**TASK16, **TASK17}
+# --------------------------------------------------------------------------- #
+# Task 18 — Root predecision, optional R and terminal seal authority
+# --------------------------------------------------------------------------- #
+
+RUN_ID = "3b241101-e2bb-4255-8caf-4136c566a962"
+
+
+def _sha(tag: str) -> str:
+    return hashlib.sha256(tag.encode("utf-8")).hexdigest()
+
+
+def _predecision_fields(classification: str, overrides: dict | None = None) -> dict:
+    precommit = classification == "precommit_rollback"
+    fields = {
+        "schema_version": "megacampus.q12.activation-truth-predecision/v1",
+        "run_id": RUN_ID,
+        "lease_epoch": "cutover",
+        "request_sha256": _sha("request"),
+        "classification": classification,
+        "action": CORE.D6_CLASSIFICATION_ACTION.get(classification, "?"),
+        "initial_database_projection_sha256": _sha("idb"),
+        "bound_database_projection_sha256": _sha("bdb"),
+        "host_projection_sha256": _sha("host"),
+        "transcript_head_before_predecision_sha256": _sha("thead"),
+        "predecessor_journal_entry_hash": _sha("pje"),
+        "predecessor_checkpoint_sha256": _sha("pcp"),
+        "planned_r_journal_entry_hash": _sha("rje") if precommit else None,
+        "planned_r_checkpoint_sha256": _sha("rcp") if precommit else None,
+        "previous_terminal_seal_sha256": None,
+        "abandoned_predecision_sha256": None,
+    }
+    fields.update(overrides or {})
+    return fields
+
+
+def _seal_fields(classification: str, predecision: dict, overrides: dict | None = None) -> dict:
+    precommit = classification == "precommit_rollback"
+    evidence = {
+        "precommit_rollback": "prepared_guarded",
+        "committed_finish_forward": "complete_receipt",
+        "drift_incident": "incident_observed",
+    }[classification]
+    fields = {
+        "schema_version": "megacampus.q12.activation-truth-terminal-seal/v1",
+        "run_id": predecision["run_id"],
+        "lease_epoch": predecision["lease_epoch"],
+        "outcome": CORE.D6_OUTCOME.get(classification, "?"),
+        "request_sha256": predecision["request_sha256"],
+        "predecision_sha256": _sha("predecision"),
+        "final_transcript_head_sha256": _sha("ftranscript"),
+        "initial_database_projection_sha256": predecision["initial_database_projection_sha256"],
+        "final_database_projection_sha256": _sha("fdb"),
+        "host_projection_sha256": predecision["host_projection_sha256"],
+        "activation_evidence_state": evidence,
+        "actual_r_journal_entry_hash": predecision["planned_r_journal_entry_hash"] if precommit else None,
+        "actual_r_checkpoint_sha256": predecision["planned_r_checkpoint_sha256"] if precommit else None,
+        "probe_pidfd_identity_sha256": _sha("pidfd"),
+        "fd9_identity_sha256": _sha("fd9"),
+        "spawn_capability_sha256": _sha("spawn"),
+        "prepared_quiesced_predecessor_sha256": _sha("pqp"),
+        "writer_quiesce_manifest_sha256": _sha("wqm"),
+        "barrier_receipt_sha256": _sha("barrier"),
+        "probe_receipt_sha256": _sha("probe"),
+        "activation_result_sha256": _sha("result") if classification == "committed_finish_forward" else None,
+        "activation_process_projection_sha256": _sha("app"),
+        "process_manifest_sha256": None,
+        "probe_exit_status": 0,
+        "transaction_end": "read_only_commit",
+        "connection_closed": True,
+    }
+    fields.update(overrides or {})
+    return fields
+
+
+def scenario_predecision(payload: dict) -> dict:
+    fields = _predecision_fields(payload["classification"], payload.get("overrides"))
+    predecision = CORE.d6_build_predecision(fields)
+    return {"ok": True, "keys": sorted(predecision), "predecision": predecision}
+
+
+def scenario_terminal_seal(payload: dict) -> dict:
+    classification = payload["classification"]
+    predecision = CORE.d6_build_predecision(_predecision_fields(classification))
+    fields = _seal_fields(classification, predecision, payload.get("overrides"))
+    seal = CORE.d6_build_terminal_seal(fields, predecision)
+    return {
+        "ok": True,
+        "keys": sorted(seal),
+        "outcome": seal["outcome"],
+        "authority": CORE.d6_terminal_seal_authority(seal),
+    }
+
+
+def scenario_publish_authority(payload: dict) -> dict:
+    classification = payload["classification"]
+    sandbox = pathlib.Path(tempfile.mkdtemp(prefix="q12-d6-seal-"))
+    run_dir = sandbox / "run"
+    os.mkdir(run_dir, 0o700)
+    predecision = CORE.d6_build_predecision(_predecision_fields(classification))
+    seal = CORE.d6_build_terminal_seal(
+        _seal_fields(classification, predecision), predecision
+    )
+    trace: list[str] = []
+    CORE.d6_publish_immutable_object(run_dir, "request", "cutover", {"k": "request"}, trace)
+    CORE.d6_append_transcript(run_dir, "cutover", {"frame": 1}, trace)
+    CORE.d6_publish_immutable_object(run_dir, "predecision", "cutover", predecision, trace)
+    # A durable R with no valid terminal seal is incident-only, never authority.
+    without_seal = CORE.d6_authority_without_seal(predecision)
+    CORE.d6_append_transcript(run_dir, "cutover", {"frame": 2}, trace)
+    CORE.d6_publish_immutable_object(run_dir, "terminal-seal", "cutover", seal, trace)
+
+    def mode_of(name: str) -> str:
+        path = run_dir / f"activation-truth-{name}-cutover.json"
+        return oct(stat_module.S_IMODE(os.lstat(path).st_mode))
+
+    transcript = run_dir / "activation-truth-transcript-cutover.jsonl"
+    return {
+        "ok": True,
+        "trace": trace,
+        "request_mode": mode_of("request"),
+        "predecision_mode": mode_of("predecision"),
+        "seal_mode": mode_of("terminal-seal"),
+        "transcript_mode": oct(stat_module.S_IMODE(os.lstat(transcript).st_mode)),
+        "authority_without_seal": without_seal,
+        "authority_with_seal": CORE.d6_terminal_seal_authority(seal),
+    }
+
+
+TASK18 = {
+    "predecision": scenario_predecision,
+    "terminal_seal": scenario_terminal_seal,
+    "publish_authority": scenario_publish_authority,
+}
+
+
+DISPATCH = {**TASK16, **TASK17, **TASK18}
 
 
 def main() -> int:
