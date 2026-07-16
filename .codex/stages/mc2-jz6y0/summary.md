@@ -1,11 +1,11 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: ALL safe local Q12 correction work complete — W `.13.10`, M `.13.11`, H `.13.12`, D5J `.13.21`/`.13.22` closed and integrated at `a73a3651`; D6 `.13.19` and Root `.13.13` are blocked explicit defers on the live-only W-tuple field 11; remote/live activation remains NO-GO
+Status: ALL safe local Q12 correction work complete, and D6 `.13.19` is implemented and integrated at `3d70eaf2` on the ratified 11/11 W tuple (field 11 ratified `72af414c`); Root `.13.13` join is the next local stream; remote/live activation remains NO-GO until the owner-gated window
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
-Current accepted integration evidence: integration HEAD `a73a3651` carries D5J `66e41cb5`, W FLIP `60910053`, H `70bf6103`, tuple addendum `3da324d8`, D6 contract/plan docs `d1627f1c`, M merge `a73a3651` from tip `29d73d04`
+Current accepted integration evidence: integration HEAD `3d70eaf2` (D6 merges `7f511691`+`3d70eaf2`, field-11 ratification `72af414c`) on top of `a73a3651`, which carries D5J `66e41cb5`, W FLIP `60910053`, H `70bf6103`, tuple addendum `3da324d8`, D6 contract/plan docs `d1627f1c`, M merge from tip `29d73d04`
 Integration branch: pushed `codex/self-hosted-qdrant-platform`; resolve the current remote SHA before continuation
-Implementation scope: Q1-Q11, E1-E7, and the full Q12 local correction wave are accepted. The remaining Q12 tail is remote/live only: `.13.7` backup/restore drill (plus the PG17 digest), `.13.8` rotation, field-11/RE-FREEZE + D6 + Root in the live window, `.13.6` S3. Live execution remains fail-closed.
+Implementation scope: Q1-Q11, E1-E7, the full Q12 local correction wave, `.13.7` (delivered), field-11 ratification, and D6 `.13.19` are accepted. The remaining tail: Root `.13.13` join (local), then GHCR publication, the live-cutover window (incl. the C7 fields-5/6/8/9 re-freeze), `.13.8` rotation (owner-deferred), `.13.6` S3. Live execution remains fail-closed.
 
 ## Q12 D5 Plan Acceptance (2026-07-14)
 
@@ -494,6 +494,45 @@ closed. Local evidence at `b97a827b`: ops+scripts battery 761 passed /
 - Q12 remains open until every live gate and observation passes; authorization
   is recorded, while accepted correction code, a truthful fresh backup/restore,
   and the complete local verification matrix remain hard stops.
+
+## Q12 D6 Activation-Truth Implementation (2026-07-16)
+
+- Field 11 RATIFIED at `72af414c` (pushed): independent review PASS P0/P1
+  zero (P2=1 F1 carried as the `.13.14` residual note, P3=2); canonical hash
+  `c90edb78…` reproduced; inventory renamed to
+  `deploy/qdrant/q12-managed-session-inventory.json`; unit pin test 5/5.
+  W tuple is now 11/11; the live-boundary checklist retains only the fields
+  5/6/8/9 production re-freeze (Task C7).
+- D6 `.13.19` implemented per frozen contract `2a2251ac…` in two disjoint
+  worktree streams and integrated at `3d70eaf2` (merges `7f511691`,
+  `3d70eaf2`):
+  - Stream 1 probe (Tasks 1-14): review PASS 0/0/2/4 → corrections (real
+    CLI runtime assembly with a single injectable runtime-I/O seam, all
+    production URL/CA/PG17 pins hardcoded; session_activity sentinel
+    COALESCE with real-background-row PG17 proof; `pg_catalog.coalesce`→
+    `COALESCE` latent fix, SQL rebound `36d28034…`) → delta PASS → DF1
+    3-point snapshot discipline (orchestrator-upgraded; deterministic
+    mid-run-drift RED proof) → 80/80 focused.
+  - Stream 2 root (Tasks 15-19): review PASS 0/0/1/4 → corrections (NFC
+    canonical, after-read secret revalidation) → delta PASS → final round
+    (descriptor rewind before child FD3/FD4 mapping; seal-predecision
+    binding enforced in restart authority) → 337/337 focused; five retained
+    commands + manifest `aaec6fc2…` proven byte-unchanged (Task 15 guard).
+  - Orchestrator rulings recorded in `mc2-jz6y0.13.19-q12-d6.md`: contract
+    ownership table governs stream split; Task 15 second-file waived
+    (max-lines cap); Stream-2 two-file test extension authorized;
+    `projection_sql_sha256` binds the FD-11 file's own hash; Named hashing
+    convention (in-memory canonical NFC no-LF; files canonical+LF
+    storage-only; validation-at-load parses then hashes) — binding for
+    `.13.13`; cross-language byte parity proven (`764d1b37…`).
+  - Integration matrix at `3d70eaf2`: focused D6+W battery 424/424
+    (`MC2_Q12_REAL_PG17=1`); broad ops+scripts 913/914 (sole failure is the
+    known `qdrant-observability-contract.test.ts:223` env failure);
+    `pnpm type-check` 0; `pnpm build` 75/75; process verification OK;
+    fields 5-10 repro byte-identical incl. recovery slice `c41cf104…`.
+- Remote-gate scope unchanged: pinned-server capability gates
+  (POSIX_SPAWN_CLOSEFROM, pidfd/ptrace/Yama, production CA acceptance) are
+  flagged, never faked; no live/remote action occurred.
 
 ## Explicit Defers
 
