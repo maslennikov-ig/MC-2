@@ -1133,7 +1133,10 @@ describe('Supabase-compatible isolated restore entrypoint', () => {
     expect(script).toContain(
       'sha256:4c6d67181e482549bab276e8ae933f807be59ea1c371c225d85c189b0c14b9de'
     );
-    expect(script).toContain('docker network create --internal');
+    expect(script).toContain(
+      'network create --opt com.docker.network.bridge.enable_ip_masquerade=false'
+    );
+    expect(script).not.toContain('network create --internal');
     expect(script).toContain('127.0.0.1::5432');
     expect(script).toContain('/var/lib/postgresql/data');
     expect(script).toContain('POSTGRES_PASSWORD_FILE=/run/secrets/initial-password');

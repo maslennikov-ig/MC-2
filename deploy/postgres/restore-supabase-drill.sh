@@ -173,7 +173,11 @@ create_restore_docker_resources() {
   network_name=$(restore_docker_expected_name network)
   volume_name=$(restore_docker_expected_name volume)
 
-  "$DOCKER" network create --internal \
+  # A Docker --internal network never publishes ports, so host loopback
+  # access is provided by a dedicated bridge with IP masquerade disabled:
+  # the kernel-assigned 127.0.0.1 publish stays reachable while container
+  # egress is dropped without NAT.
+  "$DOCKER" network create --opt com.docker.network.bridge.enable_ip_masquerade=false \
     --label "com.megacampus.q12.restore-run=$RUN_ID" \
     --label 'com.megacampus.q12.restore-resource=network' "$network_name" \
     >"$TEMP_ROOT/network-create.identity"
@@ -580,7 +584,7 @@ main() {
   write_secret "$TEMP_ROOT/restore-password" "$restore_password"
   write_secret "$TEMP_ROOT/cleanup-password" "$cleanup_password"
 
-  # Exact isolation contract: docker network create --internal, 127.0.0.1::5432,
+  # Exact isolation contract: masquerade-free dedicated network, 127.0.0.1::5432,
   # POSTGRES_PASSWORD_FILE=/run/secrets/initial-password, and one data mount.
   create_restore_docker_resources || fail 'isolated Docker resource creation failed'
   wait_ready
