@@ -158,6 +158,22 @@ interface ProbeModule {
     activation_acquired_after_release: boolean;
     activation_committed: boolean;
   }): void;
+  // Task 7
+  INVENTORY_SCHEMA_VERSION: string;
+  MANAGED_PROJECT_REF: string;
+  MANAGED_SOURCE_DECISION_SHA256: string;
+  PROBE_APP_IDENTITY: string;
+  OBSERVED_ROW_KEYS: readonly string[];
+  consumeManagedInventory(
+    text: string,
+    options: { expectedInventorySha256: string }
+  ): Record<string, unknown>;
+  projectObservedRow(raw: Record<string, unknown>): Record<string, unknown>;
+  buildSessionObservation(
+    inventory: Record<string, unknown>,
+    rawRows: Array<Record<string, unknown>>,
+    options: { probePid: number }
+  ): { rows: Array<Record<string, unknown>>; sha256: string };
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -913,7 +929,166 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     psql(`DELETE FROM ${common} WHERE id = 987654;`);
   }, 60_000);
 
+  it('Task 7 — projects the probe backend row from real pg_stat_activity', () => {
+    const { psql } = dockerFns;
+    const out = psql(
+      `SELECT pg_catalog.pg_stat_clear_snapshot();
+       SELECT pg_catalog.jsonb_build_object(
+         'role', sa.usename, 'database', sa.datname, 'backend_type', sa.backend_type,
+         'application_identity', sa.application_name, 'client_class', 'probe',
+         'state', sa.state,
+         'xact_start_is_null', (sa.xact_start IS NULL),
+         'backend_xid_is_null', (sa.backend_xid IS NULL),
+         'backend_xmin_is_null', (sa.backend_xmin IS NULL),
+         'pid', sa.pid,
+         'backend_start_utc', pg_catalog.to_char(sa.backend_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+       )::text
+       FROM pg_catalog.pg_stat_activity sa
+       WHERE sa.pid = pg_catalog.pg_backend_pid();`,
+      'megacampus-q12-activation-truth'
+    );
+    const line = out.split('\n').find(l => l.trim().startsWith('{')) as string;
+    const raw = JSON.parse(line) as Record<string, unknown>;
+    const projected = probe.projectObservedRow(raw);
+    expect(Object.keys(projected).sort()).toEqual([...probe.OBSERVED_ROW_KEYS].sort());
+    expect(projected.role).toBe('postgres');
+    expect(projected.database).toBe('postgres');
+    expect(projected.application_identity).toBe('megacampus-q12-activation-truth');
+    expect(projected.state).toBe('active');
+    expect(typeof projected.pid).toBe('number');
+  });
+
   // @@CONTAINER_TESTS_END
+});
+
+describe('Task 7 — managed inventory + session projection + drift (unit)', () => {
+  const INVENTORY_TEXT = readFileSync(
+    resolve(REPO_ROOT, 'deploy/qdrant/q12-managed-session-inventory.json'),
+    'utf8'
+  );
+  const PROBE_PID = 4242;
+  const probeRow = {
+    role: 'postgres',
+    database: 'postgres',
+    backend_type: 'client backend',
+    application_identity: 'megacampus-q12-activation-truth',
+    client_class: 'probe',
+    state: 'active',
+    xact_start_is_null: false,
+    backend_xid_is_null: true,
+    backend_xmin_is_null: false,
+    pid: PROBE_PID,
+    backend_start_utc: '2026-07-16T00:00:00.000Z',
+  };
+  const bgRow = {
+    role: '',
+    database: '',
+    backend_type: 'background writer',
+    application_identity: '',
+    client_class: 'provider-background',
+    state: 'none',
+    xact_start_is_null: true,
+    backend_xid_is_null: true,
+    backend_xmin_is_null: true,
+    pid: 55,
+    backend_start_utc: '2026-07-16T00:00:00.000Z',
+  };
+  const postgrestRow = {
+    role: 'authenticator',
+    database: 'postgres',
+    backend_type: 'client backend',
+    application_identity: 'postgrest',
+    client_class: 'application-client',
+    state: 'idle',
+    xact_start_is_null: true,
+    backend_xid_is_null: true,
+    backend_xmin_is_null: true,
+    pid: 77,
+    backend_start_utc: '2026-07-16T00:00:00.000Z',
+  };
+
+  it('consumes the immutable inventory and binds its ratified hash (field 11)', () => {
+    const inventory = probe.consumeManagedInventory(INVENTORY_TEXT, {
+      expectedInventorySha256: W_TUPLE.managed_inventory_sha256,
+    });
+    expect((inventory.identities as unknown[]).length).toBe(14);
+    expect(inventory.project_ref).toBe('diqooqbuchsliypgwksu');
+    expect(inventory.source_decision_sha256).toBe(
+      '7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27'
+    );
+  });
+
+  it('rejects a tampered inventory or a wrong expected hash', () => {
+    expect(() =>
+      probe.consumeManagedInventory(INVENTORY_TEXT + ' ', {
+        expectedInventorySha256: W_TUPLE.managed_inventory_sha256,
+      })
+    ).toThrow();
+    expect(() =>
+      probe.consumeManagedInventory(INVENTORY_TEXT, { expectedInventorySha256: 'f'.repeat(64) })
+    ).toThrow(/hash|inventory/i);
+  });
+
+  it('projects an observed row to exactly the 11 keys and lowercases state', () => {
+    const projected = probe.projectObservedRow({ ...postgrestRow, state: 'IDLE' });
+    expect(Object.keys(projected).sort()).toEqual([...probe.OBSERVED_ROW_KEYS].sort());
+    expect(projected.state).toBe('idle');
+    expect(() => probe.projectObservedRow({ ...postgrestRow, state: null })).toThrow(/null/i);
+    expect(() => probe.projectObservedRow({ ...postgrestRow, xact_start_is_null: null })).toThrow(
+      /null/i
+    );
+  });
+
+  it('builds a sorted, deterministic session observation with the probe exception', () => {
+    const inventory = probe.consumeManagedInventory(INVENTORY_TEXT, {
+      expectedInventorySha256: W_TUPLE.managed_inventory_sha256,
+    });
+    const a = probe.buildSessionObservation(inventory, [probeRow, bgRow, postgrestRow], {
+      probePid: PROBE_PID,
+    });
+    const b = probe.buildSessionObservation(inventory, [postgrestRow, probeRow, bgRow], {
+      probePid: PROBE_PID,
+    });
+    expect(a.sha256).toBe(b.sha256);
+    expect(a.rows.length).toBe(3);
+    // bytewise ascending by the first five identity fields then pid.
+    const sortKeys = a.rows.map(r =>
+      [r.role, r.database, r.backend_type, r.application_identity, r.client_class, r.pid].join(' ')
+    );
+    expect([...sortKeys].sort()).toEqual(sortKeys);
+  });
+
+  it('detects drift on unknown identity, disallowed state, and transaction-free violations', () => {
+    const inventory = probe.consumeManagedInventory(INVENTORY_TEXT, {
+      expectedInventorySha256: W_TUPLE.managed_inventory_sha256,
+    });
+    // Unknown 4-tuple identity.
+    expect(() =>
+      probe.buildSessionObservation(
+        inventory,
+        [probeRow, { ...postgrestRow, application_identity: 'intruder' }],
+        { probePid: PROBE_PID }
+      )
+    ).toThrow(/unknown|identity/i);
+    // Disallowed state for the probe (only 'active' is allowed).
+    expect(() =>
+      probe.buildSessionObservation(inventory, [{ ...probeRow, state: 'idle' }], {
+        probePid: PROBE_PID,
+      })
+    ).toThrow(/state/i);
+    // A required transaction-free background worker with a live transaction.
+    expect(() =>
+      probe.buildSessionObservation(
+        inventory,
+        [probeRow, { ...bgRow, xact_start_is_null: false }],
+        { probePid: PROBE_PID }
+      )
+    ).toThrow(/transaction[-_ ]?free|drift/i);
+    // Missing probe row.
+    expect(() =>
+      probe.buildSessionObservation(inventory, [bgRow, postgrestRow], { probePid: PROBE_PID })
+    ).toThrow(/probe/i);
+  });
 });
 
 describe('Task 6 — common-lock digest binding + conflict outcome (unit)', () => {
