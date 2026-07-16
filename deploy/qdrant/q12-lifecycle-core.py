@@ -3339,6 +3339,212 @@ def d6_assert_proc_continuity(pid: int, baseline: tuple[str, str, str]) -> None:
         raise LifecycleError("D6 probe process identity is not continuous")
 
 
+# --------------------------------------------------------------------------- #
+# Task 18 — predecision, optional durable R and terminal seal.
+#
+# Authority graph (acyclic): request -> predecision -> optional durable R/checkpoint
+# -> final transcript -> terminal seal.  Only a validated terminal seal authorizes
+# finish-forward or post-R Task 9 retirement.  A durable R without a valid terminal
+# seal is incident-only.  Schema-version strings are a Root determination (the
+# contract fixes the key sets, the outcome/action literals and the H/N rules).
+# --------------------------------------------------------------------------- #
+
+D6_PREDECISION_KEYS = (
+    "schema_version",
+    "run_id",
+    "lease_epoch",
+    "request_sha256",
+    "classification",
+    "action",
+    "initial_database_projection_sha256",
+    "bound_database_projection_sha256",
+    "host_projection_sha256",
+    "transcript_head_before_predecision_sha256",
+    "predecessor_journal_entry_hash",
+    "predecessor_checkpoint_sha256",
+    "planned_r_journal_entry_hash",
+    "planned_r_checkpoint_sha256",
+    "previous_terminal_seal_sha256",
+    "abandoned_predecision_sha256",
+)
+D6_TERMINAL_SEAL_KEYS = (
+    "schema_version",
+    "run_id",
+    "lease_epoch",
+    "outcome",
+    "request_sha256",
+    "predecision_sha256",
+    "final_transcript_head_sha256",
+    "initial_database_projection_sha256",
+    "final_database_projection_sha256",
+    "host_projection_sha256",
+    "activation_evidence_state",
+    "actual_r_journal_entry_hash",
+    "actual_r_checkpoint_sha256",
+    "probe_pidfd_identity_sha256",
+    "fd9_identity_sha256",
+    "spawn_capability_sha256",
+    "prepared_quiesced_predecessor_sha256",
+    "writer_quiesce_manifest_sha256",
+    "barrier_receipt_sha256",
+    "probe_receipt_sha256",
+    "activation_result_sha256",
+    "activation_process_projection_sha256",
+    "process_manifest_sha256",
+    "probe_exit_status",
+    "transaction_end",
+    "connection_closed",
+)
+D6_CLASSIFICATION_ACTION = {
+    "precommit_rollback": "append_r_then_seal",
+    "committed_finish_forward": "seal_finish_forward",
+    "drift_incident": "abort_incident",
+}
+D6_OUTCOME = {
+    "precommit_rollback": "precommit_rollback_sealed",
+    "committed_finish_forward": "committed_finish_forward_sealed",
+    "drift_incident": "drift_incident_sealed",
+}
+D6_EVIDENCE_STATES = {
+    "precommit_rollback": ("prepared_guarded",),
+    "committed_finish_forward": ("complete_receipt", "committed_receipt_pending"),
+    "drift_incident": ("incident_observed",),
+}
+D6_TERMINAL_SEAL_AUTHORITY = {
+    "precommit_rollback_sealed": "task9_retirement_rollback_preparation",
+    "committed_finish_forward_sealed": "finish_forward",
+    "drift_incident_sealed": "none",
+}
+
+
+def d6_build_predecision(fields: dict[str, Any]) -> dict[str, Any]:
+    """Validate and return the exact 16-key predecision object.
+
+    Predecision is atomically published/fsynced before optional R; it is never
+    finish-forward, rollback, retirement, recovery, or operator authority by itself."""
+    if set(fields) != set(D6_PREDECISION_KEYS):
+        raise LifecycleError("D6 predecision key set mismatch")
+    classification = fields["classification"]
+    if classification not in D6_CLASSIFICATION_ACTION:
+        raise LifecycleError(f"D6 unknown classification: {classification}")
+    if fields["action"] != D6_CLASSIFICATION_ACTION[classification]:
+        raise LifecycleError("D6 predecision classification/action pair mismatch")
+    planned = (fields["planned_r_journal_entry_hash"], fields["planned_r_checkpoint_sha256"])
+    if classification == "precommit_rollback":
+        if any(value is None for value in planned):
+            raise LifecycleError("D6 precommit predecision requires both planned R hashes")
+    elif any(value is not None for value in planned):
+        raise LifecycleError("D6 non-precommit predecision requires null planned R hashes")
+    return {key: fields[key] for key in D6_PREDECISION_KEYS}
+
+
+def d6_build_terminal_seal(
+    fields: dict[str, Any], predecision: dict[str, Any]
+) -> dict[str, Any]:
+    """Validate and return the exact 26-key terminal seal, bound to its predecision.
+
+    Published only after exact `closed`, clean probe exit, final transcript fsync and
+    continuity verification; it binds probe_exit_status=0, transaction_end=
+    read_only_commit, connection_closed=true, and equals the predecision classification
+    and the host projection."""
+    if set(fields) != set(D6_TERMINAL_SEAL_KEYS):
+        raise LifecycleError("D6 terminal seal key set mismatch")
+    classification = predecision["classification"]
+    if fields["outcome"] != D6_OUTCOME[classification]:
+        raise LifecycleError("D6 terminal seal outcome does not match predecision classification")
+    if fields["activation_evidence_state"] not in D6_EVIDENCE_STATES[classification]:
+        raise LifecycleError("D6 terminal seal evidence state illegal for classification")
+    actual = (fields["actual_r_journal_entry_hash"], fields["actual_r_checkpoint_sha256"])
+    planned = (
+        predecision["planned_r_journal_entry_hash"],
+        predecision["planned_r_checkpoint_sha256"],
+    )
+    if classification == "precommit_rollback":
+        if any(value is None for value in actual):
+            raise LifecycleError("D6 precommit seal actual R must be non-null")
+        if actual != planned:
+            raise LifecycleError("D6 precommit seal actual R must byte-equal predecision planned R")
+    elif any(value is not None for value in actual):
+        raise LifecycleError("D6 non-precommit seal actual R must be null")
+    if fields["probe_exit_status"] != 0:
+        raise LifecycleError("D6 terminal seal requires probe_exit_status 0")
+    if fields["transaction_end"] != "read_only_commit":
+        raise LifecycleError("D6 terminal seal requires transaction_end read_only_commit")
+    if fields["connection_closed"] is not True:
+        raise LifecycleError("D6 terminal seal requires connection_closed true")
+    for key in (
+        "run_id",
+        "lease_epoch",
+        "request_sha256",
+        "host_projection_sha256",
+        "initial_database_projection_sha256",
+    ):
+        if fields[key] != predecision[key]:
+            raise LifecycleError(f"D6 terminal seal {key} disagrees with predecision")
+    return {key: fields[key] for key in D6_TERMINAL_SEAL_KEYS}
+
+
+def d6_terminal_seal_authority(seal: dict[str, Any]) -> str:
+    """Return the sole authority a validated terminal seal confers."""
+    outcome = seal["outcome"]
+    if outcome not in D6_TERMINAL_SEAL_AUTHORITY:
+        raise LifecycleError(f"D6 unknown terminal seal outcome: {outcome}")
+    return D6_TERMINAL_SEAL_AUTHORITY[outcome]
+
+
+def d6_authority_without_seal(predecision: dict[str, Any]) -> str:
+    """A durable R with no valid terminal seal is incident-only; predecision alone
+    never authorizes finish-forward, rollback, retirement, recovery, or activation."""
+    if "classification" not in predecision:
+        raise LifecycleError("D6 authority check requires a predecision object")
+    return "incident_only"
+
+
+def d6_publish_immutable_object(
+    run_dir: pathlib.Path, name: str, epoch: str, obj: dict[str, Any], trace: list[str]
+) -> pathlib.Path:
+    """Atomically publish one immutable 0400 D6 object under the run-owned directory."""
+    require_lexical_absolute(run_dir)
+    path = run_dir / f"activation-truth-{name}-{epoch}.json"
+    temp = run_dir / f"activation-truth-{name}-{epoch}.json.tmp"
+    data = complete_object(obj)
+    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        offset = 0
+        while offset < len(data):
+            offset += os.write(descriptor, data[offset:])
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.chmod(temp, 0o400)
+    rename_noreplace(temp, path)
+    fsync_directory(run_dir)
+    trace.append(f"{name}:published")
+    return path
+
+
+def d6_append_transcript(
+    run_dir: pathlib.Path, epoch: str, frame: dict[str, Any], trace: list[str]
+) -> pathlib.Path:
+    """Append one frame to the 0600 append-only transcript and fsync it."""
+    require_lexical_absolute(run_dir)
+    path = run_dir / f"activation-truth-transcript-{epoch}.jsonl"
+    line = canonical(frame) + b"\n"
+    descriptor = os.open(
+        path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600
+    )
+    try:
+        offset = 0
+        while offset < len(line):
+            offset += os.write(descriptor, line[offset:])
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.chmod(path, 0o600)
+    trace.append("transcript:fsynced")
+    return path
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Q12 retained barrier lifecycle")
     commands = root.add_subparsers(dest="mode", required=True)
