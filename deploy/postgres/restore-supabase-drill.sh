@@ -481,6 +481,12 @@ for label in database.get("security_labels", []):
 for setting in manifest["cutover_snapshot"].get("role_settings", []):
     if setting.get("database") is not None:
         post.append(f"ALTER ROLE {ident(setting['role'])} IN DATABASE restore_test SET {ident(setting['name'])} TO {literal(setting['value'])};")
+# pg_dump never carries ALTER DATABASE SET values, so the captured database
+# settings are replayed here; search_path is a list-input GUC and stays
+# verbatim while scalars keep exact literal quoting.
+for name, value in database.get("settings", []):
+    rendered = value if name == "search_path" else literal(value)
+    post.append(f"ALTER DATABASE restore_test SET {ident(name)} TO {rendered};")
 pathlib.Path(sys.argv[3]).write_text("\n".join(post) + "\n", encoding="utf-8")
 PY
   /usr/bin/chmod 600 -- "$TEMP_ROOT/create-database.sql" "$TEMP_ROOT/database-post.sql"

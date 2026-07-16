@@ -92,7 +92,7 @@ function sourceManifest(): Record<string, unknown> {
     allow_connections: true,
     is_template: false,
     acl: [],
-    settings: [['default_transaction_read_only', 'on']],
+    settings: [['app.settings.jwt_exp', '3600']],
     comment: null,
     security_labels: [],
   };
@@ -787,7 +787,9 @@ describe('source manifest exact comparison', () => {
       `${accepted.error?.message ?? ''}\n${accepted.stdout}\n${accepted.stderr}`
     ).toBe(0);
 
-    targetCutover.extensions[1].owner = 'postgres';
+    // postgres<->supabase_admin collapse into the platform-actor token, so
+    // detectable extension-owner drift must target a non-platform role.
+    targetCutover.extensions[1].owner = 'anon';
     writeJson(targetPath, target);
     const drift = runTs(MANIFEST, [
       'compare',

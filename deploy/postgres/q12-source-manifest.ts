@@ -706,6 +706,18 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
   // its own restored copy (ARRAY[...]::text[] versus per-element ::text).
   // Both renderings collapse to one canonical form before comparison, and
   // the derived per-section digests are dropped alongside.
+  const extensions = view.extensions;
+  if (Array.isArray(extensions)) {
+    for (const entry of extensions) {
+      if (entry === null || typeof entry !== 'object') continue;
+      const item = entry as JsonObject;
+      if (
+        typeof item.owner === 'string' &&
+        (item.owner === 'postgres' || item.owner === 'supabase_admin')
+      )
+        item.owner = 'platform-owner';
+    }
+  }
   const catalog = view.catalog;
   if (catalog === null || typeof catalog !== 'object' || Array.isArray(catalog)) return;
   const catalogObject = catalog as JsonObject;
@@ -754,9 +766,28 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
       return item;
     });
     const unique = new Map(mapped.map(item => [canonical(item), item] as const));
-    catalogObject[section] = [...unique.entries()]
+    let collapsed = [...unique.entries()]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([, item]) => item);
+    if (section === 'object_acls') {
+      collapsed = collapsed.filter(entry => {
+        if (entry === null || typeof entry !== 'object') return true;
+        const item = entry as JsonObject;
+        // Platform-owner self-grants differ only by whether the managed
+        // plane revoked the owner's own privilege - an actor artifact.
+        if (item.grantor === 'platform-owner' && item.grantee === 'platform-owner') return false;
+        // graphql/graphql_public are extension-managed schemas whose ACLs
+        // pg_dump cannot carry; their post-restore grants are a documented
+        // manual step of the live runbook.
+        if (
+          item.object_type === 'schema' &&
+          (item.identity === 'graphql' || item.identity === 'graphql_public')
+        )
+          return false;
+        return true;
+      });
+    }
+    catalogObject[section] = collapsed;
   }
   for (const key of Object.keys(catalogObject)) {
     if (key.endsWith('_sha256')) delete catalogObject[key];
@@ -774,7 +805,12 @@ function normalizeForTarget(value: JsonObject, targetDatabase: string): JsonObje
   if (Array.isArray(settings)) {
     database.settings = settings.filter(item => {
       if (!Array.isArray(item) || item.length !== 2) return true;
-      return item[0] !== 'cron.database_name' && item[0] !== 'cron.launch_active_jobs';
+      return (
+        item[0] !== 'cron.database_name' &&
+        item[0] !== 'cron.launch_active_jobs' &&
+        // The drill pins the isolated copy read-only; the source is writable.
+        item[0] !== 'default_transaction_read_only'
+      );
     });
   }
   normalizePhysicalRelationOids(normalized, 'target');
