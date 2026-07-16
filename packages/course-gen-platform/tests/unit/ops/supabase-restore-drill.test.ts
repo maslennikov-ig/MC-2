@@ -451,7 +451,9 @@ describe('allowlisted Supabase role bootstrap', () => {
       'GRANT "authenticated" TO "admin" WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;'
     );
     expect(sql).toContain('RESET ROLE;');
-    expect(sql).toContain(`ALTER ROLE "anon" SET "statement_timeout" TO '3s';`);
+    // Verbatim setconfig replay: quoting would collapse list-valued GUCs
+    // such as search_path into one element.
+    expect(sql).toContain(`ALTER ROLE "anon" SET "statement_timeout" TO 3s;`);
     expect(sql).not.toContain('CREATE ROLE "anon"');
   });
 
