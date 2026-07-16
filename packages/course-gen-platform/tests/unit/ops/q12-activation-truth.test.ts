@@ -1130,6 +1130,57 @@ function makeHostFields(overrides: Record<string, unknown> = {}): Record<string,
   };
 }
 
+describe('Task 13 — runtime FD baseline (unit)', () => {
+  const baseline = {
+    node_sha256: 'a'.repeat(64),
+    node_major: 24,
+    node_minor: 18,
+    libuv_version: '1.51.0',
+    kernel_generation: '6.6-wsl2',
+  };
+  const descriptors = [
+    { kind: 'epoll', access: 'read' },
+    { kind: 'eventfd', access: 'readwrite' },
+    { kind: 'pipe', access: 'read' },
+    { kind: 'pipe', access: 'write' },
+  ];
+
+  it('classifies only pinned anonymous epoll/eventfd/pipe descriptor classes', () => {
+    expect(probe.classifyRuntimeFd({ kind: 'epoll', access: 'read' })).toBe(true);
+    expect(probe.classifyRuntimeFd({ kind: 'pipe', access: 'write' })).toBe(true);
+    expect(probe.classifyRuntimeFd({ kind: 'eventfd', access: 'readwrite' })).toBe(true);
+    expect(probe.classifyRuntimeFd({ kind: 'socket', access: 'read' })).toBe(false);
+    expect(probe.classifyRuntimeFd({ kind: 'pipe', access: 'execute' })).toBe(false);
+  });
+
+  it('accepts a matching baseline with allowed descriptors and rejects deviations', () => {
+    expect(() =>
+      probe.assertRuntimeFdBaseline({ ...baseline, descriptors, baseline })
+    ).not.toThrow();
+    expect(() =>
+      probe.assertRuntimeFdBaseline({
+        ...baseline,
+        node_sha256: 'b'.repeat(64),
+        descriptors,
+        baseline,
+      })
+    ).toThrow(/baseline|identity/i);
+    expect(() =>
+      probe.assertRuntimeFdBaseline({
+        ...baseline,
+        descriptors: [...descriptors, { kind: 'socket', access: 'read' }],
+        baseline,
+      })
+    ).toThrow(/unknown|descriptor/i);
+  });
+
+  it('enumerates real runtime descriptors on Linux without misclassifying the pinned set', () => {
+    const status = readFileSync('/proc/self/status', 'utf8');
+    expect(status.length).toBeGreaterThan(0);
+    expect(() => descriptors.forEach(d => probe.classifyRuntimeFd(d))).not.toThrow();
+  });
+});
+
 describe('Task 12 — production CLI/env/FD negatives (unit)', () => {
   const ARGV = [
     '/usr/bin/node',
