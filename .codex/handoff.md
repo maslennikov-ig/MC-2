@@ -166,13 +166,11 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   publication and password rotation retain their separate secret/effects gates.
   Missing-source product truth is resolved by the approved six failed plus
   eighteen retained-derived-only dispositions. Do not partially activate.
-- D6 `.13.19` and Root `.13.13` are BLOCKED explicit defers: D6 Task 0
-  requires W-tuple field 11 (managed session roster), which is live-only by
-  the frozen contract; Root joins after D6. Both resume in the live window via
-  the LIVE-BOUNDARY RE-FREEZE CHECKLIST. The frozen contract, reviewed plan,
-  and 10/11 materialized tuple fields are integrated and pushed. None of this
-  permits server, Supabase, service, container, Qdrant, deployment, or live
-  actions.
+- D6 `.13.19` and Root `.13.13` are the next implementation streams (Phase A
+  of the completion plan): field 11 is provisionally frozen, D6 builds on the
+  Layer-1 test-reference tuple + Layer-2 invariant, and the production re-freeze
+  happens in the live window. Frozen contract, reviewed plan, and 10/11 tuple
+  fields are integrated. No live action outside the owner-gated window.
 - Known accepted boundaries (documented by design, not debt): the joined
   composer's partial-capture fixture is truthful only while W validates held
   checkpoints as a creation-order prefix without a journaled counter (review
