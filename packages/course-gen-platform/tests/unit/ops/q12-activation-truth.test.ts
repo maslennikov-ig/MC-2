@@ -180,6 +180,22 @@ interface ProbeModule {
   buildDatabaseProjection(fields: Record<string, unknown>): Record<string, unknown>;
   buildHostProjection(fields: Record<string, unknown>): Record<string, unknown>;
   assertProjectionPreamble(input: { snapshot_cleared: unknown; fresh_read: unknown }): void;
+  // Task 9
+  validateEvidenceTable(input: {
+    classification: string;
+    activation_evidence_state: string;
+    barrier_receipt_sha256: string | null;
+    probe_receipt_sha256: string | null;
+    activation_result_sha256: string | null;
+    activation_process_projection_sha256: string | null;
+    process_manifest_sha256: string | null;
+    presence?: Record<string, 'present' | 'absent' | 'unsafe'>;
+  }): void;
+  assertCommittedReceiptPendingLegal(input: {
+    barrier_is_predecessor_recovery_ready_guarded: boolean;
+    process_manifest_present: boolean;
+    zero_live_projection: boolean;
+  }): void;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -1041,6 +1057,153 @@ function makeHostFields(overrides: Record<string, unknown> = {}): Record<string,
     ...overrides,
   };
 }
+
+describe('Task 9 — H/N evidence table (unit)', () => {
+  const H = 'c'.repeat(64);
+  const precommit = {
+    classification: 'precommit_rollback',
+    activation_evidence_state: 'prepared_guarded',
+    barrier_receipt_sha256: H,
+    probe_receipt_sha256: H,
+    activation_result_sha256: null,
+    activation_process_projection_sha256: H,
+    process_manifest_sha256: null,
+  };
+  const completeReceipt = {
+    classification: 'committed_finish_forward',
+    activation_evidence_state: 'complete_receipt',
+    barrier_receipt_sha256: H,
+    probe_receipt_sha256: H,
+    activation_result_sha256: H,
+    activation_process_projection_sha256: H,
+    process_manifest_sha256: H,
+  };
+  const pending = {
+    classification: 'committed_finish_forward',
+    activation_evidence_state: 'committed_receipt_pending',
+    barrier_receipt_sha256: H,
+    probe_receipt_sha256: H,
+    activation_result_sha256: null,
+    activation_process_projection_sha256: H,
+    process_manifest_sha256: H,
+  };
+
+  it('accepts the three deterministic H/N patterns', () => {
+    expect(() => probe.validateEvidenceTable(precommit)).not.toThrow();
+    expect(() => probe.validateEvidenceTable(completeReceipt)).not.toThrow();
+    expect(() => probe.validateEvidenceTable(pending)).not.toThrow();
+  });
+
+  it('rejects any single H<->N deviation in a deterministic pattern', () => {
+    expect(() =>
+      probe.validateEvidenceTable({ ...precommit, activation_result_sha256: H })
+    ).toThrow();
+    expect(() =>
+      probe.validateEvidenceTable({ ...precommit, barrier_receipt_sha256: null })
+    ).toThrow();
+    expect(() =>
+      probe.validateEvidenceTable({ ...completeReceipt, process_manifest_sha256: null })
+    ).toThrow();
+    expect(() =>
+      probe.validateEvidenceTable({ ...pending, activation_result_sha256: H })
+    ).toThrow();
+    // activation_process_projection is always H.
+    expect(() =>
+      probe.validateEvidenceTable({ ...precommit, activation_process_projection_sha256: null })
+    ).toThrow();
+    // wrong evidence state for the classification.
+    expect(() =>
+      probe.validateEvidenceTable({ ...precommit, activation_evidence_state: 'incident_observed' })
+    ).toThrow();
+  });
+
+  it('resolves incident_observed strictly from safe object presence, never a free choice', () => {
+    const base = {
+      classification: 'drift_incident',
+      activation_evidence_state: 'incident_observed',
+      activation_process_projection_sha256: H,
+    };
+    // present -> H, absent -> N.
+    expect(() =>
+      probe.validateEvidenceTable({
+        ...base,
+        barrier_receipt_sha256: H,
+        probe_receipt_sha256: null,
+        activation_result_sha256: null,
+        process_manifest_sha256: H,
+        presence: {
+          barrier_receipt: 'present',
+          probe_receipt: 'absent',
+          activation_result: 'absent',
+          process_manifest: 'present',
+        },
+      })
+    ).not.toThrow();
+    // present object but N value -> deviation.
+    expect(() =>
+      probe.validateEvidenceTable({
+        ...base,
+        barrier_receipt_sha256: null,
+        probe_receipt_sha256: null,
+        activation_result_sha256: null,
+        process_manifest_sha256: null,
+        presence: {
+          barrier_receipt: 'present',
+          probe_receipt: 'absent',
+          activation_result: 'absent',
+          process_manifest: 'absent',
+        },
+      })
+    ).toThrow();
+    // unsafe object stops before terminal seal (no null conversion).
+    expect(() =>
+      probe.validateEvidenceTable({
+        ...base,
+        barrier_receipt_sha256: null,
+        probe_receipt_sha256: null,
+        activation_result_sha256: null,
+        process_manifest_sha256: null,
+        presence: {
+          barrier_receipt: 'unsafe',
+          probe_receipt: 'absent',
+          activation_result: 'absent',
+          process_manifest: 'absent',
+        },
+      })
+    ).toThrow(/unsafe|incident/i);
+  });
+
+  it('permits committed_receipt_pending only with predecessor receipt + manifest + zero-live', () => {
+    expect(() =>
+      probe.assertCommittedReceiptPendingLegal({
+        barrier_is_predecessor_recovery_ready_guarded: true,
+        process_manifest_present: true,
+        zero_live_projection: true,
+      })
+    ).not.toThrow();
+    expect(() =>
+      probe.assertCommittedReceiptPendingLegal({
+        barrier_is_predecessor_recovery_ready_guarded: false,
+        process_manifest_present: true,
+        zero_live_projection: true,
+      })
+    ).toThrow(/drift/i);
+    expect(() =>
+      probe.assertCommittedReceiptPendingLegal({
+        barrier_is_predecessor_recovery_ready_guarded: true,
+        process_manifest_present: false,
+        zero_live_projection: true,
+      })
+    ).toThrow(/drift/i);
+    expect(() =>
+      probe.assertCommittedReceiptPendingLegal({
+        barrier_is_predecessor_recovery_ready_guarded: true,
+        process_manifest_present: true,
+        zero_live_projection: false,
+      })
+    ).toThrow(/drift/i);
+  });
+});
 
 describe('Task 8 — database/host projection key sets + invariants (unit)', () => {
   it('accepts a complete database projection and rejects missing/extra keys', () => {
