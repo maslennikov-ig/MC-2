@@ -11,6 +11,7 @@ readonly SERVICE_TARGET='/etc/systemd/system/megacampus-supabase-backup.service'
 readonly TIMER_TARGET='/etc/systemd/system/megacampus-supabase-backup.timer'
 readonly SCHEDULE_LOCK='/opt/megacampus/backups/supabase/schedule.lock'
 readonly INSTALL_LOCK='/opt/megacampus/backups/supabase/install.lock'
+readonly BACKUP_LOCK='/opt/megacampus/backups/supabase/backup.lock'
 readonly BACKUP_ROOT='/opt/megacampus/backups/supabase'
 readonly RESTORE_COMMAND='/opt/megacampus/deploy/postgres/restore-supabase-drill.sh'
 readonly SYSTEMCTL='/usr/bin/systemctl'
@@ -139,9 +140,10 @@ main() {
 
   /usr/bin/install -d -o claude-deploy -g claude-deploy -m 0700 "$BACKUP_ROOT"
   /usr/bin/install -d -o claude-deploy -g claude-deploy -m 0700 /opt/megacampus/logs
-  /usr/bin/touch "$SCHEDULE_LOCK" "$INSTALL_LOCK"
-  /usr/bin/chown claude-deploy:claude-deploy "$SCHEDULE_LOCK" "$INSTALL_LOCK"
-  /usr/bin/chmod 0600 "$SCHEDULE_LOCK" "$INSTALL_LOCK"
+  # The scheduler wrapper requires all three owned lock files to pre-exist.
+  /usr/bin/touch "$SCHEDULE_LOCK" "$INSTALL_LOCK" "$BACKUP_LOCK"
+  /usr/bin/chown claude-deploy:claude-deploy "$SCHEDULE_LOCK" "$INSTALL_LOCK" "$BACKUP_LOCK"
+  /usr/bin/chmod 0600 "$SCHEDULE_LOCK" "$INSTALL_LOCK" "$BACKUP_LOCK"
   exec {install_lock_fd}>"$INSTALL_LOCK"
   /usr/bin/flock --nonblock --exclusive "$install_lock_fd" || fail 'another schedule installation is active' 75
   exec {schedule_lock_fd}>"$SCHEDULE_LOCK"
