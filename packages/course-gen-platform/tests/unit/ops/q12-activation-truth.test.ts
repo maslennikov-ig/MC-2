@@ -131,6 +131,12 @@ interface ProbeModule {
     visibility: { member: boolean; wEquivalentDefinitionHash?: string | null };
     clear_snapshot_executed: boolean;
   }): Record<string, unknown>;
+  // Task 5
+  assertTemplateAllowed(bundle: Map<string, string>, candidateSql: string): void;
+  verifyGrantedLocks(input: {
+    observed: Array<{ qualified_name: string; lock_mode: string; granted: boolean }>;
+    expectedRelations: readonly string[];
+  }): void;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -769,7 +775,123 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     expect(resolved.definition_hash).toBe(probe.VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH);
   });
 
+  it('Task 5 — acquires the full-catalog SHARE lock and verifies every granted lock', () => {
+    const { psql } = dockerFns;
+    const lockTemplate = PROJECTION_TEMPLATES.get('full_catalog_share_lock') ?? '';
+    const lockProjection = PROJECTION_TEMPLATES.get('lock_projection') ?? '';
+    const out = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SET LOCAL lock_timeout = '120s';
+       SET LOCAL statement_timeout = '180s';
+       SET LOCAL idle_in_transaction_session_timeout = '300s';
+       ${lockTemplate}
+       SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t) ORDER BY (t.qualified_name))
+       FROM ( ${lockProjection.replace(/;\s*$/, '')} ) t;
+       COMMIT;`
+    );
+    const line = out.split('\n').find(l => l.trim().startsWith('[')) as string;
+    const observed = JSON.parse(line) as Array<{
+      qualified_name: string;
+      lock_mode: string;
+      granted: boolean;
+    }>;
+    expect(observed.length).toBe(ORDER_RELATIONS.length);
+    expect(() =>
+      probe.verifyGrantedLocks({ observed, expectedRelations: ORDER_RELATIONS })
+    ).not.toThrow();
+  });
+
+  it('Task 5 — locking only q12_guard.active_run fails the full-catalog verification', () => {
+    const { psql } = dockerFns;
+    const lockProjection = PROJECTION_TEMPLATES.get('lock_projection') ?? '';
+    const out = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SET LOCAL lock_timeout = '120s';
+       LOCK TABLE q12_guard.active_run IN SHARE MODE;
+       SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t) ORDER BY (t.qualified_name))
+       FROM ( ${lockProjection.replace(/;\s*$/, '')} ) t;
+       COMMIT;`
+    );
+    const line = out.split('\n').find(l => l.trim().startsWith('[')) as string;
+    const observed = JSON.parse(line) as Array<{
+      qualified_name: string;
+      lock_mode: string;
+      granted: boolean;
+    }>;
+    expect(() =>
+      probe.verifyGrantedLocks({ observed, expectedRelations: ORDER_RELATIONS })
+    ).toThrow();
+  });
+
+  it('Task 5 — the allowlist guard accepts bundle templates and rejects foreign SQL', () => {
+    const lockTemplate = PROJECTION_TEMPLATES.get('full_catalog_share_lock') ?? '';
+    expect(() => probe.assertTemplateAllowed(PROJECTION_TEMPLATES, lockTemplate)).not.toThrow();
+    expect(() =>
+      probe.assertTemplateAllowed(PROJECTION_TEMPLATES, 'DROP TABLE q12_guard.active_run;')
+    ).toThrow(/allowlist|template/i);
+    expect(() =>
+      probe.assertTemplateAllowed(PROJECTION_TEMPLATES, 'SELECT pg_sleep(1);')
+    ).toThrow();
+  });
+
   // @@CONTAINER_TESTS_END
+});
+
+describe('Task 5 — transaction/lock/allowlist (unit)', () => {
+  const expected = ['public.a', 'public.b', 'public.c'];
+  const grantAll = expected.map(qualified_name => ({
+    qualified_name,
+    lock_mode: 'ShareLock',
+    granted: true,
+  }));
+
+  it('accepts a complete set of granted SHARE locks', () => {
+    expect(() =>
+      probe.verifyGrantedLocks({ observed: grantAll, expectedRelations: expected })
+    ).not.toThrow();
+  });
+
+  it('rejects a missing, ungranted, wrong-mode, extra, or duplicate lock', () => {
+    expect(() =>
+      probe.verifyGrantedLocks({ observed: grantAll.slice(0, 2), expectedRelations: expected })
+    ).toThrow(/missing|expected/i);
+    expect(() =>
+      probe.verifyGrantedLocks({
+        observed: [...grantAll.slice(0, 2), { ...grantAll[2], granted: false }],
+        expectedRelations: expected,
+      })
+    ).toThrow(/granted/i);
+    expect(() =>
+      probe.verifyGrantedLocks({
+        observed: [...grantAll.slice(0, 2), { ...grantAll[2], lock_mode: 'AccessExclusiveLock' }],
+        expectedRelations: expected,
+      })
+    ).toThrow(/mode|share/i);
+    expect(() =>
+      probe.verifyGrantedLocks({
+        observed: [
+          ...grantAll,
+          { qualified_name: 'public.d', lock_mode: 'ShareLock', granted: true },
+        ],
+        expectedRelations: expected,
+      })
+    ).toThrow(/extra|unexpected/i);
+    expect(() =>
+      probe.verifyGrantedLocks({
+        observed: [...grantAll, grantAll[0]],
+        expectedRelations: expected,
+      })
+    ).toThrow(/duplicate|extra|unexpected/i);
+  });
+
+  it('enforces the allowlist against a simple in-memory bundle', () => {
+    const bundle = new Map([
+      ['a', 'SELECT 1;'],
+      ['b', 'LOCK TABLE x IN SHARE MODE;'],
+    ]);
+    expect(() => probe.assertTemplateAllowed(bundle, 'SELECT 1;')).not.toThrow();
+    expect(() => probe.assertTemplateAllowed(bundle, 'SELECT 2;')).toThrow();
+  });
 });
 
 describe('Task 4 — capability projection + visibility (unit)', () => {
