@@ -451,7 +451,10 @@ parts = [
     f"LOCALE_PROVIDER {provider}",
     f"LC_COLLATE {literal(database['collate'])}",
     f"LC_CTYPE {literal(database['ctype'])}",
-    f"TABLESPACE {ident(database['tablespace'])}",
+    # Explicitly naming even the default tablespace demands CREATE on it,
+    # which the non-superuser creator lacks; omitting the clause lands the
+    # database in pg_default identically.
+    *([f"TABLESPACE {ident(database['tablespace'])}"] if database["tablespace"] != "pg_default" else []),
     f"CONNECTION LIMIT {int(database['connection_limit'])}",
     f"ALLOW_CONNECTIONS {'true' if database['allow_connections'] else 'false'}",
     f"IS_TEMPLATE {'true' if database['is_template'] else 'false'}",
