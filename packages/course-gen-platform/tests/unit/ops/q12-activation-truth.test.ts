@@ -137,6 +137,27 @@ interface ProbeModule {
     observed: Array<{ qualified_name: string; lock_mode: string; granted: boolean }>;
     expectedRelations: readonly string[];
   }): void;
+  // Task 6
+  assertActivationDigestsBound(
+    provided: {
+      normal_slice: string;
+      recovery_slice: string;
+      lock_catalog: string;
+      lock_order: string;
+    },
+    wtuple: {
+      activation_normal_slice_sha256: string;
+      activation_recovery_slice_sha256: string;
+      activation_lock_catalog_sha256: string;
+      activation_lock_order_sha256: string;
+    }
+  ): void;
+  assertCommonLockConflict(outcome: {
+    probe_share_held: boolean;
+    activation_blocked_while_share_held: boolean;
+    activation_acquired_after_release: boolean;
+    activation_committed: boolean;
+  }): void;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -834,7 +855,96 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     ).toThrow();
   });
 
+  it('Task 6 — probe SHARE conflicts with activation ACCESS EXCLUSIVE (wait-winner ordering)', async () => {
+    const { psql, spawnPsql, waitForOutput, waitForExit } = dockerFns;
+    const common = 'supabase_migrations.schema_migrations';
+    const probeSession = spawnPsql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       LOCK TABLE ${common} IN SHARE MODE;
+       \\echo Q12_PROBE_SHARE_HELD
+       SELECT pg_sleep(4);
+       COMMIT;
+       \\echo Q12_PROBE_RELEASED`,
+      'q12-d6-probe-share'
+    );
+    await waitForOutput(probeSession, 'Q12_PROBE_SHARE_HELD');
+    const activation = spawnPsql(
+      `BEGIN;
+       \\echo Q12_ACT_STARTED
+       LOCK TABLE ${common} IN ACCESS EXCLUSIVE MODE;
+       \\echo Q12_ACT_LOCK_ACQUIRED
+       INSERT INTO ${common}(id) VALUES (987654);
+       COMMIT;
+       \\echo Q12_ACT_COMMITTED`,
+      'q12-d6-activation-slice'
+    );
+    await waitForOutput(activation, 'Q12_ACT_STARTED');
+    // Prove the activation slice is blocked on the common relation before any
+    // mutation while the probe holds SHARE.
+    let waiting = '0';
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      waiting = psql(
+        `SELECT count(*) FROM pg_catalog.pg_locks
+         WHERE relation = '${common}'::regclass
+           AND mode = 'AccessExclusiveLock' AND NOT granted;`
+      );
+      if (waiting === '1') break;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    expect(waiting).toBe('1');
+    expect(activation.output()).not.toContain('Q12_ACT_LOCK_ACQUIRED');
+    // Probe releases; only then may activation acquire and commit.
+    expect(await waitForExit(probeSession), probeSession.output()).toBe(0);
+    await waitForOutput(activation, 'Q12_ACT_LOCK_ACQUIRED');
+    await waitForOutput(activation, 'Q12_ACT_COMMITTED');
+    expect(await waitForExit(activation), activation.output()).toBe(0);
+    const probeReleasedFirst =
+      probeSession.output().includes('Q12_PROBE_RELEASED') &&
+      activation.output().includes('Q12_ACT_LOCK_ACQUIRED');
+    expect(() =>
+      probe.assertCommonLockConflict({
+        probe_share_held: true,
+        activation_blocked_while_share_held: waiting === '1',
+        activation_acquired_after_release: probeReleasedFirst,
+        activation_committed: activation.output().includes('Q12_ACT_COMMITTED'),
+      })
+    ).not.toThrow();
+    // Clean the inserted mutation row so the fixture stays reusable.
+    psql(`DELETE FROM ${common} WHERE id = 987654;`);
+  }, 60_000);
+
   // @@CONTAINER_TESTS_END
+});
+
+describe('Task 6 — common-lock digest binding + conflict outcome (unit)', () => {
+  const provided = {
+    normal_slice: W_TUPLE.activation_normal_slice_sha256,
+    recovery_slice: W_TUPLE.activation_recovery_slice_sha256,
+    lock_catalog: W_TUPLE.activation_lock_catalog_sha256,
+    lock_order: W_TUPLE.activation_lock_order_sha256,
+  };
+
+  it('binds exactly the accepted W slice/catalog/order digests', () => {
+    expect(() => probe.assertActivationDigestsBound(provided, W_TUPLE)).not.toThrow();
+    for (const key of Object.keys(provided) as Array<keyof typeof provided>) {
+      expect(() =>
+        probe.assertActivationDigestsBound({ ...provided, [key]: 'f'.repeat(64) }, W_TUPLE)
+      ).toThrow(new RegExp(key));
+    }
+  });
+
+  it('requires the full conflict + ordering outcome', () => {
+    const ok = {
+      probe_share_held: true,
+      activation_blocked_while_share_held: true,
+      activation_acquired_after_release: true,
+      activation_committed: true,
+    };
+    expect(() => probe.assertCommonLockConflict(ok)).not.toThrow();
+    for (const key of Object.keys(ok) as Array<keyof typeof ok>) {
+      expect(() => probe.assertCommonLockConflict({ ...ok, [key]: false })).toThrow();
+    }
+  });
 });
 
 describe('Task 5 — transaction/lock/allowlist (unit)', () => {
