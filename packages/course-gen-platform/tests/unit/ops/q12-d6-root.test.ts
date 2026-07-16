@@ -137,3 +137,26 @@ describe('Task 16 — D6 posix_spawn boundary + FD map/close-from', () => {
     expect(symlinked.error).toMatch(/symbolic|symlink|ELOOP|NOFOLLOW|unsafe/i);
   });
 });
+
+describe('Task 17 — D6 pidfd / ptrace / proc / OFD gates', () => {
+  it('opens a pidfd, retrieves FD9, and proves OFD contention + proc identity', () => {
+    const result = runScenario({ scenario: 'pidfd_gates' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.pidfd_capability).toBe(true);
+    // child FD9 refers to the same held-lock open-file description (contention preserved)
+    expect(result.fd9_ofd_contention).toBe(true);
+    expect(result.exe_is_sleep).toBe(true);
+    // /proc/<pid>/random/boot_id is a 36-char UUID
+    expect(result.boot_id_len).toBe(36);
+    // close-from left nothing above 11 to retrieve
+    expect(result.no_leak_above_11).toBe(true);
+    // pid-reuse / start-time drift is rejected
+    expect(result.continuity_rejects_mismatch).toBe(true);
+  });
+
+  it('fails the FD9 OFD contention gate when the exclusive lock is not held', () => {
+    const result = runScenario({ scenario: 'ofd_contention_unlocked' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.contention).toBe(false);
+  });
+});

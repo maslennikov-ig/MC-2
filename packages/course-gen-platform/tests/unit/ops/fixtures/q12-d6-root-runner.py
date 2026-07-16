@@ -16,11 +16,12 @@ and print exactly one JSON object ``{"ok": true, ...}`` or ``{"ok": false,
 
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import json
 import os
 import pathlib
-import socket
+import signal
 import sys
 import tempfile
 
@@ -86,8 +87,6 @@ def scenario_spawn_file_actions(payload: dict) -> dict:
 
 def _hoist(descriptor: int) -> int:
     """Return an inheritable duplicate of ``descriptor`` above the close-from line."""
-    import fcntl
-
     hoisted = fcntl.fcntl(descriptor, fcntl.F_DUPFD, 12)
     os.set_inheritable(hoisted, True)
     return hoisted
@@ -191,7 +190,88 @@ TASK16 = {
 }
 
 
-DISPATCH = {**TASK16}
+# --------------------------------------------------------------------------- #
+# Task 17 — pidfd / ptrace / proc / OFD capability gates
+# --------------------------------------------------------------------------- #
+
+
+def scenario_pidfd_gates(payload: dict) -> dict:
+    """Spawn a real child inheriting the held FD9 lock and prove the pidfd gates.
+
+    The pinned server's PTRACE_MODE_ATTACH_REALCREDS / Yama acceptance is a separate
+    remote gate; locally the parent may pidfd_getfd its own child, so this proves the
+    mechanism read-only, never the server policy."""
+    sandbox = pathlib.Path(tempfile.mkdtemp(prefix="q12-d6-pidfd-"))
+    lock_path = sandbox / "cutover.lock"
+    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    hoisted = _hoist(lock_fd)
+    pid = os.posix_spawn(
+        "/usr/bin/sleep",
+        ["/usr/bin/sleep", "120"],
+        {"PATH": "/usr/bin:/bin"},
+        file_actions=[(os.POSIX_SPAWN_DUP2, hoisted, 9), (os.POSIX_SPAWN_CLOSE, hoisted)],
+    )
+    os.close(hoisted)
+    pidfd = -1
+    try:
+        pidfd = CORE.d6_pidfd_open(pid)
+        baseline = CORE.d6_proc_identity(pid)
+        CORE.d6_assert_proc_continuity(pid, baseline)
+        got9 = CORE.d6_pidfd_getfd(pidfd, 9)
+        contention = CORE.d6_verify_fd9_ofd_contention(got9, lock_path)
+        os.close(got9)
+        # A descriptor the child never held (above 11) cannot be retrieved.
+        try:
+            leaked = CORE.d6_pidfd_getfd(pidfd, 40)
+            os.close(leaked)
+            no_leak = False
+        except OSError:
+            no_leak = True
+        # A mismatched proc identity (e.g. pid reuse) is rejected.
+        forged = (str(int(baseline[0]) + 1), baseline[1], baseline[2])
+        try:
+            CORE.d6_assert_proc_continuity(pid, forged)
+            continuity_rejects = False
+        except CORE.LifecycleError:
+            continuity_rejects = True
+        return {
+            "ok": True,
+            "pidfd_capability": True,
+            "fd9_ofd_contention": contention,
+            "exe_is_sleep": baseline[1].endswith("sleep"),
+            "boot_id_len": len(baseline[2]),
+            "no_leak_above_11": no_leak,
+            "continuity_rejects_mismatch": continuity_rejects,
+        }
+    finally:
+        if pidfd >= 0:
+            os.close(pidfd)
+        os.kill(pid, signal.SIGKILL)
+        os.waitpid(pid, 0)
+        os.close(lock_fd)
+
+
+def scenario_ofd_contention_unlocked(payload: dict) -> dict:
+    """FD9 that is NOT holding the exclusive lock fails the OFD contention gate."""
+    sandbox = pathlib.Path(tempfile.mkdtemp(prefix="q12-d6-ofd-"))
+    lock_path = sandbox / "cutover.lock"
+    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    # Deliberately do NOT flock: the contention proof must fail closed.
+    try:
+        result = CORE.d6_verify_fd9_ofd_contention(lock_fd, lock_path)
+        return {"ok": True, "contention": result}
+    finally:
+        os.close(lock_fd)
+
+
+TASK17 = {
+    "pidfd_gates": scenario_pidfd_gates,
+    "ofd_contention_unlocked": scenario_ofd_contention_unlocked,
+}
+
+
+DISPATCH = {**TASK16, **TASK17}
 
 
 def main() -> int:
