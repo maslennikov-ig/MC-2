@@ -2054,6 +2054,134 @@ function assertRuntimeFdBaseline(input) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 14 — probe inspect main flow (contract "Classifications", "Race closure
+// and restart authority" probe-visible parts). runProbeInspect wires Tasks
+// 1-13 into the full db_locked -> host_bound -> sealed -> closed protocol: it
+// validates the request, the post-connect identity, the full-catalog SHARE
+// lock, builds the database/host projections, checks the evidence table, and
+// drives the chained protocol against Root frames. The DB reads are supplied by
+// the caller (real disposable PG17 in tests); Root frames are supplied by the
+// fixture runner. No live/remote action occurs.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {Record<string, unknown>} ctx
+ */
+function runProbeInspect(ctx) {
+  const request = validateRequest(ctx.request);
+  assertPostConnect(ctx.postConnect);
+  verifyGrantedLocks(ctx.lockVerification);
+  const dbProjection = buildDatabaseProjection(ctx.dbFields);
+  validateEvidenceTable(ctx.evidence);
+  const hostProjection = buildHostProjection(ctx.hostFields);
+  assertRequestMatchesHostProjection(request, hostProjection);
+
+  const request_sha256 = canonicalHash(request);
+  const initialDbSha = canonicalHash(dbProjection);
+  const hostSha = canonicalHash(hostProjection);
+  const capabilitySha = canonicalHash(ctx.capability);
+  const fd9 = ctx.fd9_identity_sha256;
+  const actualR = ctx.actualR || { journal: null, checkpoint: null };
+
+  const proto = new ProbeProtocol(FRAME_SCHEMA_VERSION, request.run_id);
+
+  const dbLocked = proto.emit(
+    'db_locked',
+    buildDbLockedPayload({
+      request_sha256,
+      initial_database_projection_sha256: initialDbSha,
+      capability_projection_sha256: capabilitySha,
+      lock_projection_sha256: ctx.dbFields.lock_projection_sha256,
+      fd9_identity_sha256: fd9,
+    })
+  );
+
+  validateHostProjectionPayload(ctx.rootPayloads.hostProjection);
+  const rootHost = makeFrame({
+    schema_version: FRAME_SCHEMA_VERSION,
+    sequence: 2,
+    kind: 'host_projection',
+    run_id: request.run_id,
+    payload: ctx.rootPayloads.hostProjection,
+    previous_frame_sha256: dbLocked.frame_sha256,
+  });
+  proto.receive(rootHost);
+
+  const hostBound = proto.emit(
+    'host_bound',
+    buildHostBoundPayload({
+      request_sha256,
+      initial_database_projection_sha256: initialDbSha,
+      bound_database_projection_sha256: ctx.boundDbSha || initialDbSha,
+      host_projection_sha256: hostSha,
+      session_observation_sha256: ctx.sessionObservationSha,
+      fd9_identity_sha256: fd9,
+    })
+  );
+
+  validatePredecisionPayload(ctx.rootPayloads.predecision);
+  const predecisionFrame = makeFrame({
+    schema_version: FRAME_SCHEMA_VERSION,
+    sequence: 4,
+    kind: 'predecision',
+    run_id: request.run_id,
+    payload: ctx.rootPayloads.predecision,
+    previous_frame_sha256: hostBound.frame_sha256,
+  });
+  proto.receive(predecisionFrame);
+  const predecision_sha256 = ctx.rootPayloads.predecision.predecision_sha256;
+
+  const sealed = proto.emit(
+    'sealed',
+    buildSealedPayload({
+      request_sha256,
+      predecision_sha256,
+      initial_database_projection_sha256: initialDbSha,
+      final_database_projection_sha256: initialDbSha,
+      host_projection_sha256: hostSha,
+      actual_r_journal_entry_hash: actualR.journal,
+      actual_r_checkpoint_sha256: actualR.checkpoint,
+      fd9_identity_sha256: fd9,
+    })
+  );
+
+  validateReleasePayload(ctx.rootPayloads.release);
+  const releaseFrame = makeFrame({
+    schema_version: FRAME_SCHEMA_VERSION,
+    sequence: 6,
+    kind: 'release',
+    run_id: request.run_id,
+    payload: ctx.rootPayloads.release,
+    previous_frame_sha256: sealed.frame_sha256,
+  });
+  proto.receive(releaseFrame);
+
+  const closed = proto.emit(
+    'closed',
+    buildClosedPayload({
+      request_sha256,
+      predecision_sha256,
+      sealed_frame_sha256: sealed.frame_sha256,
+      release_frame_sha256: releaseFrame.frame_sha256,
+      actual_r_journal_entry_hash: actualR.journal,
+      actual_r_checkpoint_sha256: actualR.checkpoint,
+      fd9_identity_sha256: fd9,
+    })
+  );
+
+  if (!proto.done) {
+    throw new Error('runProbeInspect: protocol did not complete');
+  }
+  return {
+    frames: [dbLocked, rootHost, hostBound, predecisionFrame, sealed, releaseFrame, closed],
+    classification: ctx.rootPayloads.predecision.classification,
+    activated: ctx.activated === true,
+    dbProjection,
+    hostProjection,
+  };
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -2128,6 +2256,7 @@ module.exports = {
   RUNTIME_FD_ALLOWED,
   classifyRuntimeFd,
   assertRuntimeFdBaseline,
+  runProbeInspect,
 };
 
 // ---------------------------------------------------------------------------
