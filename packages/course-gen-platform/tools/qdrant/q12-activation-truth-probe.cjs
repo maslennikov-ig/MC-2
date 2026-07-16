@@ -1359,6 +1359,120 @@ function assertCommittedReceiptPendingLegal(input) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 10 — pre-R writer ancestry + Docker 10+5 truth (contract "Exact pre-R
+// writer ancestry and Docker truth"). Pre-R D6 binds the exact accepted
+// prepared_quiesced predecessor as the unique current head / required ancestor
+// and never requires a rollback final-writer manifest. The Docker observation
+// is ten final + five held = fifteen unique IDs, all stopped, restart "no".
+// ---------------------------------------------------------------------------
+
+const STOPPED_DOCKER_STATUSES = Object.freeze(['exited', 'created', 'dead']);
+
+/**
+ * Bind the prepared_quiesced predecessor. Requires the unique journal/checkpoint
+ * head and the exact required ancestor; refuses a rollback final-writer manifest
+ * as a precondition (that is Task 9 / .13.13 output).
+ * @param {{journal_entry_hash: string, checkpoint_sha256: string,
+ *          writer_quiesce_manifest_sha256: string, is_unique_head: boolean,
+ *          is_required_ancestor: boolean, rollback_final_writer_manifest_required?: boolean}} input
+ */
+function bindPreparedQuiescedPredecessor(input) {
+  for (const field of ['journal_entry_hash', 'checkpoint_sha256', 'writer_quiesce_manifest_sha256']) {
+    if (typeof input[field] !== 'string' || !HEX64.test(input[field])) {
+      throw new Error(`bindPreparedQuiescedPredecessor: ${field} must be lowercase 64-hex`);
+    }
+  }
+  if (input.rollback_final_writer_manifest_required === true) {
+    throw new Error(
+      'bindPreparedQuiescedPredecessor: pre-R must not require a rollback final-writer manifest (Task 9)'
+    );
+  }
+  if (input.is_unique_head !== true) {
+    throw new Error('bindPreparedQuiescedPredecessor: predecessor is not the unique current head');
+  }
+  if (input.is_required_ancestor !== true) {
+    throw new Error('bindPreparedQuiescedPredecessor: predecessor is not the required ancestor');
+  }
+  return {
+    prepared_quiesced_predecessor_sha256: canonicalHash({
+      journal_entry_hash: input.journal_entry_hash,
+      checkpoint_sha256: input.checkpoint_sha256,
+    }),
+    writer_quiesce_manifest_sha256: input.writer_quiesce_manifest_sha256,
+  };
+}
+
+/**
+ * Project the 10+5 Docker observation from synthetic `docker inspect` /
+ * `docker compose ps` inventories. Any running container, non-"no" restart
+ * policy, wrong count, missing/duplicate ID, or compose mismatch is drift.
+ * @param {{inspect: Array<Record<string, unknown>>, composePs: Array<Record<string, unknown>>}} input
+ */
+function projectDockerObservation(input) {
+  const { inspect, composePs } = input;
+  if (!Array.isArray(inspect) || !Array.isArray(composePs)) {
+    throw new Error('projectDockerObservation: inspect and composePs must be arrays');
+  }
+  const ids = new Set();
+  const canonical = [];
+  let finalCount = 0;
+  let heldCount = 0;
+  for (const entry of inspect) {
+    const id = entry && entry.Id;
+    if (typeof id !== 'string' || id.length === 0) {
+      throw new Error('projectDockerObservation: container Id must be a non-empty string');
+    }
+    if (ids.has(id)) {
+      throw new Error(`projectDockerObservation: duplicate container Id ${id}`);
+    }
+    ids.add(id);
+    const category = entry.category;
+    if (category === 'final') finalCount += 1;
+    else if (category === 'held') heldCount += 1;
+    else throw new Error(`projectDockerObservation: unknown category for ${id}`);
+    const status = entry.State && entry.State.Status;
+    if (!STOPPED_DOCKER_STATUSES.includes(status)) {
+      throw new Error(`projectDockerObservation: container ${id} is not stopped (${status})`);
+    }
+    const restart = (entry.HostConfig && entry.HostConfig.RestartPolicy) || {};
+    if (restart.Name !== 'no' || restart.MaximumRetryCount !== 0) {
+      throw new Error(`projectDockerObservation: container ${id} restart policy is not "no"/0`);
+    }
+    canonical.push({
+      id,
+      category,
+      status,
+      restart_name: restart.Name,
+      restart_max_retry: restart.MaximumRetryCount,
+    });
+  }
+  if (finalCount !== 10 || heldCount !== 5 || ids.size !== 15) {
+    throw new Error(
+      `projectDockerObservation: expected 10 final + 5 held = 15 (got ${finalCount}/${heldCount}/${ids.size})`
+    );
+  }
+  // Compose ps is only a completeness cross-check: same ID set, no missing/extra.
+  const composeIds = new Set();
+  for (const row of composePs) {
+    const id = row && row.ID;
+    if (typeof id !== 'string' || !ids.has(id) || composeIds.has(id)) {
+      throw new Error('projectDockerObservation: compose ps cross-check failed');
+    }
+    composeIds.add(id);
+  }
+  if (composeIds.size !== ids.size) {
+    throw new Error('projectDockerObservation: compose ps is missing recorded containers');
+  }
+  canonical.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return {
+    sha256: canonicalHash(canonical),
+    total: ids.size,
+    final: finalCount,
+    held: heldCount,
+  };
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -1408,6 +1522,8 @@ module.exports = {
   EVIDENCE_STATES_BY_CLASSIFICATION,
   validateEvidenceTable,
   assertCommittedReceiptPendingLegal,
+  bindPreparedQuiescedPredecessor,
+  projectDockerObservation,
 };
 
 // ---------------------------------------------------------------------------
