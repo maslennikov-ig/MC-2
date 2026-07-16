@@ -196,9 +196,33 @@ interface ProbeModule {
     process_manifest_present: boolean;
     zero_live_projection: boolean;
   }): void;
+  // Task 10
+  bindPreparedQuiescedPredecessor(input: {
+    journal_entry_hash: string;
+    checkpoint_sha256: string;
+    writer_quiesce_manifest_sha256: string;
+    is_unique_head: boolean;
+    is_required_ancestor: boolean;
+    rollback_final_writer_manifest_required?: boolean;
+  }): { prepared_quiesced_predecessor_sha256: string; writer_quiesce_manifest_sha256: string };
+  projectDockerObservation(input: {
+    inspect: Array<Record<string, unknown>>;
+    composePs: Array<Record<string, unknown>>;
+  }): { sha256: string; total: number; final: number; held: number };
+}
+
+interface RunnerModule {
+  buildSyntheticDockerInventory(options?: { corrupt?: string }): {
+    inspect: Array<Record<string, unknown>>;
+    composePs: Array<Record<string, unknown>>;
+  };
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
+const RUNNER_PATH = resolve(
+  REPO_ROOT,
+  'packages/course-gen-platform/tests/unit/ops/fixtures/q12-activation-truth-runner.cjs'
+);
 
 describe('Task 1 — canonical JSON + frame envelope + hashing', () => {
   it('serializes compact, recursively key-sorted, NFC, with no trailing LF', () => {
@@ -1057,6 +1081,62 @@ function makeHostFields(overrides: Record<string, unknown> = {}): Record<string,
     ...overrides,
   };
 }
+
+describe('Task 10 — writer ancestry + 10+5 Docker truth (unit)', () => {
+  const runner = require(RUNNER_PATH) as RunnerModule;
+  const HEXP = 'd'.repeat(64);
+  const predecessor = {
+    journal_entry_hash: HEXP,
+    checkpoint_sha256: HEXP,
+    writer_quiesce_manifest_sha256: HEXP,
+    is_unique_head: true,
+    is_required_ancestor: true,
+  };
+
+  it('binds the prepared_quiesced predecessor as the unique required ancestor', () => {
+    const bound = probe.bindPreparedQuiescedPredecessor(predecessor);
+    expect(bound.writer_quiesce_manifest_sha256).toBe(HEXP);
+    expect(bound.prepared_quiesced_predecessor_sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('rejects a non-unique head, a non-ancestor, or a required rollback manifest', () => {
+    expect(() =>
+      probe.bindPreparedQuiescedPredecessor({ ...predecessor, is_unique_head: false })
+    ).toThrow(/head/i);
+    expect(() =>
+      probe.bindPreparedQuiescedPredecessor({ ...predecessor, is_required_ancestor: false })
+    ).toThrow(/ancestor/i);
+    // Pre-R must NOT require or invent a rollback final-writer manifest.
+    expect(() =>
+      probe.bindPreparedQuiescedPredecessor({
+        ...predecessor,
+        rollback_final_writer_manifest_required: true,
+      })
+    ).toThrow(/rollback|task 9|pre-?r/i);
+  });
+
+  it('projects the 10+5 Docker truth from synthetic inspect/compose data', () => {
+    const { inspect, composePs } = runner.buildSyntheticDockerInventory();
+    const observation = probe.projectDockerObservation({ inspect, composePs });
+    expect(observation.total).toBe(15);
+    expect(observation.final).toBe(10);
+    expect(observation.held).toBe(5);
+    expect(observation.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('detects Docker drift: running, wrong restart policy, missing/duplicate/miscount', () => {
+    for (const corrupt of [
+      'running',
+      'restart-policy',
+      'missing-compose',
+      'duplicate-id',
+      'wrong-count',
+    ]) {
+      const { inspect, composePs } = runner.buildSyntheticDockerInventory({ corrupt });
+      expect(() => probe.projectDockerObservation({ inspect, composePs }), corrupt).toThrow();
+    }
+  });
+});
 
 describe('Task 9 — H/N evidence table (unit)', () => {
   const H = 'c'.repeat(64);
