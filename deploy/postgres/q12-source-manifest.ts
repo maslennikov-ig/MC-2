@@ -1255,6 +1255,30 @@ function verifyTransition(flags: Map<string, string>): void {
   process.stdout.write('baseline-to-cutover transition equality passed\n');
 }
 
+function reportManifestDiff(expected: unknown, actual: unknown): void {
+  // Diagnostic paths for the operator log; the manifest is already
+  // secret-scanned, and values are truncated.
+  const lines: string[] = [];
+  const walk = (left: unknown, right: unknown, path: string): void => {
+    if (lines.length >= 20) return;
+    if (canonical(left) === canonical(right)) return;
+    const leftIsObject = left !== null && typeof left === 'object';
+    const rightIsObject = right !== null && typeof right === 'object';
+    if (leftIsObject && rightIsObject && Array.isArray(left) === Array.isArray(right)) {
+      const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+      for (const key of [...keys].sort()) {
+        walk((left as JsonObject)[key], (right as JsonObject)[key], `${path}/${key}`);
+      }
+      return;
+    }
+    lines.push(
+      `${path}: source=${JSON.stringify(left)?.slice(0, 200) ?? 'absent'} target=${JSON.stringify(right)?.slice(0, 200) ?? 'absent'}`
+    );
+  };
+  walk(expected, actual, '');
+  for (const line of lines) process.stderr.write(`${line}\n`);
+}
+
 function compare(flags: Map<string, string>): void {
   const source = JSON.parse(readFileSync(required(flags, '--source'), 'utf8')) as JsonObject;
   const target = JSON.parse(readFileSync(required(flags, '--target'), 'utf8')) as JsonObject;
@@ -1265,7 +1289,10 @@ function compare(flags: Map<string, string>): void {
   if (source.schema !== SCHEMA || target.schema !== SCHEMA) fail('manifest schema mismatch');
   const expected = normalizeSource(object(source[viewName], `source.${viewName}`));
   const actual = normalizeForTarget(object(target[viewName], `target.${viewName}`), targetDatabase);
-  if (canonical(expected) !== canonical(actual)) fail(`manifest mismatch for ${viewName}`);
+  if (canonical(expected) !== canonical(actual)) {
+    reportManifestDiff(expected, actual);
+    fail(`manifest mismatch for ${viewName}`);
+  }
   process.stdout.write(`${viewName} manifest equality passed\n`);
 }
 
