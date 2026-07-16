@@ -69,6 +69,11 @@ interface ProbeModule {
     readonly length: number;
     readonly headHash: string | null;
   };
+  // Task 2
+  splitProjectionTemplates(sql: string): Map<string, string>;
+  assertProjectionAllowlist(sql: string): void;
+  PROJECTION_TEMPLATE_NAMES: readonly string[];
+  PROJECTION_FORBIDDEN: readonly string[];
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -173,5 +178,91 @@ describe('Task 1 — canonical JSON + frame envelope + hashing', () => {
         previous_frame_sha256: 'a'.repeat(64),
       })
     ).toThrow(/previous_frame_sha256/i);
+  });
+});
+
+// The FD-11 SQL projection's own SHA-256 IS the request `projection_sql_sha256`
+// (contract request key, separate from `w_activation_tuple_sha256`). NOTE: the
+// plan's phrase "bound from the W tuple's activation_sql_projection_sha256"
+// (field 5 = a42d6d39, the activation barrier's 8839-byte MUTATION SQL) is a
+// plan imprecision — field 5 is incompatible with a read-only allowlist. The
+// contract separates the two hashes; projection_sql_sha256 is this file's hash.
+const PROJECTION_SQL = resolve(REPO_ROOT, 'deploy/qdrant/q12-activation-truth-projection.sql');
+const PROJECTION_SQL_SHA256 = 'ba31de92256bc1f5444ab3b8dbcd814052b54664bd93fc16bc0de55a24050e6d';
+
+// Accepted W lock catalog/order (fields 8/9) — the sole authority for the
+// full-catalog SHARE lock relation set and order.
+const LOCK_ORDER = resolve(
+  REPO_ROOT,
+  'deploy/qdrant/q12-activation-lock-order.test-reference.json'
+);
+const LOCK_CATALOG = resolve(
+  REPO_ROOT,
+  'deploy/qdrant/q12-activation-lock-catalog.test-reference.json'
+);
+
+describe('Task 2 — exact SQL projection bundle', () => {
+  it('exists and its SHA-256 equals the request projection_sql_sha256', () => {
+    const bytes = readFileSync(PROJECTION_SQL);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(PROJECTION_SQL_SHA256);
+  });
+
+  it('binds the accepted W catalog/order (fields 8/9) unchanged', () => {
+    expect(createHash('sha256').update(readFileSync(LOCK_CATALOG)).digest('hex')).toBe(
+      W_TUPLE.activation_lock_catalog_sha256
+    );
+    expect(createHash('sha256').update(readFileSync(LOCK_ORDER)).digest('hex')).toBe(
+      W_TUPLE.activation_lock_order_sha256
+    );
+  });
+
+  it('splits into exactly the expected named templates', () => {
+    const sql = readFileSync(PROJECTION_SQL, 'utf8');
+    const templates = probe.splitProjectionTemplates(sql);
+    expect([...templates.keys()].sort()).toEqual([...probe.PROJECTION_TEMPLATE_NAMES].sort());
+    expect(templates.get('transaction_begin')).toContain(
+      'BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY'
+    );
+    expect(templates.get('transaction_begin')).toContain("SET LOCAL lock_timeout = '120s'");
+    expect(templates.get('transaction_begin')).toContain("SET LOCAL statement_timeout = '180s'");
+    expect(templates.get('transaction_begin')).toContain(
+      "SET LOCAL idle_in_transaction_session_timeout = '300s'"
+    );
+    expect(templates.get('full_catalog_share_lock')).toContain('IN SHARE MODE');
+    expect(templates.get('clear_snapshot')).toContain('pg_stat_clear_snapshot()');
+  });
+
+  it('bakes the full-catalog SHARE lock in the accepted byte order', () => {
+    const sql = readFileSync(PROJECTION_SQL, 'utf8');
+    const lockTemplate = probe.splitProjectionTemplates(sql).get('full_catalog_share_lock') ?? '';
+    const order = JSON.parse(readFileSync(LOCK_ORDER, 'utf8')) as { relations: string[] };
+    // Every relation appears, in the accepted order (ascending offsets).
+    let cursor = -1;
+    for (const relation of order.relations) {
+      const at = lockTemplate.indexOf(relation, cursor + 1);
+      expect(at, `relation ${relation} missing or out of order`).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+  });
+
+  it('contains no forbidden constructs outside quoted literals/identifiers', () => {
+    const sql = readFileSync(PROJECTION_SQL, 'utf8');
+    // Strip line comments, single-quoted literals, and double-quoted identifiers
+    // so quoted privilege names ('UPDATE' etc.) do not trip the scan.
+    const stripped = sql
+      .replace(/--[^\n]*/g, ' ')
+      .replace(/'(?:[^']|'')*'/g, " '' ")
+      .replace(/"(?:[^"]|"")*"/g, ' "" ');
+    for (const forbidden of probe.PROJECTION_FORBIDDEN) {
+      expect(
+        new RegExp(`\\b${forbidden}\\b`, 'i').test(stripped),
+        `forbidden construct ${forbidden} present`
+      ).toBe(false);
+    }
+    // assertProjectionAllowlist accepts the real bundle and rejects tampering.
+    expect(() => probe.assertProjectionAllowlist(sql)).not.toThrow();
+    expect(() =>
+      probe.assertProjectionAllowlist(sql + '\n--@template evil\nDROP TABLE x;\n--@end evil\n')
+    ).toThrow();
   });
 });
