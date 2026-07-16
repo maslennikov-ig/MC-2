@@ -393,7 +393,7 @@ describe('Task 1 — canonical JSON + frame envelope + hashing', () => {
 // plan imprecision — field 5 is incompatible with a read-only allowlist. The
 // contract separates the two hashes; projection_sql_sha256 is this file's hash.
 const PROJECTION_SQL = resolve(REPO_ROOT, 'deploy/qdrant/q12-activation-truth-projection.sql');
-const PROJECTION_SQL_SHA256 = 'ba31de92256bc1f5444ab3b8dbcd814052b54664bd93fc16bc0de55a24050e6d';
+const PROJECTION_SQL_SHA256 = 'b4558ec09f67b663540e53f8a24b28030661bcca9daa74cab7321564798e9bad';
 
 // Accepted W lock catalog/order (fields 8/9) — the sole authority for the
 // full-catalog SHARE lock relation set and order.

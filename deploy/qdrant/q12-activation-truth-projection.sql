@@ -365,13 +365,17 @@ ORDER BY px.gid;
 --@end prepared_xacts
 
 --@template session_activity
+-- Provider-plane backends (autovacuum launcher, background writer, etc.) report
+-- NULL usename/datname/application_name/state; coalesce them to the exact
+-- inventory sentinels ('' and 'none') so background rows match their managed
+-- identities instead of tripping the security-restricted-null gate.
 SELECT
   sa.pid AS pid,
-  sa.usename AS role,
-  sa.datname AS database,
+  COALESCE(sa.usename::text, '') AS role,
+  COALESCE(sa.datname::text, '') AS database,
   sa.backend_type AS backend_type,
-  sa.application_name AS application_identity,
-  sa.state AS state,
+  COALESCE(sa.application_name, '') AS application_identity,
+  COALESCE(sa.state, 'none') AS state,
   (sa.xact_start IS NULL) AS xact_start_is_null,
   (sa.backend_xid IS NULL) AS backend_xid_is_null,
   (sa.backend_xmin IS NULL) AS backend_xmin_is_null,
