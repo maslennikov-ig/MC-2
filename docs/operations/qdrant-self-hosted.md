@@ -539,6 +539,45 @@ failure leaves the timer disabled; there is no cron fallback or `enable --now`
 duplicate. Its authoritative proof lifecycle is likewise defined inside the
 fixed-hash installer and cannot be replaced through a mutable sibling helper.
 
+### Joined controller: smoke/observation gate and activation-truth handshake
+
+The joined Root controller (`deploy/qdrant/q12-lifecycle-core.py` behind the
+fixed wrappers `q12-live-cutover.sh` supervisor, `q12-capability-run.sh` claim,
+and `q12-live-smoke.sh` smoke) adds two local, synthetic-only surfaces used to
+prove the activation observation gate and the activation-truth R handshake
+before any authorized live window. Neither opens a database, container, socket,
+or service.
+
+`q12-live-smoke.sh observe --run-id <run-id> --observation-fixture <path>`
+evaluates the §13 activation observation gate over an observation projection and
+emits a fail-closed verdict. Acceptance requires every threshold met — document
+outcome coverage and baseline preservation `100%`, isolation violations and
+unresolved P0/P1 incidents `0`, Qdrant REST error ratio at most `2%`, hybrid
+fallback at most `5%`, Qdrant memory at most `85%`, point-count drop at most
+`10%`, exactly `12,114` points on the initial cutover, fewer than `3` degraded
+automatic decisions, a firing-and-resolved notification, and every activation
+row exactly `enabled=true`, `status=active`, `rollout_percentage=100` — together
+with at least 60 observed minutes and one complete course cycle. Any breach
+keeps Q12 open and selects the phase-aware rollback/incident path; elapsed time
+never converts a failed metric into acceptance. Every terminal verdict records
+`rotation_required=true`.
+
+The activation-truth R handshake is a chained frame transcript
+(`db_locked → host_projection → host_bound → predecision → sealed → release →
+closed` for a completed handshake, ending at `abort_incident` for a drift
+abort). Each frame carries `schema_version, sequence, kind, run_id, payload,
+previous_frame_sha256, frame_sha256`; `frame_sha256` is the SHA-256 over the
+frame's canonical body excluding that field, the sequence starts at 1, and every
+frame chains the prior tip. All hashing is over the in-memory canonical form, so
+validation-at-load parses each stored frame, re-derives `frame_sha256` from the
+canonical object, and re-verifies the chain — it never hashes raw file bytes.
+The controller binds the transcript head immediately before the predecision into
+the predecision object and the final transcript head into the terminal seal, and
+requires the seal to bind its predecision. A validated `precommit_rollback_sealed`
+seal hands the post-`R` frontier to Task 9 retirement/rollback preparation; a
+`committed_finish_forward_sealed` seal authorizes finish-forward; a drift abort
+is incident-only. These evaluators take no remote/live action.
+
 ## Snapshot and restore command contracts
 
 Development staging uses Qdrant `snapshots_storage=local` and explicitly sets
