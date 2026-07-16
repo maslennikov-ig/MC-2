@@ -672,6 +672,15 @@ PY
   [[ "$("$DOCKER" inspect --format '{{.Id}}' "$CONTAINER_ID")" == "$CONTAINER_ID" ]] || fail 'isolated container identity drift'
   "$DOCKER" restart "$CONTAINER_ID" >/dev/null
   wait_ready
+  # A restart reassigns the kernel-selected loopback port, so every service
+  # file written before the restart must be regenerated against the new port.
+  port=$("$DOCKER" port "$CONTAINER_ID" 5432/tcp)
+  [[ "$port" =~ ^127\.0\.0\.1:([0-9]+)$ ]] || fail 'kernel-selected loopback port is invalid after restart'
+  port=${BASH_REMATCH[1]}
+  write_pgpass "$TEMP_ROOT/cleanup.pgpass" "$port" postgres postgres "$cleanup_password"
+  write_service "$TEMP_ROOT/cleanup-postgres.service" mc2_restore_cleanup_postgres "$port" postgres postgres "$TEMP_ROOT/cleanup.pgpass"
+  write_pgpass "$TEMP_ROOT/cleanup-restore-test.pgpass" "$port" restore_test postgres "$cleanup_password"
+  write_service "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup "$port" restore_test postgres "$TEMP_ROOT/cleanup-restore-test.pgpass"
   prove_isolated_settings "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup
 
   write_pgpass "$TEMP_ROOT/restore.pgpass" "$port" restore_test supabase_admin "$restore_password"
