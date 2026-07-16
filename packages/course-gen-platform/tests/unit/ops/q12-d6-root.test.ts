@@ -525,3 +525,23 @@ describe('Correction — canonical() NFC normalization (cross-stream hash parity
     expect(result.no_trailing_lf).toBe(true);
   });
 });
+
+describe('Correction — secret identity re-proven after the bytes are read', () => {
+  it('accepts an unchanged descriptor after read', () => {
+    const result = runScenario({ scenario: 'secret_after_read' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.stable).toBe(true);
+  });
+
+  it('fails closed when owner/mode change (chmod) between open and the post-read check', () => {
+    const result = runScenario({ scenario: 'secret_after_read', mutation: 'chmod' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/unsafe file identity|changed/i);
+  });
+
+  it('fails closed when the inode is swapped between open and the post-read check', () => {
+    const result = runScenario({ scenario: 'secret_after_read', mutation: 'swap' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/unsafe file identity|changed/i);
+  });
+});
