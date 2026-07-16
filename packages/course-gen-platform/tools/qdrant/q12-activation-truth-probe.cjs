@@ -1473,6 +1473,432 @@ function projectDockerObservation(input) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Task 11 — request schema + frame payloads + protocol sequence (contract
+// "Canonical objects and frame envelope" (request), "Exact frame payloads").
+// The request is only a bound input; its evidence state and five evidence
+// fields obey the H/N table and must equal the later host projection byte-for-
+// byte. The probe emits db_locked -> host_bound -> sealed -> closed, chained by
+// sequence and previous_frame_sha256.
+// ---------------------------------------------------------------------------
+
+const FRAME_SCHEMA_VERSION = 'megacampus.q12.activation-truth-frame/v1';
+
+const REQUEST_KEYS = Object.freeze([
+  'schema_version',
+  'run_id',
+  'release_sha',
+  'lease_epoch',
+  'predecessor_journal_entry_hash',
+  'predecessor_checkpoint_sha256',
+  'previous_terminal_seal_sha256',
+  'abandoned_predecision_sha256',
+  'expected_catalog_sha256',
+  'expected_post_migration_catalog_sha256',
+  'database_capability_sha256',
+  'activation_capability_sha256',
+  'prepared_quiesced_predecessor_sha256',
+  'writer_quiesce_manifest_sha256',
+  'activation_evidence_state',
+  'barrier_receipt_sha256',
+  'probe_receipt_sha256',
+  'activation_result_sha256',
+  'activation_process_projection_sha256',
+  'process_manifest_sha256',
+  'w_activation_tuple_sha256',
+  'projection_sql_sha256',
+  'spawn_capability_sha256',
+  'runtime_fd_baseline_sha256',
+]);
+
+const EVIDENCE_STATE_TO_CLASSIFICATION = Object.freeze({
+  prepared_guarded: 'precommit_rollback',
+  complete_receipt: 'committed_finish_forward',
+  committed_receipt_pending: 'committed_finish_forward',
+  incident_observed: 'drift_incident',
+});
+
+const REQUEST_REQUIRED_HASHES = Object.freeze([
+  'release_sha',
+  'predecessor_journal_entry_hash',
+  'predecessor_checkpoint_sha256',
+  'expected_catalog_sha256',
+  'expected_post_migration_catalog_sha256',
+  'database_capability_sha256',
+  'activation_capability_sha256',
+  'prepared_quiesced_predecessor_sha256',
+  'writer_quiesce_manifest_sha256',
+  'activation_process_projection_sha256',
+  'w_activation_tuple_sha256',
+  'projection_sql_sha256',
+  'spawn_capability_sha256',
+  'runtime_fd_baseline_sha256',
+]);
+
+function isHashOrNull(value) {
+  return value === null || (typeof value === 'string' && HEX64.test(value));
+}
+function requireHash(obj, name, label) {
+  if (typeof obj[name] !== 'string' || !HEX64.test(obj[name])) {
+    throw new Error(`${label}: ${name} must be lowercase 64-hex`);
+  }
+}
+function requireHashOrNull(obj, name, label) {
+  if (!isHashOrNull(obj[name])) {
+    throw new Error(`${label}: ${name} must be lowercase 64-hex or null`);
+  }
+}
+
+/**
+ * Validate the immutable request against its exact 24-key schema, restart-rule
+ * nullability, and the evidence H/N table for its evidence state.
+ * @param {Record<string, unknown>} request
+ */
+function validateRequest(request) {
+  assertExactKeySet(request, REQUEST_KEYS, 'validateRequest');
+  if (typeof request.schema_version !== 'string' || request.schema_version.length === 0) {
+    throw new Error('validateRequest: schema_version must be a non-empty string');
+  }
+  if (typeof request.run_id !== 'string' || request.run_id.length === 0) {
+    throw new Error('validateRequest: run_id must be a non-empty string');
+  }
+  if (!Number.isInteger(request.lease_epoch) || request.lease_epoch < 0) {
+    throw new Error('validateRequest: lease_epoch must be a non-negative integer');
+  }
+  for (const name of REQUEST_REQUIRED_HASHES) requireHash(request, name, 'validateRequest');
+  requireHashOrNull(request, 'previous_terminal_seal_sha256', 'validateRequest');
+  requireHashOrNull(request, 'abandoned_predecision_sha256', 'validateRequest');
+  const classification = EVIDENCE_STATE_TO_CLASSIFICATION[request.activation_evidence_state];
+  if (classification === undefined) {
+    throw new Error('validateRequest: unknown activation_evidence_state');
+  }
+  if (request.activation_evidence_state === 'incident_observed') {
+    for (const name of [
+      'barrier_receipt_sha256',
+      'probe_receipt_sha256',
+      'activation_result_sha256',
+      'process_manifest_sha256',
+    ]) {
+      requireHashOrNull(request, name, 'validateRequest');
+    }
+  } else {
+    validateEvidenceTable({
+      classification,
+      activation_evidence_state: request.activation_evidence_state,
+      barrier_receipt_sha256: request.barrier_receipt_sha256,
+      probe_receipt_sha256: request.probe_receipt_sha256,
+      activation_result_sha256: request.activation_result_sha256,
+      activation_process_projection_sha256: request.activation_process_projection_sha256,
+      process_manifest_sha256: request.process_manifest_sha256,
+    });
+  }
+  const clean = {};
+  for (const key of REQUEST_KEYS) clean[key] = request[key];
+  return clean;
+}
+
+const REQUEST_HOST_EVIDENCE_FIELDS = Object.freeze([
+  'activation_evidence_state',
+  'barrier_receipt_sha256',
+  'probe_receipt_sha256',
+  'activation_result_sha256',
+  'activation_process_projection_sha256',
+  'process_manifest_sha256',
+]);
+
+/**
+ * Assert the request evidence state + five evidence fields equal the host
+ * projection byte-for-byte; any disagreement is drift_incident.
+ * @param {Record<string, unknown>} request
+ * @param {Record<string, unknown>} hostProjection
+ */
+function assertRequestMatchesHostProjection(request, hostProjection) {
+  for (const field of REQUEST_HOST_EVIDENCE_FIELDS) {
+    if (request[field] !== hostProjection[field]) {
+      throw new Error(`assertRequestMatchesHostProjection: ${field} mismatch (drift_incident)`);
+    }
+  }
+}
+
+function requireAllHash(input, names, label) {
+  for (const name of names) requireHash(input, name, label);
+}
+
+function buildDbLockedPayload(input) {
+  requireAllHash(
+    input,
+    [
+      'request_sha256',
+      'initial_database_projection_sha256',
+      'capability_projection_sha256',
+      'lock_projection_sha256',
+      'fd9_identity_sha256',
+    ],
+    'buildDbLockedPayload'
+  );
+  return {
+    request_sha256: input.request_sha256,
+    initial_database_projection_sha256: input.initial_database_projection_sha256,
+    capability_projection_sha256: input.capability_projection_sha256,
+    lock_projection_sha256: input.lock_projection_sha256,
+    fd9_identity_sha256: input.fd9_identity_sha256,
+  };
+}
+
+function buildHostBoundPayload(input) {
+  requireAllHash(
+    input,
+    [
+      'request_sha256',
+      'initial_database_projection_sha256',
+      'bound_database_projection_sha256',
+      'host_projection_sha256',
+      'session_observation_sha256',
+      'fd9_identity_sha256',
+    ],
+    'buildHostBoundPayload'
+  );
+  return {
+    request_sha256: input.request_sha256,
+    initial_database_projection_sha256: input.initial_database_projection_sha256,
+    bound_database_projection_sha256: input.bound_database_projection_sha256,
+    host_projection_sha256: input.host_projection_sha256,
+    session_observation_sha256: input.session_observation_sha256,
+    fd9_identity_sha256: input.fd9_identity_sha256,
+  };
+}
+
+function buildSealedPayload(input) {
+  requireAllHash(
+    input,
+    [
+      'request_sha256',
+      'predecision_sha256',
+      'initial_database_projection_sha256',
+      'final_database_projection_sha256',
+      'host_projection_sha256',
+      'fd9_identity_sha256',
+    ],
+    'buildSealedPayload'
+  );
+  requireHashOrNull(input, 'actual_r_journal_entry_hash', 'buildSealedPayload');
+  requireHashOrNull(input, 'actual_r_checkpoint_sha256', 'buildSealedPayload');
+  return {
+    request_sha256: input.request_sha256,
+    predecision_sha256: input.predecision_sha256,
+    initial_database_projection_sha256: input.initial_database_projection_sha256,
+    final_database_projection_sha256: input.final_database_projection_sha256,
+    host_projection_sha256: input.host_projection_sha256,
+    actual_r_journal_entry_hash: input.actual_r_journal_entry_hash,
+    actual_r_checkpoint_sha256: input.actual_r_checkpoint_sha256,
+    fd9_identity_sha256: input.fd9_identity_sha256,
+  };
+}
+
+function buildClosedPayload(input) {
+  requireAllHash(
+    input,
+    [
+      'request_sha256',
+      'predecision_sha256',
+      'sealed_frame_sha256',
+      'release_frame_sha256',
+      'fd9_identity_sha256',
+    ],
+    'buildClosedPayload'
+  );
+  requireHashOrNull(input, 'actual_r_journal_entry_hash', 'buildClosedPayload');
+  requireHashOrNull(input, 'actual_r_checkpoint_sha256', 'buildClosedPayload');
+  return {
+    request_sha256: input.request_sha256,
+    predecision_sha256: input.predecision_sha256,
+    sealed_frame_sha256: input.sealed_frame_sha256,
+    release_frame_sha256: input.release_frame_sha256,
+    actual_r_journal_entry_hash: input.actual_r_journal_entry_hash,
+    actual_r_checkpoint_sha256: input.actual_r_checkpoint_sha256,
+    transaction_end: 'read_only_commit',
+    connection_closed: true,
+    fd9_identity_sha256: input.fd9_identity_sha256,
+  };
+}
+
+const CLASSIFICATION_ACTION_PAIRS = Object.freeze({
+  precommit_rollback: 'append_r_then_seal',
+  committed_finish_forward: 'seal_finish_forward',
+  drift_incident: 'abort_incident',
+});
+
+function validateHostProjectionPayload(payload) {
+  assertExactKeySet(
+    payload,
+    [
+      'request_sha256',
+      'initial_database_projection_sha256',
+      'host_projection_sha256',
+      'proposed_classification',
+      'prepared_quiesced_predecessor_sha256',
+    ],
+    'validateHostProjectionPayload'
+  );
+  if (CLASSIFICATION_ACTION_PAIRS[payload.proposed_classification] === undefined) {
+    throw new Error('validateHostProjectionPayload: unknown proposed_classification');
+  }
+  requireAllHash(
+    payload,
+    [
+      'request_sha256',
+      'initial_database_projection_sha256',
+      'host_projection_sha256',
+      'prepared_quiesced_predecessor_sha256',
+    ],
+    'validateHostProjectionPayload'
+  );
+}
+
+function validatePredecisionPayload(payload) {
+  assertExactKeySet(
+    payload,
+    [
+      'request_sha256',
+      'predecision_sha256',
+      'classification',
+      'action',
+      'planned_r_journal_entry_hash',
+      'planned_r_checkpoint_sha256',
+      'predecessor_journal_entry_hash',
+      'predecessor_checkpoint_sha256',
+    ],
+    'validatePredecisionPayload'
+  );
+  const expectedAction = CLASSIFICATION_ACTION_PAIRS[payload.classification];
+  if (expectedAction === undefined || expectedAction !== payload.action) {
+    throw new Error('validatePredecisionPayload: classification/action pairing is invalid');
+  }
+  requireAllHash(
+    payload,
+    ['request_sha256', 'predecision_sha256', 'predecessor_journal_entry_hash', 'predecessor_checkpoint_sha256'],
+    'validatePredecisionPayload'
+  );
+  if (payload.classification === 'precommit_rollback') {
+    requireHash(payload, 'planned_r_journal_entry_hash', 'validatePredecisionPayload');
+    requireHash(payload, 'planned_r_checkpoint_sha256', 'validatePredecisionPayload');
+  } else {
+    if (payload.planned_r_journal_entry_hash !== null || payload.planned_r_checkpoint_sha256 !== null) {
+      throw new Error('validatePredecisionPayload: planned R hashes must be null for non-precommit');
+    }
+  }
+}
+
+function validateReleasePayload(payload) {
+  assertExactKeySet(
+    payload,
+    [
+      'request_sha256',
+      'predecision_sha256',
+      'sealed_frame_sha256',
+      'actual_r_journal_entry_hash',
+      'actual_r_checkpoint_sha256',
+      'expected_transaction_end',
+      'expected_connection_close',
+    ],
+    'validateReleasePayload'
+  );
+  requireAllHash(
+    payload,
+    ['request_sha256', 'predecision_sha256', 'sealed_frame_sha256'],
+    'validateReleasePayload'
+  );
+  requireHashOrNull(payload, 'actual_r_journal_entry_hash', 'validateReleasePayload');
+  requireHashOrNull(payload, 'actual_r_checkpoint_sha256', 'validateReleasePayload');
+  if (payload.expected_transaction_end !== 'read_only_commit') {
+    throw new Error("validateReleasePayload: expected_transaction_end must be 'read_only_commit'");
+  }
+  if (payload.expected_connection_close !== true) {
+    throw new Error('validateReleasePayload: expected_connection_close must be true');
+  }
+}
+
+const PROTOCOL_ORDER = Object.freeze([
+  ['probe', 'db_locked'],
+  ['root', 'host_projection'],
+  ['probe', 'host_bound'],
+  ['root', 'predecision'],
+  ['probe', 'sealed'],
+  ['root', 'release'],
+  ['probe', 'closed'],
+]);
+
+/**
+ * Probe-side protocol state machine. Enforces the exact ordered sequence and
+ * chains every frame by sequence + previous_frame_sha256; any direction,
+ * sequence, kind, or hash mismatch is an incident.
+ */
+class ProbeProtocol {
+  constructor(schemaVersion, runId) {
+    this._schemaVersion = schemaVersion;
+    this._runId = runId;
+    this._index = 0;
+    this._seq = 0;
+    this._head = null;
+  }
+
+  emit(kind, payload) {
+    const expected = PROTOCOL_ORDER[this._index];
+    if (!expected || expected[0] !== 'probe') {
+      throw new Error(`ProbeProtocol: unexpected emit at step ${this._index}`);
+    }
+    if (expected[1] !== kind) {
+      throw new Error(`ProbeProtocol: expected to emit '${expected[1]}', got '${kind}'`);
+    }
+    this._seq += 1;
+    const frame = makeFrame({
+      schema_version: this._schemaVersion,
+      sequence: this._seq,
+      kind,
+      run_id: this._runId,
+      payload,
+      previous_frame_sha256: this._head,
+    });
+    this._head = frame.frame_sha256;
+    this._index += 1;
+    return frame;
+  }
+
+  receive(frame) {
+    const expected = PROTOCOL_ORDER[this._index];
+    if (!expected || expected[0] !== 'root') {
+      throw new Error(`ProbeProtocol: unexpected receive at step ${this._index}`);
+    }
+    if (frame.kind !== expected[1]) {
+      throw new Error(`ProbeProtocol: expected to receive '${expected[1]}', got '${frame.kind}'`);
+    }
+    if (frame.sequence !== this._seq + 1) {
+      throw new Error('ProbeProtocol: out-of-order sequence');
+    }
+    if (frame.previous_frame_sha256 !== this._head) {
+      throw new Error('ProbeProtocol: broken previous_frame_sha256 chain');
+    }
+    const withoutHash = {};
+    for (const key of Object.keys(frame)) {
+      if (key !== 'frame_sha256') withoutHash[key] = frame[key];
+    }
+    if (frame.frame_sha256 !== canonicalHash(withoutHash)) {
+      throw new Error('ProbeProtocol: frame_sha256 does not match canonical bytes');
+    }
+    this._seq += 1;
+    this._head = frame.frame_sha256;
+    this._index += 1;
+  }
+
+  get done() {
+    return this._index === PROTOCOL_ORDER.length;
+  }
+
+  get headHash() {
+    return this._head;
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -1524,6 +1950,19 @@ module.exports = {
   assertCommittedReceiptPendingLegal,
   bindPreparedQuiescedPredecessor,
   projectDockerObservation,
+  FRAME_SCHEMA_VERSION,
+  REQUEST_KEYS,
+  EVIDENCE_STATE_TO_CLASSIFICATION,
+  validateRequest,
+  assertRequestMatchesHostProjection,
+  buildDbLockedPayload,
+  buildHostBoundPayload,
+  buildSealedPayload,
+  buildClosedPayload,
+  validateHostProjectionPayload,
+  validatePredecisionPayload,
+  validateReleasePayload,
+  ProbeProtocol,
 };
 
 // ---------------------------------------------------------------------------
