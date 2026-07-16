@@ -617,8 +617,11 @@ if ports != [{"HostIp":"127.0.0.1","HostPort":sys.argv[4]}]:
     raise SystemExit("loopback port mapping mismatch")
 PY
 
-  write_pgpass "$TEMP_ROOT/init.pgpass" "$port" postgres postgres "$initial_password"
-  write_service "$TEMP_ROOT/init.service" mc2_restore_init "$port" postgres postgres "$TEMP_ROOT/init.pgpass"
+  # supautils reserves the supabase_* platform roles, so the bootstrap must
+  # run as the image superuser supabase_admin; the entrypoint assigns it the
+  # same initial password.
+  write_pgpass "$TEMP_ROOT/init.pgpass" "$port" postgres supabase_admin "$initial_password"
+  write_service "$TEMP_ROOT/init.service" mc2_restore_init "$port" postgres supabase_admin "$TEMP_ROOT/init.pgpass"
   PGSERVICEFILE="$TEMP_ROOT/init.service" PGSERVICE=mc2_restore_init run_ts "$MANIFEST_TOOL" inventory --output "$TEMP_ROOT/image-roles.json"
   run_ts "$ROLE_TOOL" --manifest "$GENERATION/source-manifest.json" \
     --image-inventory "$TEMP_ROOT/image-roles.json" --target-database restore_test \
