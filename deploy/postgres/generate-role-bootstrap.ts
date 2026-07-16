@@ -331,11 +331,20 @@ function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const manifest = JSON.parse(readFileSync(args.manifest, 'utf8')) as JsonObject;
   const image = JSON.parse(readFileSync(args.image, 'utf8')) as JsonObject;
-  scanSecretShape(manifest);
   scanSecretShape(image);
   if (manifest.schema !== 'megacampus.supabase-source-manifest/v1')
     fail('source manifest schema mismatch');
   const source = object(manifest.cutover_snapshot, 'cutover_snapshot');
+  // The bootstrap renders SQL only from the role plane; manifest catalog
+  // definition bodies legitimately embed public tokens such as the published
+  // supabase-dbdev anon JWT and never reach the generated bootstrap.
+  scanSecretShape({
+    roles: source.roles,
+    pg_participants: source.pg_participants,
+    memberships: source.memberships,
+    role_settings: source.role_settings,
+    parameter_acls: source.parameter_acls,
+  });
   const roles = array(source.roles, 'cutover_snapshot.roles').map((value, index) =>
     parseRole(value, `cutover_snapshot.roles[${index}]`)
   );
