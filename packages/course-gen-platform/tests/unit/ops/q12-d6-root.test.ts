@@ -545,3 +545,21 @@ describe('Correction — secret identity re-proven after the bytes are read', ()
     expect(result.error).toMatch(/unsafe file identity|changed/i);
   });
 });
+
+describe('Correction — terminal seal binds the hash of its own predecision', () => {
+  it('accepts a seal whose predecision_sha256 hashes the canonical predecision', () => {
+    const result = runScenario({ scenario: 'seal_binding', classification: 'precommit_rollback' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.bound).toBe(true);
+  });
+
+  it('rejects a seal that binds a mismatched predecision', () => {
+    const result = runScenario({
+      scenario: 'seal_binding',
+      classification: 'precommit_rollback',
+      tamper: true,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/predecision|bind/i);
+  });
+});
