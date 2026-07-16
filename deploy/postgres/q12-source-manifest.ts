@@ -720,6 +720,18 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
       }
     }
   }
+  // A pg_default_acl row whose content equals the hardwired builtin default
+  // (owner self-grants) is vestigial: pg_dump emits nothing for it, so the
+  // restored copy legitimately lacks the row. Owner self-grant entries are
+  // therefore excluded from both sides of the comparison.
+  const defaultAcls = catalogObject.default_acls;
+  if (Array.isArray(defaultAcls)) {
+    catalogObject.default_acls = defaultAcls.filter(entry => {
+      if (entry === null || typeof entry !== 'object') return true;
+      const item = entry as JsonObject;
+      return item.grantee !== item.owner;
+    });
+  }
   for (const key of Object.keys(catalogObject)) {
     if (key.endsWith('_sha256')) delete catalogObject[key];
   }
