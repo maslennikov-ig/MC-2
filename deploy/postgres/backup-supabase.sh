@@ -651,8 +651,15 @@ if len(password) >= 8:
 uri_pattern = re.compile(rb"postgres(?:ql)?://[^\s/:]+:[^\s@]+@", re.IGNORECASE)
 token_pattern = re.compile(rb"(?:eyJ[A-Za-z0-9_-]{20,}\.|sbp_[A-Za-z0-9_-]{16,})")
 for name in sys.argv[2:]:
-    data = pathlib.Path(name).read_bytes()
-    if any(needle and needle in data for needle in needles) or uri_pattern.search(data) or token_pattern.search(data):
+    path = pathlib.Path(name)
+    data = path.read_bytes()
+    if any(needle and needle in data for needle in needles):
+        raise SystemExit("credential-shaped content detected in generation")
+    # The dump and the manifest carry database content that legitimately
+    # embeds third-party URIs and public tokens (for example the published
+    # supabase-dbdev anon JWT inside function sources), so the broad shape
+    # patterns run only on the password-free roles export.
+    if path.name == "roles.sql" and (uri_pattern.search(data) or token_pattern.search(data)):
         raise SystemExit("credential-shaped content detected in generation")
 PY
 }

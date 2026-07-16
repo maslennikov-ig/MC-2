@@ -148,6 +148,7 @@ case "\${FAKE_DUMP_MODE:-success}" in
   success)
     printf 'PGDMP' > "$output"
     /usr/bin/dd if=/dev/zero bs=2048 count=1 status=none >> "$output"
+    [[ -z "\${FAKE_DUMP_EXTRA_CONTENT:-}" ]] || printf '%s' "$FAKE_DUMP_EXTRA_CONTENT" >> "$output"
     ;;
   *) exit 92 ;;
 esac
@@ -173,6 +174,7 @@ if [[ "\${FAKE_ROLES_LAYOUT:-synthetic}" == realistic ]]; then
 fi
 printf '%s\\n' '\\restrict mc2nonce'
 printf '%s\\n' 'CREATE ROLE admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN;'
+[[ -z "\${FAKE_ROLES_EXTRA:-}" ]] || printf '%s\\n' "$FAKE_ROLES_EXTRA"
 if [[ "\${FAKE_ROLES_LAYOUT:-synthetic}" == realistic ]]; then
   printf '\\n%s\\n' '-- Roles' '--'
 fi
@@ -959,6 +961,42 @@ describe('Q12 immutable Supabase backup generations', () => {
     expect(manifestTool).not.toMatch(/d\.daticurules/);
     expect(manifestTool).toContain("to_jsonb(d)->>'daticulocale'");
     expect(manifestTool).toContain("to_jsonb(d)->>'datlocale'");
+  });
+
+  it('publishes when database content carries public token-shaped strings', () => {
+    // The dump and manifest legitimately embed third-party tokens such as
+    // the published supabase-dbdev anon JWT inside function sources.
+    const item = fixture();
+
+    const result = run(item, {
+      FAKE_DUMP_EXTRA_CONTENT: 'prosrc eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.public-payload',
+    });
+
+    expect(result.status).toBe(0);
+    expect(published(item.backupDir)).toHaveLength(1);
+  });
+
+  it('fails closed when the run credential leaks into a generation file', () => {
+    const item = fixture();
+
+    const result = run(item, { FAKE_DUMP_EXTRA_CONTENT: 'synthetic-password-never-log' });
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain('generation secret scan failed');
+    expect(published(item.backupDir)).toHaveLength(0);
+  });
+
+  it('fails closed when the roles export carries a token-shaped value', () => {
+    const item = fixture();
+
+    const result = run(item, {
+      FAKE_ROLES_EXTRA:
+        "ALTER ROLE app SET app.jwt TO 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.leak';",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain('generation secret scan failed');
+    expect(published(item.backupDir)).toHaveLength(0);
   });
 
   it('fails closed when normalized password-free role exports drift', () => {
