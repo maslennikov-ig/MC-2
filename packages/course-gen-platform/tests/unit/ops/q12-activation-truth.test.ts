@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Q12 D6 activation-truth — DB probe stream (Stream 1) test suite.
@@ -74,6 +74,37 @@ interface ProbeModule {
   assertProjectionAllowlist(sql: string): void;
   PROJECTION_TEMPLATE_NAMES: readonly string[];
   PROJECTION_FORBIDDEN: readonly string[];
+  // Task 3
+  PRODUCTION_ENDPOINT: {
+    scheme: string;
+    host: string;
+    port: number;
+    user: string;
+    database: string;
+  };
+  PROD_CA_SHA256: string;
+  parseProductionUrl(url: string): {
+    scheme: string;
+    host: string;
+    port: number;
+    user: string;
+    database: string;
+  };
+  buildTlsConfig(
+    caPem: string | Uint8Array,
+    options: { serverName: string; expectedCaSha256: string }
+  ): { rejectUnauthorized: true; servername: string; ca: string | Uint8Array };
+  assertPostConnect(observed: {
+    session_user: string;
+    current_database: string;
+    transaction_read_only: string;
+    transaction_isolation: string;
+    server_version_num: number;
+  }): void;
+  assertBackendContinuity(
+    expected: { backend_pid: number; backend_start_utc: string },
+    observed: { backend_pid: number; backend_start_utc: string }
+  ): void;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -265,4 +296,344 @@ describe('Task 2 — exact SQL projection bundle', () => {
       probe.assertProjectionAllowlist(sql + '\n--@template evil\nDROP TABLE x;\n--@end evil\n')
     ).toThrow();
   });
+});
+
+// Production endpoint (contract "Immutable database and TLS identity").
+const PROD_URL =
+  'postgresql://postgres.diqooqbuchsliypgwksu@aws-1-us-east-2.pooler.supabase.com:5432/postgres';
+const PROD_CA_SHA256 = '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7';
+
+describe('Task 3 — connection identity + TLS + post-connect asserts (unit)', () => {
+  it('accepts exactly the production URL', () => {
+    expect(probe.parseProductionUrl(PROD_URL)).toEqual({
+      scheme: 'postgresql',
+      host: 'aws-1-us-east-2.pooler.supabase.com',
+      port: 5432,
+      user: 'postgres.diqooqbuchsliypgwksu',
+      database: 'postgres',
+    });
+    expect(probe.PROD_CA_SHA256).toBe(PROD_CA_SHA256);
+  });
+
+  it('rejects any deviation from the production endpoint', () => {
+    const deviations = [
+      'postgres://postgres.diqooqbuchsliypgwksu@aws-1-us-east-2.pooler.supabase.com:5432/postgres',
+      'postgresql://postgres.diqooqbuchsliypgwksu@aws-1-us-east-2.pooler.supabase.com:6543/postgres',
+      'postgresql://postgres.diqooqbuchsliypgwksu@aws-1-us-east-2.pooler.supabase.com:5432/other',
+      'postgresql://postgres@aws-1-us-east-2.pooler.supabase.com:5432/postgres',
+      'postgresql://postgres.diqooqbuchsliypgwksu@evil.example.com:5432/postgres',
+      PROD_URL + '?sslmode=require',
+      PROD_URL + '#frag',
+    ];
+    for (const url of deviations) {
+      expect(() => probe.parseProductionUrl(url), url).toThrow();
+    }
+  });
+
+  it('builds verify-full TLS and rejects a CA whose hash is not the pinned digest', () => {
+    const syntheticCa =
+      '-----BEGIN CERTIFICATE-----\nsynthetic-ca-for-tests\n-----END CERTIFICATE-----\n';
+    // A synthetic CA fails the pinned production digest by design (reject path).
+    expect(() =>
+      probe.buildTlsConfig(syntheticCa, {
+        serverName: probe.PRODUCTION_ENDPOINT.host,
+        expectedCaSha256: PROD_CA_SHA256,
+      })
+    ).toThrow(/ca/i);
+    // The accept mechanism: a CA that matches its own expected digest yields a
+    // verify-full config bound to the pinned server name.
+    const selfHash = createHash('sha256').update(syntheticCa).digest('hex');
+    const config = probe.buildTlsConfig(syntheticCa, {
+      serverName: probe.PRODUCTION_ENDPOINT.host,
+      expectedCaSha256: selfHash,
+    });
+    expect(config.rejectUnauthorized).toBe(true);
+    expect(config.servername).toBe('aws-1-us-east-2.pooler.supabase.com');
+    expect(config.ca).toBe(syntheticCa);
+  });
+
+  it('accepts a valid post-connect identity and rejects each deviation', () => {
+    const ok = {
+      session_user: 'postgres',
+      current_database: 'postgres',
+      transaction_read_only: 'on',
+      transaction_isolation: 'read committed',
+      server_version_num: 170010,
+    };
+    expect(() => probe.assertPostConnect(ok)).not.toThrow();
+    expect(() => probe.assertPostConnect({ ...ok, session_user: 'authenticator' })).toThrow();
+    expect(() => probe.assertPostConnect({ ...ok, current_database: 'other' })).toThrow();
+    expect(() => probe.assertPostConnect({ ...ok, transaction_read_only: 'off' })).toThrow();
+    expect(() =>
+      probe.assertPostConnect({ ...ok, transaction_isolation: 'serializable' })
+    ).toThrow();
+    expect(() => probe.assertPostConnect({ ...ok, server_version_num: 180000 })).toThrow();
+    expect(() => probe.assertPostConnect({ ...ok, server_version_num: 160099 })).toThrow();
+  });
+
+  it('forbids transparent reconnect on a backend/pooler change', () => {
+    const epoch = { backend_pid: 4242, backend_start_utc: '2026-07-16T00:00:00.000Z' };
+    expect(() => probe.assertBackendContinuity(epoch, { ...epoch })).not.toThrow();
+    expect(() => probe.assertBackendContinuity(epoch, { ...epoch, backend_pid: 9999 })).toThrow(
+      /epoch|backend/i
+    );
+    expect(() =>
+      probe.assertBackendContinuity(epoch, {
+        ...epoch,
+        backend_start_utc: '2026-07-16T00:00:01.000Z',
+      })
+    ).toThrow(/epoch|backend/i);
+  });
+});
+
+// ===========================================================================
+// Disposable PostgreSQL 17.10 container harness (contract "Required RED/
+// capability and verification gates"). Gated by MC2_Q12_REAL_PG17=1; modeled on
+// tests/unit/ops/q12-structural-catalog-pg17.test.ts. Synthetic fixtures only;
+// no live/remote connection of any kind.
+// ===========================================================================
+const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
+const POSTGRES_IMAGE = 'postgres:17.10-bookworm';
+const POSTGRES_PASSWORD = 'q12-d6-local-pg17-fixture-only';
+const CONTAINER = `mc2-q12-d6-pg17-${process.pid}-${Date.now()}`;
+
+interface CommandResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
+interface AsyncPsql {
+  child: import('node:child_process').ChildProcessWithoutNullStreams;
+  output: () => string;
+}
+
+const PROJECTION_TEMPLATES = (() => {
+  try {
+    return probe.splitProjectionTemplates(readFileSync(PROJECTION_SQL, 'utf8'));
+  } catch {
+    return new Map<string, string>();
+  }
+})();
+const ORDER_RELATIONS = (() => {
+  try {
+    return (JSON.parse(readFileSync(LOCK_ORDER, 'utf8')) as { relations: string[] }).relations;
+  } catch {
+    return [] as string[];
+  }
+})();
+
+async function importChildProcess() {
+  return await import('node:child_process');
+}
+
+let dockerFns: {
+  docker: (args: string[], input?: string, timeout?: number) => CommandResult;
+  psqlResult: (sql: string, appName?: string) => CommandResult;
+  psql: (sql: string, appName?: string) => string;
+  spawnPsql: (sql: string, appName: string) => AsyncPsql;
+  waitForOutput: (session: AsyncPsql, marker: string, timeout?: number) => Promise<void>;
+  waitForExit: (session: AsyncPsql, timeout?: number) => Promise<number | null>;
+};
+
+describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => {
+  beforeAll(async () => {
+    const { spawn, spawnSync } = await importChildProcess();
+    const docker = (args: string[], input?: string, timeout = 120_000): CommandResult => {
+      const r = spawnSync('docker', args, {
+        encoding: 'utf8',
+        input,
+        timeout,
+        maxBuffer: 32 * 1024 * 1024,
+      });
+      return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+    };
+    const psqlResult = (sql: string, appName = 'q12-d6-fixture'): CommandResult =>
+      docker(
+        [
+          'exec',
+          '-i',
+          '-e',
+          `PGPASSWORD=${POSTGRES_PASSWORD}`,
+          '-e',
+          `PGAPPNAME=${appName}`,
+          CONTAINER,
+          'psql',
+          '-X',
+          '-h',
+          '127.0.0.1',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-U',
+          'postgres',
+          '-d',
+          'postgres',
+          '-At',
+        ],
+        `${sql.trim()}\n`
+      );
+    const psql = (sql: string, appName = 'q12-d6-fixture'): string => {
+      const r = psqlResult(sql, appName);
+      expect(r.status, r.stderr || r.stdout).toBe(0);
+      return r.stdout.trim();
+    };
+    const spawnPsql = (sql: string, appName: string): AsyncPsql => {
+      const child = spawn(
+        'docker',
+        [
+          'exec',
+          '-i',
+          '-e',
+          `PGPASSWORD=${POSTGRES_PASSWORD}`,
+          '-e',
+          `PGAPPNAME=${appName}`,
+          CONTAINER,
+          'psql',
+          '-X',
+          '-h',
+          '127.0.0.1',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-U',
+          'postgres',
+          '-d',
+          'postgres',
+          '-At',
+        ],
+        { stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      let output = '';
+      child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
+      child.stdout.on('data', c => {
+        output += c;
+      });
+      child.stderr.on('data', c => {
+        output += c;
+      });
+      child.stdin.end(`${sql.trim()}\n`);
+      return { child, output: () => output };
+    };
+    const waitForOutput = async (session: AsyncPsql, marker: string, timeout = 15_000) => {
+      const started = Date.now();
+      while (!session.output().includes(marker)) {
+        if (session.child.exitCode !== null) {
+          throw new Error(`psql exited before ${marker}: ${session.output()}`);
+        }
+        if (Date.now() - started > timeout) {
+          session.child.kill('SIGKILL');
+          throw new Error(`timed out waiting for ${marker}: ${session.output()}`);
+        }
+        await new Promise(r => setTimeout(r, 50));
+      }
+    };
+    const waitForExit = async (session: AsyncPsql, timeout = 30_000): Promise<number | null> => {
+      if (session.child.exitCode !== null) return session.child.exitCode;
+      return await new Promise((resolveExit, rejectExit) => {
+        const timer = setTimeout(() => {
+          session.child.kill('SIGKILL');
+          rejectExit(new Error(`timed out waiting for psql: ${session.output()}`));
+        }, timeout);
+        session.child.once('exit', code => {
+          clearTimeout(timer);
+          resolveExit(code);
+        });
+      });
+    };
+    dockerFns = { docker, psqlResult, psql, spawnPsql, waitForOutput, waitForExit };
+
+    const started = docker([
+      'run',
+      '-d',
+      '--rm',
+      '--name',
+      CONTAINER,
+      '-e',
+      `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+      POSTGRES_IMAGE,
+    ]);
+    expect(started.status, started.stderr).toBe(0);
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const probeReady = psqlResult("SELECT current_setting('server_version_num')");
+      if (probeReady.status === 0 && probeReady.stdout.trim().startsWith('17')) {
+        ready = true;
+        break;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    expect(ready, docker(['logs', CONTAINER]).stdout).toBe(true);
+
+    // Synthetic catalog fixture: the accepted-order relations as empty tables,
+    // plus q12_guard.active_run singleton and cron.job / net.http_request_queue
+    // stand-ins so the read-only projection templates execute.
+    const schemas = [...new Set(ORDER_RELATIONS.map(r => r.split('.')[0]))];
+    const createSchemas = schemas.map(s => `CREATE SCHEMA IF NOT EXISTS ${s};`).join('\n');
+    const createTables = ORDER_RELATIONS.filter(
+      r => r !== 'cron.job' && r !== 'net.http_request_queue'
+    )
+      .map(r => `CREATE TABLE ${r}(id integer PRIMARY KEY);`)
+      .join('\n');
+    psql(`
+      ${createSchemas}
+      ${createTables}
+      CREATE TABLE cron.job(jobid bigint PRIMARY KEY, schedule text, jobname text, active boolean);
+      CREATE TABLE net.http_request_queue(id bigint PRIMARY KEY);
+      CREATE SCHEMA IF NOT EXISTS q12_guard;
+      CREATE TABLE q12_guard.active_run(run_id text PRIMARY KEY, activated boolean NOT NULL);
+      INSERT INTO q12_guard.active_run(run_id, activated) VALUES ('run-fixture', false);
+      INSERT INTO cron.job(jobid, schedule, jobname, active) VALUES
+        (1,'* * * * *','q12-cron-1',true),(2,'* * * * *','q12-cron-2',true),
+        (3,'* * * * *','q12-cron-3',true),(4,'* * * * *','q12-cron-4',true),
+        (5,'* * * * *','q12-cron-5',true),(6,'* * * * *','q12-cron-6',true),
+        (7,'* * * * *','q12-cron-7',true),(8,'* * * * *','q12-cron-8',true);
+    `);
+  }, 180_000);
+
+  afterAll(() => {
+    dockerFns?.docker(['rm', '-f', CONTAINER], undefined, 30_000);
+  });
+
+  it('Task 3 — proves PG17 identity, read-only, isolation, and version bounds', () => {
+    const { psql } = dockerFns;
+    const identityTemplate = PROJECTION_TEMPLATES.get('connection_identity') ?? '';
+    const row = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SET LOCAL lock_timeout = '120s';
+       ${identityTemplate.replace(/;\s*$/, '')}
+       \\gset q12_
+       COMMIT;
+       SELECT :'q12_session_user' || '|' || :'q12_current_database' || '|' ||
+              :'q12_server_version_num' || '|' || :'q12_transaction_isolation' || '|' ||
+              :'q12_transaction_read_only';`
+    );
+    const [session_user, current_database, versionStr, isolation, readOnly] = row.split('|');
+    expect(session_user).toBe('postgres');
+    expect(current_database).toBe('postgres');
+    expect(isolation).toBe('read committed');
+    expect(readOnly).toBe('on');
+    const server_version_num = Number(versionStr);
+    expect(server_version_num).toBeGreaterThanOrEqual(170000);
+    expect(server_version_num).toBeLessThan(180000);
+    expect(() =>
+      probe.assertPostConnect({
+        session_user,
+        current_database,
+        transaction_read_only: readOnly,
+        transaction_isolation: isolation,
+        server_version_num,
+      })
+    ).not.toThrow();
+    // Reject path: a PG18 report fails the version bound.
+    expect(() =>
+      probe.assertPostConnect({
+        session_user,
+        current_database,
+        transaction_read_only: readOnly,
+        transaction_isolation: isolation,
+        server_version_num: 180000,
+      })
+    ).toThrow();
+  });
+
+  // @@CONTAINER_TESTS_END
 });
