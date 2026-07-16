@@ -43,7 +43,6 @@ interface ParameterAcl {
 
 const MISSING_ROLE_ALLOWLIST = new Set([
   'admin',
-  'cli_login_postgres',
   'instructor',
   'pgtle_admin',
   'student',
@@ -67,7 +66,6 @@ const ROLE_PRIVILEGE_ALLOWLIST = {
   rolcanlogin: new Set([
     'admin',
     'authenticator',
-    'cli_login_postgres',
     'dashboard_user',
     'instructor',
     'pgbouncer',
@@ -282,14 +280,15 @@ function scanSecretShape(value: unknown): void {
 }
 
 function roleSql(role: Role): string {
-  if (
-    role.rolsuper ||
-    role.rolcreaterole ||
-    role.rolcreatedb ||
-    role.rolreplication ||
-    role.rolbypassrls
-  ) {
-    fail(`missing role ${role.name} requests a forbidden elevated attribute`);
+  // A missing role may carry an elevated attribute only when the exact
+  // per-role privilege allowlist permits that pair: the managed
+  // supabase_functions_admin ships CREATEROLE yet is absent from the fresh
+  // image, so the blanket rejection contradicted the observed role plane.
+  for (const [attribute, allowlist] of Object.entries(ROLE_PRIVILEGE_ALLOWLIST)) {
+    if (attribute === 'rolcanlogin') continue;
+    if (role[attribute as keyof Role] === true && !allowlist.has(role.name)) {
+      fail(`missing role ${role.name} requests a forbidden elevated attribute`);
+    }
   }
   const attributes = [
     role.rolsuper ? 'SUPERUSER' : 'NOSUPERUSER',

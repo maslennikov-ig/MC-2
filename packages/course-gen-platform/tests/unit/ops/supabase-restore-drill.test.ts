@@ -455,7 +455,7 @@ describe('allowlisted Supabase role bootstrap', () => {
     expect(sql).not.toContain('CREATE ROLE "anon"');
   });
 
-  it('rejects missing roles outside the exact nine-role allowlist', () => {
+  it('rejects missing roles outside the exact eight-role allowlist', () => {
     const root = tempRoot();
     const manifest = join(root, 'source-manifest.json');
     const image = join(root, 'image-roles.json');
