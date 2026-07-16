@@ -257,6 +257,14 @@ interface ProbeModule {
       kernel_generation: string;
     };
   }): void;
+  // Task 14
+  runProbeInspect(ctx: Record<string, unknown>): {
+    frames: Array<Record<string, unknown>>;
+    classification: string;
+    activated: boolean;
+    dbProjection: Record<string, unknown>;
+    hostProjection: Record<string, unknown>;
+  };
 }
 
 interface RunnerModule {
@@ -264,6 +272,9 @@ interface RunnerModule {
     inspect: Array<Record<string, unknown>>;
     composePs: Array<Record<string, unknown>>;
   };
+  buildRootHostProjectionPayload(input: Record<string, unknown>): Record<string, unknown>;
+  buildRootPredecisionPayload(input: Record<string, unknown>): Record<string, unknown>;
+  buildRootReleasePayload(input: Record<string, unknown>): Record<string, unknown>;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -1074,6 +1085,237 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     expect(() =>
       probe.buildDatabaseProjection({ ...fields, global_pg_net_queue_count: 1 })
     ).toThrow(/net|queue/i);
+  });
+
+  it('Task 14 — drives the full inspect protocol for each classification against PG17', () => {
+    const runner = require(RUNNER_PATH) as RunnerModule;
+    const { psql } = dockerFns;
+    const HH = 'a'.repeat(64);
+
+    // Real DB facts: acquire the full-catalog SHARE lock and project pg_locks.
+    const lockTemplate = PROJECTION_TEMPLATES.get('full_catalog_share_lock') ?? '';
+    const lockProjection = PROJECTION_TEMPLATES.get('lock_projection') ?? '';
+    const capTemplate = PROJECTION_TEMPLATES.get('capability_lock_rows') ?? '';
+    const lockOut = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SET LOCAL lock_timeout = '120s';
+       ${lockTemplate}
+       SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t) ORDER BY (t.qualified_name))
+       FROM ( ${lockProjection.replace(/;\s*$/, '')} ) t;
+       COMMIT;`
+    );
+    const observed = JSON.parse(lockOut.split('\n').find(l => l.trim().startsWith('[')) as string);
+    const capOut = psql(
+      `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+       SELECT pg_catalog.pg_stat_clear_snapshot();
+       SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+         'qualified_name', s.qualified_name, 'oid', s.oid,
+         'maintain', s.priv_maintain, 'update', s.priv_update,
+         'delete', s.priv_delete, 'truncate', s.priv_truncate
+       ) ORDER BY s.qualified_name)
+       FROM ( ${capTemplate.replace(/;\s*$/, '')} ) s;
+       COMMIT;`
+    );
+    const capRows = JSON.parse(capOut.split('\n').find(l => l.trim().startsWith('[')) as string);
+    const capability = probe.buildCapabilityObject({
+      session_user: 'postgres',
+      current_database: 'postgres',
+      server_version_num: 170010,
+      rows: capRows,
+      visibility: { member: true },
+      clear_snapshot_executed: true,
+    });
+    const countsLine = psql(
+      `SELECT (SELECT pg_catalog.count(*) FROM net.http_request_queue)::int8 || '|' ||
+              (SELECT pg_catalog.count(*) FROM pg_catalog.pg_prepared_xacts)::int8 || '|' ||
+              (SELECT pg_catalog.count(*) FROM cron.job)::int8;`
+    )
+      .split('\n')
+      .find(l => l.includes('|')) as string;
+    const [netQueue, prepared, cron] = countsLine.split('|').map(Number);
+    expect(netQueue).toBe(0);
+
+    // Synthetic session observation (bare PG17 lacks the managed provider plane).
+    const inventory = probe.consumeManagedInventory(
+      readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-managed-session-inventory.json'), 'utf8'),
+      { expectedInventorySha256: W_TUPLE.managed_inventory_sha256 }
+    );
+    const sessionObservation = probe.buildSessionObservation(
+      inventory,
+      [
+        {
+          role: 'postgres',
+          database: 'postgres',
+          backend_type: 'client backend',
+          application_identity: 'megacampus-q12-activation-truth',
+          state: 'active',
+          xact_start_is_null: false,
+          backend_xid_is_null: true,
+          backend_xmin_is_null: false,
+          pid: 4242,
+          backend_start_utc: '2026-07-16T00:00:00.000Z',
+        },
+      ],
+      { probePid: 4242 }
+    );
+    // 10+5 Docker truth from the fixture runner.
+    const docker = runner.buildSyntheticDockerInventory();
+    const dockerObservation = probe.projectDockerObservation(docker);
+    expect(dockerObservation.total).toBe(15);
+    // Disconnect invalidation: a changed backend epoch forbids reconnect.
+    expect(() =>
+      probe.assertBackendContinuity(
+        { backend_pid: 4242, backend_start_utc: '2026-07-16T00:00:00.000Z' },
+        { backend_pid: 9999, backend_start_utc: '2026-07-16T00:00:00.000Z' }
+      )
+    ).toThrow();
+
+    const lockProjectionSha = probe.canonicalHash(observed);
+    const scenarios = [
+      {
+        evidence_state: 'prepared_guarded',
+        classification: 'precommit_rollback',
+        barrier: HH,
+        probe: HH,
+        result: null,
+        proc: HH,
+        manifest: null,
+        activated: false,
+        plannedR: { journal: HH, checkpoint: HH },
+        actualR: { journal: HH, checkpoint: HH },
+      },
+      {
+        evidence_state: 'complete_receipt',
+        classification: 'committed_finish_forward',
+        barrier: HH,
+        probe: HH,
+        result: HH,
+        proc: HH,
+        manifest: HH,
+        activated: true,
+        plannedR: { journal: null, checkpoint: null },
+        actualR: { journal: null, checkpoint: null },
+      },
+      {
+        evidence_state: 'incident_observed',
+        classification: 'drift_incident',
+        barrier: HH,
+        probe: HH,
+        result: HH,
+        proc: HH,
+        manifest: HH,
+        presence: {
+          barrier_receipt: 'present',
+          probe_receipt: 'present',
+          activation_result: 'present',
+          process_manifest: 'present',
+        },
+        activated: false,
+        plannedR: { journal: null, checkpoint: null },
+        actualR: { journal: null, checkpoint: null },
+      },
+    ] as const;
+
+    for (const s of scenarios) {
+      const evidenceFields = {
+        activation_evidence_state: s.evidence_state,
+        barrier_receipt_sha256: s.barrier,
+        probe_receipt_sha256: s.probe,
+        activation_result_sha256: s.result,
+        activation_process_projection_sha256: s.proc,
+        process_manifest_sha256: s.manifest,
+      };
+      const request = {
+        schema_version: 'megacampus.q12.activation-truth-request/v1',
+        run_id: 'run-scenario',
+        release_sha: HH,
+        lease_epoch: 7,
+        predecessor_journal_entry_hash: HH,
+        predecessor_checkpoint_sha256: HH,
+        previous_terminal_seal_sha256: null,
+        abandoned_predecision_sha256: null,
+        expected_catalog_sha256: HH,
+        expected_post_migration_catalog_sha256: HH,
+        database_capability_sha256: HH,
+        activation_capability_sha256: HH,
+        prepared_quiesced_predecessor_sha256: HH,
+        writer_quiesce_manifest_sha256: HH,
+        ...evidenceFields,
+        w_activation_tuple_sha256: HH,
+        projection_sql_sha256: HH,
+        spawn_capability_sha256: HH,
+        runtime_fd_baseline_sha256: HH,
+      };
+      const ctx = {
+        request,
+        postConnect: {
+          session_user: 'postgres',
+          current_database: 'postgres',
+          transaction_read_only: 'on',
+          transaction_isolation: 'read committed',
+          server_version_num: 170010,
+        },
+        lockVerification: { observed, expectedRelations: ORDER_RELATIONS },
+        capability,
+        fd9_identity_sha256: HH,
+        sessionObservationSha: sessionObservation.sha256,
+        dbFields: makeDbFields({
+          run_id: 'run-scenario',
+          lock_projection_sha256: lockProjectionSha,
+          capability_projection_sha256: probe.canonicalHash(capability),
+          session_observation_sha256: sessionObservation.sha256,
+          global_pg_net_queue_count: netQueue,
+          prepared_xact_count: prepared,
+          active_cron_count: cron,
+        }),
+        evidence: { classification: s.classification, ...evidenceFields, presence: s.presence },
+        hostFields: makeHostFields({
+          run_id: 'run-scenario',
+          lease_epoch: 7,
+          ...evidenceFields,
+          docker_observation_sha256: dockerObservation.sha256,
+        }),
+        rootPayloads: {
+          hostProjection: runner.buildRootHostProjectionPayload({
+            classification: s.classification,
+            request_sha256: HH,
+            initial_database_projection_sha256: HH,
+            host_projection_sha256: HH,
+            prepared_quiesced_predecessor_sha256: HH,
+          }),
+          predecision: runner.buildRootPredecisionPayload({
+            classification: s.classification,
+            request_sha256: HH,
+            predecision_sha256: HH,
+            planned_r_journal_entry_hash: s.plannedR.journal,
+            planned_r_checkpoint_sha256: s.plannedR.checkpoint,
+            predecessor_journal_entry_hash: HH,
+            predecessor_checkpoint_sha256: HH,
+          }),
+          release: runner.buildRootReleasePayload({
+            request_sha256: HH,
+            predecision_sha256: HH,
+            sealed_frame_sha256: HH,
+            actual_r_journal_entry_hash: s.actualR.journal,
+            actual_r_checkpoint_sha256: s.actualR.checkpoint,
+          }),
+        },
+        actualR: s.actualR,
+        activated: s.activated,
+      };
+      const result = probe.runProbeInspect(ctx);
+      expect(result.frames.length).toBe(7);
+      // Verify the chain links across all seven frames.
+      for (let i = 1; i < result.frames.length; i += 1) {
+        expect(result.frames[i].previous_frame_sha256).toBe(result.frames[i - 1].frame_sha256);
+        expect(result.frames[i].sequence).toBe(i + 1);
+      }
+      expect(result.classification).toBe(s.classification);
+      expect(result.activated).toBe(s.activated);
+      expect((result.frames[6].payload as Record<string, unknown>).transaction_end).toBe(
+        'read_only_commit'
+      );
+    }
   });
 
   // @@CONTAINER_TESTS_END
