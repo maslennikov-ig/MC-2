@@ -494,8 +494,26 @@ verify_extensions_and_toc() {
   [[ ! -s "$TEMP_ROOT/extensions.stderr" ]] || fail 'extension inventory emitted stderr'
   /usr/bin/python3 - "$GENERATION/source-manifest.json" "$TEMP_ROOT/available-extensions.json" <<'PY'
 import json, pathlib, sys
+def decode_copy_text(text):
+    # COPY TO STDOUT text format escapes backslash and control characters.
+    out = []
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\":
+            mapping = {"\\": "\\", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
+            nxt = text[i + 1] if i + 1 < len(text) else None
+            if nxt not in mapping:
+                raise SystemExit("unsupported COPY escape in query output")
+            out.append(mapping[nxt])
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
 source = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["cutover_snapshot"]["extensions"]
-available = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+available = json.loads(decode_copy_text(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8").strip()))
 # The two frozen pgTLE packages become available only when pg_restore has
 # replayed their pgtle.* functions (which precede CREATE EXTENSION in the
 # archive), so the fresh image cannot list them before the restore; the
@@ -526,7 +544,25 @@ verify_restored_pgtle_packages() {
   [[ ! -s "$TEMP_ROOT/restored-pgtle.stderr" ]] || fail 'restored pgTLE package query emitted stderr'
   /usr/bin/python3 - "$TEMP_ROOT/restored-pgtle.json" <<'PY'
 import json, pathlib, re, sys
-value = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+def decode_copy_text(text):
+    # COPY TO STDOUT text format escapes backslash and control characters.
+    out = []
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\":
+            mapping = {"\\": "\\", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
+            nxt = text[i + 1] if i + 1 < len(text) else None
+            if nxt not in mapping:
+                raise SystemExit("unsupported COPY escape in query output")
+            out.append(mapping[nxt])
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+value = json.loads(decode_copy_text(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").strip()))
 expected = {"basejump-supabase_test_helpers":"0.0.6", "supabase-dbdev":"0.0.5"}
 if set(value) != set(expected):
     raise SystemExit("restored pgTLE package set mismatch")
