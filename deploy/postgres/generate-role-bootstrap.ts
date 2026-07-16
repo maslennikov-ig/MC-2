@@ -43,6 +43,7 @@ interface ParameterAcl {
 
 const MISSING_ROLE_ALLOWLIST = new Set([
   'admin',
+  'cli_login_postgres',
   'instructor',
   'pgtle_admin',
   'student',
@@ -52,18 +53,30 @@ const MISSING_ROLE_ALLOWLIST = new Set([
   'superadmin',
 ]);
 
+// Aligned with the observed managed Supabase role plane (decision .13.14
+// trusted residual boundary): the live source and the pinned fresh image
+// carry identical elevated attributes for every shared platform role.
 const ROLE_PRIVILEGE_ALLOWLIST = {
-  rolbypassrls: new Set(['postgres', 'supabase_admin']),
+  rolbypassrls: new Set([
+    'postgres',
+    'service_role',
+    'supabase_admin',
+    'supabase_etl_admin',
+    'supabase_read_only_user',
+  ]),
   rolcanlogin: new Set([
     'admin',
     'authenticator',
+    'cli_login_postgres',
     'dashboard_user',
     'instructor',
+    'pgbouncer',
     'pgtle_admin',
     'postgres',
     'student',
     'supabase_admin',
     'supabase_auth_admin',
+    'supabase_etl_admin',
     'supabase_functions_admin',
     'supabase_privileged_role',
     'supabase_read_only_user',
@@ -72,9 +85,22 @@ const ROLE_PRIVILEGE_ALLOWLIST = {
     'supabase_storage_admin',
     'superadmin',
   ]),
-  rolcreatedb: new Set(['postgres', 'supabase_admin']),
-  rolcreaterole: new Set(['postgres', 'supabase_admin']),
-  rolreplication: new Set(['postgres', 'supabase_replication_admin']),
+  rolcreatedb: new Set(['dashboard_user', 'postgres', 'supabase_admin']),
+  rolcreaterole: new Set([
+    'dashboard_user',
+    'postgres',
+    'supabase_admin',
+    'supabase_auth_admin',
+    'supabase_functions_admin',
+    'supabase_storage_admin',
+  ]),
+  rolreplication: new Set([
+    'dashboard_user',
+    'postgres',
+    'supabase_admin',
+    'supabase_etl_admin',
+    'supabase_replication_admin',
+  ]),
   rolsuper: new Set(['postgres', 'supabase_admin']),
 } satisfies Record<string, Set<string>>;
 
