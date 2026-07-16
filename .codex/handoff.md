@@ -1,8 +1,8 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-15 (evening)
+Updated: 2026-07-16
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: pushed `codex/self-hosted-qdrant-platform` at `a73a3651`.
+Integration branch: pushed `codex/self-hosted-qdrant-platform` at `b97a827b`.
 It carries the full accepted correction wave: D5J `66e41cb5`, W FLIP
 `60910053`, H blue/green handoff `70bf6103`, the W activation-tuple addendum
 `3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
@@ -44,7 +44,7 @@ integration worktree remains authoritative for Q12.
 - Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. The final local release matrix passed backend 1,893/1,893 with zero skips, shared 23/23, web 20/20, PostgreSQL 78/78 with zero skips, exact Qdrant 15/15, applicable local snapshot/restore 5/5, Compose/runtime 8/8, Prometheus 14 rules, Alertmanager config, `pnpm type-check`, and build 75/75. The stale activation-contract test was corrected under `.26`; implementation and independent review are integrated with P0-P3 zero.
 - Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
 - Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
-- The downloaded Supabase Root 2021 CA is valid through 2031 and a current owner-supplied Session pooler URI passed PostgreSQL `17.6` `verify-full` read-only inventory. The credential exists only in the owner-only local session file and is never copied into Git, artifacts, argv, environment, logs, or worker prompts. The owner authorized its temporary use for this staging window; terminal rotation remains a separate mutation under `.13.8`. The server still has 12/12 invalid 20-byte legacy backups and zero usable generations, so `.13.7` remains open until the new fail-closed operator creates a fresh four-file generation and its Supabase-compatible isolated restore succeeds. No live mutation has occurred.
+- `.13.7` is CLOSED (2026-07-16, owner-authorized remote window). The owner DSN is installed owner-only at `/opt/megacampus/secrets/supabase_db_url` with the pinned CA; the legacy fail-open cron is suspended (root-owned rollback evidence retained); the fail-closed operator, drill, and helpers are installed root-owned under `/opt/megacampus/deploy` with Node 22 + pnpm 8.15.0 + tsx host prerequisites. The fixed-hash installer finished its canonical proof: fresh scheduled generation `20260716T105950Z-11196fff` published under full systemd hardening, isolated Supabase-PG17.6 drill PASSED (cluster-global + cutover + baseline equality, ratio 0.724, zero residue), daily `00:30 Europe/Amsterdam` timer enabled+active. Twenty-plus never-executed defects in operator/drill/manifest/bootstrap were fixed with TDD and review on the way (`dedcc076`..`da512322`). The owner explicitly deferred `.13.8` password rotation («можешь не менять»).
 - The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
 - Publisher `.13.9`, G7 `.13.7.2`, D5 decision `.13.17`, and Root producer `.13.18` are accepted/integrated. D5W seam `.13.20` is closed: source `3dd9ad53`, correctness/docs delta reviews P0-P3 zero, integration/W reruns 271/271, cleanup evidence `c150a4c2`, source worktree/local branch removed. The preserved W branch is clean and pushed at `60910053`. The joined-fixture task `.13.21` is implemented, independently reviewed, and integrated; W `.13.10`, M `.13.11`, and H `.13.12` are closed and integrated (see below); Root `.13.13` is blocked on the live-only tuple field 11. No remote/live mutation occurred.
 - D6 decision `.13.19` has an ignored owner-ready candidate SHA-256 `2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5`; final independent review SHA-256 `948982d99895489c6fefa1fb831791f7e02bb524bb268713e712629a6bdab5a7` is PASS with P0-P3 zero. On 2026-07-15 the owner approved Option A as the written-contract direction, including its sole narrow post-`R` closed-terminal exception. D6 implementation waits for accepted W and a reviewed plan; the current Fable delegation supplies local implementation authority, while remote/live authority remains separate.
@@ -96,7 +96,7 @@ integration worktree remains authoritative for Q12.
   fails identically on the pre-Q12 base) / 36 skipped; blue/green shell suite
   15/15; `pnpm type-check` exit 0; `pnpm build` exit 0 with the synthetic web
   env. PG17-gated suites run under `MC2_Q12_REAL_PG17=1`.
-- The sole executable `.13.7` packet is locally accepted after immutable P1/P2 review and independent P0-P3-zero rereview. It explicitly supersedes every older `/usr/bin` snippet, which remains historical evidence only. This acceptance does not close the live DSN, server preparation, fresh dump, isolated restore, or zero-residue gates.
+- PG17 document-evidence security-manifest digests were computed on the isolated restore (pre-120000 `dcc90cc2…`, after-120000 `4df2b22b…`, after-130000 `f7100de0…`, after-140000 `e148e241…`, after-151000 `2597a553…`) and the allowlist delta is integrated at `b8204cde` with independent review PASS P0-P2 zero and new disjointness/hex invariant tests.
 - Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
 - Design `.17` is approved/closed; grouping `.16` closed as superseded. E1-E7
   (`.18`-`.24`), Q6 `.7`, Q8 `.9`, Q9 `.10` are reviewed, integrated, and
@@ -111,20 +111,18 @@ All safe LOCAL Q12 correction work is COMPLETE: W `.13.10`, M `.13.11`,
 H `.13.12`, D5J `.13.21`/`.13.22` are closed and integrated at `a73a3651`
 with the full local release matrix green.
 
-Recommended action: present the remote/live Q12 tail to the owner as an
-explicit effects/secrets/observation/rollback packet; it stays NO-GO without
-current authorization:
+`.13.7` is DELIVERED (backup gate green, PG17 digests integrated). The owner
+authorized the remote tail on 2026-07-16 and explicitly deferred `.13.8`
+password rotation.
 
-1. `.13.7` — fresh truthful four-file server backup plus Supabase-compatible
-   isolated PG17 restore drill; compute and record the PG17 security-manifest
-   digest during that drill (the allowlist currently covers PG15/16 only).
-2. `.13.8` — database password rotation via its separate effects/rollback
-   packet.
-3. Live window — materialize W-tuple field 11 (managed session roster), run
+Recommended action: continue the authorized remote tail with the live window:
+
+1. Live window — materialize W-tuple field 11 (managed session roster), run
    the LIVE-BOUNDARY RE-FREEZE CHECKLIST (re-freeze fields 5/6/8/9 against
    production), then execute D6 `.13.19` Tasks 0-20 and the Root join
    `.13.13` local acceptance, GHCR publication, and the live-cutover packet.
-4. `.13.6` — off-host S3 remains the production-gate defer.
+2. `.13.8` — owner-deferred password rotation of the working DSN.
+3. `.13.6` — off-host S3 remains the production-gate defer.
 
 Before any of these, present exact effects, secrets, observation, rollback
 and downtime/data impact, and obtain owner approval.

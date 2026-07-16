@@ -418,6 +418,30 @@ Accepted `.14` preflight artifacts `b7c38638` and `99e08364` plus the owner's cu
   `mc2-jz6y0.13.21-q12-d5j.md`. Integration rerun and process verification
   recorded at the merged head. No remote/live mutation occurred.
 
+## Q12 `.13.7` Backup/Restore Gate Delivery (2026-07-16)
+
+Owner authorized the remote tail («Да, делай. Делай всё сам по порядку.
+Пароль можешь не менять»), so `.13.7` executed against the approved server:
+legacy fail-open cron suspended (root-owned rollback evidence), Node 22 +
+standalone pnpm 8.15.0 + tsx installed, operator/drill/helpers installed
+root-owned, owner DSN written owner-only via stdin, CA hash-verified. The
+first real runs surfaced 20+ never-executed defects across
+`backup-supabase.sh`, `q12-source-manifest.ts`, `generate-role-bootstrap.ts`,
+`restore-supabase-drill.sh`, `scan-pgtle-archive.py`, and the installer —
+each fixed with TDD, targeted review, commit, and push
+(`dedcc076`..`da512322`; highlights: libpq service-file URI decomposition,
+`ProtectHome=tmpfs`, PG17 `datlocale` rename, COPY text decoding,
+masquerade-free drill network, host-TCP readiness, supabase_admin bootstrap,
+membership grantor ordering, verbatim list-GUC replay, provider-plane actor
+collapse per `.13.14`). Canonical installer proof: fresh scheduled generation
+`generation-20260716T105950Z-11196fff-…`, isolated Supabase-PG17.6 drill PASS
+(cluster-global + cutover + baseline equality, ratio 0.724, zero residue),
+timer `00:30 Europe/Amsterdam` enabled+active. PG17 security-manifest digests
+computed on the isolated restore and integrated into the live-gate allowlists
+at `b8204cde` (review PASS P0-P2 zero). Beads: `.13.7` and `mc2-t7y6d`
+closed. Local evidence at `b97a827b`: ops+scripts battery 761 passed /
+1 known-env failure / 36 skipped, workspace `pnpm type-check` exit 0.
+
 ## Q12 W/M/H/D6 Local Completion (2026-07-15)
 
 - W `.13.10` CLOSED at `60910053` (FLIP): the genesis-rooted joined journal
