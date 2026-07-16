@@ -133,6 +133,11 @@ describe('replacement Supabase backup systemd units', () => {
     expect(service).toContain('NoNewPrivileges=true');
     expect(service).toContain('PrivateTmp=true');
     expect(service).toContain('ProtectSystem=strict');
+    // tmpfs (not true): libpq treats EACCES on the default ~/.postgresql
+    // client certificate as fatal, while the empty tmpfs home yields ENOENT
+    // and libpq proceeds without a client certificate.
+    expect(service).toContain('ProtectHome=tmpfs');
+    expect(service).not.toContain('ProtectHome=true');
     expect(service).toContain('ReadOnlyPaths=/opt/megacampus/deploy /opt/megacampus/secrets');
     expect(service).toContain(
       'ReadWritePaths=/opt/megacampus/backups/supabase /opt/megacampus/logs'
