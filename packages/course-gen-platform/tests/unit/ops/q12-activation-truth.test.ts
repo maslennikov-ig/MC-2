@@ -1517,6 +1517,190 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     }
   }, 60_000);
 
+  function buildPrecommitScenario(): {
+    request: Record<string, unknown>;
+    rootResponder: (prevSha: string, kind: string, seq: number) => Record<string, unknown>;
+    inventory: Record<string, unknown>;
+    projectionSqlText: string;
+  } {
+    const runner = require(RUNNER_PATH) as RunnerModule;
+    const HH = 'a'.repeat(64);
+    const projectionSqlText = readFileSync(PROJECTION_SQL, 'utf8');
+    const inventory = probe.consumeManagedInventory(
+      readFileSync(resolve(REPO_ROOT, 'deploy/qdrant/q12-managed-session-inventory.json'), 'utf8'),
+      { expectedInventorySha256: W_TUPLE.managed_inventory_sha256 }
+    );
+    const request = {
+      schema_version: 'megacampus.q12.activation-truth-request/v1',
+      run_id: 'run-df1',
+      release_sha: HH,
+      lease_epoch: 7,
+      predecessor_journal_entry_hash: HH,
+      predecessor_checkpoint_sha256: HH,
+      previous_terminal_seal_sha256: null,
+      abandoned_predecision_sha256: null,
+      expected_catalog_sha256: HH,
+      expected_post_migration_catalog_sha256: HH,
+      database_capability_sha256: HH,
+      activation_capability_sha256: HH,
+      prepared_quiesced_predecessor_sha256: HH,
+      writer_quiesce_manifest_sha256: HH,
+      activation_evidence_state: 'prepared_guarded',
+      barrier_receipt_sha256: HH,
+      probe_receipt_sha256: HH,
+      activation_result_sha256: null,
+      activation_process_projection_sha256: HH,
+      process_manifest_sha256: null,
+      w_activation_tuple_sha256: HH,
+      projection_sql_sha256: PROJECTION_SQL_SHA256,
+      spawn_capability_sha256: HH,
+      runtime_fd_baseline_sha256: HH,
+    };
+    const rootResponder = (prevSha: string, kind: string, seq: number): Record<string, unknown> => {
+      let payload: Record<string, unknown>;
+      if (kind === 'host_projection') {
+        payload = runner.buildRootHostProjectionPayload({
+          classification: 'precommit_rollback',
+          request_sha256: HH,
+          initial_database_projection_sha256: HH,
+          host_projection_sha256: HH,
+          prepared_quiesced_predecessor_sha256: HH,
+        });
+      } else if (kind === 'predecision') {
+        payload = runner.buildRootPredecisionPayload({
+          classification: 'precommit_rollback',
+          request_sha256: HH,
+          predecision_sha256: HH,
+          planned_r_journal_entry_hash: HH,
+          planned_r_checkpoint_sha256: HH,
+          predecessor_journal_entry_hash: HH,
+          predecessor_checkpoint_sha256: HH,
+        });
+      } else {
+        payload = runner.buildRootReleasePayload({
+          request_sha256: HH,
+          predecision_sha256: HH,
+          sealed_frame_sha256: HH,
+          actual_r_journal_entry_hash: HH,
+          actual_r_checkpoint_sha256: HH,
+        });
+      }
+      return probe.makeFrame({
+        schema_version: probe.FRAME_SCHEMA_VERSION,
+        sequence: seq,
+        kind,
+        run_id: request.run_id,
+        payload,
+        previous_frame_sha256: prevSha,
+      });
+    };
+    return { request, rootResponder, inventory, projectionSqlText };
+  }
+
+  it('DF1 — clears the snapshot + does a fresh full read before EACH of db_locked/host_bound/sealed', async () => {
+    const { request, rootResponder, inventory, projectionSqlText } = buildPrecommitScenario();
+    const { Client } = require('pg') as typeof import('pg');
+    const client = new Client({
+      host: '127.0.0.1',
+      port: pgPort,
+      user: 'postgres',
+      password: POSTGRES_PASSWORD,
+      database: 'postgres',
+      application_name: 'megacampus-q12-activation-truth',
+    });
+    await client.connect();
+    let sessionActivityReads = 0;
+    let clearCalls = 0;
+    const proxy = {
+      query: (sql: string) => {
+        if (/pg_stat_activity/.test(sql)) sessionActivityReads += 1;
+        if (/pg_stat_clear_snapshot/.test(sql)) clearCalls += 1;
+        return client.query(sql);
+      },
+    };
+    try {
+      const result = await probe.assembleInspect({
+        request,
+        projectionSql: projectionSqlText,
+        connection: proxy,
+        expectedRelations: ORDER_RELATIONS,
+        inventory,
+        rootResponder,
+        identities: { fd9_identity_sha256: 'a'.repeat(64) },
+        closeConnection: () => Promise.resolve(),
+      });
+      expect(result.frames.length).toBe(7);
+      // One complete fresh read (incl. pg_stat_activity) before each frame point.
+      expect(sessionActivityReads).toBe(3);
+      // Clears: the initial capability read + three per-frame projection reads.
+      expect(clearCalls).toBeGreaterThanOrEqual(4);
+      const hostBound = result.frames[2].payload as Record<string, unknown>;
+      const sealed = result.frames[4].payload as Record<string, unknown>;
+      expect(hostBound.bound_database_projection_sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(sealed.final_database_projection_sha256).toMatch(/^[0-9a-f]{64}$/);
+    } finally {
+      await client.end();
+    }
+  }, 60_000);
+
+  it('DF1 — a session appearing after db_locked is surfaced by the sealed-side fresh read as drift', async () => {
+    const { request, rootResponder, inventory, projectionSqlText } = buildPrecommitScenario();
+    const { Client } = require('pg') as typeof import('pg');
+    const client = new Client({
+      host: '127.0.0.1',
+      port: pgPort,
+      user: 'postgres',
+      password: POSTGRES_PASSWORD,
+      database: 'postgres',
+      application_name: 'megacampus-q12-activation-truth',
+    });
+    await client.connect();
+    // Model the non-MVCC pg_stat_activity behaviour: a backend outside the frozen
+    // inventory appears only on reads AFTER db_locked (reads 2 and 3). A single
+    // reused initial read would miss it; the per-frame fresh read surfaces it.
+    let sessionActivityReads = 0;
+    const intruderRow = {
+      role: 'postgres',
+      database: 'postgres',
+      backend_type: 'client backend',
+      application_identity: 'q12-intruder-app',
+      state: 'active',
+      xact_start_is_null: true,
+      backend_xid_is_null: true,
+      backend_xmin_is_null: true,
+      pid: 999999,
+      backend_start_utc: '2026-07-16T00:00:00.000Z',
+    };
+    const proxy = {
+      query: async (sql: string) => {
+        const result = await client.query(sql);
+        if (/pg_stat_activity/.test(sql)) {
+          sessionActivityReads += 1;
+          if (sessionActivityReads >= 2) {
+            return { ...result, rows: [...result.rows, intruderRow] };
+          }
+        }
+        return result;
+      },
+    };
+    try {
+      await expect(
+        probe.assembleInspect({
+          request,
+          projectionSql: projectionSqlText,
+          connection: proxy,
+          expectedRelations: ORDER_RELATIONS,
+          inventory,
+          rootResponder,
+          identities: { fd9_identity_sha256: 'a'.repeat(64) },
+          closeConnection: () => Promise.resolve(),
+        })
+      ).rejects.toThrow(/drift|unknown/i);
+    } finally {
+      await client.end();
+    }
+  }, 60_000);
+
   // @@CONTAINER_TESTS_END
 });
 
