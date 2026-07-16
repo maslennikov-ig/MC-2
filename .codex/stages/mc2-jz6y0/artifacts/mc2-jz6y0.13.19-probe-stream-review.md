@@ -14,7 +14,28 @@ authority_contract_tail_sha256: 2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2
 verdict: PASS
 scores_p0_p1_p2_p3: '0/0/2/4'
 suite_result: '72/72 passed (MC2_Q12_REAL_PG17=1), reproduced independently'
+repo: mc2
+branch: codex/q12-d6-probe
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: 72af414c
+worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+risk_level: high
+cleanup_status: not_applicable
+cleanup_notes: read-only review; single artifact write; no workspace to clean
+verification:
+  - 'independent review PASS 0/0/2/4; delta review PASS (F1/F2/F3 closed, DF1 later fixed); 72/72→80/80 reproduced with MC2_Q12_REAL_PG17=1'
+changed_files:
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-probe-stream-review.md
+explicit_defers:
+  - 'none beyond the findings recorded in the review body'
 ---
+
+# Summary
+
+See the review body below; verdict and severity counts are in the frontmatter/body.
 
 # D6 probe-stream independent correctness review
 
@@ -327,3 +348,11 @@ everywhere pinned (above).
 - **F5 (test-reference catalog):** unchanged — the rebound SQL (`36d28034…`) still
   embeds the W Layer-1 placeholder catalog; production re-freeze still required.
 - **F6 (representative Task-6 slice):** unchanged.
+
+# Verification
+
+See the frontmatter `verification` list and the evidence recorded in the review body.
+
+# Risks / Follow-ups
+
+All findings, dispositions, and residual notes are enumerated in the review body; none are open beyond what the stream/stage artifacts track.

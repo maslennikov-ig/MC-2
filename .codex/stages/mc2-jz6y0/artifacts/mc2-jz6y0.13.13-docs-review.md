@@ -15,6 +15,22 @@ reviewed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.13-q12-root.md (new stage artifact)
 verdict: PASS
 scores_p0_p1_p2_p3: '0/0/0/1'
+branch: codex/q12-root-join
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: 8717f7ac
+worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+risk_level: high
+cleanup_status: not_applicable
+cleanup_notes: read-only review; single artifact write; no workspace to clean
+verification:
+  - 'docs review PASS 0/0/0/1; q12-live-smoke.sh observe driven live on accept/breach fixtures; runbook thresholds match code'
+changed_files:
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.13-docs-review.md
+explicit_defers:
+  - 'none beyond the findings recorded in the review body'
 ---
 
 # Summary
@@ -126,3 +142,7 @@ true` in the verdict JSON; it executes no rotation. The runbook ("Every
 - Re-run the 283/283 Root gate and 117/117 focused reruns on the full pinned
   Qdrant + PG17 stack during integration to close the environment-gated
   documentary limitation noted in Check 3.
+
+# Verification
+
+See the frontmatter `verification` list and the evidence recorded in the review body.

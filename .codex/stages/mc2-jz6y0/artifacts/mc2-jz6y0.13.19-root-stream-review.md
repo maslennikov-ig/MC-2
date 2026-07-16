@@ -13,7 +13,28 @@ contract_tail_sha256_verified: 2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f
 manifest_sha256_verified: aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841
 verdict: PASS
 scores_p0_p1_p2_p3: '0/0/1/4'
+repo: mc2
+branch: codex/q12-d6-root
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: 72af414c
+worktree: /home/me/code/mc2/.worktrees/self-hosted-qdrant-platform
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+risk_level: high
+cleanup_status: not_applicable
+cleanup_notes: read-only review; single artifact write; no workspace to clean
+verification:
+  - 'independent review PASS 0/0/1/4; delta review PASS (D-F1/D-F2 later fixed); 278/278→337/337 reproduced; manifest sha aaec6fc2… unchanged'
+changed_files:
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-root-stream-review.md
+explicit_defers:
+  - 'none beyond the findings recorded in the review body'
 ---
+
+# Summary
+
+See the review body below; verdict and severity counts are in the frontmatter/body.
 
 # D6 Root-stream (Tasks 15-19) independent correctness review
 
@@ -287,3 +308,11 @@ FD3/FD4 path); **F3 (P3) partially closed** (mechanism tested, not wired — now
 **F2 (P3, frame envelope / chain validation / cross-stream `.cjs` parity) remains an
 integration-join item**. No secret bytes hashed or logged (FD 3 explicitly never hashed;
 comment retained); no live/remote path added.
+
+# Verification
+
+See the frontmatter `verification` list and the evidence recorded in the review body.
+
+# Risks / Follow-ups
+
+All findings, dispositions, and residual notes are enumerated in the review body; none are open beyond what the stream/stage artifacts track.

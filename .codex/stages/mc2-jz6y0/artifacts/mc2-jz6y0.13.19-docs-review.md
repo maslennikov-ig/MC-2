@@ -19,6 +19,20 @@ reviewed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-field11-ratification-review.md (reference)
 verdict: FAIL
 scores_p0_p1_p2_p3: '0/1/4/1'
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: 3d70eaf2
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+risk_level: high
+cleanup_status: not_applicable
+cleanup_notes: read-only review; single artifact write; no workspace to clean
+verification:
+  - 'docs review FAIL 0/1/4/1 on staleness; five fixes applied; re-verification PASS 0/0/0/1'
+changed_files:
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-docs-review.md
+explicit_defers:
+  - 'none beyond the findings recorded in the review body'
 ---
 
 # Summary
@@ -166,3 +180,7 @@ docs d1627f1c` mention at `handoff.md:10` is the historical description of the
 No factual re-checks were needed (all SHAs/hashes/paths/counts were verified
 true in the initial review and were not touched by the fixes). The slice is
 clear to push.
+
+# Verification
+
+See the frontmatter `verification` list and the evidence recorded in the review body.

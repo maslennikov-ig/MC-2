@@ -19,7 +19,24 @@ findings_by_severity:
   P2: 1
   P3: 2
 recomputed_canonical_hash: c90edb78341fb83a6d954212daca675f5bac89f17bd5611ceb6db3e56559bac6
+base_branch: codex/self-hosted-qdrant-platform
+base_commit: 1535a56b9699c6ed247467b6eb30800ff7bd34ff
+status: accepted
+delivery_method: n/a
+accepted_by_orchestrator: yes
+cleanup_status: not_applicable
+cleanup_notes: read-only review; single artifact write; no workspace to clean
+verification:
+  - 'canonical hash recomputed c90edb78… matches; contract tail-hash 2a2251ac… verified; checklist 1-8 PASS'
+changed_files:
+  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-field11-ratification-review.md
+explicit_defers:
+  - 'none beyond the findings recorded in the review body'
 ---
+
+# Summary
+
+See the review body below; verdict and severity counts are in the frontmatter/body.
 
 # Verdict: PASS
 
@@ -92,3 +109,11 @@ Equals the provisional canonical hash in the tasking, the freezing commit `58369
 ## Constraints honored
 
 Read-only throughout: `git show/log`, `sha256sum`, `python3` canonicalization only. No network, no DSN, no live DB access. Single write: this artifact (no existing file overwritten). General Supabase training knowledge was used only to justify FLAGS (F1/F3), never as evidence of correctness for item 6.
+
+# Verification
+
+See the frontmatter `verification` list and the evidence recorded in the review body.
+
+# Risks / Follow-ups
+
+All findings, dispositions, and residual notes are enumerated in the review body; none are open beyond what the stream/stage artifacts track.
