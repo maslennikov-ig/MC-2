@@ -3543,6 +3543,27 @@ def d6_build_terminal_seal(
     return {key: fields[key] for key in D6_TERMINAL_SEAL_KEYS}
 
 
+def d6_predecision_sha256(predecision: dict[str, Any]) -> str:
+    """The lowercase 64-hex SHA-256 over the canonical predecision object bytes."""
+    return sha256(canonical(predecision))
+
+
+def d6_verify_seal_binding(
+    seal: dict[str, Any], predecision: dict[str, Any]
+) -> str:
+    """Reject a terminal seal whose predecision_sha256 does not hash its predecision.
+
+    Invoked wherever a seal is validated against the predecision it claims (restart
+    authority and chain selection), so a seal cannot smuggle in a mismatched
+    predecision.  Returns the verified hash."""
+    expected = d6_predecision_sha256(predecision)
+    if seal["predecision_sha256"] != expected:
+        raise LifecycleError(
+            "D6 terminal seal predecision_sha256 does not bind its predecision"
+        )
+    return expected
+
+
 def d6_terminal_seal_authority(seal: dict[str, Any]) -> str:
     """Return the sole authority a validated terminal seal confers."""
     outcome = seal["outcome"]
