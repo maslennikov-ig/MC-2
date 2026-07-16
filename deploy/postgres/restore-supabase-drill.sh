@@ -697,7 +697,11 @@ PY
   run_service_psql "$TEMP_ROOT/cleanup-postgres.service" mc2_restore_cleanup_postgres --file "$TEMP_ROOT/create-database.sql" >/dev/null
   write_pgpass "$TEMP_ROOT/cleanup-restore-test.pgpass" "$port" restore_test postgres "$cleanup_password"
   write_service "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup "$port" restore_test postgres "$TEMP_ROOT/cleanup-restore-test.pgpass"
-  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --file "$TEMP_ROOT/database-post.sql" >/dev/null
+  # Custom-GUC database settings (app.*) require superuser to set, so the
+  # database-post replay runs as supabase_admin.
+  write_pgpass "$TEMP_ROOT/database-post.pgpass" "$port" restore_test supabase_admin "$restore_password"
+  write_service "$TEMP_ROOT/database-post.service" mc2_restore_database_post "$port" restore_test supabase_admin "$TEMP_ROOT/database-post.pgpass"
+  run_service_psql "$TEMP_ROOT/database-post.service" mc2_restore_database_post --file "$TEMP_ROOT/database-post.sql" >/dev/null
   verify_extensions_and_toc "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup
 
   # Required isolated cluster overrides: cron.database_name=restore_test and cron.launch_active_jobs=off.
