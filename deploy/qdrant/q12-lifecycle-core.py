@@ -3098,6 +3098,161 @@ def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any
     return engine.output()
 
 
+# ===================================================================== #
+# D6 activation-truth Root coordinator.
+#
+# D6 is a private child of the Root lifecycle supervisor: it adds no manifest
+# command, systemd unit, cron job, Compose service, shell command, or operator
+# argv.  Everything below drives the Root spawn boundary, pidfd/proc/OFD gates,
+# the predecision -> optional durable R -> final transcript -> terminal seal
+# authority graph, and the sole post-R D5 narrowing.  No live/remote action is
+# taken here; the pinned-server capability observations (atomic
+# POSIX_SPAWN_CLOSEFROM, real pidfd/ptrace/Yama policy) stay behind a separate
+# authorized remote gate.
+# ===================================================================== #
+
+D6_PROBE_ARGV = (
+    "/usr/bin/node",
+    "/opt/megacampus/packages/course-gen-platform/tools/qdrant/q12-activation-truth-probe.cjs",
+    "inspect",
+)
+# Contract "Fixed retained commands and production process": Root supplies only a
+# fixed PATH, LC_ALL=C.UTF-8, LANG=C.UTF-8, and a fixed non-writable HOME; no
+# NODE_OPTIONS and no inherited environment.  The exact PATH/HOME bytes are a
+# Root-side determination (the contract fixes only LC_ALL/LANG and the
+# non-writable-HOME property).
+D6_PROBE_ENV = {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C.UTF-8",
+    "LANG": "C.UTF-8",
+    "HOME": "/var/empty",
+}
+# Root dup2's every already-validated source into these child descriptors.
+D6_MAPPED_TARGET_FDS = (1, 2, 3, 4, 5, 6, 7, 9, 10, 11)
+# Every mapped source except FD 9 is explicitly closed right after its dup2 (the
+# contract's "close the source duplicate after each map"); the close-from below is
+# the final sweep of any remaining runtime descriptor.  FD 8 is explicitly closed;
+# FD 9 is the inherited canonical lease held at its own number and is never
+# duplicated or closed.
+D6_CLOSE_AFTER_MAP_FDS = (1, 2, 3, 4, 5, 6, 7, 10, 11)
+D6_CLOSE_FROM_FLOOR = 12
+
+D6_DB_URL_PATH = pathlib.Path("/opt/megacampus/secrets/supabase_db_url")
+D6_CA_PATH = pathlib.Path("/opt/megacampus/secrets/prod-ca-2021.crt")
+D6_DB_URL_MODES = frozenset((0o400, 0o600))
+D6_CA_MODES = frozenset((0o644,))
+D6_CA_SHA256 = "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+D6_SECRET_OWNER = "claude-deploy"
+
+
+def d6_closefrom_capability() -> bool:
+    """Report local presence of the atomic POSIX_SPAWN_CLOSEFROM file action.
+
+    The pinned server's atomic close-from semantics under descriptor pressure are a
+    separate remote capability gate; this only reports the local constant exposure
+    (Python 3.14 / glibc).  Absence is a hard engineering blocker: Root must never
+    silently fall back to preexec_fn, a threaded fork child, a shell, an inherited
+    broad pass_fds set, or a broker."""
+    return hasattr(os, "POSIX_SPAWN_CLOSEFROM")
+
+
+def d6_build_spawn_file_actions(sources: dict[int, int]) -> list[tuple]:
+    """Ordered posix_spawn file actions for the D6 probe descriptor contract.
+
+    ``sources`` maps every child target descriptor to the already-validated source
+    descriptor Root holds.  Every mapped source except FD 9 (the inherited
+    canonical lease, held at its own number) must sit at or above the close-from
+    floor so the final close-from cannot strand it."""
+    if set(sources) != set(D6_MAPPED_TARGET_FDS):
+        raise LifecycleError(
+            "D6 spawn descriptor map is not the exact FD 1-11 target set"
+        )
+    if not d6_closefrom_capability():
+        raise LifecycleError(
+            "D6 requires the atomic POSIX_SPAWN_CLOSEFROM file action; no fallback"
+        )
+    actions: list[tuple] = [
+        (os.POSIX_SPAWN_OPEN, 0, os.fsencode("/dev/null"), os.O_RDONLY, 0)
+    ]
+    for target in D6_MAPPED_TARGET_FDS:
+        source = sources[target]
+        if target == 9:
+            if source != 9:
+                raise LifecycleError(
+                    "D6 FD 9 must be the inherited canonical lease at its own number"
+                )
+            continue
+        if source < D6_CLOSE_FROM_FLOOR:
+            raise LifecycleError(
+                f"D6 spawn source descriptor {source} for FD {target} is below the close-from line"
+            )
+        actions.append((os.POSIX_SPAWN_DUP2, source, target))
+        if target in D6_CLOSE_AFTER_MAP_FDS:
+            actions.append((os.POSIX_SPAWN_CLOSE, source))
+    actions.append((os.POSIX_SPAWN_CLOSE, 8))
+    actions.append((os.POSIX_SPAWN_CLOSEFROM, D6_CLOSE_FROM_FLOOR))
+    return actions
+
+
+def d6_posix_spawn(
+    argv: list[str], env: dict[str, str], sources: dict[int, int]
+) -> int:
+    """Spawn one child under the exact D6 file-action boundary via posix_spawn."""
+    file_actions = d6_build_spawn_file_actions(sources)
+    return os.posix_spawn(argv[0], list(argv), env, file_actions=file_actions)
+
+
+def d6_spawn_probe(sources: dict[int, int]) -> int:
+    """Spawn the fixed production D6 probe argv/environment (Root supervisor use)."""
+    return d6_posix_spawn(list(D6_PROBE_ARGV), dict(D6_PROBE_ENV), sources)
+
+
+def d6_validate_secret_source(
+    path: pathlib.Path,
+    *,
+    mode_set: frozenset[int],
+    owner_uid: int,
+    owner_gid: int,
+) -> tuple[int, int, int]:
+    """Open one Root-held secret source O_RDONLY|O_NOFOLLOW|O_CLOEXEC and prove
+    owner/mode/type/canonical-path plus device/inode identity before and after read.
+
+    Returns ``(fd, dev, ino)``.  The caller maps the descriptor to FD 3 or FD 4 and,
+    for FD 3, decodes the password without ever hashing or logging its bytes."""
+    parent_fd = open_parent_directory(path)
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            path.name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=parent_fd,
+        )
+        before = os.fstat(descriptor)
+        if (
+            not stat_module.S_ISREG(before.st_mode)
+            or before.st_uid != owner_uid
+            or before.st_gid != owner_gid
+            or stat_module.S_IMODE(before.st_mode) not in mode_set
+            or before.st_nlink != 1
+        ):
+            raise LifecycleError(f"unsafe file identity: {path}")
+        path_stat = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        after = os.fstat(descriptor)
+        if (
+            (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino)
+            or (before.st_dev, before.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+            or not stat_module.S_ISREG(path_stat.st_mode)
+        ):
+            raise LifecycleError(f"file path identity changed: {path}")
+        keep = descriptor
+        descriptor = -1
+        return keep, before.st_dev, before.st_ino
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Q12 retained barrier lifecycle")
     commands = root.add_subparsers(dest="mode", required=True)

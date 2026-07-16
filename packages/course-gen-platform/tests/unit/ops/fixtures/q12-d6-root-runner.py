@@ -86,11 +86,9 @@ def scenario_spawn_file_actions(payload: dict) -> dict:
 
 def _hoist(descriptor: int) -> int:
     """Return an inheritable duplicate of ``descriptor`` above the close-from line."""
-    hoisted = os.dup(descriptor)
-    while hoisted < 12:
-        nxt = os.dup(hoisted)
-        os.close(hoisted)
-        hoisted = nxt
+    import fcntl
+
+    hoisted = fcntl.fcntl(descriptor, fcntl.F_DUPFD, 12)
     os.set_inheritable(hoisted, True)
     return hoisted
 
@@ -119,19 +117,30 @@ def scenario_spawn_under_pressure(payload: dict) -> dict:
             sources[target] = source
         # A live descriptor parked at FD8 must be explicitly closed before exec.
         os.dup2(marker, 8, inheritable=True)
+        # Probe fd numbers by fstat so the inspector opens no extra descriptor of
+        # its own (os.listdir on a dirfd would dup it and pollute the report).
         inspector = (
-            "import os;"
-            "d=os.open('/proc/self/fd',os.O_RDONLY);"
-            "fds=sorted(int(n) for n in os.listdir(d) if int(n)!=d);"
-            "os.close(d);"
-            "os.write(1,(','.join(map(str,fds))).encode())"
+            "import os\n"
+            "def live(n):\n"
+            " try: os.fstat(n); return True\n"
+            " except OSError: return False\n"
+            "fds=[n for n in range(0,64) if live(n)]\n"
+            "os.write(1,(','.join(map(str,fds))).encode())\n"
         )
         pid = CORE.d6_posix_spawn(
             ["/usr/bin/python3", "-c", inspector],
             {"PATH": "/usr/bin:/bin", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8", "HOME": "/var/empty"},
             sources,
         )
+        # Close every parent-side copy of the audit pipe write end (audit_w plus the
+        # hoisted FD1/FD2 sources) so the read below sees EOF once the child exits.
         os.close(audit_w)
+        for descriptor in hoisted:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        hoisted.clear()
         chunks = []
         while True:
             data = os.read(audit_r, 4096)

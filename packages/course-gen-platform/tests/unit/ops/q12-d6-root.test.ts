@@ -45,7 +45,9 @@ describe('Task 16 — D6 posix_spawn boundary + FD map/close-from', () => {
     expect(result.actions).toEqual([
       ['open', 0, '/dev/null', 0, 0],
       ['dup2', 21, 1],
+      ['close', 21],
       ['dup2', 22, 2],
+      ['close', 22],
       ['dup2', 23, 3],
       ['close', 23],
       ['dup2', 24, 4],
@@ -132,6 +134,6 @@ describe('Task 16 — D6 posix_spawn boundary + FD map/close-from', () => {
       symlink: true,
     });
     expect(symlinked.ok).toBe(false);
-    expect(symlinked.error).toMatch(/symlink|ELOOP|NOFOLLOW|unsafe/i);
+    expect(symlinked.error).toMatch(/symbolic|symlink|ELOOP|NOFOLLOW|unsafe/i);
   });
 });
