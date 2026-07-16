@@ -945,6 +945,19 @@ describe('Q12 immutable Supabase backup generations', () => {
     expect(lines).toContain('password=p@ss=w rd#x');
   });
 
+  it('references version-renamed pg_database locale columns only through to_jsonb', () => {
+    // PG17 renamed daticulocale to datlocale and PG15 lacks daticurules, so a
+    // direct column reference makes the catalog SQL fail on a real server.
+    const manifestTool = readFileSync(
+      resolve(REPO_ROOT, 'deploy/postgres/q12-source-manifest.ts'),
+      'utf8'
+    );
+    expect(manifestTool).not.toMatch(/d\.daticulocale/);
+    expect(manifestTool).not.toMatch(/d\.daticurules/);
+    expect(manifestTool).toContain("to_jsonb(d)->>'daticulocale'");
+    expect(manifestTool).toContain("to_jsonb(d)->>'datlocale'");
+  });
+
   it('fails closed when normalized password-free role exports drift', () => {
     const item = fixture();
 

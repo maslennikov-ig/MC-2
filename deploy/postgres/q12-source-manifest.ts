@@ -103,7 +103,47 @@ function runPsql(sql: string): string {
   if (result.status !== 0)
     fail(`PostgreSQL 17 manifest query failed with status ${result.status ?? 'signal'}`);
   if (result.stderr.trim() !== '') fail('PostgreSQL 17 manifest query emitted stderr');
-  return result.stdout.trim();
+  // Every runPsql statement returns one COPY TO STDOUT text-format line, so
+  // the COPY escape sequences must be decoded before the jsonb is parsed.
+  return decodeCopyText(result.stdout.trim());
+}
+
+function decodeCopyText(value: string): string {
+  let decoded = '';
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character !== '\\') {
+      decoded += character;
+      continue;
+    }
+    index += 1;
+    switch (value[index]) {
+      case '\\':
+        decoded += '\\';
+        break;
+      case 'b':
+        decoded += '\b';
+        break;
+      case 'f':
+        decoded += '\f';
+        break;
+      case 'n':
+        decoded += '\n';
+        break;
+      case 'r':
+        decoded += '\r';
+        break;
+      case 't':
+        decoded += '\t';
+        break;
+      case 'v':
+        decoded += '\v';
+        break;
+      default:
+        fail('COPY text output contains an unsupported escape sequence');
+    }
+  }
+  return decoded;
 }
 
 function catalogSql(snapshot: string | null): string {
@@ -122,8 +162,8 @@ WITH database_row AS (
     'ctype', d.datctype,
     'provider_locale', to_jsonb(d)->>'datlocale',
     'builtin_locale', to_jsonb(d)->>'datbuiltinlocale',
-    'icu_locale', d.daticulocale,
-    'icu_rules', d.daticurules,
+    'icu_locale', to_jsonb(d)->>'daticulocale',
+    'icu_rules', to_jsonb(d)->>'daticurules',
     'collation_version', d.datcollversion,
     'tablespace', t.spcname,
     'connection_limit', d.datconnlimit,
@@ -269,7 +309,7 @@ SELECT jsonb_build_object(
   ) ORDER BY jobid) FROM cron.job), '[]'::jsonb),
   'pg_net_queue_count', (SELECT count(*)::text FROM net.http_request_queue),
   'server_version', current_setting('server_version'), 'migration_frontier', COALESCE((SELECT max(version)::text FROM supabase_migrations.schema_migrations),'')
-);
+)
 ) TO STDOUT;
 COMMIT;`;
 }
@@ -605,13 +645,39 @@ function validateExpectedCatalog(
 }
 
 function rejectSecretShape(value: unknown): void {
-  const text = canonical(value);
-  if (/rolpassword|password_hash|encrypted_password/i.test(text))
-    fail('password field is forbidden in manifest');
-  if (/postgres(?:ql)?:\/\/[^\s/:]+:[^\s@]+@/i.test(text))
-    fail('credential URI is forbidden in manifest');
-  if (/eyJ[A-Za-z0-9_-]{20,}\.|sbp_[A-Za-z0-9_-]{16,}/.test(text))
-    fail('token-shaped value is forbidden in manifest');
+  const rejectSecretText = (text: string): void => {
+    if (/postgres(?:ql)?:\/\/[^\s/:]+:[^\s@]+@/i.test(text))
+      fail('credential URI is forbidden in manifest');
+    if (/eyJ[A-Za-z0-9_-]{20,}\.|sbp_[A-Za-z0-9_-]{16,}/.test(text))
+      fail('token-shaped value is forbidden in manifest');
+    if (/^(?:md5[0-9a-f]{32}|SCRAM-SHA-256\$.+)$/.test(text))
+      fail('password field is forbidden in manifest');
+  };
+  // Catalog `definition` bodies are database DDL content whose sensitivity
+  // equals the adjacent dump: public extension code such as supabase-dbdev
+  // legitimately embeds its published anon JWT, and Supabase exposes
+  // structural identifiers such as the auth.users.encrypted_password column
+  // name. Every other manifest key and string must stay free of credential
+  // material, including secret-bearing object keys.
+  const walk = (node: unknown, container: string): void => {
+    if (typeof node === 'string') {
+      if (container !== 'definition') rejectSecretText(node);
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, container);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      for (const [key, item] of Object.entries(node)) {
+        if (/^(?:rolpassword|password_hash|encrypted_password|password)$/i.test(key))
+          fail('password field is forbidden in manifest');
+        rejectSecretText(key);
+        walk(item, key);
+      }
+    }
+  };
+  walk(value, '');
 }
 
 function writeOwnerOnly(path: string, value: unknown): void {
