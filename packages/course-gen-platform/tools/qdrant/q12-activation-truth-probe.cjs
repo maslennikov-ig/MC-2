@@ -344,6 +344,139 @@ class FrameChain {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 2 — FD-11 SQL projection bundle: template splitting + allowlist guard.
+//
+// The projection SQL is a set of named READ-ONLY templates delimited by
+// "--@template <name>" / "--@end <name>" markers. The probe only ever executes
+// a template whose text is a member of the parsed bundle (contract "Allowed SQL
+// is limited to fixed templates from FD 11").
+// ---------------------------------------------------------------------------
+
+const PROJECTION_TEMPLATE_NAMES = Object.freeze([
+  'transaction_begin',
+  'clear_snapshot',
+  'connection_identity',
+  'capability_lock_rows',
+  'activity_visibility',
+  'full_catalog_share_lock',
+  'lock_projection',
+  'active_run_singleton',
+  'structural_catalog',
+  'database_default',
+  'cron_jobs',
+  'global_pg_net_queue',
+  'prepared_xacts',
+  'session_activity',
+  'transaction_commit',
+  'transaction_rollback',
+]);
+
+// Mutation/capability verbs and calls that must never appear outside quoted
+// literals/identifiers. UPDATE/DELETE/TRUNCATE/MAINTAIN are permitted only as
+// quoted has_table_privilege(...) privilege names, which are stripped before
+// scanning.
+const PROJECTION_FORBIDDEN = Object.freeze([
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'TRUNCATE',
+  'MERGE',
+  'COPY',
+  'GRANT',
+  'REVOKE',
+  'CALL',
+  'REINDEX',
+  'CLUSTER',
+  'VACUUM',
+  'REFRESH',
+  'set_config',
+  'pg_advisory_unlock',
+  'pg_advisory_lock',
+  'pg_terminate_backend',
+  'pg_cancel_backend',
+  'pg_reload_conf',
+]);
+
+/**
+ * Split the FD-11 projection SQL into its named templates. Rejects unknown
+ * markers, duplicate template names, and mismatched open/close markers.
+ * @param {string} sql
+ * @returns {Map<string, string>}
+ */
+function splitProjectionTemplates(sql) {
+  const templates = new Map();
+  const lines = sql.split('\n');
+  let current = null;
+  let buffer = [];
+  for (const line of lines) {
+    const open = line.match(/^--@template\s+(\S+)\s*$/);
+    const close = line.match(/^--@end\s+(\S+)\s*$/);
+    if (open) {
+      if (current !== null) {
+        throw new Error(`splitProjectionTemplates: nested template '${open[1]}' inside '${current}'`);
+      }
+      current = open[1];
+      buffer = [];
+      continue;
+    }
+    if (close) {
+      if (current === null || close[1] !== current) {
+        throw new Error(`splitProjectionTemplates: unmatched --@end ${close[1]}`);
+      }
+      if (templates.has(current)) {
+        throw new Error(`splitProjectionTemplates: duplicate template '${current}'`);
+      }
+      templates.set(current, buffer.join('\n').trim());
+      current = null;
+      continue;
+    }
+    if (current !== null) buffer.push(line);
+  }
+  if (current !== null) {
+    throw new Error(`splitProjectionTemplates: template '${current}' not closed`);
+  }
+  return templates;
+}
+
+/**
+ * Remove line comments, single-quoted literals, and double-quoted identifiers
+ * so quoted privilege names do not trip the forbidden-construct scan.
+ * @param {string} sql
+ * @returns {string}
+ */
+function stripSqlLiterals(sql) {
+  return sql
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/'(?:[^']|'')*'/g, " '' ")
+    .replace(/"(?:[^"]|"")*"/g, ' "" ');
+}
+
+/**
+ * Assert the projection bundle contains only the expected named templates and
+ * no forbidden constructs. Throws on any deviation.
+ * @param {string} sql
+ */
+function assertProjectionAllowlist(sql) {
+  const templates = splitProjectionTemplates(sql);
+  const names = [...templates.keys()].sort();
+  const expected = [...PROJECTION_TEMPLATE_NAMES].sort();
+  if (names.length !== expected.length || names.some((name, index) => name !== expected[index])) {
+    throw new Error(
+      `assertProjectionAllowlist: template set mismatch (got ${names.join(',')})`
+    );
+  }
+  const stripped = stripSqlLiterals(sql);
+  for (const forbidden of PROJECTION_FORBIDDEN) {
+    if (new RegExp(`\\b${forbidden}\\b`, 'i').test(stripped)) {
+      throw new Error(`assertProjectionAllowlist: forbidden construct '${forbidden}'`);
+    }
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -352,6 +485,11 @@ module.exports = {
   makeFrame,
   FrameChain,
   HEX64,
+  PROJECTION_TEMPLATE_NAMES,
+  PROJECTION_FORBIDDEN,
+  splitProjectionTemplates,
+  stripSqlLiterals,
+  assertProjectionAllowlist,
 };
 
 // ---------------------------------------------------------------------------
