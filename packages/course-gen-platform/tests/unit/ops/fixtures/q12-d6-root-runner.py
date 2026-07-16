@@ -441,7 +441,76 @@ TASK19 = {
 }
 
 
-DISPATCH = {**TASK16, **TASK17, **TASK18, **TASK19}
+# --------------------------------------------------------------------------- #
+# Post-review corrections: NFC canonicalization, after-read secret revalidation,
+# and terminal-seal <-> predecision binding.
+# --------------------------------------------------------------------------- #
+
+
+def scenario_canonical_nfc(payload: dict) -> dict:
+    """A decomposed-Unicode payload must hash identically to its NFC-composed form."""
+    composed = payload["composed"]
+    decomposed = payload["decomposed"]
+    value_c = hashlib.sha256(CORE.canonical({"name": composed})).hexdigest()
+    value_d = hashlib.sha256(CORE.canonical({"name": decomposed})).hexdigest()
+    key_c = hashlib.sha256(CORE.canonical({composed: 1})).hexdigest()
+    key_d = hashlib.sha256(CORE.canonical({decomposed: 1})).hexdigest()
+    return {
+        "ok": True,
+        "value_equal": value_c == value_d,
+        "key_equal": key_c == key_d,
+        "no_trailing_lf": not CORE.canonical({"name": composed}).endswith(b"\n"),
+    }
+
+
+def scenario_secret_after_read(payload: dict) -> dict:
+    """Prove owner/mode/type/dev/inode are re-checked after the secret bytes are read."""
+    sandbox = pathlib.Path(tempfile.mkdtemp(prefix="q12-d6-afterread-"))
+    path = _make_secret(sandbox, "supabase_db_url", b"postgresql://u:p@h/postgres\n", 0o600)
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    before = os.fstat(descriptor)
+    before_tuple = [before.st_uid, before.st_gid, before.st_mode, before.st_dev, before.st_ino]
+    mutation = payload.get("mutation")
+    if mutation == "chmod":
+        os.chmod(path, 0o644)
+    elif mutation == "swap":
+        _make_secret(sandbox, "replacement", b"other\n", 0o600)
+        os.replace(sandbox / "replacement", path)
+    try:
+        CORE.d6_assert_secret_identity_stable(
+            descriptor,
+            before_tuple,
+            path,
+            mode_set=frozenset((0o400, 0o600)),
+            owner_uid=os.getuid(),
+            owner_gid=os.getgid(),
+        )
+        return {"ok": True, "stable": True}
+    finally:
+        os.close(descriptor)
+
+
+def scenario_seal_binding(payload: dict) -> dict:
+    classification = payload.get("classification", "precommit_rollback")
+    predecision = CORE.d6_build_predecision(_predecision_fields(classification))
+    overrides = {"predecision_sha256": CORE.d6_predecision_sha256(predecision)}
+    if payload.get("tamper"):
+        overrides["predecision_sha256"] = _sha("tampered-predecision")
+    seal = CORE.d6_build_terminal_seal(
+        _seal_fields(classification, predecision, overrides), predecision
+    )
+    CORE.d6_verify_seal_binding(seal, predecision)
+    return {"ok": True, "bound": True}
+
+
+CORRECTIONS = {
+    "canonical_nfc": scenario_canonical_nfc,
+    "secret_after_read": scenario_secret_after_read,
+    "seal_binding": scenario_seal_binding,
+}
+
+
+DISPATCH = {**TASK16, **TASK17, **TASK18, **TASK19, **CORRECTIONS}
 
 
 def main() -> int:

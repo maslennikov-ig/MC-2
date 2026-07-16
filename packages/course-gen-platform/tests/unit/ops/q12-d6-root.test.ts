@@ -511,3 +511,17 @@ describe('Task 19 — D6 post-R narrowing + race closure + restart authority', (
     ).toBe(false);
   });
 });
+
+describe('Correction — canonical() NFC normalization (cross-stream hash parity)', () => {
+  it('hashes decomposed Unicode identically to its NFC-composed form, with no trailing LF', () => {
+    // composed "\u00e9" vs decomposed "e" + U+0301
+    const composed = String.fromCodePoint(0x00e9);
+    const decomposed = `e${String.fromCodePoint(0x0301)}`;
+    expect(composed).not.toBe(decomposed); // genuinely distinct pre-normalization
+    const result = runScenario({ scenario: 'canonical_nfc', composed, decomposed });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.value_equal).toBe(true);
+    expect(result.key_equal).toBe(true);
+    expect(result.no_trailing_lf).toBe(true);
+  });
+});
