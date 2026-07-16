@@ -752,6 +752,62 @@ function buildCapabilityObject(input) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Task 5 — transaction, full-catalog SHARE lock, allowlist enforcement
+// (contract "Database transaction, lock and SQL allowlist"). Only templates
+// whose exact text is a member of the FD-11 bundle may execute; every accepted
+// catalog relation must carry a granted ShareLock (locking a proper subset such
+// as q12_guard.active_run alone is forbidden).
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert a candidate SQL string is exactly one of the FD-11 bundle templates.
+ * @param {Map<string, string>} bundle
+ * @param {string} candidateSql
+ */
+function assertTemplateAllowed(bundle, candidateSql) {
+  const candidate = String(candidateSql).trim();
+  for (const text of bundle.values()) {
+    if (text.trim() === candidate) return;
+  }
+  throw new Error('assertTemplateAllowed: SQL is not in the FD-11 template allowlist');
+}
+
+/**
+ * Verify the observed pg_locks projection contains exactly one granted ShareLock
+ * per accepted relation, with no missing/extra/ungranted/wrong-mode entry.
+ * @param {{observed: Array<{qualified_name: string, lock_mode: string, granted: boolean}>,
+ *          expectedRelations: readonly string[]}} input
+ */
+function verifyGrantedLocks(input) {
+  const { observed, expectedRelations } = input;
+  const expected = new Set(expectedRelations);
+  if (expected.size !== expectedRelations.length) {
+    throw new Error('verifyGrantedLocks: expectedRelations contains duplicates');
+  }
+  const seen = new Set();
+  for (const row of observed) {
+    if (!expected.has(row.qualified_name)) {
+      throw new Error(`verifyGrantedLocks: unexpected/extra lock on ${row.qualified_name}`);
+    }
+    if (seen.has(row.qualified_name)) {
+      throw new Error(`verifyGrantedLocks: duplicate lock row for ${row.qualified_name}`);
+    }
+    seen.add(row.qualified_name);
+    if (row.lock_mode !== 'ShareLock') {
+      throw new Error(`verifyGrantedLocks: relation ${row.qualified_name} is not in SHARE mode`);
+    }
+    if (row.granted !== true) {
+      throw new Error(`verifyGrantedLocks: relation ${row.qualified_name} lock is not granted`);
+    }
+  }
+  for (const relation of expectedRelations) {
+    if (!seen.has(relation)) {
+      throw new Error(`verifyGrantedLocks: missing granted SHARE lock on expected ${relation}`);
+    }
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -778,6 +834,8 @@ module.exports = {
   resolveActivityVisibility,
   assertClearSnapshotExecuted,
   buildCapabilityObject,
+  assertTemplateAllowed,
+  verifyGrantedLocks,
 };
 
 // ---------------------------------------------------------------------------
