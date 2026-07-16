@@ -1019,8 +1019,14 @@ describe('Task 7 — managed inventory + session projection + drift (unit)', () 
   });
 
   it('rejects a tampered inventory or a wrong expected hash', () => {
+    // Altering real content changes the canonical hash and/or fails validation.
+    const tampered = INVENTORY_TEXT.replace(
+      '"provider_plane_trusted": true',
+      '"provider_plane_trusted": false'
+    );
+    expect(tampered).not.toBe(INVENTORY_TEXT);
     expect(() =>
-      probe.consumeManagedInventory(INVENTORY_TEXT + ' ', {
+      probe.consumeManagedInventory(tampered, {
         expectedInventorySha256: W_TUPLE.managed_inventory_sha256,
       })
     ).toThrow();

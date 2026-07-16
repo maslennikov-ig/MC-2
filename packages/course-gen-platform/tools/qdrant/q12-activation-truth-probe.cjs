@@ -859,6 +859,255 @@ function assertCommonLockConflict(outcome) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 7 — exact managed-provider and session projection (contract "Exact
+// managed-provider and session projection"). D6 consumes the immutable
+// hash-bound inventory and projects each observed pg_stat_activity row into the
+// exact eleven-key shape, detecting drift (unknown identity, disallowed state,
+// transaction-free violations) without ever controlling the trusted plane.
+//
+// Modeling boundary: the projection layer receives already-normalized identity
+// fields (provider-background sentinels: empty role/database and state 'none').
+// A genuine JSON null in a required field is a security-restricted null and
+// fails here; the provider null->sentinel normalization is applied upstream at
+// the SQL layer (coalesce) because bare PG17 cannot reproduce the frozen
+// Supabase provider inventory.
+// ---------------------------------------------------------------------------
+
+const INVENTORY_SCHEMA_VERSION = 'megacampus.q12.managed-session-inventory/v1';
+const MANAGED_PROJECT_REF = 'diqooqbuchsliypgwksu';
+const MANAGED_DATABASE = 'postgres';
+const MANAGED_SOURCE_DECISION_SHA256 =
+  '7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27';
+const PROBE_APP_IDENTITY = 'megacampus-q12-activation-truth';
+
+const INVENTORY_TOP_KEYS = Object.freeze([
+  'database',
+  'identities',
+  'project_ref',
+  'provider_plane_trusted',
+  'schema_version',
+  'source_decision_sha256',
+]);
+const IDENTITY_KEYS = Object.freeze([
+  'allowed_states',
+  'application_identity',
+  'backend_type',
+  'client_class',
+  'database',
+  'role',
+  'transaction_free_required',
+]);
+const OBSERVED_ROW_KEYS = Object.freeze([
+  'application_identity',
+  'backend_start_utc',
+  'backend_type',
+  'backend_xid_is_null',
+  'backend_xmin_is_null',
+  'client_class',
+  'database',
+  'pid',
+  'role',
+  'state',
+  'xact_start_is_null',
+]);
+
+const RFC3339_MS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+function sameKeySet(obj, expectedSortedKeys) {
+  const keys = Object.keys(obj).sort();
+  return (
+    keys.length === expectedSortedKeys.length && keys.every((k, i) => k === expectedSortedKeys[i])
+  );
+}
+
+function identityFourTupleKey(row) {
+  return JSON.stringify([row.role, row.database, row.backend_type, row.application_identity]);
+}
+
+/**
+ * Consume the immutable managed-session inventory, validate its exact key sets
+ * and fixed scalars, and bind its canonical hash to the accepted W field 11.
+ * @param {string} text
+ * @param {{expectedInventorySha256: string}} options
+ */
+function consumeManagedInventory(text, options) {
+  const parsed = parseCanonicalJson(text);
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('consumeManagedInventory: inventory must be a JSON object');
+  }
+  if (!sameKeySet(parsed, INVENTORY_TOP_KEYS)) {
+    throw new Error('consumeManagedInventory: unexpected top-level key set');
+  }
+  if (parsed.schema_version !== INVENTORY_SCHEMA_VERSION) {
+    throw new Error('consumeManagedInventory: wrong schema_version');
+  }
+  if (parsed.project_ref !== MANAGED_PROJECT_REF) {
+    throw new Error('consumeManagedInventory: wrong project_ref');
+  }
+  if (parsed.database !== MANAGED_DATABASE) {
+    throw new Error('consumeManagedInventory: wrong database');
+  }
+  if (parsed.source_decision_sha256 !== MANAGED_SOURCE_DECISION_SHA256) {
+    throw new Error('consumeManagedInventory: wrong source_decision_sha256');
+  }
+  if (parsed.provider_plane_trusted !== true) {
+    throw new Error('consumeManagedInventory: provider_plane_trusted must be true');
+  }
+  if (!Array.isArray(parsed.identities) || parsed.identities.length === 0) {
+    throw new Error('consumeManagedInventory: identities must be a non-empty array');
+  }
+  const seen = new Set();
+  for (const identity of parsed.identities) {
+    if (identity === null || typeof identity !== 'object' || Array.isArray(identity)) {
+      throw new Error('consumeManagedInventory: identity must be an object');
+    }
+    if (!sameKeySet(identity, IDENTITY_KEYS)) {
+      throw new Error('consumeManagedInventory: unexpected identity key set');
+    }
+    for (const field of ['role', 'database', 'backend_type', 'application_identity', 'client_class']) {
+      if (typeof identity[field] !== 'string') {
+        throw new Error(`consumeManagedInventory: identity field '${field}' must be a string`);
+      }
+    }
+    if (
+      !Array.isArray(identity.allowed_states) ||
+      identity.allowed_states.some(s => typeof s !== 'string')
+    ) {
+      throw new Error('consumeManagedInventory: allowed_states must be a string array');
+    }
+    if (typeof identity.transaction_free_required !== 'boolean') {
+      throw new Error('consumeManagedInventory: transaction_free_required must be boolean');
+    }
+    const key = identityFourTupleKey(identity);
+    if (seen.has(key)) {
+      throw new Error('consumeManagedInventory: duplicate identity ambiguity');
+    }
+    seen.add(key);
+  }
+  const actual = canonicalHash(parsed);
+  if (actual !== options.expectedInventorySha256) {
+    throw new Error('consumeManagedInventory: inventory hash does not match the accepted field 11');
+  }
+  return parsed;
+}
+
+/**
+ * Project one observed activity row into the exact eleven-key shape. Rejects a
+ * security-restricted null in any required field and lowercases the state.
+ * @param {Record<string, unknown>} raw
+ */
+function projectObservedRow(raw) {
+  if (raw === null || typeof raw !== 'object') {
+    throw new Error('projectObservedRow: row must be an object');
+  }
+  for (const field of ['role', 'database', 'backend_type', 'application_identity', 'client_class']) {
+    if (typeof raw[field] !== 'string') {
+      throw new Error(`projectObservedRow: required field '${field}' is a security-restricted null`);
+    }
+  }
+  if (typeof raw.state !== 'string' || raw.state.length === 0) {
+    throw new Error('projectObservedRow: required field state is a security-restricted null');
+  }
+  for (const field of ['xact_start_is_null', 'backend_xid_is_null', 'backend_xmin_is_null']) {
+    if (typeof raw[field] !== 'boolean') {
+      throw new Error(`projectObservedRow: null predicate '${field}' must be a boolean`);
+    }
+  }
+  if (!Number.isInteger(raw.pid)) {
+    throw new Error('projectObservedRow: pid must be an integer');
+  }
+  if (typeof raw.backend_start_utc !== 'string' || !RFC3339_MS.test(raw.backend_start_utc)) {
+    throw new Error('projectObservedRow: backend_start_utc must be UTC RFC3339 milliseconds');
+  }
+  return {
+    role: raw.role,
+    database: raw.database,
+    backend_type: raw.backend_type,
+    application_identity: raw.application_identity,
+    client_class: raw.client_class,
+    state: raw.state.toLowerCase(),
+    xact_start_is_null: raw.xact_start_is_null,
+    backend_xid_is_null: raw.backend_xid_is_null,
+    backend_xmin_is_null: raw.backend_xmin_is_null,
+    pid: raw.pid,
+    backend_start_utc: raw.backend_start_utc,
+  };
+}
+
+function observedSortKey(row) {
+  return [
+    row.role,
+    row.database,
+    row.backend_type,
+    row.application_identity,
+    row.client_class,
+  ].join(' ');
+}
+
+/**
+ * Build the canonical, drift-checked session observation. Each observed row must
+ * resolve to a known inventory identity by its (role, database, backend_type,
+ * application_identity) 4-tuple; its state must be allowed; a transaction-free-
+ * required identity must carry the three null predicates; the sole non-
+ * transaction-free exception is the probe backend.
+ * @param {Record<string, unknown>} inventory
+ * @param {Array<Record<string, unknown>>} rawRows
+ * @param {{probePid: number}} options
+ * @returns {{rows: Array<Record<string, unknown>>, sha256: string}}
+ */
+function buildSessionObservation(inventory, rawRows, options) {
+  const index = new Map();
+  for (const identity of inventory.identities) {
+    index.set(identityFourTupleKey(identity), identity);
+  }
+  let probeRows = 0;
+  const projected = [];
+  for (const raw of rawRows) {
+    const identity = index.get(identityFourTupleKey(raw));
+    if (identity === undefined) {
+      throw new Error('buildSessionObservation: unknown managed identity (drift)');
+    }
+    const isProbe = raw.application_identity === PROBE_APP_IDENTITY && raw.pid === options.probePid;
+    const state = typeof raw.state === 'string' ? raw.state.toLowerCase() : raw.state;
+    if (!identity.allowed_states.includes(state)) {
+      throw new Error(`buildSessionObservation: disallowed state '${state}' (drift)`);
+    }
+    if (identity.transaction_free_required === true) {
+      if (
+        raw.xact_start_is_null !== true ||
+        raw.backend_xid_is_null !== true ||
+        raw.backend_xmin_is_null !== true
+      ) {
+        throw new Error('buildSessionObservation: transaction-free predicate is false (drift)');
+      }
+    }
+    if (isProbe) {
+      probeRows += 1;
+      if (
+        identity.client_class !== 'probe' ||
+        state !== 'active' ||
+        raw.role !== 'postgres' ||
+        raw.database !== 'postgres'
+      ) {
+        throw new Error('buildSessionObservation: probe backend identity mismatch (drift)');
+      }
+    }
+    projected.push(projectObservedRow({ ...raw, client_class: identity.client_class }));
+  }
+  if (probeRows !== 1) {
+    throw new Error('buildSessionObservation: exactly one probe backend row is required');
+  }
+  projected.sort((a, b) => {
+    const ka = observedSortKey(a);
+    const kb = observedSortKey(b);
+    if (ka < kb) return -1;
+    if (ka > kb) return 1;
+    return a.pid - b.pid;
+  });
+  return { rows: projected, sha256: canonicalHash(projected) };
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -889,6 +1138,17 @@ module.exports = {
   verifyGrantedLocks,
   assertActivationDigestsBound,
   assertCommonLockConflict,
+  INVENTORY_SCHEMA_VERSION,
+  MANAGED_PROJECT_REF,
+  MANAGED_DATABASE,
+  MANAGED_SOURCE_DECISION_SHA256,
+  PROBE_APP_IDENTITY,
+  INVENTORY_TOP_KEYS,
+  IDENTITY_KEYS,
+  OBSERVED_ROW_KEYS,
+  consumeManagedInventory,
+  projectObservedRow,
+  buildSessionObservation,
 };
 
 // ---------------------------------------------------------------------------
