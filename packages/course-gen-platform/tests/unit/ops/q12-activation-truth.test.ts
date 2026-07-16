@@ -755,7 +755,11 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
 
   it('Task 4 — clears the stats snapshot and proves pg_read_all_stats membership', () => {
     const { psql } = dockerFns;
-    expect(psql('SELECT pg_catalog.pg_stat_clear_snapshot() IS NULL;')).toBe('t');
+    // pg_stat_clear_snapshot() returns void; prove it executes without error via
+    // a following marker select in the same session.
+    expect(psql("SELECT pg_catalog.pg_stat_clear_snapshot(); SELECT 'cleared';")).toContain(
+      'cleared'
+    );
     const member = psql(
       "SELECT pg_catalog.pg_has_role('postgres', 'pg_read_all_stats', 'MEMBER');"
     );

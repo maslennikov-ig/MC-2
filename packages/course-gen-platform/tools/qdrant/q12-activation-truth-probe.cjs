@@ -613,6 +613,145 @@ function assertBackendContinuity(expected, observed) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Task 4 — read-only capability projection (contract "Required read-only
+// capability projection; no new grants"). The capability object has exactly
+// nine keys; each per-OID lock row must be authorized; activity visibility is
+// proven only by pg_read_all_stats membership or a W-accepted equivalent digest
+// (D6 cannot invent one); a missing capability is a hard stop.
+// ---------------------------------------------------------------------------
+
+const CAPABILITY_SCHEMA_VERSION = 'megacampus.q12.activation-truth-capability/v1';
+
+const STRONG_PRIVILEGE_FIELDS = Object.freeze(['maintain', 'update', 'delete', 'truncate']);
+
+// Immutable definition of the pg_read_all_stats visibility mode.
+const VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH = canonicalHash({
+  mode: 'pg_read_all_stats_member',
+  predicate: "pg_has_role(session_user, 'pg_read_all_stats', 'MEMBER')",
+});
+
+function assertBoolean(value, field) {
+  if (typeof value !== 'boolean') {
+    throw new Error(`normalizeLockRow: required field '${field}' is a security-restricted null`);
+  }
+  return value;
+}
+
+/**
+ * Normalize a per-OID lock row and derive lock_authorized as the OR of the four
+ * strong privileges. Rejects missing/null privilege fields.
+ * @param {Record<string, unknown>} raw
+ */
+function normalizeLockRow(raw) {
+  if (raw === null || typeof raw !== 'object') {
+    throw new Error('normalizeLockRow: row must be an object');
+  }
+  const qualified_name = raw.qualified_name;
+  if (typeof qualified_name !== 'string' || qualified_name.length === 0) {
+    throw new Error('normalizeLockRow: qualified_name must be a non-empty string');
+  }
+  if (!Number.isInteger(raw.oid)) {
+    throw new Error(`normalizeLockRow: oid must be an integer for ${qualified_name}`);
+  }
+  const maintain = assertBoolean(raw.maintain, 'maintain');
+  const update = assertBoolean(raw.update, 'update');
+  const del = assertBoolean(raw.delete, 'delete');
+  const truncate = assertBoolean(raw.truncate, 'truncate');
+  const lock_authorized = maintain || update || del || truncate;
+  return {
+    qualified_name,
+    oid: raw.oid,
+    maintain,
+    update,
+    delete: del,
+    truncate,
+    lock_authorized,
+  };
+}
+
+/**
+ * Assert every per-OID row is lock-authorized, the set is non-empty, and no
+ * qualified_name repeats. Any unauthorized/duplicate/empty set fails before
+ * classification.
+ * @param {Array<Record<string, unknown>>} rows
+ */
+function assertLockRowsAuthorized(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('assertLockRowsAuthorized: no rows (empty lock catalog projection)');
+  }
+  const seen = new Set();
+  for (const raw of rows) {
+    const row = normalizeLockRow(raw);
+    if (seen.has(row.qualified_name)) {
+      throw new Error(`assertLockRowsAuthorized: duplicate relation ${row.qualified_name}`);
+    }
+    seen.add(row.qualified_name);
+    if (!row.lock_authorized) {
+      throw new Error(`assertLockRowsAuthorized: relation ${row.qualified_name} is not authorized`);
+    }
+  }
+}
+
+/**
+ * Resolve the activity-visibility mode. Only pg_read_all_stats membership or a
+ * W-accepted equivalent digest is accepted; anything else is a hard stop.
+ * @param {{member: boolean, wEquivalentDefinitionHash?: string | null}} input
+ * @returns {{mode: string, definition_hash: string}}
+ */
+function resolveActivityVisibility(input) {
+  if (input.member === true) {
+    return {
+      mode: 'pg_read_all_stats_member',
+      definition_hash: VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH,
+    };
+  }
+  const wHash = input.wEquivalentDefinitionHash;
+  if (typeof wHash === 'string' && HEX64.test(wHash)) {
+    return { mode: 'w_accepted_equivalent', definition_hash: wHash };
+  }
+  throw new Error('resolveActivityVisibility: no proven activity visibility (missing capability)');
+}
+
+/**
+ * @param {unknown} flag
+ */
+function assertClearSnapshotExecuted(flag) {
+  if (flag !== true) {
+    throw new Error('assertClearSnapshotExecuted: pg_stat_clear_snapshot() did not execute');
+  }
+}
+
+/**
+ * Build the nine-key capability object and its derived hashes (contract keys:
+ * schema_version, session_user, current_database, server_version_num,
+ * lock_relation_count, lock_privilege_sha256, activity_visibility_mode,
+ * activity_visibility_sha256, clear_snapshot_executed).
+ * @param {{session_user: string, current_database: string, server_version_num: number,
+ *          rows: Array<Record<string, unknown>>,
+ *          visibility: {member: boolean, wEquivalentDefinitionHash?: string | null},
+ *          clear_snapshot_executed: boolean}} input
+ */
+function buildCapabilityObject(input) {
+  assertClearSnapshotExecuted(input.clear_snapshot_executed);
+  assertLockRowsAuthorized(input.rows);
+  const normalized = input.rows
+    .map(normalizeLockRow)
+    .sort((a, b) => (a.qualified_name < b.qualified_name ? -1 : a.qualified_name > b.qualified_name ? 1 : 0));
+  const visibility = resolveActivityVisibility(input.visibility);
+  return {
+    schema_version: CAPABILITY_SCHEMA_VERSION,
+    session_user: input.session_user,
+    current_database: input.current_database,
+    server_version_num: input.server_version_num,
+    lock_relation_count: normalized.length,
+    lock_privilege_sha256: canonicalHash(normalized),
+    activity_visibility_mode: visibility.mode,
+    activity_visibility_sha256: visibility.definition_hash,
+    clear_snapshot_executed: true,
+  };
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -632,6 +771,13 @@ module.exports = {
   buildTlsConfig,
   assertPostConnect,
   assertBackendContinuity,
+  CAPABILITY_SCHEMA_VERSION,
+  VISIBILITY_PG_READ_ALL_STATS_DEFINITION_HASH,
+  normalizeLockRow,
+  assertLockRowsAuthorized,
+  resolveActivityVisibility,
+  assertClearSnapshotExecuted,
+  buildCapabilityObject,
 };
 
 // ---------------------------------------------------------------------------
