@@ -1,0 +1,135 @@
+{
+  "database": "postgres",
+  "identities": [
+    {
+      "allowed_states": ["none"],
+      "application_identity": "",
+      "backend_type": "archiver",
+      "client_class": "provider-background",
+      "database": "",
+      "role": "",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "",
+      "backend_type": "autovacuum launcher",
+      "client_class": "provider-background",
+      "database": "",
+      "role": "",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "",
+      "backend_type": "background writer",
+      "client_class": "provider-background",
+      "database": "",
+      "role": "",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "",
+      "backend_type": "checkpointer",
+      "client_class": "provider-background",
+      "database": "",
+      "role": "",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "",
+      "backend_type": "walwriter",
+      "client_class": "provider-background",
+      "database": "",
+      "role": "",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["active", "idle", "idle in transaction", "idle in transaction (aborted)"],
+      "application_identity": "postgrest",
+      "backend_type": "client backend",
+      "client_class": "application-client",
+      "database": "postgres",
+      "role": "authenticator",
+      "transaction_free_required": false
+    },
+    {
+      "allowed_states": ["active", "idle"],
+      "application_identity": "Supavisor (auth_query)",
+      "backend_type": "client backend",
+      "client_class": "provider-client",
+      "database": "postgres",
+      "role": "pgbouncer",
+      "transaction_free_required": false
+    },
+    {
+      "allowed_states": ["active", "idle", "idle in transaction"],
+      "application_identity": "Supavisor",
+      "backend_type": "client backend",
+      "client_class": "controller-client",
+      "database": "postgres",
+      "role": "postgres",
+      "transaction_free_required": false
+    },
+    {
+      "allowed_states": ["active"],
+      "application_identity": "megacampus-q12-activation-truth",
+      "backend_type": "client backend",
+      "client_class": "probe",
+      "database": "postgres",
+      "role": "postgres",
+      "transaction_free_required": false
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "",
+      "backend_type": "logical replication launcher",
+      "client_class": "provider-background",
+      "database": "",
+      "role": "supabase_admin",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["active", "idle"],
+      "application_identity": "",
+      "backend_type": "client backend",
+      "client_class": "provider-client",
+      "database": "postgres",
+      "role": "supabase_admin",
+      "transaction_free_required": false
+    },
+    {
+      "allowed_states": ["active", "idle"],
+      "application_identity": "postgres_exporter",
+      "backend_type": "client backend",
+      "client_class": "provider-client",
+      "database": "postgres",
+      "role": "supabase_admin",
+      "transaction_free_required": false
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "pg_cron scheduler",
+      "backend_type": "pg_cron launcher",
+      "client_class": "provider-background",
+      "database": "postgres",
+      "role": "supabase_admin",
+      "transaction_free_required": true
+    },
+    {
+      "allowed_states": ["none"],
+      "application_identity": "pg_net 0.19.5",
+      "backend_type": "pg_net 0.19.5 worker",
+      "client_class": "provider-background",
+      "database": "postgres",
+      "role": "supabase_admin",
+      "transaction_free_required": true
+    }
+  ],
+  "project_ref": "diqooqbuchsliypgwksu",
+  "provider_plane_trusted": true,
+  "schema_version": "megacampus.q12.managed-session-inventory/v1",
+  "source_decision_sha256": "7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27"
+}
