@@ -720,6 +720,7 @@ function canonicalizeDeparsedDefinitions(view: JsonObject): void {
     }
   }
   delete view.schemas_sha256;
+  delete view.extensions_sha256;
   const catalog = view.catalog;
   if (catalog === null || typeof catalog !== 'object' || Array.isArray(catalog)) return;
   const catalogObject = catalog as JsonObject;
