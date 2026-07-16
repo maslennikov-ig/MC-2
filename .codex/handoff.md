@@ -2,7 +2,7 @@
 
 Updated: 2026-07-16
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: pushed `codex/self-hosted-qdrant-platform` at `b97a827b`.
+Integration branch: pushed `codex/self-hosted-qdrant-platform` at `5836927e`.
 It carries the full accepted correction wave: D5J `66e41cb5`, W FLIP
 `60910053`, H blue/green handoff `70bf6103`, the W activation-tuple addendum
 `3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
@@ -117,10 +117,14 @@ password rotation.
 
 Recommended action: continue the authorized remote tail with the live window:
 
-1. Live window — materialize W-tuple field 11 (managed session roster), run
-   the LIVE-BOUNDARY RE-FREEZE CHECKLIST (re-freeze fields 5/6/8/9 against
-   production), then execute D6 `.13.19` Tasks 0-20 and the Root join
-   `.13.13` local acceptance, GHCR publication, and the live-cutover packet.
+1. Live window — field 11 is PROVISIONALLY frozen at `c90edb78…`
+   (`deploy/qdrant/q12-managed-session-inventory.provisional.json`, from the
+   authorized 2026-07-16 read-only live inventory) and needs ratification by
+   independent review; fields 5/6/8/9 re-freeze waits for the production
+   expected-post-migration-catalog produced by the live migration run. Then
+   execute D6 `.13.19` Tasks 0-20 (reviewed plan, two worktree streams) and
+   the Root join `.13.13` local acceptance, GHCR publication, and the
+   live-cutover packet.
 2. `.13.8` — owner-deferred password rotation of the working DSN.
 3. `.13.6` — off-host S3 remains the production-gate defer.
 
