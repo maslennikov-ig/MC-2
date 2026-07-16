@@ -416,7 +416,8 @@ prove_isolated_settings() {
   settings=$(run_service_psql "$service_file" "$service" --tuples-only --no-align --command \
     "SELECT json_build_array(current_setting('default_transaction_read_only'), current_setting('cron.database_name'), current_setting('cron.launch_active_jobs'))") || \
     fail 'isolated setting proof query failed'
-  [[ "$settings" == '["on","restore_test","off"]' ]] || fail 'isolated setting proof mismatch'
+  [[ "$settings" == '["on","restore_test","off"]' ]] || \
+    fail "isolated setting proof mismatch: observed $settings"
 }
 
 create_database_sql() {
