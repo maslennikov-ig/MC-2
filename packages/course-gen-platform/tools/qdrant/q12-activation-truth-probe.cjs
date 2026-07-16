@@ -2226,73 +2226,112 @@ async function assembleInspect(io) {
     transaction_isolation: id.transaction_isolation,
     server_version_num,
   });
-  const backend_pid = Number(id.backend_pid);
-
-  const capRows = (await rows('capability_lock_rows')).map(r => ({
-    qualified_name: r.qualified_name,
-    oid: Number(r.oid),
-    maintain: r.priv_maintain,
-    update: r.priv_update,
-    delete: r.priv_delete,
-    truncate: r.priv_truncate,
-  }));
-  const vis = (await rows('activity_visibility'))[0];
-  const capability = buildCapabilityObject({
-    session_user: id.session_user,
-    current_database: id.current_database,
-    server_version_num,
-    rows: capRows,
-    visibility: { member: vis.pg_read_all_stats_member === true },
-    clear_snapshot_executed: true,
-  });
-
-  await run('full_catalog_share_lock');
-  const lockObserved = (await rows('lock_projection')).map(r => ({
-    qualified_name: r.qualified_name,
-    lock_mode: r.lock_mode,
-    granted: r.granted,
-  }));
-  verifyGrantedLocks({ observed: lockObserved, expectedRelations: io.expectedRelations });
-
+  // Capability proof precedes the LOCK (contract "After capability proof, the
+  // probe issues the exact accepted byte-ordered full-catalog LOCK ...").
   await run('clear_snapshot');
-  const sessionObservation = buildSessionObservation(io.inventory, await rows('session_activity'), {
-    probePid: backend_pid,
-  });
+  {
+    const proofRows = (await rows('capability_lock_rows')).map(r => ({
+      qualified_name: r.qualified_name,
+      oid: Number(r.oid),
+      maintain: r.priv_maintain,
+      update: r.priv_update,
+      delete: r.priv_delete,
+      truncate: r.priv_truncate,
+    }));
+    const proofVis = (await rows('activity_visibility'))[0];
+    buildCapabilityObject({
+      session_user: id.session_user,
+      current_database: id.current_database,
+      server_version_num,
+      rows: proofRows,
+      visibility: { member: proofVis.pg_read_all_stats_member === true },
+      clear_snapshot_executed: true,
+    });
+  }
+  await run('full_catalog_share_lock');
+  {
+    const lockObserved0 = (await rows('lock_projection')).map(r => ({
+      qualified_name: r.qualified_name,
+      lock_mode: r.lock_mode,
+      granted: r.granted,
+    }));
+    verifyGrantedLocks({ observed: lockObserved0, expectedRelations: io.expectedRelations });
+  }
 
-  const structural = (await rows('structural_catalog'))[0].structural_catalog_sha256;
-  const databaseDefault = (await rows('database_default'))[0].database_default;
-  const activeRun = (await rows('active_run_singleton'))[0].active_run;
-  const cronRows = await rows('cron_jobs');
-  const net = Number((await rows('global_pg_net_queue'))[0].global_pg_net_queue_count);
-  const preparedRows = await rows('prepared_xacts');
-
-  const dbProjection = buildDatabaseProjection({
-    schema_version: 'megacampus.q12.activation-truth-db-projection/v1',
-    run_id: request.run_id,
-    server_version_num,
-    session_user: id.session_user,
-    current_database: id.current_database,
-    transaction_isolation: id.transaction_isolation,
-    transaction_read_only: id.transaction_read_only,
-    backend_pid,
-    connection_identity_sha256: canonicalHash(id),
-    capability_projection_sha256: canonicalHash(capability),
-    active_run_sha256: canonicalHash(activeRun),
-    guard_projection_sha256: canonicalHash(activeRun),
-    structural_catalog_sha256: String(structural),
-    database_default_sha256: canonicalHash(databaseDefault),
-    cron_jobs_sha256: canonicalHash(cronRows),
-    active_cron_count: cronRows.length,
-    global_pg_net_queue_count: net,
-    prepared_xact_count: preparedRows.length,
-    session_inventory_sha256: canonicalHash(io.inventory),
-    session_observation_sha256: sessionObservation.sha256,
-    lock_projection_sha256: canonicalHash(lockObserved),
-  });
+  // 3-point snapshot discipline (contract "Before db_locked, host_bound, and
+  // sealed, the probe calls pg_stat_clear_snapshot() and performs a complete
+  // fresh read"). pg_stat_activity is NOT MVCC-bound under READ COMMITTED, so a
+  // session/process appearing after db_locked (or live drift during the R
+  // window) is caught only by re-reading before each frame point. Structural
+  // sections legitimately hash identical while the SHARE locks are held; the
+  // observation-bearing sections change and surface drift.
+  const readFreshProjection = async () => {
+    await run('clear_snapshot');
+    const idr = (await rows('connection_identity'))[0];
+    const svn = Number(idr.server_version_num);
+    const bpid = Number(idr.backend_pid);
+    const capRows = (await rows('capability_lock_rows')).map(r => ({
+      qualified_name: r.qualified_name,
+      oid: Number(r.oid),
+      maintain: r.priv_maintain,
+      update: r.priv_update,
+      delete: r.priv_delete,
+      truncate: r.priv_truncate,
+    }));
+    const vis = (await rows('activity_visibility'))[0];
+    const capability = buildCapabilityObject({
+      session_user: idr.session_user,
+      current_database: idr.current_database,
+      server_version_num: svn,
+      rows: capRows,
+      visibility: { member: vis.pg_read_all_stats_member === true },
+      clear_snapshot_executed: true,
+    });
+    const lockObserved = (await rows('lock_projection')).map(r => ({
+      qualified_name: r.qualified_name,
+      lock_mode: r.lock_mode,
+      granted: r.granted,
+    }));
+    verifyGrantedLocks({ observed: lockObserved, expectedRelations: io.expectedRelations });
+    const sessionObservation = buildSessionObservation(
+      io.inventory,
+      await rows('session_activity'),
+      { probePid: bpid }
+    );
+    const structural = (await rows('structural_catalog'))[0].structural_catalog_sha256;
+    const databaseDefault = (await rows('database_default'))[0].database_default;
+    const activeRun = (await rows('active_run_singleton'))[0].active_run;
+    const cronRows = await rows('cron_jobs');
+    const net = Number((await rows('global_pg_net_queue'))[0].global_pg_net_queue_count);
+    const preparedRows = await rows('prepared_xacts');
+    const dbProjection = buildDatabaseProjection({
+      schema_version: 'megacampus.q12.activation-truth-db-projection/v1',
+      run_id: request.run_id,
+      server_version_num: svn,
+      session_user: idr.session_user,
+      current_database: idr.current_database,
+      transaction_isolation: idr.transaction_isolation,
+      transaction_read_only: idr.transaction_read_only,
+      backend_pid: bpid,
+      connection_identity_sha256: canonicalHash(idr),
+      capability_projection_sha256: canonicalHash(capability),
+      active_run_sha256: canonicalHash(activeRun),
+      guard_projection_sha256: canonicalHash(activeRun),
+      structural_catalog_sha256: String(structural),
+      database_default_sha256: canonicalHash(databaseDefault),
+      cron_jobs_sha256: canonicalHash(cronRows),
+      active_cron_count: cronRows.length,
+      global_pg_net_queue_count: net,
+      prepared_xact_count: preparedRows.length,
+      session_inventory_sha256: canonicalHash(io.inventory),
+      session_observation_sha256: sessionObservation.sha256,
+      lock_projection_sha256: canonicalHash(lockObserved),
+    });
+    return { dbProjection, capability, sessionObservation };
+  };
 
   const proto = new ProbeProtocol(FRAME_SCHEMA_VERSION, request.run_id);
   const request_sha256 = canonicalHash(request);
-  const initialDbSha = canonicalHash(dbProjection);
   const fd9 = io.identities.fd9_identity_sha256;
   const frames = [];
   const emit = (kind, payload) => {
@@ -2300,38 +2339,45 @@ async function assembleInspect(io) {
     frames.push(frame);
     return frame;
   };
-  const receive = (kind, seq, validate) => {
-    const frame = io.rootResponder(proto.headHash, kind, seq);
+  const receive = async (kind, seq, validate) => {
+    const frame = await io.rootResponder(proto.headHash, kind, seq);
     validate(frame.payload);
     proto.receive(frame);
     frames.push(frame);
     return frame;
   };
 
+  // Fresh read #1 -> db_locked.
+  const read1 = await readFreshProjection();
+  const initialDbSha = canonicalHash(read1.dbProjection);
   emit(
     'db_locked',
     buildDbLockedPayload({
       request_sha256,
       initial_database_projection_sha256: initialDbSha,
-      capability_projection_sha256: canonicalHash(capability),
-      lock_projection_sha256: dbProjection.lock_projection_sha256,
+      capability_projection_sha256: canonicalHash(read1.capability),
+      lock_projection_sha256: read1.dbProjection.lock_projection_sha256,
       fd9_identity_sha256: fd9,
     })
   );
-  const hostProjFrame = receive('host_projection', 2, validateHostProjectionPayload);
+  const hostProjFrame = await receive('host_projection', 2, validateHostProjectionPayload);
   const hostProjectionSha = hostProjFrame.payload.host_projection_sha256;
+
+  // Fresh read #2 -> host_bound (bound projection is its own read).
+  const read2 = await readFreshProjection();
+  const boundDbSha = canonicalHash(read2.dbProjection);
   emit(
     'host_bound',
     buildHostBoundPayload({
       request_sha256,
       initial_database_projection_sha256: initialDbSha,
-      bound_database_projection_sha256: initialDbSha,
+      bound_database_projection_sha256: boundDbSha,
       host_projection_sha256: hostProjectionSha,
-      session_observation_sha256: sessionObservation.sha256,
+      session_observation_sha256: read2.sessionObservation.sha256,
       fd9_identity_sha256: fd9,
     })
   );
-  const predecisionFrame = receive('predecision', 4, validatePredecisionPayload);
+  const predecisionFrame = await receive('predecision', 4, validatePredecisionPayload);
   const predecision_sha256 = predecisionFrame.payload.predecision_sha256;
   const classification = predecisionFrame.payload.classification;
   const actualR =
@@ -2341,20 +2387,24 @@ async function assembleInspect(io) {
           checkpoint: predecisionFrame.payload.planned_r_checkpoint_sha256,
         }
       : { journal: null, checkpoint: null };
+
+  // Fresh read #3 -> sealed (final projection is its own read).
+  const read3 = await readFreshProjection();
+  const finalDbSha = canonicalHash(read3.dbProjection);
   const sealed = emit(
     'sealed',
     buildSealedPayload({
       request_sha256,
       predecision_sha256,
       initial_database_projection_sha256: initialDbSha,
-      final_database_projection_sha256: initialDbSha,
+      final_database_projection_sha256: finalDbSha,
       host_projection_sha256: hostProjectionSha,
       actual_r_journal_entry_hash: actualR.journal,
       actual_r_checkpoint_sha256: actualR.checkpoint,
       fd9_identity_sha256: fd9,
     })
   );
-  const releaseFrame = receive('release', 6, validateReleasePayload);
+  const releaseFrame = await receive('release', 6, validateReleasePayload);
 
   // Post-`R` (or post-predecision) the sole transaction-end: the read-only
   // COMMIT that ends the transaction and releases the SHARE locks, then the
@@ -2377,7 +2427,13 @@ async function assembleInspect(io) {
   if (!proto.done) {
     throw new Error('assembleInspect: protocol did not complete');
   }
-  return { frames, classification, dbProjection, capability, sessionObservation };
+  return {
+    frames,
+    classification,
+    dbProjection: read1.dbProjection,
+    capability: read1.capability,
+    sessionObservation: read1.sessionObservation,
+  };
 }
 
 /**
