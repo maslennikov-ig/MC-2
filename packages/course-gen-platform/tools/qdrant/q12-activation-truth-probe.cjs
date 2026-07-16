@@ -1108,6 +1108,134 @@ function buildSessionObservation(inventory, rawRows, options) {
   return { rows: projected, sha256: canonicalHash(projected) };
 }
 
+// ---------------------------------------------------------------------------
+// Task 8 — database and host projection key sets and initial invariants
+// (contract "Database and host projections"). Both projections carry their
+// exact key set in every classification; the global pg_net queue count and the
+// prepared-transaction count are exactly zero; every required (non-evidence)
+// field is non-null. A snapshot clear plus a complete fresh read precede
+// db_locked, host_bound, and sealed.
+// ---------------------------------------------------------------------------
+
+const DB_PROJECTION_KEYS = Object.freeze([
+  'schema_version',
+  'run_id',
+  'server_version_num',
+  'session_user',
+  'current_database',
+  'transaction_isolation',
+  'transaction_read_only',
+  'backend_pid',
+  'connection_identity_sha256',
+  'capability_projection_sha256',
+  'active_run_sha256',
+  'guard_projection_sha256',
+  'structural_catalog_sha256',
+  'database_default_sha256',
+  'cron_jobs_sha256',
+  'active_cron_count',
+  'global_pg_net_queue_count',
+  'prepared_xact_count',
+  'session_inventory_sha256',
+  'session_observation_sha256',
+  'lock_projection_sha256',
+]);
+
+const HOST_PROJECTION_KEYS = Object.freeze([
+  'schema_version',
+  'run_id',
+  'lease_epoch',
+  'activation_evidence_state',
+  'fd9_identity_sha256',
+  'probe_pidfd_identity_sha256',
+  'spawn_capability_sha256',
+  'runtime_fd_baseline_sha256',
+  'activation_process_projection_sha256',
+  'prepared_quiesced_predecessor_sha256',
+  'writer_quiesce_manifest_sha256',
+  'writer_inventory_sha256',
+  'docker_observation_sha256',
+  'barrier_receipt_sha256',
+  'probe_receipt_sha256',
+  'activation_result_sha256',
+  'process_manifest_sha256',
+  'w_activation_tuple_sha256',
+]);
+
+// The four host evidence fields that may be JSON null under the H/N table
+// (Task 9). activation_process_projection_sha256 is required non-null in every
+// classification.
+const HOST_EVIDENCE_NULLABLE = Object.freeze([
+  'barrier_receipt_sha256',
+  'probe_receipt_sha256',
+  'activation_result_sha256',
+  'process_manifest_sha256',
+]);
+
+function assertExactKeySet(fields, keys, label) {
+  if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) {
+    throw new Error(`${label}: fields must be an object`);
+  }
+  const actual = Object.keys(fields).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((k, i) => k !== expected[i])) {
+    throw new Error(`${label}: key set mismatch`);
+  }
+}
+
+/**
+ * Assemble and validate the database projection. Enforces the global net-queue
+ * and prepared-transaction zero invariants and rejects any missing/extra key.
+ * @param {Record<string, unknown>} fields
+ */
+function buildDatabaseProjection(fields) {
+  assertExactKeySet(fields, DB_PROJECTION_KEYS, 'buildDatabaseProjection');
+  if (fields.global_pg_net_queue_count !== 0) {
+    throw new Error('buildDatabaseProjection: global_pg_net_queue_count must be exactly zero');
+  }
+  if (fields.prepared_xact_count !== 0) {
+    throw new Error('buildDatabaseProjection: prepared_xact_count must be exactly zero');
+  }
+  if (!Number.isInteger(fields.active_cron_count) || fields.active_cron_count < 0) {
+    throw new Error('buildDatabaseProjection: active_cron_count must be a non-negative integer');
+  }
+  const projection = {};
+  for (const key of DB_PROJECTION_KEYS) projection[key] = fields[key];
+  return projection;
+}
+
+/**
+ * Assemble and validate the host projection. Rejects any missing/extra key and
+ * any null in a required (non-evidence) field.
+ * @param {Record<string, unknown>} fields
+ */
+function buildHostProjection(fields) {
+  assertExactKeySet(fields, HOST_PROJECTION_KEYS, 'buildHostProjection');
+  for (const key of HOST_PROJECTION_KEYS) {
+    if (HOST_EVIDENCE_NULLABLE.includes(key)) continue;
+    if (fields[key] === null || fields[key] === undefined) {
+      throw new Error(`buildHostProjection: required field '${key}' must be non-null`);
+    }
+  }
+  const projection = {};
+  for (const key of HOST_PROJECTION_KEYS) projection[key] = fields[key];
+  return projection;
+}
+
+/**
+ * Assert a snapshot clear and a complete fresh read preceded an authority-
+ * bearing projection.
+ * @param {{snapshot_cleared: unknown, fresh_read: unknown}} input
+ */
+function assertProjectionPreamble(input) {
+  if (input.snapshot_cleared !== true) {
+    throw new Error('assertProjectionPreamble: snapshot clear did not precede the read');
+  }
+  if (input.fresh_read !== true) {
+    throw new Error('assertProjectionPreamble: a complete fresh read did not occur');
+  }
+}
+
 module.exports = {
   canonicalize,
   sha256Hex,
@@ -1149,6 +1277,11 @@ module.exports = {
   consumeManagedInventory,
   projectObservedRow,
   buildSessionObservation,
+  DB_PROJECTION_KEYS,
+  HOST_PROJECTION_KEYS,
+  buildDatabaseProjection,
+  buildHostProjection,
+  assertProjectionPreamble,
 };
 
 // ---------------------------------------------------------------------------
