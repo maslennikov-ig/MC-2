@@ -174,6 +174,12 @@ interface ProbeModule {
     rawRows: Array<Record<string, unknown>>,
     options: { probePid: number }
   ): { rows: Array<Record<string, unknown>>; sha256: string };
+  // Task 8
+  DB_PROJECTION_KEYS: readonly string[];
+  HOST_PROJECTION_KEYS: readonly string[];
+  buildDatabaseProjection(fields: Record<string, unknown>): Record<string, unknown>;
+  buildHostProjection(fields: Record<string, unknown>): Record<string, unknown>;
+  assertProjectionPreamble(input: { snapshot_cleared: unknown; fresh_read: unknown }): void;
 }
 
 const probe = require(PROBE_PATH) as ProbeModule;
@@ -958,7 +964,133 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     expect(typeof projected.pid).toBe('number');
   });
 
+  it('Task 8 — builds a database projection with net-queue-zero and prepared-zero invariants', () => {
+    const { psql } = dockerFns;
+    const counts = psql(
+      `SELECT
+         (SELECT pg_catalog.count(*) FROM net.http_request_queue)::int8 || '|' ||
+         (SELECT pg_catalog.count(*) FROM pg_catalog.pg_prepared_xacts)::int8 || '|' ||
+         (SELECT pg_catalog.count(*) FROM cron.job)::int8;`
+    );
+    const line = counts.split('\n').find(l => l.includes('|')) as string;
+    const [netQueue, prepared, cron] = line.split('|').map(Number);
+    expect(netQueue).toBe(0);
+    expect(prepared).toBe(0);
+    expect(cron).toBe(8);
+    const fields = makeDbFields({
+      global_pg_net_queue_count: netQueue,
+      prepared_xact_count: prepared,
+      active_cron_count: cron,
+    });
+    expect(() => probe.buildDatabaseProjection(fields)).not.toThrow();
+    expect(() =>
+      probe.buildDatabaseProjection({ ...fields, global_pg_net_queue_count: 1 })
+    ).toThrow(/net|queue/i);
+  });
+
   // @@CONTAINER_TESTS_END
+});
+
+const HEX = 'a'.repeat(64);
+function makeDbFields(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schema_version: 'megacampus.q12.activation-truth-db-projection/v1',
+    run_id: 'run-0001',
+    server_version_num: 170010,
+    session_user: 'postgres',
+    current_database: 'postgres',
+    transaction_isolation: 'read committed',
+    transaction_read_only: 'on',
+    backend_pid: 4242,
+    connection_identity_sha256: HEX,
+    capability_projection_sha256: HEX,
+    active_run_sha256: HEX,
+    guard_projection_sha256: HEX,
+    structural_catalog_sha256: HEX,
+    database_default_sha256: HEX,
+    cron_jobs_sha256: HEX,
+    active_cron_count: 8,
+    global_pg_net_queue_count: 0,
+    prepared_xact_count: 0,
+    session_inventory_sha256: HEX,
+    session_observation_sha256: HEX,
+    lock_projection_sha256: HEX,
+    ...overrides,
+  };
+}
+function makeHostFields(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schema_version: 'megacampus.q12.activation-truth-host-projection/v1',
+    run_id: 'run-0001',
+    lease_epoch: 7,
+    activation_evidence_state: 'prepared_guarded',
+    fd9_identity_sha256: HEX,
+    probe_pidfd_identity_sha256: HEX,
+    spawn_capability_sha256: HEX,
+    runtime_fd_baseline_sha256: HEX,
+    activation_process_projection_sha256: HEX,
+    prepared_quiesced_predecessor_sha256: HEX,
+    writer_quiesce_manifest_sha256: HEX,
+    writer_inventory_sha256: HEX,
+    docker_observation_sha256: HEX,
+    barrier_receipt_sha256: HEX,
+    probe_receipt_sha256: HEX,
+    activation_result_sha256: null,
+    process_manifest_sha256: null,
+    w_activation_tuple_sha256: HEX,
+    ...overrides,
+  };
+}
+
+describe('Task 8 — database/host projection key sets + invariants (unit)', () => {
+  it('accepts a complete database projection and rejects missing/extra keys', () => {
+    const fields = makeDbFields();
+    expect(Object.keys(probe.buildDatabaseProjection(fields)).sort()).toEqual(
+      [...probe.DB_PROJECTION_KEYS].sort()
+    );
+    const missing = { ...fields };
+    delete missing.lock_projection_sha256;
+    expect(() => probe.buildDatabaseProjection(missing)).toThrow();
+    expect(() => probe.buildDatabaseProjection({ ...fields, extra: 1 })).toThrow();
+  });
+
+  it('enforces net-queue-zero and prepared-zero invariants', () => {
+    expect(() =>
+      probe.buildDatabaseProjection(makeDbFields({ global_pg_net_queue_count: 3 }))
+    ).toThrow(/net|queue/i);
+    expect(() => probe.buildDatabaseProjection(makeDbFields({ prepared_xact_count: 2 }))).toThrow(
+      /prepared/i
+    );
+  });
+
+  it('accepts a host projection with evidence nulls and rejects a required null', () => {
+    const fields = makeHostFields();
+    expect(Object.keys(probe.buildHostProjection(fields)).sort()).toEqual(
+      [...probe.HOST_PROJECTION_KEYS].sort()
+    );
+    // activation_process_projection_sha256 is required non-null in all classes.
+    expect(() =>
+      probe.buildHostProjection(makeHostFields({ activation_process_projection_sha256: null }))
+    ).toThrow();
+    expect(() =>
+      probe.buildHostProjection(makeHostFields({ w_activation_tuple_sha256: null }))
+    ).toThrow();
+    const missing = makeHostFields();
+    delete missing.docker_observation_sha256;
+    expect(() => probe.buildHostProjection(missing)).toThrow();
+  });
+
+  it('requires a snapshot clear and a fresh read before each authority projection', () => {
+    expect(() =>
+      probe.assertProjectionPreamble({ snapshot_cleared: true, fresh_read: true })
+    ).not.toThrow();
+    expect(() =>
+      probe.assertProjectionPreamble({ snapshot_cleared: false, fresh_read: true })
+    ).toThrow(/snapshot/i);
+    expect(() =>
+      probe.assertProjectionPreamble({ snapshot_cleared: true, fresh_read: false })
+    ).toThrow(/read/i);
+  });
 });
 
 describe('Task 7 — managed inventory + session projection + drift (unit)', () => {
