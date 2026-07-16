@@ -3303,6 +3303,10 @@ def d6_validate_secret_source(
             owner_uid=owner_uid,
             owner_gid=owner_gid,
         )
+        # Rewind: the descriptor is mapped to the child's FD 3/FD 4, and a child
+        # sequential read must see the full bytes, not the EOF left by the after-read
+        # revalidation above.
+        os.lseek(descriptor, 0, os.SEEK_SET)
         keep = descriptor
         descriptor = -1
         return keep, before.st_dev, before.st_ino
