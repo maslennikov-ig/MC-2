@@ -109,7 +109,16 @@ const ROLE_SETTING_ALLOWLIST = new Map<string, Set<string>>([
     'authenticator',
     new Set(['lock_timeout=8s', 'session_preload_libraries=safeupdate', 'statement_timeout=8s']),
   ],
-  ['postgres', new Set(['search_path="$user", public, extensions'])],
+  [
+    'postgres',
+    new Set([
+      'search_path="$user", public, extensions',
+      // The live managed role literally stores a backslash-escaped
+      // search_path (an old migration escaping artifact); the restore must
+      // reproduce the source byte-for-byte, so both renderings are allowed.
+      'search_path="\\$user", public, extensions',
+    ]),
+  ],
   [
     'supabase_admin',
     new Set(['log_statement=none', 'search_path="$user", public, auth, extensions']),
