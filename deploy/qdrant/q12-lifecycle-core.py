@@ -14,6 +14,7 @@ import re
 import stat as stat_module
 import subprocess
 import sys
+import unicodedata
 import uuid
 import weakref
 from dataclasses import dataclass, field
@@ -171,9 +172,25 @@ class Executor(Protocol):
     def launch_claim(self, argv: list[str], journal_fd: int) -> dict[str, Any]: ...
 
 
+def _nfc(value: Any) -> Any:
+    """Recursively NFC-normalize every string key and value.
+
+    The canonical object convention (shared with the Stream 1 probe) is UTF-8 NFC,
+    compact, recursively key-sorted, with no trailing LF.  Normalizing here keeps
+    cross-stream frame/object hashes byte-identical on non-ASCII input; it is a
+    no-op on ASCII and already-composed data."""
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value)
+    if isinstance(value, dict):
+        return {_nfc(key): _nfc(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_nfc(item) for item in value]
+    return value
+
+
 def canonical(value: Any) -> bytes:
     return json.dumps(
-        value, ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
+        _nfc(value), ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
     ).encode("utf-8")
 
 
@@ -3096,6 +3113,669 @@ def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any
     if validate_canonical_lease_lock(run_root, lease_fd) != canonical_identity:
         raise LifecycleError("canonical lease lock changed during supervisor transition")
     return engine.output()
+
+
+# ===================================================================== #
+# D6 activation-truth Root coordinator.
+#
+# D6 is a private child of the Root lifecycle supervisor: it adds no manifest
+# command, no scheduled unit, no periodic job, no compose target, no shell
+# command, and no operator argv.  Everything below drives the Root spawn
+# boundary, pidfd/proc/OFD gates,
+# the predecision -> optional durable R -> final transcript -> terminal seal
+# authority graph, and the sole post-R D5 narrowing.  No live/remote action is
+# taken here; the pinned-server capability observations (atomic
+# POSIX_SPAWN_CLOSEFROM, real pidfd/ptrace/Yama policy) stay behind a separate
+# authorized remote gate.
+# ===================================================================== #
+
+D6_PROBE_ARGV = (
+    "/usr/bin/node",
+    "/opt/megacampus/packages/course-gen-platform/tools/qdrant/q12-activation-truth-probe.cjs",
+    "inspect",
+)
+# Contract "Fixed retained commands and production process": Root supplies only a
+# fixed PATH, LC_ALL=C.UTF-8, LANG=C.UTF-8, and a fixed non-writable HOME; no
+# NODE_OPTIONS and no inherited environment.  The exact PATH/HOME bytes are a
+# Root-side determination (the contract fixes only LC_ALL/LANG and the
+# non-writable-HOME property).
+D6_PROBE_ENV = {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C.UTF-8",
+    "LANG": "C.UTF-8",
+    "HOME": "/var/empty",
+}
+# Root dup2's every already-validated source into these child descriptors.
+D6_MAPPED_TARGET_FDS = (1, 2, 3, 4, 5, 6, 7, 9, 10, 11)
+# Every mapped source except FD 9 is explicitly closed right after its dup2 (the
+# contract's "close the source duplicate after each map"); the close-from below is
+# the final sweep of any remaining runtime descriptor.  FD 8 is explicitly closed;
+# FD 9 is the inherited canonical lease held at its own number and is never
+# duplicated or closed.
+D6_CLOSE_AFTER_MAP_FDS = (1, 2, 3, 4, 5, 6, 7, 10, 11)
+D6_CLOSE_FROM_FLOOR = 12
+
+D6_DB_URL_PATH = pathlib.Path("/opt/megacampus/secrets/supabase_db_url")
+D6_CA_PATH = pathlib.Path("/opt/megacampus/secrets/prod-ca-2021.crt")
+D6_DB_URL_MODES = frozenset((0o400, 0o600))
+D6_CA_MODES = frozenset((0o644,))
+D6_CA_SHA256 = "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+D6_SECRET_OWNER = "claude-deploy"
+
+
+def d6_closefrom_capability() -> bool:
+    """Report local presence of the atomic POSIX_SPAWN_CLOSEFROM file action.
+
+    The pinned server's atomic close-from semantics under descriptor pressure are a
+    separate remote capability gate; this only reports the local constant exposure
+    (Python 3.14 / glibc).  Absence is a hard engineering blocker: Root must never
+    silently fall back to preexec_fn, a threaded fork child, a shell, an inherited
+    broad pass_fds set, or a broker."""
+    return hasattr(os, "POSIX_SPAWN_CLOSEFROM")
+
+
+def d6_build_spawn_file_actions(sources: dict[int, int]) -> list[tuple]:
+    """Ordered posix_spawn file actions for the D6 probe descriptor contract.
+
+    ``sources`` maps every child target descriptor to the already-validated source
+    descriptor Root holds.  Every mapped source except FD 9 (the inherited
+    canonical lease, held at its own number) must sit at or above the close-from
+    floor so the final close-from cannot strand it."""
+    if set(sources) != set(D6_MAPPED_TARGET_FDS):
+        raise LifecycleError(
+            "D6 spawn descriptor map is not the exact FD 1-11 target set"
+        )
+    if not d6_closefrom_capability():
+        raise LifecycleError(
+            "D6 requires the atomic POSIX_SPAWN_CLOSEFROM file action; no fallback"
+        )
+    actions: list[tuple] = [
+        (os.POSIX_SPAWN_OPEN, 0, os.fsencode("/dev/null"), os.O_RDONLY, 0)
+    ]
+    for target in D6_MAPPED_TARGET_FDS:
+        source = sources[target]
+        if target == 9:
+            if source != 9:
+                raise LifecycleError(
+                    "D6 FD 9 must be the inherited canonical lease at its own number"
+                )
+            continue
+        if source < D6_CLOSE_FROM_FLOOR:
+            raise LifecycleError(
+                f"D6 spawn source descriptor {source} for FD {target} is below the close-from line"
+            )
+        actions.append((os.POSIX_SPAWN_DUP2, source, target))
+        if target in D6_CLOSE_AFTER_MAP_FDS:
+            actions.append((os.POSIX_SPAWN_CLOSE, source))
+    actions.append((os.POSIX_SPAWN_CLOSE, 8))
+    actions.append((os.POSIX_SPAWN_CLOSEFROM, D6_CLOSE_FROM_FLOOR))
+    return actions
+
+
+def d6_posix_spawn(
+    argv: list[str], env: dict[str, str], sources: dict[int, int]
+) -> int:
+    """Spawn one child under the exact D6 file-action boundary via posix_spawn."""
+    file_actions = d6_build_spawn_file_actions(sources)
+    return os.posix_spawn(argv[0], list(argv), env, file_actions=file_actions)
+
+
+def d6_spawn_probe(sources: dict[int, int]) -> int:
+    """Spawn the fixed production D6 probe argv/environment (Root supervisor use)."""
+    return d6_posix_spawn(list(D6_PROBE_ARGV), dict(D6_PROBE_ENV), sources)
+
+
+def d6_assert_secret_identity_stable(
+    descriptor: int,
+    before: list[int],
+    path: pathlib.Path,
+    *,
+    mode_set: frozenset[int],
+    owner_uid: int,
+    owner_gid: int,
+) -> None:
+    """Re-prove the descriptor's owner/mode/type/device/inode after the bytes are read.
+
+    ``before`` is the pre-read fstat tuple ``[uid, gid, mode, dev, ino]``.  A chmod,
+    chown, type change, or inode swap between open and this check fails closed — the
+    contract requires identity proof both before and after open/read."""
+    after = os.fstat(descriptor)
+    path_stat = os.stat(path, follow_symlinks=False)
+    before_uid, before_gid, before_mode, before_dev, before_ino = before
+    if (
+        not stat_module.S_ISREG(after.st_mode)
+        or after.st_uid != owner_uid
+        or after.st_gid != owner_gid
+        or stat_module.S_IMODE(after.st_mode) not in mode_set
+        or after.st_nlink != 1
+        or (after.st_uid, after.st_gid, after.st_mode, after.st_dev, after.st_ino)
+        != (before_uid, before_gid, before_mode, before_dev, before_ino)
+        or (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+        or not stat_module.S_ISREG(path_stat.st_mode)
+    ):
+        raise LifecycleError(f"unsafe file identity changed after read: {path}")
+
+
+def d6_validate_secret_source(
+    path: pathlib.Path,
+    *,
+    mode_set: frozenset[int],
+    owner_uid: int,
+    owner_gid: int,
+) -> tuple[int, int, int]:
+    """Open one Root-held secret source O_RDONLY|O_NOFOLLOW|O_CLOEXEC and prove
+    owner/mode/type/canonical-path plus device/inode identity before and after read.
+
+    Returns ``(fd, dev, ino)``.  The caller maps the descriptor to FD 3 or FD 4 and,
+    for FD 3, decodes the password without ever hashing or logging its bytes."""
+    parent_fd = open_parent_directory(path)
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            path.name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=parent_fd,
+        )
+        before = os.fstat(descriptor)
+        if (
+            not stat_module.S_ISREG(before.st_mode)
+            or before.st_uid != owner_uid
+            or before.st_gid != owner_gid
+            or stat_module.S_IMODE(before.st_mode) not in mode_set
+            or before.st_nlink != 1
+        ):
+            raise LifecycleError(f"unsafe file identity: {path}")
+        before_identity = [
+            before.st_uid,
+            before.st_gid,
+            before.st_mode,
+            before.st_dev,
+            before.st_ino,
+        ]
+        # Read the bytes (FD 3 password decode / FD 4 CA read); FD 3 is never hashed.
+        while os.read(descriptor, 1024 * 1024):
+            pass
+        d6_assert_secret_identity_stable(
+            descriptor,
+            before_identity,
+            path,
+            mode_set=mode_set,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
+        # Rewind: the descriptor is mapped to the child's FD 3/FD 4, and a child
+        # sequential read must see the full bytes, not the EOF left by the after-read
+        # revalidation above.
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        keep = descriptor
+        descriptor = -1
+        return keep, before.st_dev, before.st_ino
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+# --------------------------------------------------------------------------- #
+# Task 17 — pidfd / ptrace / proc / OFD capability gates.
+#
+# Each gate is mandatory: any failed capability blocks classification with no test
+# override.  Local checks are read-only.  The pinned server's
+# PTRACE_MODE_ATTACH_REALCREDS / Yama acceptance of pidfd_getfd stays behind the
+# separately authorized remote observation gate.
+# --------------------------------------------------------------------------- #
+
+# pidfd_getfd is syscall 438 on the generic Linux syscall table (x86_64/aarch64).
+D6_SYS_PIDFD_GETFD = 438
+
+
+def d6_pidfd_open(pid: int) -> int:
+    """Open a pidfd for the spawned probe immediately (identity anchor)."""
+    return os.pidfd_open(pid)
+
+
+def d6_pidfd_getfd(pidfd: int, target_fd: int) -> int:
+    """Retrieve one descriptor from the target via pidfd_getfd (SYS 438).
+
+    Acceptance on the pinned server depends on its PTRACE_MODE_ATTACH_REALCREDS /
+    Yama policy — a remote capability gate.  Locally the parent may retrieve from
+    its own child."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.syscall.restype = ctypes.c_long
+    result = libc.syscall(
+        ctypes.c_long(D6_SYS_PIDFD_GETFD),
+        ctypes.c_int(pidfd),
+        ctypes.c_int(target_fd),
+        ctypes.c_uint(0),
+    )
+    if result < 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), f"pidfd_getfd fd {target_fd}")
+    return int(result)
+
+
+def d6_verify_fd9_ofd_contention(fd9: int, lock_path: pathlib.Path) -> bool:
+    """Prove the retrieved child FD 9 is the canonical held-lock open-file description.
+
+    The descriptor must be the exact regular 0600 lock file (device/inode identity),
+    and the exclusive lock it inherited must still contend: a fresh open of the same
+    path from a distinct open-file description cannot take LOCK_EX."""
+    stat = os.fstat(fd9)
+    path_stat = os.stat(lock_path, follow_symlinks=False)
+    if (
+        not stat_module.S_ISREG(stat.st_mode)
+        or stat_module.S_IMODE(stat.st_mode) != 0o600
+        or stat.st_nlink != 1
+        or (stat.st_dev, stat.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+    ):
+        raise LifecycleError("D6 FD 9 is not the canonical cutover.lock identity")
+    probe_fd = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    else:
+        fcntl.flock(probe_fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(probe_fd)
+
+
+def d6_proc_identity(pid: int) -> tuple[str, str, str]:
+    """Return (/proc/<pid>/stat start-time, /proc/<pid>/exe target, boot-id)."""
+    with open(f"/proc/{pid}/stat", "rb") as handle:
+        raw = handle.read().decode("latin-1")
+    # comm (field 2) is parenthesised and may contain spaces/parens; parse after
+    # the final ')'.  Field 22 (start-time) is index 19 of the remaining fields.
+    tail = raw[raw.rindex(")") + 2 :].split()
+    start_time = tail[19]
+    exe = os.readlink(f"/proc/{pid}/exe")
+    with open("/proc/sys/kernel/random/boot_id", "rb") as handle:
+        boot_id = handle.read().decode("ascii").strip()
+    return start_time, exe, boot_id
+
+
+def d6_assert_proc_continuity(pid: int, baseline: tuple[str, str, str]) -> None:
+    """Fail closed when start-time / exe / boot-id drift from the spawn baseline."""
+    current = d6_proc_identity(pid)
+    if tuple(current) != tuple(baseline):
+        raise LifecycleError("D6 probe process identity is not continuous")
+
+
+# --------------------------------------------------------------------------- #
+# Task 18 — predecision, optional durable R and terminal seal.
+#
+# Authority graph (acyclic): request -> predecision -> optional durable R/checkpoint
+# -> final transcript -> terminal seal.  Only a validated terminal seal authorizes
+# finish-forward or post-R Task 9 retirement.  A durable R without a valid terminal
+# seal is incident-only.  Schema-version strings are a Root determination (the
+# contract fixes the key sets, the outcome/action literals and the H/N rules).
+# --------------------------------------------------------------------------- #
+
+D6_PREDECISION_KEYS = (
+    "schema_version",
+    "run_id",
+    "lease_epoch",
+    "request_sha256",
+    "classification",
+    "action",
+    "initial_database_projection_sha256",
+    "bound_database_projection_sha256",
+    "host_projection_sha256",
+    "transcript_head_before_predecision_sha256",
+    "predecessor_journal_entry_hash",
+    "predecessor_checkpoint_sha256",
+    "planned_r_journal_entry_hash",
+    "planned_r_checkpoint_sha256",
+    "previous_terminal_seal_sha256",
+    "abandoned_predecision_sha256",
+)
+D6_TERMINAL_SEAL_KEYS = (
+    "schema_version",
+    "run_id",
+    "lease_epoch",
+    "outcome",
+    "request_sha256",
+    "predecision_sha256",
+    "final_transcript_head_sha256",
+    "initial_database_projection_sha256",
+    "final_database_projection_sha256",
+    "host_projection_sha256",
+    "activation_evidence_state",
+    "actual_r_journal_entry_hash",
+    "actual_r_checkpoint_sha256",
+    "probe_pidfd_identity_sha256",
+    "fd9_identity_sha256",
+    "spawn_capability_sha256",
+    "prepared_quiesced_predecessor_sha256",
+    "writer_quiesce_manifest_sha256",
+    "barrier_receipt_sha256",
+    "probe_receipt_sha256",
+    "activation_result_sha256",
+    "activation_process_projection_sha256",
+    "process_manifest_sha256",
+    "probe_exit_status",
+    "transaction_end",
+    "connection_closed",
+)
+D6_CLASSIFICATION_ACTION = {
+    "precommit_rollback": "append_r_then_seal",
+    "committed_finish_forward": "seal_finish_forward",
+    "drift_incident": "abort_incident",
+}
+D6_OUTCOME = {
+    "precommit_rollback": "precommit_rollback_sealed",
+    "committed_finish_forward": "committed_finish_forward_sealed",
+    "drift_incident": "drift_incident_sealed",
+}
+D6_EVIDENCE_STATES = {
+    "precommit_rollback": ("prepared_guarded",),
+    "committed_finish_forward": ("complete_receipt", "committed_receipt_pending"),
+    "drift_incident": ("incident_observed",),
+}
+D6_TERMINAL_SEAL_AUTHORITY = {
+    "precommit_rollback_sealed": "task9_retirement_rollback_preparation",
+    "committed_finish_forward_sealed": "finish_forward",
+    "drift_incident_sealed": "none",
+}
+
+
+def d6_build_predecision(fields: dict[str, Any]) -> dict[str, Any]:
+    """Validate and return the exact 16-key predecision object.
+
+    Predecision is atomically published/fsynced before optional R; it is never
+    finish-forward, rollback, retirement, recovery, or operator authority by itself."""
+    if set(fields) != set(D6_PREDECISION_KEYS):
+        raise LifecycleError("D6 predecision key set mismatch")
+    classification = fields["classification"]
+    if classification not in D6_CLASSIFICATION_ACTION:
+        raise LifecycleError(f"D6 unknown classification: {classification}")
+    if fields["action"] != D6_CLASSIFICATION_ACTION[classification]:
+        raise LifecycleError("D6 predecision classification/action pair mismatch")
+    planned = (fields["planned_r_journal_entry_hash"], fields["planned_r_checkpoint_sha256"])
+    if classification == "precommit_rollback":
+        if any(value is None for value in planned):
+            raise LifecycleError("D6 precommit predecision requires both planned R hashes")
+    elif any(value is not None for value in planned):
+        raise LifecycleError("D6 non-precommit predecision requires null planned R hashes")
+    return {key: fields[key] for key in D6_PREDECISION_KEYS}
+
+
+def d6_build_terminal_seal(
+    fields: dict[str, Any], predecision: dict[str, Any]
+) -> dict[str, Any]:
+    """Validate and return the exact 26-key terminal seal, bound to its predecision.
+
+    Published only after exact `closed`, clean probe exit, final transcript fsync and
+    continuity verification; it binds probe_exit_status=0, transaction_end=
+    read_only_commit, connection_closed=true, and equals the predecision classification
+    and the host projection."""
+    if set(fields) != set(D6_TERMINAL_SEAL_KEYS):
+        raise LifecycleError("D6 terminal seal key set mismatch")
+    classification = predecision["classification"]
+    if fields["outcome"] != D6_OUTCOME[classification]:
+        raise LifecycleError("D6 terminal seal outcome does not match predecision classification")
+    if fields["activation_evidence_state"] not in D6_EVIDENCE_STATES[classification]:
+        raise LifecycleError("D6 terminal seal evidence state illegal for classification")
+    actual = (fields["actual_r_journal_entry_hash"], fields["actual_r_checkpoint_sha256"])
+    planned = (
+        predecision["planned_r_journal_entry_hash"],
+        predecision["planned_r_checkpoint_sha256"],
+    )
+    if classification == "precommit_rollback":
+        if any(value is None for value in actual):
+            raise LifecycleError("D6 precommit seal actual R must be non-null")
+        if actual != planned:
+            raise LifecycleError("D6 precommit seal actual R must byte-equal predecision planned R")
+    elif any(value is not None for value in actual):
+        raise LifecycleError("D6 non-precommit seal actual R must be null")
+    if fields["probe_exit_status"] != 0:
+        raise LifecycleError("D6 terminal seal requires probe_exit_status 0")
+    if fields["transaction_end"] != "read_only_commit":
+        raise LifecycleError("D6 terminal seal requires transaction_end read_only_commit")
+    if fields["connection_closed"] is not True:
+        raise LifecycleError("D6 terminal seal requires connection_closed true")
+    for key in (
+        "run_id",
+        "lease_epoch",
+        "request_sha256",
+        "host_projection_sha256",
+        "initial_database_projection_sha256",
+    ):
+        if fields[key] != predecision[key]:
+            raise LifecycleError(f"D6 terminal seal {key} disagrees with predecision")
+    return {key: fields[key] for key in D6_TERMINAL_SEAL_KEYS}
+
+
+def d6_predecision_sha256(predecision: dict[str, Any]) -> str:
+    """The lowercase 64-hex SHA-256 over the canonical predecision object bytes."""
+    return sha256(canonical(predecision))
+
+
+def d6_verify_seal_binding(
+    seal: dict[str, Any], predecision: dict[str, Any]
+) -> str:
+    """Reject a terminal seal whose predecision_sha256 does not hash its predecision.
+
+    Enforced by ``d6_select_restart_authority`` when an epoch carries its loaded
+    ``seal`` and ``predecision`` objects: a mismatch makes the epoch unbound and it
+    cannot become a restart chain tip.  Returns the verified hash."""
+    expected = d6_predecision_sha256(predecision)
+    if seal["predecision_sha256"] != expected:
+        raise LifecycleError(
+            "D6 terminal seal predecision_sha256 does not bind its predecision"
+        )
+    return expected
+
+
+def d6_terminal_seal_authority(seal: dict[str, Any]) -> str:
+    """Return the sole authority a validated terminal seal confers."""
+    outcome = seal["outcome"]
+    if outcome not in D6_TERMINAL_SEAL_AUTHORITY:
+        raise LifecycleError(f"D6 unknown terminal seal outcome: {outcome}")
+    return D6_TERMINAL_SEAL_AUTHORITY[outcome]
+
+
+def d6_authority_without_seal(predecision: dict[str, Any]) -> str:
+    """A durable R with no valid terminal seal is incident-only; predecision alone
+    never authorizes finish-forward, rollback, retirement, recovery, or activation."""
+    if "classification" not in predecision:
+        raise LifecycleError("D6 authority check requires a predecision object")
+    return "incident_only"
+
+
+def d6_publish_immutable_object(
+    run_dir: pathlib.Path, name: str, epoch: str, obj: dict[str, Any], trace: list[str]
+) -> pathlib.Path:
+    """Atomically publish one immutable 0400 D6 object under the run-owned directory."""
+    require_lexical_absolute(run_dir)
+    path = run_dir / f"activation-truth-{name}-{epoch}.json"
+    temp = run_dir / f"activation-truth-{name}-{epoch}.json.tmp"
+    data = complete_object(obj)
+    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        offset = 0
+        while offset < len(data):
+            offset += os.write(descriptor, data[offset:])
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.chmod(temp, 0o400)
+    rename_noreplace(temp, path)
+    fsync_directory(run_dir)
+    trace.append(f"{name}:published")
+    return path
+
+
+def d6_append_transcript(
+    run_dir: pathlib.Path, epoch: str, frame: dict[str, Any], trace: list[str]
+) -> pathlib.Path:
+    """Append one frame to the 0600 append-only transcript and fsync it."""
+    require_lexical_absolute(run_dir)
+    path = run_dir / f"activation-truth-transcript-{epoch}.jsonl"
+    line = canonical(frame) + b"\n"
+    descriptor = os.open(
+        path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600
+    )
+    try:
+        offset = 0
+        while offset < len(line):
+            offset += os.write(descriptor, line[offset:])
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.chmod(path, 0o600)
+    trace.append("transcript:fsynced")
+    return path
+
+
+# --------------------------------------------------------------------------- #
+# Task 19 — sole D5 post-R narrowing, precommit race closure, restart authority.
+# --------------------------------------------------------------------------- #
+
+# After R the D6 probe (the sole exception to the D5 stop) may only finish its
+# already-started read-only protocol; Root may only extend its two D6 audit
+# objects.  Everything else — spawn/exec, mutation-capable connections, journal
+# rows, rollback/resource mutation, capabilities, receipts, final-writer state,
+# new children/sessions — stays forbidden between R and complete retirement.
+D6_POST_R_PROBE_ALLOWED = frozenset(
+    (
+        "emit_sealed",
+        "receive_release",
+        "read_only_commit",
+        "close_connection",
+        "emit_closed",
+        "exit",
+    )
+)
+D6_POST_R_ROOT_ALLOWED = frozenset(
+    (
+        "append_transcript",
+        "fsync_transcript",
+        "publish_terminal_seal",
+        "fsync_terminal_seal",
+        "prove_probe_exit",
+        "close_pipes",
+        "permit_task9_retirement",
+    )
+)
+# The precommit race hold: the probe keeps full SHARE + FD9 across this exact Root
+# ordering, so no W-bound activation path can pass its common incompatible lock.
+D6_PRECOMMIT_RACE_ORDER = (
+    "publish_predecision",
+    "append_r",
+    "fsync_r",
+    "obtain_sealed",
+    "release",
+    "receive_closed",
+    "observe_clean_exit",
+    "fsync_transcript",
+    "publish_terminal_seal",
+)
+
+
+def d6_post_r_allowed(actor: str, action: str) -> bool:
+    """Whether ``action`` by ``actor`` is inside the sole post-R narrowing."""
+    if actor == "probe":
+        return action in D6_POST_R_PROBE_ALLOWED
+    if actor == "root":
+        return action in D6_POST_R_ROOT_ALLOWED
+    raise LifecycleError(f"D6 unknown post-R actor: {actor}")
+
+
+def d6_precommit_race_order() -> list[str]:
+    """The exact ordered Root actions of the precommit race-closure interval."""
+    return list(D6_PRECOMMIT_RACE_ORDER)
+
+
+def d6_crash_authority(state: dict[str, Any]) -> str:
+    """Map a recovered durable state to its sole authority, per the crash rules.
+
+    - predecision, no R, continuous original transaction -> may continue;
+    - predecision, no R, not continuous -> abandoned (bind only as
+      abandoned_predecision_sha256, no reuse of classification/projections);
+    - durable R, no valid terminal seal -> incident-only;
+    - terminal seal, no R, committed, unique chain tip -> finish-forward only;
+    - terminal seal with exact R -> Task 9 post-R retirement/rollback prep only;
+    - incident terminal seal -> no mutation."""
+    if state.get("has_terminal_seal"):
+        outcome = state.get("seal_outcome")
+        if outcome == "drift_incident_sealed":
+            return "none"
+        if outcome == "precommit_rollback_sealed":
+            if not state.get("has_durable_r"):
+                raise LifecycleError("D6 precommit seal without durable R is incident")
+            return "task9_retirement_rollback_preparation"
+        if outcome == "committed_finish_forward_sealed":
+            if state.get("has_durable_r"):
+                raise LifecycleError("D6 committed finish-forward seal must not carry durable R")
+            if not state.get("unique_chain_tip"):
+                raise LifecycleError("D6 committed finish-forward seal is not the unique chain tip")
+            return "finish_forward"
+        raise LifecycleError(f"D6 unknown terminal seal outcome: {outcome}")
+    if state.get("has_durable_r"):
+        return "incident_only"
+    if state.get("has_predecision"):
+        return "continue" if state.get("continuity") else "abandoned"
+    return "none"
+
+
+def d6_lease_ordinal(epoch: str) -> int:
+    """Numeric lease order (`cutover`=0, `cutover-recovery-N`=N)."""
+    if not EPOCH_RE.match(epoch):
+        raise LifecycleError(f"D6 illegal lease epoch: {epoch}")
+    if epoch == "cutover":
+        return 0
+    return int(epoch.rsplit("-", 1)[1])
+
+
+def d6_select_restart_authority(
+    epochs: list[dict[str, Any]], canonical_head: str
+) -> dict[str, Any]:
+    """Select the unique terminal-seal chain tip bound to the canonical head.
+
+    Multiple tips, forked lineage, reused epochs, unbound/broken chains, or a stale
+    head (no tip matching the current journal/checkpoint head) are all incidents."""
+    seen: set[str] = set()
+    for epoch in epochs:
+        lease_epoch = epoch["lease_epoch"]
+        d6_lease_ordinal(lease_epoch)
+        if lease_epoch in seen:
+            raise LifecycleError("D6 restart: reused lease epoch")
+        seen.add(lease_epoch)
+        if not epoch.get("chain_ok"):
+            raise LifecycleError("D6 restart: unbound or broken hash chain")
+        # When the loaded seal and predecision objects are present, the seal must
+        # bind the exact predecision it claims or the epoch is unbound (incident) and
+        # cannot become a chain tip.
+        seal = epoch.get("seal")
+        predecision = epoch.get("predecision")
+        if epoch.get("terminal_seal") and seal is not None and predecision is not None:
+            d6_verify_seal_binding(seal, predecision)
+    ordered = sorted(epochs, key=lambda item: d6_lease_ordinal(item["lease_epoch"]))
+    seals = [item for item in ordered if item.get("terminal_seal")]
+    lineage = [
+        item["previous_terminal_seal"]
+        for item in seals
+        if item.get("previous_terminal_seal") is not None
+    ]
+    if len(lineage) != len(set(lineage)):
+        raise LifecycleError("D6 restart: forked terminal seal lineage")
+    tips = [
+        item
+        for item in seals
+        if item.get("predecessor_head") == canonical_head
+        or item.get("actual_r_head") == canonical_head
+    ]
+    if not tips:
+        raise LifecycleError("D6 restart: stale head, no terminal seal tip matches canonical head")
+    if len(tips) > 1:
+        raise LifecycleError("D6 restart: multiple terminal seal tips")
+    tip = tips[0]
+    return {
+        "lease_epoch": tip["lease_epoch"],
+        "authority": d6_terminal_seal_authority({"outcome": tip["seal_outcome"]}),
+    }
 
 
 def parser() -> argparse.ArgumentParser:

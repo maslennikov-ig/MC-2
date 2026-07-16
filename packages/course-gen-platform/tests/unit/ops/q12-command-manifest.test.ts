@@ -482,3 +482,111 @@ describe('Q12 canonical command manifest', () => {
     }
   });
 });
+
+// D6 (Q12 activation-truth classifier) is a private child of the Root supervisor.
+// It adds no command to the manifest and does not touch the five retained barrier
+// entries. These assertions pin the whole accepted twenty-command manifest and the
+// five retained entries to their frozen bytes so any D6 Root change that would alter
+// the command surface fails here instead of silently mutating the manifest.
+const D6_COMMAND_MANIFEST_SHA256 =
+  'aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841';
+
+function barrierArgv(subcommand: readonly string[]): string[] {
+  return [
+    '/opt/megacampus/deploy/qdrant/q12-database-barrier.sh',
+    ...subcommand,
+    '--run-id',
+    '<run-id>',
+    '--db-url-file',
+    '/opt/megacampus/secrets/supabase_db_url',
+    '--ca-file',
+    '/opt/megacampus/secrets/prod-ca-2021.crt',
+    '--q12-db-capability-file',
+    '/opt/megacampus/backups/q12/<run-id>/secrets/db-capability',
+    '--expected-post-migration-catalog',
+    '/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json',
+    '--expected-post-migration-catalog-sha256',
+    '<expected-post-migration-catalog-sha256>',
+  ];
+}
+
+const RETAINED_BARRIERS: Record<
+  (typeof BARRIER_IDS)[number],
+  { argv: string[]; argv_sha256: string }
+> = {
+  'barrier.install': {
+    argv: barrierArgv(['install']),
+    argv_sha256: '0caafb416a252f5b00d606e813ac2d4c021415e1137ecb6b7c5383e058db373b',
+  },
+  'barrier.verify-after-base': {
+    argv: barrierArgv(['verify-extended', '--after-migration', '20260711140000']),
+    argv_sha256: 'a9eb8d69416dbc8102e473d1b6c9716d5604392b4140581a18b65137210eea1e',
+  },
+  'barrier.verify-after-observability': {
+    argv: barrierArgv(['verify-extended', '--after-migration', '20260711151000']),
+    argv_sha256: '0dfd3b80aac5674cbb77a1c708e8f4751dff96f4465362c3a4c0862b78ab321d',
+  },
+  'barrier.prepare-recovery': {
+    argv: barrierArgv(['prepare-recovery']),
+    argv_sha256: 'b45a23caaa74f197a0779e52b460079c53ea246ba1951456fd8f04856673021c',
+  },
+  'barrier.activate': {
+    argv: barrierArgv(['activate']),
+    argv_sha256: 'f267f1dc9889ae85171257b2ddaf553cb372fe97be9deb7e201b7e5bcc69c191',
+  },
+};
+
+describe('Q12 D6 keeps the retained commands and manifest byte-stable', () => {
+  const manifestBytes = readFileSync(MANIFEST);
+  const manifest = JSON.parse(manifestBytes.toString('utf8')) as {
+    schema_version: string;
+    commands: Record<string, { argv: string[]; argv_sha256: string; env: Record<string, string> }>;
+  };
+
+  it('pins the accepted twenty-command manifest to the W-tuple sha256', () => {
+    expect(createHash('sha256').update(manifestBytes).digest('hex')).toBe(
+      D6_COMMAND_MANIFEST_SHA256
+    );
+    expect(manifest.schema_version).toBe('megacampus.q12.command-manifest/v1');
+    expect(Object.keys(manifest.commands)).toEqual(ALL_IDS);
+    expect(Object.keys(manifest.commands)).toHaveLength(20);
+    expect(Object.keys(manifest.commands).slice(0, 5)).toEqual([...BARRIER_IDS]);
+  });
+
+  it('keeps the five retained barrier entries byte-identical under D6', () => {
+    for (const id of BARRIER_IDS) {
+      const command = manifest.commands[id];
+      expect(command.argv, id).toEqual(RETAINED_BARRIERS[id].argv);
+      expect(command.argv_sha256, id).toBe(RETAINED_BARRIERS[id].argv_sha256);
+      expect(command.argv_sha256, id).toBe(argvHash(command.argv));
+      expect(command.env, id).toEqual(BASE_ENV);
+    }
+  });
+
+  it('introduces no D6 command, shorthand namespace, systemd unit, or cron job', () => {
+    for (const shorthand of [
+      'install',
+      'verify-after-base',
+      'verify-after-observability',
+      'prepare-recovery',
+      'activate',
+    ]) {
+      expect(Object.keys(manifest.commands)).not.toContain(shorthand);
+    }
+    const probe = resolveProbe(
+      [
+        'manifest = core.load_manifest()',
+        "print(json.dumps({'ids': list(core.MANIFEST_COMMAND_IDS), 'keys': list(manifest['commands'].keys())}))",
+      ].join('\n')
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
+    const output = JSON.parse(probe.stdout) as { ids: string[]; keys: string[] };
+    expect(output.ids).toEqual(ALL_IDS);
+    expect(output.keys).toEqual(ALL_IDS);
+    const source = readFileSync(CORE, 'utf8');
+    for (const scheduling of ['systemctl', 'systemd', 'crontab', '.service', '.timer']) {
+      expect(source, scheduling).not.toContain(scheduling);
+    }
+  });
+});
