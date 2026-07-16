@@ -408,7 +408,40 @@ TASK18 = {
 }
 
 
-DISPATCH = {**TASK16, **TASK17, **TASK18}
+# --------------------------------------------------------------------------- #
+# Task 19 — post-R D5 narrowing, race closure and restart authority
+# --------------------------------------------------------------------------- #
+
+
+def scenario_post_r_narrowing(payload: dict) -> dict:
+    allowed = {}
+    for actor, action in payload["checks"]:
+        allowed[f"{actor}:{action}"] = CORE.d6_post_r_allowed(actor, action)
+    return {"ok": True, "allowed": allowed}
+
+
+def scenario_race_order(payload: dict) -> dict:
+    return {"ok": True, "order": CORE.d6_precommit_race_order()}
+
+
+def scenario_crash_authority(payload: dict) -> dict:
+    return {"ok": True, "authority": CORE.d6_crash_authority(payload["state"])}
+
+
+def scenario_restart_authority(payload: dict) -> dict:
+    result = CORE.d6_select_restart_authority(payload["epochs"], payload["canonical_head"])
+    return {"ok": True, **result}
+
+
+TASK19 = {
+    "post_r_narrowing": scenario_post_r_narrowing,
+    "race_order": scenario_race_order,
+    "crash_authority": scenario_crash_authority,
+    "restart_authority": scenario_restart_authority,
+}
+
+
+DISPATCH = {**TASK16, **TASK17, **TASK18, **TASK19}
 
 
 def main() -> int:

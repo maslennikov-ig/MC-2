@@ -315,3 +315,199 @@ describe('Task 18 — D6 predecision / optional-R / terminal-seal authority', ()
     expect(result.authority_with_seal).toBe('task9_retirement_rollback_preparation');
   });
 });
+
+describe('Task 19 — D6 post-R narrowing + race closure + restart authority', () => {
+  it('permits only the narrowed post-R probe and Root operations', () => {
+    const checks: Array<[string, string]> = [
+      ['probe', 'emit_sealed'],
+      ['probe', 'receive_release'],
+      ['probe', 'read_only_commit'],
+      ['probe', 'close_connection'],
+      ['probe', 'emit_closed'],
+      ['probe', 'exit'],
+      ['probe', 'spawn_child'],
+      ['probe', 'open_mutation_connection'],
+      ['probe', 'write_journal'],
+      ['root', 'append_transcript'],
+      ['root', 'fsync_transcript'],
+      ['root', 'publish_terminal_seal'],
+      ['root', 'prove_probe_exit'],
+      ['root', 'permit_task9_retirement'],
+      ['root', 'append_journal_row'],
+      ['root', 'mutate_rollback'],
+      ['root', 'open_new_session'],
+    ];
+    const result = runScenario({ scenario: 'post_r_narrowing', checks });
+    expect(result.ok, result.error).toBe(true);
+    const allowed = result.allowed as Record<string, boolean>;
+    for (const key of [
+      'probe:emit_sealed',
+      'probe:receive_release',
+      'probe:read_only_commit',
+      'probe:close_connection',
+      'probe:emit_closed',
+      'probe:exit',
+      'root:append_transcript',
+      'root:fsync_transcript',
+      'root:publish_terminal_seal',
+      'root:prove_probe_exit',
+      'root:permit_task9_retirement',
+    ]) {
+      expect(allowed[key], key).toBe(true);
+    }
+    for (const key of [
+      'probe:spawn_child',
+      'probe:open_mutation_connection',
+      'probe:write_journal',
+      'root:append_journal_row',
+      'root:mutate_rollback',
+      'root:open_new_session',
+    ]) {
+      expect(allowed[key], key).toBe(false);
+    }
+  });
+
+  it('emits the exact precommit race-closure Root ordering', () => {
+    const result = runScenario({ scenario: 'race_order' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.order).toEqual([
+      'publish_predecision',
+      'append_r',
+      'fsync_r',
+      'obtain_sealed',
+      'release',
+      'receive_closed',
+      'observe_clean_exit',
+      'fsync_transcript',
+      'publish_terminal_seal',
+    ]);
+  });
+
+  it('maps the exact crash-rule authority table', () => {
+    const authority = (state: Record<string, unknown>) =>
+      runScenario({ scenario: 'crash_authority', state }).authority;
+    // predecision, no R, continuous original transaction -> may continue
+    expect(authority({ has_predecision: true, has_durable_r: false, continuity: true })).toBe(
+      'continue'
+    );
+    // predecision, no R, not continuous -> abandoned, no authority
+    expect(authority({ has_predecision: true, has_durable_r: false, continuity: false })).toBe(
+      'abandoned'
+    );
+    // durable R, no valid terminal seal -> incident-only
+    expect(authority({ has_predecision: true, has_durable_r: true })).toBe('incident_only');
+    // terminal seal, no R, committed, unique tip -> finish-forward
+    expect(
+      authority({
+        has_terminal_seal: true,
+        seal_outcome: 'committed_finish_forward_sealed',
+        has_durable_r: false,
+        unique_chain_tip: true,
+      })
+    ).toBe('finish_forward');
+    // terminal seal with exact R -> Task 9 retirement only
+    expect(
+      authority({
+        has_terminal_seal: true,
+        seal_outcome: 'precommit_rollback_sealed',
+        has_durable_r: true,
+      })
+    ).toBe('task9_retirement_rollback_preparation');
+    // incident terminal seal authorizes no mutation
+    expect(authority({ has_terminal_seal: true, seal_outcome: 'drift_incident_sealed' })).toBe(
+      'none'
+    );
+  });
+
+  it('rejects a committed finish-forward seal that is not the unique chain tip', () => {
+    const result = runScenario({
+      scenario: 'crash_authority',
+      state: {
+        has_terminal_seal: true,
+        seal_outcome: 'committed_finish_forward_sealed',
+        has_durable_r: false,
+        unique_chain_tip: false,
+      },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('selects the unique terminal-seal chain tip matching the canonical head', () => {
+    const epochs = [
+      {
+        lease_epoch: 'cutover',
+        chain_ok: true,
+        terminal_seal: true,
+        seal_outcome: 'precommit_rollback_sealed',
+        previous_terminal_seal: null,
+        predecessor_head: 'headA',
+        actual_r_head: 'rA',
+      },
+      {
+        lease_epoch: 'cutover-recovery-1',
+        chain_ok: true,
+        terminal_seal: true,
+        seal_outcome: 'committed_finish_forward_sealed',
+        previous_terminal_seal: 'sealA',
+        predecessor_head: 'HEAD',
+        actual_r_head: null,
+      },
+    ];
+    const result = runScenario({ scenario: 'restart_authority', epochs, canonical_head: 'HEAD' });
+    expect(result.ok, result.error).toBe(true);
+    expect(result.lease_epoch).toBe('cutover-recovery-1');
+    expect(result.authority).toBe('finish_forward');
+  });
+
+  it('treats forks, multiple tips, reused epochs, unbound chains, and a stale head as incidents', () => {
+    const tip = (epoch: string, prev: string | null, head: string) => ({
+      lease_epoch: epoch,
+      chain_ok: true,
+      terminal_seal: true,
+      seal_outcome: 'committed_finish_forward_sealed',
+      previous_terminal_seal: prev,
+      predecessor_head: head,
+      actual_r_head: null,
+    });
+    // multiple tips both matching the head
+    expect(
+      runScenario({
+        scenario: 'restart_authority',
+        epochs: [tip('cutover', null, 'HEAD'), tip('cutover-recovery-1', 'sealA', 'HEAD')],
+        canonical_head: 'HEAD',
+      }).ok
+    ).toBe(false);
+    // forked lineage: two seals share the same previous_terminal_seal
+    expect(
+      runScenario({
+        scenario: 'restart_authority',
+        epochs: [tip('cutover', 'sameprev', 'x'), tip('cutover-recovery-1', 'sameprev', 'HEAD')],
+        canonical_head: 'HEAD',
+      }).ok
+    ).toBe(false);
+    // reused lease epoch
+    expect(
+      runScenario({
+        scenario: 'restart_authority',
+        epochs: [tip('cutover', null, 'HEAD'), tip('cutover', 'sealA', 'y')],
+        canonical_head: 'HEAD',
+      }).ok
+    ).toBe(false);
+    // unbound / broken chain
+    expect(
+      runScenario({
+        scenario: 'restart_authority',
+        epochs: [{ ...tip('cutover', null, 'HEAD'), chain_ok: false }],
+        canonical_head: 'HEAD',
+      }).ok
+    ).toBe(false);
+    // stale head: no tip matches
+    expect(
+      runScenario({
+        scenario: 'restart_authority',
+        epochs: [tip('cutover', null, 'other')],
+        canonical_head: 'HEAD',
+      }).ok
+    ).toBe(false);
+  });
+});
