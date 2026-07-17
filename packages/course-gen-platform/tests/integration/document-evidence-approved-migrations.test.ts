@@ -441,25 +441,17 @@ appliedDescribe('approved document evidence migrations applied', () => {
     ).toBe('recovered');
   });
 
-  it('refuses an earlier pending repository migration', async () => {
-    const previous = (await repositoryMigrationNames()).filter(
-      migration => migration.version < DOCUMENT_EVIDENCE_APPROVED_MIGRATIONS[0].version
-    );
-    await client.query('DELETE FROM supabase_migrations.schema_migrations WHERE version=$1', [
-      previous.at(-1)!.version,
-    ]);
-    await expect(
-      runDocumentEvidenceApprovedMigrations({
-        databaseUrl: disposableUrl(databaseUrl!),
-        direction: 'apply',
-      })
-    ).rejects.toThrow(/repository migration frontier/u);
-  });
-
-  it('refuses unknown, gapped and later migration history', async () => {
+  // MCP-style tolerance (versions absent from repo files, max == frontier) is proven
+  // directly against assertRepositoryMigrationFrontier in the docker-free unit suite
+  // (tests/unit/scripts/document-evidence-frontier.test.ts), and end-to-end with MCP-shaped
+  // source history in the real-PG17 composed==real-source plan proof — the full apply here
+  // is gated on the pinned Supabase image's security manifest, so it cannot run on a vanilla
+  // PG17. These integration negatives throw at the frontier BEFORE the image-pinned apply.
+  it('refuses unknown history NEWER than the frontier, a between-frontier version, and a gapped prefix (round-16)', async () => {
+    // A version strictly ABOVE the reviewed frontier (not our chain) -> unknown newer history.
     await client.query(
       `INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
-       VALUES('20250000000000','unknown_history',ARRAY[]::text[])`
+       VALUES('20260711160000','unexpected_later_tail',ARRAY[]::text[])`
     );
     await expect(
       runDocumentEvidenceApprovedMigrations({
@@ -469,6 +461,20 @@ appliedDescribe('approved document evidence migrations applied', () => {
     ).rejects.toThrow(/repository migration frontier/u);
 
     await resetDatabase();
+    // A version strictly BETWEEN the frontier and the first chain version -> unknown newer.
+    await client.query(
+      `INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
+       VALUES('20260706000000','between_frontier_and_chain',ARRAY[]::text[])`
+    );
+    await expect(
+      runDocumentEvidenceApprovedMigrations({
+        databaseUrl: disposableUrl(databaseUrl!),
+        direction: 'apply',
+      })
+    ).rejects.toThrow(/repository migration frontier/u);
+
+    await resetDatabase();
+    // The SECOND chain migration present without the first -> unsupported prefix (gap).
     const loaded = await loadDocumentEvidenceApprovedMigrations();
     await client.query(
       `INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
@@ -481,18 +487,6 @@ appliedDescribe('approved document evidence migrations applied', () => {
         direction: 'apply',
       })
     ).rejects.toThrow(/supported prefix/u);
-
-    await resetDatabase();
-    await client.query(
-      `INSERT INTO supabase_migrations.schema_migrations(version,name,statements)
-       VALUES('20260711160000','unexpected_later_tail',ARRAY[]::text[])`
-    );
-    await expect(
-      runDocumentEvidenceApprovedMigrations({
-        databaseUrl: disposableUrl(databaseUrl!),
-        direction: 'apply',
-      })
-    ).rejects.toThrow(/repository migration frontier/u);
   });
 
   it('refuses base rollback while observability history and live objects remain', async () => {
