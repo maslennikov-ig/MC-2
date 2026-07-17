@@ -25,10 +25,13 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
 STRUCTURAL_CATALOG_FILE = pathlib.Path(__file__).with_name("q12-structural-catalog.sql")
+# A docker/compose object name; anchored so a seam value can never inject argv.
+CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 
 GUARDED_RELATIONS_SQL = """
 SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -100,9 +103,19 @@ def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _validated_binary(path: str, label: str) -> str:
+    if not (os.path.isabs(path) and not os.path.islink(path) and os.path.isfile(path)):
+        raise CaptureError(f"{label} must be an absolute non-symlink regular file")
+    return path
+
+
 def _psql_argv(container: str | None) -> list[str]:
     if container is not None:
-        docker = os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker")
+        if not CONTAINER_RE.fullmatch(container):
+            raise CaptureError("invalid --container value")
+        docker = _validated_binary(
+            os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker"), "MC2_Q12_PLAN_DOCKER"
+        )
         return [
             docker,
             "exec",
@@ -119,7 +132,9 @@ def _psql_argv(container: str | None) -> list[str]:
             "-v",
             "ON_ERROR_STOP=1",
         ]
-    binary = os.environ.get("MC2_Q12_PLAN_PSQL", "/usr/lib/postgresql/17/bin/psql")
+    binary = _validated_binary(
+        os.environ.get("MC2_Q12_PLAN_PSQL", "/usr/lib/postgresql/17/bin/psql"), "MC2_Q12_PLAN_PSQL"
+    )
     return [
         binary,
         "-X",

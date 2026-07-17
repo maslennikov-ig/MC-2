@@ -322,6 +322,47 @@ describe('Q12 expected-post-migration-catalog plan builder', () => {
   });
 });
 
+describe('Q12 plan capture helper and builder input hardening', () => {
+  it('rejects an unsafe --container value before any exec', () => {
+    const result = spawnSync('/usr/bin/python3', [CAPTURE, '--container', 'evil;rm -rf /'], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/invalid --container/iu);
+  });
+
+  it('rejects a non-absolute MC2_Q12_PLAN_PSQL before any exec', () => {
+    const result = spawnSync('/usr/bin/python3', [CAPTURE], {
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '/usr/bin:/bin',
+        LC_ALL: 'C',
+        LANG: 'C',
+        MC2_Q12_PLAN_PSQL: 'relative/psql',
+      },
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/absolute non-symlink regular file/iu);
+  });
+
+  it.each(['oid', 'jobid'] as const)(
+    'fails closed on a boolean-as-integer %s in capture evidence',
+    field => {
+      const fixture = planFixture();
+      const evidence = baseEvidence() as any;
+      if (field === 'oid') evidence.guarded_relations[0].oid = true;
+      else evidence.cron_jobs[0].jobid = true;
+
+      const result = runPlan(fixture, evidence);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/plan rejected|plan error/iu);
+      expect(existsSync(fixture.catalogPath)).toBe(false);
+    }
+  );
+});
+
 describe.runIf(REAL_PG17)('Q12 plan capture against disposable PostgreSQL 17.10', () => {
   it('captures the real structural catalog and builds a barrier-valid plan catalog', async () => {
     const container = `mc2-q12-plan-${process.pid}-${Date.now()}`;
