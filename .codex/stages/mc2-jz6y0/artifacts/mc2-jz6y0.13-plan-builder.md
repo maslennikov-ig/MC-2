@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-18 search_path-independent catalog reg*-name checks RED->GREEN: f3bff0ca -> 14725ee2. Fixes rehearsal #11 (Required extensions.pgcrypto digest dependency does not match): assertPgcryptoDigestDependency (document-evidence-approved.ts) compared to_regprocedure(extensions.digest(bytea,text))::text against the qualified literal, but ::text DROPS the schema when extensions is on the session search_path — and the §3-allowlisted postgres role carries search_path="$user", public, extensions in BOTH cloud and the drill-replayed isolate (verified at the SQL level: with extensions on path ::text renders digest(bytea,text); without it renders extensions.digest(bytea,text)) — so the check failed against every real environment (a fourth never-executed-path defect that would kill live C5). Repair: resolve by QUALIFIED name (to_regprocedure resolution is search_path-safe) + assert explicit catalog facts (procedure present, pg_namespace(pronamespace)==extensions, proname==digest, pg_get_function_identity_arguments==\"bytea, text\", prorettype::regtype::text==bytea [pg_catalog types always unqualified], language c, secdef false, proconfig []); keep extversion/extension-schema. SWEEP both CLIs for the same class: the four to_regclass(...)::text-vs-literal helpers (requireSupabaseHistory x2, relationExists, totalsRelationExists) -> to_regclass(...) IS NOT NULL (search_path-independent); assertProcedures only null-checks (safe); ::regclass/::regprocedure in WHERE are resolution (safe). supabase_migrations is never on the postgres search_path (verified) so those were safe but latent; fixed anyway. Docker-free real-DB unit (pgcrypto in extensions schema): the check passes in BOTH search_path shapes and still fails closed on a wrong extension schema (3 passed). Integration suite: 13 failures are all the pre-existing image-pinned security-manifest apply-path failures (12 \"does not match\" + 1 \"residue\"), NONE from the IS NOT NULL / pgcrypto changes. The plan real-PG17 composed==real already runs with extensions on the postgres search_path (DRILL_SOURCE_SCHEMA seeds ALTER ROLE postgres SET search_path) and holds byte-exact (round-17 64 passed, plan path unchanged). Known benign: extension/function OWNER postgres->supabase_admin isolate divergence — content non-fatal, absent from composed entries; no action. tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; catalog schema untouched; CLIs .ts not manifest-pinned.'
   - 'Round-17 lift the drill read-only override before the migration phase RED->GREEN: f78e03a8 -> cad61e06. Fixes rehearsal #10 (cannot execute CREATE TABLE in a read-only transaction): the drill leaves the restored DB with default_transaction_read_only=on (one of its three documented overrides). Before the base packet, the drill-path plan runs ALTER DATABASE <dbname> SET default_transaction_read_only TO off (with PGOPTIONS read-only off for that write, mirroring the drill actor) and verifies on a FRESH connection that the default is off, failing closed otherwise. Only the drill path. NOT restored afterward: teardown destroys the isolate, and the frozen structural settings hash EXCLUDES this GUC (q12-structural-catalog.sql:69) so checkpoint captures are unaffected — the composed==real-source proof holds byte-exact WITH the flip, validating the exclusion end-to-end. Sweep: the drill's only other post-restore overrides are ALTER SYSTEM cron.database_name/cron.launch_active_jobs (inert for our migrations) + the source-replayed DB/role GUCs (what the migrations already run under in prod); nothing else blocks the apply. RED: the fake drill now leaves restore_test read-only -> the migrate test failed with "cannot execute CREATE ROLE in a read-only transaction". GREEN: real-PG17 q12-migration-plan.test.ts 64 passed (migrate + composed==real with the flip). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; catalog schema/consumers untouched.'
   - 'Round-16 repair frontier assertion for MCP-generated history RED->GREEN: 37368792 -> 4a3c99d3. Fixes rehearsal #9 (the real base CLI fail-closed with "Supabase repository migration frontier contains unknown history"): assertRepositoryMigrationFrontier (document-evidence-approved.ts) required every history version to be a 14-digit repo FILENAME version, but this projects prod migrations are applied via the Supabase MCP with apply-time version timestamps that have no same-named repo file (300+ of 317 rows) — the premise "history subset of repo filenames" is false and can NEVER pass against the real DB (a never-executed-path defect that would kill the live C-window identically). Repair: pin APPROVED_HISTORY_FRONTIER=20260704150249; replace the per-row filename + earlier-pending + ambiguous-count checks with "no non-chain history version above the frontier" (also forbids any version strictly between the frontier and the first chain version) + no duplicates; keep the chain-prefix logic and loadRepositoryMigrations + REPOSITORY_MIGRATION_MANIFEST_SHA256 (repo-tree pin) EXACTLY. Swept the observability CLI (no history-subset-repo premise; per-version readHistory only). The CLIs .ts bytes are NOT security-manifest-pinned (the manifest hashes SQL/function bodies), so this is safe. Docker-free unit (mock client): MCP-style history tolerated (prefix 0); NEWER-than-frontier/between-frontier/gapped-prefix/duplicate fail (5 passed). Integration negatives throw at the frontier before the pinned-image apply (the full apply is image-gated, cannot run on vanilla PG17 — pre-existing). Plan real-PG17 composed==real-source now runs with MCP-shaped source history and holds byte-exact (64 passed). Document-evidence unit suites 19 passed. tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; REPOSITORY_MIGRATION_MANIFEST_SHA256 unchanged.'
   - 'Round-15 delta-neutral extras in the completeness gate RED->GREEN: 163c7364 -> fbabbab9. Fixes rehearsal #8 ([default_acls] extra 2 — the Supabase image manufactures default ACLs on restore-created schemas tests/test_overrides that were dropped in the cloud source). Completeness gate now: MISSING (source object absent from isolate) -> absolutely fatal (unchanged); EXTRA (isolate identity absent from source) -> tolerated iff DELTA-NEUTRAL. The additive-delta check in _compose_predicted_payload already hard-stops any extra that changes/disappears across the pre/base/observability checkpoints, and composition now EXCLUDES tolerated extras from the composed payload (they are not in the live source) so composed still == real. Tolerated extras reported: plan result JSON gets observed_extra_identities [{section,identity}] + each named on stderr (assemble ignores the evidence key -> catalog bytes unchanged; no result consumer validates keys). Real-PG17 q12-migration-plan.test.ts: 64 passed — incl. an isolate-only extra tolerated+reported with the composed catalog still byte-matching the real post-migration source; a MISSING object still fatal (+ diagnostics preserved under --keep-equality-diagnostics); repurposed injectDrift->tolerated, injectMissing->fatal. No-docker adds 3 engine cases (extra collection, composition exclusion, mutating-extra fatal). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; validate_expected_catalog/catalog schema untouched.'
@@ -52,13 +53,70 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-migration-plan-runner.py
   - packages/course-gen-platform/tests/unit/ops/supabase-restore-drill.test.ts
   - packages/course-gen-platform/scripts/migrations/document-evidence-approved.ts
+  - packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts
   - packages/course-gen-platform/tests/unit/scripts/document-evidence-frontier.test.ts
+  - packages/course-gen-platform/tests/unit/scripts/document-evidence-pgcrypto.test.ts
   - packages/course-gen-platform/tests/integration/document-evidence-approved-migrations.test.ts
 explicit_defers:
   - "Supabase-image-only leg (real drill restore of the real source on the pinned image + real migration CLIs) is CI-unreproducible: the drill checks the pinned image digest / Supabase role bootstrap / extension versions, and the CLIs' security manifests are pinned to the isolated restore of generation-20260716T105950Z (document-evidence-approved.ts:1250-1356). Validated by the owner's server-side pre-C1 `q12-live-cutover.sh plan` run (read-only on the source, fail-closed everywhere, so a defect blocks the window rather than corrupting anything). Loopback needs no --confirm/--allow-remote (document-evidence-approved.ts:648 returns early for 127.0.0.1/localhost/::1 before the remote gate). If prod schema drifted since that generation the manifests fail closed — a correct product-truth outcome, not to be relaxed."
 ---
 
 # Summary
+
+Round-18 makes the migration CLIs' catalog reg\*-name checks search_path-independent
+(`f3bff0ca` -> `14725ee2`). Rehearsal #11 confirmed the read-only lift works — the base CLI
+applied further and fail-closed at `assertPgcryptoDigestDependency`
+(`Required extensions.pgcrypto digest dependency does not match`). Everything the check
+queries is actually correct in both cloud and isolate (pgcrypto 1.3, schema extensions,
+language c, secdef false, proconfig null); the only real source-vs-isolate delta is the
+extension/function OWNER `postgres`->`supabase_admin`, which the check does not examine
+(a KNOWN benign isolate divergence — content non-fatal under the completeness gate, absent
+from composed entries; no action). The failing clause was
+`to_regprocedure('extensions.digest(bytea,text)')::text !== 'extensions.digest(bytea,text)'`:
+`::text` renders the name WITHOUT its schema when `extensions` is on the session
+search_path, and the §3-allowlisted `postgres` role carries
+`search_path="$user", public, extensions` in both the real cloud and the drill-replayed
+isolate. Verified at the SQL level: with `extensions` on the path,
+`to_regprocedure('extensions.digest(bytea,text)')::text` = `digest(bytea,text)`; without it,
+`extensions.digest(bytea,text)`. So the check failed against every real environment — a
+fourth never-executed-path defect that would also kill live C5. Resolution by qualified name
+is search_path-safe; only the TEXT RENDERING isn't.
+
+Fix: `assertPgcryptoDigestDependency` now resolves `extensions.digest(bytea,text)` by its
+qualified name (kept in the `to_regprocedure(...)` JOIN) and asserts explicit catalog facts —
+procedure present, `pg_namespace(pronamespace).nspname == 'extensions'`, `proname ==
+'digest'`, `pg_get_function_identity_arguments(oid) == 'bytea, text'`,
+`prorettype::regtype::text == 'bytea'` (pg_catalog types always render unqualified), language
+`c`, `prosecdef == false`, `proconfig == []` — keeping the `extversion == '1.3'` and
+extension-schema clauses.
+
+Sweep of both CLIs for the same class (every `reg*::text` rendering compared against a
+literal):
+
+| site                                               | before                                                                                 | after                                                  |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------- | -------------------------------- |
+| approved assertPgcryptoDigestDependency            | `to_regprocedure('extensions.digest(bytea,text)')::text` vs `'extensions.digest(...)'` | explicit catalog facts (namespace/name/args/rettype/…) |
+| approved requireSupabaseHistory                    | `to_regclass('supabase_migrations.schema_migrations')::text` vs qualified literal      | `to_regclass(...) IS NOT NULL` (existence)             |
+| observability requireSupabaseHistory               | same                                                                                   | `to_regclass(...) IS NOT NULL`                         |
+| approved relationExists                            | `to_regclass($1)::text` vs `public.`-stripped name                                     | `to_regclass($1) IS NOT NULL`                          |
+| observability totalsRelationExists                 | `to_regclass('public...')::text` vs unqualified name                                   | `to_regclass(...) IS NOT NULL`                         |
+| approved assertProcedures                          | `to_regprocedure('public.'                                                             |                                                        | sig)::text`— only`=== null` checked | unchanged (existence-only, safe) |
+| both CLIs `::regclass` / `::regprocedure` in WHERE | resolution by qualified name                                                           | unchanged (resolution is search_path-safe)             |
+| `prorettype::regtype::text`                        | pg_catalog type — always unqualified                                                   | unchanged (safe)                                       |
+
+The `supabase_migrations`-qualified comparisons were safe today (that schema is never on the
+`postgres` role's search_path — verified) but latent; the `public`-relative ones relied on
+`public` being on the path (true, but latent); both are now search_path-independent.
+
+Proven: a docker-free real-DB unit suite (pgcrypto created in an `extensions` schema) runs
+the real `assertPgcryptoDigestDependency` in BOTH search_path shapes (with and without
+`extensions` on the path) and still fails closed on a wrong extension schema. The integration
+suite's 13 failures on a vanilla PG17 are all the pre-existing image-pinned security-manifest
+apply-path failures — none from these changes. The plan's real-PG17 composed==real-source
+proof already runs with `extensions` on the `postgres` search_path (`DRILL_SOURCE_SCHEMA`
+seeds `ALTER ROLE postgres SET search_path`) and holds byte-exact; the plan path is unchanged
+this round (the fake apply seam does not run the CLIs). The CLIs' `.ts` bytes are not
+security-manifest-pinned.
 
 Round-17 lifts the drill's read-only override before the migration phase (`f78e03a8` ->
 `cad61e06`). Rehearsal #10 confirmed the frontier repair works — the base CLI passed the
