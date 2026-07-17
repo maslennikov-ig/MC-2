@@ -108,23 +108,24 @@ integration worktree remains authoritative for Q12.
 Next stage id: `mc2-jz6y0`
 
 The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
-Fable orchestrator. Phase A is COMPLETE: A0 baseline; A1 field 11 ratified
-(`72af414c`); A2/A3 D6 `.13.19` integrated (`3d70eaf2`, closed) and Root
-`.13.13` join integrated (`fcd05e27`, reviews PASS 0/0/0/5 and 0/0/0/1) —
-joined supervisor + smoke/observation gate + D6 frame join. Final Phase A
-matrix at the integration head: focused 463/463 (PG17), broad ops+scripts
-952/953 (known env failure only), type-check 0, build 75/75, process
-verification OK. `.13.7` is DELIVERED; the owner authorized the remote tail
-on 2026-07-16 and explicitly deferred `.13.8` password rotation.
+Fable orchestrator. Phase A is COMPLETE (A1 `72af414c`; D6 `.13.19` at
+`3d70eaf2`; Root `.13.13` join at `fcd05e27`; final matrix: focused 463/463
+PG17, broad 952/953 known-env-only, type-check 0, build 75/75). Phase B is
+COMPLETE (`mc2-rl4p9`, owner-approved 2026-07-17): operator image published
+`ghcr.io/maslennikov-ig/mc-2/qdrant-operator:266de3d7…` @ index digest
+`sha256:0fe4265ca80eb100912f6ce8155b061712db90ace4e0b1641e63e9a1a247e199`,
+remote SLSA v1 provenance independently validated (source/revision/
+Dockerfile PASS); two latent publisher defects found by the first live run
+(metadata-file 0644 vs asserted 0600; validator SLSA v0.2-only) fixed with
+TDD, suite 24/24 (receipt: `…artifacts/mc2-rl4p9-q12-b1-publication.md`).
+`.13.7` is DELIVERED; the owner explicitly deferred `.13.8` rotation.
 
 Recommended action: continue the completion program:
 
-1. Phase B — GHCR publication packet (owner PAT via stdin, STOP-and-ask):
-   `deploy/qdrant/publish-qdrant-operator.sh` →
-   `ghcr.io/maslennikov-ig/mc-2/qdrant-operator`, verify image-lock digests.
-2. Phase C — live-cutover window packet (Task C0, owner approval), including
-   fields 5/6/8/9 production re-freeze at C7 and field-11 ratified truth.
-3. `.13.8` — owner-deferred password rotation; `.13.6` — off-host S3
+1. Phase C — live-cutover window packet (Task C0, owner approval), including
+   GHCR pull-auth/visibility for the server, fields 5/6/8/9 production
+   re-freeze at C7, and field-11 ratified truth.
+2. `.13.8` — owner-deferred password rotation; `.13.6` — off-host S3
    production gate; `.25` — Prometheus retention YAML (Phase D).
 
 Before any of these, present exact effects, secrets, observation, rollback

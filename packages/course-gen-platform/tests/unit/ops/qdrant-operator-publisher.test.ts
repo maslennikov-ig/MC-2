@@ -25,6 +25,8 @@ const DIGEST = `sha256:${'a'.repeat(64)}`;
 const OTHER_DIGEST = `sha256:${'b'.repeat(64)}`;
 const TOKEN = 'ghp_q12SyntheticTokenNeverPersisted_123456789';
 const BUILDKIT_METADATA_KEY = 'https://mobyproject.org/buildkit@v1#metadata';
+const BUILDKIT_V1_BUILD_TYPE =
+  'https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md';
 const roots: string[] = [];
 
 function provenance(
@@ -49,6 +51,40 @@ function provenance(
               },
             }
           : {}),
+      },
+    },
+  };
+}
+
+function provenanceV1(
+  revision = COMMIT,
+  source = SOURCE_REPOSITORY,
+  includeMaxEvidence = true
+): Record<string, unknown> {
+  return {
+    buildDefinition: {
+      buildType: BUILDKIT_V1_BUILD_TYPE,
+      externalParameters: { request: { frontend: 'dockerfile.v0' } },
+    },
+    runDetails: {
+      builder: { id: '' },
+      metadata: {
+        buildkit_metadata: {
+          vcs: { revision, source },
+          ...(includeMaxEvidence
+            ? {
+                source: {
+                  infos: [
+                    {
+                      filename: 'packages/course-gen-platform/Dockerfile',
+                      data: 'FROM runner AS qdrant-operator',
+                    },
+                  ],
+                },
+              }
+            : {}),
+        },
+        buildkit_completeness: { request: true, resolvedDependencies: false },
       },
     },
   };
@@ -246,9 +282,17 @@ case "\${1:-} \${2:-}" in
       wrong-revision) printf '%s\\n' ${shellQuote(buildMetadata(provenance('f'.repeat(40))))} > "$metadata" ;;
       wrong-source) printf '%s\\n' ${shellQuote(buildMetadata(provenance(COMMIT, 'https://github.com/example/wrong.git')))} > "$metadata" ;;
       missing-max) printf '%s\\n' ${shellQuote(buildMetadata(provenance(COMMIT, SOURCE_REPOSITORY, false)))} > "$metadata" ;;
+      slsa-v1|v1-wrong-remote-*|v1-missing-remote-max) printf '%s\\n' ${shellQuote(buildMetadata(provenanceV1()))} > "$metadata" ;;
+      v1-wrong-revision) printf '%s\\n' ${shellQuote(buildMetadata(provenanceV1('f'.repeat(40))))} > "$metadata" ;;
+      v1-wrong-source) printf '%s\\n' ${shellQuote(buildMetadata(provenanceV1(COMMIT, 'https://github.com/example/wrong.git')))} > "$metadata" ;;
+      v1-missing-max) printf '%s\\n' ${shellQuote(buildMetadata(provenanceV1(COMMIT, SOURCE_REPOSITORY, false)))} > "$metadata" ;;
       *) printf '%s\\n' ${shellQuote(buildMetadata())} > "$metadata" ;;
     esac
-    /usr/bin/chmod 0600 "$metadata"
+    if [[ "$mode" == slsa-v1* || "$mode" == v1-* ]]; then
+      /usr/bin/chmod 0644 "$metadata"
+    else
+      /usr/bin/chmod 0600 "$metadata"
+    fi
     : > "$build_state"
     ;;
   'buildx imagetools')
@@ -279,6 +323,10 @@ case "\${1:-} \${2:-}" in
         wrong-remote-revision) printf '%s\\n' ${shellQuote(JSON.stringify(provenance('e'.repeat(40))))} ;;
         wrong-remote-source) printf '%s\\n' ${shellQuote(JSON.stringify(provenance(COMMIT, 'https://github.com/example/wrong.git')))} ;;
         missing-remote-max) printf '%s\\n' ${shellQuote(JSON.stringify(provenance(COMMIT, SOURCE_REPOSITORY, false)))} ;;
+        slsa-v1|v1-wrong-revision|v1-wrong-source|v1-missing-max) printf '%s\\n' ${shellQuote(JSON.stringify(provenanceV1()))} ;;
+        v1-wrong-remote-revision) printf '%s\\n' ${shellQuote(JSON.stringify(provenanceV1('e'.repeat(40))))} ;;
+        v1-wrong-remote-source) printf '%s\\n' ${shellQuote(JSON.stringify(provenanceV1(COMMIT, 'https://github.com/example/wrong.git')))} ;;
+        v1-missing-remote-max) printf '%s\\n' ${shellQuote(JSON.stringify(provenanceV1(COMMIT, SOURCE_REPOSITORY, false)))} ;;
         *) printf '%s\\n' ${shellQuote(JSON.stringify(provenance()))} ;;
       esac
     else
@@ -611,6 +659,52 @@ describe('Q12 build-only qdrant-operator publisher', () => {
       'wrong-remote-revision',
       'wrong-remote-source',
       'missing-remote-max',
+    ]) {
+      const item = fixture();
+      writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('remote provenance validation failed');
+      expect(commands(item)).toContain(`\tbuildx\timagetools\tinspect\t${REPOSITORY}@${DIGEST}`);
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('publishes with SLSA v1 provenance and a group-readable metadata file as real buildx writes them', () => {
+    const item = fixture();
+    writeFileSync(item.dockerMode, 'slsa-v1\n', { mode: 0o600 });
+    const result = run(item);
+    const log = commands(item);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`${REPOSITORY}@${DIGEST}`);
+    expect(log).toContain('\t--provenance=mode=max');
+    expect(log.split('\n').filter(line => line.startsWith('external\tpython3\t'))).toHaveLength(2);
+    expectNoRunResidue(item);
+    expectNoToken(item, result);
+  });
+
+  it('requires well-formed full SLSA v1 local Buildx provenance for the accepted source revision', () => {
+    for (const mode of ['v1-wrong-revision', 'v1-wrong-source', 'v1-missing-max']) {
+      const item = fixture();
+      writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });
+      const result = run(item);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Buildx metadata provenance validation failed');
+      expect(commands(item)).not.toContain('Provenance.SLSA');
+      expectNoRunResidue(item);
+      expectNoToken(item, result);
+    }
+  });
+
+  it('requires well-formed full SLSA v1 remote provenance for the verified pushed digest', () => {
+    for (const mode of [
+      'v1-wrong-remote-revision',
+      'v1-wrong-remote-source',
+      'v1-missing-remote-max',
     ]) {
       const item = fixture();
       writeFileSync(item.dockerMode, `${mode}\n`, { mode: 0o600 });

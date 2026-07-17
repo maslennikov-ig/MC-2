@@ -1,6 +1,6 @@
 # Stage mc2-jz6y0 — Self-Hosted Qdrant Platform
 
-Status: Phase A of the Q12 Full Completion program is COMPLETE — D6 `.13.19` (integrated `3d70eaf2`, closed) and Root `.13.13` join (integrated `fcd05e27`, reviews PASS) on the ratified 11/11 W tuple; next is Phase B GHCR publication (owner-gated); remote/live activation remains NO-GO until the owner-gated window
+Status: Phases A and B of the Q12 Full Completion program are COMPLETE — D6 `.13.19` (`3d70eaf2`) and Root `.13.13` join (`fcd05e27`) on the ratified 11/11 W tuple; operator image published to GHCR 2026-07-17 (`mc2-rl4p9`, index digest `sha256:0fe4265c…`, provenance verified); next is the Phase C Task C0 window packet (owner-gated); remote/live activation remains NO-GO until the owner-gated window
 Classification: complex, multi-stream, security/data/operations sensitive
 Base branch: `origin/codex/self-hosted-qdrant-platform`
 Current accepted integration evidence: integration HEAD `fcd05e27` (Root-join merge on D6 merges `7f511691`+`3d70eaf2`, field-11 ratification `72af414c`, docs slice `8717f7ac`) on top of `a73a3651`, which carries D5J `66e41cb5`, W FLIP `60910053`, H `70bf6103`, tuple addendum `3da324d8`, D6 contract/plan docs `d1627f1c`, M merge from tip `29d73d04`
@@ -554,6 +554,30 @@ closed. Local evidence at `b97a827b`: ops+scripts battery 761 passed /
   (`MC2_Q12_REAL_PG17=1`, 10 files), broad ops+scripts 952/953 (sole
   failure = known `QDRANT_METRICS_GID` env case), `pnpm type-check` 0,
   `pnpm build` 75/75, process verification OK.
+
+## Q12 Phase B GHCR Publication (2026-07-17)
+
+- Task B1 delivered (`mc2-rl4p9`, owner-approved packet + owner PAT via
+  stdin from a shredded 0600 scratchpad file; the owner explicitly accepted
+  transcript exposure of the one-time token). Published:
+  `ghcr.io/maslennikov-ig/mc-2/qdrant-operator:266de3d7457f81a035c9698768e8b7ffb0053495`,
+  index digest `sha256:0fe4265ca80eb100912f6ce8155b061712db90ace4e0b1641e63e9a1a247e199`,
+  image manifest `sha256:8de97bf3…`, attestation `sha256:ae2289bd…`,
+  linux/amd64, built by the publisher from a clean detached worktree.
+- The first live run exposed two latent publisher defects (mocked fixture
+  had hidden both): buildx writes the metadata file mode 0644 while the
+  script asserted 0600 without normalizing, and the embedded provenance
+  validator accepted only the legacy SLSA v0.2 shape while the registry
+  returns SLSA v1. The push itself had already succeeded; remote digest and
+  SLSA v1 provenance (source/revision/Dockerfile) were verified
+  independently with the same predicates, then both defects were fixed with
+  TDD (RED reproduced the exact live error; publisher suite 24/24; the
+  fixed validator re-validated the real registry provenance bytes and
+  rejected an adversarial wrong revision). Receipt + rulings:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-rl4p9-q12-b1-publication.md`.
+- `deploy/qdrant/image-lock.json` unchanged (it pins the Qdrant base
+  container for Phase C, not the operator image). No application traffic
+  changed; acceptance gate B reached.
 
 ## Explicit Defers
 

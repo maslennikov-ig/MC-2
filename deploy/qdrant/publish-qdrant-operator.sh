@@ -363,6 +363,9 @@ import sys
 
 BUILDKIT_METADATA_KEY = "https://mobyproject.org/buildkit@v1#metadata"
 BUILDKIT_BUILD_TYPE = "https://mobyproject.org/buildkit@v1"
+BUILDKIT_V1_BUILD_TYPE = (
+    "https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md"
+)
 
 
 def invalid():
@@ -398,12 +401,25 @@ try:
 
     if not isinstance(statement, dict):
         invalid()
-    if statement.get("buildType") != BUILDKIT_BUILD_TYPE:
-        invalid()
-    metadata = statement.get("metadata")
-    if not isinstance(metadata, dict):
-        invalid()
-    buildkit_metadata = metadata.get(BUILDKIT_METADATA_KEY)
+    build_definition = statement.get("buildDefinition")
+    run_details = statement.get("runDetails")
+    if isinstance(build_definition, dict) or isinstance(run_details, dict):
+        # SLSA v1 shape emitted by current BuildKit attestations.
+        if not isinstance(build_definition, dict) or not isinstance(run_details, dict):
+            invalid()
+        if build_definition.get("buildType") != BUILDKIT_V1_BUILD_TYPE:
+            invalid()
+        run_metadata = run_details.get("metadata")
+        if not isinstance(run_metadata, dict):
+            invalid()
+        buildkit_metadata = run_metadata.get("buildkit_metadata")
+    else:
+        if statement.get("buildType") != BUILDKIT_BUILD_TYPE:
+            invalid()
+        metadata = statement.get("metadata")
+        if not isinstance(metadata, dict):
+            invalid()
+        buildkit_metadata = metadata.get(BUILDKIT_METADATA_KEY)
     if not isinstance(buildkit_metadata, dict):
         invalid()
     vcs = buildkit_metadata.get("vcs")
@@ -488,6 +504,8 @@ publish_and_verify() {
 
   [[ -f "$metadata_file" && ! -L "$metadata_file" ]] ||
     fail 'Buildx did not produce a regular metadata file'
+  chmod 0600 "$metadata_file" ||
+    fail 'unable to restrict the Buildx metadata file to mode 0600'
   [[ "$(stat -c '%a' "$metadata_file")" == 600 ]] ||
     fail 'Buildx metadata file must be mode 0600'
   metadata_digest="$(validate_provenance_file "$metadata_file" metadata)" ||
