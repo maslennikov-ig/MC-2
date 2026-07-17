@@ -22,6 +22,7 @@ const RUNNER = resolve(
 const WRAPPER = resolve(REPO_ROOT, 'deploy/qdrant/q12-live-cutover.sh');
 const BARRIER = resolve(REPO_ROOT, 'deploy/qdrant/q12-database-barrier.sh');
 const CAPTURE = resolve(REPO_ROOT, 'deploy/qdrant/q12-migration-plan-capture.py');
+const ROLES = resolve(REPO_ROOT, 'deploy/qdrant/q12-migration-plan-roles.py');
 const CORE = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
 const STRUCTURAL_CATALOG = resolve(REPO_ROOT, 'deploy/qdrant/q12-structural-catalog.sql');
 const EXPECTED_SCHEMA = 'megacampus.q12.expected-post-migration-catalog/v1';
@@ -343,7 +344,7 @@ describe('Q12 plan capture helper and builder input hardening', () => {
       },
     });
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/absolute non-symlink regular file/iu);
+    expect(result.stderr).toMatch(/absolute regular file/iu);
   });
 
   it.each(['oid', 'jobid'] as const)(
@@ -577,6 +578,10 @@ CREATE SCHEMA storage;
 CREATE SCHEMA cron;
 CREATE SCHEMA net;
 CREATE SCHEMA realtime;
+-- A §3-allowlisted app role absent from a vanilla isolate: the restore of the
+-- table it owns aborts unless the role bootstrap ran first.
+CREATE ROLE admin LOGIN NOINHERIT;
+ALTER ROLE postgres SET search_path TO "$user", public, extensions;
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$ SELECT '{}'::jsonb $fn$;
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT 'service_role'::text $fn$;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $fn$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $fn$;
@@ -611,6 +616,7 @@ CREATE TABLE storage.objects(id bigint PRIMARY KEY);
 CREATE TABLE storage.s3_multipart_uploads(id bigint PRIMARY KEY);
 CREATE TABLE storage.s3_multipart_uploads_parts(id bigint PRIMARY KEY);
 CREATE TABLE realtime.messages(id bigint PRIMARY KEY);
+ALTER TABLE realtime.messages OWNER TO admin;
 CREATE TABLE cron.job(jobid bigint PRIMARY KEY, schedule text, command text, nodename text, nodeport int, database text, username text, active boolean);
 CREATE TABLE cron.job_run_details(runid bigint PRIMARY KEY);
 INSERT INTO cron.job SELECT v,'0 * * * *','SELECT '||v,'localhost',5432,'postgres','postgres',true FROM generate_series(1,8) v;
@@ -834,4 +840,135 @@ esac
     // Cleanup-override still reclaims the diagnostic resources.
     expect(leftoverIsolates()).toEqual([]);
   }, 180_000);
+});
+
+describe('Q12 plan §3 role bootstrap generator', () => {
+  function fullRole(
+    name: string,
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      name,
+      rolsuper: false,
+      rolinherit: true,
+      rolcreaterole: false,
+      rolcreatedb: false,
+      rolcanlogin: false,
+      rolreplication: false,
+      rolconnlimit: -1,
+      rolvaliduntil: null,
+      rolbypassrls: false,
+      ...overrides,
+    };
+  }
+
+  function runRoles(request: unknown): ReturnType<typeof spawnSync> {
+    return spawnSync('/usr/bin/python3', [ROLES], {
+      input: JSON.stringify(request),
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    });
+  }
+
+  function baseRequest(): Record<string, unknown> {
+    return {
+      source_roles: [
+        fullRole('postgres', {
+          rolsuper: true,
+          rolinherit: true,
+          rolcreaterole: true,
+          rolcreatedb: true,
+          rolcanlogin: true,
+          rolreplication: true,
+          rolbypassrls: true,
+        }),
+        fullRole('admin', { rolcanlogin: true }),
+        fullRole('instructor', { rolcanlogin: true }),
+      ],
+      isolate_roles: ['postgres'],
+      source_memberships: [
+        {
+          member: 'instructor',
+          role: 'admin',
+          grantor: 'postgres',
+          admin_option: false,
+          inherit_option: true,
+          set_option: true,
+        },
+      ],
+      source_role_settings: [
+        {
+          role: 'postgres',
+          database: null,
+          name: 'search_path',
+          value: '"$user", public, extensions',
+        },
+      ],
+    };
+  }
+
+  it('creates only allowlisted absent roles password-free, replays memberships, applies allowed settings', () => {
+    const result = runRoles(baseRequest());
+
+    expect(result.status, result.stderr).toBe(0);
+    const sql = result.stdout;
+    expect(sql).toContain(
+      'CREATE ROLE "admin" WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN'
+    );
+    expect(sql).toContain('CREATE ROLE "instructor" WITH');
+    expect(sql).not.toContain('"postgres" WITH'); // present in isolate -> not recreated
+    expect(sql).not.toMatch(/PASSWORD/iu); // login-capable bootstrap roles get no password
+    expect(sql).toContain('SET ROLE "postgres";');
+    expect(sql).toContain(
+      'GRANT "admin" TO "instructor" WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;'
+    );
+    expect(sql).toContain('RESET ROLE;');
+    expect(sql).toContain(
+      'ALTER ROLE "postgres" SET "search_path" TO "$user", public, extensions;'
+    );
+  });
+
+  it.each([
+    [
+      'a non-allowlisted source role absent from the isolate',
+      (request: any) => {
+        request.source_roles.push(fullRole('evil_role'));
+      },
+      /unexpected missing source role/iu,
+    ],
+    [
+      'a role setting outside the frozen allowlist',
+      (request: any) => {
+        request.source_role_settings.push({
+          role: 'postgres',
+          database: null,
+          name: 'work_mem',
+          value: '999MB',
+        });
+      },
+      /not allowlisted/iu,
+    ],
+    [
+      'a forbidden elevated attribute on a bootstrap role',
+      (request: any) => {
+        request.source_roles[1].rolsuper = true;
+      },
+      /privilege allowlist rejects/iu,
+    ],
+    [
+      'an isolate role absent from the source',
+      (request: any) => {
+        request.isolate_roles.push('mystery_role');
+      },
+      /unexpected isolate role/iu,
+    ],
+  ] as const)('fails closed on %s', (_label, mutate, pattern) => {
+    const request = baseRequest();
+    mutate(request);
+
+    const result = runRoles(request);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(pattern);
+  });
 });
