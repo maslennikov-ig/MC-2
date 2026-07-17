@@ -545,3 +545,34 @@ export async function materializeJoinedRetainedBarrierFixture(
     rollbackFinalWriterManifestPath: output.rollbackFinalWriterManifestPath,
   };
 }
+
+export interface LiveControllerFixtureSpec {
+  runRoot: string;
+  /** pin the run id (e.g. the composer-derived id) for byte-parity comparison */
+  runId?: string;
+  /** exercise the production run-root coupling gate (Engine.__post_init__) */
+  production?: boolean;
+}
+
+/**
+ * Drive the Task-9 live cutover controller (run_live) on a fixture root and
+ * return the journal it produced. The controller reuses the same Engine and
+ * serializer primitives as the closed composer, so its rows can be compared
+ * byte-for-byte against materializeJoinedRetainedBarrierFixture's.
+ */
+export async function materializeLiveController(
+  spec: LiveControllerFixtureSpec
+): Promise<{ journalEntries: Record<string, unknown>[] }> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+    input: JSON.stringify({ liveController: true, ...spec }),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status !== 0) {
+    throw new Error(`live controller runner failed (${child.status}): ${child.stderr.trim()}`);
+  }
+  const output = JSON.parse(child.stdout) as { journalEntries: Record<string, unknown>[] };
+  return { journalEntries: output.journalEntries };
+}
