@@ -30,6 +30,9 @@ class FakePlanExecutor:
         # Deep copy through JSON so the builder cannot mutate the fixture.
         return json.loads(json.dumps(self._evidence))
 
+    def teardown(self) -> None:
+        return None
+
 
 def main() -> int:
     payload = json.load(sys.stdin)

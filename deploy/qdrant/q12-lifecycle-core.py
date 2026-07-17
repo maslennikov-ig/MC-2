@@ -4499,45 +4499,122 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
         "run_root": str(run_root),
         "generation": getattr(arguments, "generation", None),
     }
-    evidence = plan_executor.capture(request)
-    catalog = assemble_expected_catalog(release_sha, evidence)
-    validate_expected_catalog(catalog)
-    data = complete_object(catalog)
-    immutable_publish(output_path, data, 0o400, [])
-    return {
-        "schema_version": "megacampus.q12.plan-result/v1",
-        "run_id": run_id,
-        "release_sha": release_sha,
-        "expected_catalog_path": str(output_path),
-        "expected_catalog_sha256": sha256(data),
-        "expected_post_migration_catalog_sha256": catalog["expected_post_migration_catalog_sha256"],
-        "baseline_structural_sha256": catalog["baseline_structural_sha256"],
-        "status": "planned",
-    }
+    # The diagnostic archive/container/network/volume are removed only after the
+    # catalog is emitted and its hash is durably bound; a teardown failure
+    # overrides success (design §2). capture() registers its resources so the
+    # finally teardown reclaims them whether capture, assembly, or emit failed.
+    try:
+        evidence = plan_executor.capture(request)
+        catalog = assemble_expected_catalog(release_sha, evidence)
+        validate_expected_catalog(catalog)
+        data = complete_object(catalog)
+        immutable_publish(output_path, data, 0o400, [])
+        result = {
+            "schema_version": "megacampus.q12.plan-result/v1",
+            "run_id": run_id,
+            "release_sha": release_sha,
+            "expected_catalog_path": str(output_path),
+            "expected_catalog_sha256": sha256(data),
+            "expected_post_migration_catalog_sha256": catalog[
+                "expected_post_migration_catalog_sha256"
+            ],
+            "baseline_structural_sha256": catalog["baseline_structural_sha256"],
+            "status": "planned",
+        }
+    finally:
+        plan_executor.teardown()
+    return result
+
+
+PLAN_PINNED_RESTORE_IMAGE = (
+    "public.ecr.aws/supabase/postgres@sha256:"
+    "d00c45c73f9c3d130ea4f379d8ae7748b0711d628eea690d27d03198ed609f2f"
+)
+# The real release-SHA migration CLIs, invoked in legacy loopback mode against
+# the isolated restore. On a faithful restore of the real source their pinned
+# security manifests match by construction (they were computed there), so the
+# in-isolate history rows are byte-identical to the live cutover with zero drift.
+PLAN_BASE_MIGRATION_CLI = "packages/course-gen-platform/scripts/migrations/document-evidence-approved.ts"
+PLAN_OBSERVABILITY_MIGRATION_CLI = (
+    "packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts"
+)
 
 
 class LivePlanExecutor:
     """Production plan capture: read-only source snapshot + isolated restore/migrate.
 
-    This orchestrates the real, live-window path.  It is exercised end to end only
-    against the real Supabase source and the pinned isolated image (owner-only,
-    off-repo), so CI proves the deterministic capture/assembly/emission surface
-    against a disposable PostgreSQL 17 instead (see the gated real-PG17 suite).
-    The SQL projection is delegated to `q12-migration-plan-capture.py`; the
-    isolated pinned-image restore follows `restore-supabase-drill.sh`.
-    """
+    Orchestrates the real live-window path per design §2: capture the read-only
+    source structural catalog / guarded relations / cron rows, snapshot the
+    source, restore that snapshot into the pinned isolated Supabase image, prove
+    the isolate's pre-migration structural catalog equals the source's, apply only
+    the five release-SHA migration files in-isolate, and hand back the evidence the
+    catalog builder freezes. Guarded relations / cron / baseline / frontier come
+    from the SOURCE (live OIDs); checkpoint hashes and relation deltas come from
+    the ISOLATE. The diagnostic container/network/volume/archive are reclaimed by
+    teardown() only after the catalog is emitted; a teardown failure overrides
+    success.
 
-    RESTORE_IMAGE = (
-        "public.ecr.aws/supabase/postgres@sha256:"
-        "d00c45c73f9c3d130ea4f379d8ae7748b0711d628eea690d27d03198ed609f2f"
-    )
+    Execution is seam-injectable so CI proves the whole pipeline end-to-end on a
+    disposable PostgreSQL 17 (both source and isolate), while production stays
+    pinned:
+      * MC2_Q12_PLAN_RESTORE_IMAGE   — isolate image (default: pinned Supabase digest).
+      * MC2_Q12_PLAN_SOURCE_CONTAINER — CI: capture/dump the source via docker exec;
+        production leaves it unset and reads the source over TLS.
+      * MC2_Q12_PLAN_MIGRATION_APPLY  — CI: an injected per-packet applier that runs
+        the real five SQL files; production leaves it unset and runs the real CLIs.
+      * MC2_Q12_PLAN_DOCKER           — docker binary (default /usr/bin/docker).
+      * MC2_Q12_PLAN_FAULT            — test-only fault injection (equality|teardown).
+    The isolated restore follows the reviewed lifecycle of
+    deploy/postgres/restore-supabase-drill.sh (pinned image, labeled isolated
+    network/volume, loopback publish, blocking cleanup).
+    """
 
     def __init__(self) -> None:
         self.repo_root = pathlib.Path(__file__).resolve().parents[2]
         self.capture_helper = pathlib.Path(__file__).with_name("q12-migration-plan-capture.py")
+        self.docker = os.environ.get("MC2_Q12_PLAN_DOCKER") or "/usr/bin/docker"
+        self.restore_image = os.environ.get("MC2_Q12_PLAN_RESTORE_IMAGE") or PLAN_PINNED_RESTORE_IMAGE
+        self.source_container = os.environ.get("MC2_Q12_PLAN_SOURCE_CONTAINER") or None
+        self.migration_apply = os.environ.get("MC2_Q12_PLAN_MIGRATION_APPLY") or None
+        self.fault = os.environ.get("MC2_Q12_PLAN_FAULT") or None
+        self._resources: dict[str, str | None] = {
+            "container": None,
+            "network": None,
+            "volume": None,
+            "workdir": None,
+        }
+        self._isolate_port: str | None = None
+        self._isolate_password: str | None = None
+        self._source_service: dict[str, str] | None = None
 
-    def _run_capture(self, *, container: str | None, service_env: dict[str, str] | None) -> dict[str, Any]:
-        env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+    def _base_env(self) -> dict[str, str]:
+        return {
+            "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
+            "LC_ALL": "C",
+            "LANG": "C",
+        }
+
+    def _docker_run(
+        self, args: list[str], *, input_bytes: bytes | None = None, check: bool = True
+    ) -> subprocess.CompletedProcess[bytes]:
+        completed = subprocess.run(
+            [self.docker, *args],
+            input=input_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env={**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker},
+            check=False,
+        )
+        if check and completed.returncode != 0:
+            raise LifecycleError(
+                f"docker {args[0]} failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+            )
+        return completed
+
+    def _run_capture(
+        self, *, container: str | None, service_env: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
         if service_env:
             env.update(service_env)
         argv = ["/usr/bin/python3", str(self.capture_helper)]
@@ -4561,17 +4638,289 @@ class LivePlanExecutor:
         return sha256(path.read_bytes())
 
     @staticmethod
-    def _relation_delta(after: list[dict[str, Any]], before: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _relation_delta(
+        after: list[dict[str, Any]], before: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         before_identities = {(rel["schema"], rel["name"]) for rel in before}
         return [rel for rel in after if (rel["schema"], rel["name"]) not in before_identities]
 
-    def capture(self, request: dict[str, Any]) -> dict[str, Any]:
-        raise LifecycleError(
-            "live plan capture requires the isolated pinned-image restore of an "
-            "operator-provided source generation; this leg runs only in the "
-            "owner-approved live window (see q12-migration-plan-capture.py for the "
-            "read-only projection reused there)"
+    def _source_service_env(self, request: dict[str, Any], workdir: pathlib.Path) -> dict[str, str]:
+        """Production: a mode-0600 libpq service file so the source password never
+        appears in argv/environment values (design §7)."""
+        import urllib.parse
+
+        raw = pathlib.Path(request["db_url_file"]).read_text(encoding="utf-8").strip()
+        parsed = urllib.parse.urlparse(raw)
+        if parsed.scheme not in ("postgres", "postgresql") or not parsed.hostname or not parsed.username:
+            raise LifecycleError("plan source URI is malformed")
+        password = urllib.parse.unquote(parsed.password or "")
+        service_path = workdir / "libpq-service"
+        descriptor = os.open(service_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            lines = [
+                "[q12plan]",
+                f"host={parsed.hostname}",
+                f"port={parsed.port or 5432}",
+                f"dbname={parsed.path.lstrip('/') or 'postgres'}",
+                f"user={urllib.parse.unquote(parsed.username)}",
+                f"password={password}",
+                "sslmode=verify-full",
+                f"sslrootcert={request['ca_file']}",
+                "",
+            ]
+            os.write(descriptor, "\n".join(lines).encode("utf-8"))
+        finally:
+            os.close(descriptor)
+        return {"PGSERVICEFILE": str(service_path), "PGSERVICE": "q12plan"}
+
+    def _capture_source(self, request: dict[str, Any], workdir: pathlib.Path) -> dict[str, Any]:
+        if self.source_container:
+            return self._run_capture(container=self.source_container)
+        self._source_service = self._source_service_env(request, workdir)
+        return self._run_capture(container=None, service_env=self._source_service)
+
+    def _create_isolate(self, run_id: str) -> str:
+        import time
+
+        suffix = os.urandom(6).hex()
+        network = f"mc2-q12-plan-net-{run_id}-{suffix}"
+        volume = f"mc2-q12-plan-data-{run_id}-{suffix}"
+        container = f"mc2-q12-plan-{run_id}-{suffix}"
+        self._isolate_password = os.urandom(18).hex()
+        label = f"com.megacampus.q12.plan-run={run_id}"
+        self._docker_run(["network", "create", "--label", label, network])
+        self._resources["network"] = network
+        self._docker_run(["volume", "create", "--label", label, volume])
+        self._resources["volume"] = volume
+        self._docker_run(
+            [
+                "run",
+                "-d",
+                "--name",
+                container,
+                "--label",
+                label,
+                "--network",
+                network,
+                "--mount",
+                f"type=volume,src={volume},dst=/var/lib/postgresql/data",
+                "-e",
+                f"POSTGRES_PASSWORD={self._isolate_password}",
+                "-p",
+                "127.0.0.1::5432",
+                self.restore_image,
+            ]
         )
+        self._resources["container"] = container
+        # The postgres/Supabase image runs a temporary init server (which also
+        # answers pg_isready) before restarting on the real port; wait for the
+        # init-complete marker so a snapshot restore never lands on the throwaway.
+        marker = b"PostgreSQL init process complete; ready for start up."
+        for _ in range(300):
+            logs = self._docker_run(["logs", container], check=False)
+            probe = self._docker_run(
+                ["exec", container, "pg_isready", "-U", "postgres", "-d", "postgres"], check=False
+            )
+            if probe.returncode == 0 and marker in logs.stdout + logs.stderr:
+                break
+            time.sleep(0.2)
+        else:
+            raise LifecycleError("isolated restore target did not become ready")
+        published = self._docker_run(["port", container, "5432/tcp"], check=True)
+        match = re.search(r":(\d+)\s*$", published.stdout.decode("utf-8", "replace").strip())
+        if not match:
+            raise LifecycleError("isolated restore target did not publish a loopback port")
+        self._isolate_port = match.group(1)
+        return container
+
+    def _dump_source(self, workdir: pathlib.Path) -> pathlib.Path:
+        archive = workdir / "source.dump"
+        if self.source_container:
+            dump = self._docker_run(
+                ["exec", self.source_container, "pg_dump", "-U", "postgres", "-Fc", "--no-password", "postgres"]
+            )
+            data = dump.stdout
+        else:
+            pg_dump = os.environ.get("MC2_Q12_PLAN_PG_DUMP") or "/usr/lib/postgresql/17/bin/pg_dump"
+            completed = subprocess.run(
+                [pg_dump, "-Fc", "--no-password", "postgres"],
+                env={**self._base_env(), **(self._source_service or {})},
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise LifecycleError(
+                    f"source pg_dump failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+                )
+            data = completed.stdout
+        descriptor = os.open(archive, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(descriptor, data)
+        finally:
+            os.close(descriptor)
+        return archive
+
+    def _restore_snapshot(self, workdir: pathlib.Path, container: str) -> None:
+        archive = self._dump_source(workdir)
+        restore = self._docker_run(
+            [
+                "exec",
+                "-i",
+                container,
+                "pg_restore",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "--no-password",
+                "--exit-on-error",
+                "--single-transaction",
+            ],
+            input_bytes=archive.read_bytes(),
+            check=False,
+        )
+        if restore.returncode != 0:
+            raise LifecycleError(
+                f"isolated restore failed: {restore.stderr.decode('utf-8', 'replace').strip()}"
+            )
+
+    def _apply_migrations(self, container: str, packet: str) -> None:
+        if self.migration_apply:
+            completed = subprocess.run(
+                [self.migration_apply, packet],
+                env={
+                    **self._base_env(),
+                    "MC2_Q12_PLAN_ISOLATE_CONTAINER": container,
+                    "MC2_Q12_PLAN_DOCKER": self.docker,
+                    "MC2_Q12_PLAN_REPO_ROOT": str(self.repo_root),
+                },
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise LifecycleError(
+                    f"plan migration apply seam failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+                )
+            return
+        self._apply_real_cli(packet)
+
+    def _apply_real_cli(self, packet: str) -> None:
+        """Production: run the real, drift-free migration CLIs in legacy loopback
+        mode against the isolate. Their pinned security manifests match on the
+        faithful restore, so the in-isolate history rows equal the live cutover."""
+        url = (
+            f"postgresql://postgres:{self._isolate_password}@127.0.0.1:{self._isolate_port}/postgres"
+        )
+        if packet == "base":
+            script, action = PLAN_BASE_MIGRATION_CLI, "apply"
+        elif packet == "observability":
+            script, action = PLAN_OBSERVABILITY_MIGRATION_CLI, "apply-all"
+        else:
+            raise LifecycleError(f"unknown migration packet: {packet}")
+        completed = subprocess.run(
+            ["node", "--import", "tsx", str(self.repo_root / script), action],
+            cwd=str(self.repo_root / "packages/course-gen-platform"),
+            env={**self._base_env(), "SUPABASE_DB_URL": url},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(
+                f"in-isolate migration CLI ({packet}) failed: "
+                f"{completed.stderr.decode('utf-8', 'replace').strip()}"
+            )
+
+    def capture(self, request: dict[str, Any]) -> dict[str, Any]:
+        run_id = request["run_id"]
+        workdir = pathlib.Path(
+            f"/tmp/mc2-q12-plan-work-{run_id}-{os.urandom(6).hex()}"
+        )
+        os.mkdir(workdir, 0o700)
+        self._resources["workdir"] = str(workdir)
+
+        source = self._capture_source(request, workdir)
+        container = self._create_isolate(run_id)
+        self._restore_snapshot(workdir, container)
+
+        isolate_baseline = self._run_capture(container=container)
+        isolate_structural = isolate_baseline["structural_sha256"]
+        if self.fault == "equality":
+            isolate_structural = "0" * 64
+        if isolate_structural != source["structural_sha256"]:
+            raise LifecycleError(
+                "isolated pre-migration structural catalog differs from the read-only source catalog"
+            )
+        before_public = isolate_baseline["public_relations"]
+
+        self._apply_migrations(container, "base")
+        after_base = self._run_capture(container=container)
+        self._apply_migrations(container, "observability")
+        after_observability = self._run_capture(container=container)
+
+        return {
+            "database": source["database"],
+            "database_owner": source["database_owner"],
+            "migration_frontier": source["migration_frontier"],
+            "baseline_structural_sha256": source["structural_sha256"],
+            "guarded_relations": source["guarded_relations"],
+            "cron_jobs": source["cron_jobs"],
+            "migrations": {
+                "20260711140000": {
+                    "catalog_sha256": after_base["structural_sha256"],
+                    "migration_file_sha256": self._migration_file_sha256("20260711140000"),
+                    "relations": self._relation_delta(
+                        after_base["public_relations"], before_public
+                    ),
+                },
+                "20260711151000": {
+                    "catalog_sha256": after_observability["structural_sha256"],
+                    "migration_file_sha256": self._migration_file_sha256("20260711151000"),
+                    "relations": self._relation_delta(
+                        after_observability["public_relations"], after_base["public_relations"]
+                    ),
+                },
+            },
+        }
+
+    def teardown(self) -> None:
+        import shutil
+
+        errors: list[str] = []
+        container = self._resources.get("container")
+        if container:
+            result = self._docker_run(["rm", "-f", container], check=False)
+            if result.returncode != 0:
+                errors.append(f"container: {result.stderr.decode('utf-8', 'replace').strip()}")
+            self._resources["container"] = None
+        volume = self._resources.get("volume")
+        if volume:
+            result = self._docker_run(["volume", "rm", "--force", volume], check=False)
+            if result.returncode != 0:
+                errors.append(f"volume: {result.stderr.decode('utf-8', 'replace').strip()}")
+            self._resources["volume"] = None
+        network = self._resources.get("network")
+        if network:
+            result = self._docker_run(["network", "rm", network], check=False)
+            if result.returncode != 0:
+                errors.append(f"network: {result.stderr.decode('utf-8', 'replace').strip()}")
+            self._resources["network"] = None
+        workdir = self._resources.get("workdir")
+        if workdir:
+            try:
+                shutil.rmtree(workdir, ignore_errors=False)
+            except OSError as error:
+                errors.append(f"workdir: {error}")
+            self._resources["workdir"] = None
+        if self.fault == "teardown":
+            errors.append("injected teardown fault")
+        if errors:
+            raise LifecycleError(
+                "plan diagnostic teardown failed (cleanup overrides success): " + "; ".join(errors)
+            )
 
 
 def parser() -> argparse.ArgumentParser:

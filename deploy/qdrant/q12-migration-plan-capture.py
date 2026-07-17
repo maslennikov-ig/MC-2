@@ -102,8 +102,9 @@ def sha256_hex(data: bytes) -> str:
 
 def _psql_argv(container: str | None) -> list[str]:
     if container is not None:
+        docker = os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker")
         return [
-            "/usr/bin/docker",
+            docker,
             "exec",
             "-i",
             container,
