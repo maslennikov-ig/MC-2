@@ -4582,6 +4582,23 @@ PLAN_OBSERVABILITY_MIGRATION_CLI = (
     "packages/course-gen-platform/scripts/migrations/document-evidence-observability-index.ts"
 )
 
+# Belt-and-braces scrub for drill diagnostics. The drill does not print secret
+# values by contract, but a failure tail is surfaced into the caller's log, so any
+# libpq URI credential, service/pgpass password, 64-hex synthetic secret, or JWT/
+# service-key shape is redacted before it can be logged.
+_PLAN_SECRET_SCRUB = (
+    (re.compile(r"(postgres(?:ql)?://[^\s/:@]+:)[^\s@]+(@)", re.IGNORECASE), r"\1***\2"),
+    (re.compile(r"(?i)(password\s*=\s*)\S+"), r"\1***"),
+    (re.compile(r"\b[0-9a-f]{64}\b"), "***"),
+    (re.compile(r"eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+|sbp_[A-Za-z0-9_-]{16,}"), "***"),
+)
+
+
+def _scrub_plan_secret_text(text: str) -> str:
+    for pattern, replacement in _PLAN_SECRET_SCRUB:
+        text = pattern.sub(replacement, text)
+    return text
+
 
 class LivePlanExecutor:
     """Production plan capture: read-only source snapshot + isolated restore/migrate.
@@ -5151,23 +5168,6 @@ class LivePlanExecutor:
         self._write_checksums(generation)
         return generation
 
-    def _prepare_capability(self, request: dict[str, Any]) -> pathlib.Path:
-        # The drill's Q12 mode requires a run-bound capability at the fixed run path;
-        # plan supplies a synthetic one (the drill's activation cleanup is a no-op on
-        # a source with no q12_guard). Never a real credential.
-        secrets = pathlib.Path(request["run_root"]) / "secrets"
-        secrets_existed = os.path.isdir(secrets)
-        ensure_directory(secrets)
-        capability = secrets / "db-capability"
-        if os.path.lexists(capability):
-            capability.unlink()
-        atomic_replace(capability, (os.urandom(32).hex() + "\n").encode("utf-8"), 0o400)
-        self._resources["capability"] = str(capability)
-        # Only reclaim the secrets dir in teardown if plan created it.
-        if not secrets_existed:
-            self._resources["secrets"] = str(secrets)
-        return capability
-
     def _read_handle(self, handle_path: pathlib.Path, run_id: str) -> dict[str, Any]:
         data = validate_regular_file(handle_path, mode=0o400)
         handle = json.loads(data)
@@ -5289,37 +5289,79 @@ class LivePlanExecutor:
         target = self._restore_via_drill(request, workdir, generation, run_id)
         return source, target
 
+    def _drill_failure_detail(
+        self, returncode: int, stdout_log: pathlib.Path, stderr_log: pathlib.Path, lines: int = 60
+    ) -> str:
+        """Compose a diagnosable failure message from the drill's captured output.
+
+        Many drill steps run without a `|| fail` wrapper, so a mid-script failure
+        exits via `set -e` with its reason on stdout OR stderr and no drill-level
+        message — an empty stderr blinded the pre-C1 rehearsal. Surface the tail of
+        BOTH streams (labeled, secrets scrubbed) so the reason lands in the caller's
+        log even though teardown reclaims the underlying files."""
+
+        def tail(path: pathlib.Path) -> str:
+            try:
+                content = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                return "<unavailable>"
+            chunk = "\n".join(content.splitlines()[-lines:])
+            return _scrub_plan_secret_text(chunk) if chunk else "<empty>"
+
+        return (
+            f"isolated drill restore failed (exit {returncode}); drill output tail "
+            f"below (secrets scrubbed).\n"
+            f"--- drill stderr (last {lines} lines) ---\n{tail(stderr_log)}\n"
+            f"--- drill stdout (last {lines} lines) ---\n{tail(stdout_log)}"
+        )
+
     def _restore_via_drill(
         self, request: dict[str, Any], workdir: pathlib.Path, generation: pathlib.Path, run_id: str
     ) -> dict[str, str]:
-        capability = self._prepare_capability(request)
         handle_path = pathlib.Path(request["run_root"]) / "restore-persist-handle.json"
         if os.path.lexists(handle_path):
             handle_path.unlink()
         self._resources["handle"] = str(handle_path)
-        completed = subprocess.run(
-            [
-                self.drill,
-                "--run-id",
-                run_id,
-                "--q12-db-capability-file",
-                str(capability),
-                "--generation",
-                str(generation),
-            ],
-            env={
-                **self._base_env(),
-                "MC2_Q12_RESTORE_PERSIST_HANDLE": str(handle_path),
-                "MC2_Q12_PLAN_DOCKER": self.docker,
-                "MC2_Q12_PLAN_REPO_ROOT": str(self.repo_root),
-            },
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+        # The plan restores a read-only PRE-cutover source, which has no q12_guard
+        # schema; the drill's Q12 activation cleanup requires q12_guard
+        # (run-restore-cleanup.ts calls q12_guard.verify_capability() and
+        # generate_cleanup_sql emits DROP SCHEMA q12_guard CASCADE), so it can never
+        # succeed here. The drill's SCHEDULED mode does the same restore / role
+        # bootstrap / extension + catalog compare without the activation cleanup or a
+        # capability — exactly what the plan needs — and the opt-in persist seam
+        # (now allowed in scheduled mode) hands back the live isolate. Drill stdout and
+        # stderr stream to owner-only files under the plan workdir so a failure tail is
+        # diagnosable even though teardown reclaims them.
+        stdout_log = workdir / "drill-stdout.log"
+        stderr_log = workdir / "drill-stderr.log"
+        out_fd = os.open(stdout_log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        err_fd = os.open(stderr_log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            completed = subprocess.run(
+                [
+                    self.drill,
+                    "--scheduled-run-id",
+                    run_id,
+                    "--generation",
+                    str(generation),
+                ],
+                env={
+                    **self._base_env(),
+                    "MC2_Q12_RESTORE_PERSIST_HANDLE": str(handle_path),
+                    "MC2_Q12_PLAN_DOCKER": self.docker,
+                    "MC2_Q12_PLAN_REPO_ROOT": str(self.repo_root),
+                },
+                stdin=subprocess.DEVNULL,
+                stdout=out_fd,
+                stderr=err_fd,
+                check=False,
+            )
+        finally:
+            os.close(out_fd)
+            os.close(err_fd)
         if completed.returncode != 0:
             raise LifecycleError(
-                f"isolated drill restore failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+                self._drill_failure_detail(completed.returncode, stdout_log, stderr_log)
             )
         handle = self._read_handle(handle_path, run_id)
         self._resources["container"] = handle["container"]

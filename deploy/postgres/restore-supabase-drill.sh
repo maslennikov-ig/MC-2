@@ -650,7 +650,12 @@ PY
 validate_persist_handle() {
   PERSIST_HANDLE="${MC2_Q12_RESTORE_PERSIST_HANDLE:-}"
   [[ -n "$PERSIST_HANDLE" ]] || return 0
-  [[ "$RUN_KIND" == q12 ]] || fail 'persist seam is only valid in Q12 mode' 64
+  # Q12 mode: the live-cutover activation path. Scheduled mode: the Q12 plan's
+  # read-only PRE-cutover restore, which has no q12_guard and therefore must not run
+  # the activation cleanup; it still needs the live isolate handed back to capture
+  # and migrate. Both publish the same handle over the isolated loopback resources.
+  [[ "$RUN_KIND" == q12 || "$RUN_KIND" == scheduled ]] ||
+    fail 'persist seam requires q12 or scheduled mode' 64
   [[ "$PERSIST_HANDLE" == /* && "$PERSIST_HANDLE" != *$'\n'* && "$PERSIST_HANDLE" != *$'\r'* ]] ||
     fail 'persist handle must be an absolute control-free path' 64
   local parent="${PERSIST_HANDLE%/*}"
