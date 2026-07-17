@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive Q12 plan builder + drill-seam contract suite */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -1014,6 +1015,21 @@ describe.runIf(REAL_PG17)(
       return REAL_DRILL_SOURCE.slice(start, end);
     }
 
+    // The exact q12_guard.verify_capability() query the real drill runs during its
+    // Q12 activation cleanup (run-restore-cleanup.ts). It cannot exist on a restore
+    // of a read-only PRE-cutover source (no q12_guard), which is why the plan must
+    // NOT use the drill's Q12 mode. Extracted from the real helper bytes so the fake
+    // drill's Q12 branch fails exactly as the server drill did.
+    const REAL_CLEANUP_SOURCE = readFileSync(
+      resolve(REPO_ROOT, 'deploy/postgres/run-restore-cleanup.ts'),
+      'utf8'
+    );
+    function realVerifyCapabilitySql(): string {
+      const m = REAL_CLEANUP_SOURCE.match(/const VERIFY_CAPABILITY_SQL\s*=\s*'([^']+)'/u);
+      if (!m) throw new Error('VERIFY_CAPABILITY_SQL not found in run-restore-cleanup.ts');
+      return m[1];
+    }
+
     // Minimal Supabase-shaped source that restores faithfully into restore_test:
     // an allowlisted `admin` role owning a table forces the drill's role bootstrap,
     // and a supabase_migrations frontier row + extensions match the structural sha.
@@ -1126,10 +1142,11 @@ CREATE TABLE net.http_response(id bigint PRIMARY KEY);
 set -Eeuo pipefail
 d="\${MC2_Q12_PLAN_DOCKER:-/usr/bin/docker}"
 { printf 'argv:%s\\n' "$*"; printf 'handle_env:%s\\n' "$MC2_Q12_RESTORE_PERSIST_HANDLE"; } > ${JSON.stringify(logPath)}
-run_id=''; generation=''
+run_id=''; generation=''; mode=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-id) run_id="$2"; shift 2;;
+    --run-id) run_id="$2"; mode=q12; shift 2;;
+    --scheduled-run-id) run_id="$2"; mode=scheduled; shift 2;;
     --generation) generation="$2"; shift 2;;
     --q12-db-capability-file) shift 2;;
     *) shift;;
@@ -1159,6 +1176,12 @@ for i in $(seq 1 300); do "$d" exec "$c" pg_isready -U postgres >/dev/null 2>&1 
 # replicate the postgres db's default comment so the structural sha matches.
 "$d" exec -i "$c" psql -X -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE admin LOGIN NOINHERIT;" -c "CREATE DATABASE restore_test;" -c "COMMENT ON DATABASE restore_test IS 'default administrative connection database';" >/dev/null
 "$d" exec -i "$c" pg_restore -U postgres -d restore_test --no-password --exit-on-error --single-transaction < "$generation/database.dump" >/dev/null
+if [[ "$mode" == q12 ]]; then
+  # Mirror the real drill's Q12 activation cleanup (run-restore-cleanup.ts): it runs
+  # q12_guard.verify_capability() against restore_test, which cannot exist on a
+  # guard-less pre-cutover plan restore. Scheduled mode skips this, as the real drill does.
+  "$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c ${JSON.stringify(realVerifyCapabilitySql())} >/dev/null
+fi
 port=$("$d" port "$c" 5432/tcp | sed -n 's/.*:\\([0-9][0-9]*\\)$/\\1/p')
 /usr/bin/python3 -c 'import json,os,sys
 h={"schema_version":"megacampus.q12.restore-persist-handle/v1","run_id":sys.argv[1],"container":sys.argv[2],"network":sys.argv[3],"volume":sys.argv[4],"host":"127.0.0.1","port":int(sys.argv[5]),"database":"restore_test","user":"postgres","password":"fakedrillpw"}
@@ -1260,18 +1283,21 @@ esac
         .filter(Boolean);
     }
 
-    it('invokes the drill with the persist handle, migrates restore_test through it, and tears everything down', () => {
+    it('invokes the drill in scheduled mode with the persist handle, migrates restore_test through it, and tears everything down', () => {
       const fixture = planFixture();
       const drillLog = join(fixture.runRoot, 'drill-invocation.log');
 
       const result = runDrillPlan(fixture, fakeDrill(drillLog));
 
       expect(result.status, result.stderr).toBe(0);
-      // Drill invocation argv + persist-handle env were passed correctly.
+      // The plan restores a guard-less pre-cutover source, so it uses the drill's
+      // SCHEDULED mode (no capability, no Q12 activation cleanup) — the Q12 mode
+      // would run q12_guard.verify_capability() and fail.
       const log = readFileSync(drillLog, 'utf8');
-      expect(log).toContain('--run-id');
+      expect(log).toContain('--scheduled-run-id');
       expect(log).toContain('--generation');
-      expect(log).toContain('--q12-db-capability-file');
+      expect(log).not.toContain('--q12-db-capability-file');
+      expect(log).not.toMatch(/argv:[^\n]*--run-id\b/u);
       expect(log).toMatch(/handle_env:.*restore-persist-handle\.json/u);
       // Catalog emitted from the restore_test capture through the handle.
       const emitted = readFileSync(fixture.catalogPath);
@@ -1608,5 +1634,64 @@ ${body}`;
     const res = runFaultPlan(runRoot);
     expect(res.status).not.toBe(0);
     expect(existsSync(runRoot)).toBe(true);
+  });
+});
+
+describe('Q12 plan drill failure diagnostics (round-9)', () => {
+  const CORE_PATH = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
+  const PY_ENV9 = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };
+
+  function drillFailureDetail(
+    returncode: number,
+    stdoutLog: string,
+    stderrLog: string
+  ): ReturnType<typeof spawnSync> {
+    const script = `import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE_PATH)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+detail = core.LivePlanExecutor()._drill_failure_detail(
+    int(sys.argv[1]), pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+)
+sys.stdout.write(detail)`;
+    return spawnSync('/usr/bin/python3', ['-c', script, String(returncode), stdoutLog, stderrLog], {
+      encoding: 'utf8',
+      env: PY_ENV9,
+    });
+  }
+
+  it('surfaces labeled stdout AND stderr tails and scrubs secret shapes', () => {
+    const dir = mkdtempSync('/tmp/mc2-q12-plan-diag-');
+    temporaryDirectories.push(dir);
+    const stdoutLog = join(dir, 'drill-stdout.log');
+    const stderrLog = join(dir, 'drill-stderr.log');
+    const hex = 'a'.repeat(64);
+    // stderr may be empty (the exact rehearsal symptom); the reason is on stdout.
+    writeFileSync(stderrLog, '', { mode: 0o600 });
+    writeFileSync(
+      stdoutLog,
+      [
+        'connecting postgresql://postgres:supersecretpw@127.0.0.1:5432/postgres',
+        `restore token ${hex}`,
+        'password=hunter2 in service file',
+        'ERROR:  schema "q12_guard" does not exist',
+      ].join('\n'),
+      { mode: 0o600 }
+    );
+
+    const res = drillFailureDetail(42, stdoutLog, stderrLog);
+
+    expect(res.status, res.stderr).toBe(0);
+    const detail = res.stdout;
+    expect(detail).toContain('exit 42');
+    expect(detail).toContain('drill stderr (last 60 lines)');
+    expect(detail).toContain('drill stdout (last 60 lines)');
+    // The empty stderr is shown as such, and the real reason (on stdout) survives.
+    expect(detail).toContain('<empty>');
+    expect(detail).toContain('schema "q12_guard" does not exist');
+    // Secrets scrubbed.
+    expect(detail).not.toContain('supersecretpw');
+    expect(detail).not.toContain('hunter2');
+    expect(detail).not.toContain(hex);
+    expect(detail).toContain('***');
   });
 });
