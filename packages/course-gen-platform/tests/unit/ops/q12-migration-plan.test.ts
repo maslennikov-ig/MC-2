@@ -630,6 +630,9 @@ CREATE TABLE cron.job_run_details(runid bigint PRIMARY KEY);
 INSERT INTO cron.job SELECT v,'0 * * * *','SELECT '||v,'localhost',5432,'postgres','postgres',true FROM generate_series(1,8) v;
 CREATE TABLE net.http_request_queue(id bigint PRIMARY KEY);
 CREATE TABLE net.http_response(id bigint PRIMARY KEY);
+-- A no-dependent source function the injectMissing drill can DROP from the isolate to
+-- simulate a MISSING source object (a function, so it does not change guarded-relation counts).
+CREATE FUNCTION public.q12_missing_probe() RETURNS integer LANGUAGE sql IMMUTABLE AS $fn$ SELECT 1 $fn$;
 `;
 
   beforeAll(async () => {
@@ -1088,6 +1091,9 @@ CREATE TABLE cron.job_run_details(runid bigint PRIMARY KEY);
 INSERT INTO cron.job SELECT v,'0 * * * *','SELECT '||v,'localhost',5432,'postgres','postgres',true FROM generate_series(1,8) v;
 CREATE TABLE net.http_request_queue(id bigint PRIMARY KEY);
 CREATE TABLE net.http_response(id bigint PRIMARY KEY);
+-- A no-dependent source function the injectMissing drill can DROP from the isolate to
+-- simulate a MISSING source object (a function, so it does not change guarded-relation counts).
+CREATE FUNCTION public.q12_missing_probe() RETURNS integer LANGUAGE sql IMMUTABLE AS $fn$ SELECT 1 $fn$;
 `;
 
     async function readyPostgres(container: string): Promise<void> {
@@ -1134,7 +1140,7 @@ CREATE TABLE net.http_response(id bigint PRIMARY KEY);
 
     function fakeDrill(
       logPath: string,
-      opts: { badHandle?: boolean; injectDrift?: boolean } = {}
+      opts: { badHandle?: boolean; injectDrift?: boolean; injectMissing?: boolean } = {}
     ): string {
       const dir = mkdtempSync('/tmp/mc2-q12-fakedrill-');
       temporaryDirectories.push(dir);
@@ -1187,9 +1193,16 @@ if [[ "$mode" == q12 ]]; then
 fi
 ${
   opts.injectDrift
-    ? `# Structural drift ONLY in the isolate (not the source), to exercise the plan's
-# equality-proof diff diagnostics.
+    ? `# A delta-neutral EXTRA object ONLY in the isolate (not the source): the completeness
+# gate must tolerate + report it, and composition must exclude it.
 "$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c "CREATE FUNCTION public.q12_drift_probe() RETURNS integer LANGUAGE sql IMMUTABLE AS \\$\\$ SELECT 1 \\$\\$;" >/dev/null`
+    : ''
+}
+${
+  opts.injectMissing
+    ? `# Drop a SOURCE function from the isolate -> the restore is missing a source object
+# (absolutely fatal). The source keeps public.q12_missing_probe (from DRILL_SOURCE_SCHEMA).
+"$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c "DROP FUNCTION public.q12_missing_probe();" >/dev/null`
     : ''
 }
 port=$("$d" port "$c" 5432/tcp | sed -n 's/.*:\\([0-9][0-9]*\\)$/\\1/p')
@@ -1336,35 +1349,44 @@ esac
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
 
-    it('equality-proof failure names the diverging section and identifier (round-11)', () => {
+    it('tolerates a delta-neutral extra object, reports it, and still emits the catalog (round-15)', () => {
       const fixture = planFixture();
       const drillLog = join(fixture.runRoot, 'drill-invocation.log');
 
-      // The drill injects a function ONLY into the isolate, so the isolate carries an
-      // EXTRA object the source lacks; the object-completeness check must fail with a
-      // NAMED diff (the injected function is not a source object).
+      // The drill manufactures a function ONLY in the isolate (an EXTRA the source lacks),
+      // like the image synthesizing default ACLs on restore-created schemas. It is
+      // delta-neutral (unchanged across checkpoints), so the plan SUCCEEDS, EXCLUDES it
+      // from the composed catalog (composed still == real source), and REPORTS it.
       const result = runDrillPlan(fixture, fakeDrill(drillLog, { injectDrift: true }));
 
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toMatch(/not object-complete/iu);
-      expect(result.stderr).toMatch(/\[functions\]/u);
+      expect(result.status, result.stderr).toBe(0);
+      expect(existsSync(fixture.catalogPath)).toBe(true);
+      const plan = JSON.parse(result.stdout) as {
+        observed_extra_identities: Array<{ section: string; identity: string }>;
+      };
+      const extra = plan.observed_extra_identities.find(e =>
+        e.identity.includes('q12_drift_probe')
+      );
+      expect(extra, JSON.stringify(plan.observed_extra_identities)).toBeTruthy();
+      expect(extra?.section).toBe('functions');
+      // The tolerated extra is named in the run log too.
+      expect(result.stderr).toContain('tolerated delta-neutral extra');
       expect(result.stderr).toContain('q12_drift_probe');
-      expect(existsSync(fixture.catalogPath)).toBe(false);
-      // No flag: no preserved diagnostics dir (behavior unchanged).
-      expect(existsSync(join(fixture.runRoot, 'equality-diagnostics'))).toBe(false);
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
 
-    it('--keep-equality-diagnostics preserves the full payloads + diff on equality failure (round-12)', () => {
+    it('--keep-equality-diagnostics preserves the full payloads + diff on a MISSING-object failure (round-12)', () => {
       const fixture = planFixture();
       const drillLog = join(fixture.runRoot, 'drill-invocation.log');
 
-      const result = runDrillPlan(fixture, fakeDrill(drillLog, { injectDrift: true }), {}, [
+      // The drill DROPS a source function from the isolate -> the restore is missing a
+      // source object -> completeness is absolutely fatal, and diagnostics are preserved.
+      const result = runDrillPlan(fixture, fakeDrill(drillLog, { injectMissing: true }), {}, [
         '--keep-equality-diagnostics',
       ]);
 
       expect(result.status).not.toBe(0);
-      expect(result.stderr).toMatch(/\[functions\]/u);
+      expect(result.stderr).toMatch(/not object-complete/iu);
       const diagDir = join(fixture.runRoot, 'equality-diagnostics');
       expect(statSync(diagDir).mode & 0o777).toBe(0o700);
       for (const name of [
@@ -1376,11 +1398,13 @@ esac
         expect(existsSync(path), `${name} missing`).toBe(true);
         expect(statSync(path).mode & 0o777).toBe(0o600);
       }
-      // The preserved payloads are the real canonical catalogs; the drift function
-      // must appear in the isolate payload (and the full diff), unbounded.
-      const isolatePayload = readFileSync(join(diagDir, 'isolate-structural-payload.json'), 'utf8');
-      expect(isolatePayload).toContain('q12_drift_probe');
-      expect(readFileSync(join(diagDir, 'equality-diff.txt'), 'utf8')).toContain('q12_drift_probe');
+      // The preserved payloads are the real canonical catalogs; the dropped (missing)
+      // source function must appear in the SOURCE payload and the full diff.
+      const sourcePayload = readFileSync(join(diagDir, 'source-structural-payload.json'), 'utf8');
+      expect(sourcePayload).toContain('q12_missing_probe');
+      expect(readFileSync(join(diagDir, 'equality-diff.txt'), 'utf8')).toContain(
+        'q12_missing_probe'
+      );
       expect(existsSync(fixture.catalogPath)).toBe(false);
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
@@ -2163,14 +2187,14 @@ except core.LifecycleError as error:
     expect(payload.database.comment).toBe('live');
   });
 
-  it('_assert_restore_object_complete hard-stops when the restore is missing a source object', () => {
+  it('_check_restore_completeness hard-stops when the restore is missing a source object', () => {
     const source = {
       schema_version: SV,
       database: { name: 'postgres' },
       constraints: [preExistingLive],
     };
     const iPre = { schema_version: SV, database: { name: 'postgres' }, constraints: [] };
-    const res = callCore('_assert_restore_object_complete', [source, iPre]);
+    const res = callCore('_check_restore_completeness', [source, iPre]);
     expect(res.status).toBe(7);
     expect(res.err).toMatch(/\[constraints\]/u);
     expect(res.err).toContain('check_processing_method');
@@ -2244,7 +2268,7 @@ except core.LifecycleError as error:
         },
       ],
     };
-    const res = callCore('_assert_restore_object_complete', [source, isolate]);
+    const res = callCore('_check_restore_completeness', [source, isolate]);
     expect(res.status, res.err).toBe(0);
   });
 
@@ -2277,7 +2301,7 @@ except core.LifecycleError as error:
         },
       ],
     };
-    const res = callCore('_assert_restore_object_complete', [source, isolate]);
+    const res = callCore('_check_restore_completeness', [source, isolate]);
     expect(res.status, res.err).toBe(0);
   });
 
@@ -2300,5 +2324,68 @@ except core.LifecycleError as error:
     expect(
       (composed.out as unknown as { columns: Array<{ position: number }> }).columns[0].position
     ).toBe(7);
+  });
+
+  // round-15: delta-neutral EXTRA identities (restore artifacts absent from the source,
+  // e.g. the image manufacturing default ACLs on restore-created schemas) — MISSING stays
+  // fatal, EXTRA is tolerated iff byte-identical across checkpoints and excluded from composed.
+  const aclA = { role: 'r', schema: 'public', object_type: 'f', acl: ['x'] };
+  const aclExtra = { role: 'supabase_admin', schema: 'tests', object_type: 'f', acl: ['y'] };
+
+  it('_check_restore_completeness collects EXTRA identities without failing (round-15)', () => {
+    const source = { schema_version: SV, database: { name: 'postgres' }, default_acls: [aclA] };
+    const isolate = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      default_acls: [aclA, aclExtra],
+    };
+    const res = callCore('_check_restore_completeness', [source, isolate]);
+    expect(res.status, res.err).toBe(0);
+    const extras = res.out as Array<{ section: string; identity: string }>;
+    expect(extras.length).toBe(1);
+    expect(extras[0].section).toBe('default_acls');
+    expect(extras[0].identity).toContain('tests');
+  });
+
+  it('_compose_predicted_payload EXCLUDES a delta-neutral extra from the composed payload (round-15)', () => {
+    const source = { schema_version: SV, database: { name: 'postgres' }, default_acls: [aclA] };
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      default_acls: [aclA, aclExtra],
+    };
+    const iCheck = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      default_acls: [aclA, aclExtra],
+    };
+    const composed = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    const payload = composed.out as { default_acls: Array<{ schema: string }> };
+    // the extra (schema=tests) is excluded; only the source pre-existing entry remains.
+    expect(payload.default_acls.length).toBe(1);
+    expect(payload.default_acls[0].schema).toBe('public');
+  });
+
+  it('_compose_predicted_payload hard-stops when a tolerated extra MUTATES across checkpoints (round-15)', () => {
+    const aclExtraMutated = {
+      role: 'supabase_admin',
+      schema: 'tests',
+      object_type: 'f',
+      acl: ['CHANGED'],
+    };
+    const source = { schema_version: SV, database: { name: 'postgres' }, default_acls: [aclA] };
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      default_acls: [aclA, aclExtra],
+    };
+    const iCheck = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      default_acls: [aclA, aclExtraMutated],
+    };
+    const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(res.status).toBe(7);
+    expect(res.err).toMatch(/\[default_acls\]/u);
   });
 });
