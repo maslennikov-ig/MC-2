@@ -1281,3 +1281,145 @@ esac
     }, 180_000);
   }
 );
+
+describe('Q12 plan production seam lockdown (P2-1)', () => {
+  const PROD_RUN_ROOT = '/opt/megacampus/backups/q12/123e4567-e89b-42d3-a456-426614174000';
+  const SEAMS = [
+    'MC2_Q12_PLAN_RESTORE_MODE',
+    'MC2_Q12_PLAN_RESTORE_IMAGE',
+    'MC2_Q12_PLAN_SOURCE_CONTAINER',
+    'MC2_Q12_PLAN_MIGRATION_APPLY',
+    'MC2_Q12_PLAN_DRILL',
+    'MC2_Q12_PLAN_FAULT',
+    'MC2_Q12_PLAN_PG_DUMP',
+    'MC2_Q12_PLAN_PG_DUMPALL',
+    'MC2_Q12_PLAN_PSQL',
+    'MC2_Q12_PLAN_DOCKER',
+  ] as const;
+
+  function runGuard(
+    runRoot: string,
+    extraEnv: Record<string, string>
+  ): ReturnType<typeof spawnSync> {
+    const script = `import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+try:
+    core.assert_production_seam_lockdown(pathlib.Path(sys.argv[1]))
+    print('OK')
+except core.LifecycleError as error:
+    sys.stderr.write(str(error) + '\\n'); sys.exit(3)`;
+    return spawnSync('/usr/bin/python3', ['-c', script, runRoot], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C', ...extraEnv },
+    });
+  }
+
+  it('proceeds in production shape with a clean environment', () => {
+    const result = runGuard(PROD_RUN_ROOT, {});
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('OK');
+  });
+
+  it.each(SEAMS)('fails closed in production shape when %s is set', seam => {
+    const result = runGuard(PROD_RUN_ROOT, { [seam]: 'anything' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(seam);
+    expect(result.stderr).toMatch(/not permitted in a production plan run/iu);
+  });
+
+  it('allows test seams with an explicit /tmp/mc2-q12-plan-* run root', () => {
+    const result = runGuard('/tmp/mc2-q12-plan-abc', { MC2_Q12_PLAN_FAULT: 'equality' });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('OK');
+  });
+});
+
+describe('Q12 plan persist-handle write/read binding (P2-2)', () => {
+  const RESTORE = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
+  const HANDLE_RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
+
+  // The exact write_persist_handle() function extracted from the real drill, so a
+  // future drill field change fails this test instead of the live window.
+  function drillWritePersistHandle(): string {
+    const source = readFileSync(RESTORE, 'utf8');
+    const start = source.indexOf('write_persist_handle() {');
+    const terminator = '\nPY\n}';
+    const end = source.indexOf(terminator, start);
+    if (start < 0 || end < 0) throw new Error('write_persist_handle not found in the drill');
+    return source.slice(start, end + terminator.length);
+  }
+
+  function writeRealHandle(handlePath: string): void {
+    const harness = `set -Eeuo pipefail
+PERSIST_HANDLE="$1"
+CONTAINER_ID="$2"
+NETWORK_ID="$3"
+VOLUME_NAME="$4"
+RUN_ID="$5"
+${drillWritePersistHandle()}
+write_persist_handle "$6" "$7"`;
+    const result = spawnSync(
+      '/usr/bin/bash',
+      [
+        '-c',
+        harness,
+        'h',
+        handlePath,
+        'mc2-c',
+        'mc2-net',
+        'mc2-vol',
+        HANDLE_RUN_ID,
+        '54329',
+        'pw123',
+      ],
+      { encoding: 'utf8', env: { PATH: process.env.PATH ?? '/usr/bin:/bin' } }
+    );
+    if (result.status !== 0) throw new Error(`drill write_persist_handle failed: ${result.stderr}`);
+  }
+
+  function readHandle(handlePath: string): ReturnType<typeof spawnSync> {
+    const script = `import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+handle = core.LivePlanExecutor()._read_handle(pathlib.Path(sys.argv[1]), sys.argv[2])
+print('ACCEPT ' + handle['container'] + ' ' + handle['database'])`;
+    return spawnSync('/usr/bin/python3', ['-c', script, handlePath, HANDLE_RUN_ID], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    });
+  }
+
+  it('the real _read_handle accepts the real drill write_persist_handle output', () => {
+    const dir = mkdtempSync('/tmp/mc2-q12-plan-');
+    temporaryDirectories.push(dir);
+    chmodSync(dir, 0o700);
+    const handlePath = join(dir, 'restore-persist-handle.json');
+    writeRealHandle(handlePath);
+
+    const result = readHandle(handlePath);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('ACCEPT mc2-c restore_test');
+  });
+
+  it('the real _read_handle rejects a handle with a dropped field', () => {
+    const dir = mkdtempSync('/tmp/mc2-q12-plan-');
+    temporaryDirectories.push(dir);
+    chmodSync(dir, 0o700);
+    const handlePath = join(dir, 'restore-persist-handle.json');
+    writeRealHandle(handlePath);
+    const handle = JSON.parse(readFileSync(handlePath, 'utf8')) as Record<string, unknown>;
+    delete handle.volume;
+    chmodSync(handlePath, 0o600);
+    writeFileSync(handlePath, `${JSON.stringify(handle, Object.keys(handle).sort())}\n`, {
+      mode: 0o400,
+    });
+    chmodSync(handlePath, 0o400);
+
+    const result = readHandle(handlePath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/persist handle/iu);
+  });
+});
