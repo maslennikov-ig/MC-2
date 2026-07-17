@@ -149,6 +149,31 @@ Stream: `mc2-jz6y0.13` (this worktree `codex/q12-plan-builder`).
 - No W-owned file (`q12-writer-resume.py`, `source-recovery-run.sh`) modified.
 - Artifact updated + `validate_artifact.py` OK; no push; report to main.
 
+## Implementation log
+
+- **R1 done** (RED `264fefe0` → GREEN `2b3a1459`). Added `run_live` (the Task-9 controller)
+  driving the same `Engine` + `append_ordinary_lifecycle` primitive as the composer; journals
+  the group-1 `operator.self-check` genesis; production run-root coupling enforced by
+  `Engine.__post_init__`. Parity vs the composer proven for the genesis lifecycle; existing
+  composer/quiesce-seam suites (52 tests) green; tsc 0; frozen bytes unchanged.
+  - **Parity-wording correction (carries into every round):** the plan said "byte/order-
+    identical." `checkpoint_bytes` (`q12-lifecycle-core.py:845`) binds the physical journal
+    file's `journal_device`/`journal_inode` (anti-tamper), so `capability_manifest_sha256`,
+    `entry_hash`, and `previous_hash` are inherently **per-run-root**. Cross-root parity is
+    therefore asserted over the **root-independent** row grammar + command bindings (phase,
+    outcome, `command_id`, `command_sha256`, run/release/operator/resource/quiesce bindings,
+    accepted-object, `lease_epoch`, `seq`, `timestamp`) — the meaningful "does not fork a
+    second authority" proof, since `run_live` calls the same serializer functions. The three
+    physical-binding hashes match only within a single run root.
+  - **Barrier-orchestration open question (shapes R4, flagged for the review):** the composer
+    runs the 5 barriers in-process via `retained_chain` (`d5()`); the deployed window ran them
+    as 5 separate `q12-live-cutover.sh <op>` supervisor invocations (the Task-9-absent
+    interim). The controller can either (a) drive barriers in-process via `retained_chain`
+    (one process, trivial parity, but changes the operator procedure and holds `cutover.lock`
+    across the whole window), or (b) shell out to the 5 supervisor invocations (preserves the
+    current procedure, splits lock custody). This shapes R4 and the lease/FD-9 model; resolve
+    with the design review before R4.
+
 ## Open risks carried forward
 
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
