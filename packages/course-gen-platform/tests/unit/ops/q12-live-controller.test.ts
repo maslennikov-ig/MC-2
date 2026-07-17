@@ -104,8 +104,22 @@ describe('Q12 live cutover controller (Task-9) — R1 genesis + production seam'
       ['preflight', 'capability_claimed', 'operator.self-check'],
       ['preflight', 'completed', 'operator.self-check'],
     ]);
-    // §10 byte/order parity: the controller's genesis rows equal the composer's first four.
-    expect(live.journalEntries).toEqual(composer.journalEntries.slice(0, 4));
+    // §10 parity: every root-INDEPENDENT field (command bindings, phases, outcomes, run/
+    // release/operator/resource/quiesce bindings, accepted-object, epoch, seq) equals the
+    // composer's first four rows. The checkpoint binds the physical journal file's
+    // device+inode (checkpoint_bytes journal_device/journal_inode, anti-tamper), so the
+    // three fields that transitively carry it — capability_manifest_sha256, entry_hash,
+    // previous_hash — are inherently per-run-root and are excluded from cross-root parity.
+    const rootIndependent = (row: Record<string, unknown>) => {
+      const { capability_manifest_sha256, entry_hash, previous_hash, ...rest } = row;
+      void capability_manifest_sha256;
+      void entry_hash;
+      void previous_hash;
+      return rest;
+    };
+    expect(live.journalEntries.map(rootIndependent)).toEqual(
+      composer.journalEntries.slice(0, 4).map(rootIndependent)
+    );
   });
 
   it('fails closed when a production request targets a non-production run root', async () => {
