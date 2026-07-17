@@ -4572,6 +4572,7 @@ class LivePlanExecutor:
     def __init__(self) -> None:
         self.repo_root = pathlib.Path(__file__).resolve().parents[2]
         self.capture_helper = pathlib.Path(__file__).with_name("q12-migration-plan-capture.py")
+        self.roles_helper = pathlib.Path(__file__).with_name("q12-migration-plan-roles.py")
         self.docker = os.environ.get("MC2_Q12_PLAN_DOCKER") or "/usr/bin/docker"
         self.restore_image = os.environ.get("MC2_Q12_PLAN_RESTORE_IMAGE") or PLAN_PINNED_RESTORE_IMAGE
         self.source_container = os.environ.get("MC2_Q12_PLAN_SOURCE_CONTAINER") or None
@@ -4612,7 +4613,11 @@ class LivePlanExecutor:
         return completed
 
     def _run_capture(
-        self, *, container: str | None, service_env: dict[str, str] | None = None
+        self,
+        *,
+        container: str | None,
+        service_env: dict[str, str] | None = None,
+        roles_only: bool = False,
     ) -> dict[str, Any]:
         env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
         if service_env:
@@ -4620,6 +4625,8 @@ class LivePlanExecutor:
         argv = ["/usr/bin/python3", str(self.capture_helper)]
         if container is not None:
             argv += ["--container", container]
+        if roles_only:
+            argv.append("--roles-only")
         completed = subprocess.run(
             argv,
             env=env,
@@ -4734,53 +4741,116 @@ class LivePlanExecutor:
         return container
 
     def _dump_source(self, workdir: pathlib.Path) -> pathlib.Path:
+        # Stream the custom archive straight to disk (pg_dump stdout -> file fd)
+        # so peak memory is not ~2x the database size on the production server.
         archive = workdir / "source.dump"
-        if self.source_container:
-            dump = self._docker_run(
-                ["exec", self.source_container, "pg_dump", "-U", "postgres", "-Fc", "--no-password", "postgres"]
-            )
-            data = dump.stdout
-        else:
-            pg_dump = os.environ.get("MC2_Q12_PLAN_PG_DUMP") or "/usr/lib/postgresql/17/bin/pg_dump"
+        descriptor = os.open(archive, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            if self.source_container:
+                argv = [
+                    self.docker,
+                    "exec",
+                    self.source_container,
+                    "pg_dump",
+                    "-U",
+                    "postgres",
+                    "-Fc",
+                    "--no-password",
+                    "postgres",
+                ]
+                env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
+            else:
+                pg_dump = os.environ.get("MC2_Q12_PLAN_PG_DUMP") or "/usr/lib/postgresql/17/bin/pg_dump"
+                argv = [pg_dump, "-Fc", "--no-password", "postgres"]
+                env = {**self._base_env(), **(self._source_service or {})}
             completed = subprocess.run(
-                [pg_dump, "-Fc", "--no-password", "postgres"],
-                env={**self._base_env(), **(self._source_service or {})},
+                argv,
+                env=env,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
+                stdout=descriptor,
                 stderr=subprocess.PIPE,
                 check=False,
             )
-            if completed.returncode != 0:
-                raise LifecycleError(
-                    f"source pg_dump failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
-                )
-            data = completed.stdout
-        descriptor = os.open(archive, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        try:
-            os.write(descriptor, data)
         finally:
             os.close(descriptor)
+        if completed.returncode != 0:
+            raise LifecycleError(
+                f"source pg_dump failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+            )
         return archive
 
-    def _restore_snapshot(self, workdir: pathlib.Path, container: str) -> None:
-        archive = self._dump_source(workdir)
-        restore = self._docker_run(
+    def _bootstrap_roles(self, container: str, source: dict[str, Any]) -> None:
+        """Apply the §3 allowlisted role bootstrap so the isolated pg_restore does
+        not abort on source app roles absent from the pinned image. Never executes
+        raw pg_dumpall output; the SQL is generated from the verified projection."""
+        isolate = self._run_capture(container=container, roles_only=True)
+        request = {
+            "source_roles": source.get("source_roles", []),
+            "source_memberships": source.get("source_memberships", []),
+            "source_role_settings": source.get("source_role_settings", []),
+            "isolate_roles": [role["name"] for role in isolate["source_roles"]],
+        }
+        generated = subprocess.run(
+            ["/usr/bin/python3", str(self.roles_helper)],
+            input=json.dumps(request),
+            env=self._base_env(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        if generated.returncode != 0:
+            raise LifecycleError(f"§3 role bootstrap generation failed: {generated.stderr.strip()}")
+        applied = self._docker_run(
             [
                 "exec",
                 "-i",
                 container,
-                "pg_restore",
+                "psql",
+                "-X",
+                "--no-psqlrc",
                 "-U",
                 "postgres",
                 "-d",
                 "postgres",
-                "--no-password",
-                "--exit-on-error",
-                "--single-transaction",
+                "--set",
+                "ON_ERROR_STOP=on",
             ],
-            input_bytes=archive.read_bytes(),
+            input_bytes=generated.stdout.encode("utf-8"),
             check=False,
         )
+        if applied.returncode != 0:
+            raise LifecycleError(
+                f"§3 role bootstrap apply failed: {applied.stderr.decode('utf-8', 'replace').strip()}"
+            )
+
+    def _restore_snapshot(self, workdir: pathlib.Path, container: str, source: dict[str, Any]) -> None:
+        archive = self._dump_source(workdir)
+        self._bootstrap_roles(container, source)
+        # Stream the archive into pg_restore via an open file descriptor rather
+        # than buffering the whole dump in memory.
+        with open(archive, "rb") as handle:
+            restore = subprocess.run(
+                [
+                    self.docker,
+                    "exec",
+                    "-i",
+                    container,
+                    "pg_restore",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "postgres",
+                    "--no-password",
+                    "--exit-on-error",
+                    "--single-transaction",
+                ],
+                stdin=handle,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker},
+                check=False,
+            )
         if restore.returncode != 0:
             raise LifecycleError(
                 f"isolated restore failed: {restore.stderr.decode('utf-8', 'replace').strip()}"
@@ -4844,7 +4914,7 @@ class LivePlanExecutor:
 
         source = self._capture_source(request, workdir)
         container = self._create_isolate(run_id)
-        self._restore_snapshot(workdir, container)
+        self._restore_snapshot(workdir, container, source)
 
         isolate_baseline = self._run_capture(container=container)
         isolate_structural = isolate_baseline["structural_sha256"]

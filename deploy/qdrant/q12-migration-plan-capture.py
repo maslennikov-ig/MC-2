@@ -80,6 +80,52 @@ SELECT COALESCE(jsonb_agg(jsonb_build_object(
 FROM cron.job
 """.strip()
 
+ROLES_SQL = """
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'name', rolname,
+  'rolsuper', rolsuper,
+  'rolinherit', rolinherit,
+  'rolcreaterole', rolcreaterole,
+  'rolcreatedb', rolcreatedb,
+  'rolcanlogin', rolcanlogin,
+  'rolreplication', rolreplication,
+  'rolconnlimit', rolconnlimit,
+  'rolvaliduntil', CASE WHEN rolvaliduntil IS NULL THEN NULL ELSE rolvaliduntil::text END,
+  'rolbypassrls', rolbypassrls
+) ORDER BY rolname), '[]'::jsonb)
+FROM pg_catalog.pg_roles
+WHERE rolname !~ '^pg_' AND rolname <> 'cli_login_postgres'
+""".strip()
+
+MEMBERSHIPS_SQL = """
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'member', m.rolname,
+  'role', r.rolname,
+  'grantor', g.rolname,
+  'admin_option', am.admin_option,
+  'inherit_option', am.inherit_option,
+  'set_option', am.set_option
+) ORDER BY m.rolname, r.rolname, g.rolname), '[]'::jsonb)
+FROM pg_catalog.pg_auth_members am
+JOIN pg_catalog.pg_roles m ON m.oid = am.member
+JOIN pg_catalog.pg_roles r ON r.oid = am.roleid
+JOIN pg_catalog.pg_roles g ON g.oid = am.grantor
+WHERE m.rolname !~ '^pg_' AND r.rolname !~ '^pg_' AND g.rolname !~ '^pg_'
+""".strip()
+
+ROLE_SETTINGS_SQL = """
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'role', COALESCE(r.rolname, ''),
+  'database', NULL,
+  'name', pg_catalog.split_part(entry.setting, '=', 1),
+  'value', pg_catalog.substr(entry.setting, pg_catalog.strpos(entry.setting, '=') + 1)
+) ORDER BY COALESCE(r.rolname, ''), entry.setting), '[]'::jsonb)
+FROM pg_catalog.pg_db_role_setting drs
+CROSS JOIN LATERAL pg_catalog.unnest(drs.setconfig) AS entry(setting)
+LEFT JOIN pg_catalog.pg_roles r ON r.oid = drs.setrole
+WHERE drs.setdatabase = 0
+""".strip()
+
 IDENTITY_SQL = """
 SELECT jsonb_build_object(
   'database', pg_catalog.current_database(),
@@ -103,8 +149,13 @@ def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _validated_binary(path: str, label: str) -> str:
-    if not (os.path.isabs(path) and not os.path.islink(path) and os.path.isfile(path)):
+def _validated_binary(path: str, label: str, *, allow_symlink: bool = False) -> str:
+    # os.path.isfile follows symlinks, so a symlinked system binary (e.g. the
+    # Docker Desktop docker shim) still resolves to a regular file; psql keeps the
+    # stricter non-symlink contract.
+    if not os.path.isabs(path) or not os.path.isfile(path):
+        raise CaptureError(f"{label} must be an absolute regular file")
+    if not allow_symlink and os.path.islink(path):
         raise CaptureError(f"{label} must be an absolute non-symlink regular file")
     return path
 
@@ -114,7 +165,9 @@ def _psql_argv(container: str | None) -> list[str]:
         if not CONTAINER_RE.fullmatch(container):
             raise CaptureError("invalid --container value")
         docker = _validated_binary(
-            os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker"), "MC2_Q12_PLAN_DOCKER"
+            os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker"),
+            "MC2_Q12_PLAN_DOCKER",
+            allow_symlink=True,
         )
         return [
             docker,
@@ -159,7 +212,30 @@ def run_sql(sql: str, container: str | None) -> str:
         raise CaptureError(
             f"psql failed (status {completed.returncode}): {completed.stderr.strip()}"
         )
-    return completed.stdout.strip()
+    return _decode_copy(completed.stdout.strip())
+
+
+_COPY_ESCAPES = {"\\": "\\", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
+
+
+def _decode_copy(text: str) -> str:
+    """Reverse PostgreSQL COPY TO STDOUT text-format backslash escaping so a jsonb
+    value that itself contains quotes/commas/backslashes parses back cleanly."""
+    if "\\" not in text:
+        return text
+    result: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char == "\\" and index + 1 < length:
+            nxt = text[index + 1]
+            result.append(_COPY_ESCAPES.get(nxt, nxt))
+            index += 2
+            continue
+        result.append(char)
+        index += 1
+    return "".join(result)
 
 
 def read_only_wrap(body: str) -> str:
@@ -169,6 +245,19 @@ def read_only_wrap(body: str) -> str:
         f"COPY ({body}) TO STDOUT;\n"
         "COMMIT;\n"
     )
+
+
+def capture_roles(container: str | None) -> dict[str, object]:
+    """Read-only §3 role plane: roles / membership edges / cluster role settings.
+
+    Usable against a fresh isolate (no application schema yet), so the plan can
+    diff the source role plane against the isolate before restore."""
+    return {
+        "schema_version": "megacampus.q12.plan-role-capture/v1",
+        "source_roles": json.loads(run_sql(read_only_wrap(ROLES_SQL), container)),
+        "source_memberships": json.loads(run_sql(read_only_wrap(MEMBERSHIPS_SQL), container)),
+        "source_role_settings": json.loads(run_sql(read_only_wrap(ROLE_SETTINGS_SQL), container)),
+    }
 
 
 def capture(container: str | None) -> dict[str, object]:
@@ -205,14 +294,16 @@ def capture(container: str | None) -> dict[str, object]:
         "guarded_relations": guarded,
         "cron_jobs": cron_jobs,
         "public_relations": public_relations,
+        **capture_roles(container),
     }
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Q12 plan capture helper")
     parser.add_argument("--container", default=None)
+    parser.add_argument("--roles-only", action="store_true")
     arguments = parser.parse_args(argv)
-    output = capture(arguments.container)
+    output = capture_roles(arguments.container) if arguments.roles_only else capture(arguments.container)
     sys.stdout.write(json.dumps(output, ensure_ascii=False, sort_keys=True))
     sys.stdout.write("\n")
     return 0
