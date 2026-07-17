@@ -1263,5 +1263,21 @@ esac
       expect(existsSync(fixture.catalogPath)).toBe(false);
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
+
+    it('fails closed before restore when the snapshot coordinator yields a malformed id', () => {
+      const fixture = planFixture();
+      const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+
+      const result = runDrillPlan(fixture, fakeDrill(drillLog), {
+        MC2_Q12_PLAN_FAULT: 'snapshot',
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/invalid snapshot|snapshot coordinator/iu);
+      // The drill is never invoked, so no catalog and no drill resource exists.
+      expect(existsSync(fixture.catalogPath)).toBe(false);
+      expect(existsSync(drillLog)).toBe(false);
+      expect(leftoverFakeDrill()).toEqual([]);
+    }, 180_000);
   }
 );
