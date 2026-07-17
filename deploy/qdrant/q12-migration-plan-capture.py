@@ -347,11 +347,31 @@ def capture_structural_payload(
     return payload
 
 
+def render_payload_hash(container: str | None, dbname: str, payload_json: str) -> str:
+    """Render a composed structural-catalog payload to its sha256 THROUGH PostgreSQL, so
+    the ``jsonb::text`` canonicalization is byte-identical to what the frozen SQL/barrier
+    computes on the live side. The JSON is embedded with dollar-quoting — no escaping and
+    no injection surface, since the tag cannot occur inside JSON."""
+    json.loads(payload_json)  # reject non-JSON before it ever reaches SQL
+    tag = "$mc2q12payload$"
+    if tag in payload_json:
+        raise CaptureError("payload contains the reserved dollar-quote tag")
+    body = (
+        "SELECT encode(extensions.digest(convert_to("
+        f"{tag}{payload_json}{tag}::jsonb::text, 'UTF8'), 'sha256'), 'hex')"
+    )
+    digest = run_sql(read_only_wrap(body), container, dbname).strip()
+    if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        raise CaptureError("rendered payload SHA-256 is malformed")
+    return digest
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Q12 plan capture helper")
     parser.add_argument("--container", default=None)
     parser.add_argument("--roles-only", action="store_true")
     parser.add_argument("--structural-payload", action="store_true")
+    parser.add_argument("--render-hash", action="store_true")
     parser.add_argument("--dbname", default="postgres")
     parser.add_argument("--snapshot", default=None)
     arguments = parser.parse_args(argv)
@@ -359,6 +379,11 @@ def main(argv: list[str]) -> int:
     snapshot = arguments.snapshot
     if snapshot is not None and not SNAPSHOT_RE.fullmatch(snapshot):
         raise CaptureError("invalid --snapshot value")
+    if arguments.render_hash:
+        # Composed payload arrives on stdin (too large for argv); output is the plain hash.
+        sys.stdout.write(render_payload_hash(arguments.container, dbname, sys.stdin.read()))
+        sys.stdout.write("\n")
+        return 0
     if arguments.structural_payload:
         output: dict[str, object] = capture_structural_payload(arguments.container, dbname, snapshot)
     elif arguments.roles_only:

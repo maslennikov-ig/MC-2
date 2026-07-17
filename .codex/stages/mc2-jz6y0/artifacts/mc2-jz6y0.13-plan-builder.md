@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-13 delta-composed live-hash prediction (§2 method correction) RED->GREEN: 461409a7 -> ee70f8ac. Ruling (rehearsal #6 full payloads): the divergence is dump-round-trip EXPRESSION RENORMALIZATION, not arch/version drift — e.g. public.check_processing_method source `= ANY (ARRAY[..::character varying]::text[])` vs restored `= ANY (ARRAY[..::character varying::text])`; also [columns] ~117 (defaults) + db comment. So the raw-isolate-hash equality of design §2 is empirically unsound (an isolate can never byte-predict live hashes for pre-existing objects). Replaced with the sound construction. Gating verified against the FROZEN q12-structural-catalog.sql: NO OIDs in payload entries, NO timestamps in migration_history (version/name/statements only, :1190-1196), every section ORDER BY is identity-determined (a renormalizable expression never reorders a section) -> composition is byte-exact; no stop-and-report needed. (1) Equality proof -> object-completeness: _assert_restore_object_complete requires the isolate pre-migration identity-set == source per section (missing/extra -> hard stop); content divergence is expected + non-fatal (drill compare guards fidelity). (2) Checkpoint hashes -> delta-composed: each in-isolate delta must be strictly ADDITIVE (no removed/modified pre-existing, migration_history append-only) -> hard stop; predicted = SOURCE pre-existing content + isolate FRESH content in isolate SQL order, hashed THROUGH postgres (capture.py --render-hash, jsonb::text canonicalization byte-identical to live); baseline_structural_sha256 stays raw SOURCE. barrier/manifest/structural SQL + validate_expected_catalog untouched, hashes stay 64-hex. CI PROOF (strong): applying the same five migration files to the SOURCE container yields a hash byte-EQUAL to the composed prediction even with a seeded renormalizing check constraint (the old raw-isolate method would have differed); negative: an in-isolate ALTER of a pre-existing column default hard-stops naming [columns]. Real-PG17 q12-migration-plan.test.ts: 58 passed. No-docker adds 4 engine cases (compose/object-complete/non-additive). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-12 preserve equality-diff payloads RED->GREEN: 33e27794 -> c06f3a54. Surgical argv-gated seam so the full cloud-source-vs-pinned-image divergence survives for a product-truth ruling (the first-10 summary died with the workdir). New plan flag --keep-equality-diagnostics (argv, NOT env — production seam lockdown still rejects env seams): on equality failure the plan writes 3 owner-only files into <run_root>/equality-diagnostics/ (0700 dir, 0600 files) — source + isolate canonical payloads + the FULL unbounded diff (_structural_catalog_diff gained max_ids/max_lines=None); run_plan preserves the created run dir when diagnostics were written (else removed as before). No scrub needed: the frozen SQL stores subscription conninfo as connection_sha256 and carries no cron/row data, so the payload is secret-free by construction. Real-PG17 q12-migration-plan.test.ts: 52 passed — incl. flag-on preserves the 3 files with q12_drift_probe in the isolate payload + full diff; flag-off writes no diag dir. No-docker adds 2 cases (unbounded diff = 50 identifiers; run-dir preservation exception). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-11 structural equality-proof diff diagnostics RED->GREEN: d28bdae1 -> 5ebeeaca. Makes the opaque structural-sha mismatch (rehearsal #4) self-diagnosing WITHOUT touching the frozen q12-structural-catalog.sql (verified byte-identical). capture.py --structural-payload selects the query's `payload` column (the exact pre-hash jsonb); the plan eagerly captures the source payload in the snapshot window and, on equality failure, captures the isolate payload and raises a bounded per-section diff (identifiers + sha digests only; statements/values never shown). Real-PG17 q12-migration-plan.test.ts: 49 passed — incl. the round-11 negative where a fake-drill injectDrift creates a function ONLY in the isolate and the error names [functions] + q12_drift_probe; the happy path survives the eager source-payload capture. No-docker adds 2 diff-engine cases (per-section add/remove/change identifiers + digests, 64-hex scrub, bounded output). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-10 drill/backup tsx runner RED->GREEN: 268677a1 -> a1b24302. Fixes the rehearsal #3 killer: tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to the workspace root, so `pnpm exec tsx` from the repo root is unresolvable (ERR_PNPM). run_ts now invokes the package pnpm shim ($PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx) with cwd=$PROJECT_ROOT + a fail-closed preflight naming the missing shim; backup-supabase.sh gets the same fix (bytes not sha-pinned). Drill suite supabase-restore-drill.test.ts: 47 passed (46 UNMODIFIED + 1 new RED-through-real-bytes runner test that extracts run_ts and proves it resolves via the package shim, not pnpm). Backup suites (operator+schedule): 65 passed (test-mode injection untouched). Plan suite: no-docker 39, real-PG17 46 passed (fake-drill path unaffected). tsc 0; drill+backup bash -n OK; frozen bytes aaec6fc2…/134255ce… intact (backup path in q12-command-manifest.json unchanged).'
@@ -51,6 +52,69 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-13 is the orchestrator's design-§2 METHOD CORRECTION (`461409a7` -> `ee70f8ac`),
+issued as a product-truth ruling after rehearsal #6 preserved the full payloads. This is
+the decisive round.
+
+Ruling + evidence (value-level): the structural divergence is dump-round-trip EXPRESSION
+RENORMALIZATION, not architecture/version drift (source is PG 17.6 aarch64, image 17.6
+x86_64 — same PG). The stored parse trees of pre-existing objects (created under older PG
+parsers) deparse one way on the live source, but `pg_restore` re-parses the SQL text under
+17.6 into equivalent-but-differently-spelled trees. Verbatim example —
+`public.check_processing_method`:
+source `= ANY (ARRAY['full_text'::character varying, 'hierarchical'::character varying]::text[])`
+isolate `= ANY (ARRAY['full_text'::character varying::text, 'hierarchical'::character varying::text])`
+Also `[columns] ~117` (the same class via column defaults) and the database comment. So an
+isolate can NEVER byte-predict the live hash of a pre-existing object, and design §2's
+raw-isolate-hash equality method is empirically unsound. The purpose of §2 is preserved;
+the frozen barrier/manifest/structural-SQL bytes are untouched.
+
+The sound construction — delta-composed prediction:
+
+1. The equality proof is replaced by two fail-closed checks. (a) OBJECT-COMPLETENESS: the
+   isolate's per-section identity-set (structural key fields — a superset of every
+   section's ORDER BY key) must exactly equal the source's; a missing or extra identity is
+   a hard stop (it proves the restore is object-complete). (b) Content-hash divergence on
+   pre-existing entries is expected (renormalization) and no longer fatal — pre-existing
+   content is taken from the SOURCE, and the drill's own catalog compare (which passed)
+   remains the content-fidelity guard for the restore.
+2. Checkpoint hash prediction. For each checkpoint the in-isolate delta (I_checkpoint −
+   I_pre by identity) must be strictly ADDITIVE: no removed and no modified pre-existing
+   entry in any section, migration_history append-only — any modification of a pre-existing
+   entry is a hard stop (its live form is unpredictable). The predicted live payload is
+   composed as SOURCE pre-existing content + isolate FRESH content, placed in the isolate
+   checkpoint's SQL order (identity-determined = live order), then hashed THROUGH postgres
+   (`capture.py --render-hash` evaluates `encode(digest($composed::jsonb::text,'sha256'))`
+   so the jsonb::text canonicalization is byte-identical to the live side). These become
+   `migrations[].catalog_sha256` and `expected_post_migration_catalog_sha256`;
+   `baseline_structural_sha256` stays the raw SOURCE hash (install-time compare is
+   source-vs-source). `validate_expected_catalog` and the catalog schema/consumers are
+   untouched; all hashes stay 64-hex.
+3. Gating analysis (item 3), verified against the frozen SQL before proceeding — all three
+   conditions for byte-exactness hold, so NO stop-and-report was needed:
+   - migration_history rows are `{version, name, statements}` ordered by version — NO
+     timestamps (:1190-1196).
+   - NO payload entry embeds an OID (only CTE join/order helpers reference oids; guarded\_
+     relations, which does carry oids, is a SEPARATE source-only projection, not the
+     structural payload). Fresh objects therefore have identical content live vs isolate.
+   - Every top-level section's ORDER BY is by identity fields (schema/name/identity-args/
+     attnum/version), never a renormalizable expression — so the check_processing_method
+     deparse difference cannot reorder a section, and the composed order equals the live
+     order.
+4. CI proof (fully reproducible, the strong part): after the plan composes its prediction
+   against a seeded source, the test applies the SAME five migration files to the SOURCE
+   container itself (the live window) and asserts its real post-migration structural hash
+   is byte-EQUAL to the composed prediction. The source is seeded with a check constraint
+   written so PG 17.6 renormalizes it on restore (the check_processing_method class), so
+   the old raw-isolate method would have FAILED while the composed method passes. Negative:
+   an in-isolate migration that ALTERs a pre-existing column default hard-stops naming
+   `[columns]`.
+
+Fail-closed properties: object-incompleteness (missing/extra), a non-additive delta
+(removed/modified pre-existing), an identity collision, a malformed rendered hash, and a
+failed render all hard-stop with a bounded, scrubbed, named diagnostic; on
+`--keep-equality-diagnostics` the full payloads + diff are preserved.
 
 Round-12 preserves the FULL equality-diff evidence for a product-truth ruling
 (`33e27794` -> `c06f3a54`). Rehearsal #5 emitted the round-11 named per-section diff

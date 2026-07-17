@@ -825,13 +825,13 @@ esac
     expect(leftoverIsolates()).toEqual([]);
   }, 180_000);
 
-  it('fails closed on a pre-migration structural-equality mismatch and reclaims the isolate', () => {
+  it('fails closed when the restored isolate is not object-complete against the source and reclaims the isolate', () => {
     const fixture = planFixture();
 
     const result = runLivePlan(fixture, { MC2_Q12_PLAN_FAULT: 'equality' });
 
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/structural catalog differs/iu);
+    expect(result.stderr).toMatch(/not object-complete/iu);
     expect(existsSync(fixture.catalogPath)).toBe(false);
     expect(leftoverIsolates()).toEqual([]);
   }, 180_000);
@@ -1340,14 +1340,13 @@ esac
       const fixture = planFixture();
       const drillLog = join(fixture.runRoot, 'drill-invocation.log');
 
-      // The drill injects a function ONLY into the isolate, so the isolate structural
-      // catalog diverges from the source; the equality proof must fail with a NAMED diff.
+      // The drill injects a function ONLY into the isolate, so the isolate carries an
+      // EXTRA object the source lacks; the object-completeness check must fail with a
+      // NAMED diff (the injected function is not a source object).
       const result = runDrillPlan(fixture, fakeDrill(drillLog, { injectDrift: true }));
 
       expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain(
-        'isolated pre-migration structural catalog differs from the read-only source catalog'
-      );
+      expect(result.stderr).toMatch(/not object-complete/iu);
       expect(result.stderr).toMatch(/\[functions\]/u);
       expect(result.stderr).toContain('q12_drift_probe');
       expect(existsSync(fixture.catalogPath)).toBe(false);
@@ -1382,6 +1381,154 @@ esac
       const isolatePayload = readFileSync(join(diagDir, 'isolate-structural-payload.json'), 'utf8');
       expect(isolatePayload).toContain('q12_drift_probe');
       expect(readFileSync(join(diagDir, 'equality-diff.txt'), 'utf8')).toContain('q12_drift_probe');
+      expect(existsSync(fixture.catalogPath)).toBe(false);
+      expect(leftoverFakeDrill()).toEqual([]);
+    }, 180_000);
+
+    const MIG_DIR = resolve(REPO_ROOT, 'packages/course-gen-platform/supabase/migrations');
+    const BASE_FILES = [
+      '20260711120000_document_evidence.sql',
+      '20260711130000_document_conflict_auto_answers.sql',
+      '20260711140000_document_conflict_side_identity.sql',
+    ];
+    const OBS_FILES = [
+      '20260711150000_document_evidence_observability_index.sql',
+      '20260711151000_document_evidence_observability_totals.sql',
+    ];
+    function applyFilesTo(container: string, files: string[]): void {
+      for (const file of files) {
+        const sql = readFileSync(join(MIG_DIR, file), 'utf8');
+        const res = docker(
+          [
+            'exec',
+            '-i',
+            container,
+            'psql',
+            '-X',
+            '-v',
+            'ON_ERROR_STOP=1',
+            '-U',
+            'postgres',
+            '-d',
+            'postgres',
+          ],
+          sql
+        );
+        if (res.status !== 0) throw new Error(`apply ${file} failed: ${res.stderr}`);
+      }
+    }
+    function structuralSha(container: string): string {
+      const res = spawnSync(
+        '/usr/bin/python3',
+        [CAPTURE, '--container', container, '--dbname', 'postgres'],
+        {
+          encoding: 'utf8',
+          env: {
+            PATH: process.env.PATH ?? '/usr/bin:/bin',
+            LC_ALL: 'C',
+            LANG: 'C',
+            MC2_Q12_PLAN_DOCKER: '/usr/bin/docker',
+          },
+        }
+      );
+      if (res.status !== 0) throw new Error(`source capture failed: ${res.stderr}`);
+      return (JSON.parse(res.stdout) as { structural_sha256: string }).structural_sha256;
+    }
+
+    it('composed prediction equals the real post-migration SOURCE hash despite dump-round-trip renormalization (round-13)', async () => {
+      // Dedicated disposable source seeded with the Supabase-shaped schema, the roles the
+      // migrations GRANT to, AND a check constraint written so PG 17.6 renormalizes it on
+      // dump/restore (the ruling's check_processing_method class) — so a naive raw-isolate
+      // prediction of a pre-existing object would NOT match the live post-migration hash.
+      const container = `mc2-q13-src-${process.pid}-${Date.now()}`;
+      const started = docker([
+        'run',
+        '-d',
+        '--name',
+        container,
+        '-e',
+        `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+        POSTGRES_IMAGE,
+      ]);
+      if (started.status !== 0) throw new Error(`q13 source run failed: ${started.stderr}`);
+      try {
+        await readyPostgres(container);
+        // The check constraint attaches to an EXISTING table (no new guarded relation, so
+        // the frozen inventory_counts stay intact) and is written so PG 17.6 renormalizes it
+        // on dump/restore (the ruling's check_processing_method class).
+        const seed = `${DRILL_SOURCE_SCHEMA}
+CREATE ROLE anon NOLOGIN NOINHERIT;
+CREATE ROLE authenticated NOLOGIN NOINHERIT;
+CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
+CREATE ROLE authenticator NOLOGIN NOINHERIT;
+ALTER TABLE public.courses ADD CONSTRAINT check_processing_method
+  CHECK (generation_status = ANY (ARRAY['full_text'::varchar, 'hierarchical'::varchar]::text[]));`;
+        const setup = docker(
+          ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+          seed
+        );
+        if (setup.status !== 0) throw new Error(`q13 source seed failed: ${setup.stderr}`);
+
+        const fixture = planFixture();
+        const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+        const result = runDrillPlan(fixture, fakeDrill(drillLog), {
+          MC2_Q12_PLAN_SOURCE_CONTAINER: container,
+        });
+        expect(result.status, result.stderr).toBe(0);
+        const catalog = JSON.parse(readFileSync(fixture.catalogPath, 'utf8')) as {
+          migrations: Record<string, { catalog_sha256: string }>;
+        };
+
+        // Apply the SAME five migration files to the SOURCE itself (the live window),
+        // and compute its REAL post-migration structural hash at each checkpoint.
+        applyFilesTo(container, BASE_FILES);
+        const realBase = structuralSha(container);
+        applyFilesTo(container, OBS_FILES);
+        const realObs = structuralSha(container);
+
+        expect(catalog.migrations['20260711140000'].catalog_sha256).toBe(realBase);
+        expect(catalog.migrations['20260711151000'].catalog_sha256).toBe(realObs);
+        expect(leftoverFakeDrill()).toEqual([]);
+      } finally {
+        docker(['rm', '-f', container]);
+      }
+    }, 180_000);
+
+    function applySeamModifyPreexisting(): string {
+      const dir = mkdtempSync('/tmp/mc2-q12-plan-seam-');
+      temporaryDirectories.push(dir);
+      const script = join(dir, 'apply.sh');
+      writeFileSync(
+        script,
+        `#!/usr/bin/env bash
+set -euo pipefail
+packet="$1"
+c="$MC2_Q12_PLAN_ISOLATE_CONTAINER"
+db="\${MC2_Q12_PLAN_ISOLATE_DBNAME:-postgres}"
+d="$MC2_Q12_PLAN_DOCKER"
+if [[ "$packet" == base ]]; then
+  # Modify a PRE-EXISTING column (courses.generation_status default) in the isolate —
+  # a non-additive delta that must hard-stop (unpredictable live form).
+  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d "$db" -c "ALTER TABLE public.courses ALTER COLUMN generation_status SET DEFAULT 'q13-modified';"
+fi
+`,
+        { mode: 0o755 }
+      );
+      chmodSync(script, 0o755);
+      return script;
+    }
+
+    it('hard-stops when an in-isolate migration MODIFIES a pre-existing entry (round-13 negative)', () => {
+      const fixture = planFixture();
+      const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+
+      const result = runDrillPlan(fixture, fakeDrill(drillLog), {
+        MC2_Q12_PLAN_MIGRATION_APPLY: applySeamModifyPreexisting(),
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/non-additive|modified a pre-existing/iu);
+      expect(result.stderr).toMatch(/\[columns\]/u);
       expect(existsSync(fixture.catalogPath)).toBe(false);
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
@@ -1913,5 +2060,148 @@ sys.stdout.write(core._structural_catalog_diff(json.loads(sys.argv[1]), json.loa
     // The run dir it created is PRESERVED (not removed) because diagnostics live there.
     expect(existsSync(runRoot)).toBe(true);
     expect(existsSync(join(runRoot, 'equality-diagnostics', 'equality-diff.txt'))).toBe(true);
+  });
+});
+
+describe('Q12 delta-composed prediction engine (round-13)', () => {
+  const CORE13 = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
+  const PY_ENV13 = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };
+
+  // Call a module function with JSON args; returns {status, out(parsed|null), err}.
+  function callCore(fn: string, args: unknown[]): { status: number; out: unknown; err: string } {
+    const script = `import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE13)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+try:
+    result = getattr(core, sys.argv[1])(*[json.loads(a) for a in sys.argv[2:]])
+    sys.stdout.write('' if result is None else json.dumps(result))
+except core.LifecycleError as error:
+    sys.stderr.write('LIFECYCLE: ' + str(error)); sys.exit(7)`;
+    const res = spawnSync(
+      '/usr/bin/python3',
+      ['-c', script, fn, ...args.map(a => JSON.stringify(a))],
+      {
+        encoding: 'utf8',
+        env: PY_ENV13,
+      }
+    );
+    return {
+      status: res.status ?? -1,
+      out: res.stdout ? JSON.parse(res.stdout) : null,
+      err: res.stderr,
+    };
+  }
+
+  const SV = 'megacampus.q12.structural-catalog-payload/v1';
+  // A pre-existing constraint whose stored tree deparses differently after restore
+  // (the check_processing_method renormalization class), plus a fresh one.
+  const preExistingLive = {
+    schema: 'public',
+    name: 'check_processing_method',
+    relation_schema: 'public',
+    relation_name: 't',
+    definition:
+      "= ANY (ARRAY['full_text'::character varying, 'hierarchical'::character varying]::text[])",
+  };
+  const preExistingIsolate = {
+    schema: 'public',
+    name: 'check_processing_method',
+    relation_schema: 'public',
+    relation_name: 't',
+    definition:
+      "= ANY (ARRAY['full_text'::character varying::text, 'hierarchical'::character varying::text])",
+  };
+  const freshEntry = {
+    schema: 'public',
+    name: 'fresh_ck',
+    relation_schema: 'public',
+    relation_name: 't',
+    definition: 'CHECK (x > 0)',
+  };
+
+  it('_compose_predicted_payload takes pre-existing content from the SOURCE and fresh from the isolate, in isolate order', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres', comment: 'live' },
+      constraints: [preExistingLive],
+    };
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres', comment: 'iso' },
+      constraints: [preExistingIsolate],
+    };
+    const iCheck = {
+      schema_version: SV,
+      database: { name: 'postgres', comment: 'iso' },
+      constraints: [preExistingIsolate, freshEntry],
+    };
+
+    const composed = callCore('_compose_predicted_payload', [source, iPre, iCheck]) as {
+      out: {
+        database: { comment: string };
+        constraints: Array<{ name: string; definition: string }>;
+      };
+    };
+    const payload = composed.out as unknown as {
+      database: { comment: string };
+      constraints: Array<{ name: string; definition: string }>;
+    };
+
+    // pre-existing → SOURCE (live) content, still first (isolate order); fresh → isolate content.
+    expect(payload.constraints[0].name).toBe('check_processing_method');
+    expect(payload.constraints[0].definition).toBe(preExistingLive.definition);
+    expect(payload.constraints[1].name).toBe('fresh_ck');
+    // singleton database is the pre-existing SOURCE object.
+    expect(payload.database.comment).toBe('live');
+  });
+
+  it('_assert_restore_object_complete hard-stops when the restore is missing a source object', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingLive],
+    };
+    const iPre = { schema_version: SV, database: { name: 'postgres' }, constraints: [] };
+    const res = callCore('_assert_restore_object_complete', [source, iPre]);
+    expect(res.status).toBe(7);
+    expect(res.err).toMatch(/\[constraints\]/u);
+    expect(res.err).toContain('check_processing_method');
+  });
+
+  it('_compose_predicted_payload hard-stops when a migration MODIFIES a pre-existing entry (non-additive)', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingLive],
+    };
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingIsolate],
+    };
+    // i_check ALTERs the pre-existing constraint (definition changed vs i_pre).
+    const altered = { ...preExistingIsolate, definition: 'CHECK (different)' };
+    const iCheck = { schema_version: SV, database: { name: 'postgres' }, constraints: [altered] };
+    const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(res.status).toBe(7);
+    expect(res.err).toMatch(/\[constraints\]/u);
+    expect(res.err).toMatch(/modified|removed|non-additive/iu);
+  });
+
+  it('_compose_predicted_payload hard-stops when a migration REMOVES a pre-existing entry', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingLive],
+    };
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingIsolate],
+    };
+    const iCheck = { schema_version: SV, database: { name: 'postgres' }, constraints: [] };
+    const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(res.status).toBe(7);
+    expect(res.err).toMatch(/\[constraints\]/u);
   });
 });
