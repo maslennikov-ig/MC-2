@@ -321,10 +321,37 @@ def capture(container: str | None, dbname: str = "postgres", snapshot: str | Non
     }
 
 
+def capture_structural_payload(
+    container: str | None, dbname: str = "postgres", snapshot: str | None = None
+) -> dict[str, object]:
+    """Read-only diagnostic projection: the FULL canonical structural catalog payload
+    — the exact pre-hash jsonb ``q12-structural-catalog.sql`` hashes into
+    ``structural_sha256``. Selecting the query's ``payload`` column (instead of
+    ``structural_sha256``) leaves the frozen SQL byte-identical. Used ONLY to explain
+    an equality-proof mismatch; never part of the frozen capture output."""
+    structural_sql = STRUCTURAL_CATALOG_FILE.read_text(encoding="utf-8").strip()
+    if ";" in structural_sql:
+        raise CaptureError("structural catalog SQL must be one semicolon-free query")
+    payload = json.loads(
+        run_sql(
+            read_only_wrap(f"SELECT payload FROM (\n{structural_sql}\n) AS plan_capture", snapshot),
+            container,
+            dbname,
+        )
+    )
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != "megacampus.q12.structural-catalog-payload/v1"
+    ):
+        raise CaptureError("structural catalog payload is malformed")
+    return payload
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Q12 plan capture helper")
     parser.add_argument("--container", default=None)
     parser.add_argument("--roles-only", action="store_true")
+    parser.add_argument("--structural-payload", action="store_true")
     parser.add_argument("--dbname", default="postgres")
     parser.add_argument("--snapshot", default=None)
     arguments = parser.parse_args(argv)
@@ -332,11 +359,12 @@ def main(argv: list[str]) -> int:
     snapshot = arguments.snapshot
     if snapshot is not None and not SNAPSHOT_RE.fullmatch(snapshot):
         raise CaptureError("invalid --snapshot value")
-    output = (
-        capture_roles(arguments.container, dbname, snapshot)
-        if arguments.roles_only
-        else capture(arguments.container, dbname, snapshot)
-    )
+    if arguments.structural_payload:
+        output: dict[str, object] = capture_structural_payload(arguments.container, dbname, snapshot)
+    elif arguments.roles_only:
+        output = capture_roles(arguments.container, dbname, snapshot)
+    else:
+        output = capture(arguments.container, dbname, snapshot)
     sys.stdout.write(json.dumps(output, ensure_ascii=False, sort_keys=True))
     sys.stdout.write("\n")
     return 0

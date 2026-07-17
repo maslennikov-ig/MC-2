@@ -1132,7 +1132,10 @@ CREATE TABLE net.http_response(id bigint PRIMARY KEY);
       if (sourceContainer) docker(['rm', '-f', sourceContainer]);
     });
 
-    function fakeDrill(logPath: string, opts: { badHandle?: boolean } = {}): string {
+    function fakeDrill(
+      logPath: string,
+      opts: { badHandle?: boolean; injectDrift?: boolean } = {}
+    ): string {
       const dir = mkdtempSync('/tmp/mc2-q12-fakedrill-');
       temporaryDirectories.push(dir);
       const script = join(dir, 'drill.sh');
@@ -1182,6 +1185,13 @@ if [[ "$mode" == q12 ]]; then
   # guard-less pre-cutover plan restore. Scheduled mode skips this, as the real drill does.
   "$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c ${JSON.stringify(realVerifyCapabilitySql())} >/dev/null
 fi
+${
+  opts.injectDrift
+    ? `# Structural drift ONLY in the isolate (not the source), to exercise the plan's
+# equality-proof diff diagnostics.
+"$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c "CREATE FUNCTION public.q12_drift_probe() RETURNS integer LANGUAGE sql IMMUTABLE AS \\$\\$ SELECT 1 \\$\\$;" >/dev/null`
+    : ''
+}
 port=$("$d" port "$c" 5432/tcp | sed -n 's/.*:\\([0-9][0-9]*\\)$/\\1/p')
 /usr/bin/python3 -c 'import json,os,sys
 h={"schema_version":"megacampus.q12.restore-persist-handle/v1","run_id":sys.argv[1],"container":sys.argv[2],"network":sys.argv[3],"volume":sys.argv[4],"host":"127.0.0.1","port":int(sys.argv[5]),"database":"restore_test","user":"postgres","password":"fakedrillpw"}
@@ -1320,6 +1330,24 @@ esac
 
       expect(result.status).not.toBe(0);
       expect(result.stderr).toMatch(/persist handle/iu);
+      expect(existsSync(fixture.catalogPath)).toBe(false);
+      expect(leftoverFakeDrill()).toEqual([]);
+    }, 180_000);
+
+    it('equality-proof failure names the diverging section and identifier (round-11)', () => {
+      const fixture = planFixture();
+      const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+
+      // The drill injects a function ONLY into the isolate, so the isolate structural
+      // catalog diverges from the source; the equality proof must fail with a NAMED diff.
+      const result = runDrillPlan(fixture, fakeDrill(drillLog, { injectDrift: true }));
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(
+        'isolated pre-migration structural catalog differs from the read-only source catalog'
+      );
+      expect(result.stderr).toMatch(/\[functions\]/u);
+      expect(result.stderr).toContain('q12_drift_probe');
       expect(existsSync(fixture.catalogPath)).toBe(false);
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
@@ -1693,5 +1721,94 @@ sys.stdout.write(detail)`;
     expect(detail).not.toContain('hunter2');
     expect(detail).not.toContain(hex);
     expect(detail).toContain('***');
+  });
+});
+
+describe('Q12 structural equality diff engine (round-11)', () => {
+  const CORE_PATH = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
+  const PY_ENV11 = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };
+
+  function structuralDiff(source: unknown, isolate: unknown): string {
+    const script = `import importlib.util, json, pathlib, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE_PATH)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+sys.stdout.write(core._structural_catalog_diff(json.loads(sys.argv[1]), json.loads(sys.argv[2])))`;
+    const res = spawnSync(
+      '/usr/bin/python3',
+      ['-c', script, JSON.stringify(source), JSON.stringify(isolate)],
+      { encoding: 'utf8', env: PY_ENV11 }
+    );
+    if (res.status !== 0) throw new Error(`_structural_catalog_diff failed: ${res.stderr}`);
+    return res.stdout;
+  }
+
+  it('names per-section added/removed/changed identifiers with side value digests, statements as sha only', () => {
+    const source = {
+      schema_version: 'megacampus.q12.structural-catalog-payload/v1',
+      database: { name: 'postgres', owner: 'admin', encoding: 'UTF8' },
+      extensions: [{ name: 'pgcrypto', version: '1.3', schema: 'extensions' }],
+      functions: [
+        { schema: 'public', name: 'f', identity: 'f()' },
+        { schema: 'auth', name: 'jwt', identity: 'jwt()' },
+      ],
+      migration_history: [
+        { version: '20260704150249', name: 'frontier', statements: ['CREATE X'] },
+      ],
+    };
+    const isolate = {
+      schema_version: 'megacampus.q12.structural-catalog-payload/v1',
+      // extension version bumped by the image (changed), not add/remove.
+      database: { name: 'postgres', owner: 'postgres', encoding: 'UTF8' },
+      extensions: [{ name: 'pgcrypto', version: '1.4', schema: 'extensions' }],
+      // auth.jwt removed; a new probe added.
+      functions: [
+        { schema: 'public', name: 'f', identity: 'f()' },
+        { schema: 'public', name: 'q12_drift_probe', identity: 'q12_drift_probe()' },
+      ],
+      migration_history: [
+        { version: '20260704150249', name: 'frontier', statements: ['CREATE Y'] },
+      ],
+    };
+
+    const diff = structuralDiff(source, isolate);
+
+    expect(diff).toMatch(/\[extensions\][^\n]*~1/u);
+    expect(diff).toContain('name=pgcrypto');
+    expect(diff).toMatch(/\[functions\][^\n]*\+1[^\n]*-1/u);
+    expect(diff).toContain('name=q12_drift_probe');
+    expect(diff).toContain('name=jwt');
+    expect(diff).toMatch(/\[database\]/u);
+    expect(diff).toContain('owner');
+    expect(diff).toMatch(/\[migration_history\][^\n]*~1/u);
+    expect(diff).toContain('version=20260704150249');
+    // Statements are digested, never shown verbatim.
+    expect(diff).not.toContain('CREATE X');
+    expect(diff).not.toContain('CREATE Y');
+  });
+
+  it('scrubs secret shapes in identifiers and bounds output', () => {
+    const hex = 'b'.repeat(64);
+    const source = {
+      schema_version: 'megacampus.q12.structural-catalog-payload/v1',
+      relations: Array.from({ length: 50 }, (_, i) => ({ schema: 'public', name: `t${i}` })),
+      comments: [{ object_type: 'table', schema: 'public', identity: `secret_${hex}` }],
+    };
+    const isolate = {
+      schema_version: 'megacampus.q12.structural-catalog-payload/v1',
+      relations: [],
+      comments: [],
+    };
+
+    const diff = structuralDiff(source, isolate);
+
+    // The raw 64-hex secret shape must not survive into the diagnostic.
+    expect(diff).not.toContain(hex);
+    expect(diff).toContain('***');
+    // Bounded: 50 removed relations must not print 50 identifier lines.
+    expect(diff).toMatch(/\[relations\][^\n]*-50/u);
+    const relationLines = diff
+      .split('\n')
+      .filter(l => l.trimStart().startsWith('- schema=public|name=t'));
+    expect(relationLines.length).toBeLessThanOrEqual(10);
   });
 });

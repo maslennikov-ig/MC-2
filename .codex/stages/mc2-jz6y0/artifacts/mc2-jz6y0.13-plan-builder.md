@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-11 structural equality-proof diff diagnostics RED->GREEN: d28bdae1 -> 5ebeeaca. Makes the opaque structural-sha mismatch (rehearsal #4) self-diagnosing WITHOUT touching the frozen q12-structural-catalog.sql (verified byte-identical). capture.py --structural-payload selects the query's `payload` column (the exact pre-hash jsonb); the plan eagerly captures the source payload in the snapshot window and, on equality failure, captures the isolate payload and raises a bounded per-section diff (identifiers + sha digests only; statements/values never shown). Real-PG17 q12-migration-plan.test.ts: 49 passed — incl. the round-11 negative where a fake-drill injectDrift creates a function ONLY in the isolate and the error names [functions] + q12_drift_probe; the happy path survives the eager source-payload capture. No-docker adds 2 diff-engine cases (per-section add/remove/change identifiers + digests, 64-hex scrub, bounded output). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-10 drill/backup tsx runner RED->GREEN: 268677a1 -> a1b24302. Fixes the rehearsal #3 killer: tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to the workspace root, so `pnpm exec tsx` from the repo root is unresolvable (ERR_PNPM). run_ts now invokes the package pnpm shim ($PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx) with cwd=$PROJECT_ROOT + a fail-closed preflight naming the missing shim; backup-supabase.sh gets the same fix (bytes not sha-pinned). Drill suite supabase-restore-drill.test.ts: 47 passed (46 UNMODIFIED + 1 new RED-through-real-bytes runner test that extracts run_ts and proves it resolves via the package shim, not pnpm). Backup suites (operator+schedule): 65 passed (test-mode injection untouched). Plan suite: no-docker 39, real-PG17 46 passed (fake-drill path unaffected). tsc 0; drill+backup bash -n OK; frozen bytes aaec6fc2…/134255ce… intact (backup path in q12-command-manifest.json unchanged).'
   - 'Round-9 drill diagnostics + scheduled-mode RED->GREEN: 4e3fc6fb -> 87d2601c. Real-PG17 q12-migration-plan.test.ts: 46 passed — the end-to-end drill-seam test now proves the plan restores via the drill SCHEDULED mode; the fake drill mirrors the real drill Q12 activation cleanup (runs the real q12_guard.verify_capability() extracted from run-restore-cleanup.ts) in q12 mode and skips it in scheduled mode, reproducing the pre-C1 rehearsal failure (q12) and proving the fix (scheduled). No-docker adds a diagnostics case (_drill_failure_detail labeled stdout+stderr tails, secrets scrubbed, empty-stderr symptom). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED (persist-seam extension to scheduled mode is env-gated + default byte-identical). tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
   - 'Round-8 drill-generation preflight RED->GREEN: 0791805e -> 53b6fcce. Closes the whole generation preflight the server pre-C1 rehearsal fail-closed on (generation basename is invalid). Real-PG17 q12-migration-plan.test.ts: 45 passed — the end-to-end drill-seam test now drives production _produce_generation output through a fake drill that MIRRORS the real drill preflight (basename ERE + validate_generation Python block, both extracted verbatim from the drill bytes), sweeping the full set: generation-<UTCstamp>Z-<uuid> basename, 4-file layout, 0600 modes, checksums schema/generation/files/sha256/size, source-manifest schema. No-docker adds 5 round-8 cases (contract + item-4 run-dir cleanup). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED. tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
@@ -49,6 +50,43 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-11 makes the plan's structural-sha equality proof self-diagnosing (`d28bdae1` ->
+`5ebeeaca`), after rehearsal #4 got the real drill to complete end-to-end on the pinned
+image but the plan's own gate rejected the restore with an opaque
+`isolated pre-migration structural catalog differs from the read-only source catalog`.
+The drill's OWN baseline-equality compare passed, so the divergence lives in what
+q12-structural-catalog.sql hashes BEYOND the drill's compare set.
+
+- Diagnostic capture (no SQL change): the frozen `q12-structural-catalog.sql` emits BOTH
+  `payload` (the canonical jsonb) and `structural_sha256` (its hash); the capture helper
+  previously selected only the sha. A new `--structural-payload` projection selects the
+  `payload` column instead — the exact pre-hash catalog — leaving the SQL byte-identical.
+- Self-diagnosis: `_capture_source` eagerly captures the source's structural payload while
+  the snapshot window is open (owner-only, under workdir), because the window closes before
+  the equality proof runs. On mismatch the plan captures the isolate payload and raises a
+  bounded, labeled diff — per top-level section the +added/-removed/~changed counts and up
+  to 10 differing identifiers, each with a source/isolate sha digest. It emits ONLY
+  identifiers + digests: no data values, no credentials, migration statements collapse to
+  their object digest. Both payloads may sit 0600 under the workdir (teardown reclaims
+  them); the error tail is the surviving evidence.
+- Design sanity-check (item 3): the structural hash is a SUPERSET of the drill's own
+  compare. The drill compares source-manifest vs restored catalog for the cutover_snapshot
+  and baseline VIEWS (database identity, guarded relations, triggers, cron rows, extensions
+  present) and passed. The structural hash additionally binds the full catalog surface the
+  drill does NOT compare: extension VERSIONS and their instantiated function/catalog rows
+  (the pinned self-hosted image instantiates CREATE EXTENSION at the image's version,
+  which can differ from the managed cloud source), publications/subscriptions, comments,
+  security labels, event triggers, collations/types/operators, and migration_history
+  statements. Those are exactly the diff categories to expect. The structural SQL already
+  excludes only the three drill overrides + is database-name-agnostic (line 69 / db_row);
+  NO new exclusion or allowlist was added — the frozen barrier consumes the same hash at
+  the live window, so weakening the proof would poison the catalog. If rehearsal #5's
+  named diff shows a real irreconcilable divergence (e.g. image extension versions), that is
+  a product-truth finding for the owner to rule on, not something to paper over.
+- RED reproduces it: a fake-drill `injectDrift` variant creates a function ONLY in the
+  isolate, so the isolate catalog diverges from the source and the equality proof must fail
+  naming `[functions]` + the injected identifier.
 
 Round-10 fixes the drill's tsx runner, which the round-9 diagnostics exposed on rehearsal
 #3 (`268677a1` -> `a1b24302`). The self-describing tail read
