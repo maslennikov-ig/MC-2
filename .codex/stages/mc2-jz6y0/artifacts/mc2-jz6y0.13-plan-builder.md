@@ -23,8 +23,9 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
-  - 'Drill-seam consumption RED->GREEN: 0e2cae74 -> a8f355f2. §3 role bootstrap: dc0d9cc6 -> 6a0825fa. Persist seam: 28e75d8c -> 93f01595. Live orchestration: ee04d555 -> 2b6b16ad. Builder: a46c6173 -> 28ec3448.'
-  - 'Unit + drill (no docker): q12-migration-plan.test.ts + supabase-restore-drill.test.ts = 65 passed | 6 skipped.'
+  - 'Snapshot coordinator RED->GREEN: b32ce5ed -> e92ec529. Drill-seam consumption: 0e2cae74 -> a8f355f2. §3 role bootstrap: dc0d9cc6 -> 6a0825fa. Persist seam: 28e75d8c -> 93f01595. Live orchestration: ee04d555 -> 2b6b16ad. Builder: a46c6173 -> 28ec3448.'
+  - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 26 passed clean (first try) — incl. the drill-consumption positive that binds source capture + pg_dump to one exported snapshot via the coordinator, and the malformed-snapshot negative that hard-stops before the drill is invoked.'
+  - 'Unit + drill (no docker): q12-migration-plan.test.ts + supabase-restore-drill.test.ts = 65 passed | 7 skipped.'
   - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 25 passed — capture, direct-mode end-to-end, drill-seam consumption (fake drill: correct drill argv + persist-handle env, restore_test dbname routing, migrate/capture through the handle, teardown of container/network/volume + handle + generation), malformed-handle fail-closed with zero leaked resource, plus equality-mismatch and teardown-override negatives.'
   - '44 existing drill tests pass UNMODIFIED (default byte-identical); pnpm type-check / tsc --noEmit exit 0; python3 compile OK; drill bash -n OK.'
   - 'Frozen bytes unchanged: q12-command-manifest.json aaec6fc2…, q12-database-barrier.sh 134255ce…; q12-live-cutover.test.ts and all existing tests untouched; frozen pg.restore argv untouched.'
@@ -42,6 +43,25 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-6 fixed a real production-path defect and added snapshot coordination
+(`b32ce5ed` -> `e92ec529`): `_produce_source_manifest` called
+`q12-source-manifest.ts capture` with no `--snapshot`, which the CLI hard-rejects
+(q12-source-manifest.ts:1440-1441). Rather than only add a flag, the generation
+production now mirrors the reviewed backup coordinator (backup-supabase.sh:853-883):
+`_open_snapshot_coordinator` opens ONE `REPEATABLE READ READ ONLY` session on the
+source (host psql over the libpq service in production, `docker exec` for CI),
+exports and fail-closed validates a `pg_export_snapshot()` id
+(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+$`), and keeps it open until the source
+capture, dump, and manifest all read that instant. The source
+structural/guarded/cron/frontier capture (`q12-migration-plan-capture.py` gained a
+validated `--snapshot` -> `SET TRANSACTION SNAPSHOT`), `pg_dump --snapshot=`, and
+the manifest `capture --snapshot` all bind to the exported snapshot; a dead
+coordinator or malformed id hard-stops before any restore, and teardown closes the
+session (COMMIT + `\q`). Cluster roles are not MVCC-snapshotted, so — like the
+reviewed backup (backup-supabase.sh:589-614) — `roles.sql` is exported before and
+after the snapshot-bound work and must be byte-identical after removing only the
+PG17 `\restrict`/`\unrestrict` nonce pair; role drift during the window hard-stops.
 
 Wired production `LivePlanExecutor` to restore through the reviewed
 `restore-supabase-drill.sh` via its persist seam instead of the direct
