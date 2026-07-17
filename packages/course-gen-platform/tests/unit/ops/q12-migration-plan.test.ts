@@ -1199,6 +1199,17 @@ for i in $(seq 1 300); do "$d" exec "$c" pg_isready -U postgres >/dev/null 2>&1 
 # The real drill creates restore_test with the source database's exact properties;
 # replicate the postgres db's default comment so the structural sha matches.
 "$d" exec -i "$c" psql -X -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE admin LOGIN NOINHERIT;" -c "CREATE DATABASE restore_test;" -c "COMMENT ON DATABASE restore_test IS 'default administrative connection database';" >/dev/null
+# The real drill restores the source roles (generation/roles.sql) BEFORE database.dump so the
+# schema's GRANTs to the Supabase app roles resolve. Mirror that ordering: idempotently create
+# the app roles the source dump may GRANT to, before restoring the schema.
+"$d" exec -i "$c" psql -X -U postgres -v ON_ERROR_STOP=1 <<'ROLES' >/dev/null
+DO $roles$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticator') THEN CREATE ROLE authenticator NOLOGIN NOINHERIT; END IF;
+END $roles$;
+ROLES
 "$d" exec -i "$c" pg_restore -U postgres -d restore_test --no-password --exit-on-error --single-transaction < "$generation/database.dump" >/dev/null
 if [[ "$mode" == q12 ]]; then
   # Mirror the real drill's Q12 activation cleanup (run-restore-cleanup.ts): it runs
@@ -1531,6 +1542,80 @@ COMMENT ON COLUMN public.organizations.q14_post_gap IS 'q14 post-gap column comm
 
         // Apply the SAME five migration files to the SOURCE itself (the live window),
         // and compute its REAL post-migration structural hash at each checkpoint.
+        applyFilesTo(container, BASE_FILES);
+        const realBase = structuralSha(container);
+        applyFilesTo(container, OBS_FILES);
+        const realObs = structuralSha(container);
+
+        expect(catalog.migrations['20260711140000'].catalog_sha256).toBe(realBase);
+        expect(catalog.migrations['20260711151000'].catalog_sha256).toBe(realObs);
+        expect(leftoverFakeDrill()).toEqual([]);
+      } finally {
+        docker(['rm', '-f', container]);
+      }
+    }, 180_000);
+
+    it('composed prediction equals the real post-migration SOURCE hash for an allowlisted MODIFIED pre-existing function (round-19)', async () => {
+      // Same disposable-source proof as round-13, but auto_answer_questions_atomic(p_course_id
+      // uuid) already EXISTS in the source before the window runs, seeded from the exact
+      // prod-producing repo file (history 20260127143610 /
+      // 20260127200000_auto_answer_questions_atomic_rpc.sql) — chosen over hand-transcribed DDL
+      // so the seed stays byte-faithful to the object prod actually has. 20260711120000 and
+      // 20260711130000 both CREATE OR REPLACE it (120000 re-GRANTs EXECUTE), so it is an
+      // in-place MODIFICATION of a pre-existing entry — the exact rehearsal-12 fail-closed stop.
+      // The frozen MIGRATION_MODIFIED_IDENTITY_ALLOWLIST must let the composer take the isolate
+      // POST render, and composed == real must stay byte-EQUAL (empirical proof that CREATE OR
+      // REPLACE renders identically on both sides on the pinned PG 17.6). CI missed this before
+      // because the source seed lacked the function, so the replace was additive.
+      const container = `mc2-q19-src-${process.pid}-${Date.now()}`;
+      const started = docker([
+        'run',
+        '-d',
+        '--name',
+        container,
+        '-e',
+        `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+        POSTGRES_IMAGE,
+      ]);
+      if (started.status !== 0) throw new Error(`q19 source run failed: ${started.stderr}`);
+      try {
+        await readyPostgres(container);
+        const seed = `${DRILL_SOURCE_SCHEMA}
+CREATE ROLE anon NOLOGIN NOINHERIT;
+CREATE ROLE authenticated NOLOGIN NOINHERIT;
+CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
+CREATE ROLE authenticator NOLOGIN NOINHERIT;
+ALTER TABLE public.courses ADD CONSTRAINT check_processing_method
+  CHECK (generation_status = ANY (ARRAY['full_text'::varchar, 'hierarchical'::varchar]::text[]));`;
+        const setup = docker(
+          ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+          seed
+        );
+        if (setup.status !== 0) throw new Error(`q19 source seed failed: ${setup.stderr}`);
+        // Pre-create the OLD function so the window MODIFIES (not adds) it. Roles the GRANTs
+        // target already exist from the seed above.
+        const oldRpc = readFileSync(
+          join(MIG_DIR, '20260127200000_auto_answer_questions_atomic_rpc.sql'),
+          'utf8'
+        );
+        const seedFn = docker(
+          ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+          oldRpc
+        );
+        if (seedFn.status !== 0) throw new Error(`q19 old-function seed failed: ${seedFn.stderr}`);
+
+        const fixture = planFixture();
+        const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+        const result = runDrillPlan(fixture, fakeDrill(drillLog), {
+          MC2_Q12_PLAN_SOURCE_CONTAINER: container,
+        });
+        // Without the allowlist this fails closed with the rehearsal-12 message; with it the
+        // plan succeeds and the composed checkpoint hashes must equal the real ones.
+        expect(result.status, result.stderr).toBe(0);
+        const catalog = JSON.parse(readFileSync(fixture.catalogPath, 'utf8')) as {
+          migrations: Record<string, { catalog_sha256: string }>;
+        };
+
         applyFilesTo(container, BASE_FILES);
         const realBase = structuralSha(container);
         applyFilesTo(container, OBS_FILES);
@@ -2405,5 +2490,110 @@ except core.LifecycleError as error:
     const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
     expect(res.status).toBe(7);
     expect(res.err).toMatch(/\[default_acls\]/u);
+  });
+
+  // round-19: the release window CREATE-OR-REPLACEs public.auto_answer_questions_atomic
+  // (p_course_id uuid), which pre-exists in prod — an in-place MODIFICATION of a pre-existing
+  // entry. It is the single frozen MIGRATION_MODIFIED_IDENTITY_ALLOWLIST entry: the composer
+  // must take the ISOLATE POST-migration render (identical SQL, same PG), not the
+  // pre-modification live source. The entry's compose identity is schema|name|identity_arguments|kind.
+  const allowFnLive = {
+    schema: 'public',
+    name: 'auto_answer_questions_atomic',
+    identity_arguments: 'p_course_id uuid',
+    kind: 'f',
+    definition: 'LIVE-OLD-DEF',
+    acl: ['=X/postgres'],
+  };
+  const allowFnIsoPre = { ...allowFnLive, definition: 'ISO-OLD-DEF' };
+  const allowFnIsoPost = {
+    ...allowFnLive,
+    definition: 'ISO-NEW-DEF',
+    acl: ['authenticated=X/postgres'],
+  };
+
+  it('_compose_predicted_payload takes ISOLATE POST content for an allowlisted MODIFIED pre-existing entry (round-19)', () => {
+    const source = { schema_version: SV, database: { name: 'postgres' }, functions: [allowFnLive] };
+    const iPre = { schema_version: SV, database: { name: 'postgres' }, functions: [allowFnIsoPre] };
+    const iCheck = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      functions: [allowFnIsoPost],
+    };
+    const composed = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(composed.status, composed.err).toBe(0);
+    const payload = composed.out as { functions: Array<{ name: string; definition: string }> };
+    expect(payload.functions.length).toBe(1);
+    // the migration replaces it: composed content is the isolate POST render, not the live
+    // pre-modification source.
+    expect(payload.functions[0].definition).toBe('ISO-NEW-DEF');
+  });
+
+  it('_compose_predicted_payload still hard-stops a NON-allowlisted function modification (round-19)', () => {
+    const otherLive = { ...allowFnLive, name: 'some_other_rpc' };
+    const otherPre = { ...otherLive, definition: 'ISO-OLD-DEF' };
+    const otherPost = { ...otherLive, definition: 'ISO-NEW-DEF' };
+    const source = { schema_version: SV, database: { name: 'postgres' }, functions: [otherLive] };
+    const iPre = { schema_version: SV, database: { name: 'postgres' }, functions: [otherPre] };
+    const iCheck = { schema_version: SV, database: { name: 'postgres' }, functions: [otherPost] };
+    const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(res.status).toBe(7);
+    expect(res.err).toMatch(/\[functions\]/u);
+    expect(res.err).toMatch(/modified a pre-existing/iu);
+  });
+
+  it('_compose_predicted_payload collects non-additive violations across ALL sections before failing (round-19)', () => {
+    const relLive = {
+      schema: 'public',
+      name: 't2',
+      relation_schema: 'public',
+      relation_name: 't2',
+      definition: 'LIVE',
+    };
+    const relPre = { ...relLive, definition: 'ISO-OLD' };
+    const relPost = { ...relLive, definition: 'ISO-NEW' };
+    const alteredConstraint = { ...preExistingIsolate, definition: 'CHECK (different)' };
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingLive],
+      relations: [relLive],
+    };
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [preExistingIsolate],
+      relations: [relPre],
+    };
+    const iCheck = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      constraints: [alteredConstraint],
+      relations: [relPost],
+    };
+    const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(res.status).toBe(7);
+    // BOTH violating sections are reported together (not fail-fast on the first).
+    expect(res.err).toMatch(/\[constraints\]/u);
+    expect(res.err).toMatch(/\[relations\]/u);
+  });
+
+  it('_compose_predicted_payload keeps a REMOVED allowlisted identity fatal (round-19)', () => {
+    const source = { schema_version: SV, database: { name: 'postgres' }, functions: [allowFnLive] };
+    const iPre = { schema_version: SV, database: { name: 'postgres' }, functions: [allowFnIsoPre] };
+    const iCheck = { schema_version: SV, database: { name: 'postgres' }, functions: [] };
+    const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
+    expect(res.status).toBe(7);
+    expect(res.err).toMatch(/\[functions\]/u);
+    expect(res.err).toMatch(/removed pre-existing/iu);
+  });
+
+  it('_check_restore_completeness accepts an allowlisted pre-existing entry with divergent content (round-19)', () => {
+    const source = { schema_version: SV, database: { name: 'postgres' }, functions: [allowFnLive] };
+    const iPre = { schema_version: SV, database: { name: 'postgres' }, functions: [allowFnIsoPre] };
+    const res = callCore('_check_restore_completeness', [source, iPre]);
+    expect(res.status, res.err).toBe(0);
+    // identity preserved on both sides → no missing, no extra; content divergence is non-fatal here.
+    expect(res.out as unknown[]).toEqual([]);
   });
 });
