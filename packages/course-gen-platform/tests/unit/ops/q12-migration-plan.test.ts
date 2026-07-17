@@ -1,10 +1,18 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
@@ -14,6 +22,7 @@ const RUNNER = resolve(
 const WRAPPER = resolve(REPO_ROOT, 'deploy/qdrant/q12-live-cutover.sh');
 const BARRIER = resolve(REPO_ROOT, 'deploy/qdrant/q12-database-barrier.sh');
 const CAPTURE = resolve(REPO_ROOT, 'deploy/qdrant/q12-migration-plan-capture.py');
+const CORE = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
 const STRUCTURAL_CATALOG = resolve(REPO_ROOT, 'deploy/qdrant/q12-structural-catalog.sql');
 const EXPECTED_SCHEMA = 'megacampus.q12.expected-post-migration-catalog/v1';
 const RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
@@ -331,7 +340,7 @@ describe.runIf(REAL_PG17)('Q12 plan capture against disposable PostgreSQL 17.10'
     expect(started.status, started.stderr).toBe(0);
     try {
       let ready = false;
-      for (let attempt = 0; attempt < 100; attempt += 1) {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
         const probe = docker(['exec', container, 'pg_isready', '-U', 'postgres', '-d', 'postgres']);
         if (probe.status === 0) {
           ready = true;
@@ -504,4 +513,284 @@ CREATE TABLE net.http_response(id bigint PRIMARY KEY);
       docker(['rm', '-f', container]);
     }
   }, 120_000);
+});
+
+describe.runIf(REAL_PG17)('Q12 live plan orchestration against disposable PostgreSQL 17.10', () => {
+  const docker = (args: string[], input?: string) =>
+    spawnSync('docker', args, { encoding: 'utf8', input, timeout: 60_000 });
+  let sourceContainer = '';
+
+  // Synthetic Supabase-shaped source that hosts the REAL five migration files:
+  // 47 public (44 dummies + courses/organizations/clarifying_questions, the FK /
+  // RLS / index dependencies of the migrations), 22 auth, 5 named storage,
+  // cron.job(8), net.http_request_queue, the frozen source frontier row, auth
+  // helper functions, plus schema/name decoys the guarded filter must drop.
+  const SOURCE_SCHEMA = `
+CREATE SCHEMA extensions;
+CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+CREATE SCHEMA supabase_migrations;
+CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY, name text, statements text[]);
+INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20260704150249','frontier');
+CREATE SCHEMA auth;
+CREATE SCHEMA storage;
+CREATE SCHEMA cron;
+CREATE SCHEMA net;
+CREATE SCHEMA realtime;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$ SELECT '{}'::jsonb $fn$;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT 'service_role'::text $fn$;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $fn$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $fn$;
+CREATE TABLE public.organizations(id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.courses(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id),
+  generation_status text
+);
+CREATE TABLE public.clarifying_questions(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL REFERENCES public.courses(id),
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  question_category text,
+  question_priority text,
+  status text,
+  question_type text,
+  suggested_answers jsonb,
+  user_answer jsonb,
+  answer_source text,
+  selected_suggestion_index integer,
+  answered_at timestamptz
+);
+DO $seed$ BEGIN
+  FOR i IN 0..43 LOOP EXECUTE format('CREATE TABLE public.public_table_%s(id bigint PRIMARY KEY)', to_char(i,'FM00')); END LOOP;
+  FOR i IN 0..21 LOOP EXECUTE format('CREATE TABLE auth.auth_table_%s(id bigint PRIMARY KEY)', to_char(i,'FM00')); END LOOP;
+END $seed$;
+CREATE TABLE storage.buckets(id text PRIMARY KEY);
+CREATE TABLE storage.buckets_analytics(id text PRIMARY KEY);
+CREATE TABLE storage.objects(id bigint PRIMARY KEY);
+CREATE TABLE storage.s3_multipart_uploads(id bigint PRIMARY KEY);
+CREATE TABLE storage.s3_multipart_uploads_parts(id bigint PRIMARY KEY);
+CREATE TABLE realtime.messages(id bigint PRIMARY KEY);
+CREATE TABLE cron.job(jobid bigint PRIMARY KEY, schedule text, command text, nodename text, nodeport int, database text, username text, active boolean);
+CREATE TABLE cron.job_run_details(runid bigint PRIMARY KEY);
+INSERT INTO cron.job SELECT v,'0 * * * *','SELECT '||v,'localhost',5432,'postgres','postgres',true FROM generate_series(1,8) v;
+CREATE TABLE net.http_request_queue(id bigint PRIMARY KEY);
+CREATE TABLE net.http_response(id bigint PRIMARY KEY);
+`;
+
+  beforeAll(async () => {
+    sourceContainer = `mc2-q12-plan-src-${process.pid}-${Date.now()}`;
+    const started = docker([
+      'run',
+      '-d',
+      '--rm',
+      '--name',
+      sourceContainer,
+      '-e',
+      `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+      POSTGRES_IMAGE,
+    ]);
+    if (started.status !== 0) throw new Error(`source run failed: ${started.stderr}`);
+    let ready = false;
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      const logs = docker(['logs', sourceContainer]);
+      const probe = docker([
+        'exec',
+        sourceContainer,
+        'pg_isready',
+        '-U',
+        'postgres',
+        '-d',
+        'postgres',
+      ]);
+      if (
+        probe.status === 0 &&
+        `${logs.stdout}${logs.stderr}`.includes(
+          'PostgreSQL init process complete; ready for start up.'
+        )
+      ) {
+        ready = true;
+        break;
+      }
+      await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
+    }
+    if (!ready) throw new Error(`source not ready: ${docker(['logs', sourceContainer]).stderr}`);
+    const setup = docker(
+      ['exec', '-i', sourceContainer, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+      SOURCE_SCHEMA
+    );
+    if (setup.status !== 0) throw new Error(`source schema failed: ${setup.stderr}`);
+  }, 120_000);
+
+  afterAll(() => {
+    if (sourceContainer) docker(['rm', '-f', sourceContainer]);
+  });
+
+  function applySeam(): string {
+    const dir = mkdtempSync('/tmp/mc2-q12-plan-seam-');
+    temporaryDirectories.push(dir);
+    const script = join(dir, 'apply.sh');
+    writeFileSync(
+      script,
+      `#!/usr/bin/env bash
+set -euo pipefail
+packet="$1"
+c="$MC2_Q12_PLAN_ISOLATE_CONTAINER"
+d="$MC2_Q12_PLAN_DOCKER"
+mig="$MC2_Q12_PLAN_REPO_ROOT/packages/course-gen-platform/supabase/migrations"
+apply() {
+  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$mig/$3"
+  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c \\
+    "INSERT INTO supabase_migrations.schema_migrations(version,name,statements) VALUES ('$1','$2',ARRAY['$1']::text[]);"
+}
+# The pinned Supabase image ships these roles; a vanilla PG17 isolate needs
+# them created before the real migrations can GRANT to them.
+"$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres <<'ROLES'
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticator') THEN CREATE ROLE authenticator NOLOGIN NOINHERIT; END IF;
+END
+$roles$;
+ROLES
+case "$packet" in
+  base)
+    apply 20260711120000 document_evidence 20260711120000_document_evidence.sql
+    apply 20260711130000 document_conflict_auto_answers 20260711130000_document_conflict_auto_answers.sql
+    apply 20260711140000 document_conflict_side_identity 20260711140000_document_conflict_side_identity.sql
+    ;;
+  observability)
+    apply 20260711150000 document_evidence_observability_index 20260711150000_document_evidence_observability_index.sql
+    apply 20260711151000 document_evidence_observability_totals 20260711151000_document_evidence_observability_totals.sql
+    ;;
+  *) echo "unknown packet $packet" >&2; exit 2 ;;
+esac
+`,
+      { mode: 0o755 }
+    );
+    chmodSync(script, 0o755);
+    return script;
+  }
+
+  function runLivePlan(
+    fixture: PlanFixture,
+    extraEnv: Record<string, string> = {}
+  ): ReturnType<typeof spawnSync> {
+    return spawnSync(
+      '/usr/bin/python3',
+      [
+        CORE,
+        'plan',
+        '--run-id',
+        RUN_ID,
+        '--release-sha',
+        RELEASE_SHA,
+        '--db-url-file',
+        fixture.dbUrl,
+        '--ca-file',
+        fixture.ca,
+        '--run-root',
+        fixture.runRoot,
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 180_000,
+        env: {
+          PATH: process.env.PATH ?? '/usr/bin:/bin',
+          LC_ALL: 'C',
+          LANG: 'C',
+          MC2_Q12_PLAN_SOURCE_CONTAINER: sourceContainer,
+          MC2_Q12_PLAN_RESTORE_IMAGE: POSTGRES_IMAGE,
+          MC2_Q12_PLAN_MIGRATION_APPLY: applySeam(),
+          MC2_Q12_PLAN_DOCKER: '/usr/bin/docker',
+          ...extraEnv,
+        },
+      }
+    );
+  }
+
+  function leftoverIsolates(): string[] {
+    return docker([
+      'ps',
+      '-a',
+      '--filter',
+      `label=com.megacampus.q12.plan-run=${RUN_ID}`,
+      '--format',
+      '{{.Names}}',
+    ])
+      .stdout.split('\n')
+      .filter(Boolean);
+  }
+
+  it('restores the source, proves structural equality, applies the real five files, and emits a barrier-valid catalog', () => {
+    const fixture = planFixture();
+
+    const result = runLivePlan(fixture);
+
+    expect(result.status, result.stderr).toBe(0);
+    const emitted = readFileSync(fixture.catalogPath);
+    expect(statSync(fixture.catalogPath).mode & 0o777).toBe(0o400);
+    assertPassesFrozenBarrier(emitted.toString('utf8'));
+    const plan = JSON.parse(result.stdout) as Record<string, string>;
+    expect(plan.expected_catalog_sha256).toBe(sha256(emitted));
+    const catalog = JSON.parse(emitted.toString('utf8')) as Record<string, any>;
+    expect(catalog.guarded_relations).toHaveLength(76);
+    expect(catalog.baseline_structural_sha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(catalog.expected_post_migration_catalog_sha256).toBe(
+      catalog.migrations['20260711151000'].catalog_sha256
+    );
+    expect(catalog.migrations['20260711140000'].relations.map((r: any) => r.name)).toEqual([
+      'document_evidence_batch_checkpoints',
+      'document_evidence_conflict_checkpoints',
+      'document_evidence_conflicts',
+      'document_evidence_decisions',
+      'document_evidence_items',
+      'document_evidence_retry_applications',
+      'document_evidence_runs',
+    ]);
+    expect(catalog.migrations['20260711151000'].relations.map((r: any) => r.name)).toEqual([
+      'document_evidence_observability_totals',
+    ]);
+    expect(catalog.migrations['20260711140000'].migration_file_sha256).toBe(
+      sha256(
+        readFileSync(
+          resolve(
+            REPO_ROOT,
+            'packages/course-gen-platform/supabase/migrations/20260711140000_document_conflict_side_identity.sql'
+          )
+        )
+      )
+    );
+    // The post-migration structural hash must differ from the pre-migration one.
+    expect(catalog.migrations['20260711140000'].catalog_sha256).not.toBe(
+      catalog.baseline_structural_sha256
+    );
+    expect(leftoverIsolates()).toEqual([]);
+  }, 180_000);
+
+  it('fails closed on a pre-migration structural-equality mismatch and reclaims the isolate', () => {
+    const fixture = planFixture();
+
+    const result = runLivePlan(fixture, { MC2_Q12_PLAN_FAULT: 'equality' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/structural catalog differs/iu);
+    expect(existsSync(fixture.catalogPath)).toBe(false);
+    expect(leftoverIsolates()).toEqual([]);
+  }, 180_000);
+
+  it('lets a teardown failure override success after the catalog is bound', () => {
+    const fixture = planFixture();
+
+    const result = runLivePlan(fixture, { MC2_Q12_PLAN_FAULT: 'teardown' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/teardown failed|cleanup overrides/iu);
+    // The catalog is emitted and bound before teardown runs.
+    expect(existsSync(fixture.catalogPath)).toBe(true);
+    assertPassesFrozenBarrier(readFileSync(fixture.catalogPath, 'utf8'));
+    // Cleanup-override still reclaims the diagnostic resources.
+    expect(leftoverIsolates()).toEqual([]);
+  }, 180_000);
 });
