@@ -131,14 +131,21 @@ Recommended action: continue the completion program:
    CLIs, production seam lockdown; reviews PASS 0 P0/P1:
    `mc2-jz6y0.13-plan-builder-review.md`,
    `mc2-jz6y0.13-plan-live-review.md`).
-2. NEXT: install updated deploy files on megacampus-prod (hash-verified:
-   `deploy/qdrant/q12-lifecycle-core.py`, `q12-live-cutover.sh`,
-   `q12-migration-plan-capture.py`, `q12-migration-plan-roles.py`,
-   `deploy/postgres/restore-supabase-drill.sh`), run the read-only pre-C1
-   rehearsal `q12-live-cutover.sh plan` as claude-deploy with a fresh UUIDv4
-   run-id (it validates the CI-unreproducible real-CLI/pinned-image leg,
-   fail-closed), then C1..C10 per the window packet with C7 in-window
-   re-freeze of W fields 5/6/8/9.
+2. Pre-C1 rehearsals are COMPLETE: 13 read-only server rehearsals drove
+   rounds 8-19 (scheduled drill mode, tsx shim runners, delta-composed
+   prediction ruling, dump-stable identities, delta-neutral extras, frontier
+   repair, read-only lift, search_path-independent catalog checks, single-
+   entry MIGRATION_MODIFIED_IDENTITY_ALLOWLIST). Rehearsal #13 (run
+   `f4afe952`, release `7ba8f372`, core `e287d0fe…` installed 0444 root)
+   fully SUCCEEDED: status `planned`, catalog at `/opt/megacampus/backups/
+q12/f4afe952-68f9-4fea-873e-2e3809982758/expected-post-migration-catalog.
+json` (0400, sha `de9e6b03…`), baseline `edbea709…`, expected post-
+   migration sha `68041d94…`, clean teardown. Four never-executed-path
+   live-window defects repaired (drill tsx, backup tsx, frontier premise,
+   search_path rendering). NEXT: independent review of rounds 8-19
+   (`7764cfb4..7ba8f372`, artifact `mc2-jz6y0.13-plan-live-review-r2.md`)
+   is IN PROGRESS; on PASS open C1..C10 per the window packet with C7
+   in-window re-freeze of W fields 5/6/8/9.
 3. `.13.8` — owner-deferred password rotation (re-confirm explicitly; never
    rotate on a general "do it"); `.13.6` — off-host S3 production gate;
    `.25` — Prometheus retention YAML (Phase D). Alertmanager Telegram bot
