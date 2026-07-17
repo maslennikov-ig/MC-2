@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Exhaustive drill suite plus the persist-seam fake-docker tests. */
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import {
@@ -1525,4 +1526,120 @@ printf 'adopt\\n' >&"\${MC2_TEMP[1]}"`,
       expect(readdirSync('/tmp').filter(name => name.startsWith(prefix))).toEqual([]);
     }
   );
+});
+
+describe('Q12 restore persist seam', () => {
+  function writeSeamFakeDocker(path: string): void {
+    writeFileSync(
+      path,
+      `#!${process.execPath}
+const fs = require('node:fs');
+const path = require('node:path');
+const state = process.env.FAKE_DOCKER_STATE;
+const argv = process.argv.slice(2);
+const records = () => fs.readdirSync(state).map(name => JSON.parse(fs.readFileSync(path.join(state, name), 'utf8')));
+const labels = () => argv.flatMap((value, index) => value === '--label' ? [argv[index + 1]] : []).reduce((all, item) => { const split = item.indexOf('='); all[item.slice(0, split)] = item.slice(split + 1); return all; }, {});
+const save = (kind, id, name) => fs.writeFileSync(path.join(state, kind + '-' + id), JSON.stringify({ kind, id, name, labels: labels() }));
+const collision = name => records().some(item => item.name === name);
+const create = (kind, id, name, output = id) => { if (collision(name)) process.exit(1); save(kind, id, name); process.stdout.write(output + '\\n'); };
+const remove = (kind, id) => { const record = records().find(item => item.kind === kind && item.id === id); if (!record) process.exit(1); fs.unlinkSync(path.join(state, kind + '-' + id)); };
+const filtered = kind => records().filter(item => item.kind === kind && argv.filter(value => value.startsWith('label=com.megacampus.q12.restore-')).every(filter => { const label = filter.slice(6); const split = label.indexOf('='); return item.labels[label.slice(0, split)] === label.slice(split + 1); }));
+if (argv[0] === 'network' && argv[1] === 'create') create('network', 'a'.repeat(64), argv.at(-1));
+else if (argv[0] === 'volume' && argv[1] === 'create') create('volume', argv.at(-1), argv.at(-1));
+else if (argv[0] === 'run') create('container', 'c'.repeat(64), argv[argv.indexOf('--name') + 1]);
+else if (argv[0] === 'ps') process.stdout.write(filtered('container').map(item => item.id).join('\\n') + (filtered('container').length ? '\\n' : ''));
+else if (argv[0] === 'network' && argv[1] === 'ls') process.stdout.write(filtered('network').map(item => item.id).join('\\n') + (filtered('network').length ? '\\n' : ''));
+else if (argv[0] === 'volume' && argv[1] === 'ls') process.stdout.write(filtered('volume').map(item => item.id).join('\\n') + (filtered('volume').length ? '\\n' : ''));
+else if (argv[0] === 'inspect' || (argv[0] === 'network' && argv[1] === 'inspect') || (argv[0] === 'volume' && argv[1] === 'inspect')) { const id = argv.at(-1); const item = records().find(value => value.id === id); if (!item) process.exit(1); const name = item.kind === 'container' ? '/' + item.name : item.name; process.stdout.write(item.labels['com.megacampus.q12.restore-run'] + '|' + item.labels['com.megacampus.q12.restore-resource'] + '|' + name + '\\n'); }
+else if (argv[0] === 'rm') remove('container', argv.at(-1));
+else if (argv[0] === 'network' && argv[1] === 'rm') remove('network', argv.at(-1));
+else if (argv[0] === 'volume' && argv[1] === 'rm') remove('volume', argv.at(-1));
+else process.exit(2);
+`,
+      { mode: 0o700 }
+    );
+    chmodSync(path, 0o700);
+  }
+
+  const runId = '11111111-2222-4333-8444-555555555555';
+
+  function seamHarness(root: string): { fakeDocker: string; state: string } {
+    const state = join(root, 'docker-state');
+    const fakeDocker = join(root, 'docker');
+    mkdirSync(state, { mode: 0o700 });
+    writeSeamFakeDocker(fakeDocker);
+    return { fakeDocker, state };
+  }
+
+  it('hands off the live isolated resources without teardown when the persist seam is engaged', () => {
+    const root = tempRoot();
+    const lifecycle = join(root, 'restore-docker-lifecycle-inline.sh');
+    writeFileSync(lifecycle, trackedDockerLifecycle(), { mode: 0o600 });
+    const { fakeDocker, state } = seamHarness(root);
+
+    const handoff = spawnSync(
+      '/usr/bin/bash',
+      [
+        '-c',
+        `set -Eeuo pipefail\nDOCKER=$1\nRUN_ID=$2\nRESTORE_IMAGE=synthetic-image\nTEMP_ROOT=$3\nCONTAINER_ID=''\nNETWORK_ID=''\nVOLUME_NAME=''\nPERSIST_ENGAGED=0\nsource $4\ncreate_restore_docker_resources\nPERSIST_ENGAGED=1\ncleanup_restore_docker_resources`,
+        'seam',
+        fakeDocker,
+        runId,
+        root,
+        lifecycle,
+      ],
+      { env: { PATH: '/usr/bin:/bin', FAKE_DOCKER_STATE: state }, encoding: 'utf8' }
+    );
+    expect(handoff.status, handoff.stderr).toBe(0);
+    // All three live resources survive for the caller to migrate/capture.
+    expect(readdirSync(state).length).toBe(3);
+
+    // Caller-owned teardown (a fresh process, resources rediscovered by label).
+    const teardown = spawnSync(
+      '/usr/bin/bash',
+      [
+        '-c',
+        `set -Eeuo pipefail\nDOCKER=$1\nRUN_ID=$2\nRESTORE_IMAGE=x\nTEMP_ROOT=$3\nCONTAINER_ID=''\nNETWORK_ID=''\nVOLUME_NAME=''\nsource $4\ncleanup_restore_docker_resources`,
+        'seam',
+        fakeDocker,
+        runId,
+        root,
+        lifecycle,
+      ],
+      { env: { PATH: '/usr/bin:/bin', FAKE_DOCKER_STATE: state }, encoding: 'utf8' }
+    );
+    expect(teardown.status, teardown.stderr).toBe(0);
+    expect(readdirSync(state)).toEqual([]);
+  });
+
+  it('does not leak isolated resources when the persist seam is requested but the restore fails before handoff', () => {
+    const root = tempRoot();
+    const lifecycle = join(root, 'restore-docker-lifecycle-inline.sh');
+    writeFileSync(lifecycle, trackedDockerLifecycle(), { mode: 0o600 });
+    const { fakeDocker, state } = seamHarness(root);
+
+    const failed = spawnSync(
+      '/usr/bin/bash',
+      [
+        '-c',
+        `set -Eeuo pipefail\nDOCKER=$1\nRUN_ID=$2\nRESTORE_IMAGE=synthetic-image\nTEMP_ROOT=$3\nCONTAINER_ID=''\nNETWORK_ID=''\nVOLUME_NAME=''\nsource $4\ntrap 'cleanup_restore_docker_resources' EXIT\ncreate_restore_docker_resources\nfalse`,
+        'seam',
+        fakeDocker,
+        runId,
+        root,
+        lifecycle,
+      ],
+      {
+        env: {
+          PATH: '/usr/bin:/bin',
+          FAKE_DOCKER_STATE: state,
+          MC2_Q12_RESTORE_PERSIST_HANDLE: join(root, 'handle.json'),
+        },
+        encoding: 'utf8',
+      }
+    );
+    // Restore failed before PERSIST_ENGAGED could reach 1, so full cleanup runs.
+    expect(failed.status).not.toBe(0);
+    expect(readdirSync(state)).toEqual([]);
+  });
 });
