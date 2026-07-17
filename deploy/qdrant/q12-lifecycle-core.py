@@ -4716,6 +4716,133 @@ def _structural_catalog_diff(
     return "\n".join(lines)
 
 
+# Delta-composed live-hash prediction (orchestrator §2 method correction). A dump/restore
+# re-parses stored expression trees under the pinned image, so an isolate can never
+# byte-predict the LIVE hash of a PRE-EXISTING object. But pre-existing objects are
+# untouched by our migrations (their live form is exactly the SOURCE payload), and FRESH
+# objects are parsed identically live and in-isolate (same SQL text, same PG 17.6, ASCII
+# names). So a checkpoint's live catalog = SOURCE pre-existing entries + isolate FRESH
+# entries, and its hash is predictable. Identity is the section-agnostic set of structural
+# key fields below (a superset of every section's ORDER BY key — verified: no OIDs, no
+# timestamps, ordering is identity-determined), which is IDENTICAL for a pre-existing
+# object between source and isolate (only non-identity content deparse-renormalizes).
+_COMPOSE_IDENTITY_KEYS = (
+    "object_type", "schema", "name", "relation", "relation_schema", "relation_name",
+    "table_schema", "table_name", "domain_schema", "domain_name", "position",
+    "identity", "identity_arguments", "subobject_id", "provider", "version",
+    "access_method", "encoding", "role", "parameter", "language",
+    "source_type", "target_type", "left_type", "right_type", "kind",
+)
+
+
+def _compose_identity(entry: Any) -> str:
+    if not isinstance(entry, dict):
+        return "raw:" + _diff_canon(entry)
+    parts = [
+        f"{key}={entry[key]}"
+        for key in _COMPOSE_IDENTITY_KEYS
+        if key in entry and not isinstance(entry[key], (list, dict))
+    ]
+    if not parts:
+        # No structural key fields — fall back to the whole entry so distinct entries
+        # never collapse (a collapse would be caught by the uniqueness guard anyway).
+        return "whole:" + _diff_canon(entry)
+    return "|".join(parts)
+
+
+def _index_by_identity(section: str, entries: list[Any]) -> dict[str, Any]:
+    indexed: dict[str, Any] = {}
+    for entry in entries:
+        identity = _compose_identity(entry)
+        if identity in indexed:
+            raise LifecycleError(
+                f"[{section}] identity is not unique for composition: "
+                f"{_scrub_plan_secret_text(identity)}"
+            )
+        indexed[identity] = entry
+    return indexed
+
+
+def _assert_restore_object_complete(source: dict[str, Any], isolate_pre: dict[str, Any]) -> None:
+    """Fail-closed proof that the restore is object-complete: every source object is
+    present in the isolate and no extra objects appear (identity-set equality per
+    section). Content divergence (deparse renormalization) is NOT checked here — that is
+    expected and handled by delta-composition."""
+    problems: list[str] = []
+    for section in sorted(set(source) | set(isolate_pre)):
+        if section in ("schema_version", "database"):
+            continue
+        source_ids = {_compose_identity(entry) for entry in (source.get(section) or [])}
+        isolate_ids = {_compose_identity(entry) for entry in (isolate_pre.get(section) or [])}
+        missing = sorted(source_ids - isolate_ids)
+        extra = sorted(isolate_ids - source_ids)
+        if missing or extra:
+            detail = f"[{section}] missing {len(missing)} extra {len(extra)}"
+            for identity in missing[:10]:
+                detail += f"\n  missing {_scrub_plan_secret_text(identity)}"
+            for identity in extra[:10]:
+                detail += f"\n  extra {_scrub_plan_secret_text(identity)}"
+            problems.append(detail)
+    if problems:
+        raise LifecycleError(
+            "isolated restore is not object-complete against the read-only source catalog\n"
+            + "\n".join(problems)
+        )
+
+
+def _compose_predicted_payload(
+    source: dict[str, Any], isolate_pre: dict[str, Any], isolate_checkpoint: dict[str, Any]
+) -> dict[str, Any]:
+    """Compose the predicted live post-migration payload: pre-existing entries from the
+    SOURCE (their live deparse), fresh entries from the isolate checkpoint (identical live),
+    placed in the isolate checkpoint's SQL order (identity-determined = live order). Hard
+    stops if the in-isolate migration delta is not strictly ADDITIVE relative to the
+    pre-migration isolate (no removed or modified pre-existing entry in any section)."""
+    predicted: dict[str, Any] = {}
+    for section in sorted(set(source) | set(isolate_checkpoint)):
+        source_value = source.get(section)
+        pre_value = isolate_pre.get(section)
+        check_value = isolate_checkpoint.get(section)
+        if section == "schema_version":
+            predicted[section] = source_value
+            continue
+        if isinstance(check_value, list) or isinstance(source_value, list):
+            source_by = _index_by_identity(section, source_value or [])
+            pre_by = _index_by_identity(section, pre_value or [])
+            check_by = _index_by_identity(section, check_value or [])
+            removed = sorted(set(pre_by) - set(check_by))
+            if removed:
+                raise LifecycleError(
+                    f"[{section}] non-additive delta: migration removed pre-existing entries: "
+                    + ", ".join(_scrub_plan_secret_text(identity) for identity in removed[:10])
+                )
+            modified = sorted(
+                identity
+                for identity in (set(pre_by) & set(check_by))
+                if _diff_canon(pre_by[identity]) != _diff_canon(check_by[identity])
+            )
+            if modified:
+                raise LifecycleError(
+                    f"[{section}] non-additive delta: migration modified a pre-existing entry: "
+                    + ", ".join(_scrub_plan_secret_text(identity) for identity in modified[:10])
+                )
+            # Pre-existing (identity in source) → live SOURCE content; fresh → isolate content.
+            predicted[section] = [
+                source_by[identity] if (identity := _compose_identity(entry)) in source_by else entry
+                for entry in (check_value or [])
+            ]
+        elif isinstance(source_value, dict):
+            # Singleton pre-existing object (database): migrations must not modify it.
+            if pre_value != check_value:
+                raise LifecycleError(
+                    f"[{section}] non-additive delta: migration modified the pre-existing {section} object"
+                )
+            predicted[section] = source_value
+        else:
+            predicted[section] = source_value
+    return predicted
+
+
 class LivePlanExecutor:
     """Production plan capture: read-only source snapshot + isolated restore/migrate.
 
@@ -4910,6 +5037,83 @@ class LivePlanExecutor:
         finally:
             os.close(descriptor)
 
+    def _read_structural_payload(
+        self, container: str | None, dbname: str, *, service_env: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        """Capture the full canonical structural payload (in memory) for composition."""
+        env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
+        if service_env:
+            env.update(service_env)
+        argv = ["/usr/bin/python3", str(self.capture_helper), "--structural-payload", "--dbname", dbname]
+        if container is not None:
+            argv += ["--container", container]
+        completed = subprocess.run(
+            argv, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(f"structural payload capture failed: {completed.stderr.strip()}")
+        return json.loads(completed.stdout)
+
+    def _render_payload_hash(
+        self, container: str | None, dbname: str, payload: dict[str, Any]
+    ) -> str:
+        """Render a composed payload to its sha256 THROUGH postgres, so jsonb::text
+        canonicalization is byte-identical to the frozen SQL/barrier on the live side."""
+        env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
+        argv = ["/usr/bin/python3", str(self.capture_helper), "--render-hash", "--dbname", dbname]
+        if container is not None:
+            argv += ["--container", container]
+        completed = subprocess.run(
+            argv,
+            input=json.dumps(payload, sort_keys=True, ensure_ascii=False),
+            env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(f"composed catalog hash render failed: {completed.stderr.strip()}")
+        digest = completed.stdout.strip()
+        if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+            raise LifecycleError("composed catalog hash is malformed")
+        return digest
+
+    def _structural_failure_detail(
+        self,
+        request: dict[str, Any],
+        base_message: str,
+        source_payload: dict[str, Any],
+        isolate_payload: dict[str, Any],
+    ) -> str:
+        if request.get("keep_equality_diagnostics"):
+            try:
+                self._preserve_equality_diagnostics(request, source_payload, isolate_payload)
+            except OSError:
+                pass
+        diff = _structural_catalog_diff(source_payload, isolate_payload)
+        return (
+            f"{base_message}\n"
+            "--- structural catalog diff (source vs isolate; object values as sha digests) ---\n"
+            f"{diff}"
+        )
+
+    def _compose_checkpoint_hash(
+        self,
+        request: dict[str, Any],
+        container: str,
+        dbname: str,
+        source_payload: dict[str, Any],
+        isolate_pre: dict[str, Any],
+        isolate_checkpoint: dict[str, Any],
+    ) -> str:
+        try:
+            predicted = _compose_predicted_payload(source_payload, isolate_pre, isolate_checkpoint)
+        except LifecycleError as error:
+            raise LifecycleError(
+                self._structural_failure_detail(
+                    request, str(error), source_payload, isolate_checkpoint
+                )
+            ) from None
+        return self._render_payload_hash(container, dbname, predicted)
+
     def _capture_source(
         self, request: dict[str, Any], workdir: pathlib.Path, snapshot: str | None = None
     ) -> dict[str, Any]:
@@ -4970,34 +5174,6 @@ class LivePlanExecutor:
         )
         full = _structural_catalog_diff(source_payload, isolate_payload, max_ids=None, max_lines=None)
         emit("equality-diff.txt", (full + "\n").encode("utf-8"))
-
-    def _structural_equality_failure_detail(
-        self, request: dict[str, Any], workdir: pathlib.Path, target: dict[str, str], dbname: str
-    ) -> str:
-        base = "isolated pre-migration structural catalog differs from the read-only source catalog"
-        source_path = self._resources.get("source_payload")
-        try:
-            if not source_path or not os.path.exists(source_path):
-                return f"{base} (source structural payload unavailable for diff)"
-            source_payload = json.loads(pathlib.Path(source_path).read_text(encoding="utf-8"))
-            isolate_path = workdir / "isolate-structural-payload.json"
-            if os.path.lexists(isolate_path):
-                isolate_path.unlink()
-            self._write_structural_payload(
-                isolate_path, container=target["container"], dbname=dbname, snapshot=None
-            )
-            isolate_payload = json.loads(isolate_path.read_text(encoding="utf-8"))
-            diff = _structural_catalog_diff(source_payload, isolate_payload)
-            if request.get("keep_equality_diagnostics"):
-                self._preserve_equality_diagnostics(request, source_payload, isolate_payload)
-        except (LifecycleError, OSError, ValueError) as error:
-            return f"{base} (diff unavailable: {_scrub_plan_secret_text(str(error))})"
-        return (
-            f"{base}\n"
-            "--- structural catalog diff (source@snapshot vs isolate; object values as sha "
-            "digests) ---\n"
-            f"{diff}"
-        )
 
     def _create_isolate(self, run_id: str) -> str:
         import time
@@ -5622,21 +5798,47 @@ class LivePlanExecutor:
         else:
             raise LifecycleError(f"unknown plan restore mode: {self.restore_mode}")
         dbname = target["dbname"]
+        container = target["container"]
 
-        isolate_baseline = self._run_capture(container=target["container"], dbname=dbname)
-        isolate_structural = isolate_baseline["structural_sha256"]
-        if self.fault == "equality":
-            isolate_structural = "0" * 64
-        if isolate_structural != source["structural_sha256"]:
-            raise LifecycleError(
-                self._structural_equality_failure_detail(request, workdir, target, dbname)
-            )
+        isolate_baseline = self._run_capture(container=container, dbname=dbname)
         before_public = isolate_baseline["public_relations"]
 
+        # Delta-composed live-hash prediction (orchestrator §2 method correction). The
+        # isolate can NEVER byte-predict the live hash of a pre-existing object (dump/restore
+        # renormalizes stored expression trees), so instead of an equality proof we (1)
+        # prove the restore is object-complete (identity-set), then (2) predict each
+        # checkpoint hash by composing SOURCE pre-existing content + isolate FRESH content
+        # and rendering through postgres. Content divergence on pre-existing entries is
+        # expected and non-fatal; the drill's own catalog compare guards restore fidelity.
+        source_payload = json.loads(
+            pathlib.Path(self._resources["source_payload"]).read_text(encoding="utf-8")
+        )
+        isolate_pre = self._read_structural_payload(container, dbname)
+        if self.fault == "equality":
+            # Synthetic object-incompleteness: an isolate schema the source lacks.
+            isolate_pre.setdefault("schemas", []).append(
+                {"name": "mc2_synthetic_fault_schema", "owner": "postgres", "acl": []}
+            )
+        try:
+            _assert_restore_object_complete(source_payload, isolate_pre)
+        except LifecycleError as error:
+            raise LifecycleError(
+                self._structural_failure_detail(request, str(error), source_payload, isolate_pre)
+            ) from None
+
         self._apply_migrations(target, "base")
-        after_base = self._run_capture(container=target["container"], dbname=dbname)
+        after_base = self._run_capture(container=container, dbname=dbname)
+        isolate_base = self._read_structural_payload(container, dbname)
+        base_hash = self._compose_checkpoint_hash(
+            request, container, dbname, source_payload, isolate_pre, isolate_base
+        )
+
         self._apply_migrations(target, "observability")
-        after_observability = self._run_capture(container=target["container"], dbname=dbname)
+        after_observability = self._run_capture(container=container, dbname=dbname)
+        isolate_observability = self._read_structural_payload(container, dbname)
+        observability_hash = self._compose_checkpoint_hash(
+            request, container, dbname, source_payload, isolate_pre, isolate_observability
+        )
 
         return {
             "database": source["database"],
@@ -5647,14 +5849,14 @@ class LivePlanExecutor:
             "cron_jobs": source["cron_jobs"],
             "migrations": {
                 "20260711140000": {
-                    "catalog_sha256": after_base["structural_sha256"],
+                    "catalog_sha256": base_hash,
                     "migration_file_sha256": self._migration_file_sha256("20260711140000"),
                     "relations": self._relation_delta(
                         after_base["public_relations"], before_public
                     ),
                 },
                 "20260711151000": {
-                    "catalog_sha256": after_observability["structural_sha256"],
+                    "catalog_sha256": observability_hash,
                     "migration_file_sha256": self._migration_file_sha256("20260711151000"),
                     "relations": self._relation_delta(
                         after_observability["public_relations"], after_base["public_relations"]

@@ -1453,15 +1453,16 @@ esac
       if (started.status !== 0) throw new Error(`q13 source run failed: ${started.stderr}`);
       try {
         await readyPostgres(container);
+        // The check constraint attaches to an EXISTING table (no new guarded relation, so
+        // the frozen inventory_counts stay intact) and is written so PG 17.6 renormalizes it
+        // on dump/restore (the ruling's check_processing_method class).
         const seed = `${DRILL_SOURCE_SCHEMA}
 CREATE ROLE anon NOLOGIN NOINHERIT;
 CREATE ROLE authenticated NOLOGIN NOINHERIT;
 CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
 CREATE ROLE authenticator NOLOGIN NOINHERIT;
-CREATE TABLE public.renorm_probe(
-  method text,
-  CONSTRAINT check_processing_method CHECK (method = ANY (ARRAY['full_text'::varchar, 'hierarchical'::varchar]::text[]))
-);`;
+ALTER TABLE public.courses ADD CONSTRAINT check_processing_method
+  CHECK (generation_status = ANY (ARRAY['full_text'::varchar, 'hierarchical'::varchar]::text[]));`;
         const setup = docker(
           ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
           seed
