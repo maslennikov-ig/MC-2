@@ -1643,3 +1643,44 @@ else process.exit(2);
     expect(readdirSync(state)).toEqual([]);
   });
 });
+
+describe('drill tsx runner resolution (round-10)', () => {
+  // tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to
+  // the workspace root, so `pnpm exec tsx` from PROJECT_ROOT is unresolvable
+  // (ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL) — this killed rehearsal #3, masked in CI by
+  // the fake pnpm. Extract the real run_ts() bytes and prove it resolves tsx through
+  // the package shim, in an environment that has the package shim but NO
+  // root-resolvable tsx.
+  function extractRunTs(): string {
+    const src = readFileSync(RESTORE, 'utf8');
+    const start = src.indexOf('run_ts() {');
+    const end = src.indexOf('\n}', start);
+    if (start < 0 || end < 0) throw new Error('run_ts() not found in the drill');
+    return src.slice(start, end + 2);
+  }
+
+  it('run_ts resolves tsx through the package shim, not workspace pnpm', () => {
+    const root = tempRoot();
+    const binDir = join(root, 'packages/course-gen-platform/node_modules/.bin');
+    mkdirSync(binDir, { recursive: true });
+    const shim = join(binDir, 'tsx');
+    // A stand-in for the pnpm-generated shim: proves run_ts calls THIS path.
+    writeFileSync(shim, '#!/bin/sh\necho "TSX_SHIM_OK $*"\n', { mode: 0o755 });
+    chmodSync(shim, 0o755);
+
+    const harness = `set -Eeuo pipefail
+PROJECT_ROOT=${JSON.stringify(root)}
+TSX_SHIM="$PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx"
+${extractRunTs()}
+run_ts probe-arg`;
+    const res = spawnSync('/usr/bin/bash', ['-c', harness], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', TMPDIR: '/tmp' },
+    });
+
+    // Old runner (`/usr/bin/pnpm exec tsx` in a non-workspace cwd) fails; the shim
+    // runner echoes the marker with the forwarded args.
+    expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
+    expect(res.stdout).toContain('TSX_SHIM_OK probe-arg');
+  });
+});

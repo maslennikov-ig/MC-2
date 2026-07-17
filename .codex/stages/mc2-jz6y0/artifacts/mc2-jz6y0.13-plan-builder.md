@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-10 drill/backup tsx runner RED->GREEN: 268677a1 -> a1b24302. Fixes the rehearsal #3 killer: tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to the workspace root, so `pnpm exec tsx` from the repo root is unresolvable (ERR_PNPM). run_ts now invokes the package pnpm shim ($PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx) with cwd=$PROJECT_ROOT + a fail-closed preflight naming the missing shim; backup-supabase.sh gets the same fix (bytes not sha-pinned). Drill suite supabase-restore-drill.test.ts: 47 passed (46 UNMODIFIED + 1 new RED-through-real-bytes runner test that extracts run_ts and proves it resolves via the package shim, not pnpm). Backup suites (operator+schedule): 65 passed (test-mode injection untouched). Plan suite: no-docker 39, real-PG17 46 passed (fake-drill path unaffected). tsc 0; drill+backup bash -n OK; frozen bytes aaec6fc2…/134255ce… intact (backup path in q12-command-manifest.json unchanged).'
   - 'Round-9 drill diagnostics + scheduled-mode RED->GREEN: 4e3fc6fb -> 87d2601c. Real-PG17 q12-migration-plan.test.ts: 46 passed — the end-to-end drill-seam test now proves the plan restores via the drill SCHEDULED mode; the fake drill mirrors the real drill Q12 activation cleanup (runs the real q12_guard.verify_capability() extracted from run-restore-cleanup.ts) in q12 mode and skips it in scheduled mode, reproducing the pre-C1 rehearsal failure (q12) and proving the fix (scheduled). No-docker adds a diagnostics case (_drill_failure_detail labeled stdout+stderr tails, secrets scrubbed, empty-stderr symptom). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED (persist-seam extension to scheduled mode is env-gated + default byte-identical). tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
   - 'Round-8 drill-generation preflight RED->GREEN: 0791805e -> 53b6fcce. Closes the whole generation preflight the server pre-C1 rehearsal fail-closed on (generation basename is invalid). Real-PG17 q12-migration-plan.test.ts: 45 passed — the end-to-end drill-seam test now drives production _produce_generation output through a fake drill that MIRRORS the real drill preflight (basename ERE + validate_generation Python block, both extracted verbatim from the drill bytes), sweeping the full set: generation-<UTCstamp>Z-<uuid> basename, 4-file layout, 0600 modes, checksums schema/generation/files/sha256/size, source-manifest schema. No-docker adds 5 round-8 cases (contract + item-4 run-dir cleanup). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED. tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
   - 'Round-8 broad no-docker ops set (tests/unit/ops/): 876 passed | 59 skipped, 1 pre-existing failure in qdrant-observability-contract.test.ts (Q9 observability: .env.production.example lacks QDRANT_METRICS_GID) — outside the round-8 change surface (round-8 touched only q12-lifecycle-core.py + q12-migration-plan.test.ts + the plan runner fixture; the observability test and its ops/qdrant inputs are untouched).'
@@ -39,6 +40,7 @@ changed_files:
   - deploy/qdrant/q12-migration-plan-capture.py
   - deploy/qdrant/q12-migration-plan-roles.py
   - deploy/postgres/restore-supabase-drill.sh
+  - deploy/postgres/backup-supabase.sh
   - packages/course-gen-platform/tests/unit/ops/q12-migration-plan.test.ts
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-migration-plan-runner.py
   - packages/course-gen-platform/tests/unit/ops/supabase-restore-drill.test.ts
@@ -47,6 +49,45 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-10 fixes the drill's tsx runner, which the round-9 diagnostics exposed on rehearsal
+#3 (`268677a1` -> `a1b24302`). The self-describing tail read
+`ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL / Command "tsx" not found`.
+
+- Root cause: `run_ts()` did `(cd "$PROJECT_ROOT" && /usr/bin/pnpm exec tsx "$@")`, but tsx
+  is a devDependency of `packages/course-gen-platform` ONLY, not hoisted to the workspace
+  root, and there is no hoist config — `pnpm exec tsx` from the repo root is unresolvable
+  everywhere (server AND dev; `node_modules/.bin/tsx` at the root is absent). The drill's
+  tsx leg had never been executable in reality; the fake pnpm in the suite masked it. This
+  also broke the real C-window drill run and the scheduled backup (both run as root with
+  PATH=/usr/sbin:/usr/bin:/sbin:/bin), so the fix repairs the live cutover path, not just
+  plan mode.
+- Fix: `run_ts()` invokes the package's own pnpm-generated shim directly
+  (`$PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx`), keeping
+  cwd=$PROJECT_ROOT for the scripts' relative-path expectations. The shim is a `#!/bin/sh`
+  script that execs `node` (resolved on PATH — /usr/bin/node on the server) with tsx's
+  cli.mjs, and each machine's pnpm install regenerates it with that machine's absolute
+  NODE_PATH. A fail-closed preflight in `parse_arguments` names the missing shim instead of
+  surfacing an opaque ERR_PNPM mid-restore. NOTE: the team-lead's assumed shim shebang
+  `#!/usr/bin/env node` is actually `#!/bin/sh` + internal `exec node` — the node-on-PATH
+  assumption still holds and is stated in the script comment.
+- Sweep of other pnpm-exec/tsx/node resolution in the drill + helpers:
+  - `backup-supabase.sh:585` had the SAME `/usr/bin/pnpm exec tsx` bug (scheduled backup +
+    cutover backup). Its bytes are NOT sha-pinned (only its PATH string appears in the
+    frozen `q12-command-manifest.json`, whose sha is unchanged), so it is fixed with the
+    same shim + preflight; its test-mode injection (which bypasses this line) is untouched
+    and its 65 tests pass.
+  - The plan's own node/tsx sites (`_produce_source_manifest`, `_apply_real_cli`) use
+    `node --import tsx` with cwd=packages/course-gen-platform, so tsx resolves from the
+    package's node_modules — consistent with the shim rule; they worked on the server and
+    are left as-is (noted).
+  - The helper shebangs (`#!/usr/bin/env -S pnpm exec tsx` on run-restore-cleanup.ts,
+    q12-source-manifest.ts, generate-role-bootstrap.ts) are the same broken pattern but
+    COSMETIC — every call site invokes them via a runner (tsx/`node --import tsx`), never
+    executes them directly — so they are left unchanged and noted.
+- RED reproduces the killer honestly: a new drill-suite test extracts the real `run_ts()`
+  bytes and runs them in an env with the package shim present but NO root-resolvable tsx;
+  the old runner fails, the shim runner succeeds.
 
 Round-9 adds drill failure diagnostics and fixes the next mock-reality drift the pre-C1
 rehearsal exposed (`4e3fc6fb` -> `87d2601c`). Rehearsal #2 passed the generation preflight
