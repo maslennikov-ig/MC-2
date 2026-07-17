@@ -29,6 +29,14 @@ CONTAINER_ID=''
 NETWORK_ID=''
 VOLUME_NAME=''
 CLEANUP_STARTED=0
+# Opt-in Q12 plan persist seam. When MC2_Q12_RESTORE_PERSIST_HANDLE names a safe
+# owner-only output path (q12 mode only), a successful restore writes an
+# owner-only 0400 handle (container/network/volume/loopback port + restore_test
+# connection) and hands the live resources to the caller instead of tearing them
+# down; the caller then owns teardown. When the env is unset the drill is
+# byte-for-byte its previous self. Invalid values fail closed.
+PERSIST_HANDLE=''
+PERSIST_ENGAGED=0
 
 fail() {
   printf 'Supabase restore drill failed: %s\n' "$1" >&2
@@ -104,6 +112,15 @@ restore_docker_discover() {
 
 cleanup_restore_docker_resources() {
   local status=0 identity='' discovery_status=0
+  # Persist seam (opt-in): once a successful restore has published its handle and
+  # transferred ownership to the caller, the container/network/volume must survive
+  # for the caller to migrate/capture. PERSIST_ENGAGED is set to 1 only on that
+  # exact success path; on any failure it stays 0 and full cleanup runs, so the
+  # seam can never become a silent leak. TEMP_ROOT is still reclaimed by
+  # cleanup_resources regardless. Default (unset) behavior is unchanged.
+  if [[ "${PERSIST_ENGAGED:-0}" == 1 ]]; then
+    return 0
+  fi
   if [[ -n "${CONTAINER_ID:-}" ]]; then
     identity=$CONTAINER_ID
   elif identity=$(restore_docker_discover container); then
@@ -630,8 +647,49 @@ PY
   /usr/bin/chmod 600 -- "$TEMP_ROOT/activation-cleanup.sql"
 }
 
+validate_persist_handle() {
+  PERSIST_HANDLE="${MC2_Q12_RESTORE_PERSIST_HANDLE:-}"
+  [[ -n "$PERSIST_HANDLE" ]] || return 0
+  [[ "$RUN_KIND" == q12 ]] || fail 'persist seam is only valid in Q12 mode' 64
+  [[ "$PERSIST_HANDLE" == /* && "$PERSIST_HANDLE" != *$'\n'* && "$PERSIST_HANDLE" != *$'\r'* ]] ||
+    fail 'persist handle must be an absolute control-free path' 64
+  local parent="${PERSIST_HANDLE%/*}"
+  [[ -n "$parent" ]] || parent='/'
+  require_absolute_directory 'persist handle parent' "$parent" '700'
+  [[ ! -e "$PERSIST_HANDLE" || ( -f "$PERSIST_HANDLE" && ! -L "$PERSIST_HANDLE" ) ]] ||
+    fail 'persist handle path is not a plain non-symlink file' 64
+  [[ ! -e "$PERSIST_HANDLE" ]] || /usr/bin/rm -f -- "$PERSIST_HANDLE"
+}
+
+write_persist_handle() {
+  local port=$1 password=$2
+  /usr/bin/python3 - "$PERSIST_HANDLE" "$CONTAINER_ID" "$NETWORK_ID" "$VOLUME_NAME" "$port" "$password" "$RUN_ID" <<'PY'
+import json, os, sys
+path, container, network, volume, port, password, run_id = sys.argv[1:8]
+handle = {
+    "schema_version": "megacampus.q12.restore-persist-handle/v1",
+    "run_id": run_id,
+    "container": container,
+    "network": network,
+    "volume": volume,
+    "host": "127.0.0.1",
+    "port": int(port),
+    "database": "restore_test",
+    "user": "postgres",
+    "password": password,
+}
+descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o400)
+try:
+    os.write(descriptor, (json.dumps(handle, sort_keys=True) + "\n").encode("utf-8"))
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
 main() {
   parse_arguments "$@"
+  validate_persist_handle
   create_temp_root
   validate_generation
   verify_image_identity
@@ -777,6 +835,12 @@ if source <= 0 or not 0.25 <= ratio <= 2.0:
     raise SystemExit("restored database size ratio is outside 25%-200%")
 print(f"restore size ratio={ratio:.6f}")
 PY
+  if [[ -n "$PERSIST_HANDLE" ]]; then
+    write_persist_handle "$port" "$cleanup_password" || fail 'failed to publish persist handle'
+    # Ownership of the live container/network/volume transfers to the caller only
+    # now, after a fully successful restore and durable handle publication.
+    PERSIST_ENGAGED=1
+  fi
   printf 'Supabase isolated restore passed: %s\n' "${GENERATION##*/}"
 }
 
