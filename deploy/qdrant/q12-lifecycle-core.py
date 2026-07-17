@@ -4148,9 +4148,442 @@ def run_smoke(arguments: argparse.Namespace) -> dict[str, Any]:
     return evaluate_smoke_observation(observation, arguments.run_id)
 
 
+# --- Q12 expected-post-migration-catalog plan builder -----------------------
+#
+# `plan` mode is the non-mutating, pre-live builder described in the corrections
+# design (§2, "Before any live mutation, q12-live-cutover.sh --plan also builds
+# the migration expectation independently").  It captures the read-only source
+# structural catalog, restores that snapshot into the pinned isolated Supabase
+# image, applies only the five release-SHA migration files inside the isolated
+# target, and emits the owner-only expected-post-migration-catalog.json that the
+# database barrier, source manifest, and backup consumers accept byte-exactly.
+#
+# The catalog-assembly/validation/emission surface below is fully deterministic
+# and is the sole authority for the frozen artifact shape; the DB/Docker work is
+# delegated to an injectable PlanExecutor so it can be exercised with synthetic
+# fixtures (fast unit tests) or a real disposable PostgreSQL 17 (gated proof).
+
+EXPECTED_CATALOG_SCHEMA_VERSION = "megacampus.q12.expected-post-migration-catalog/v1"
+PLAN_MIGRATION_KEYS = ("20260711140000", "20260711151000")
+PLAN_FINAL_MIGRATION_KEY = PLAN_MIGRATION_KEYS[-1]
+PLAN_MIGRATION_FRONTIER = "20260704150249"
+PLAN_GUARDED_SCHEMAS = frozenset({"public", "auth", "storage", "cron", "net"})
+PLAN_STORAGE_NAMES = (
+    "buckets",
+    "buckets_analytics",
+    "objects",
+    "s3_multipart_uploads",
+    "s3_multipart_uploads_parts",
+)
+PLAN_INVENTORY_COUNTS = {"public": 47, "auth": 22, "storage": 5, "cron_jobs": 8, "pg_net_queue": 0}
+PLAN_MIGRATION_FILES = {
+    "20260711140000": (
+        "packages/course-gen-platform/supabase/migrations/"
+        "20260711140000_document_conflict_side_identity.sql"
+    ),
+    "20260711151000": (
+        "packages/course-gen-platform/supabase/migrations/"
+        "20260711151000_document_evidence_observability_totals.sql"
+    ),
+}
+HEX64_RE = re.compile(r"[0-9a-f]{64}")
+HEX40_RE = re.compile(r"[0-9a-f]{40}")
+PLAN_NAME_RE = re.compile(r"[a-z_][a-z0-9_]*")
+UUID4_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+)
+
+
+class PlanExecutor(Protocol):
+    def capture(self, request: dict[str, Any]) -> dict[str, Any]: ...
+
+
+def _plan_is_bad_hex64(value: Any) -> bool:
+    return not (isinstance(value, str) and HEX64_RE.fullmatch(value))
+
+
+def _plan_relation_sort_key(relation: Any) -> tuple[str, str]:
+    if isinstance(relation, dict):
+        return (str(relation.get("schema")), str(relation.get("name")))
+    return ("", "")
+
+
+def _validate_guarded_relations(relations: Any) -> list[str]:
+    if not isinstance(relations, list) or len(relations) != 76:
+        raise LifecycleError("guarded_relations must be a 76-element array")
+    oids: set[int] = set()
+    identities: list[str] = []
+    counts = {"public": 0, "auth": 0, "storage": 0}
+    storage_names: list[str] = []
+    for relation in relations:
+        if not isinstance(relation, dict) or set(relation) != {
+            "schema",
+            "name",
+            "oid",
+            "relkind",
+            "parent_oid",
+            "owner",
+        }:
+            raise LifecycleError("guarded relation key set mismatch")
+        schema = relation["schema"]
+        name = relation["name"]
+        owner = relation["owner"]
+        oid = relation["oid"]
+        parent_oid = relation["parent_oid"]
+        if (
+            schema not in PLAN_GUARDED_SCHEMAS
+            or not (isinstance(name, str) and PLAN_NAME_RE.fullmatch(name))
+            or not (isinstance(owner, str) and PLAN_NAME_RE.fullmatch(owner))
+            or relation["relkind"] not in ("r", "p")
+            or not isinstance(oid, int)
+            or isinstance(oid, bool)
+            or oid <= 0
+            or (parent_oid is not None and (not isinstance(parent_oid, int) or isinstance(parent_oid, bool)))
+        ):
+            raise LifecycleError("guarded relation shape mismatch")
+        identity = f"{schema}.{name}"
+        if oid in oids or identity in identities:
+            raise LifecycleError("guarded relation duplicate identity")
+        oids.add(oid)
+        identities.append(identity)
+        if schema in counts:
+            counts[schema] += 1
+        if schema == "storage":
+            storage_names.append(name)
+    if counts != {"public": 47, "auth": 22, "storage": 5}:
+        raise LifecycleError("guarded relation per-schema inventory mismatch")
+    if sorted(storage_names) != sorted(PLAN_STORAGE_NAMES):
+        raise LifecycleError("guarded storage relation set mismatch")
+    if any(rel["schema"] == "auth" and rel["name"] == "schema_migrations" for rel in relations):
+        raise LifecycleError("auth.schema_migrations must not be guarded")
+    if sum(1 for rel in relations if rel["schema"] == "cron" and rel["name"] == "job") != 1:
+        raise LifecycleError("cron.job must appear exactly once")
+    if (
+        sum(1 for rel in relations if rel["schema"] == "net" and rel["name"] == "http_request_queue")
+        != 1
+    ):
+        raise LifecycleError("net.http_request_queue must appear exactly once")
+    return identities
+
+
+def _validate_cron_jobs(cron_jobs: Any) -> None:
+    if not isinstance(cron_jobs, list) or len(cron_jobs) != 8:
+        raise LifecycleError("cron_jobs must be an 8-element array")
+    jobids: set[int] = set()
+    for job in cron_jobs:
+        if not isinstance(job, dict) or set(job) != {"jobid", "username", "command_sha256"}:
+            raise LifecycleError("cron job key set mismatch")
+        if (
+            not isinstance(job["jobid"], int)
+            or isinstance(job["jobid"], bool)
+            or job["username"] != "postgres"
+            or _plan_is_bad_hex64(job["command_sha256"])
+        ):
+            raise LifecycleError("cron job shape mismatch")
+        jobids.add(job["jobid"])
+    if len(jobids) != 8:
+        raise LifecycleError("cron jobs contain duplicate jobids")
+
+
+def _validate_migrations(catalog: dict[str, Any], guarded_identities: list[str]) -> None:
+    migrations = catalog["migrations"]
+    if not isinstance(migrations, dict) or tuple(sorted(migrations)) != PLAN_MIGRATION_KEYS:
+        raise LifecycleError("migrations key set mismatch")
+    all_identities = list(guarded_identities)
+    for key in PLAN_MIGRATION_KEYS:
+        entry = migrations[key]
+        if not isinstance(entry, dict) or set(entry) != {
+            "catalog_sha256",
+            "migration_file_sha256",
+            "relations",
+        }:
+            raise LifecycleError(f"migration {key} key set mismatch")
+        if _plan_is_bad_hex64(entry["catalog_sha256"]) or _plan_is_bad_hex64(
+            entry["migration_file_sha256"]
+        ):
+            raise LifecycleError(f"migration {key} hash shape mismatch")
+        relations = entry["relations"]
+        if not isinstance(relations, list) or not relations:
+            raise LifecycleError(f"migration {key} relation set is empty")
+        previous = ""
+        for relation in relations:
+            if not isinstance(relation, dict) or set(relation) != {
+                "schema",
+                "name",
+                "relkind",
+                "parent_schema",
+                "parent_name",
+                "owner",
+            }:
+                raise LifecycleError(f"migration {key} relation key set mismatch")
+            schema = relation["schema"]
+            name = relation["name"]
+            owner = relation["owner"]
+            parent_schema = relation["parent_schema"]
+            parent_name = relation["parent_name"]
+            if (
+                schema not in PLAN_GUARDED_SCHEMAS
+                or not (isinstance(name, str) and PLAN_NAME_RE.fullmatch(name))
+                or not (isinstance(owner, str) and PLAN_NAME_RE.fullmatch(owner))
+                or relation["relkind"] not in ("r", "p")
+                or (parent_schema is None) != (parent_name is None)
+            ):
+                raise LifecycleError(f"migration {key} relation shape mismatch")
+            if parent_schema is not None and (
+                parent_schema not in PLAN_GUARDED_SCHEMAS
+                or not (isinstance(parent_name, str) and PLAN_NAME_RE.fullmatch(parent_name))
+            ):
+                raise LifecycleError(f"migration {key} relation parent shape mismatch")
+            identity = f"{schema}.{name}"
+            if identity < previous:
+                raise LifecycleError(f"migration {key} relations are not sorted by schema,name")
+            previous = identity
+            all_identities.append(identity)
+    if migrations[PLAN_FINAL_MIGRATION_KEY]["catalog_sha256"] != catalog[
+        "expected_post_migration_catalog_sha256"
+    ]:
+        raise LifecycleError("final migration catalog hash must equal expected_post_migration_catalog_sha256")
+    if len(set(all_identities)) != len(all_identities):
+        raise LifecycleError("relation identity is not globally unique across guarded and migration sets")
+
+
+def validate_expected_catalog(catalog: Any) -> None:
+    """Fail-closed mirror of the frozen barrier/source-manifest schema contract."""
+    if not isinstance(catalog, dict) or set(catalog) != {
+        "schema_version",
+        "database",
+        "database_owner",
+        "release_sha",
+        "migration_frontier",
+        "baseline_structural_sha256",
+        "expected_post_migration_catalog_sha256",
+        "inventory_counts",
+        "guarded_relations",
+        "cron_jobs",
+        "migrations",
+    }:
+        raise LifecycleError("expected catalog top-level key set mismatch")
+    if catalog["schema_version"] != EXPECTED_CATALOG_SCHEMA_VERSION:
+        raise LifecycleError("expected catalog schema_version mismatch")
+    if catalog["database"] != "postgres" or catalog["database_owner"] != "postgres":
+        raise LifecycleError("expected catalog database/owner must be postgres")
+    if not (isinstance(catalog["release_sha"], str) and HEX40_RE.fullmatch(catalog["release_sha"])):
+        raise LifecycleError("expected catalog release_sha must be 40-hex")
+    if catalog["migration_frontier"] != PLAN_MIGRATION_FRONTIER:
+        raise LifecycleError("expected catalog migration_frontier mismatch")
+    for field in ("baseline_structural_sha256", "expected_post_migration_catalog_sha256"):
+        if _plan_is_bad_hex64(catalog[field]):
+            raise LifecycleError(f"expected catalog {field} must be 64-hex")
+    if catalog["inventory_counts"] != PLAN_INVENTORY_COUNTS:
+        raise LifecycleError("expected catalog inventory_counts mismatch")
+    guarded_identities = _validate_guarded_relations(catalog["guarded_relations"])
+    _validate_cron_jobs(catalog["cron_jobs"])
+    _validate_migrations(catalog, guarded_identities)
+
+
+def _plan_count_schema(relations: Any, schema: str) -> int:
+    if not isinstance(relations, list):
+        return -1
+    return sum(1 for rel in relations if isinstance(rel, dict) and rel.get("schema") == schema)
+
+
+def assemble_expected_catalog(release_sha: str, evidence: Any) -> dict[str, Any]:
+    """Deterministically build the frozen catalog dict from capture evidence."""
+    required = {
+        "database",
+        "database_owner",
+        "migration_frontier",
+        "baseline_structural_sha256",
+        "guarded_relations",
+        "cron_jobs",
+        "migrations",
+    }
+    if not isinstance(evidence, dict) or not required <= set(evidence):
+        raise LifecycleError("plan capture evidence is missing required fields")
+    migrations_evidence = evidence["migrations"]
+    if not isinstance(migrations_evidence, dict) or tuple(sorted(migrations_evidence)) != PLAN_MIGRATION_KEYS:
+        raise LifecycleError("plan capture evidence migrations keys mismatch")
+    migrations: dict[str, Any] = {}
+    for key in PLAN_MIGRATION_KEYS:
+        entry = migrations_evidence[key]
+        if not isinstance(entry, dict) or set(entry) != {
+            "catalog_sha256",
+            "migration_file_sha256",
+            "relations",
+        }:
+            raise LifecycleError(f"plan capture evidence migration {key} shape mismatch")
+        relations = entry["relations"]
+        if not isinstance(relations, list):
+            raise LifecycleError(f"plan capture evidence migration {key} relations must be a list")
+        migrations[key] = {
+            "catalog_sha256": entry["catalog_sha256"],
+            "migration_file_sha256": entry["migration_file_sha256"],
+            "relations": sorted(relations, key=_plan_relation_sort_key),
+        }
+    return {
+        "schema_version": EXPECTED_CATALOG_SCHEMA_VERSION,
+        "database": evidence["database"],
+        "database_owner": evidence["database_owner"],
+        "release_sha": release_sha,
+        "migration_frontier": evidence["migration_frontier"],
+        "baseline_structural_sha256": evidence["baseline_structural_sha256"],
+        "expected_post_migration_catalog_sha256": migrations[PLAN_FINAL_MIGRATION_KEY]["catalog_sha256"],
+        "inventory_counts": {
+            "public": _plan_count_schema(evidence["guarded_relations"], "public"),
+            "auth": _plan_count_schema(evidence["guarded_relations"], "auth"),
+            "storage": _plan_count_schema(evidence["guarded_relations"], "storage"),
+            "cron_jobs": len(evidence["cron_jobs"]) if isinstance(evidence["cron_jobs"], list) else -1,
+            "pg_net_queue": 0,
+        },
+        "guarded_relations": evidence["guarded_relations"],
+        "cron_jobs": evidence["cron_jobs"],
+        "migrations": migrations,
+    }
+
+
+def _validate_plan_credential_file(path: pathlib.Path, allowed_modes: set[int]) -> None:
+    require_lexical_absolute(path)
+    parent = open_parent_directory(path)
+    try:
+        descriptor = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent)
+    except OSError as error:
+        os.close(parent)
+        raise LifecycleError(f"plan credential file unavailable: {path}") from error
+    try:
+        stat = os.fstat(descriptor)
+        if (
+            not stat_module.S_ISREG(stat.st_mode)
+            or stat.st_uid != 1000
+            or stat.st_gid != 1000
+            or (stat.st_mode & 0o777) not in allowed_modes
+            or stat.st_nlink != 1
+        ):
+            raise LifecycleError(f"unsafe plan credential file: {path}")
+    finally:
+        os.close(descriptor)
+        os.close(parent)
+
+
+def _plan_run_root(run_id: str, run_root_argument: str | None) -> pathlib.Path:
+    production_root = pathlib.Path("/opt/megacampus/backups/q12") / run_id
+    if run_root_argument is None:
+        return production_root
+    run_root = pathlib.Path(run_root_argument)
+    require_lexical_absolute(run_root)
+    if run_root != production_root and not re.fullmatch(
+        r"/tmp/mc2-q12-plan-[^/]+", str(run_root)
+    ):
+        raise LifecycleError("plan run root shape mismatch")
+    return run_root
+
+
+def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict[str, Any]:
+    run_id = arguments.run_id
+    if not UUID4_RE.fullmatch(run_id):
+        raise LifecycleError("plan --run-id must be a lower-case UUIDv4")
+    release_sha = arguments.release_sha
+    if not HEX40_RE.fullmatch(release_sha):
+        raise LifecycleError("plan --release-sha must be a lower-case 40-hex commit")
+    db_url_file = pathlib.Path(arguments.db_url_file)
+    ca_file = pathlib.Path(arguments.ca_file)
+    _validate_plan_credential_file(db_url_file, {0o400, 0o600})
+    _validate_plan_credential_file(ca_file, {0o644})
+    run_root = _plan_run_root(run_id, getattr(arguments, "run_root", None))
+    ensure_directory(run_root)
+    output_path = run_root / "expected-post-migration-catalog.json"
+    request = {
+        "run_id": run_id,
+        "release_sha": release_sha,
+        "db_url_file": str(db_url_file),
+        "ca_file": str(ca_file),
+        "run_root": str(run_root),
+        "generation": getattr(arguments, "generation", None),
+    }
+    evidence = plan_executor.capture(request)
+    catalog = assemble_expected_catalog(release_sha, evidence)
+    validate_expected_catalog(catalog)
+    data = complete_object(catalog)
+    immutable_publish(output_path, data, 0o400, [])
+    return {
+        "schema_version": "megacampus.q12.plan-result/v1",
+        "run_id": run_id,
+        "release_sha": release_sha,
+        "expected_catalog_path": str(output_path),
+        "expected_catalog_sha256": sha256(data),
+        "expected_post_migration_catalog_sha256": catalog["expected_post_migration_catalog_sha256"],
+        "baseline_structural_sha256": catalog["baseline_structural_sha256"],
+        "status": "planned",
+    }
+
+
+class LivePlanExecutor:
+    """Production plan capture: read-only source snapshot + isolated restore/migrate.
+
+    This orchestrates the real, live-window path.  It is exercised end to end only
+    against the real Supabase source and the pinned isolated image (owner-only,
+    off-repo), so CI proves the deterministic capture/assembly/emission surface
+    against a disposable PostgreSQL 17 instead (see the gated real-PG17 suite).
+    The SQL projection is delegated to `q12-migration-plan-capture.py`; the
+    isolated pinned-image restore follows `restore-supabase-drill.sh`.
+    """
+
+    RESTORE_IMAGE = (
+        "public.ecr.aws/supabase/postgres@sha256:"
+        "d00c45c73f9c3d130ea4f379d8ae7748b0711d628eea690d27d03198ed609f2f"
+    )
+
+    def __init__(self) -> None:
+        self.repo_root = pathlib.Path(__file__).resolve().parents[2]
+        self.capture_helper = pathlib.Path(__file__).with_name("q12-migration-plan-capture.py")
+
+    def _run_capture(self, *, container: str | None, service_env: dict[str, str] | None) -> dict[str, Any]:
+        env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+        if service_env:
+            env.update(service_env)
+        argv = ["/usr/bin/python3", str(self.capture_helper)]
+        if container is not None:
+            argv += ["--container", container]
+        completed = subprocess.run(
+            argv,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(f"plan capture helper failed: {completed.stderr.strip()}")
+        return json.loads(completed.stdout)
+
+    def _migration_file_sha256(self, key: str) -> str:
+        path = self.repo_root / PLAN_MIGRATION_FILES[key]
+        return sha256(path.read_bytes())
+
+    @staticmethod
+    def _relation_delta(after: list[dict[str, Any]], before: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        before_identities = {(rel["schema"], rel["name"]) for rel in before}
+        return [rel for rel in after if (rel["schema"], rel["name"]) not in before_identities]
+
+    def capture(self, request: dict[str, Any]) -> dict[str, Any]:
+        raise LifecycleError(
+            "live plan capture requires the isolated pinned-image restore of an "
+            "operator-provided source generation; this leg runs only in the "
+            "owner-approved live window (see q12-migration-plan-capture.py for the "
+            "read-only projection reused there)"
+        )
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Q12 retained barrier lifecycle")
     commands = root.add_subparsers(dest="mode", required=True)
+    plan = commands.add_parser("plan")
+    plan.add_argument("--run-id", required=True)
+    plan.add_argument("--release-sha", required=True)
+    plan.add_argument("--db-url-file", required=True)
+    plan.add_argument("--ca-file", required=True)
+    plan.add_argument("--generation", required=False)
+    plan.add_argument("--run-root", required=False)
     supervisor = commands.add_parser("supervisor")
     supervisor.add_argument("operation", choices=OPERATIONS)
     supervisor.add_argument("--run-id", required=True)
@@ -4177,6 +4610,10 @@ def main() -> int:
     arguments = parser().parse_args()
     if arguments.mode == "smoke":
         output = run_smoke(arguments)
+        sys.stdout.buffer.write(complete_object(output))
+        return 0
+    if arguments.mode == "plan":
+        output = run_plan(arguments, LivePlanExecutor())
         sys.stdout.buffer.write(complete_object(output))
         return 0
     if arguments.mode == "supervisor":
