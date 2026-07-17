@@ -45,20 +45,30 @@ explicit_defers:
 
 # Summary
 
-Round-7 is the final review-hardening pass (`4e752470` -> `c6ac3a8d`), 2 P2 + 4 P3:
-`assert_production_seam_lockdown` makes a production plan run (run*root under
-`/opt/megacampus/backups/q12`) reject any set `MC2_Q12_PLAN*_`test seam by name —
-which also pins`restore_mode=drill`and the pinned image, since those only diverge
-from the default when their seam is set — while`/tmp/mc2-q12-plan-_`run roots
-still allow seams for the CI suites (P2-1). A docker-free test drives the REAL`restore-supabase-drill.sh write*persist_handle`and asserts the REAL`\_read_handle`accepts its exact bytes and rejects a dropped field, pinning the write/read
-contract against mock drift (P2-2). The snapshot-coordinator readline gained a
-bounded`select()`timeout (P3a); teardown reclaims the synthetic capability file
-and the plan-created secrets dir (P3b) and does a second-pass docker sweep by both
-the plan and drill run labels so a malformed-handle-after-persist path cannot leak
-(P3d);`teardown()`is declared in the`PlanExecutor`Protocol (P3c). Ownership
-checks on`MC2_Q12_PLAN`binary overrides were intentionally skipped — subsumed by
-P2-1 rejecting those seams in production. The §3 helper's documented divergence from`generate-role-bootstrap.ts`(it drops`pg*\*`roles/edges via the capture projection
-rather than doing the TS`pg_participants`cross-check) is recorded in`q12-migration-plan-roles.py` with rationale.
+Round-7 is the final review-hardening pass (`4e752470` -> `c6ac3a8d`): 2 P2 + 4 P3.
+
+- P2-1 production seam lockdown: `assert_production_seam_lockdown` makes a production
+  plan run (run root under `/opt/megacampus/backups/q12`) reject any set
+  `MC2_Q12_PLAN_...` test-seam environment variable by name, which also pins the
+  drill restore mode and the pinned image (those diverge from the default only when
+  their seam is set). Test seams stay usable with an explicit `/tmp/mc2-q12-plan-...`
+  run root, which the seam-driven CI suites use.
+- P2-2 anti mock-drift: a docker-free test drives the REAL `write_persist_handle`
+  from `restore-supabase-drill.sh` and asserts the REAL `_read_handle` accepts its
+  exact bytes and rejects a dropped field, so a future drill handle-field change
+  fails CI instead of the live window.
+- P3a: a bounded `select()` timeout on the snapshot-coordinator readline (a stalled
+  source psql fails closed instead of blocking). P3b: teardown reclaims the synthetic
+  capability file and the plan-created secrets dir. P3c: `teardown()` is declared in
+  the `PlanExecutor` Protocol. P3d: teardown does a second-pass docker sweep by both
+  the plan isolate label and the drill restore label for the run id, so a
+  malformed-handle-after-persist path cannot leak a resource whose name never
+  reached us.
+- Notes: ownership checks on the binary-override seams were intentionally skipped —
+  subsumed by P2-1 rejecting those seams in production. The §3 helper's documented
+  divergence from `generate-role-bootstrap.ts` (the capture projection drops the
+  PostgreSQL built-in roles and edges rather than doing the TS `pg_participants`
+  cross-check) is recorded in `q12-migration-plan-roles.py` with rationale.
 
 Round-6 fixed a real production-path defect and added snapshot coordination
 (`b32ce5ed` -> `e92ec529`): `_produce_source_manifest` called
