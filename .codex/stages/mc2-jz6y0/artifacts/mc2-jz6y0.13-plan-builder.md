@@ -23,6 +23,8 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-8 drill-generation preflight RED->GREEN: 0791805e -> 53b6fcce. Closes the whole generation preflight the server pre-C1 rehearsal fail-closed on (generation basename is invalid). Real-PG17 q12-migration-plan.test.ts: 45 passed — the end-to-end drill-seam test now drives production _produce_generation output through a fake drill that MIRRORS the real drill preflight (basename ERE + validate_generation Python block, both extracted verbatim from the drill bytes), sweeping the full set: generation-<UTCstamp>Z-<uuid> basename, 4-file layout, 0600 modes, checksums schema/generation/files/sha256/size, source-manifest schema. No-docker adds 5 round-8 cases (contract + item-4 run-dir cleanup). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED. tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
+  - 'Round-8 broad no-docker ops set (tests/unit/ops/): 876 passed | 59 skipped, 1 pre-existing failure in qdrant-observability-contract.test.ts (Q9 observability: .env.production.example lacks QDRANT_METRICS_GID) — outside the round-8 change surface (round-8 touched only q12-lifecycle-core.py + q12-migration-plan.test.ts + the plan runner fixture; the observability test and its ops/qdrant inputs are untouched).'
   - 'Round-7 hardening RED->GREEN: 4e752470 -> c6ac3a8d (P2-1 seam lockdown, P2-2 handle write/read binding, P3 a-d). Snapshot coordinator: b32ce5ed -> e92ec529. Drill-seam consumption: 0e2cae74 -> a8f355f2. §3 role bootstrap: dc0d9cc6 -> 6a0825fa. Persist seam: 28e75d8c -> 93f01595. Live orchestration: ee04d555 -> 2b6b16ad. Builder: a46c6173 -> 28ec3448.'
   - 'Round-7 real-PG17: 40 passed (all gated tests, drill positive still ends clean through the enhanced teardown + label sweep). No-docker suites: 79 passed | 7 skipped (adds 12 P2-1 seam-lockdown cases + 2 P2-2 handle-binding cases). tsc exit 0.'
   - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 26 passed clean (first try) — incl. the drill-consumption positive that binds source capture + pg_dump to one exported snapshot via the coordinator, and the malformed-snapshot negative that hard-stops before the drill is invoked.'
@@ -44,6 +46,34 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-8 closes the whole drill generation preflight (`0791805e` -> `53b6fcce`), after
+the server pre-C1 rehearsal fail-closed at the real drill with `generation basename is
+invalid` (teardown was clean, so the safety contract held — this is the mock-reality
+drift class the rehearsal is designed to catch).
+
+- Root cause + fix: `_produce_generation` named the dir `generation-<16hex>`, but the
+  drill requires `^generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}$`
+  (`restore-supabase-drill.sh` parse_arguments). `_generation_dirname` now builds
+  `generation-<UTCstamp>Z-<run uuid>`; the stamp is bound once per run in `capture()`
+  (deterministic per run, not per retry).
+- Second latent mismatch (would have failed the very next check): the drill's
+  `validate_generation` requires `checksums.json` carry `generation == basename`;
+  `_write_checksums` omitted it. Now recorded.
+- Full-set sweep instead of one field: the fake drill now MIRRORS the real drill's
+  preflight — the basename ERE and the `validate_generation` Python block are extracted
+  verbatim from the drill bytes (the P2-2 real-bytes technique) and run against the
+  plan's actual generation before any resource is created. The real-PG17 end-to-end
+  drill test therefore enforces the identical set the server drill does: 4-file layout,
+  0600 modes, `checksums` schema/generation/files/sha256/size, `source-manifest` schema.
+  A future drill preflight change now fails CI, not the live window. (The one real-drill
+  check not mirrorable in CI — `pg_restore --list` TOC + pgTLE offline scan — needs the
+  pinned Supabase image; the fake drill still does its own `pg_restore` into
+  `restore_test`, and the real leg stays validated by the server pre-C1 run.)
+- item-4 (leftover run dir): a failed pre-emission `run_plan` now removes ONLY a run dir
+  it created; a caller-provided/pre-existing dir is preserved. The rehearsal's leftover
+  `/opt/megacampus/backups/q12/49eca245-…` was an empty run dir left after teardown
+  reclaimed capability/secrets; a failed pre-emission run now cleans the dir it made.
 
 Round-7 is the final review-hardening pass (`4e752470` -> `c6ac3a8d`): 2 P2 + 4 P3.
 
