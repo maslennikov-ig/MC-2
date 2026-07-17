@@ -142,10 +142,22 @@ q12/f4afe952-68f9-4fea-873e-2e3809982758/expected-post-migration-catalog.
 json` (0400, sha `de9e6b03…`), baseline `edbea709…`, expected post-
    migration sha `68041d94…`, clean teardown. Four never-executed-path
    live-window defects repaired (drill tsx, backup tsx, frontier premise,
-   search_path rendering). NEXT: independent review of rounds 8-19
-   (`7764cfb4..7ba8f372`, artifact `mc2-jz6y0.13-plan-live-review-r2.md`)
-   is IN PROGRESS; on PASS open C1..C10 per the window packet with C7
-   in-window re-freeze of W fields 5/6/8/9.
+   search_path rendering). Independent review of rounds 8-19
+   (`7764cfb4..7ba8f372`, artifact `mc2-jz6y0.13-plan-live-review-r2.md`):
+   correctness PASS, quality PASS, 0 P0/P1/P2, 3 P3 (handled/recorded).
+   HOWEVER the window is BLOCKED pre-open: operator-procedure research
+   (`mc2-jz6y0-c0-window-operator-procedure.md`, orchestrator-verified)
+   shows the D5J §10 "real plan|live|recover controller … and live
+   orchestration" was deliberately kept in Task-9 scope and `.13.13`
+   delivered only the synthetic smoke evaluator + D6 frame join. Six open
+   questions (OQ1 quiesce-ordering contradiction vs frozen chronology; OQ2
+   no production emitter of ordinary journal rows; OQ3 resume needs
+   guard_cleanup_complete + final-writer-manifest producers; OQ4 production
+   resource_manifest_sha256 undefined; OQ5 no production snapshot exporter
+   for pg.backup; OQ6 no baseline.json producer). NEXT: live-controller
+   design (OQ resolutions grounded in frozen truth) → plan → TDD rounds →
+   re-verify → re-present window open; then C1..C10 with C7 in-window
+   re-freeze of W fields 5/6/8/9.
 3. `.13.8` — owner-deferred password rotation (re-confirm explicitly; never
    rotate on a general "do it"); `.13.6` — off-host S3 production gate;
    `.25` — Prometheus retention YAML (Phase D). Alertmanager Telegram bot
