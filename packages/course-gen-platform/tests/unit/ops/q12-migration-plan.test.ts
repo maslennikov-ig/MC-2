@@ -382,15 +382,21 @@ describe.runIf(REAL_PG17)('Q12 plan capture against disposable PostgreSQL 17.10'
     expect(started.status, started.stderr).toBe(0);
     try {
       let ready = false;
-      for (let attempt = 0; attempt < 200; attempt += 1) {
+      for (let attempt = 0; attempt < 300; attempt += 1) {
+        const logs = docker(['logs', container]);
         const probe = docker(['exec', container, 'pg_isready', '-U', 'postgres', '-d', 'postgres']);
-        if (probe.status === 0) {
+        if (
+          probe.status === 0 &&
+          `${logs.stdout}${logs.stderr}`.includes(
+            'PostgreSQL init process complete; ready for start up.'
+          )
+        ) {
           ready = true;
           break;
         }
         await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
       }
-      expect(ready, docker(['logs', container]).stdout).toBe(true);
+      expect(ready, docker(['logs', container]).stderr).toBe(true);
 
       // Synthetic Supabase-shaped source: 47 public + 22 auth + 5 named
       // storage + cron.job + net.http_request_queue (76 guarded), plus decoys
@@ -685,13 +691,13 @@ c="$MC2_Q12_PLAN_ISOLATE_CONTAINER"
 d="$MC2_Q12_PLAN_DOCKER"
 mig="$MC2_Q12_PLAN_REPO_ROOT/packages/course-gen-platform/supabase/migrations"
 apply() {
-  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$mig/$3"
-  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c \\
+  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d "\${MC2_Q12_PLAN_ISOLATE_DBNAME:-postgres}" < "$mig/$3"
+  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d "\${MC2_Q12_PLAN_ISOLATE_DBNAME:-postgres}" -c \\
     "INSERT INTO supabase_migrations.schema_migrations(version,name,statements) VALUES ('$1','$2',ARRAY['$1']::text[]);"
 }
 # The pinned Supabase image ships these roles; a vanilla PG17 isolate needs
 # them created before the real migrations can GRANT to them.
-"$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres <<'ROLES'
+"$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d "\${MC2_Q12_PLAN_ISOLATE_DBNAME:-postgres}" <<'ROLES'
 DO $roles$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
@@ -747,6 +753,7 @@ esac
           PATH: process.env.PATH ?? '/usr/bin:/bin',
           LC_ALL: 'C',
           LANG: 'C',
+          MC2_Q12_PLAN_RESTORE_MODE: 'direct',
           MC2_Q12_PLAN_SOURCE_CONTAINER: sourceContainer,
           MC2_Q12_PLAN_RESTORE_IMAGE: POSTGRES_IMAGE,
           MC2_Q12_PLAN_MIGRATION_APPLY: applySeam(),
@@ -972,3 +979,289 @@ describe('Q12 plan §3 role bootstrap generator', () => {
     expect(result.stderr).toMatch(pattern);
   });
 });
+
+describe.runIf(REAL_PG17)(
+  'Q12 live plan drill-seam consumption on disposable PostgreSQL 17.10',
+  () => {
+    const docker = (args: string[], input?: string) =>
+      spawnSync('docker', args, { encoding: 'utf8', input, timeout: 60_000 });
+    let sourceContainer = '';
+
+    // Minimal Supabase-shaped source that restores faithfully into restore_test:
+    // an allowlisted `admin` role owning a table forces the drill's role bootstrap,
+    // and a supabase_migrations frontier row + extensions match the structural sha.
+    // Same proven Supabase-shaped source as the direct suite (47 public incl. the
+    // migration dependencies + admin owning the realtime decoy), so the migrations
+    // apply and the restore into restore_test needs the §3 role bootstrap.
+    const DRILL_SOURCE_SCHEMA = `
+CREATE SCHEMA extensions;
+CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+CREATE SCHEMA supabase_migrations;
+CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY, name text, statements text[]);
+INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20260704150249','frontier');
+CREATE SCHEMA auth;
+CREATE SCHEMA storage;
+CREATE SCHEMA cron;
+CREATE SCHEMA net;
+CREATE SCHEMA realtime;
+CREATE ROLE admin LOGIN NOINHERIT;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$ SELECT '{}'::jsonb $fn$;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT 'service_role'::text $fn$;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $fn$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $fn$;
+CREATE TABLE public.organizations(id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.courses(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id),
+  generation_status text
+);
+CREATE TABLE public.clarifying_questions(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL REFERENCES public.courses(id),
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  question_category text,
+  question_priority text,
+  status text,
+  question_type text,
+  suggested_answers jsonb,
+  user_answer jsonb,
+  answer_source text,
+  selected_suggestion_index integer,
+  answered_at timestamptz
+);
+DO $seed$ BEGIN
+  FOR i IN 0..43 LOOP EXECUTE format('CREATE TABLE public.public_table_%s(id bigint PRIMARY KEY)', to_char(i,'FM00')); END LOOP;
+  FOR i IN 0..21 LOOP EXECUTE format('CREATE TABLE auth.auth_table_%s(id bigint PRIMARY KEY)', to_char(i,'FM00')); END LOOP;
+END $seed$;
+CREATE TABLE storage.buckets(id text PRIMARY KEY);
+CREATE TABLE storage.buckets_analytics(id text PRIMARY KEY);
+CREATE TABLE storage.objects(id bigint PRIMARY KEY);
+CREATE TABLE storage.s3_multipart_uploads(id bigint PRIMARY KEY);
+CREATE TABLE storage.s3_multipart_uploads_parts(id bigint PRIMARY KEY);
+CREATE TABLE realtime.messages(id bigint PRIMARY KEY);
+ALTER TABLE realtime.messages OWNER TO admin;
+CREATE TABLE cron.job(jobid bigint PRIMARY KEY, schedule text, command text, nodename text, nodeport int, database text, username text, active boolean);
+CREATE TABLE cron.job_run_details(runid bigint PRIMARY KEY);
+INSERT INTO cron.job SELECT v,'0 * * * *','SELECT '||v,'localhost',5432,'postgres','postgres',true FROM generate_series(1,8) v;
+CREATE TABLE net.http_request_queue(id bigint PRIMARY KEY);
+CREATE TABLE net.http_response(id bigint PRIMARY KEY);
+`;
+
+    async function readyPostgres(container: string): Promise<void> {
+      for (let attempt = 0; attempt < 300; attempt += 1) {
+        const logs = docker(['logs', container]);
+        const probe = docker(['exec', container, 'pg_isready', '-U', 'postgres', '-d', 'postgres']);
+        if (
+          probe.status === 0 &&
+          `${logs.stdout}${logs.stderr}`.includes(
+            'PostgreSQL init process complete; ready for start up.'
+          )
+        ) {
+          return;
+        }
+        await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
+      }
+      throw new Error(`postgres not ready: ${docker(['logs', container]).stderr}`);
+    }
+
+    beforeAll(async () => {
+      sourceContainer = `mc2-q12-drill-src-${process.pid}-${Date.now()}`;
+      const started = docker([
+        'run',
+        '-d',
+        '--rm',
+        '--name',
+        sourceContainer,
+        '-e',
+        `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+        POSTGRES_IMAGE,
+      ]);
+      if (started.status !== 0) throw new Error(`drill source run failed: ${started.stderr}`);
+      await readyPostgres(sourceContainer);
+      const setup = docker(
+        ['exec', '-i', sourceContainer, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+        DRILL_SOURCE_SCHEMA
+      );
+      if (setup.status !== 0) throw new Error(`drill source schema failed: ${setup.stderr}`);
+    }, 120_000);
+
+    afterAll(() => {
+      if (sourceContainer) docker(['rm', '-f', sourceContainer]);
+    });
+
+    function fakeDrill(logPath: string, opts: { badHandle?: boolean } = {}): string {
+      const dir = mkdtempSync('/tmp/mc2-q12-fakedrill-');
+      temporaryDirectories.push(dir);
+      const script = join(dir, 'drill.sh');
+      writeFileSync(
+        script,
+        `#!/usr/bin/env bash
+set -Eeuo pipefail
+d="\${MC2_Q12_PLAN_DOCKER:-/usr/bin/docker}"
+{ printf 'argv:%s\\n' "$*"; printf 'handle_env:%s\\n' "$MC2_Q12_RESTORE_PERSIST_HANDLE"; } > ${JSON.stringify(logPath)}
+run_id=''; generation=''
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --run-id) run_id="$2"; shift 2;;
+    --generation) generation="$2"; shift 2;;
+    --q12-db-capability-file) shift 2;;
+    *) shift;;
+  esac
+done
+${
+  opts.badHandle
+    ? `# Fail before creating any resource, so a malformed handle can never leak one.
+printf '{"broken":true}\\n' > "$MC2_Q12_RESTORE_PERSIST_HANDLE"
+chmod 0400 "$MC2_Q12_RESTORE_PERSIST_HANDLE"
+exit 0`
+    : ''
+}
+net="mc2-q12-fakedrill-net-$$"; vol="mc2-q12-fakedrill-vol-$$"; c="mc2-q12-fakedrill-$$"
+"$d" network create "$net" >/dev/null
+"$d" volume create "$vol" >/dev/null
+"$d" run -d --name "$c" --network "$net" --mount "type=volume,src=$vol,dst=/var/lib/postgresql/data" -e POSTGRES_PASSWORD=fakedrillpw -p 127.0.0.1::5432 ${JSON.stringify(POSTGRES_IMAGE)} >/dev/null
+for i in $(seq 1 300); do "$d" exec "$c" pg_isready -U postgres >/dev/null 2>&1 && "$d" logs "$c" 2>&1 | grep -q "init process complete" && break; sleep 0.2; done
+# The real drill creates restore_test with the source database's exact properties;
+# replicate the postgres db's default comment so the structural sha matches.
+"$d" exec -i "$c" psql -X -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE admin LOGIN NOINHERIT;" -c "CREATE DATABASE restore_test;" -c "COMMENT ON DATABASE restore_test IS 'default administrative connection database';" >/dev/null
+"$d" exec -i "$c" pg_restore -U postgres -d restore_test --no-password --exit-on-error --single-transaction < "$generation/database.dump" >/dev/null
+port=$("$d" port "$c" 5432/tcp | sed -n 's/.*:\\([0-9][0-9]*\\)$/\\1/p')
+/usr/bin/python3 -c 'import json,os,sys
+h={"schema_version":"megacampus.q12.restore-persist-handle/v1","run_id":sys.argv[1],"container":sys.argv[2],"network":sys.argv[3],"volume":sys.argv[4],"host":"127.0.0.1","port":int(sys.argv[5]),"database":"restore_test","user":"postgres","password":"fakedrillpw"}
+open(sys.argv[6],"w").write(json.dumps(h,sort_keys=True)+"\\n")' "$run_id" "$c" "$net" "$vol" "$port" "$MC2_Q12_RESTORE_PERSIST_HANDLE"
+chmod 0400 "$MC2_Q12_RESTORE_PERSIST_HANDLE"
+`,
+        { mode: 0o755 }
+      );
+      chmodSync(script, 0o755);
+      return script;
+    }
+
+    function runDrillPlan(
+      fixture: PlanFixture,
+      drill: string,
+      extraEnv: Record<string, string> = {}
+    ) {
+      return spawnSync(
+        '/usr/bin/python3',
+        [
+          CORE,
+          'plan',
+          '--run-id',
+          RUN_ID,
+          '--release-sha',
+          RELEASE_SHA,
+          '--db-url-file',
+          fixture.dbUrl,
+          '--ca-file',
+          fixture.ca,
+          '--run-root',
+          fixture.runRoot,
+        ],
+        {
+          encoding: 'utf8',
+          timeout: 180_000,
+          env: {
+            PATH: process.env.PATH ?? '/usr/bin:/bin',
+            LC_ALL: 'C',
+            LANG: 'C',
+            MC2_Q12_PLAN_RESTORE_MODE: 'drill',
+            MC2_Q12_PLAN_DRILL: drill,
+            MC2_Q12_PLAN_SOURCE_CONTAINER: sourceContainer,
+            MC2_Q12_PLAN_MIGRATION_APPLY: applySeamDrill(),
+            MC2_Q12_PLAN_DOCKER: '/usr/bin/docker',
+            ...extraEnv,
+          },
+        }
+      );
+    }
+
+    // The apply seam routes to the handle's dbname (restore_test) and bootstraps the
+    // Supabase roles the migrations GRANT to (as in the direct-mode seam).
+    function applySeamDrill(): string {
+      const dir = mkdtempSync('/tmp/mc2-q12-plan-seam-');
+      temporaryDirectories.push(dir);
+      const script = join(dir, 'apply.sh');
+      writeFileSync(
+        script,
+        `#!/usr/bin/env bash
+set -euo pipefail
+packet="$1"
+c="$MC2_Q12_PLAN_ISOLATE_CONTAINER"
+db="\${MC2_Q12_PLAN_ISOLATE_DBNAME:-postgres}"
+d="$MC2_Q12_PLAN_DOCKER"
+mig="$MC2_Q12_PLAN_REPO_ROOT/packages/course-gen-platform/supabase/migrations"
+apply() {
+  "$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d "$db" < "$mig/$3"
+}
+"$d" exec -i "$c" psql -X -v ON_ERROR_STOP=1 -U postgres -d "$db" <<'ROLES'
+DO $roles$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticator') THEN CREATE ROLE authenticator NOLOGIN NOINHERIT; END IF;
+END $roles$;
+ROLES
+case "$packet" in
+  base)
+    apply 20260711120000 x 20260711120000_document_evidence.sql
+    apply 20260711130000 x 20260711130000_document_conflict_auto_answers.sql
+    apply 20260711140000 x 20260711140000_document_conflict_side_identity.sql
+    ;;
+  observability)
+    apply 20260711150000 x 20260711150000_document_evidence_observability_index.sql
+    apply 20260711151000 x 20260711151000_document_evidence_observability_totals.sql
+    ;;
+esac
+`,
+        { mode: 0o755 }
+      );
+      chmodSync(script, 0o755);
+      return script;
+    }
+
+    function leftoverFakeDrill(): string[] {
+      return docker(['ps', '-a', '--filter', 'name=mc2-q12-fakedrill-', '--format', '{{.Names}}'])
+        .stdout.split('\n')
+        .filter(Boolean);
+    }
+
+    it('invokes the drill with the persist handle, migrates restore_test through it, and tears everything down', () => {
+      const fixture = planFixture();
+      const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+
+      const result = runDrillPlan(fixture, fakeDrill(drillLog));
+
+      expect(result.status, result.stderr).toBe(0);
+      // Drill invocation argv + persist-handle env were passed correctly.
+      const log = readFileSync(drillLog, 'utf8');
+      expect(log).toContain('--run-id');
+      expect(log).toContain('--generation');
+      expect(log).toContain('--q12-db-capability-file');
+      expect(log).toMatch(/handle_env:.*restore-persist-handle\.json/u);
+      // Catalog emitted from the restore_test capture through the handle.
+      const emitted = readFileSync(fixture.catalogPath);
+      assertPassesFrozenBarrier(emitted.toString('utf8'));
+      const catalog = JSON.parse(emitted.toString('utf8')) as Record<string, any>;
+      expect(catalog.guarded_relations).toHaveLength(76);
+      expect(catalog.migrations['20260711151000'].relations.map((r: any) => r.name)).toEqual([
+        'document_evidence_observability_totals',
+      ]);
+      // Plan tears down the drill's persisted resources + handle + generation.
+      expect(leftoverFakeDrill()).toEqual([]);
+      expect(existsSync(join(fixture.runRoot, 'restore-persist-handle.json'))).toBe(false);
+    }, 180_000);
+
+    it('fails closed and reclaims resources when the drill publishes a malformed handle', () => {
+      const fixture = planFixture();
+      const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+
+      const result = runDrillPlan(fixture, fakeDrill(drillLog, { badHandle: true }));
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/persist handle/iu);
+      expect(existsSync(fixture.catalogPath)).toBe(false);
+      expect(leftoverFakeDrill()).toEqual([]);
+    }, 180_000);
+  }
+);
