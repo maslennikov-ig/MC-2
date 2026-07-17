@@ -414,7 +414,12 @@ CREATE SCHEMA extensions;
 CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 CREATE SCHEMA supabase_migrations;
 CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY, name text, statements text[]);
-INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20260704150249','frontier');
+-- MCP-style history: apply-time version timestamps with NO same-named repo file, max ==
+-- the reviewed frontier — exactly how this project's production history is generated.
+INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES
+  ('20260101093012','mcp_apply_alpha'),
+  ('20260515164533','mcp_apply_beta'),
+  ('20260704150249','frontier');
 CREATE SCHEMA auth;
 CREATE SCHEMA storage;
 CREATE SCHEMA cron;
@@ -580,7 +585,12 @@ CREATE SCHEMA extensions;
 CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 CREATE SCHEMA supabase_migrations;
 CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY, name text, statements text[]);
-INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20260704150249','frontier');
+-- MCP-style history: apply-time version timestamps with NO same-named repo file, max ==
+-- the reviewed frontier — exactly how this project's production history is generated.
+INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES
+  ('20260101093012','mcp_apply_alpha'),
+  ('20260515164533','mcp_apply_beta'),
+  ('20260704150249','frontier');
 CREATE SCHEMA auth;
 CREATE SCHEMA storage;
 CREATE SCHEMA cron;
@@ -1044,7 +1054,12 @@ CREATE SCHEMA extensions;
 CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 CREATE SCHEMA supabase_migrations;
 CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY, name text, statements text[]);
-INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20260704150249','frontier');
+-- MCP-style history: apply-time version timestamps with NO same-named repo file, max ==
+-- the reviewed frontier — exactly how this project's production history is generated.
+INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES
+  ('20260101093012','mcp_apply_alpha'),
+  ('20260515164533','mcp_apply_beta'),
+  ('20260704150249','frontier');
 CREATE SCHEMA auth;
 CREATE SCHEMA storage;
 CREATE SCHEMA cron;
