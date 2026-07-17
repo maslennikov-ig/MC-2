@@ -14,6 +14,7 @@ import re
 import stat as stat_module
 import subprocess
 import sys
+import time
 import unicodedata
 import uuid
 import weakref
@@ -4521,6 +4522,10 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
     _validate_plan_credential_file(ca_file, {0o644})
     run_root = _plan_run_root(run_id, getattr(arguments, "run_root", None))
     assert_production_seam_lockdown(run_root)
+    # A failed pre-emission run must remove only the run dir it created; a
+    # pre-existing dir is never touched (design §2 leaves no half-run directory
+    # behind, but a caller-provided root is the caller's to keep).
+    run_root_existed = run_root.exists()
     ensure_directory(run_root)
     output_path = run_root / "expected-post-migration-catalog.json"
     request = {
@@ -4535,12 +4540,14 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
     # catalog is emitted and its hash is durably bound; a teardown failure
     # overrides success (design §2). capture() registers its resources so the
     # finally teardown reclaims them whether capture, assembly, or emit failed.
+    emitted = False
     try:
         evidence = plan_executor.capture(request)
         catalog = assemble_expected_catalog(release_sha, evidence)
         validate_expected_catalog(catalog)
         data = complete_object(catalog)
         immutable_publish(output_path, data, 0o400, [])
+        emitted = True
         result = {
             "schema_version": "megacampus.q12.plan-result/v1",
             "run_id": run_id,
@@ -4555,6 +4562,10 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
         }
     finally:
         plan_executor.teardown()
+        if not emitted and not run_root_existed:
+            import shutil
+
+            shutil.rmtree(run_root, ignore_errors=True)
     return result
 
 
@@ -4627,6 +4638,10 @@ class LivePlanExecutor:
             "secrets": None,
         }
         self._run_id: str | None = None
+        # The drill preflight requires the generation basename carry a UTC stamp;
+        # it is bound once per run (not per retry) so every generation in a run
+        # shares one instant.
+        self._generation_stamp: str | None = None
         self._isolate_port: str | None = None
         self._isolate_password: str | None = None
         self._source_service: dict[str, str] | None = None
@@ -5059,7 +5074,13 @@ class LivePlanExecutor:
         for name in ("database.dump", "roles.sql", "source-manifest.json"):
             data = (generation / name).read_bytes()
             entries[name] = {"sha256": sha256(data), "size": len(data)}
-        manifest = {"schema": "megacampus.supabase-backup-checksums/v1", "files": entries}
+        # The drill's validate_generation binds the manifest to its own generation
+        # basename (checksums.json `generation` == dir basename), so record it.
+        manifest = {
+            "schema": "megacampus.supabase-backup-checksums/v1",
+            "generation": generation.name,
+            "files": entries,
+        }
         atomic_replace(generation / "checksums.json", complete_object(manifest), 0o600)
 
     @staticmethod
@@ -5101,12 +5122,23 @@ class LivePlanExecutor:
         ):
             raise LifecycleError("source role plane drifted during the snapshot window")
 
-    def _produce_generation(self, workdir: pathlib.Path, snapshot: str | None = None) -> pathlib.Path:
+    def _generation_dirname(self, run_id: str) -> str:
+        """Basename the drill preflight requires:
+        ^generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}$
+        (restore-supabase-drill.sh parse_arguments). The stamp is the per-run
+        instant bound in capture() (deterministic per run, not per retry); the
+        run id supplies the 36-char UUID tail."""
+        stamp = self._generation_stamp or time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        return f"generation-{stamp}-{run_id}"
+
+    def _produce_generation(
+        self, workdir: pathlib.Path, run_id: str, snapshot: str | None = None
+    ) -> pathlib.Path:
         """Diagnostic backup generation for the drill (NOT the accepted recoverable
         backup); removed by teardown once the catalog is bound. Cluster roles are
         not MVCC-snapshotted, so — like the reviewed backup — they are exported
         before and after the snapshot-bound dump and must be byte-identical."""
-        generation = workdir / ("generation-" + os.urandom(8).hex())
+        generation = workdir / self._generation_dirname(run_id)
         os.mkdir(generation, 0o700)
         roles = generation / "roles.sql"
         self._dump_roles(roles)
@@ -5250,7 +5282,7 @@ class LivePlanExecutor:
         coordinator, snapshot = self._open_snapshot_coordinator(request, workdir)
         try:
             source = self._capture_source(request, workdir, snapshot=snapshot)
-            generation = self._produce_generation(workdir, snapshot=snapshot)
+            generation = self._produce_generation(workdir, run_id, snapshot=snapshot)
             self._resources["generation"] = str(generation)
         finally:
             self._close_snapshot_coordinator(coordinator)
@@ -5303,6 +5335,7 @@ class LivePlanExecutor:
     def capture(self, request: dict[str, Any]) -> dict[str, Any]:
         run_id = request["run_id"]
         self._run_id = run_id
+        self._generation_stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         workdir = pathlib.Path(
             f"/tmp/mc2-q12-plan-work-{run_id}-{os.urandom(6).hex()}"
         )

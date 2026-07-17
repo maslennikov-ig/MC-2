@@ -988,6 +988,32 @@ describe.runIf(REAL_PG17)(
       spawnSync('docker', args, { encoding: 'utf8', input, timeout: 60_000 });
     let sourceContainer = '';
 
+    // The fake drill mirrors the REAL drill's whole generation preflight, extracted
+    // from the drill bytes: the basename ERE (parse_arguments) and the structural
+    // validate_generation Python block (4-file set, 0600 modes, checksums
+    // schema/generation/files/sha256/size, source-manifest schema). Sourcing the
+    // real bytes means a future drill preflight change fails this CI suite, not the
+    // live server rehearsal (the reality drift class that produced round-8).
+    const REAL_DRILL_SOURCE = readFileSync(
+      resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh'),
+      'utf8'
+    );
+    function realDrillGenerationEre(): string {
+      const m = REAL_DRILL_SOURCE.match(
+        /=~ (\^generation-\S+?\$) \]\] \|\| fail 'generation basename is invalid'/u
+      );
+      if (!m) throw new Error('generation basename regex not found in the drill');
+      return m[1];
+    }
+    function realDrillValidateGenerationPy(): string {
+      const fn = REAL_DRILL_SOURCE.indexOf('validate_generation() {');
+      const open = REAL_DRILL_SOURCE.indexOf("<<'PY'\n", fn);
+      const start = open + "<<'PY'\n".length;
+      const end = REAL_DRILL_SOURCE.indexOf('\nPY\n', start);
+      if (fn < 0 || open < 0 || end < 0) throw new Error('validate_generation PY block not found');
+      return REAL_DRILL_SOURCE.slice(start, end);
+    }
+
     // Minimal Supabase-shaped source that restores faithfully into restore_test:
     // an allowlisted `admin` role owning a table forces the drill's role bootstrap,
     // and a supabase_migrations frontier row + extensions match the structural sha.
@@ -1117,6 +1143,13 @@ chmod 0400 "$MC2_Q12_RESTORE_PERSIST_HANDLE"
 exit 0`
     : ''
 }
+# Real drill preflight (extracted from the drill bytes): reject before creating any
+# resource, exactly as the server drill validates the generation before restoring.
+gbase="\${generation##*/}"
+[[ "$gbase" =~ ${realDrillGenerationEre()} ]] || { printf 'generation basename is invalid\\n' >&2; exit 64; }
+/usr/bin/python3 - "$generation" "$gbase" "$(id -u)" "$(id -g)" <<'PY'
+${realDrillValidateGenerationPy()}
+PY
 net="mc2-q12-fakedrill-net-$$"; vol="mc2-q12-fakedrill-vol-$$"; c="mc2-q12-fakedrill-$$"
 "$d" network create "$net" >/dev/null
 "$d" volume create "$vol" >/dev/null
