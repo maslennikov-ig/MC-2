@@ -4753,6 +4753,34 @@ _COMPOSE_IDENTITY_KEYS = (
 )
 
 
+# Frozen allowlist of pre-existing catalog identities a release migration window is permitted
+# to MODIFY in place (CREATE OR REPLACE). For an allowlisted MODIFIED entry the composed live
+# payload takes the ISOLATE POST-migration content, not the live SOURCE content: the migration
+# replaces the object, so the live post-migration object equals what the isolate renders.
+# Keys are section names; values are the composer's exact `_compose_identity` strings
+# (schema|name|identity_arguments|kind for a functions entry).
+#
+# The single entry — public.auto_answer_questions_atomic(p_course_id uuid): the release window's
+# 20260711120000 and 20260711130000 both CREATE OR REPLACE it (it pre-exists in prod as history
+# 20260127143610 / repo 20260127200000_auto_answer_questions_atomic_rpc.sql), and 120000 re-GRANTs
+# EXECUTE. Soundness of taking the isolate POST render: a plpgsql body is stored verbatim
+# (prosrc) and both the live source and the isolate parse the IDENTICAL migration SQL on the
+# pinned PostgreSQL 17.6, so pg_get_functiondef renders byte-identically on both sides; the ACL
+# baseline is restored from the source and the identical GRANTs (grantor postgres on both) apply
+# on both sides; CREATE OR REPLACE preserves the owner. So the isolate POST content is the live
+# POST content (proven byte-EQUAL by the round-19 composed==real CI test).
+#
+# Modification only: a REMOVED pre-existing entry is always fatal (an allowlisted identity that
+# disappears is NOT covered here), and any modified identity NOT listed stays a hard stop.
+MIGRATION_MODIFIED_IDENTITY_ALLOWLIST: dict[str, frozenset[str]] = {
+    "functions": frozenset(
+        {
+            "schema=public|name=auto_answer_questions_atomic|identity_arguments=p_course_id uuid|kind=f",
+        }
+    ),
+}
+
+
 def _compose_identity(entry: Any) -> str:
     if not isinstance(entry, dict):
         return "raw:" + _diff_canon(entry)
@@ -4823,9 +4851,15 @@ def _compose_predicted_payload(
     """Compose the predicted live post-migration payload: pre-existing entries from the
     SOURCE (their live deparse), fresh entries from the isolate checkpoint (identical live),
     placed in the isolate checkpoint's SQL order (identity-determined = live order). Hard
-    stops if the in-isolate migration delta is not strictly ADDITIVE relative to the
-    pre-migration isolate (no removed or modified pre-existing entry in any section)."""
+    stops if the in-isolate migration delta is not ADDITIVE relative to the pre-migration
+    isolate — with one bounded exception: an identity on the frozen
+    MIGRATION_MODIFIED_IDENTITY_ALLOWLIST may be MODIFIED in place, and its composed content
+    is then taken from the ISOLATE POST render (the migration replaces it, so live == isolate).
+    A REMOVED pre-existing entry is always fatal (never allowlisted), and any modified entry
+    that is not allowlisted is fatal. All non-additive violations across every section are
+    collected and reported together before failing (fail-once, not fail-fast)."""
     predicted: dict[str, Any] = {}
+    violations: list[str] = []
     for section in sorted(set(source) | set(isolate_checkpoint)):
         source_value = source.get(section)
         pre_value = isolate_pre.get(section)
@@ -4839,29 +4873,35 @@ def _compose_predicted_payload(
             check_by = _index_by_identity(section, check_value or [])
             removed = sorted(set(pre_by) - set(check_by))
             if removed:
-                raise LifecycleError(
+                violations.append(
                     f"[{section}] non-additive delta: migration removed pre-existing entries: "
                     + ", ".join(_scrub_plan_secret_text(identity) for identity in removed[:10])
                 )
+            allowlist_ids = MIGRATION_MODIFIED_IDENTITY_ALLOWLIST.get(section, frozenset())
             modified = sorted(
                 identity
                 for identity in (set(pre_by) & set(check_by))
                 if _diff_canon(pre_by[identity]) != _diff_canon(check_by[identity])
             )
-            if modified:
-                raise LifecycleError(
+            allowed_modified = {identity for identity in modified if identity in allowlist_ids}
+            disallowed = [identity for identity in modified if identity not in allowlist_ids]
+            if disallowed:
+                violations.append(
                     f"[{section}] non-additive delta: migration modified a pre-existing entry: "
-                    + ", ".join(_scrub_plan_secret_text(identity) for identity in modified[:10])
+                    + ", ".join(_scrub_plan_secret_text(identity) for identity in disallowed[:10])
                 )
             # Classify every isolate-checkpoint entry:
-            #   in source            -> pre-existing: live SOURCE content;
-            #   not source, in pre   -> tolerated delta-neutral EXTRA (restore artifact
-            #                           absent from the live source): EXCLUDE it;
-            #   not source, not pre  -> FRESH (migration-added, present live): isolate content.
+            #   allowlisted & modified -> the migration replaced it: ISOLATE POST content;
+            #   in source              -> pre-existing (unmodified): live SOURCE content;
+            #   not source, in pre     -> tolerated delta-neutral EXTRA (restore artifact
+            #                             absent from the live source): EXCLUDE it;
+            #   not source, not pre    -> FRESH (migration-added, present live): isolate content.
             composed_section: list[Any] = []
             for entry in check_value or []:
                 identity = _compose_identity(entry)
-                if identity in source_by:
+                if identity in allowed_modified:
+                    composed_section.append(entry)
+                elif identity in source_by:
                     composed_section.append(source_by[identity])
                 elif identity in pre_by:
                     continue
@@ -4871,12 +4911,14 @@ def _compose_predicted_payload(
         elif isinstance(source_value, dict):
             # Singleton pre-existing object (database): migrations must not modify it.
             if pre_value != check_value:
-                raise LifecycleError(
+                violations.append(
                     f"[{section}] non-additive delta: migration modified the pre-existing {section} object"
                 )
             predicted[section] = source_value
         else:
             predicted[section] = source_value
+    if violations:
+        raise LifecycleError("\n".join(violations))
     return predicted
 
 
