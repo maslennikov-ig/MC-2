@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-12 preserve equality-diff payloads RED->GREEN: 33e27794 -> c06f3a54. Surgical argv-gated seam so the full cloud-source-vs-pinned-image divergence survives for a product-truth ruling (the first-10 summary died with the workdir). New plan flag --keep-equality-diagnostics (argv, NOT env — production seam lockdown still rejects env seams): on equality failure the plan writes 3 owner-only files into <run_root>/equality-diagnostics/ (0700 dir, 0600 files) — source + isolate canonical payloads + the FULL unbounded diff (_structural_catalog_diff gained max_ids/max_lines=None); run_plan preserves the created run dir when diagnostics were written (else removed as before). No scrub needed: the frozen SQL stores subscription conninfo as connection_sha256 and carries no cron/row data, so the payload is secret-free by construction. Real-PG17 q12-migration-plan.test.ts: 52 passed — incl. flag-on preserves the 3 files with q12_drift_probe in the isolate payload + full diff; flag-off writes no diag dir. No-docker adds 2 cases (unbounded diff = 50 identifiers; run-dir preservation exception). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-11 structural equality-proof diff diagnostics RED->GREEN: d28bdae1 -> 5ebeeaca. Makes the opaque structural-sha mismatch (rehearsal #4) self-diagnosing WITHOUT touching the frozen q12-structural-catalog.sql (verified byte-identical). capture.py --structural-payload selects the query's `payload` column (the exact pre-hash jsonb); the plan eagerly captures the source payload in the snapshot window and, on equality failure, captures the isolate payload and raises a bounded per-section diff (identifiers + sha digests only; statements/values never shown). Real-PG17 q12-migration-plan.test.ts: 49 passed — incl. the round-11 negative where a fake-drill injectDrift creates a function ONLY in the isolate and the error names [functions] + q12_drift_probe; the happy path survives the eager source-payload capture. No-docker adds 2 diff-engine cases (per-section add/remove/change identifiers + digests, 64-hex scrub, bounded output). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-10 drill/backup tsx runner RED->GREEN: 268677a1 -> a1b24302. Fixes the rehearsal #3 killer: tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to the workspace root, so `pnpm exec tsx` from the repo root is unresolvable (ERR_PNPM). run_ts now invokes the package pnpm shim ($PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx) with cwd=$PROJECT_ROOT + a fail-closed preflight naming the missing shim; backup-supabase.sh gets the same fix (bytes not sha-pinned). Drill suite supabase-restore-drill.test.ts: 47 passed (46 UNMODIFIED + 1 new RED-through-real-bytes runner test that extracts run_ts and proves it resolves via the package shim, not pnpm). Backup suites (operator+schedule): 65 passed (test-mode injection untouched). Plan suite: no-docker 39, real-PG17 46 passed (fake-drill path unaffected). tsc 0; drill+backup bash -n OK; frozen bytes aaec6fc2…/134255ce… intact (backup path in q12-command-manifest.json unchanged).'
   - 'Round-9 drill diagnostics + scheduled-mode RED->GREEN: 4e3fc6fb -> 87d2601c. Real-PG17 q12-migration-plan.test.ts: 46 passed — the end-to-end drill-seam test now proves the plan restores via the drill SCHEDULED mode; the fake drill mirrors the real drill Q12 activation cleanup (runs the real q12_guard.verify_capability() extracted from run-restore-cleanup.ts) in q12 mode and skips it in scheduled mode, reproducing the pre-C1 rehearsal failure (q12) and proving the fix (scheduled). No-docker adds a diagnostics case (_drill_failure_detail labeled stdout+stderr tails, secrets scrubbed, empty-stderr symptom). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED (persist-seam extension to scheduled mode is env-gated + default byte-identical). tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
@@ -50,6 +51,31 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-12 preserves the FULL equality-diff evidence for a product-truth ruling
+(`33e27794` -> `c06f3a54`). Rehearsal #5 emitted the round-11 named per-section diff
+(extensions ~5, functions ~46, relations/types/schemas/constraints/indexes deltas, a db
+comment delta, a courses.difficulty subobject only in the isolate). The source is
+PostgreSQL 17.6 on AARCH64, the pinned image is 17.6 on x86_64 — same PG version, so this
+is not simple version drift but per-arch/glibc + TLE-restore + deparse artifacts; the
+owner needs the full payloads, which previously died with the workdir.
+
+- New plan subcommand flag `--keep-equality-diagnostics` — argv, NOT an env seam, so
+  `assert_production_seam_lockdown` still rejects every `MC2_Q12_PLAN_*` env seam in a
+  production run. When set AND the equality proof fails, the plan writes exactly three
+  owner-only files into `<run_root>/equality-diagnostics/` (0700 dir, 0600 files): the
+  source and isolate canonical structural payloads and the FULL unbounded per-entry diff
+  (`_structural_catalog_diff` now takes `max_ids`/`max_lines`; None = unbounded).
+- `run_plan`s failed-run cleanup gains a documented exception: it preserves the run dir it
+  created when equality diagnostics were written under it; everything else
+  (containers/volume/network/handle/generation/workdir) is still torn down. Flag off ⇒
+  behavior byte-identical to before.
+- Scrub confirmation (item 2): reading the frozen SQL's payload assembly, subscription
+  conninfo is stored as `connection_sha256` (pre-hashed, never plaintext), and the payload
+  carries no cron command text or table row data (structural = schema only). The only free
+  text is our own migration-history statements. So the payload is secret-free by
+  construction and the preserved copies are written verbatim — scrubbing would corrupt the
+  exact diagnostic the ruling needs. The hash/proof itself is untouched.
 
 Round-11 makes the plan's structural-sha equality proof self-diagnosing (`d28bdae1` ->
 `5ebeeaca`), after rehearsal #4 got the real drill to complete end-to-end on the pinned
