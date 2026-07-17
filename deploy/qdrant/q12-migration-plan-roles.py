@@ -11,6 +11,16 @@ password for login-capable bootstrap roles. Anything outside the frozen allowlis
 restore, so a real Supabase source that references app roles absent from the pinned
 image no longer aborts the isolated pg_restore. Semantics mirror the reviewed
 deploy/postgres/generate-role-bootstrap.ts; the allowlists are frozen in code.
+
+Documented divergence from generate-role-bootstrap.ts (reviewer note): the source
+role projection (q12-migration-plan-capture.py) excludes PostgreSQL built-in `pg_*`
+roles and any membership edge touching them (`rolname !~ '^pg_'`), so this helper
+never sees them and does not perform the TS tool's `pg_participants` source-vs-image
+cross-check. That is safe for the plan's purpose: `pg_*` roles are cluster built-ins
+present identically in the source and the pinned image, are never in the §3
+missing-role allowlist (so this helper would never create them), and own no
+guarded/document-evidence objects — cross-checking them would add no safety to the
+diagnostic catalog while coupling the plan to the full manifest inventory shape.
 """
 
 from __future__ import annotations

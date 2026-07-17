@@ -4196,8 +4196,37 @@ UUID4_RE = re.compile(
 )
 
 
+PLAN_TEST_SEAM_ENV = (
+    "MC2_Q12_PLAN_RESTORE_MODE",
+    "MC2_Q12_PLAN_RESTORE_IMAGE",
+    "MC2_Q12_PLAN_SOURCE_CONTAINER",
+    "MC2_Q12_PLAN_MIGRATION_APPLY",
+    "MC2_Q12_PLAN_DRILL",
+    "MC2_Q12_PLAN_FAULT",
+    "MC2_Q12_PLAN_PG_DUMP",
+    "MC2_Q12_PLAN_PG_DUMPALL",
+    "MC2_Q12_PLAN_PSQL",
+    "MC2_Q12_PLAN_DOCKER",
+)
+
+
+def assert_production_seam_lockdown(run_root: pathlib.Path) -> None:
+    """In a production plan run (run_root under /opt/megacampus/backups/q12) the
+    reviewed drill path and pinned image are mandatory and NO MC2_Q12_PLAN_* test
+    seam may be set. Rejecting the seams also pins restore_mode=drill and the pinned
+    image (those only diverge from the default when their seam is set). Test seams
+    stay usable only with an explicit /tmp/mc2-q12-plan-* run root."""
+    if not re.fullmatch(r"/opt/megacampus/backups/q12/[^/]+", str(run_root)):
+        return
+    for name in PLAN_TEST_SEAM_ENV:
+        if os.environ.get(name) is not None:
+            raise LifecycleError(f"{name} test seam is not permitted in a production plan run")
+
+
 class PlanExecutor(Protocol):
     def capture(self, request: dict[str, Any]) -> dict[str, Any]: ...
+
+    def teardown(self) -> None: ...
 
 
 def _plan_is_bad_hex64(value: Any) -> bool:
@@ -4491,6 +4520,7 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
     _validate_plan_credential_file(db_url_file, {0o400, 0o600})
     _validate_plan_credential_file(ca_file, {0o644})
     run_root = _plan_run_root(run_id, getattr(arguments, "run_root", None))
+    assert_production_seam_lockdown(run_root)
     ensure_directory(run_root)
     output_path = run_root / "expected-post-migration-catalog.json"
     request = {
@@ -4593,7 +4623,10 @@ class LivePlanExecutor:
             "workdir": None,
             "handle": None,
             "generation": None,
+            "capability": None,
+            "secrets": None,
         }
+        self._run_id: str | None = None
         self._isolate_port: str | None = None
         self._isolate_password: str | None = None
         self._source_service: dict[str, str] | None = None
@@ -5091,11 +5124,16 @@ class LivePlanExecutor:
         # plan supplies a synthetic one (the drill's activation cleanup is a no-op on
         # a source with no q12_guard). Never a real credential.
         secrets = pathlib.Path(request["run_root"]) / "secrets"
+        secrets_existed = os.path.isdir(secrets)
         ensure_directory(secrets)
         capability = secrets / "db-capability"
         if os.path.lexists(capability):
             capability.unlink()
         atomic_replace(capability, (os.urandom(32).hex() + "\n").encode("utf-8"), 0o400)
+        self._resources["capability"] = str(capability)
+        # Only reclaim the secrets dir in teardown if plan created it.
+        if not secrets_existed:
+            self._resources["secrets"] = str(secrets)
         return capability
 
     def _read_handle(self, handle_path: pathlib.Path, run_id: str) -> dict[str, Any]:
@@ -5170,6 +5208,13 @@ class LivePlanExecutor:
                 "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT pg_export_snapshot();\n"
             )
             proc.stdin.flush()
+            import select
+
+            # Bounded wait so a stalled source psql fails closed instead of blocking.
+            ready, _, _ = select.select([proc.stdout], [], [], 30)
+            if not ready:
+                proc.kill()
+                raise LifecycleError("snapshot coordinator did not export a snapshot within the timeout")
             snapshot = proc.stdout.readline().strip()
         except (BrokenPipeError, OSError) as error:
             raise LifecycleError("snapshot coordinator died before exporting a snapshot") from error
@@ -5257,6 +5302,7 @@ class LivePlanExecutor:
 
     def capture(self, request: dict[str, Any]) -> dict[str, Any]:
         run_id = request["run_id"]
+        self._run_id = run_id
         workdir = pathlib.Path(
             f"/tmp/mc2-q12-plan-work-{run_id}-{os.urandom(6).hex()}"
         )
@@ -5357,6 +5403,21 @@ class LivePlanExecutor:
             except OSError as error:
                 errors.append(f"generation: {error}")
             self._resources["generation"] = None
+        capability = self._resources.get("capability")
+        if capability:
+            try:
+                if os.path.lexists(capability):
+                    os.unlink(capability)
+            except OSError as error:
+                errors.append(f"capability: {error}")
+            self._resources["capability"] = None
+        secrets = self._resources.get("secrets")
+        if secrets:
+            try:
+                shutil.rmtree(secrets, ignore_errors=False)
+            except OSError as error:
+                errors.append(f"secrets: {error}")
+            self._resources["secrets"] = None
         workdir = self._resources.get("workdir")
         if workdir:
             try:
@@ -5364,12 +5425,43 @@ class LivePlanExecutor:
             except OSError as error:
                 errors.append(f"workdir: {error}")
             self._resources["workdir"] = None
+        # Second pass: force-remove any run-labeled docker leftover, so a
+        # malformed-handle-after-persist path (where the resource names never
+        # reached us) can never leak. Both the plan's own isolate label and the
+        # drill's restore label are swept.
+        errors.extend(self._label_sweep())
         if self.fault == "teardown":
             errors.append("injected teardown fault")
         if errors:
             raise LifecycleError(
                 "plan diagnostic teardown failed (cleanup overrides success): " + "; ".join(errors)
             )
+
+    def _label_sweep(self) -> list[str]:
+        run_id = self._run_id
+        if not run_id:
+            return []
+        errors: list[str] = []
+        for label in (
+            f"com.megacampus.q12.plan-run={run_id}",
+            f"com.megacampus.q12.restore-run={run_id}",
+        ):
+            for kind, list_args, remove in (
+                ("container", ["ps", "-aq"], ["rm", "-f"]),
+                ("network", ["network", "ls", "-q"], ["network", "rm"]),
+                ("volume", ["volume", "ls", "-q"], ["volume", "rm", "--force"]),
+            ):
+                listed = self._docker_run([*list_args, "--filter", f"label={label}"], check=False)
+                if listed.returncode != 0:
+                    continue
+                for identity in listed.stdout.decode("utf-8", "replace").split():
+                    result = self._docker_run([*remove, identity], check=False)
+                    if result.returncode != 0:
+                        errors.append(
+                            f"{kind} sweep {identity}: "
+                            f"{result.stderr.decode('utf-8', 'replace').strip()}"
+                        )
+        return errors
 
 
 def parser() -> argparse.ArgumentParser:
