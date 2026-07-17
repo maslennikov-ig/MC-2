@@ -32,6 +32,8 @@ import sys
 STRUCTURAL_CATALOG_FILE = pathlib.Path(__file__).with_name("q12-structural-catalog.sql")
 # A docker/compose object name; anchored so a seam value can never inject argv.
 CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+# The exported-snapshot id shape from pg_export_snapshot() (backup-supabase.sh).
+SNAPSHOT_RE = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+")
 
 GUARDED_RELATIONS_SQL = """
 SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -249,44 +251,53 @@ def _decode_copy(text: str) -> str:
     return "".join(result)
 
 
-def read_only_wrap(body: str) -> str:
-    """One read-only transaction; COPY the body's single query to STDOUT as text."""
+def read_only_wrap(body: str, snapshot: str | None = None) -> str:
+    """One read-only transaction; COPY the body's single query to STDOUT as text.
+
+    When a snapshot id is supplied it is pinned with SET TRANSACTION SNAPSHOT so
+    every projection reads the exact instant the backup coordinator exported."""
+    binding = ""
+    if snapshot is not None:
+        if not SNAPSHOT_RE.fullmatch(snapshot):
+            raise CaptureError("invalid --snapshot value")
+        binding = f"SET TRANSACTION SNAPSHOT '{snapshot}';\n"
     return (
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\n"
+        f"{binding}"
         f"COPY ({body}) TO STDOUT;\n"
         "COMMIT;\n"
     )
 
 
-def capture_roles(container: str | None, dbname: str = "postgres") -> dict[str, object]:
+def capture_roles(container: str | None, dbname: str = "postgres", snapshot: str | None = None) -> dict[str, object]:
     """Read-only §3 role plane: roles / membership edges / cluster role settings.
 
     Usable against a fresh isolate (no application schema yet), so the plan can
     diff the source role plane against the isolate before restore."""
     return {
         "schema_version": "megacampus.q12.plan-role-capture/v1",
-        "source_roles": json.loads(run_sql(read_only_wrap(ROLES_SQL), container, dbname)),
-        "source_memberships": json.loads(run_sql(read_only_wrap(MEMBERSHIPS_SQL), container, dbname)),
-        "source_role_settings": json.loads(run_sql(read_only_wrap(ROLE_SETTINGS_SQL), container, dbname)),
+        "source_roles": json.loads(run_sql(read_only_wrap(ROLES_SQL, snapshot), container, dbname)),
+        "source_memberships": json.loads(run_sql(read_only_wrap(MEMBERSHIPS_SQL, snapshot), container, dbname)),
+        "source_role_settings": json.loads(run_sql(read_only_wrap(ROLE_SETTINGS_SQL, snapshot), container, dbname)),
     }
 
 
-def capture(container: str | None, dbname: str = "postgres") -> dict[str, object]:
+def capture(container: str | None, dbname: str = "postgres", snapshot: str | None = None) -> dict[str, object]:
     structural_sql = STRUCTURAL_CATALOG_FILE.read_text(encoding="utf-8").strip()
     if ";" in structural_sql:
         raise CaptureError("structural catalog SQL must be one semicolon-free query")
     structural_sha256 = run_sql(
-        read_only_wrap(f"SELECT structural_sha256 FROM (\n{structural_sql}\n) AS plan_capture"),
+        read_only_wrap(f"SELECT structural_sha256 FROM (\n{structural_sql}\n) AS plan_capture", snapshot),
         container,
         dbname,
     )
     if len(structural_sha256) != 64 or any(ch not in "0123456789abcdef" for ch in structural_sha256):
         raise CaptureError("structural catalog SHA-256 is malformed")
 
-    identity = json.loads(run_sql(read_only_wrap(IDENTITY_SQL), container, dbname))
-    guarded = json.loads(run_sql(read_only_wrap(GUARDED_RELATIONS_SQL), container, dbname))
-    public_relations = json.loads(run_sql(read_only_wrap(PUBLIC_RELATIONS_SQL), container, dbname))
-    cron_raw = json.loads(run_sql(read_only_wrap(CRON_JOBS_SQL), container, dbname))
+    identity = json.loads(run_sql(read_only_wrap(IDENTITY_SQL, snapshot), container, dbname))
+    guarded = json.loads(run_sql(read_only_wrap(GUARDED_RELATIONS_SQL, snapshot), container, dbname))
+    public_relations = json.loads(run_sql(read_only_wrap(PUBLIC_RELATIONS_SQL, snapshot), container, dbname))
+    cron_raw = json.loads(run_sql(read_only_wrap(CRON_JOBS_SQL, snapshot), container, dbname))
 
     cron_jobs = [
         {
@@ -306,7 +317,7 @@ def capture(container: str | None, dbname: str = "postgres") -> dict[str, object
         "guarded_relations": guarded,
         "cron_jobs": cron_jobs,
         "public_relations": public_relations,
-        **capture_roles(container, dbname),
+        **capture_roles(container, dbname, snapshot),
     }
 
 
@@ -315,12 +326,16 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--container", default=None)
     parser.add_argument("--roles-only", action="store_true")
     parser.add_argument("--dbname", default="postgres")
+    parser.add_argument("--snapshot", default=None)
     arguments = parser.parse_args(argv)
     dbname = _validated_dbname(arguments.dbname)
+    snapshot = arguments.snapshot
+    if snapshot is not None and not SNAPSHOT_RE.fullmatch(snapshot):
+        raise CaptureError("invalid --snapshot value")
     output = (
-        capture_roles(arguments.container, dbname)
+        capture_roles(arguments.container, dbname, snapshot)
         if arguments.roles_only
-        else capture(arguments.container, dbname)
+        else capture(arguments.container, dbname, snapshot)
     )
     sys.stdout.write(json.dumps(output, ensure_ascii=False, sort_keys=True))
     sys.stdout.write("\n")

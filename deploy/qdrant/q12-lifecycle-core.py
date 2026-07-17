@@ -4188,6 +4188,8 @@ PLAN_MIGRATION_FILES = {
 }
 HEX64_RE = re.compile(r"[0-9a-f]{64}")
 HEX40_RE = re.compile(r"[0-9a-f]{40}")
+# pg_export_snapshot() id shape (mirrors backup-supabase.sh's validation).
+PLAN_SNAPSHOT_RE = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+")
 PLAN_NAME_RE = re.compile(r"[a-z_][a-z0-9_]*")
 UUID4_RE = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
@@ -4595,6 +4597,7 @@ class LivePlanExecutor:
         self._isolate_port: str | None = None
         self._isolate_password: str | None = None
         self._source_service: dict[str, str] | None = None
+        self._coordinator: subprocess.Popen[str] | None = None
 
     def _base_env(self) -> dict[str, str]:
         return {
@@ -4627,11 +4630,14 @@ class LivePlanExecutor:
         service_env: dict[str, str] | None = None,
         roles_only: bool = False,
         dbname: str = "postgres",
+        snapshot: str | None = None,
     ) -> dict[str, Any]:
         env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
         if service_env:
             env.update(service_env)
         argv = ["/usr/bin/python3", str(self.capture_helper), "--dbname", dbname]
+        if snapshot is not None:
+            argv += ["--snapshot", snapshot]
         if container is not None:
             argv += ["--container", container]
         if roles_only:
@@ -4689,11 +4695,16 @@ class LivePlanExecutor:
             os.close(descriptor)
         return {"PGSERVICEFILE": str(service_path), "PGSERVICE": "q12plan"}
 
-    def _capture_source(self, request: dict[str, Any], workdir: pathlib.Path) -> dict[str, Any]:
+    def _capture_source(
+        self, request: dict[str, Any], workdir: pathlib.Path, snapshot: str | None = None
+    ) -> dict[str, Any]:
         if self.source_container:
-            return self._run_capture(container=self.source_container)
-        self._source_service = self._source_service_env(request, workdir)
-        return self._run_capture(container=None, service_env=self._source_service)
+            return self._run_capture(container=self.source_container, snapshot=snapshot)
+        if self._source_service is None:
+            self._source_service = self._source_service_env(request, workdir)
+        return self._run_capture(
+            container=None, service_env=self._source_service, snapshot=snapshot
+        )
 
     def _create_isolate(self, run_id: str) -> str:
         import time
@@ -4749,7 +4760,7 @@ class LivePlanExecutor:
         self._isolate_port = match.group(1)
         return container
 
-    def _dump_source(self, archive: pathlib.Path) -> pathlib.Path:
+    def _dump_source(self, archive: pathlib.Path, snapshot: str | None = None) -> pathlib.Path:
         # Stream the custom archive straight to disk (pg_dump stdout -> file fd)
         # so peak memory is not ~2x the database size on the production server.
         descriptor = os.open(archive, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -4764,12 +4775,17 @@ class LivePlanExecutor:
                     "postgres",
                     "-Fc",
                     "--no-password",
-                    "postgres",
                 ]
+                if snapshot is not None:
+                    argv.append(f"--snapshot={snapshot}")
+                argv.append("postgres")
                 env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
             else:
                 pg_dump = os.environ.get("MC2_Q12_PLAN_PG_DUMP") or "/usr/lib/postgresql/17/bin/pg_dump"
-                argv = [pg_dump, "-Fc", "--no-password", "postgres"]
+                argv = [pg_dump, "-Fc", "--no-password"]
+                if snapshot is not None:
+                    argv.append(f"--snapshot={snapshot}")
+                argv.append("postgres")
                 env = {**self._base_env(), **(self._source_service or {})}
             completed = subprocess.run(
                 argv,
@@ -4929,8 +4945,6 @@ class LivePlanExecutor:
                 "port": str(self._isolate_port),
                 "password": str(self._isolate_password),
             }
-        if self.restore_mode == "drill":
-            return self._restore_via_drill(request, workdir, source, run_id)
         raise LifecycleError(f"unknown plan restore mode: {self.restore_mode}")
 
     def _dump_roles(self, dest: pathlib.Path) -> None:
@@ -4970,7 +4984,7 @@ class LivePlanExecutor:
                 f"source roles export failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
             )
 
-    def _produce_source_manifest(self, dest: pathlib.Path) -> None:
+    def _produce_source_manifest(self, dest: pathlib.Path, snapshot: str | None = None) -> None:
         # The reviewed source manifest is produced by q12-source-manifest.ts over
         # host psql in production; that leg is Supabase-only and validated by the
         # server-side pre-C1 plan run. A CI source container uses a schema-shaped
@@ -4991,6 +5005,8 @@ class LivePlanExecutor:
                 "tsx",
                 str(self.repo_root / "deploy/postgres/q12-source-manifest.ts"),
                 "capture",
+                "--snapshot",
+                str(snapshot),
                 "--output",
                 str(dest),
             ],
@@ -5013,14 +5029,60 @@ class LivePlanExecutor:
         manifest = {"schema": "megacampus.supabase-backup-checksums/v1", "files": entries}
         atomic_replace(generation / "checksums.json", complete_object(manifest), 0o600)
 
-    def _produce_generation(self, workdir: pathlib.Path, source: dict[str, Any]) -> pathlib.Path:
+    @staticmethod
+    def _normalize_roles(text: str) -> str:
+        """Mirror backup-supabase.sh:589-614 — remove only the PG17 \\restrict /
+        \\unrestrict nonce pair (which differs per invocation) and trailing blank
+        lines, requiring the pair to be present exactly once."""
+        lines = text.splitlines()
+        if not lines:
+            raise LifecycleError("empty roles export")
+        while lines and lines[-1] == "":
+            lines.pop()
+        openings = [
+            (index, match.group(1))
+            for index, line in enumerate(lines)
+            if (match := re.fullmatch(r"\\restrict ([A-Za-z0-9]+)", line))
+        ]
+        closings = [
+            (index, match.group(1))
+            for index, line in enumerate(lines)
+            if (match := re.fullmatch(r"\\unrestrict ([A-Za-z0-9]+)", line))
+        ]
+        if len(openings) != 1 or len(closings) != 1:
+            raise LifecycleError(
+                "roles export must contain exactly one PostgreSQL 17 restrict/unrestrict pair"
+            )
+        opening_index, opening_nonce = openings[0]
+        closing_index, closing_nonce = closings[0]
+        if opening_index >= closing_index or opening_nonce != closing_nonce:
+            raise LifecycleError("roles export has a missing or mismatched unrestrict marker")
+        normalized = "\n".join(
+            line for index, line in enumerate(lines) if index not in (opening_index, closing_index)
+        )
+        return normalized + "\n" if normalized else ""
+
+    def _assert_roles_stable(self, before: pathlib.Path, after: pathlib.Path) -> None:
+        if self._normalize_roles(before.read_text(encoding="utf-8")) != self._normalize_roles(
+            after.read_text(encoding="utf-8")
+        ):
+            raise LifecycleError("source role plane drifted during the snapshot window")
+
+    def _produce_generation(self, workdir: pathlib.Path, snapshot: str | None = None) -> pathlib.Path:
         """Diagnostic backup generation for the drill (NOT the accepted recoverable
-        backup); removed by teardown once the catalog is bound."""
+        backup); removed by teardown once the catalog is bound. Cluster roles are
+        not MVCC-snapshotted, so — like the reviewed backup — they are exported
+        before and after the snapshot-bound dump and must be byte-identical."""
         generation = workdir / ("generation-" + os.urandom(8).hex())
         os.mkdir(generation, 0o700)
-        self._dump_source(generation / "database.dump")
-        self._dump_roles(generation / "roles.sql")
-        self._produce_source_manifest(generation / "source-manifest.json")
+        roles = generation / "roles.sql"
+        self._dump_roles(roles)
+        self._dump_source(generation / "database.dump", snapshot)
+        self._produce_source_manifest(generation / "source-manifest.json", snapshot)
+        roles_after = generation / ".roles.after.sql"
+        self._dump_roles(roles_after)
+        self._assert_roles_stable(roles, roles_after)
+        roles_after.unlink()
         self._write_checksums(generation)
         return generation
 
@@ -5067,11 +5129,92 @@ class LivePlanExecutor:
                 raise LifecycleError(f"persist handle field mismatch: {key}")
         return handle
 
+    def _open_snapshot_coordinator(
+        self, request: dict[str, Any], workdir: pathlib.Path
+    ) -> tuple[subprocess.Popen[str], str]:
+        """Open one REPEATABLE READ READ ONLY session on the source, export a
+        snapshot, and keep the session open so the source capture, dump, and manifest
+        all read the same instant (mirrors backup-supabase.sh:853-883). Fail closed
+        on a dead coordinator or a malformed snapshot id."""
+        if self.source_container:
+            argv = [
+                self.docker,
+                "exec",
+                "-i",
+                self.source_container,
+                "psql",
+                "-X",
+                "--no-psqlrc",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "-tAq",
+                "-v",
+                "ON_ERROR_STOP=1",
+            ]
+            env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
+        else:
+            if self._source_service is None:
+                self._source_service = self._source_service_env(request, workdir)
+            binary = os.environ.get("MC2_Q12_PLAN_PSQL", "/usr/lib/postgresql/17/bin/psql")
+            argv = [binary, "-X", "--no-psqlrc", "--no-password", "-tAq", "-v", "ON_ERROR_STOP=1"]
+            env = {**self._base_env(), **self._source_service}
+        proc = subprocess.Popen(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True
+        )
+        self._coordinator = proc
+        try:
+            assert proc.stdin is not None and proc.stdout is not None
+            proc.stdin.write(
+                "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT pg_export_snapshot();\n"
+            )
+            proc.stdin.flush()
+            snapshot = proc.stdout.readline().strip()
+        except (BrokenPipeError, OSError) as error:
+            raise LifecycleError("snapshot coordinator died before exporting a snapshot") from error
+        if self.fault == "snapshot":
+            snapshot = "not-a-valid-snapshot"
+        if proc.poll() is not None or not PLAN_SNAPSHOT_RE.fullmatch(snapshot):
+            raise LifecycleError("snapshot coordinator exported an invalid snapshot id")
+        return proc, snapshot
+
+    def _close_snapshot_coordinator(self, proc: subprocess.Popen[str] | None) -> None:
+        if proc is None:
+            return
+        self._coordinator = None
+        try:
+            if proc.stdin is not None and not proc.stdin.closed:
+                proc.stdin.write("COMMIT;\n\\q\n")
+                proc.stdin.flush()
+                proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+        try:
+            returncode = proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            raise LifecycleError("snapshot coordinator did not release the snapshot")
+        if returncode != 0:
+            raise LifecycleError("snapshot coordinator session failed")
+
+    def _drill_flow(
+        self, request: dict[str, Any], workdir: pathlib.Path, run_id: str
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        coordinator, snapshot = self._open_snapshot_coordinator(request, workdir)
+        try:
+            source = self._capture_source(request, workdir, snapshot=snapshot)
+            generation = self._produce_generation(workdir, snapshot=snapshot)
+            self._resources["generation"] = str(generation)
+        finally:
+            self._close_snapshot_coordinator(coordinator)
+        target = self._restore_via_drill(request, workdir, generation, run_id)
+        return source, target
+
     def _restore_via_drill(
-        self, request: dict[str, Any], workdir: pathlib.Path, source: dict[str, Any], run_id: str
+        self, request: dict[str, Any], workdir: pathlib.Path, generation: pathlib.Path, run_id: str
     ) -> dict[str, str]:
-        generation = self._produce_generation(workdir, source)
-        self._resources["generation"] = str(generation)
         capability = self._prepare_capability(request)
         handle_path = pathlib.Path(request["run_root"]) / "restore-persist-handle.json"
         if os.path.lexists(handle_path):
@@ -5120,8 +5263,15 @@ class LivePlanExecutor:
         os.mkdir(workdir, 0o700)
         self._resources["workdir"] = str(workdir)
 
-        source = self._capture_source(request, workdir)
-        target = self._prepare_target(request, workdir, source, run_id)
+        if self.restore_mode == "drill":
+            # Production: source capture + generation are bound to one exported
+            # source snapshot (coordinator), then the reviewed drill restores it.
+            source, target = self._drill_flow(request, workdir, run_id)
+        elif self.restore_mode == "direct":
+            source = self._capture_source(request, workdir)
+            target = self._prepare_target(request, workdir, source, run_id)
+        else:
+            raise LifecycleError(f"unknown plan restore mode: {self.restore_mode}")
         dbname = target["dbname"]
 
         isolate_baseline = self._run_capture(container=target["container"], dbname=dbname)
@@ -5168,6 +5318,12 @@ class LivePlanExecutor:
         import shutil
 
         errors: list[str] = []
+        if self._coordinator is not None:
+            try:
+                self._close_snapshot_coordinator(self._coordinator)
+            except LifecycleError as error:
+                errors.append(f"coordinator: {error}")
+            self._coordinator = None
         container = self._resources.get("container")
         if container:
             result = self._docker_run(["rm", "-f", container], check=False)
