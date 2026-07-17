@@ -310,10 +310,11 @@ async function assertAllowlistedSource(direction: Direction): Promise<void> {
 }
 
 async function requireSupabaseHistory(client: Client): Promise<void> {
-  const relation = await client.query<{ relation: string | null }>(
-    `SELECT to_regclass('supabase_migrations.schema_migrations')::text AS relation`
+  // Existence by resolution (IS NOT NULL) is search_path-independent (see the approved CLI).
+  const relation = await client.query<{ present: boolean }>(
+    `SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL AS present`
   );
-  if (relation.rows[0]?.relation !== 'supabase_migrations.schema_migrations') {
+  if (relation.rows[0]?.present !== true) {
     throw new Error('Existing Supabase migration history is required');
   }
   const columns = await client.query<{ column_name: string; data_type: string }>(`
@@ -520,10 +521,13 @@ const TOTALS_TRIGGERS = [
 ] as const;
 
 async function totalsRelationExists(client: Client): Promise<boolean> {
-  const result = await client.query<{ relation: string | null }>(
-    "SELECT to_regclass('public.document_evidence_observability_totals')::text AS relation"
+  // Existence by resolution (IS NOT NULL) is search_path-independent; the earlier
+  // to_regclass(...)::text = <unqualified name> relied on `public` being on the session
+  // search_path to render unqualified — true today, but a latent search_path trap.
+  const result = await client.query<{ present: boolean }>(
+    "SELECT to_regclass('public.document_evidence_observability_totals') IS NOT NULL AS present"
   );
-  return result.rows[0]?.relation === 'document_evidence_observability_totals';
+  return result.rows[0]?.present === true;
 }
 
 async function assertExactTotals(client: Client): Promise<void> {

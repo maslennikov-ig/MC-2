@@ -800,10 +800,14 @@ async function loadDownstreamMigrations(): Promise<LoadedMigration[]> {
 }
 
 async function requireSupabaseHistory(client: Client): Promise<void> {
-  const relation = await client.query<{ relation: string | null }>(
-    `SELECT to_regclass('supabase_migrations.schema_migrations')::text AS relation`
+  // Existence by resolution (IS NOT NULL) is search_path-independent; the earlier
+  // to_regclass(...)::text = 'supabase_migrations.schema_migrations' compared a rendered name
+  // against a qualified literal (safe only while supabase_migrations is absent from the
+  // session search_path — it is, for the postgres role — but a latent search_path trap).
+  const relation = await client.query<{ present: boolean }>(
+    `SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL AS present`
   );
-  if (relation.rows[0]?.relation !== 'supabase_migrations.schema_migrations') {
+  if (relation.rows[0]?.present !== true) {
     throw new Error('Existing Supabase migration history is required');
   }
   const columns = await client.query<{ column_name: string; data_type: string }>(`
@@ -892,11 +896,14 @@ function assertExactHistory(row: HistoryRow, migration: LoadedMigration): void {
 }
 
 async function relationExists(client: Client, relation: string): Promise<boolean> {
-  const result = await client.query<{ relation: string | null }>(
-    `SELECT to_regclass($1)::text AS relation`,
+  // Existence by resolution (IS NOT NULL) is search_path-independent; the earlier
+  // to_regclass($1)::text = <name stripped of public.> relied on `public` being on the
+  // session search_path to render unqualified — true today, but a latent search_path trap.
+  const result = await client.query<{ present: boolean }>(
+    `SELECT to_regclass($1) IS NOT NULL AS present`,
     [relation]
   );
-  return result.rows[0]?.relation === relation.replace(/^public\./u, '');
+  return result.rows[0]?.present === true;
 }
 
 async function columnExists(client: Client, table: string, column: string): Promise<boolean> {
@@ -1000,26 +1007,42 @@ async function assertClarifyingSubjectIndex(client: Client): Promise<void> {
   }
 }
 
-async function assertPgcryptoDigestDependency(client: Client): Promise<void> {
+export async function assertPgcryptoDigestDependency(client: Client): Promise<void> {
+  // Resolve extensions.digest(bytea,text) by its QUALIFIED name (to_regprocedure is
+  // search_path-independent for resolution) and assert explicit CATALOG facts. The earlier
+  // `to_regprocedure(...)::text = 'extensions.digest(bytea,text)'` clause was
+  // search_path-SENSITIVE: to_regprocedure(...)::text drops the schema when `extensions` is
+  // on the session search_path, and the §3-allowlisted postgres role carries
+  // search_path="$user", public, extensions in both cloud and the drill-replayed isolate,
+  // so the rendered value was `digest(bytea,text)` and the check failed against every real
+  // environment. Argument/return types render as pg_catalog types (bytea, text), which are
+  // always unqualified, so those comparisons stay search_path-safe.
   const result = await client.query<{
     extname: string;
     extversion: string;
-    nspname: string;
-    digest_signature: string | null;
+    extension_schema: string;
+    digest_present: boolean;
+    digest_schema: string | null;
+    digest_name: string | null;
+    digest_arguments: string | null;
     result_type: string | null;
     language: string | null;
     security_definer: boolean | null;
     configuration: string[];
   }>(`
-    SELECT extensions.extname,extensions.extversion,namespaces.nspname,
-      to_regprocedure('extensions.digest(bytea,text)')::text AS digest_signature,
+    SELECT extensions.extname,extensions.extversion,extension_namespace.nspname AS extension_schema,
+      procedures.oid IS NOT NULL AS digest_present,
+      procedure_namespace.nspname AS digest_schema,
+      procedures.proname AS digest_name,
+      pg_get_function_identity_arguments(procedures.oid) AS digest_arguments,
       procedures.prorettype::regtype::text AS result_type,languages.lanname AS language,
       procedures.prosecdef AS security_definer,
       COALESCE(to_json(procedures.proconfig),'[]'::json) AS configuration
     FROM pg_extension extensions
-    JOIN pg_namespace namespaces ON namespaces.oid=extensions.extnamespace
+    JOIN pg_namespace extension_namespace ON extension_namespace.oid=extensions.extnamespace
     LEFT JOIN pg_proc procedures
       ON procedures.oid=to_regprocedure('extensions.digest(bytea,text)')
+    LEFT JOIN pg_namespace procedure_namespace ON procedure_namespace.oid=procedures.pronamespace
     LEFT JOIN pg_language languages ON languages.oid=procedures.prolang
     WHERE extensions.extname='pgcrypto'
   `);
@@ -1028,8 +1051,11 @@ async function assertPgcryptoDigestDependency(client: Client): Promise<void> {
     !dependency ||
     dependency.extname !== 'pgcrypto' ||
     dependency.extversion !== '1.3' ||
-    dependency.nspname !== 'extensions' ||
-    dependency.digest_signature !== 'extensions.digest(bytea,text)' ||
+    dependency.extension_schema !== 'extensions' ||
+    dependency.digest_present !== true ||
+    dependency.digest_schema !== 'extensions' ||
+    dependency.digest_name !== 'digest' ||
+    dependency.digest_arguments !== 'bytea, text' ||
     dependency.result_type !== 'bytea' ||
     dependency.language !== 'c' ||
     dependency.security_definer !== false ||
