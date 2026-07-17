@@ -23,85 +23,90 @@ cleanup_notes: >-
   filters show zero leftovers.
 risk_level: medium
 verification:
-  - 'Builder RED->GREEN: a46c6173 -> 28ec3448. Live orchestration RED->GREEN: ee04d555 -> 2b6b16ad.'
-  - 'Capture-seam hardening (reviewer P3): 864da98f. Drill persist seam RED->GREEN: 28e75d8c -> 93f01595.'
-  - 'Unit + drill (no docker): q12-migration-plan.test.ts + supabase-restore-drill.test.ts = 60 passed | 4 skipped.'
-  - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 14 passed — capture helper + full live LivePlanExecutor end-to-end (direct restore path) incl. equality-mismatch fail-closed and teardown-overrides-success.'
-  - 'Drill: 44 existing tests pass UNMODIFIED (default byte-identical) + 2 new persist-seam tests (handoff keeps resources; failure before handoff still cleans up).'
-  - 'pnpm type-check / tsc --noEmit exit 0; python3 compile OK; drill bash -n OK.'
+  - 'Blocking §3 role bootstrap RED->GREEN: dc0d9cc6 -> 6a0825fa. Builder/live/hardening/drill-seam from prior rounds unchanged.'
+  - 'Unit + drill (no docker): q12-migration-plan.test.ts + supabase-restore-drill.test.ts = 65 passed | 4 skipped.'
+  - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 23 passed — incl. the live LivePlanExecutor end-to-end where the source owns a table via an allowlisted `admin` role absent from the isolate, so the restore succeeds only because the §3 bootstrap ran, plus equality-mismatch fail-closed and teardown-overrides-success.'
+  - 'Role-bootstrap generator negatives (unit, fail closed BEFORE any restore): non-allowlisted source role, disallowed role setting, forbidden elevated attribute, isolate role absent from source.'
+  - '44 existing drill tests + all prior suites pass unmodified; pnpm type-check / tsc --noEmit exit 0; python3 compile OK.'
   - 'Frozen bytes unchanged: q12-command-manifest.json aaec6fc2…, q12-database-barrier.sh 134255ce…; q12-live-cutover.test.ts and all existing tests untouched; frozen pg.restore argv untouched.'
 changed_files:
   - deploy/qdrant/q12-lifecycle-core.py
   - deploy/qdrant/q12-live-cutover.sh
   - deploy/qdrant/q12-migration-plan-capture.py
+  - deploy/qdrant/q12-migration-plan-roles.py
   - deploy/postgres/restore-supabase-drill.sh
   - packages/course-gen-platform/tests/unit/ops/q12-migration-plan.test.ts
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-migration-plan-runner.py
   - packages/course-gen-platform/tests/unit/ops/supabase-restore-drill.test.ts
 explicit_defers:
-  - "Production restore reuse of restore-supabase-drill.sh via the new persist seam is the sequenced next integration (bounded, tracked here): LivePlanExecutor's production restore must consume MC2_Q12_RESTORE_PERSIST_HANDLE (produce a diagnostic generation with the reviewed tools -> call the drill -> read the handle -> migrate/capture restore_test through the handle -> own teardown), because a plain pg_restore into the pinned image fails on source app-role-owned objects (the image lacks admin/instructor/student/superadmin/pgtle_admin) and --no-owner would break the structural-equality proof. The seam that unblocks this is delivered and tested; the consumption is Supabase-image-only and CI-unreproducible, so it is validated by the owner's server-side pre-C1 plan run (decision B), not in CI."
-  - "Real-CLI migration leg: CI-unreproducible by cryptographic binding (document-evidence-approved.ts:1250-1356 security manifests pinned to the real restore); validated by the owner's server-side pre-C1 q12-live-cutover.sh plan run (read-only on the source). If prod schema drifted since generation-20260716T105950Z the manifests fail closed — a correct product-truth outcome, not to be relaxed."
+  - "Real-CLI migration leg: CI-unreproducible by cryptographic binding (document-evidence-approved.ts:1250-1356 security manifests pinned to the real restore of generation-20260716T105950Z); production applies migrations with the real CLIs in loopback mode (loopback needs no --confirm/--allow-remote: document-evidence-approved.ts:648 returns early for 127.0.0.1/localhost/::1 before the remote gate). Validated by the owner's server-side pre-C1 `q12-live-cutover.sh plan` run (read-only on the source). If prod schema drifted since that generation the manifests fail closed — a correct product-truth outcome, not to be relaxed."
 ---
 
 # Summary
 
-Q12 `plan` mode is delivered with a fully CI-proven builder and live-orchestration
-pipeline, plus the reviewer P3 hardening and decision A(i)'s opt-in persist seam on
-`restore-supabase-drill.sh`. Round-3 commits on `codex/q12-plan-builder`:
+Closed the blocking completeness defect the team-lead found by direct diff review:
+the live restore leg had no §3 allowlisted role bootstrap before `pg_restore`, so a
+real Supabase source that owns/grants via app roles absent from the pinned image
+would abort the isolated restore (or drift ACLs and fail the equality proof). CI
+masked it because the vanilla source only had `postgres`. Round-4 RED->GREEN:
+`dc0d9cc6` -> `6a0825fa`.
 
-- `864da98f` harden: fail-closed capture-seam inputs (`--container` regex,
-  `MC2_Q12_PLAN_PSQL`/`MC2_Q12_PLAN_DOCKER` absolute non-symlink regular file) +
-  an explicit boolean-as-integer negative (oid/jobid = true) pinning the
-  `isinstance(bool)` guards.
-- `28e75d8c` -> `93f01595` (RED -> GREEN): opt-in `MC2_Q12_RESTORE_PERSIST_HANDLE`
-  seam on `restore-supabase-drill.sh`. On a fully successful Q12 restore the drill
-  publishes an owner-only 0400 handle (container/network/volume/loopback port +
-  restore_test connection) and hands the live resources to the caller instead of
-  tearing them down, so plan mode can reuse the drill's reviewed role bootstrap
-  rather than forking it. `PERSIST_ENGAGED` flips to 1 only on that exact success
-  path; every failure keeps it 0 so `on_exit` still fully cleans up (no silent
-  leak). Default (env unset) is byte-identical — the 44 existing drill tests pass
-  unmodified and the frozen `pg.restore` argv is untouched.
+- `deploy/qdrant/q12-migration-plan-roles.py` (new): a pure §3 bootstrap generator
+  mirroring the reviewed `generate-role-bootstrap.ts` semantics with the frozen
+  missing-role / privilege / role-setting allowlists. It creates ONLY roles that
+  are in the source, absent from the isolate, and on the §3 missing-role allowlist
+  — password-free — replays membership edges under the exact grantor (superuser
+  grants first) with admin/inherit/set options, applies ONLY §3-allowlisted cluster
+  role settings, and hard-stops before any restore on a non-allowlisted missing
+  role, a forbidden elevated attribute, a disallowed setting, or an isolate role
+  absent from the source. It never executes raw pg_dumpall output.
+- `q12-migration-plan-capture.py`: read-only role-plane projection (pg_roles /
+  pg_auth_members / cluster pg_db_role_setting), a `--roles-only` mode for the fresh
+  isolate, and COPY-text decoding so quoted/comma/backslash values round-trip.
+- `LivePlanExecutor`: diffs the source role plane against the isolate, generates and
+  applies the bootstrap with `psql -X --set ON_ERROR_STOP=on` BEFORE `pg_restore`.
+  P2: `pg_dump` now streams straight to a file descriptor and `pg_restore` reads the
+  open archive, so peak memory is not ~2x the database size on the server.
 
-Key enabling finding: the frozen `q12-structural-catalog.sql` has no database-name
-field and excludes the three drill overrides (`default_transaction_read_only`,
-`cron.database_name`, `cron.launch_active_jobs`) from its hash, so the source
-`postgres` and the drill's isolated `restore_test` produce the same structural SHA
-— the plan equality proof holds against the drill restore, making A(i) sound.
-
-Reviewer P2 (guarded/delta split) is already implemented and enforced: the builder
-sources `guarded_relations`/`cron_jobs`/`baseline`/`frontier` from the SOURCE
-capture (live OIDs) and each `migrations[].relations` from the post-migration
-ISOLATE delta; `validate_expected_catalog()` and the frozen barrier both require
-global identity disjointness.
+With this, the direct restore path is correct for a real Supabase source (it
+creates the app roles), and the pre-migration structural-equality proof remains the
+fail-closed safety net for any residual restore infidelity. The A(i) drill persist
+seam from round 3 remains a delivered, tested capability if a future stream wants
+the drill's fuller restore, but the team-lead directed the §3 bootstrap into the
+live leg directly (mirror, not drill consumption), which this delivers and proves
+on vanilla PG17.
 
 # Verification
 
-- Round-3 unit (no docker): `q12-migration-plan.test.ts` + `supabase-restore-drill.test.ts`
-  = `60 passed | 4 skipped`. New: two capture-seam rejections, the boolean-as-int
-  negative, and the two persist-seam fake-docker tests (handoff keeps all three
-  resources alive; persist-requested-but-failed still cleans up to zero).
-- Drill regression: the 44 pre-existing drill tests pass UNMODIFIED (default path
-  byte-identical); `bash -n` clean.
-- Real-PG17 (`MC2_Q12_REAL_PG17=1`): `14 passed` — capture helper + the full live
-  `LivePlanExecutor` end-to-end via the direct restore path (source snapshot ->
-  isolated restore -> structural-equality proof -> the real five migration files
-  applied -> barrier-valid catalog), plus equality-mismatch fail-closed and
-  teardown-overrides-success; zero leftover containers.
-- `tsc --noEmit` exit 0; frozen bytes (`q12-command-manifest.json`,
-  `q12-database-barrier.sh`) re-verified; `q12-live-cutover.test.ts` untouched.
+- Role-bootstrap RED (`dc0d9cc6`, impl absent): the five generator unit tests
+  failed; GREEN (`6a0825fa`) they pass.
+- Unit + drill (no docker): `65 passed | 4 skipped`. The generator suite proves the
+  positive render (CREATE ROLE password-free, SET ROLE/GRANT/RESET replay, ALTER
+  ROLE SET for an allowed setting) and four fail-closed negatives.
+- Real-PG17 (`MC2_Q12_REAL_PG17=1`): `23 passed`. The live-orchestration source now
+  has an allowlisted `admin` role owning `realtime.messages` and an allowed
+  `postgres` search_path setting; the isolated `pg_restore` succeeds only because
+  the §3 bootstrap created `admin` first, and the emitted catalog still passes the
+  frozen barrier filter with the equality proof intact. Negatives
+  (`MC2_Q12_PLAN_FAULT=equality|teardown`) still hold.
+- Regression: 44 existing drill tests + all prior suites pass unmodified; `tsc`
+  exit 0; frozen bytes re-verified; `q12-live-cutover.test.ts` untouched.
+- P3 confirmation: the production migration CLIs run in loopback mode with only
+  `SUPABASE_DB_URL` — `validateDocumentEvidenceApprovedMigrationTarget`
+  (document-evidence-approved.ts:634) returns at :648 for 127.0.0.1/localhost/::1
+  BEFORE the `--allow-remote`/`--confirm`/sslmode gate, and `apply` applies all
+  three base files (observability `apply-all` applies both). Loopback mode exists as
+  assumed — not a stop-and-report.
 
 # Risks / Follow-ups
 
-- Production restore does not yet consume the persist seam. Today `LivePlanExecutor`
-  restores via the direct `pg_dump | pg_restore` path, which is correct and
-  CI-proven on vanilla PG17 but insufficient for a real Supabase source (app-role
-  ownership). The seam delivered this round unblocks the reviewed-drill restore;
-  wiring `LivePlanExecutor` to consume it is the bounded next stream (see
-  `explicit_defers`), Supabase-only / server-validated per decision B. I recommend
-  it be the immediate follow-on before the owner's pre-C1 rehearsal.
-- The drill persist handle carries the disposable restore_test connection password
-  (owner-only 0400, loopback-only throwaway); it is never a source credential.
-- Real-CLI leg and the drill-consumption leg are both server-validated (decision
-  B), not CI-reproducible; the artifact records exactly what CI proves vs. what the
-  pre-C1 server run proves so there is no silent gap.
+- The direct restore + §3 bootstrap is less exhaustive than restore-supabase-drill.sh
+  (no explicit extension-version / exact-database-property verification), but the
+  structural-equality proof fails closed on any resulting infidelity, so the plan
+  cannot emit a catalog from an unfaithful restore. The delivered drill persist seam
+  remains available if a stream later wants the drill's fuller restore for plan.
+- Real-CLI migration leg stays server-validated (decision B); see `explicit_defers`.
+- The gated real-PG17 suite is docker-timing sensitive and occasionally needs a
+  re-run under load (readiness waits on the image init-complete marker); it is
+  skipped without `MC2_Q12_REAL_PG17=1`, so the default deterministic path is
+  docker-free and flake-free.
