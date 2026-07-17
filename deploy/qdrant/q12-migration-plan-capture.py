@@ -160,7 +160,16 @@ def _validated_binary(path: str, label: str, *, allow_symlink: bool = False) -> 
     return path
 
 
-def _psql_argv(container: str | None) -> list[str]:
+def _validated_dbname(dbname: str) -> str:
+    # The drill restores into restore_test, not postgres; route capture explicitly
+    # rather than silently reading the wrong database.
+    if not CONTAINER_RE.fullmatch(dbname):
+        raise CaptureError("invalid --dbname value")
+    return dbname
+
+
+def _psql_argv(container: str | None, dbname: str) -> list[str]:
+    _validated_dbname(dbname)
     if container is not None:
         if not CONTAINER_RE.fullmatch(container):
             raise CaptureError("invalid --container value")
@@ -180,7 +189,7 @@ def _psql_argv(container: str | None) -> list[str]:
             "-U",
             "postgres",
             "-d",
-            "postgres",
+            dbname,
             "-tAq",
             "-v",
             "ON_ERROR_STOP=1",
@@ -196,12 +205,14 @@ def _psql_argv(container: str | None) -> list[str]:
         "-tAq",
         "-v",
         "ON_ERROR_STOP=1",
+        "-d",
+        dbname,
     ]
 
 
-def run_sql(sql: str, container: str | None) -> str:
+def run_sql(sql: str, container: str | None, dbname: str) -> str:
     completed = subprocess.run(
-        _psql_argv(container),
+        _psql_argv(container, dbname),
         input=sql,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -247,34 +258,35 @@ def read_only_wrap(body: str) -> str:
     )
 
 
-def capture_roles(container: str | None) -> dict[str, object]:
+def capture_roles(container: str | None, dbname: str = "postgres") -> dict[str, object]:
     """Read-only §3 role plane: roles / membership edges / cluster role settings.
 
     Usable against a fresh isolate (no application schema yet), so the plan can
     diff the source role plane against the isolate before restore."""
     return {
         "schema_version": "megacampus.q12.plan-role-capture/v1",
-        "source_roles": json.loads(run_sql(read_only_wrap(ROLES_SQL), container)),
-        "source_memberships": json.loads(run_sql(read_only_wrap(MEMBERSHIPS_SQL), container)),
-        "source_role_settings": json.loads(run_sql(read_only_wrap(ROLE_SETTINGS_SQL), container)),
+        "source_roles": json.loads(run_sql(read_only_wrap(ROLES_SQL), container, dbname)),
+        "source_memberships": json.loads(run_sql(read_only_wrap(MEMBERSHIPS_SQL), container, dbname)),
+        "source_role_settings": json.loads(run_sql(read_only_wrap(ROLE_SETTINGS_SQL), container, dbname)),
     }
 
 
-def capture(container: str | None) -> dict[str, object]:
+def capture(container: str | None, dbname: str = "postgres") -> dict[str, object]:
     structural_sql = STRUCTURAL_CATALOG_FILE.read_text(encoding="utf-8").strip()
     if ";" in structural_sql:
         raise CaptureError("structural catalog SQL must be one semicolon-free query")
     structural_sha256 = run_sql(
         read_only_wrap(f"SELECT structural_sha256 FROM (\n{structural_sql}\n) AS plan_capture"),
         container,
+        dbname,
     )
     if len(structural_sha256) != 64 or any(ch not in "0123456789abcdef" for ch in structural_sha256):
         raise CaptureError("structural catalog SHA-256 is malformed")
 
-    identity = json.loads(run_sql(read_only_wrap(IDENTITY_SQL), container))
-    guarded = json.loads(run_sql(read_only_wrap(GUARDED_RELATIONS_SQL), container))
-    public_relations = json.loads(run_sql(read_only_wrap(PUBLIC_RELATIONS_SQL), container))
-    cron_raw = json.loads(run_sql(read_only_wrap(CRON_JOBS_SQL), container))
+    identity = json.loads(run_sql(read_only_wrap(IDENTITY_SQL), container, dbname))
+    guarded = json.loads(run_sql(read_only_wrap(GUARDED_RELATIONS_SQL), container, dbname))
+    public_relations = json.loads(run_sql(read_only_wrap(PUBLIC_RELATIONS_SQL), container, dbname))
+    cron_raw = json.loads(run_sql(read_only_wrap(CRON_JOBS_SQL), container, dbname))
 
     cron_jobs = [
         {
@@ -294,7 +306,7 @@ def capture(container: str | None) -> dict[str, object]:
         "guarded_relations": guarded,
         "cron_jobs": cron_jobs,
         "public_relations": public_relations,
-        **capture_roles(container),
+        **capture_roles(container, dbname),
     }
 
 
@@ -302,8 +314,14 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Q12 plan capture helper")
     parser.add_argument("--container", default=None)
     parser.add_argument("--roles-only", action="store_true")
+    parser.add_argument("--dbname", default="postgres")
     arguments = parser.parse_args(argv)
-    output = capture_roles(arguments.container) if arguments.roles_only else capture(arguments.container)
+    dbname = _validated_dbname(arguments.dbname)
+    output = (
+        capture_roles(arguments.container, dbname)
+        if arguments.roles_only
+        else capture(arguments.container, dbname)
+    )
     sys.stdout.write(json.dumps(output, ensure_ascii=False, sort_keys=True))
     sys.stdout.write("\n")
     return 0

@@ -4578,11 +4578,19 @@ class LivePlanExecutor:
         self.source_container = os.environ.get("MC2_Q12_PLAN_SOURCE_CONTAINER") or None
         self.migration_apply = os.environ.get("MC2_Q12_PLAN_MIGRATION_APPLY") or None
         self.fault = os.environ.get("MC2_Q12_PLAN_FAULT") or None
+        # Production restores through the reviewed drill via its persist seam; the
+        # direct pg_dump|pg_restore path is a test-only seam.
+        self.restore_mode = os.environ.get("MC2_Q12_PLAN_RESTORE_MODE") or "drill"
+        self.drill = os.environ.get("MC2_Q12_PLAN_DRILL") or str(
+            self.repo_root / "deploy/postgres/restore-supabase-drill.sh"
+        )
         self._resources: dict[str, str | None] = {
             "container": None,
             "network": None,
             "volume": None,
             "workdir": None,
+            "handle": None,
+            "generation": None,
         }
         self._isolate_port: str | None = None
         self._isolate_password: str | None = None
@@ -4618,11 +4626,12 @@ class LivePlanExecutor:
         container: str | None,
         service_env: dict[str, str] | None = None,
         roles_only: bool = False,
+        dbname: str = "postgres",
     ) -> dict[str, Any]:
         env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
         if service_env:
             env.update(service_env)
-        argv = ["/usr/bin/python3", str(self.capture_helper)]
+        argv = ["/usr/bin/python3", str(self.capture_helper), "--dbname", dbname]
         if container is not None:
             argv += ["--container", container]
         if roles_only:
@@ -4740,10 +4749,9 @@ class LivePlanExecutor:
         self._isolate_port = match.group(1)
         return container
 
-    def _dump_source(self, workdir: pathlib.Path) -> pathlib.Path:
+    def _dump_source(self, archive: pathlib.Path) -> pathlib.Path:
         # Stream the custom archive straight to disk (pg_dump stdout -> file fd)
         # so peak memory is not ~2x the database size on the production server.
-        archive = workdir / "source.dump"
         descriptor = os.open(archive, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         try:
             if self.source_container:
@@ -4825,7 +4833,7 @@ class LivePlanExecutor:
             )
 
     def _restore_snapshot(self, workdir: pathlib.Path, container: str, source: dict[str, Any]) -> None:
-        archive = self._dump_source(workdir)
+        archive = self._dump_source(workdir / "source.dump")
         self._bootstrap_roles(container, source)
         # Stream the archive into pg_restore via an open file descriptor rather
         # than buffering the whole dump in memory.
@@ -4856,13 +4864,14 @@ class LivePlanExecutor:
                 f"isolated restore failed: {restore.stderr.decode('utf-8', 'replace').strip()}"
             )
 
-    def _apply_migrations(self, container: str, packet: str) -> None:
+    def _apply_migrations(self, target: dict[str, str], packet: str) -> None:
         if self.migration_apply:
             completed = subprocess.run(
                 [self.migration_apply, packet],
                 env={
                     **self._base_env(),
-                    "MC2_Q12_PLAN_ISOLATE_CONTAINER": container,
+                    "MC2_Q12_PLAN_ISOLATE_CONTAINER": target["container"],
+                    "MC2_Q12_PLAN_ISOLATE_DBNAME": target["dbname"],
                     "MC2_Q12_PLAN_DOCKER": self.docker,
                     "MC2_Q12_PLAN_REPO_ROOT": str(self.repo_root),
                 },
@@ -4875,14 +4884,15 @@ class LivePlanExecutor:
                     f"plan migration apply seam failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
                 )
             return
-        self._apply_real_cli(packet)
+        self._apply_real_cli(target, packet)
 
-    def _apply_real_cli(self, packet: str) -> None:
+    def _apply_real_cli(self, target: dict[str, str], packet: str) -> None:
         """Production: run the real, drift-free migration CLIs in legacy loopback
-        mode against the isolate. Their pinned security manifests match on the
-        faithful restore, so the in-isolate history rows equal the live cutover."""
+        mode against the persisted restore target (restore_test for the drill
+        path). Their pinned security manifests match on the faithful restore, so
+        the in-isolate history rows equal the live cutover."""
         url = (
-            f"postgresql://postgres:{self._isolate_password}@127.0.0.1:{self._isolate_port}/postgres"
+            f"postgresql://postgres:{target['password']}@127.0.0.1:{target['port']}/{target['dbname']}"
         )
         if packet == "base":
             script, action = PLAN_BASE_MIGRATION_CLI, "apply"
@@ -4904,6 +4914,204 @@ class LivePlanExecutor:
                 f"{completed.stderr.decode('utf-8', 'replace').strip()}"
             )
 
+    def _prepare_target(
+        self, request: dict[str, Any], workdir: pathlib.Path, source: dict[str, Any], run_id: str
+    ) -> dict[str, str]:
+        if self.restore_mode == "direct":
+            # Test-only seam: the direct pg_dump|pg_restore path is never reachable
+            # in production (it cannot faithfully restore a real Supabase source
+            # beyond its own §3 role bootstrap). Production uses the reviewed drill.
+            container = self._create_isolate(run_id)
+            self._restore_snapshot(workdir, container, source)
+            return {
+                "container": container,
+                "dbname": "postgres",
+                "port": str(self._isolate_port),
+                "password": str(self._isolate_password),
+            }
+        if self.restore_mode == "drill":
+            return self._restore_via_drill(request, workdir, source, run_id)
+        raise LifecycleError(f"unknown plan restore mode: {self.restore_mode}")
+
+    def _dump_roles(self, dest: pathlib.Path) -> None:
+        if self.source_container:
+            argv = [
+                self.docker,
+                "exec",
+                self.source_container,
+                "pg_dumpall",
+                "-U",
+                "postgres",
+                "--roles-only",
+                "--no-role-passwords",
+                "--no-password",
+            ]
+            env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
+        else:
+            pg_dumpall = (
+                os.environ.get("MC2_Q12_PLAN_PG_DUMPALL") or "/usr/lib/postgresql/17/bin/pg_dumpall"
+            )
+            argv = [pg_dumpall, "--roles-only", "--no-role-passwords", "--no-password"]
+            env = {**self._base_env(), **(self._source_service or {})}
+        descriptor = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            completed = subprocess.run(
+                argv,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=descriptor,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+        finally:
+            os.close(descriptor)
+        if completed.returncode != 0:
+            raise LifecycleError(
+                f"source roles export failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+            )
+
+    def _produce_source_manifest(self, dest: pathlib.Path) -> None:
+        # The reviewed source manifest is produced by q12-source-manifest.ts over
+        # host psql in production; that leg is Supabase-only and validated by the
+        # server-side pre-C1 plan run. A CI source container uses a schema-shaped
+        # placeholder the fake drill accepts.
+        if self.source_container:
+            placeholder = {
+                "schema": "megacampus.supabase-source-manifest/v1",
+                "snapshot_id": "00000000-00000000-0",
+                "baseline": {},
+                "cutover_snapshot": {},
+            }
+            atomic_replace(dest, complete_object(placeholder), 0o600)
+            return
+        completed = subprocess.run(
+            [
+                "node",
+                "--import",
+                "tsx",
+                str(self.repo_root / "deploy/postgres/q12-source-manifest.ts"),
+                "capture",
+                "--output",
+                str(dest),
+            ],
+            cwd=str(self.repo_root / "packages/course-gen-platform"),
+            env={**self._base_env(), **(self._source_service or {})},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(
+                f"source manifest capture failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+            )
+
+    def _write_checksums(self, generation: pathlib.Path) -> None:
+        entries = {}
+        for name in ("database.dump", "roles.sql", "source-manifest.json"):
+            data = (generation / name).read_bytes()
+            entries[name] = {"sha256": sha256(data), "size": len(data)}
+        manifest = {"schema": "megacampus.supabase-backup-checksums/v1", "files": entries}
+        atomic_replace(generation / "checksums.json", complete_object(manifest), 0o600)
+
+    def _produce_generation(self, workdir: pathlib.Path, source: dict[str, Any]) -> pathlib.Path:
+        """Diagnostic backup generation for the drill (NOT the accepted recoverable
+        backup); removed by teardown once the catalog is bound."""
+        generation = workdir / ("generation-" + os.urandom(8).hex())
+        os.mkdir(generation, 0o700)
+        self._dump_source(generation / "database.dump")
+        self._dump_roles(generation / "roles.sql")
+        self._produce_source_manifest(generation / "source-manifest.json")
+        self._write_checksums(generation)
+        return generation
+
+    def _prepare_capability(self, request: dict[str, Any]) -> pathlib.Path:
+        # The drill's Q12 mode requires a run-bound capability at the fixed run path;
+        # plan supplies a synthetic one (the drill's activation cleanup is a no-op on
+        # a source with no q12_guard). Never a real credential.
+        secrets = pathlib.Path(request["run_root"]) / "secrets"
+        ensure_directory(secrets)
+        capability = secrets / "db-capability"
+        if os.path.lexists(capability):
+            capability.unlink()
+        atomic_replace(capability, (os.urandom(32).hex() + "\n").encode("utf-8"), 0o400)
+        return capability
+
+    def _read_handle(self, handle_path: pathlib.Path, run_id: str) -> dict[str, Any]:
+        data = validate_regular_file(handle_path, mode=0o400)
+        handle = json.loads(data)
+        expected = {
+            "schema_version",
+            "run_id",
+            "container",
+            "network",
+            "volume",
+            "host",
+            "port",
+            "database",
+            "user",
+            "password",
+        }
+        if not isinstance(handle, dict) or set(handle) != expected:
+            raise LifecycleError("persist handle shape mismatch")
+        if (
+            handle["schema_version"] != "megacampus.q12.restore-persist-handle/v1"
+            or handle["run_id"] != run_id
+            or handle["host"] != "127.0.0.1"
+            or handle["database"] != "restore_test"
+            or not isinstance(handle["port"], int)
+            or isinstance(handle["port"], bool)
+        ):
+            raise LifecycleError("persist handle identity/connection mismatch")
+        for key in ("container", "network", "volume", "user", "password"):
+            if not (isinstance(handle[key], str) and handle[key]):
+                raise LifecycleError(f"persist handle field mismatch: {key}")
+        return handle
+
+    def _restore_via_drill(
+        self, request: dict[str, Any], workdir: pathlib.Path, source: dict[str, Any], run_id: str
+    ) -> dict[str, str]:
+        generation = self._produce_generation(workdir, source)
+        self._resources["generation"] = str(generation)
+        capability = self._prepare_capability(request)
+        handle_path = pathlib.Path(request["run_root"]) / "restore-persist-handle.json"
+        if os.path.lexists(handle_path):
+            handle_path.unlink()
+        self._resources["handle"] = str(handle_path)
+        completed = subprocess.run(
+            [
+                self.drill,
+                "--run-id",
+                run_id,
+                "--q12-db-capability-file",
+                str(capability),
+                "--generation",
+                str(generation),
+            ],
+            env={
+                **self._base_env(),
+                "MC2_Q12_RESTORE_PERSIST_HANDLE": str(handle_path),
+                "MC2_Q12_PLAN_DOCKER": self.docker,
+                "MC2_Q12_PLAN_REPO_ROOT": str(self.repo_root),
+            },
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(
+                f"isolated drill restore failed: {completed.stderr.decode('utf-8', 'replace').strip()}"
+            )
+        handle = self._read_handle(handle_path, run_id)
+        self._resources["container"] = handle["container"]
+        self._resources["network"] = handle["network"]
+        self._resources["volume"] = handle["volume"]
+        return {
+            "container": handle["container"],
+            "dbname": handle["database"],
+            "port": str(handle["port"]),
+            "password": handle["password"],
+        }
+
     def capture(self, request: dict[str, Any]) -> dict[str, Any]:
         run_id = request["run_id"]
         workdir = pathlib.Path(
@@ -4913,10 +5121,10 @@ class LivePlanExecutor:
         self._resources["workdir"] = str(workdir)
 
         source = self._capture_source(request, workdir)
-        container = self._create_isolate(run_id)
-        self._restore_snapshot(workdir, container, source)
+        target = self._prepare_target(request, workdir, source, run_id)
+        dbname = target["dbname"]
 
-        isolate_baseline = self._run_capture(container=container)
+        isolate_baseline = self._run_capture(container=target["container"], dbname=dbname)
         isolate_structural = isolate_baseline["structural_sha256"]
         if self.fault == "equality":
             isolate_structural = "0" * 64
@@ -4926,10 +5134,10 @@ class LivePlanExecutor:
             )
         before_public = isolate_baseline["public_relations"]
 
-        self._apply_migrations(container, "base")
-        after_base = self._run_capture(container=container)
-        self._apply_migrations(container, "observability")
-        after_observability = self._run_capture(container=container)
+        self._apply_migrations(target, "base")
+        after_base = self._run_capture(container=target["container"], dbname=dbname)
+        self._apply_migrations(target, "observability")
+        after_observability = self._run_capture(container=target["container"], dbname=dbname)
 
         return {
             "database": source["database"],
@@ -4978,6 +5186,21 @@ class LivePlanExecutor:
             if result.returncode != 0:
                 errors.append(f"network: {result.stderr.decode('utf-8', 'replace').strip()}")
             self._resources["network"] = None
+        handle = self._resources.get("handle")
+        if handle:
+            try:
+                if os.path.lexists(handle):
+                    os.unlink(handle)
+            except OSError as error:
+                errors.append(f"handle: {error}")
+            self._resources["handle"] = None
+        generation = self._resources.get("generation")
+        if generation:
+            try:
+                shutil.rmtree(generation, ignore_errors=False)
+            except OSError as error:
+                errors.append(f"generation: {error}")
+            self._resources["generation"] = None
         workdir = self._resources.get("workdir")
         if workdir:
             try:
