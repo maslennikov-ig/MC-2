@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-16 repair frontier assertion for MCP-generated history RED->GREEN: 37368792 -> 4a3c99d3. Fixes rehearsal #9 (the real base CLI fail-closed with "Supabase repository migration frontier contains unknown history"): assertRepositoryMigrationFrontier (document-evidence-approved.ts) required every history version to be a 14-digit repo FILENAME version, but this projects prod migrations are applied via the Supabase MCP with apply-time version timestamps that have no same-named repo file (300+ of 317 rows) — the premise "history subset of repo filenames" is false and can NEVER pass against the real DB (a never-executed-path defect that would kill the live C-window identically). Repair: pin APPROVED_HISTORY_FRONTIER=20260704150249; replace the per-row filename + earlier-pending + ambiguous-count checks with "no non-chain history version above the frontier" (also forbids any version strictly between the frontier and the first chain version) + no duplicates; keep the chain-prefix logic and loadRepositoryMigrations + REPOSITORY_MIGRATION_MANIFEST_SHA256 (repo-tree pin) EXACTLY. Swept the observability CLI (no history-subset-repo premise; per-version readHistory only). The CLIs .ts bytes are NOT security-manifest-pinned (the manifest hashes SQL/function bodies), so this is safe. Docker-free unit (mock client): MCP-style history tolerated (prefix 0); NEWER-than-frontier/between-frontier/gapped-prefix/duplicate fail (5 passed). Integration negatives throw at the frontier before the pinned-image apply (the full apply is image-gated, cannot run on vanilla PG17 — pre-existing). Plan real-PG17 composed==real-source now runs with MCP-shaped source history and holds byte-exact (64 passed). Document-evidence unit suites 19 passed. tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; REPOSITORY_MIGRATION_MANIFEST_SHA256 unchanged.'
   - 'Round-15 delta-neutral extras in the completeness gate RED->GREEN: 163c7364 -> fbabbab9. Fixes rehearsal #8 ([default_acls] extra 2 — the Supabase image manufactures default ACLs on restore-created schemas tests/test_overrides that were dropped in the cloud source). Completeness gate now: MISSING (source object absent from isolate) -> absolutely fatal (unchanged); EXTRA (isolate identity absent from source) -> tolerated iff DELTA-NEUTRAL. The additive-delta check in _compose_predicted_payload already hard-stops any extra that changes/disappears across the pre/base/observability checkpoints, and composition now EXCLUDES tolerated extras from the composed payload (they are not in the live source) so composed still == real. Tolerated extras reported: plan result JSON gets observed_extra_identities [{section,identity}] + each named on stderr (assemble ignores the evidence key -> catalog bytes unchanged; no result consumer validates keys). Real-PG17 q12-migration-plan.test.ts: 64 passed — incl. an isolate-only extra tolerated+reported with the composed catalog still byte-matching the real post-migration source; a MISSING object still fatal (+ diagnostics preserved under --keep-equality-diagnostics); repurposed injectDrift->tolerated, injectMissing->fatal. No-docker adds 3 engine cases (extra collection, composition exclusion, mutating-extra fatal). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; validate_expected_catalog/catalog schema untouched.'
   - 'Round-14 dump-stable completeness identities RED->GREEN: 07d158ba -> e95237dc. Fixes rehearsal #7 false positive ([columns] missing 92 extra 92 — SAME columns, different attnum). Production tables carry dropped-column gaps: the source keeps attnums as holes, pg_restore compacts them, so a pre-existing column has a different `position` and a column comment a different `subobject_id` in the isolate. _COMPOSE_IDENTITY_KEYS now EXCLUDES those dump-unstable attnum fields (they stay in entry CONTENT, so composition still takes SOURCE content for pre-existing entries); a column comment is matched by its `identity` (pg_identify_object schema.table.column, carrying the column NAME). Invariants re-verified: within-section order still byte-matches live (dropping a column preserves the relative order of survivors -> isolate order == live order), additive-delta check internally consistent (isolate pre/post share compacted attnums). CI PROOF: the composed==real-source proof holds byte-EQUAL WITH a dropped-column gap + a post-gap column comment on a pre-existing table the migrations never touch (public.organizations). Real-PG17 q12-migration-plan.test.ts: 61 passed. No-docker adds 3 engine cases (position/subobject_id tolerance + name-match composition). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-13 delta-composed live-hash prediction (§2 method correction) RED->GREEN: 461409a7 -> ee70f8ac. Ruling (rehearsal #6 full payloads): the divergence is dump-round-trip EXPRESSION RENORMALIZATION, not arch/version drift — e.g. public.check_processing_method source `= ANY (ARRAY[..::character varying]::text[])` vs restored `= ANY (ARRAY[..::character varying::text])`; also [columns] ~117 (defaults) + db comment. So the raw-isolate-hash equality of design §2 is empirically unsound (an isolate can never byte-predict live hashes for pre-existing objects). Replaced with the sound construction. Gating verified against the FROZEN q12-structural-catalog.sql: NO OIDs in payload entries, NO timestamps in migration_history (version/name/statements only, :1190-1196), every section ORDER BY is identity-determined (a renormalizable expression never reorders a section) -> composition is byte-exact; no stop-and-report needed. (1) Equality proof -> object-completeness: _assert_restore_object_complete requires the isolate pre-migration identity-set == source per section (missing/extra -> hard stop); content divergence is expected + non-fatal (drill compare guards fidelity). (2) Checkpoint hashes -> delta-composed: each in-isolate delta must be strictly ADDITIVE (no removed/modified pre-existing, migration_history append-only) -> hard stop; predicted = SOURCE pre-existing content + isolate FRESH content in isolate SQL order, hashed THROUGH postgres (capture.py --render-hash, jsonb::text canonicalization byte-identical to live); baseline_structural_sha256 stays raw SOURCE. barrier/manifest/structural SQL + validate_expected_catalog untouched, hashes stay 64-hex. CI PROOF (strong): applying the same five migration files to the SOURCE container yields a hash byte-EQUAL to the composed prediction even with a seeded renormalizing check constraint (the old raw-isolate method would have differed); negative: an in-isolate ALTER of a pre-existing column default hard-stops naming [columns]. Real-PG17 q12-migration-plan.test.ts: 58 passed. No-docker adds 4 engine cases (compose/object-complete/non-additive). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
@@ -49,11 +50,57 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/q12-migration-plan.test.ts
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-migration-plan-runner.py
   - packages/course-gen-platform/tests/unit/ops/supabase-restore-drill.test.ts
+  - packages/course-gen-platform/scripts/migrations/document-evidence-approved.ts
+  - packages/course-gen-platform/tests/unit/scripts/document-evidence-frontier.test.ts
+  - packages/course-gen-platform/tests/integration/document-evidence-approved-migrations.test.ts
 explicit_defers:
   - "Supabase-image-only leg (real drill restore of the real source on the pinned image + real migration CLIs) is CI-unreproducible: the drill checks the pinned image digest / Supabase role bootstrap / extension versions, and the CLIs' security manifests are pinned to the isolated restore of generation-20260716T105950Z (document-evidence-approved.ts:1250-1356). Validated by the owner's server-side pre-C1 `q12-live-cutover.sh plan` run (read-only on the source, fail-closed everywhere, so a defect blocks the window rather than corrupting anything). Loopback needs no --confirm/--allow-remote (document-evidence-approved.ts:648 returns early for 127.0.0.1/localhost/::1 before the remote gate). If prod schema drifted since that generation the manifests fail closed — a correct product-truth outcome, not to be relaxed."
 ---
 
 # Summary
+
+Round-16 repairs the real migration CLI's frontier assertion (`37368792` -> `4a3c99d3`).
+Rehearsal #9 got past completeness and the real base migration CLI fail-closed with
+`Supabase repository migration frontier contains unknown history`. The owner's read-only
+probes showed prod history is 317 rows with max == the pinned frontier `20260704150249`
+(no newer history), but `assertRepositoryMigrationFrontier` required every history version
+to be a 14-digit repository FILENAME version. In this project production migrations are
+applied via the Supabase MCP, which stamps history rows with its OWN apply-time version
+timestamps that have no same-named repo file (300+ of the 317 rows), so the premise
+"history ⊆ repo filenames" is false and can NEVER pass against the real database — another
+never-executed-path defect that would kill the live C-window identically. This repairs the
+live window, not just plan mode.
+
+The repair gives equivalent anti-drift protection without the false premise:
+
+- Pin `APPROVED_HISTORY_FRONTIER = '20260704150249'` (the reviewed max pre-chain history
+  version — note it is NOT a repo file; the last pre-chain repo file is `20260704150000`).
+- Replace the three false-premise checks — per-row "history version is a repo filename",
+  the `expectedPrevious` "earlier pending repo migration must match by name", and the
+  "history count == expectedPrevious + prefix" ambiguity check — with: no non-chain history
+  version may be strictly ABOVE the frontier (which also forbids any version strictly
+  between the frontier and the first chain version), plus the existing no-duplicate check.
+- Keep the chain-prefix logic EXACTLY (our five versions must form a supported prefix of
+  history: none → apply all; partial → continue; gap → fail, with `assertExactHistory`),
+  and keep `loadRepositoryMigrations` + `REPOSITORY_MIGRATION_MANIFEST_SHA256` EXACTLY (the
+  repo-tree pin stays; it just no longer cross-references DB history rows it cannot know).
+  Rationale: the pinned frontier gives the same protection the filename cross-check
+  intended (no unknown NEWER history can precede the chain; the reviewed frontier is the
+  anchor), while the old check mismodeled how this project's history versions are generated.
+- Swept `document-evidence-observability-index.ts`: it has no history⊆repo premise (it uses
+  per-version `readHistory` for its own migration versions only). The CLIs' `.ts` bytes are
+  NOT security-manifest-pinned — the manifest hashes SQL file contents / function bodies
+  (not the runner source) — so editing the frontier function is safe. Frozen
+  barrier/manifest/structural SQL untouched.
+
+Proven: a docker-free unit suite drives `assertRepositoryMigrationFrontier` with a mock
+client — MCP-style history (versions absent from repo files, max == frontier) is tolerated
+(returns prefix 0), while NEWER-than-frontier, between-frontier, gapped-prefix, and
+duplicate history each fail. The integration negatives throw at the frontier before the
+pinned-image apply (the full apply is gated on the image's security manifest and cannot run
+on a vanilla PG17 — pre-existing). The plan's real-PG17 composed==real-source proof now runs
+with MCP-shaped source history and still holds byte-exact, proving the whole flow against
+the real history shape.
 
 Round-15 makes the completeness gate tolerate DELTA-NEUTRAL EXTRAS (`163c7364` ->
 `fbabbab9`). Rehearsal #8 passed columns completeness but failed `[default_acls] missing 0
