@@ -579,6 +579,55 @@ closed. Local evidence at `b97a827b`: ops+scripts battery 761 passed /
   container for Phase C, not the operator image). No application traffic
   changed; acceptance gate B reached.
 
+## Q12 Phase C Window Open + Plan Builder Delivery (2026-07-17)
+
+- Owner approved the live-cutover window (packet
+  `mc2-jz6y0-c0-window-packet.md`, status accepted). Server bring-up
+  completed: root-owned hash-verified `deploy/qdrant` + `ops/qdrant` assets,
+  metrics identities, generated secrets, compose replacement, workspace
+  install, systemd units (timers disabled), q12-mode `deploy_blue_green.sh`,
+  operator image pulled by digest (`4b02d3f9…` config match), pinned isolate
+  image present.
+- BLOCKING product-truth gap found at the C1 boundary before any mutation:
+  the `q12-live-cutover.sh --plan` expected-post-migration-catalog builder
+  from the accepted corrections design §2 was specified but never
+  implemented (all repo references were consumers). Window paused;
+  implemented via worker `q12-plan-builder` on `codex/q12-plan-builder`
+  (integrated fast-forward to this branch at `7764cfb4`), seven RED→GREEN
+  rounds:
+  1. Deterministic builder: `plan` subcommand, injectable PlanExecutor,
+     `assemble_expected_catalog`/`validate_expected_catalog` (clause-for-
+     clause mirror of the frozen barrier jq program, strictly stricter),
+     owner-only 0400 self-binding emission.
+  2. Live orchestration: read-only TLS source capture (libpq service file
+     0600), snapshot-coordinated generation (one `pg_export_snapshot()`
+     binding pg*dump + `q12-source-manifest.ts capture --snapshot` +
+     `SET TRANSACTION SNAPSHOT` source capture; roles.sql before/after
+     byte-stability), restore through `restore-supabase-drill.sh` via the
+     new opt-in `MC2_Q12_RESTORE_PERSIST_HANDLE` seam (default path
+     byte-identical, 44 existing drill tests unmodified), §3 allowlisted
+     role bootstrap (`q12-migration-plan-roles.py`, frozen allowlists,
+     hard-stop before restore), fail-closed pre-migration structural-
+     equality proof, real migration CLIs in loopback
+     (`document-evidence-approved.ts:648` early-return proven), evidence
+     split (source → guarded/cron/baseline/frontier live OIDs; isolate →
+     checkpoint hashes/deltas), teardown with cleanup-failure-overrides-
+     success + run-scoped label sweep, production seam lockdown (any set
+     `MC2_Q12_PLAN*\*` under the production run root → named LifecycleError).
+- Orchestrator-found defects during rounds (each fixed with TDD): missing
+  §3 role bootstrap (CI-masked), `capture` called without `--snapshot`
+  (CLI hard-fail), missing snapshot coordination, pg_isready readiness race,
+  RAM-buffered full dump. Worker-found: migration CLIs cryptographically
+  bound to the real restore (real-CLI leg CI-unreproducible — validated by
+  the read-only server-side pre-C1 `plan` rehearsal instead).
+- Reviews (independent, range-pinned): builder range PASS 0 P0/P1
+  (`mc2-jz6y0.13-plan-builder-review.md`); live range PASS 0 P0/P1 with
+  round-7 delta PASS 0 findings (`mc2-jz6y0.13-plan-live-review.md`).
+- Final evidence (orchestrator-rerun): real-PG17 40 passed; no-docker
+  79 passed | 7 skipped; drill 46; regression trio 289; type-check 0;
+  frozen bytes `aaec6fc2…`/`134255ce…` intact; `q12-live-cutover.test.ts`
+  untouched.
+
 ## Explicit Defers
 
 - Q12 staging cutover, remote reindex, secret activation, deploy, and live smoke

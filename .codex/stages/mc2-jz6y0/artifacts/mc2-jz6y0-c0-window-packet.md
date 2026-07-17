@@ -28,7 +28,7 @@ parallel_group: none
 depends_on_streams:
   - Phase B receipt mc2-rl4p9-q12-b1-publication.md (GHCR image digest)
 parallel_decision: single sequential owner-gated window; no decomposition.
-status: blocked
+status: accepted
 delivery_method: n/a
 accepted_by_orchestrator: yes
 cleanup_status: not_applicable
@@ -46,11 +46,12 @@ verification:
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0-c0-window-packet.md
 explicit_defers:
-  - 'Window execution, run-id generation, and all receipts: after explicit owner approval only.'
   - 'GHCR pull-auth decision (package visibility vs read:packages token on the server): owner decision required at this gate.'
 ---
 
 # Summary
+
+OWNER APPROVAL RECORDED: окно одобрено владельцем 2026-07-17 («Да, конечно, согласен, делай») — открытие окна, перевод compose на образ Phase B и решение pull-auth делегировано оркестратору в рамках пакета.
 
 Пакет окна живого перехода (Task C0). Одно наблюдаемое окно, один
 супервизор `deploy/qdrant/q12-live-cutover.sh --run-id <uuid>` на сервере

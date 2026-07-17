@@ -122,14 +122,30 @@ TDD, suite 24/24 (receipt: `…artifacts/mc2-rl4p9-q12-b1-publication.md`).
 
 Recommended action: continue the completion program:
 
-1. Phase C — live-cutover window packet (Task C0, owner approval), including
-   GHCR pull-auth/visibility for the server, fields 5/6/8/9 production
-   re-freeze at C7, and field-11 ratified truth.
-2. `.13.8` — owner-deferred password rotation; `.13.6` — off-host S3
-   production gate; `.25` — Prometheus retention YAML (Phase D).
+1. Phase C window is OPEN (owner approved 2026-07-17; packet
+   `mc2-jz6y0-c0-window-packet.md`; server brought up, operator image pulled
+   by digest). The C1 product-truth gap — the `plan` expected-catalog
+   builder — is DELIVERED on this branch (deterministic builder + full live
+   orchestration: snapshot-coordinated generation, drill persist-seam
+   restore, §3 role bootstrap, structural-equality proof, real loopback
+   CLIs, production seam lockdown; reviews PASS 0 P0/P1:
+   `mc2-jz6y0.13-plan-builder-review.md`,
+   `mc2-jz6y0.13-plan-live-review.md`).
+2. NEXT: install updated deploy files on megacampus-prod (hash-verified:
+   `deploy/qdrant/q12-lifecycle-core.py`, `q12-live-cutover.sh`,
+   `q12-migration-plan-capture.py`, `q12-migration-plan-roles.py`,
+   `deploy/postgres/restore-supabase-drill.sh`), run the read-only pre-C1
+   rehearsal `q12-live-cutover.sh plan` as claude-deploy with a fresh UUIDv4
+   run-id (it validates the CI-unreproducible real-CLI/pinned-image leg,
+   fail-closed), then C1..C10 per the window packet with C7 in-window
+   re-freeze of W fields 5/6/8/9.
+3. `.13.8` — owner-deferred password rotation (re-confirm explicitly; never
+   rotate on a general "do it"); `.13.6` — off-host S3 production gate;
+   `.25` — Prometheus retention YAML (Phase D). Alertmanager Telegram bot
+   token + chat id still owed by the owner before monitoring bring-up.
 
-Before any of these, present exact effects, secrets, observation, rollback
-and downtime/data impact, and obtain owner approval.
+Before any live mutation, present exact effects, secrets, observation,
+rollback and downtime/data impact per the window packet.
 
 ## Starter prompt for next orchestrator
 
