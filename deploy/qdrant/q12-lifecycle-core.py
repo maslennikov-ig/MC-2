@@ -4589,7 +4589,9 @@ PLAN_OBSERVABILITY_MIGRATION_CLI = (
 _PLAN_SECRET_SCRUB = (
     (re.compile(r"(postgres(?:ql)?://[^\s/:@]+:)[^\s@]+(@)", re.IGNORECASE), r"\1***\2"),
     (re.compile(r"(?i)(password\s*=\s*)\S+"), r"\1***"),
-    (re.compile(r"\b[0-9a-f]{64}\b"), "***"),
+    # 64-hex secret shape (no word-boundary anchors: catches runs embedded in an
+    # identifier like `secret_<hex>`; 16-hex diff digests are unaffected).
+    (re.compile(r"[0-9a-f]{64}"), "***"),
     (re.compile(r"eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+|sbp_[A-Za-z0-9_-]{16,}"), "***"),
 )
 
@@ -4598,6 +4600,100 @@ def _scrub_plan_secret_text(text: str) -> str:
     for pattern, replacement in _PLAN_SECRET_SCRUB:
         text = pattern.sub(replacement, text)
     return text
+
+
+# Structured diff of two canonical structural-catalog payloads (the exact jsonb the
+# frozen q12-structural-catalog.sql hashes), used to explain an equality-proof
+# mismatch. Emits only identifiers + per-object sha digests — never data values,
+# credentials, or migration statements — bounded to a readable summary.
+_DIFF_IDENTITY_KEYS = (
+    "object_type", "schema", "relation", "table", "name", "identity",
+    "provider", "subobject_id", "argument_types", "left_type", "right_type",
+)
+_DIFF_SECTION_IDENTITY = {"migration_history": ("version",)}
+_DIFF_MAX_IDS = 10
+_DIFF_MAX_LINES = 400
+
+
+def _diff_canon(obj: Any) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _diff_value_digest(obj: Any) -> str:
+    return hashlib.sha256(_diff_canon(obj).encode("utf-8")).hexdigest()[:16]
+
+
+def _diff_identity(section: str, obj: Any) -> str:
+    if isinstance(obj, dict):
+        keys = _DIFF_SECTION_IDENTITY.get(section, _DIFF_IDENTITY_KEYS)
+        parts = [
+            f"{key}={obj[key]}"
+            for key in keys
+            if key in obj and isinstance(obj[key], (str, int, float, bool))
+        ]
+        if parts:
+            return _scrub_plan_secret_text("|".join(parts))
+    return "digest:" + _diff_value_digest(obj)
+
+
+def _structural_catalog_diff(source: dict[str, Any], isolate: dict[str, Any]) -> str:
+    lines: list[str] = []
+    for section in sorted(set(source) | set(isolate)):
+        if section == "schema_version":
+            continue
+        source_value, isolate_value = source.get(section), isolate.get(section)
+        if source_value == isolate_value:
+            continue
+        if isinstance(source_value, list) or isinstance(isolate_value, list):
+            source_by: dict[str, Any] = {}
+            isolate_by: dict[str, Any] = {}
+            for item in source_value if isinstance(source_value, list) else []:
+                source_by.setdefault(_diff_identity(section, item), item)
+            for item in isolate_value if isinstance(isolate_value, list) else []:
+                isolate_by.setdefault(_diff_identity(section, item), item)
+            added = sorted(set(isolate_by) - set(source_by))
+            removed = sorted(set(source_by) - set(isolate_by))
+            changed = sorted(
+                key
+                for key in (set(source_by) & set(isolate_by))
+                if _diff_canon(source_by[key]) != _diff_canon(isolate_by[key])
+            )
+            if not (added or removed or changed):
+                continue
+            lines.append(f"[{section}] +{len(added)} -{len(removed)} ~{len(changed)}")
+            for key in removed[:_DIFF_MAX_IDS]:
+                lines.append(f"  - {key}  source={_diff_value_digest(source_by[key])} isolate=<absent>")
+            for key in added[:_DIFF_MAX_IDS]:
+                lines.append(f"  + {key}  source=<absent> isolate={_diff_value_digest(isolate_by[key])}")
+            for key in changed[:_DIFF_MAX_IDS]:
+                lines.append(
+                    f"  ~ {key}  source={_diff_value_digest(source_by[key])} "
+                    f"isolate={_diff_value_digest(isolate_by[key])}"
+                )
+        elif isinstance(source_value, dict) and isinstance(isolate_value, dict):
+            fields = sorted(
+                field
+                for field in (set(source_value) | set(isolate_value))
+                if source_value.get(field) != isolate_value.get(field)
+            )
+            lines.append(f"[{section}] ~{len(fields)} field(s)")
+            for field in fields[:_DIFF_MAX_IDS]:
+                lines.append(
+                    f"  ~ {_scrub_plan_secret_text(str(field))}  "
+                    f"source={_diff_value_digest(source_value.get(field))} "
+                    f"isolate={_diff_value_digest(isolate_value.get(field))}"
+                )
+        else:
+            lines.append(
+                f"[{section}] scalar differs source={_diff_value_digest(source_value)} "
+                f"isolate={_diff_value_digest(isolate_value)}"
+            )
+    if not lines:
+        return "structural payloads differ but no per-section difference was localized (identity collision?)"
+    if len(lines) > _DIFF_MAX_LINES:
+        omitted = len(lines) - _DIFF_MAX_LINES
+        return "\n".join(lines[:_DIFF_MAX_LINES]) + f"\n… ({omitted} more diff lines omitted)"
+    return "\n".join(lines)
 
 
 class LivePlanExecutor:
@@ -4653,6 +4749,8 @@ class LivePlanExecutor:
             "generation": None,
             "capability": None,
             "secrets": None,
+            # Diagnostic source structural payload (under workdir; reclaimed with it).
+            "source_payload": None,
         }
         self._run_id: str | None = None
         # The drill preflight requires the generation basename carry a UTC stamp;
@@ -4760,15 +4858,87 @@ class LivePlanExecutor:
             os.close(descriptor)
         return {"PGSERVICEFILE": str(service_path), "PGSERVICE": "q12plan"}
 
+    def _write_structural_payload(
+        self,
+        dest: pathlib.Path,
+        *,
+        container: str | None,
+        dbname: str,
+        snapshot: str | None = None,
+        service_env: dict[str, str] | None = None,
+    ) -> None:
+        """Capture the full canonical structural payload (diagnostic) to an owner-only
+        file. Snapshot-bound when a snapshot id is supplied (source), unbound for the
+        live isolate."""
+        env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
+        if service_env:
+            env.update(service_env)
+        argv = ["/usr/bin/python3", str(self.capture_helper), "--structural-payload", "--dbname", dbname]
+        if snapshot is not None:
+            argv += ["--snapshot", snapshot]
+        if container is not None:
+            argv += ["--container", container]
+        completed = subprocess.run(
+            argv, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, check=False,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(f"structural payload capture failed: {completed.stderr.strip()}")
+        descriptor = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(descriptor, completed.stdout.encode("utf-8"))
+        finally:
+            os.close(descriptor)
+
     def _capture_source(
         self, request: dict[str, Any], workdir: pathlib.Path, snapshot: str | None = None
     ) -> dict[str, Any]:
         if self.source_container:
-            return self._run_capture(container=self.source_container, snapshot=snapshot)
-        if self._source_service is None:
-            self._source_service = self._source_service_env(request, workdir)
-        return self._run_capture(
-            container=None, service_env=self._source_service, snapshot=snapshot
+            result = self._run_capture(container=self.source_container, snapshot=snapshot)
+            container, service_env = self.source_container, None
+        else:
+            if self._source_service is None:
+                self._source_service = self._source_service_env(request, workdir)
+            result = self._run_capture(
+                container=None, service_env=self._source_service, snapshot=snapshot
+            )
+            container, service_env = None, self._source_service
+        # Eagerly capture the source's full structural payload while the snapshot is
+        # still open, so a later equality-proof mismatch can be diffed after the window
+        # closes. Owner-only, under the workdir (reclaimed by teardown).
+        payload_path = workdir / "source-structural-payload.json"
+        if not os.path.lexists(payload_path):
+            self._write_structural_payload(
+                payload_path, container=container, dbname="postgres",
+                snapshot=snapshot, service_env=service_env,
+            )
+            self._resources["source_payload"] = str(payload_path)
+        return result
+
+    def _structural_equality_failure_detail(
+        self, workdir: pathlib.Path, target: dict[str, str], dbname: str
+    ) -> str:
+        base = "isolated pre-migration structural catalog differs from the read-only source catalog"
+        source_path = self._resources.get("source_payload")
+        try:
+            if not source_path or not os.path.exists(source_path):
+                return f"{base} (source structural payload unavailable for diff)"
+            source_payload = json.loads(pathlib.Path(source_path).read_text(encoding="utf-8"))
+            isolate_path = workdir / "isolate-structural-payload.json"
+            if os.path.lexists(isolate_path):
+                isolate_path.unlink()
+            self._write_structural_payload(
+                isolate_path, container=target["container"], dbname=dbname, snapshot=None
+            )
+            isolate_payload = json.loads(isolate_path.read_text(encoding="utf-8"))
+            diff = _structural_catalog_diff(source_payload, isolate_payload)
+        except (LifecycleError, OSError, ValueError) as error:
+            return f"{base} (diff unavailable: {_scrub_plan_secret_text(str(error))})"
+        return (
+            f"{base}\n"
+            "--- structural catalog diff (source@snapshot vs isolate; object values as sha "
+            "digests) ---\n"
+            f"{diff}"
         )
 
     def _create_isolate(self, run_id: str) -> str:
@@ -5401,7 +5571,7 @@ class LivePlanExecutor:
             isolate_structural = "0" * 64
         if isolate_structural != source["structural_sha256"]:
             raise LifecycleError(
-                "isolated pre-migration structural catalog differs from the read-only source catalog"
+                self._structural_equality_failure_detail(workdir, target, dbname)
             )
         before_public = isolate_baseline["public_relations"]
 
