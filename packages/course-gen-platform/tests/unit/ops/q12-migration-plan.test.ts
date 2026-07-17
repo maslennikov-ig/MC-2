@@ -1462,7 +1462,15 @@ CREATE ROLE authenticated NOLOGIN NOINHERIT;
 CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
 CREATE ROLE authenticator NOLOGIN NOINHERIT;
 ALTER TABLE public.courses ADD CONSTRAINT check_processing_method
-  CHECK (generation_status = ANY (ARRAY['full_text'::varchar, 'hierarchical'::varchar]::text[]));`;
+  CHECK (generation_status = ANY (ARRAY['full_text'::varchar, 'hierarchical'::varchar]::text[]));
+-- round-14: a DROPPED-column attnum GAP on a pre-existing table the migrations never
+-- touch, plus a comment on a column AFTER the gap. In the source these attnums have a
+-- hole; pg_restore compacts them in the isolate, so dump-UNSTABLE identity keys
+-- (column position, comment subobject_id) would false-positive object-completeness.
+ALTER TABLE public.organizations ADD COLUMN q14_dropme text;
+ALTER TABLE public.organizations DROP COLUMN q14_dropme;
+ALTER TABLE public.organizations ADD COLUMN q14_post_gap text;
+COMMENT ON COLUMN public.organizations.q14_post_gap IS 'q14 post-gap column comment';`;
         const setup = docker(
           ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
           seed
@@ -2203,5 +2211,94 @@ except core.LifecycleError as error:
     const res = callCore('_compose_predicted_payload', [source, iPre, iCheck]);
     expect(res.status).toBe(7);
     expect(res.err).toMatch(/\[constraints\]/u);
+  });
+
+  // round-14: completeness identity must ignore dump-UNSTABLE fields. Production tables
+  // carry dropped-column gaps in the source; pg_restore compacts attnums, so the SAME
+  // column has a different `position` (and a column comment a different `subobject_id`)
+  // in the isolate. Those must NOT be read as missing/extra objects.
+  it('object-completeness tolerates a dump-unstable column position (round-14)', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      columns: [
+        {
+          schema: 'auth',
+          relation: 'oauth_clients',
+          name: 'client_name',
+          position: 7,
+          type: 'text',
+        },
+      ],
+    };
+    const isolate = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      columns: [
+        {
+          schema: 'auth',
+          relation: 'oauth_clients',
+          name: 'client_name',
+          position: 6,
+          type: 'text',
+        },
+      ],
+    };
+    const res = callCore('_assert_restore_object_complete', [source, isolate]);
+    expect(res.status, res.err).toBe(0);
+  });
+
+  it('object-completeness tolerates a dump-unstable column-comment subobject_id (round-14)', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      comments: [
+        {
+          object_type: 'table column',
+          schema: 'auth',
+          name: 'oauth_clients',
+          identity: 'auth.oauth_clients.client_name',
+          subobject_id: 7,
+          comment: 'x',
+        },
+      ],
+    };
+    const isolate = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      comments: [
+        {
+          object_type: 'table column',
+          schema: 'auth',
+          name: 'oauth_clients',
+          identity: 'auth.oauth_clients.client_name',
+          subobject_id: 6,
+          comment: 'x',
+        },
+      ],
+    };
+    const res = callCore('_assert_restore_object_complete', [source, isolate]);
+    expect(res.status, res.err).toBe(0);
+  });
+
+  it('_compose_predicted_payload matches a pre-existing column by name across a position shift (round-14)', () => {
+    const source = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      columns: [{ schema: 'auth', relation: 'oauth_clients', name: 'client_name', position: 7 }],
+    };
+    // isolate carries the compacted attnum; content differs only in position.
+    const iPre = {
+      schema_version: SV,
+      database: { name: 'postgres' },
+      columns: [{ schema: 'auth', relation: 'oauth_clients', name: 'client_name', position: 6 }],
+    };
+    const composed = callCore('_compose_predicted_payload', [source, iPre, iPre]) as {
+      out: { columns: Array<{ name: string; position: number }> };
+    };
+    // pre-existing column resolved to the SOURCE content (source attnum 7), not flagged.
+    expect(
+      (composed.out as unknown as { columns: Array<{ position: number }> }).columns[0].position
+    ).toBe(7);
   });
 });
