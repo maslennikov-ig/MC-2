@@ -27,6 +27,10 @@ PG_DUMPALL='/usr/lib/postgresql/17/bin/pg_dumpall'
 PG_RESTORE='/usr/lib/postgresql/17/bin/pg_restore'
 PSQL='/usr/lib/postgresql/17/bin/psql'
 MANIFEST_GENERATOR="$SCRIPT_DIR/q12-source-manifest.ts"
+# tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to
+# the workspace root, so `pnpm exec tsx` is unresolvable; invoke the package's own
+# pnpm-generated shim (a /bin/sh script that execs `node` on PATH with tsx cli.mjs).
+TSX_SHIM="$SCRIPT_DIR/../../packages/course-gen-platform/node_modules/.bin/tsx"
 TEST_MODE_ACTIVE=0
 TRUST_BOUNDARY='/'
 PRE_DUMP_HOOK=''
@@ -580,9 +584,10 @@ run_manifest_generator() {
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$MANIFEST_GENERATOR" "${args[@]}"
   else
+    [[ -x "$TSX_SHIM" ]] || fail "tsx runner is unavailable: $TSX_SHIM is missing or not executable (run pnpm install in the workspace)"
     PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
-      /usr/bin/pnpm exec tsx "$MANIFEST_GENERATOR" "${args[@]}"
+      "$TSX_SHIM" "$MANIFEST_GENERATOR" "${args[@]}"
   fi
 }
 

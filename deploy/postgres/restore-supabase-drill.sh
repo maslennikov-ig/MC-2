@@ -18,6 +18,12 @@ readonly ROLE_TOOL="$SCRIPT_DIR/generate-role-bootstrap.ts"
 readonly CLEANUP_HELPER="$SCRIPT_DIR/run-restore-cleanup.ts"
 readonly TEMP_DIRECTORY_HELPER="$SCRIPT_DIR/create-private-temp-dir.py"
 readonly PGTLE_ARCHIVE_SCANNER="$SCRIPT_DIR/scan-pgtle-archive.py"
+# tsx is a devDependency of packages/course-gen-platform only and is NOT hoisted to
+# the workspace root, so `pnpm exec tsx` from PROJECT_ROOT is unresolvable
+# (ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL). The package's own pnpm-generated shim resolves
+# tsx deterministically without workspace resolution; it is a /bin/sh script that execs
+# `node` (found on PATH — /usr/bin/node on the server) with tsx's cli.mjs.
+readonly TSX_SHIM="$PROJECT_ROOT/packages/course-gen-platform/node_modules/.bin/tsx"
 
 GENERATION=''
 RUN_ID=''
@@ -305,6 +311,9 @@ parse_arguments() {
   fi
   [[ -x "$DOCKER" && -x "$PSQL" && -x "$PG_RESTORE" ]] || fail 'required Docker or PostgreSQL 17 command is unavailable'
   [[ -f "$MANIFEST_TOOL" && ! -L "$MANIFEST_TOOL" && -f "$ROLE_TOOL" && ! -L "$ROLE_TOOL" && -f "$CLEANUP_HELPER" && ! -L "$CLEANUP_HELPER" && -f "$TEMP_DIRECTORY_HELPER" && ! -L "$TEMP_DIRECTORY_HELPER" && -f "$PGTLE_ARCHIVE_SCANNER" && ! -L "$PGTLE_ARCHIVE_SCANNER" ]] || fail 'tracked restore helper is unavailable'
+  # Fail closed with a named cause if the workspace tsx runner is missing, rather
+  # than surfacing an opaque ERR_PNPM later mid-restore.
+  [[ -x "$TSX_SHIM" ]] || fail "tsx runner is unavailable: $TSX_SHIM is missing or not executable (run pnpm install in the workspace)"
 }
 
 create_temp_root() {
@@ -419,7 +428,9 @@ wait_ready() {
 }
 
 run_ts() {
-  (cd "$PROJECT_ROOT" && TMPDIR=/tmp /usr/bin/pnpm exec tsx "$@")
+  # Resolve tsx via the package shim, not pnpm workspace resolution; cwd stays
+  # PROJECT_ROOT so the invoked scripts see their expected relative paths.
+  (cd "$PROJECT_ROOT" && TMPDIR=/tmp "$TSX_SHIM" "$@")
 }
 
 run_service_psql() {
