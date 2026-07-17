@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-15 delta-neutral extras in the completeness gate RED->GREEN: 163c7364 -> fbabbab9. Fixes rehearsal #8 ([default_acls] extra 2 — the Supabase image manufactures default ACLs on restore-created schemas tests/test_overrides that were dropped in the cloud source). Completeness gate now: MISSING (source object absent from isolate) -> absolutely fatal (unchanged); EXTRA (isolate identity absent from source) -> tolerated iff DELTA-NEUTRAL. The additive-delta check in _compose_predicted_payload already hard-stops any extra that changes/disappears across the pre/base/observability checkpoints, and composition now EXCLUDES tolerated extras from the composed payload (they are not in the live source) so composed still == real. Tolerated extras reported: plan result JSON gets observed_extra_identities [{section,identity}] + each named on stderr (assemble ignores the evidence key -> catalog bytes unchanged; no result consumer validates keys). Real-PG17 q12-migration-plan.test.ts: 64 passed — incl. an isolate-only extra tolerated+reported with the composed catalog still byte-matching the real post-migration source; a MISSING object still fatal (+ diagnostics preserved under --keep-equality-diagnostics); repurposed injectDrift->tolerated, injectMissing->fatal. No-docker adds 3 engine cases (extra collection, composition exclusion, mutating-extra fatal). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql byte-identical; validate_expected_catalog/catalog schema untouched.'
   - 'Round-14 dump-stable completeness identities RED->GREEN: 07d158ba -> e95237dc. Fixes rehearsal #7 false positive ([columns] missing 92 extra 92 — SAME columns, different attnum). Production tables carry dropped-column gaps: the source keeps attnums as holes, pg_restore compacts them, so a pre-existing column has a different `position` and a column comment a different `subobject_id` in the isolate. _COMPOSE_IDENTITY_KEYS now EXCLUDES those dump-unstable attnum fields (they stay in entry CONTENT, so composition still takes SOURCE content for pre-existing entries); a column comment is matched by its `identity` (pg_identify_object schema.table.column, carrying the column NAME). Invariants re-verified: within-section order still byte-matches live (dropping a column preserves the relative order of survivors -> isolate order == live order), additive-delta check internally consistent (isolate pre/post share compacted attnums). CI PROOF: the composed==real-source proof holds byte-EQUAL WITH a dropped-column gap + a post-gap column comment on a pre-existing table the migrations never touch (public.organizations). Real-PG17 q12-migration-plan.test.ts: 61 passed. No-docker adds 3 engine cases (position/subobject_id tolerance + name-match composition). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-13 delta-composed live-hash prediction (§2 method correction) RED->GREEN: 461409a7 -> ee70f8ac. Ruling (rehearsal #6 full payloads): the divergence is dump-round-trip EXPRESSION RENORMALIZATION, not arch/version drift — e.g. public.check_processing_method source `= ANY (ARRAY[..::character varying]::text[])` vs restored `= ANY (ARRAY[..::character varying::text])`; also [columns] ~117 (defaults) + db comment. So the raw-isolate-hash equality of design §2 is empirically unsound (an isolate can never byte-predict live hashes for pre-existing objects). Replaced with the sound construction. Gating verified against the FROZEN q12-structural-catalog.sql: NO OIDs in payload entries, NO timestamps in migration_history (version/name/statements only, :1190-1196), every section ORDER BY is identity-determined (a renormalizable expression never reorders a section) -> composition is byte-exact; no stop-and-report needed. (1) Equality proof -> object-completeness: _assert_restore_object_complete requires the isolate pre-migration identity-set == source per section (missing/extra -> hard stop); content divergence is expected + non-fatal (drill compare guards fidelity). (2) Checkpoint hashes -> delta-composed: each in-isolate delta must be strictly ADDITIVE (no removed/modified pre-existing, migration_history append-only) -> hard stop; predicted = SOURCE pre-existing content + isolate FRESH content in isolate SQL order, hashed THROUGH postgres (capture.py --render-hash, jsonb::text canonicalization byte-identical to live); baseline_structural_sha256 stays raw SOURCE. barrier/manifest/structural SQL + validate_expected_catalog untouched, hashes stay 64-hex. CI PROOF (strong): applying the same five migration files to the SOURCE container yields a hash byte-EQUAL to the composed prediction even with a seeded renormalizing check constraint (the old raw-isolate method would have differed); negative: an in-isolate ALTER of a pre-existing column default hard-stops naming [columns]. Real-PG17 q12-migration-plan.test.ts: 58 passed. No-docker adds 4 engine cases (compose/object-complete/non-additive). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-12 preserve equality-diff payloads RED->GREEN: 33e27794 -> c06f3a54. Surgical argv-gated seam so the full cloud-source-vs-pinned-image divergence survives for a product-truth ruling (the first-10 summary died with the workdir). New plan flag --keep-equality-diagnostics (argv, NOT env — production seam lockdown still rejects env seams): on equality failure the plan writes 3 owner-only files into <run_root>/equality-diagnostics/ (0700 dir, 0600 files) — source + isolate canonical payloads + the FULL unbounded diff (_structural_catalog_diff gained max_ids/max_lines=None); run_plan preserves the created run dir when diagnostics were written (else removed as before). No scrub needed: the frozen SQL stores subscription conninfo as connection_sha256 and carries no cron/row data, so the payload is secret-free by construction. Real-PG17 q12-migration-plan.test.ts: 52 passed — incl. flag-on preserves the 3 files with q12_drift_probe in the isolate payload + full diff; flag-off writes no diag dir. No-docker adds 2 cases (unbounded diff = 50 identifiers; run-dir preservation exception). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
@@ -53,6 +54,49 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-15 makes the completeness gate tolerate DELTA-NEUTRAL EXTRAS (`163c7364` ->
+`fbabbab9`). Rehearsal #8 passed columns completeness but failed `[default_acls] missing 0
+extra 2`: the isolate had two extra default-ACL entries (object_type=f schema=tests and
+schema=test_overrides, role=supabase_admin) absent from the source. Cause: the Supabase
+image's schema-creation machinery (a supautils-style event trigger) manufactures default
+ACLs when the restore CREATES those schemas; in the cloud source they had been dropped.
+This is a benign artifact of the restore, not a lost object.
+
+Ruling implemented for the completeness gate (our construction, not the frozen proof):
+
+- (a) MISSING is absolutely fatal — the restore must reproduce every source object.
+- (b) EXTRA identities (isolate has, source lacks) are tolerated ONLY if delta-neutral: the
+  extra must be present and byte-identical in the isolate pre-migration AND every post-
+  checkpoint capture, so it cancels out of every delta and never enters the composed
+  payload. Any extra that appears/changes/disappears across checkpoints is fatal.
+
+Implementation:
+
+- `_check_restore_completeness` (renamed from the assert) raises ONLY on missing and RETURNS
+  the extras as [{section, identity}].
+- The additive-delta check in `_compose_predicted_payload` already enforces delta-neutrality
+  for extras: an extra is `in isolate_pre`, so if it disappears in a checkpoint it is a
+  `removed` hard-stop, and if it changes it is a `modified` hard-stop.
+- Composition now classifies each isolate-checkpoint entry three ways: in source ->
+  pre-existing (SOURCE content); not source but in isolate_pre -> tolerated EXTRA
+  (EXCLUDED, since it is not in the live source); not source and not in isolate_pre ->
+  FRESH (isolate content). Excluding extras keeps composed == live (the live source has no
+  restore artifacts), and removing them from the isolate order preserves the live order of
+  the remaining entries.
+- Behavioral risk is already covered fail-closed: if an extra changed what a migration
+  produced, the isolate delta would diverge from live and the composed hash would not match
+  at cutover — the barrier blocks, never corrupts.
+- Reporting: the plan RESULT JSON gains `observed_extra_identities` (array of
+  {section, identity}) and each tolerated extra is named on stderr for the rehearsal log.
+  This is a result field only — `assemble_expected_catalog` reads a fixed key set and
+  ignores it, so the frozen CATALOG file bytes are unchanged, and no consumer validates the
+  plan-result key set. `validate_expected_catalog` and the catalog schema are untouched.
+
+Proven end-to-end: an isolate-only extra (a function the source lacks) is tolerated +
+reported, and the composed catalog still byte-matches the real post-migration source (the
+extra cancels); a missing source object stays fatal (and preserves diagnostics under
+--keep-equality-diagnostics); a mutating extra hard-stops.
 
 Round-14 makes the object-completeness identity DUMP-STABLE (`07d158ba` -> `e95237dc`).
 Rehearsal #7 engaged the composed-prediction machinery correctly but object-completeness
