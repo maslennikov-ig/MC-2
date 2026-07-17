@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -1421,5 +1422,158 @@ print('ACCEPT ' + handle['container'] + ' ' + handle['database'])`;
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/persist handle/iu);
+  });
+});
+
+describe('Q12 plan drill generation contract (round-8)', () => {
+  const RESTORE_DRILL = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
+  const GEN_RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
+  const PY_ENV = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };
+
+  // The exact generation-basename ERE the real drill enforces
+  // (restore-supabase-drill.sh parse_arguments), extracted from the drill bytes so
+  // a future format change fails CI, not the server rehearsal.
+  function realDrillGenerationRegex(): string {
+    const src = readFileSync(RESTORE_DRILL, 'utf8');
+    const m = src.match(
+      /=~ (\^generation-\S+?\$) \]\] \|\| fail 'generation basename is invalid'/u
+    );
+    if (!m) throw new Error('generation basename regex not found in the drill');
+    return m[1];
+  }
+
+  // The real drill's structural validate_generation Python block (4-file set, 0600
+  // modes, checksums schema/generation/files/sha256/size, source-manifest schema),
+  // extracted verbatim so this contract and the fake drill enforce the identical
+  // set the server drill does.
+  function realDrillValidatePy(): string {
+    const src = readFileSync(RESTORE_DRILL, 'utf8');
+    const fn = src.indexOf('validate_generation() {');
+    const open = src.indexOf("<<'PY'\n", fn);
+    const start = open + "<<'PY'\n".length;
+    const end = src.indexOf('\nPY\n', start);
+    if (fn < 0 || open < 0 || end < 0) throw new Error('validate_generation PY block not found');
+    return src.slice(start, end);
+  }
+
+  function loadCore(body: string): string {
+    return `import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+${body}`;
+  }
+
+  function generationDirname(runId: string): string {
+    const res = spawnSync(
+      '/usr/bin/python3',
+      ['-c', loadCore('print(core.LivePlanExecutor()._generation_dirname(sys.argv[1]))'), runId],
+      { encoding: 'utf8', env: PY_ENV }
+    );
+    if (res.status !== 0) throw new Error(`_generation_dirname failed: ${res.stderr}`);
+    return res.stdout.trim();
+  }
+
+  function writeChecksums(dir: string): void {
+    const res = spawnSync(
+      '/usr/bin/python3',
+      ['-c', loadCore('core.LivePlanExecutor()._write_checksums(pathlib.Path(sys.argv[1]))'), dir],
+      { encoding: 'utf8', env: PY_ENV }
+    );
+    if (res.status !== 0) throw new Error(`_write_checksums failed: ${res.stderr}`);
+  }
+
+  function runDrillPreflight(dir: string, basename: string): ReturnType<typeof spawnSync> {
+    return spawnSync(
+      '/usr/bin/python3',
+      ['-', dir, basename, String(process.getuid?.() ?? 0), String(process.getgid?.() ?? 0)],
+      { encoding: 'utf8', input: realDrillValidatePy(), env: PY_ENV }
+    );
+  }
+
+  function buildGeneration(basename: string): string {
+    const parent = mkdtempSync('/tmp/mc2-q12-plan-genwork-');
+    temporaryDirectories.push(parent);
+    const dir = join(parent, basename);
+    mkdirSync(dir, 0o700);
+    for (const [name, body] of [
+      ['database.dump', 'PGDMP-synthetic\n'],
+      ['roles.sql', '-- roles\n'],
+      [
+        'source-manifest.json',
+        `${JSON.stringify({ schema: 'megacampus.supabase-source-manifest/v1' })}\n`,
+      ],
+    ]) {
+      writeFileSync(join(dir, name), body, { mode: 0o600 });
+      chmodSync(join(dir, name), 0o600);
+    }
+    return dir;
+  }
+
+  it('the real drill basename regex rejects the pre-fix hex basename and accepts the timestamped-uuid form (rehearsal reproduction)', () => {
+    const re = new RegExp(realDrillGenerationRegex(), 'u');
+    // Exactly the pre-fix shape that fail-closed the server rehearsal.
+    expect(re.test('generation-0123456789abcdef')).toBe(false);
+    expect(re.test(`generation-20260716T120000Z-${GEN_RUN_ID}`)).toBe(true);
+  });
+
+  it('_generation_dirname emits a basename the real drill preflight accepts', () => {
+    expect(generationDirname(GEN_RUN_ID)).toMatch(new RegExp(realDrillGenerationRegex(), 'u'));
+  });
+
+  it('_write_checksums records the generation basename so the real drill validate_generation accepts it', () => {
+    const basename = `generation-20260716T120000Z-${GEN_RUN_ID}`;
+    const dir = buildGeneration(basename);
+    writeChecksums(dir);
+
+    const manifest = JSON.parse(readFileSync(join(dir, 'checksums.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(manifest.schema).toBe('megacampus.supabase-backup-checksums/v1');
+    expect(manifest.generation).toBe(basename);
+
+    const preflight = runDrillPreflight(dir, basename);
+    expect(preflight.status, preflight.stderr).toBe(0);
+  });
+
+  function runFaultPlan(runRoot: string): ReturnType<typeof spawnSync> {
+    const creds = mkdtempSync('/tmp/mc2-q12-plan-creds-');
+    temporaryDirectories.push(creds);
+    const dbUrl = join(creds, 'supabase_db_url');
+    const ca = join(creds, 'prod-ca.crt');
+    writeFileSync(dbUrl, 'postgresql://synthetic\n', { mode: 0o600 });
+    chmodSync(dbUrl, 0o600);
+    writeFileSync(ca, 'synthetic-ca\n', { mode: 0o644 });
+    chmodSync(ca, 0o644);
+    return spawnSync('/usr/bin/python3', [RUNNER], {
+      input: JSON.stringify({
+        run_id: GEN_RUN_ID,
+        release_sha: RELEASE_SHA,
+        db_url_file: dbUrl,
+        ca_file: ca,
+        run_root: runRoot,
+        evidence: {},
+        capture_fault: 'synthetic pre-emission failure',
+      }),
+      encoding: 'utf8',
+      env: PY_ENV,
+    });
+  }
+
+  it('removes a run dir it created when the run fails before emitting the catalog (item-4)', () => {
+    const runRoot = `/tmp/mc2-q12-plan-${GEN_RUN_ID}-created`;
+    rmSync(runRoot, { recursive: true, force: true });
+    const res = runFaultPlan(runRoot);
+    expect(res.status).not.toBe(0);
+    expect(existsSync(runRoot)).toBe(false);
+  });
+
+  it('preserves a pre-existing run dir on failure (item-4)', () => {
+    const runRoot = mkdtempSync('/tmp/mc2-q12-plan-');
+    temporaryDirectories.push(runRoot);
+    chmodSync(runRoot, 0o700);
+    const res = runFaultPlan(runRoot);
+    expect(res.status).not.toBe(0);
+    expect(existsSync(runRoot)).toBe(true);
   });
 });

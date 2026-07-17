@@ -21,12 +21,20 @@ SPEC.loader.exec_module(CORE)
 
 
 class FakePlanExecutor:
-    """Returns pre-baked synthetic capture evidence; performs no I/O."""
+    """Returns pre-baked synthetic capture evidence; performs no I/O.
 
-    def __init__(self, evidence: object) -> None:
+    When ``capture_fault`` is set the executor raises to exercise the failed
+    pre-emission path (run-dir cleanup); ``teardown`` is always a no-op so the
+    only thing that can reclaim the run dir is ``run_plan`` itself.
+    """
+
+    def __init__(self, evidence: object, capture_fault: str | None = None) -> None:
         self._evidence = evidence
+        self._capture_fault = capture_fault
 
     def capture(self, request: dict[str, object]) -> object:
+        if self._capture_fault:
+            raise CORE.LifecycleError(self._capture_fault)
         # Deep copy through JSON so the builder cannot mutate the fixture.
         return json.loads(json.dumps(self._evidence))
 
@@ -51,7 +59,7 @@ def main() -> int:
             payload["run_root"],
         ]
     )
-    executor = FakePlanExecutor(payload["evidence"])
+    executor = FakePlanExecutor(payload["evidence"], payload.get("capture_fault"))
     result = CORE.run_plan(arguments, executor)
     sys.stdout.write(json.dumps(result))
     sys.stdout.write("\n")
