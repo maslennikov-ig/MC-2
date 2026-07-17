@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-14 dump-stable completeness identities RED->GREEN: 07d158ba -> e95237dc. Fixes rehearsal #7 false positive ([columns] missing 92 extra 92 — SAME columns, different attnum). Production tables carry dropped-column gaps: the source keeps attnums as holes, pg_restore compacts them, so a pre-existing column has a different `position` and a column comment a different `subobject_id` in the isolate. _COMPOSE_IDENTITY_KEYS now EXCLUDES those dump-unstable attnum fields (they stay in entry CONTENT, so composition still takes SOURCE content for pre-existing entries); a column comment is matched by its `identity` (pg_identify_object schema.table.column, carrying the column NAME). Invariants re-verified: within-section order still byte-matches live (dropping a column preserves the relative order of survivors -> isolate order == live order), additive-delta check internally consistent (isolate pre/post share compacted attnums). CI PROOF: the composed==real-source proof holds byte-EQUAL WITH a dropped-column gap + a post-gap column comment on a pre-existing table the migrations never touch (public.organizations). Real-PG17 q12-migration-plan.test.ts: 61 passed. No-docker adds 3 engine cases (position/subobject_id tolerance + name-match composition). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-13 delta-composed live-hash prediction (§2 method correction) RED->GREEN: 461409a7 -> ee70f8ac. Ruling (rehearsal #6 full payloads): the divergence is dump-round-trip EXPRESSION RENORMALIZATION, not arch/version drift — e.g. public.check_processing_method source `= ANY (ARRAY[..::character varying]::text[])` vs restored `= ANY (ARRAY[..::character varying::text])`; also [columns] ~117 (defaults) + db comment. So the raw-isolate-hash equality of design §2 is empirically unsound (an isolate can never byte-predict live hashes for pre-existing objects). Replaced with the sound construction. Gating verified against the FROZEN q12-structural-catalog.sql: NO OIDs in payload entries, NO timestamps in migration_history (version/name/statements only, :1190-1196), every section ORDER BY is identity-determined (a renormalizable expression never reorders a section) -> composition is byte-exact; no stop-and-report needed. (1) Equality proof -> object-completeness: _assert_restore_object_complete requires the isolate pre-migration identity-set == source per section (missing/extra -> hard stop); content divergence is expected + non-fatal (drill compare guards fidelity). (2) Checkpoint hashes -> delta-composed: each in-isolate delta must be strictly ADDITIVE (no removed/modified pre-existing, migration_history append-only) -> hard stop; predicted = SOURCE pre-existing content + isolate FRESH content in isolate SQL order, hashed THROUGH postgres (capture.py --render-hash, jsonb::text canonicalization byte-identical to live); baseline_structural_sha256 stays raw SOURCE. barrier/manifest/structural SQL + validate_expected_catalog untouched, hashes stay 64-hex. CI PROOF (strong): applying the same five migration files to the SOURCE container yields a hash byte-EQUAL to the composed prediction even with a seeded renormalizing check constraint (the old raw-isolate method would have differed); negative: an in-isolate ALTER of a pre-existing column default hard-stops naming [columns]. Real-PG17 q12-migration-plan.test.ts: 58 passed. No-docker adds 4 engine cases (compose/object-complete/non-additive). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-12 preserve equality-diff payloads RED->GREEN: 33e27794 -> c06f3a54. Surgical argv-gated seam so the full cloud-source-vs-pinned-image divergence survives for a product-truth ruling (the first-10 summary died with the workdir). New plan flag --keep-equality-diagnostics (argv, NOT env — production seam lockdown still rejects env seams): on equality failure the plan writes 3 owner-only files into <run_root>/equality-diagnostics/ (0700 dir, 0600 files) — source + isolate canonical payloads + the FULL unbounded diff (_structural_catalog_diff gained max_ids/max_lines=None); run_plan preserves the created run dir when diagnostics were written (else removed as before). No scrub needed: the frozen SQL stores subscription conninfo as connection_sha256 and carries no cron/row data, so the payload is secret-free by construction. Real-PG17 q12-migration-plan.test.ts: 52 passed — incl. flag-on preserves the 3 files with q12_drift_probe in the isolate payload + full diff; flag-off writes no diag dir. No-docker adds 2 cases (unbounded diff = 50 identifiers; run-dir preservation exception). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
   - 'Round-11 structural equality-proof diff diagnostics RED->GREEN: d28bdae1 -> 5ebeeaca. Makes the opaque structural-sha mismatch (rehearsal #4) self-diagnosing WITHOUT touching the frozen q12-structural-catalog.sql (verified byte-identical). capture.py --structural-payload selects the query's `payload` column (the exact pre-hash jsonb); the plan eagerly captures the source payload in the snapshot window and, on equality failure, captures the isolate payload and raises a bounded per-section diff (identifiers + sha digests only; statements/values never shown). Real-PG17 q12-migration-plan.test.ts: 49 passed — incl. the round-11 negative where a fake-drill injectDrift creates a function ONLY in the isolate and the error names [functions] + q12_drift_probe; the happy path survives the eager source-payload capture. No-docker adds 2 diff-engine cases (per-section add/remove/change identifiers + digests, 64-hex scrub, bounded output). tsc 0; frozen bytes aaec6fc2…/134255ce… AND q12-structural-catalog.sql all byte-identical.'
@@ -52,6 +53,52 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-14 makes the object-completeness identity DUMP-STABLE (`07d158ba` -> `e95237dc`).
+Rehearsal #7 engaged the composed-prediction machinery correctly but object-completeness
+false-positived: `[columns] missing 92 extra 92` — the SAME columns with different
+`position` (attnum). Root cause: production tables carry DROPPED columns; the source keeps
+their attnum slots as holes, but pg_restore recreates the tables without them and attnums
+compact. So a pre-existing column has a source attnum ≠ isolate attnum, and my completeness
+identity keyed on `position` (attnum) read the same column as one missing + one extra.
+
+Fix: the composition identity now EXCLUDES the dump-unstable attnum fields (they remain in
+entry CONTENT so composition still takes SOURCE content for pre-existing entries and renders
+the correct live hash). Per-section identity after the sweep (identity fields only; all
+other fields are content):
+
+| section                                                                  | identity keys (dump-stable)                                    |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| columns                                                                  | schema, relation, name (was ...+position=attnum)               |
+| comments (incl. on columns)                                              | object_type, schema, name, identity (was ...+subobject_id)     |
+| security_labels                                                          | object_type, schema, name, identity, provider (was ...+subobj) |
+| relations / sequences / indexes / extended*statistics / text_search*\*   | schema, name                                                   |
+| constraints                                                              | schema, name, relation_schema, relation_name                   |
+| functions / aggregates                                                   | schema, name, identity_arguments                               |
+| triggers / rules / policies                                              | schema, relation, name (name-keyed, no ordinal)                |
+| extensions / access_methods / languages / fdw / servers / event_triggers | name                                                           |
+| types / collations / conversions / operators(+family/class)              | schema, name (+encoding/access_method)                         |
+| casts / transforms                                                       | source_type, target_type / language                            |
+| publications / subscriptions                                             | name                                                           |
+| default_acls                                                             | role, schema, object_type                                      |
+| parameter_acls                                                           | parameter, role                                                |
+| migration_history                                                        | version                                                        |
+| database                                                                 | singleton (field-wise)                                         |
+
+The dump-unstable components removed are exactly `position` (column attnum) and
+`subobject_id` (a column comment/label attnum); no other section keys on an attnum,
+subobject, ordinal, or oid. A column comment stays uniquely identified by its `identity`
+(pg_identify_object `schema.table.column`, which carries the column NAME, not the attnum).
+
+Invariants re-verified (item 2): (a) within-section ORDER still byte-matches live — dropping
+a column preserves the relative order of the surviving columns, so the isolate's SQL order
+(by compacted attnum) equals the live order (by gapped attnum) for the survivors, and the
+composed content carries the SOURCE attnums; (b) the additive-delta check compares isolate
+pre vs post, which share the same compacted attnums, so it is internally consistent and
+unaffected. Both are proven end-to-end by the composed==real-source CI proof running WITH a
+dropped-column gap + a post-gap column comment on public.organizations (a pre-existing table
+the migrations never touch): the composed hash is byte-EQUAL to the real post-migration
+source hash, which proves attnum gaps do not break the composed live-hash prediction.
 
 Round-13 is the orchestrator's design-§2 METHOD CORRECTION (`461409a7` -> `ee70f8ac`),
 issued as a product-truth ruling after rehearsal #6 preserved the full payloads. This is

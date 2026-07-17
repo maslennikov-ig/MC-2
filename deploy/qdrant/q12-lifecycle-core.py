@@ -4722,14 +4722,22 @@ def _structural_catalog_diff(
 # untouched by our migrations (their live form is exactly the SOURCE payload), and FRESH
 # objects are parsed identically live and in-isolate (same SQL text, same PG 17.6, ASCII
 # names). So a checkpoint's live catalog = SOURCE pre-existing entries + isolate FRESH
-# entries, and its hash is predictable. Identity is the section-agnostic set of structural
-# key fields below (a superset of every section's ORDER BY key — verified: no OIDs, no
-# timestamps, ordering is identity-determined), which is IDENTICAL for a pre-existing
-# object between source and isolate (only non-identity content deparse-renormalizes).
+# entries, and its hash is predictable.
+#
+# Identity is the section-agnostic set of structural key fields below (a superset of every
+# section's ORDER BY key). It DELIBERATELY EXCLUDES dump-UNSTABLE fields (which stay in
+# entry CONTENT): production tables carry dropped-column gaps whose attnums the source
+# keeps as holes but pg_restore compacts, so `position` (a column's attnum) and
+# `subobject_id` (a column comment/label's attnum) differ for the SAME object between
+# source and isolate — including them would false-positive object-completeness. A column
+# comment's `identity` (pg_identify_object, e.g. `schema.table.column`) carries the column
+# NAME, so it stays a stable discriminator. Verified: no OIDs, no timestamps, section
+# ordering is identity-determined, and every remaining key is a name/type/version/ordinal-
+# free property that is IDENTICAL for a pre-existing object across the dump round-trip.
 _COMPOSE_IDENTITY_KEYS = (
     "object_type", "schema", "name", "relation", "relation_schema", "relation_name",
-    "table_schema", "table_name", "domain_schema", "domain_name", "position",
-    "identity", "identity_arguments", "subobject_id", "provider", "version",
+    "table_schema", "table_name", "domain_schema", "domain_name",
+    "identity", "identity_arguments", "provider", "version",
     "access_method", "encoding", "role", "parameter", "language",
     "source_type", "target_type", "left_type", "right_type", "kind",
 )
