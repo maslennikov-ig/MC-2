@@ -1207,7 +1207,8 @@ chmod 0400 "$MC2_Q12_RESTORE_PERSIST_HANDLE"
     function runDrillPlan(
       fixture: PlanFixture,
       drill: string,
-      extraEnv: Record<string, string> = {}
+      extraEnv: Record<string, string> = {},
+      extraArgs: string[] = []
     ) {
       return spawnSync(
         '/usr/bin/python3',
@@ -1224,6 +1225,7 @@ chmod 0400 "$MC2_Q12_RESTORE_PERSIST_HANDLE"
           fixture.ca,
           '--run-root',
           fixture.runRoot,
+          ...extraArgs,
         ],
         {
           encoding: 'utf8',
@@ -1348,6 +1350,38 @@ esac
       );
       expect(result.stderr).toMatch(/\[functions\]/u);
       expect(result.stderr).toContain('q12_drift_probe');
+      expect(existsSync(fixture.catalogPath)).toBe(false);
+      // No flag: no preserved diagnostics dir (behavior unchanged).
+      expect(existsSync(join(fixture.runRoot, 'equality-diagnostics'))).toBe(false);
+      expect(leftoverFakeDrill()).toEqual([]);
+    }, 180_000);
+
+    it('--keep-equality-diagnostics preserves the full payloads + diff on equality failure (round-12)', () => {
+      const fixture = planFixture();
+      const drillLog = join(fixture.runRoot, 'drill-invocation.log');
+
+      const result = runDrillPlan(fixture, fakeDrill(drillLog, { injectDrift: true }), {}, [
+        '--keep-equality-diagnostics',
+      ]);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/\[functions\]/u);
+      const diagDir = join(fixture.runRoot, 'equality-diagnostics');
+      expect(statSync(diagDir).mode & 0o777).toBe(0o700);
+      for (const name of [
+        'source-structural-payload.json',
+        'isolate-structural-payload.json',
+        'equality-diff.txt',
+      ]) {
+        const path = join(diagDir, name);
+        expect(existsSync(path), `${name} missing`).toBe(true);
+        expect(statSync(path).mode & 0o777).toBe(0o600);
+      }
+      // The preserved payloads are the real canonical catalogs; the drift function
+      // must appear in the isolate payload (and the full diff), unbounded.
+      const isolatePayload = readFileSync(join(diagDir, 'isolate-structural-payload.json'), 'utf8');
+      expect(isolatePayload).toContain('q12_drift_probe');
+      expect(readFileSync(join(diagDir, 'equality-diff.txt'), 'utf8')).toContain('q12_drift_probe');
       expect(existsSync(fixture.catalogPath)).toBe(false);
       expect(leftoverFakeDrill()).toEqual([]);
     }, 180_000);
@@ -1810,5 +1844,74 @@ sys.stdout.write(core._structural_catalog_diff(json.loads(sys.argv[1]), json.loa
       .split('\n')
       .filter(l => l.trimStart().startsWith('- schema=public|name=t'));
     expect(relationLines.length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('Q12 equality diagnostics preservation (round-12)', () => {
+  const CORE12 = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
+  const RUN_ID12 = '123e4567-e89b-42d3-a456-426614174000';
+  const PY_ENV12 = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };
+
+  it('emits the FULL unbounded per-entry diff when max_ids/max_lines are None', () => {
+    const source = {
+      schema_version: 'megacampus.q12.structural-catalog-payload/v1',
+      relations: Array.from({ length: 50 }, (_, i) => ({ schema: 'public', name: `t${i}` })),
+    };
+    const isolate = {
+      schema_version: 'megacampus.q12.structural-catalog-payload/v1',
+      relations: [],
+    };
+    const script = `import importlib.util, json, pathlib, sys
+spec = importlib.util.spec_from_file_location('core', ${JSON.stringify(CORE12)})
+core = importlib.util.module_from_spec(spec); sys.modules['core'] = core; spec.loader.exec_module(core)
+sys.stdout.write(core._structural_catalog_diff(json.loads(sys.argv[1]), json.loads(sys.argv[2]), max_ids=None, max_lines=None))`;
+    const res = spawnSync(
+      '/usr/bin/python3',
+      ['-c', script, JSON.stringify(source), JSON.stringify(isolate)],
+      { encoding: 'utf8', env: PY_ENV12 }
+    );
+
+    expect(res.status, res.stderr).toBe(0);
+    const relationLines = res.stdout
+      .split('\n')
+      .filter(l => l.trimStart().startsWith('- schema=public|name=t'));
+    // Unbounded: all 50 removed relations are listed, not capped at 10.
+    expect(relationLines.length).toBe(50);
+  });
+
+  function runDiagFaultPlan(runRoot: string): ReturnType<typeof spawnSync> {
+    const creds = mkdtempSync('/tmp/mc2-q12-plan-creds-');
+    temporaryDirectories.push(creds);
+    const dbUrl = join(creds, 'supabase_db_url');
+    const ca = join(creds, 'prod-ca.crt');
+    writeFileSync(dbUrl, 'postgresql://synthetic\n', { mode: 0o600 });
+    chmodSync(dbUrl, 0o600);
+    writeFileSync(ca, 'synthetic-ca\n', { mode: 0o644 });
+    chmodSync(ca, 0o644);
+    return spawnSync('/usr/bin/python3', [RUNNER], {
+      input: JSON.stringify({
+        run_id: RUN_ID12,
+        release_sha: RELEASE_SHA,
+        db_url_file: dbUrl,
+        ca_file: ca,
+        run_root: runRoot,
+        evidence: {},
+        write_diag: true,
+        capture_fault: 'synthetic equality mismatch',
+      }),
+      encoding: 'utf8',
+      env: PY_ENV12,
+    });
+  }
+
+  it('preserves a created run dir on failure when equality diagnostics were written', () => {
+    const runRoot = `/tmp/mc2-q12-plan-${RUN_ID12}-diag`;
+    rmSync(runRoot, { recursive: true, force: true });
+    const res = runDiagFaultPlan(runRoot);
+    temporaryDirectories.push(runRoot);
+    expect(res.status).not.toBe(0);
+    // The run dir it created is PRESERVED (not removed) because diagnostics live there.
+    expect(existsSync(runRoot)).toBe(true);
+    expect(existsSync(join(runRoot, 'equality-diagnostics', 'equality-diff.txt'))).toBe(true);
   });
 });

@@ -28,11 +28,23 @@ class FakePlanExecutor:
     only thing that can reclaim the run dir is ``run_plan`` itself.
     """
 
-    def __init__(self, evidence: object, capture_fault: str | None = None) -> None:
+    def __init__(
+        self,
+        evidence: object,
+        capture_fault: str | None = None,
+        write_diag: bool = False,
+    ) -> None:
         self._evidence = evidence
         self._capture_fault = capture_fault
+        self._write_diag = write_diag
 
     def capture(self, request: dict[str, object]) -> object:
+        if self._write_diag:
+            # Simulate an equality-proof failure that preserved diagnostics under the
+            # run dir, so run_plan's failed-run cleanup must keep the dir.
+            diag = pathlib.Path(str(request["run_root"])) / "equality-diagnostics"
+            diag.mkdir(mode=0o700)
+            (diag / "equality-diff.txt").write_text("synthetic diff\n")
         if self._capture_fault:
             raise CORE.LifecycleError(self._capture_fault)
         # Deep copy through JSON so the builder cannot mutate the fixture.
@@ -59,7 +71,9 @@ def main() -> int:
             payload["run_root"],
         ]
     )
-    executor = FakePlanExecutor(payload["evidence"], payload.get("capture_fault"))
+    executor = FakePlanExecutor(
+        payload["evidence"], payload.get("capture_fault"), bool(payload.get("write_diag"))
+    )
     result = CORE.run_plan(arguments, executor)
     sys.stdout.write(json.dumps(result))
     sys.stdout.write("\n")

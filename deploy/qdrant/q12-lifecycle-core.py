@@ -4535,6 +4535,7 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
         "ca_file": str(ca_file),
         "run_root": str(run_root),
         "generation": getattr(arguments, "generation", None),
+        "keep_equality_diagnostics": bool(getattr(arguments, "keep_equality_diagnostics", False)),
     }
     # The diagnostic archive/container/network/volume are removed only after the
     # catalog is emitted and its hash is durably bound; a teardown failure
@@ -4562,7 +4563,14 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
         }
     finally:
         plan_executor.teardown()
-        if not emitted and not run_root_existed:
+        # Failed pre-emission runs remove the run dir they created — EXCEPT when
+        # equality diagnostics were preserved under it (--keep-equality-diagnostics),
+        # which are the whole point of that run and must survive teardown.
+        if (
+            not emitted
+            and not run_root_existed
+            and not (run_root / "equality-diagnostics").exists()
+        ):
             import shutil
 
             shutil.rmtree(run_root, ignore_errors=True)
@@ -4636,7 +4644,19 @@ def _diff_identity(section: str, obj: Any) -> str:
     return "digest:" + _diff_value_digest(obj)
 
 
-def _structural_catalog_diff(source: dict[str, Any], isolate: dict[str, Any]) -> str:
+def _structural_catalog_diff(
+    source: dict[str, Any],
+    isolate: dict[str, Any],
+    *,
+    max_ids: int | None = _DIFF_MAX_IDS,
+    max_lines: int | None = _DIFF_MAX_LINES,
+) -> str:
+    """Bounded per-section diff for the LifecycleError message; pass
+    max_ids=max_lines=None for the full unbounded report preserved for a ruling."""
+
+    def cap(items: list[str]) -> list[str]:
+        return items if max_ids is None else items[:max_ids]
+
     lines: list[str] = []
     for section in sorted(set(source) | set(isolate)):
         if section == "schema_version":
@@ -4661,11 +4681,11 @@ def _structural_catalog_diff(source: dict[str, Any], isolate: dict[str, Any]) ->
             if not (added or removed or changed):
                 continue
             lines.append(f"[{section}] +{len(added)} -{len(removed)} ~{len(changed)}")
-            for key in removed[:_DIFF_MAX_IDS]:
+            for key in cap(removed):
                 lines.append(f"  - {key}  source={_diff_value_digest(source_by[key])} isolate=<absent>")
-            for key in added[:_DIFF_MAX_IDS]:
+            for key in cap(added):
                 lines.append(f"  + {key}  source=<absent> isolate={_diff_value_digest(isolate_by[key])}")
-            for key in changed[:_DIFF_MAX_IDS]:
+            for key in cap(changed):
                 lines.append(
                     f"  ~ {key}  source={_diff_value_digest(source_by[key])} "
                     f"isolate={_diff_value_digest(isolate_by[key])}"
@@ -4677,7 +4697,7 @@ def _structural_catalog_diff(source: dict[str, Any], isolate: dict[str, Any]) ->
                 if source_value.get(field) != isolate_value.get(field)
             )
             lines.append(f"[{section}] ~{len(fields)} field(s)")
-            for field in fields[:_DIFF_MAX_IDS]:
+            for field in cap(fields):
                 lines.append(
                     f"  ~ {_scrub_plan_secret_text(str(field))}  "
                     f"source={_diff_value_digest(source_value.get(field))} "
@@ -4690,9 +4710,9 @@ def _structural_catalog_diff(source: dict[str, Any], isolate: dict[str, Any]) ->
             )
     if not lines:
         return "structural payloads differ but no per-section difference was localized (identity collision?)"
-    if len(lines) > _DIFF_MAX_LINES:
-        omitted = len(lines) - _DIFF_MAX_LINES
-        return "\n".join(lines[:_DIFF_MAX_LINES]) + f"\n… ({omitted} more diff lines omitted)"
+    if max_lines is not None and len(lines) > max_lines:
+        omitted = len(lines) - max_lines
+        return "\n".join(lines[:max_lines]) + f"\n… ({omitted} more diff lines omitted)"
     return "\n".join(lines)
 
 
@@ -4915,8 +4935,44 @@ class LivePlanExecutor:
             self._resources["source_payload"] = str(payload_path)
         return result
 
+    def _preserve_equality_diagnostics(
+        self,
+        request: dict[str, Any],
+        source_payload: dict[str, Any],
+        isolate_payload: dict[str, Any],
+    ) -> None:
+        """Persist the two full canonical payloads and the full unbounded diff under
+        <run_root>/equality-diagnostics/ (0700 dir, 0600 files) for a product-truth
+        ruling. The payloads are secret-free by construction — the frozen SQL stores
+        subscription conninfo as connection_sha256 and carries no cron command text or
+        row data; the only free text is our own migration statements — so they are
+        written verbatim (scrubbing would corrupt the diagnostic)."""
+        diagnostics = pathlib.Path(request["run_root"]) / "equality-diagnostics"
+        ensure_directory(diagnostics)
+
+        def emit(name: str, data: bytes) -> None:
+            path = diagnostics / name
+            if os.path.lexists(path):
+                path.unlink()
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            try:
+                os.write(descriptor, data)
+            finally:
+                os.close(descriptor)
+
+        emit(
+            "source-structural-payload.json",
+            (json.dumps(source_payload, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"),
+        )
+        emit(
+            "isolate-structural-payload.json",
+            (json.dumps(isolate_payload, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"),
+        )
+        full = _structural_catalog_diff(source_payload, isolate_payload, max_ids=None, max_lines=None)
+        emit("equality-diff.txt", (full + "\n").encode("utf-8"))
+
     def _structural_equality_failure_detail(
-        self, workdir: pathlib.Path, target: dict[str, str], dbname: str
+        self, request: dict[str, Any], workdir: pathlib.Path, target: dict[str, str], dbname: str
     ) -> str:
         base = "isolated pre-migration structural catalog differs from the read-only source catalog"
         source_path = self._resources.get("source_payload")
@@ -4932,6 +4988,8 @@ class LivePlanExecutor:
             )
             isolate_payload = json.loads(isolate_path.read_text(encoding="utf-8"))
             diff = _structural_catalog_diff(source_payload, isolate_payload)
+            if request.get("keep_equality_diagnostics"):
+                self._preserve_equality_diagnostics(request, source_payload, isolate_payload)
         except (LifecycleError, OSError, ValueError) as error:
             return f"{base} (diff unavailable: {_scrub_plan_secret_text(str(error))})"
         return (
@@ -5571,7 +5629,7 @@ class LivePlanExecutor:
             isolate_structural = "0" * 64
         if isolate_structural != source["structural_sha256"]:
             raise LifecycleError(
-                self._structural_equality_failure_detail(workdir, target, dbname)
+                self._structural_equality_failure_detail(request, workdir, target, dbname)
             )
         before_public = isolate_baseline["public_relations"]
 
@@ -5719,6 +5777,9 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("--ca-file", required=True)
     plan.add_argument("--generation", required=False)
     plan.add_argument("--run-root", required=False)
+    # Argv-only (NOT an env seam, so production seam lockdown still rejects env seams):
+    # on an equality-proof failure, preserve the full source/isolate payloads + diff.
+    plan.add_argument("--keep-equality-diagnostics", action="store_true")
     supervisor = commands.add_parser("supervisor")
     supervisor.add_argument("operation", choices=OPERATIONS)
     supervisor.add_argument("--run-id", required=True)
