@@ -23,7 +23,8 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
-  - 'Snapshot coordinator RED->GREEN: b32ce5ed -> e92ec529. Drill-seam consumption: 0e2cae74 -> a8f355f2. §3 role bootstrap: dc0d9cc6 -> 6a0825fa. Persist seam: 28e75d8c -> 93f01595. Live orchestration: ee04d555 -> 2b6b16ad. Builder: a46c6173 -> 28ec3448.'
+  - 'Round-7 hardening RED->GREEN: 4e752470 -> c6ac3a8d (P2-1 seam lockdown, P2-2 handle write/read binding, P3 a-d). Snapshot coordinator: b32ce5ed -> e92ec529. Drill-seam consumption: 0e2cae74 -> a8f355f2. §3 role bootstrap: dc0d9cc6 -> 6a0825fa. Persist seam: 28e75d8c -> 93f01595. Live orchestration: ee04d555 -> 2b6b16ad. Builder: a46c6173 -> 28ec3448.'
+  - 'Round-7 real-PG17: 40 passed (all gated tests, drill positive still ends clean through the enhanced teardown + label sweep). No-docker suites: 79 passed | 7 skipped (adds 12 P2-1 seam-lockdown cases + 2 P2-2 handle-binding cases). tsc exit 0.'
   - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 26 passed clean (first try) — incl. the drill-consumption positive that binds source capture + pg_dump to one exported snapshot via the coordinator, and the malformed-snapshot negative that hard-stops before the drill is invoked.'
   - 'Unit + drill (no docker): q12-migration-plan.test.ts + supabase-restore-drill.test.ts = 65 passed | 7 skipped.'
   - 'Real-PG17 (MC2_Q12_REAL_PG17=1): 25 passed — capture, direct-mode end-to-end, drill-seam consumption (fake drill: correct drill argv + persist-handle env, restore_test dbname routing, migrate/capture through the handle, teardown of container/network/volume + handle + generation), malformed-handle fail-closed with zero leaked resource, plus equality-mismatch and teardown-override negatives.'
@@ -43,6 +44,21 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-7 is the final review-hardening pass (`4e752470` -> `c6ac3a8d`), 2 P2 + 4 P3:
+`assert_production_seam_lockdown` makes a production plan run (run*root under
+`/opt/megacampus/backups/q12`) reject any set `MC2_Q12_PLAN*_`test seam by name —
+which also pins`restore_mode=drill`and the pinned image, since those only diverge
+from the default when their seam is set — while`/tmp/mc2-q12-plan-_`run roots
+still allow seams for the CI suites (P2-1). A docker-free test drives the REAL`restore-supabase-drill.sh write*persist_handle`and asserts the REAL`\_read_handle`accepts its exact bytes and rejects a dropped field, pinning the write/read
+contract against mock drift (P2-2). The snapshot-coordinator readline gained a
+bounded`select()`timeout (P3a); teardown reclaims the synthetic capability file
+and the plan-created secrets dir (P3b) and does a second-pass docker sweep by both
+the plan and drill run labels so a malformed-handle-after-persist path cannot leak
+(P3d);`teardown()`is declared in the`PlanExecutor`Protocol (P3c). Ownership
+checks on`MC2_Q12_PLAN`binary overrides were intentionally skipped — subsumed by
+P2-1 rejecting those seams in production. The §3 helper's documented divergence from`generate-role-bootstrap.ts`(it drops`pg*\*`roles/edges via the capture projection
+rather than doing the TS`pg_participants`cross-check) is recorded in`q12-migration-plan-roles.py` with rationale.
 
 Round-6 fixed a real production-path defect and added snapshot coordination
 (`b32ce5ed` -> `e92ec529`): `_produce_source_manifest` called
