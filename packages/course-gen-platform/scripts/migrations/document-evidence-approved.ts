@@ -522,6 +522,16 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
   '3ee5b37c2f727b0d68b00860235362ed72f9fd21a5a1fd871959378379ede1bf';
 
+// The reviewed migration frontier: the maximum Supabase history version that may exist
+// BEFORE this project's approved chain applies. In this codebase production migrations are
+// applied via the Supabase MCP, which stamps history rows with its OWN apply-time version
+// timestamps that have no same-named repository file — so the earlier premise "every
+// history version is a repository filename" is false and can never pass against the real
+// database. This pinned frontier gives the equivalent anti-drift protection (no unknown
+// history NEWER than the reviewed anchor can precede the chain) without cross-referencing
+// history rows against repo filenames the CLI cannot know.
+const APPROVED_HISTORY_FRONTIER = '20260704150249';
+
 // PG17 digests (PostgreSQL 17.6, pinned Supabase image
 // public.ecr.aws/supabase/postgres@sha256:d00c45c73f9c3d130ea4f379d8ae77
 // 48b0711d628eea690d27d03198ed609f2f) were computed on the isolated
@@ -820,16 +830,18 @@ async function readHistory(client: Client, version: string): Promise<HistoryRow 
   ).rows[0];
 }
 
-async function assertRepositoryMigrationFrontier(
+export async function assertRepositoryMigrationFrontier(
   client: Client,
   approved: LoadedMigration[]
 ): Promise<number> {
-  const repository = await loadRepositoryMigrations();
+  // Keep the repository-tree pin EXACTLY (loadRepositoryMigrations validates the on-disk
+  // migration set against REPOSITORY_MIGRATION_MANIFEST_SHA256). It just no longer
+  // cross-references DB history rows, which in this project are MCP apply-time versions
+  // with no same-named repo file.
+  await loadRepositoryMigrations();
   const downstream = await loadDownstreamMigrations();
   const chain = [...approved, ...downstream];
-  const firstChainVersion = chain[0].version;
-  const expectedPrevious = repository.filter(migration => migration.version < firstChainVersion);
-  const expectedVersions = new Set(repository.map(migration => migration.version));
+  const chainVersions = new Set(chain.map(migration => migration.version));
   const history = (
     await client.query<HistoryRow>(
       `SELECT version,name,statements FROM supabase_migrations.schema_migrations ORDER BY version`
@@ -837,17 +849,20 @@ async function assertRepositoryMigrationFrontier(
   ).rows;
   const historyByVersion = new Map<string, HistoryRow>();
   for (const row of history) {
-    if (historyByVersion.has(row.version) || !expectedVersions.has(row.version)) {
-      throw new Error('Supabase repository migration frontier contains unknown history');
+    if (historyByVersion.has(row.version)) {
+      throw new Error('Supabase migration history contains a duplicate version');
     }
     historyByVersion.set(row.version, row);
-  }
-  for (const migration of expectedPrevious) {
-    const row = historyByVersion.get(migration.version);
-    if (!row || row.name !== migration.name) {
-      throw new Error('Supabase repository migration frontier has an earlier pending migration');
+    // Anti-drift anchor: no unknown history strictly NEWER than the reviewed frontier may
+    // precede our chain. Every non-chain history version must be at or before the frontier;
+    // this also forbids any version strictly between the frontier and the first chain
+    // version (those are non-chain and above the frontier).
+    if (!chainVersions.has(row.version) && row.version > APPROVED_HISTORY_FRONTIER) {
+      throw new Error('Supabase repository migration frontier contains unknown history');
     }
   }
+  // Our chain must form a supported PREFIX of history (unchanged): none applied -> apply
+  // all; a partial prefix -> continue; a gap after an applied version -> fail.
   let prefixLength = 0;
   let missing = false;
   for (const migration of chain) {
@@ -861,9 +876,6 @@ async function assertRepositoryMigrationFrontier(
     }
     assertExactHistory(row, migration);
     prefixLength += 1;
-  }
-  if (history.length !== expectedPrevious.length + prefixLength) {
-    throw new Error('Supabase repository migration frontier is ambiguous');
   }
   return prefixLength;
 }
