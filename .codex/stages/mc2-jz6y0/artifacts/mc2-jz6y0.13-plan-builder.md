@@ -23,6 +23,7 @@ cleanup_notes: >-
   docker filters show zero leftovers.
 risk_level: medium
 verification:
+  - 'Round-9 drill diagnostics + scheduled-mode RED->GREEN: 4e3fc6fb -> 87d2601c. Real-PG17 q12-migration-plan.test.ts: 46 passed — the end-to-end drill-seam test now proves the plan restores via the drill SCHEDULED mode; the fake drill mirrors the real drill Q12 activation cleanup (runs the real q12_guard.verify_capability() extracted from run-restore-cleanup.ts) in q12 mode and skips it in scheduled mode, reproducing the pre-C1 rehearsal failure (q12) and proving the fix (scheduled). No-docker adds a diagnostics case (_drill_failure_detail labeled stdout+stderr tails, secrets scrubbed, empty-stderr symptom). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED (persist-seam extension to scheduled mode is env-gated + default byte-identical). tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
   - 'Round-8 drill-generation preflight RED->GREEN: 0791805e -> 53b6fcce. Closes the whole generation preflight the server pre-C1 rehearsal fail-closed on (generation basename is invalid). Real-PG17 q12-migration-plan.test.ts: 45 passed — the end-to-end drill-seam test now drives production _produce_generation output through a fake drill that MIRRORS the real drill preflight (basename ERE + validate_generation Python block, both extracted verbatim from the drill bytes), sweeping the full set: generation-<UTCstamp>Z-<uuid> basename, 4-file layout, 0600 modes, checksums schema/generation/files/sha256/size, source-manifest schema. No-docker adds 5 round-8 cases (contract + item-4 run-dir cleanup). Drill suite supabase-restore-drill.test.ts: 46 passed UNMODIFIED. tsc exit 0. Frozen bytes aaec6fc2… / 134255ce… intact.'
   - 'Round-8 broad no-docker ops set (tests/unit/ops/): 876 passed | 59 skipped, 1 pre-existing failure in qdrant-observability-contract.test.ts (Q9 observability: .env.production.example lacks QDRANT_METRICS_GID) — outside the round-8 change surface (round-8 touched only q12-lifecycle-core.py + q12-migration-plan.test.ts + the plan runner fixture; the observability test and its ops/qdrant inputs are untouched).'
   - 'Round-7 hardening RED->GREEN: 4e752470 -> c6ac3a8d (P2-1 seam lockdown, P2-2 handle write/read binding, P3 a-d). Snapshot coordinator: b32ce5ed -> e92ec529. Drill-seam consumption: 0e2cae74 -> a8f355f2. §3 role bootstrap: dc0d9cc6 -> 6a0825fa. Persist seam: 28e75d8c -> 93f01595. Live orchestration: ee04d555 -> 2b6b16ad. Builder: a46c6173 -> 28ec3448.'
@@ -46,6 +47,57 @@ explicit_defers:
 ---
 
 # Summary
+
+Round-9 adds drill failure diagnostics and fixes the next mock-reality drift the pre-C1
+rehearsal exposed (`4e3fc6fb` -> `87d2601c`). Rehearsal #2 passed the generation preflight
+but died at the drill with an EMPTY detail (`isolated drill restore failed:` with nothing
+after it); teardown was again perfect, which also destroyed the evidence.
+
+- Diagnostics (primary): `_restore_via_drill` streams the drill's stdout AND stderr to
+  owner-only (0600) files under the plan workdir and, on failure, raises a LifecycleError
+  carrying the labeled last-60-line tail of BOTH streams with secret shapes scrubbed
+  (`_scrub_plan_secret_text`: libpq URIs, service/pgpass passwords, 64-hex secrets,
+  JWT/service-key shapes). The empty stderr was the symptom of a mid-drill step run
+  without a `|| fail` wrapper: `set -e` exits with the reason on stdout, which the old
+  code never captured. The tail now lands in the caller's log even though teardown
+  reclaims the files.
+- Root-cause fix (the concrete killer the sweep found): the plan restores a read-only
+  PRE-cutover source, which has no `q12_guard` schema, but the drill's Q12 activation
+  cleanup requires it — `run-restore-cleanup.ts` runs `q12_guard.verify_capability()` and
+  `generate_cleanup_sql` emits `DROP SCHEMA q12_guard CASCADE`. The fake drill skipped
+  that whole path, so CI never saw it. The plan now uses the drill's SCHEDULED mode (no
+  capability, no activation cleanup — the same restore/role-bootstrap/extension/catalog
+  compare), and the opt-in persist seam is extended to scheduled mode so the live isolate
+  is still handed back to capture and migrate. Q12 mode and the real cutover path are
+  untouched; the seam stays default byte-identical. `_prepare_capability` and the synthetic
+  capability are removed. RED reproduces it via a fake drill that mirrors the real Q12
+  activation cleanup (running the real `verify_capability()` extracted from the helper
+  bytes) in q12 mode and skips it in scheduled mode.
+
+Post-preflight sweep of the drill's Q12 path (each check vs the plan's scheduled-mode
+generation; verified against the drill + helper bytes):
+
+- generation basename / 4-file layout / 0600 modes / checksums schema+generation+sha256 /
+  source-manifest schema — satisfied (round-8, enforced end-to-end by the mirrored fake
+  drill).
+- capability file content/shape — no longer applicable: scheduled mode takes no capability
+  (`scheduled restore must not receive a Q12 capability`), and the capability CONTENT was
+  only consumed by `run-restore-cleanup.ts` in Q12 mode, which the plan no longer uses.
+- roles.sql / §3 role bootstrap (`generate-role-bootstrap.ts` + `verify-inventory`) — runs
+  identically in scheduled mode; the source-manifest roles are the real
+  `q12-source-manifest.ts` output. Satisfied on a faithful restore (server-validated).
+- `create_database_sql` (cutover_snapshot.database name==postgres, owner, encoding, locale,
+  acl, settings, role_settings) and `verify_extensions_and_toc` (cutover_snapshot.extensions
+  - pinned image defaults) — consumed from the real manifest; mode-independent. Server-validated.
+- archive TOC (`pg_restore --list`) + pgTLE offline scan + strict `pg_restore` restore — run
+  in both modes; the fake drill exercises its own `pg_restore` into restore_test, but the
+  pinned-image (17.6) `pg_restore` of the host `pg_dump` (17.x) archive is NOT CI-reproducible
+  (needs the pinned Supabase image). FLAGGED: a host `pg_dump` newer than the image
+  `pg_restore` could fail with an unsupported archive-format-version header exactly here; the
+  new diagnostics will name it if it is the next failure. This stays on the server-validated
+  boundary (decision B).
+- Q12 activation cleanup (`generate_cleanup_sql` + `run-restore-cleanup.ts`) — REMOVED from
+  the plan path by the scheduled-mode switch (the fix above).
 
 Round-8 closes the whole drill generation preflight (`0791805e` -> `53b6fcce`), after
 the server pre-C1 rehearsal fail-closed at the real drill with `generation basename is
