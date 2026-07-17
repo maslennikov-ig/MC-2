@@ -4549,6 +4549,15 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
         data = complete_object(catalog)
         immutable_publish(output_path, data, 0o400, [])
         emitted = True
+        observed_extras = evidence.get("observed_extra_identities", [])
+        if observed_extras:
+            # Name every tolerated delta-neutral extra in the run log for the record.
+            for extra in observed_extras:
+                print(
+                    f"q12 plan tolerated delta-neutral extra: "
+                    f"[{extra.get('section')}] {extra.get('identity')}",
+                    file=sys.stderr,
+                )
         result = {
             "schema_version": "megacampus.q12.plan-result/v1",
             "run_id": run_id,
@@ -4559,6 +4568,7 @@ def run_plan(arguments: argparse.Namespace, plan_executor: PlanExecutor) -> dict
                 "expected_post_migration_catalog_sha256"
             ],
             "baseline_structural_sha256": catalog["baseline_structural_sha256"],
+            "observed_extra_identities": observed_extras,
             "status": "planned",
         }
     finally:
@@ -4771,31 +4781,40 @@ def _index_by_identity(section: str, entries: list[Any]) -> dict[str, Any]:
     return indexed
 
 
-def _assert_restore_object_complete(source: dict[str, Any], isolate_pre: dict[str, Any]) -> None:
-    """Fail-closed proof that the restore is object-complete: every source object is
-    present in the isolate and no extra objects appear (identity-set equality per
-    section). Content divergence (deparse renormalization) is NOT checked here — that is
-    expected and handled by delta-composition."""
-    problems: list[str] = []
+def _check_restore_completeness(
+    source: dict[str, Any], isolate_pre: dict[str, Any]
+) -> list[dict[str, str]]:
+    """Restore completeness gate (our construction, not the frozen proof). MISSING source
+    objects are absolutely fatal (the restore lost something). EXTRA objects — identities
+    the isolate manufactured that the source lacks (e.g. the Supabase image's schema-
+    creation machinery synthesizes default ACLs on restore-created schemas that were
+    dropped in the cloud source) — are NOT fatal here: they are returned as candidate
+    tolerated extras. They are tolerated only if DELTA-NEUTRAL, which the additive-delta
+    check in _compose_predicted_payload enforces (an extra that changes or disappears
+    across checkpoints hard-stops there), and they are EXCLUDED from the composed live
+    payload (they are not in the live source). Content divergence on pre-existing entries
+    (deparse renormalization) is expected and not checked here."""
+    missing_problems: list[str] = []
+    extras: list[dict[str, str]] = []
     for section in sorted(set(source) | set(isolate_pre)):
         if section in ("schema_version", "database"):
             continue
         source_ids = {_compose_identity(entry) for entry in (source.get(section) or [])}
         isolate_ids = {_compose_identity(entry) for entry in (isolate_pre.get(section) or [])}
         missing = sorted(source_ids - isolate_ids)
-        extra = sorted(isolate_ids - source_ids)
-        if missing or extra:
-            detail = f"[{section}] missing {len(missing)} extra {len(extra)}"
+        if missing:
+            detail = f"[{section}] missing {len(missing)}"
             for identity in missing[:10]:
                 detail += f"\n  missing {_scrub_plan_secret_text(identity)}"
-            for identity in extra[:10]:
-                detail += f"\n  extra {_scrub_plan_secret_text(identity)}"
-            problems.append(detail)
-    if problems:
+            missing_problems.append(detail)
+        for identity in sorted(isolate_ids - source_ids):
+            extras.append({"section": section, "identity": _scrub_plan_secret_text(identity)})
+    if missing_problems:
         raise LifecycleError(
             "isolated restore is not object-complete against the read-only source catalog\n"
-            + "\n".join(problems)
+            + "\n".join(missing_problems)
         )
+    return extras
 
 
 def _compose_predicted_payload(
@@ -4834,11 +4853,21 @@ def _compose_predicted_payload(
                     f"[{section}] non-additive delta: migration modified a pre-existing entry: "
                     + ", ".join(_scrub_plan_secret_text(identity) for identity in modified[:10])
                 )
-            # Pre-existing (identity in source) → live SOURCE content; fresh → isolate content.
-            predicted[section] = [
-                source_by[identity] if (identity := _compose_identity(entry)) in source_by else entry
-                for entry in (check_value or [])
-            ]
+            # Classify every isolate-checkpoint entry:
+            #   in source            -> pre-existing: live SOURCE content;
+            #   not source, in pre   -> tolerated delta-neutral EXTRA (restore artifact
+            #                           absent from the live source): EXCLUDE it;
+            #   not source, not pre  -> FRESH (migration-added, present live): isolate content.
+            composed_section: list[Any] = []
+            for entry in check_value or []:
+                identity = _compose_identity(entry)
+                if identity in source_by:
+                    composed_section.append(source_by[identity])
+                elif identity in pre_by:
+                    continue
+                else:
+                    composed_section.append(entry)
+            predicted[section] = composed_section
         elif isinstance(source_value, dict):
             # Singleton pre-existing object (database): migrations must not modify it.
             if pre_value != check_value:
@@ -5823,12 +5852,12 @@ class LivePlanExecutor:
         )
         isolate_pre = self._read_structural_payload(container, dbname)
         if self.fault == "equality":
-            # Synthetic object-incompleteness: an isolate schema the source lacks.
-            isolate_pre.setdefault("schemas", []).append(
-                {"name": "mc2_synthetic_fault_schema", "owner": "postgres", "acl": []}
-            )
+            # Synthetic object-INCOMPLETENESS: drop a source object from the isolate view
+            # so a real source object is missing (missing is absolutely fatal).
+            if isolate_pre.get("schemas"):
+                isolate_pre["schemas"] = isolate_pre["schemas"][1:]
         try:
-            _assert_restore_object_complete(source_payload, isolate_pre)
+            observed_extras = _check_restore_completeness(source_payload, isolate_pre)
         except LifecycleError as error:
             raise LifecycleError(
                 self._structural_failure_detail(request, str(error), source_payload, isolate_pre)
@@ -5871,6 +5900,10 @@ class LivePlanExecutor:
                     ),
                 },
             },
+            # Delta-neutral extras tolerated by the completeness gate (restore artifacts
+            # absent from the source). Reported for the record; excluded from the catalog.
+            # assemble_expected_catalog ignores this key, so the catalog bytes are unchanged.
+            "observed_extra_identities": observed_extras,
         }
 
     def teardown(self) -> None:
