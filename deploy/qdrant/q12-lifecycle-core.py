@@ -5436,6 +5436,39 @@ class LivePlanExecutor:
                 f"{completed.stderr.decode('utf-8', 'replace').strip()}"
             )
 
+    def _lift_isolate_read_only(self, container: str, dbname: str) -> None:
+        """The drill leaves the restored DB with default_transaction_read_only=on (one of
+        its three documented overrides). Lift it so the migration phase can write. The
+        isolate is disposable and loopback-only, so this plan-owned mutation of its own
+        diagnostic target is safe, and it is NOT restored afterward: teardown destroys the
+        isolate, and the frozen structural settings hash EXCLUDES this GUC
+        (q12-structural-catalog.sql:69), so every checkpoint capture is unaffected. ALTER
+        DATABASE ... SET is itself a write, so the connection issuing it runs with read-only
+        off (PGOPTIONS), mirroring the drill's own restore actor."""
+        self._docker_run(
+            [
+                "exec", "-e", "PGOPTIONS=-c default_transaction_read_only=off", "-i", container,
+                "psql", "-X", "--no-psqlrc", "-U", "postgres", "-d", dbname, "-v", "ON_ERROR_STOP=1",
+                "-c", f'ALTER DATABASE "{dbname}" SET default_transaction_read_only TO off',
+            ],
+            check=True,
+        )
+        # Verify on a FRESH connection (no PGOPTIONS): the new database default must be off.
+        result = self._docker_run(
+            [
+                "exec", "-i", container, "psql", "-X", "--no-psqlrc", "-U", "postgres",
+                "-d", dbname, "-tAq", "-v", "ON_ERROR_STOP=1",
+                "-c", "SHOW default_transaction_read_only",
+            ],
+            check=True,
+        )
+        observed = result.stdout.decode("utf-8", "replace").strip()
+        if observed != "off":
+            raise LifecycleError(
+                f"isolate default_transaction_read_only is still {observed!r} after lift; "
+                "refusing to migrate"
+            )
+
     def _prepare_target(
         self, request: dict[str, Any], workdir: pathlib.Path, source: dict[str, Any], run_id: str
     ) -> dict[str, str]:
@@ -5862,6 +5895,10 @@ class LivePlanExecutor:
             raise LifecycleError(
                 self._structural_failure_detail(request, str(error), source_payload, isolate_pre)
             ) from None
+
+        if self.restore_mode == "drill":
+            # The drill left restore_test read-only; lift it before the migration phase.
+            self._lift_isolate_read_only(container, dbname)
 
         self._apply_migrations(target, "base")
         after_base = self._run_capture(container=container, dbname=dbname)

@@ -1220,6 +1220,9 @@ ${
 "$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c "DROP FUNCTION public.q12_missing_probe();" >/dev/null`
     : ''
 }
+# Mirror the real drill's write-blocking override: the restored DB is left read-only, so the
+# plan's migration phase must lift it (excluded from the frozen structural settings hash).
+"$d" exec -i "$c" psql -X -U postgres -d restore_test -v ON_ERROR_STOP=1 -c "ALTER DATABASE restore_test SET default_transaction_read_only TO on;" >/dev/null
 port=$("$d" port "$c" 5432/tcp | sed -n 's/.*:\\([0-9][0-9]*\\)$/\\1/p')
 /usr/bin/python3 -c 'import json,os,sys
 h={"schema_version":"megacampus.q12.restore-persist-handle/v1","run_id":sys.argv[1],"container":sys.argv[2],"network":sys.argv[3],"volume":sys.argv[4],"host":"127.0.0.1","port":int(sys.argv[5]),"database":"restore_test","user":"postgres","password":"fakedrillpw"}
