@@ -106,10 +106,14 @@ fake drill replicates it too.
   the whole consumption mechanics with a fake drill on vanilla PG17. This boundary
   is intentional and fail-closed (the pre-C1 run is read-only on the source), so a
   defect blocks the window rather than corrupting anything — see `explicit_defers`.
-- The gated real-PG17 suite is docker-timing sensitive; readiness now waits on the
-  image init-complete marker (the temp init server stops before it prints, so a
-  post-marker `pg_isready` reflects the final server), and it is skipped without
-  `MC2_Q12_REAL_PG17=1` so the default deterministic path is docker-free.
+- The gated real-PG17 suite's container-readiness race is fixed: EVERY `pg_isready`
+  wait in the file (the round-2 capture test at :387, both `beforeAll` sources at
+  :652/:1053, and the fake-drill script at :1123) is now marker-gated on
+  "PostgreSQL init process complete; ready for start up." — the temp init server
+  stops before that line prints, so a post-marker `pg_isready` reflects only the
+  final server and setup can never land in the restart window. Re-verified stable
+  across four consecutive `MC2_Q12_REAL_PG17=1` runs (25 passed each). The suite is
+  skipped without the flag, so the default path is deterministic and docker-free.
 - The drill persist seam (round 3) and the direct restore + §3 bootstrap (round 4)
   remain: the seam is the reuse point this stream consumes; the direct path stays as
   the CI seam and is not reachable in production.
