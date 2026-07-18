@@ -573,7 +573,44 @@ def run_joined_fixture(spec: dict) -> int:
     return 0
 
 
-LIVE_SPEC_KEYS = {"runRoot", "liveController", "runId", "production"}
+LIVE_SPEC_KEYS = {"runRoot", "liveController", "runId", "production", "quiesceManifestPath"}
+
+
+def quiesce_manifest_sha256_readonly(raw_path: Any) -> str:
+    """Safely digest an absolute owner-only 0400 quiesce manifest.
+
+    The parity proof shares ONE quiesce manifest between the composer and the
+    controller, so (unlike the joined fixture's own root-relative preimage) the
+    path can live outside the controller's run root. The controller itself reads
+    the same bytes read-only via validate_regular_file(mode=0o400); this only
+    computes the digest the controller's request must carry.
+    """
+    if not isinstance(raw_path, str) or not raw_path.startswith("/"):
+        raise RuntimeError("quiesce manifest path must be absolute")
+    if os.path.normpath(raw_path) != raw_path:
+        raise RuntimeError("quiesce manifest path must be normalized")
+    file_fd = os.open(raw_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        before = os.fstat(file_fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or stat.S_IMODE(before.st_mode) != 0o400
+            or before.st_uid != os.geteuid()
+            or before.st_gid != os.getegid()
+            or before.st_nlink != 1
+            or before.st_size <= 0
+            or before.st_size > 4 * 1024 * 1024
+        ):
+            raise RuntimeError("quiesce manifest identity/mode/link is unsafe")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(file_fd, 64 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        return digest.hexdigest()
+    finally:
+        os.close(file_fd)
 
 
 def run_live_fixture(spec: dict) -> int:
@@ -607,18 +644,26 @@ def run_live_fixture(spec: dict) -> int:
     if not expected_catalog.exists():
         expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
         expected_catalog.chmod(0o400)
+    quiesce_manifest_path = spec.get("quiesceManifestPath")
+    quiesce_manifest_sha256 = (
+        quiesce_manifest_sha256_readonly(quiesce_manifest_path)
+        if quiesce_manifest_path is not None
+        else "0" * 64
+    )
     request = {
         "run_root": str(root),
         "run_id": spec.get("runId") or derive_run_id(root),
         "release_sha": "0123456789abcdef0123456789abcdef01234567",
         "operator_digest": "1" * 64,
         "resource_manifest_sha256": "2" * 64,
-        "quiesce_manifest_sha256": "0" * 64,
+        "quiesce_manifest_sha256": quiesce_manifest_sha256,
         "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
         "rotation_required": False,
         "lease_fd": 9,
         "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
     }
+    if quiesce_manifest_path is not None:
+        request["quiesce_manifest_path"] = quiesce_manifest_path
     if spec.get("production") is True:
         request["production"] = True
     try:
@@ -641,6 +686,19 @@ def main() -> int:
             raise RuntimeError("run-id derivation accepts only runRoot")
         root = fixture_root(request["runRoot"])
         sys.stdout.write(json.dumps({"runId": derive_run_id(root)}) + "\n")
+        return 0
+    if len(sys.argv) > 1 and sys.argv[1] == "--validate-walk":
+        if len(sys.argv) != 2:
+            raise RuntimeError("invalid validate-walk arguments")
+        payload = json.load(sys.stdin)
+        if set(payload) != {"journal", "request"}:
+            raise RuntimeError("validate-walk accepts only journal and request")
+        try:
+            CORE.validate_stable_binding_walk(payload["journal"], payload["request"])
+        except CORE.LifecycleError as error:
+            print(str(error), file=sys.stderr)
+            return 2
+        sys.stdout.write("ok\n")
         return 0
     if len(sys.argv) > 1 and sys.argv[1] == "--claim-noio":
         claim_arguments = sys.argv[2:]

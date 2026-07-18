@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -8,6 +8,8 @@ import {
   deriveRootRetainedBarrierFixtureRunId,
   materializeJoinedRetainedBarrierFixture,
   materializeLiveController,
+  sha,
+  validateStableBindingWalk,
 } from './fixtures/q12-retained-barrier-contract.js';
 
 // Task-9 live cutover controller (run_live), amendment §10 / design
@@ -82,44 +84,165 @@ function writeQuiesceManifest(runRoot: string, runId: string): string {
   return path;
 }
 
-describe('Q12 live cutover controller (Task-9) — R1 genesis + production seam', () => {
-  it('journals the group-1 operator.self-check genesis byte-identical to the closed composer', async () => {
+// The blessed parity exclusion set (design §6a ruling 4; plan "R3 constraint 2026-07-18").
+// The checkpoint binds the physical journal file's device+inode (checkpoint_bytes
+// journal_device/journal_inode, anti-tamper), so capability_manifest_sha256 / entry_hash /
+// previous_hash are inherently per-run-root. resource_manifest_sha256 joins them VALUE-only:
+// the controller carries the digest of a REAL checkpoint-bound resource-manifest artifact,
+// which cannot equal the composer's fixture step derivation on any row that carries one
+// (genesis segment + the two stepped segments = every row). Its VALUE is excluded; its
+// step TOPOLOGY is asserted separately and must match exactly.
+const BLESSED_EXCLUSIONS = [
+  'capability_manifest_sha256',
+  'entry_hash',
+  'previous_hash',
+  'resource_manifest_sha256',
+] as const;
+
+function withoutBlessedExclusions(row: Record<string, unknown>): Record<string, unknown> {
+  const rest = { ...row };
+  for (const key of BLESSED_EXCLUSIONS) delete rest[key];
+  return rest;
+}
+
+function resourceAt(rows: readonly Record<string, unknown>[], index: number): string {
+  return String(rows[index].resource_manifest_sha256);
+}
+
+function witnessIndex(
+  rows: readonly Record<string, unknown>[],
+  commandId: string,
+  outcome: string
+): number {
+  const index = rows.findIndex(r => r.command_id === commandId && r.outcome === outcome);
+  if (index < 0) throw new Error(`missing witness ${commandId}/${outcome}`);
+  return index;
+}
+
+describe('Q12 live cutover controller (Task-9) — R3 resource-manifest 2-step binding', () => {
+  it('journals the full forward window as a byte-parity twin of the composer with a real 2-step resource binding', async () => {
     const composerRoot = root();
     const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    // The parity proof feeds the SAME quiesce manifest path to both drivers so every
+    // <quiesce-manifest> substitution (and each command_sha256 that carries it) is identical.
     const quiescePath = writeQuiesceManifest(composerRoot, runId);
     const composer = await materializeJoinedRetainedBarrierFixture({
       runRoot: composerRoot,
       joinedProfile: 'forward',
       quiesceManifestPath: quiescePath,
     });
+    const live = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
 
-    // The live controller runs on its own fresh root, pinned to the composer's run id so the
-    // rows (which carry run_id but no run-root path) are directly comparable.
-    const live = await materializeLiveController({ runRoot: root(), runId });
-
-    expect(live.journalEntries.length).toBe(4);
-    expect(live.journalEntries.map(r => [r.phase, r.outcome, r.command_id])).toEqual([
-      ['preflight', 'intent', 'operator.self-check'],
-      ['preflight', 'capability_issued', 'operator.self-check'],
-      ['preflight', 'capability_claimed', 'operator.self-check'],
-      ['preflight', 'completed', 'operator.self-check'],
-    ]);
-    // §10 parity: every root-INDEPENDENT field (command bindings, phases, outcomes, run/
-    // release/operator/resource/quiesce bindings, accepted-object, epoch, seq) equals the
-    // composer's first four rows. The checkpoint binds the physical journal file's
-    // device+inode (checkpoint_bytes journal_device/journal_inode, anti-tamper), so the
-    // three fields that transitively carry it — capability_manifest_sha256, entry_hash,
-    // previous_hash — are inherently per-run-root and are excluded from cross-root parity.
-    const rootIndependent = (row: Record<string, unknown>) => {
-      const { capability_manifest_sha256, entry_hash, previous_hash, ...rest } = row;
-      void capability_manifest_sha256;
-      void entry_hash;
-      void previous_hash;
-      return rest;
-    };
-    expect(live.journalEntries.map(rootIndependent)).toEqual(
-      composer.journalEntries.slice(0, 4).map(rootIndependent)
+    // Full-forward twin: same row count and same rows on every shared binding. seq is NOT
+    // excluded (the exclusion set is blessed and closed), so the controller must reproduce
+    // the composer's exact interleave of ordinary lifecycles and in-process barrier chains.
+    expect(live.journalEntries.length).toBe(composer.journalEntries.length);
+    expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
+      composer.journalEntries.map(withoutBlessedExclusions)
     );
+
+    // --- Resource step TOPOLOGY (asserted despite the value exclusion) ---
+    const backupIntent = witnessIndex(live.journalEntries, 'pg.backup', 'intent');
+    const prepareCompleted = witnessIndex(live.journalEntries, 'deploy.prepare', 'completed');
+    const genesisDigest = resourceAt(live.journalEntries, 0);
+    const snapshotDigest = resourceAt(live.journalEntries, backupIntent);
+    const targetsDigest = resourceAt(live.journalEntries, live.journalEntries.length - 1);
+
+    // three distinct real-artifact digests, none equal to the composer's fixture derivations
+    expect(new Set([genesisDigest, snapshotDigest, targetsDigest]).size).toBe(3);
+    expect(genesisDigest).not.toBe(resourceAt(composer.journalEntries, 0));
+    expect(snapshotDigest).not.toBe(resourceAt(composer.journalEntries, backupIntent));
+    expect(targetsDigest).not.toBe(
+      resourceAt(composer.journalEntries, composer.journalEntries.length - 1)
+    );
+
+    // the field changes EXACTLY at the two witnesses and is carried unchanged elsewhere
+    live.journalEntries.forEach((row, index) => {
+      const value = String(row.resource_manifest_sha256);
+      if (index === 0) {
+        expect(value).toBe(genesisDigest);
+      } else if (index === backupIntent) {
+        expect(value).toBe(snapshotDigest);
+        expect(value).not.toBe(resourceAt(live.journalEntries, index - 1));
+      } else if (index === prepareCompleted) {
+        expect(value).toBe(targetsDigest);
+        expect(value).not.toBe(resourceAt(live.journalEntries, index - 1));
+      } else {
+        // every non-witness row equals its predecessor (no off-witness step)
+        expect(value).toBe(resourceAt(live.journalEntries, index - 1));
+      }
+    });
+    // first/last request-global pins (validate_stable_binding_walk :357-368)
+    expect(resourceAt(live.journalEntries, 0)).toBe(genesisDigest);
+    expect(resourceAt(live.journalEntries, live.journalEntries.length - 1)).toBe(targetsDigest);
+
+    // --- P3-2: each in-process barrier invocation carries the then-current stepped value ---
+    const segmentOf = (commandId: string) => {
+      const rows = live.journalEntries.filter(r => r.command_id === commandId);
+      expect(rows.length).toBeGreaterThan(0);
+      return new Set(rows.map(r => String(r.resource_manifest_sha256)));
+    };
+    expect(segmentOf('barrier.install')).toEqual(new Set([genesisDigest]));
+    expect(segmentOf('barrier.verify-after-base')).toEqual(new Set([snapshotDigest]));
+    expect(segmentOf('barrier.verify-after-observability')).toEqual(new Set([snapshotDigest]));
+    expect(segmentOf('barrier.activate')).toEqual(new Set([targetsDigest]));
+
+    // --- the three artifacts are real, fsynced, 0400, and their digests ARE the row values ---
+    for (const [stage, digest] of [
+      ['genesis', genesisDigest],
+      ['snapshot', snapshotDigest],
+      ['targets', targetsDigest],
+    ] as const) {
+      const path = live.resourceManifestPaths[stage];
+      expect(path, `resource manifest ${stage} path`).toBeTruthy();
+      const bytes = readFileSync(path);
+      expect(sha(bytes)).toBe(digest);
+      expect(statSync(path).mode & 0o777).toBe(0o400);
+    }
+  });
+
+  it('rejects an off-witness resource step through the real validate_stable_binding_walk', async () => {
+    const composerRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    const quiescePath = writeQuiesceManifest(composerRoot, runId);
+    const live = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+
+    const head = live.journalEntries[0];
+    const tail = live.journalEntries[live.journalEntries.length - 1];
+    const request = {
+      run_id: runId,
+      release_sha: head.release_sha,
+      operator_digest: head.operator_digest,
+      rotation_required: head.rotation_required,
+      quiesce_manifest_sha256: tail.quiesce_manifest_sha256,
+      resource_manifest_sha256: head.resource_manifest_sha256,
+    };
+
+    // positive control: the real controller journal passes the production walk unchanged
+    expect(await validateStableBindingWalk(live.journalEntries, request)).toEqual({
+      ok: true,
+      error: '',
+    });
+
+    // mutate a NON-witness mid-segment row so the resource value steps off a witness
+    const offWitness = live.journalEntries.findIndex(
+      r => r.command_id === 'migration.base.apply' && r.outcome === 'completed'
+    );
+    expect(offWitness).toBeGreaterThan(0);
+    const mutated = live.journalEntries.map((r, i) =>
+      i === offWitness ? { ...r, resource_manifest_sha256: 'c'.repeat(64) } : { ...r }
+    );
+    const rejected = await validateStableBindingWalk(mutated, request);
+    expect(rejected.ok).toBe(false);
+    expect(rejected.error).toMatch(/resource_manifest_sha256/u);
   });
 
   it('fails closed when a production request targets a non-production run root', async () => {

@@ -552,17 +552,26 @@ export interface LiveControllerFixtureSpec {
   runId?: string;
   /** exercise the production run-root coupling gate (Engine.__post_init__) */
   production?: boolean;
+  /**
+   * The W-owned quiesce manifest bytes the forward window consumes. The parity
+   * proof feeds the SAME path to the composer and the controller so the
+   * <quiesce-manifest> substitution (and every command_sha256 that carries it)
+   * is identical across the two journals; the controller reads it read-only.
+   */
+  quiesceManifestPath?: string;
 }
 
 /**
  * Drive the Task-9 live cutover controller (run_live) on a fixture root and
- * return the journal it produced. The controller reuses the same Engine and
+ * return the journal it produced plus the checkpoint-bound resource-manifest
+ * artifacts it fsynced (OQ4). The controller reuses the same Engine and
  * serializer primitives as the closed composer, so its rows can be compared
- * byte-for-byte against materializeJoinedRetainedBarrierFixture's.
+ * against materializeJoinedRetainedBarrierFixture's on every shared binding.
  */
-export async function materializeLiveController(
-  spec: LiveControllerFixtureSpec
-): Promise<{ journalEntries: Record<string, unknown>[] }> {
+export async function materializeLiveController(spec: LiveControllerFixtureSpec): Promise<{
+  journalEntries: Record<string, unknown>[];
+  resourceManifestPaths: Record<string, string>;
+}> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
     input: JSON.stringify({ liveController: true, ...spec }),
@@ -573,6 +582,32 @@ export async function materializeLiveController(
   if (child.status !== 0) {
     throw new Error(`live controller runner failed (${child.status}): ${child.stderr.trim()}`);
   }
-  const output = JSON.parse(child.stdout) as { journalEntries: Record<string, unknown>[] };
-  return { journalEntries: output.journalEntries };
+  const output = JSON.parse(child.stdout) as {
+    journalEntries: Record<string, unknown>[];
+    resourceManifestPaths?: Record<string, string>;
+  };
+  return {
+    journalEntries: output.journalEntries,
+    resourceManifestPaths: output.resourceManifestPaths ?? {},
+  };
+}
+
+/**
+ * Invoke the REAL production validate_stable_binding_walk against an in-memory
+ * journal + request so a negative can prove an off-witness resource step is
+ * rejected without having to re-chain entry hashes on disk.
+ */
+export async function validateStableBindingWalk(
+  journal: readonly Record<string, unknown>[],
+  request: Record<string, unknown>
+): Promise<{ ok: boolean; error: string }> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER, '--validate-walk'], {
+    input: JSON.stringify({ journal, request }),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status === 0) return { ok: true, error: '' };
+  return { ok: false, error: child.stderr.trim() };
 }
