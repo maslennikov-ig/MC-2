@@ -3543,9 +3543,24 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             resource_manifest_paths, marker_path, ordinary, d5,
             include_fwm=False,
         )
+    # RULING 2 option (a) requirement 1: a barrier head is resumed idempotently by the STANDALONE
+    # supervisor for that operation (resume_retained_chain), which recover deliberately leaves
+    # byte-untouched as the manual/recovery entrypoint. Point the operator at that exact command so
+    # the next step comes from the error text, not archaeology; recover then continues from the
+    # resulting supported head. (Whether that composition holds end-to-end is proven at R8's
+    # execution smoke + the server custody rehearsal, per the design §5.5 procedure.)
+    head_command = head["command_id"]
+    next_step = ""
+    if head_command.startswith("barrier."):
+        operation = head_command[len("barrier.") :]
+        if operation in OPERATIONS:
+            next_step = (
+                f"; re-run the standalone supervisor 'q12-live-cutover.sh {operation}' to resume "
+                "this barrier, then run recover"
+            )
     raise LifecycleError(
         "recover does not support resuming from "
-        f"phase={head['phase']} outcome={head['outcome']} command={head['command_id']}"
+        f"phase={head['phase']} outcome={head['outcome']} command={head_command}{next_step}"
     )
 
 
