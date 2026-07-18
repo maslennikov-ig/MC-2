@@ -411,8 +411,66 @@ cron activity` (nothing transitioned). This is unavoidable without a frozen-byte
   barrier defect, not by any harness gap, and fixing it requires an explicitly authorized,
   separate round that touches the frozen barrier script.
 
+- **Frozen-barrier-fix round done (real barrier.install reaches `maintenance_guarded`
+  end-to-end).** The explicitly authorized round that edits `q12-database-barrier.sh` (the
+  frozen-byte constraint lifted for this stream only; cascade to the frozen-trio contract and
+  W-tuple field 4 is a separate, tracked follow-up, not executed here). Two rounds landed on
+  this branch: the ACL array-type fix (`c4c05d762`, `typcategory <> 'A'` at the four owner-only
+  scan/loop sites) and this round's catalog-fd-consumption + PG-dialect fixes. RED
+  (`test(q12): RED frozen-barrier-fix round`) extended the R4 Sub-round C harness (jobname
+  gap in the synthetic `cron.job` fixture — real Supabase `pg_cron` has a nullable `jobname`
+  column the barrier's install Node runner requires; the fixture's table lacked it) and
+  rewrote the acceptance to this round's actual mandate (barrier reaches `maintenance_guarded`
+  with an exact receipt + q12_guard install-surface proof, not the full R4
+  validateTransition chain, since `q12-source-manifest.ts` stays frozen/out of scope and has
+  its own known, separate, pre-existing 5-vs-10 q12_guard-function-set drift against the
+  barrier). GREEN (`fix(q12): barrier catalog-fd double-consumption + PG-dialect
+precedence/scalar fixes`) fixed: (1) the catalog-fd double consumption at
+  `q12-database-barrier.sh:361` — `expected_json="$(cat <&"$catalog_fd")"` consumed the shared
+  fd-13 open-file-description to EOF, so the install Node runner's later by-number
+  `fs.readFileSync(Number(catalogFd))` read landed at EOF and returned an empty string,
+  breaking the very first `current_setting('megacampus.q12_expected_catalog')::jsonb` cast in
+  tx1 with "invalid input syntax for type json" — fixed by reading via `/proc/self/fd/13`
+  (a fresh, independent file description) instead, matching the pattern already used at the
+  barrier's six other catalog reads; (2) an operator-precedence bug in
+  `verify_install_resume_state()`/the prepare-recovery readiness check (two sites): Postgres's
+  additive `-` binds tighter than `->`, so `saved->'database_settings' - 'setconfig'` parsed
+  as `saved -> ('database_settings' - 'setconfig')`, an ambiguous "unknown - unknown" operator
+  error between two untyped literals — fixed with explicit parens; (3) a missing scalar guard
+  in the same two expressions — `saved->'database_settings'` is the jsonb scalar `null` on a
+  database's very first install (no `pg_db_role_setting` row yet), and jsonb `-` refuses
+  scalars ("cannot delete from scalar") — fixed with a `jsonb_typeof(...)='object'` guard
+  mirroring the pattern already used three times in the same function. All three were latent
+  (never exercised until the ACL bug, then the fd bug, stopped masking them in turn) and are
+  execution-enabling, behavior-preserving PG-dialect/plumbing corrections — no validation
+  semantics, guard/type/count set, receipt shape, identity pin, or ACL policy changed. Verified
+  end-to-end on the real-PG17 harness: barrier rc==0; receipt
+  `{state:"maintenance_guarded", last_command:"install", rollback_probes_verified:false,
+probe_receipt_sha256:null}`; q12_guard schema present with its 4 tables + 10 functions +
+  1 event trigger; cron 0/8 active; `default_transaction_read_only`==on. The three original RED
+  modes (ACL loop abort, ACL residual `_active_run|0|USAGE`, fd-consumption empty-catalog JSON
+  error) were independently re-verified against isolated SQL/fd repros before the fixes landed.
+  No-docker suite 303/303; `tsc --noEmit` 0; `q12-command-manifest.json` `aaec6fc2…` and
+  `q12-structural-catalog.sql` `0b8a943f…` unchanged; zero leftover docker. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-barrier-pg17-acl-fix.md`. **Cascade
+  (not executed here, orchestrator's next step):** the final barrier sha256 replaces
+  `134255ce…` in the frozen-trio contract; the W-tuple field-4 `activation_barrier_sha256`
+  needs a Layer-1 amendment and fields 5-9 need a repro-tool re-run; a byte-verified server
+  reinstall is the team-lead's pre-window step. R4's full validateTransition chain (the
+  `q12-source-manifest.ts` function-set drift) remains open and untouched by this round.
+
 ## Open risks carried forward
 
+- **`q12-source-manifest.ts` q12_guard function-set drift (found this round, untouched).** The
+  tool's `validateExactGuardDelta` hardcodes a 5-function `q12_guard` allowlist
+  (`assert_capability, enforce_write_barrier, extend_guard, verify_capability,
+verify_expected_guards`); the real, current barrier installs 10 (adds
+  `assert_controller_binding, enforce_ddl_barrier, quiesce_client_backends,
+verify_activated_state, verify_install_resume_state`). This is why the real-PG17 harness's
+  diagnostic `capture` step still fails ("unexpected baseline-to-cutover delta: q12_guard
+  function set") even after the barrier reaches `maintenance_guarded`. `q12-source-manifest.ts`
+  is frozen/out of scope for the barrier-fix round; reconciling the allowlist is a separate,
+  explicitly-scoped future round (full R4 validateTransition closure).
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
   onward re-sequences (quiesce after `prepare-recovery`) and the D5J §5 chronology must be
   re-frozen first — a larger design-amendment stop. R1 and the parity harness are ruling
