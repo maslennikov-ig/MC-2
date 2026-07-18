@@ -238,6 +238,33 @@ active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; c
     structural query). Note: `q12-source-manifest.ts` is NOT frozen-sha-pinned, but the producer
     must not modify it — it invokes it.
 
+- **R3 done** (RED `4fdef6e8` → GREEN `2cd88fc3`). `run_live` now journals amendment §5
+  groups 1–13 (through `deploy.prepare`/completed = the design §6a ruling-1 **C7 planned-exit
+  checkpoint**) as a byte/order twin of `run_joined_composer`'s forward prefix, and owns the
+  OQ4 resource-manifest authority. New module-level `write_live_resource_manifest` fsyncs a
+  real checkpoint-bound resource-manifest artifact (0400) at three stages — genesis
+  (empty-accepted), snapshot (records `<exported-id>`), targets (five identities) — and
+  `run_live` steps `current_resource_manifest_sha256` to each digest EXACTLY at the two
+  witnesses (snapshot set before `pg.backup`/intent; targets via
+  `resource_step_before_completion` at `deploy.prepare`/completed). `request["resource_manifest_sha256"]`
+  is set to the genesis digest so the walk's first/last pin holds against a real
+  controller-owned artifact. Parity uses ONLY the blessed exclusion set
+  (`capability_manifest_sha256`/`entry_hash`/`previous_hash` + `resource_manifest_sha256`
+  value-only); `seq` is not excluded, so the twin reproduces the composer's exact
+  ordinary+in-process-barrier interleave. The test also asserts the step topology, the P3-2
+  per-barrier segment values (install→genesis, verify-after-base/-observability→snapshot,
+  prepare-recovery→snapshot), artifact recomputability, and an off-witness-step negative
+  through the REAL `validate_stable_binding_walk` (new `--validate-walk` fixture seam). Both
+  drivers are fed the SAME quiesce-manifest path so every `<quiesce-manifest>`-bearing
+  `command_sha256` matches. Suites: 453 green (live-controller 3, shared-fixture composer/
+  seam suites 301, source-recovery-runtime 149); tsc 0; frozen bytes unchanged; no W-file
+  changed. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-live-controller.md`.
+  - **C7-boundary ruling (flagged to orchestrator):** R3 stops at group 13 rather than
+    running to `activate` because the group-14 FWM `accepted_object_sha256` is inherently
+    per-run-root (embeds `input_checkpoint_sha256` + the intent-row `entry_hash`), which would
+    require a **5th, un-blessed** parity exclusion. Stopping at the sanctioned C7 exit keeps
+    parity inside the blessed 4-field set; the FWM row + its exclusion decision move to R5.
+
 - **R3 constraint (blessed 2026-07-18).** `resource_manifest_sha256` joins the pinned parity
   exclusion set VALUE-only, enumerated explicitly beside `capability_manifest_sha256` /
   `entry_hash` / `previous_hash`, only on rows carrying a real artifact digest (initial + the

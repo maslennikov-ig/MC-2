@@ -3066,17 +3066,60 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
     return output
 
 
+def write_live_resource_manifest(
+    engine: "Engine",
+    stage: str,
+    *,
+    snapshot: str | None = None,
+    targets: tuple[str, ...] = (),
+) -> str:
+    """Design OQ4: fsync a checkpoint-bound resource-manifest artifact and return its digest.
+
+    The genesis stage is the documented empty-accepted manifest (no checkpoint exists before
+    the first row); the snapshot/targets stages bind the current durable checkpoint. The
+    digest becomes ``current_resource_manifest_sha256`` for its segment, so the value carried
+    in the journal is a real fsynced artifact digest sourced from run inputs (never a fresh
+    live lookup), exactly as amendment section 3 requires.
+    """
+    checkpoint_sha256 = (
+        sha256(engine.checkpoint_path.read_bytes())
+        if engine.checkpoint_path.exists()
+        else None
+    )
+    manifest_object = {
+        "schema_version": "megacampus.q12.resource-manifest/v1",
+        "run_id": engine.request["run_id"],
+        "stage": stage,
+        "checkpoint_sha256": checkpoint_sha256,
+        "snapshot": snapshot,
+        "targets": list(targets),
+    }
+    body = complete_object(manifest_object)
+    path = engine.run_root / f"resource-manifest-{stage}-{engine.request['run_id']}.json"
+    immutable_publish(path, body, 0o400, engine.trace)
+    return sha256(body)
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
     Drives the real forward window through the SAME Engine and serializer/capability/
     object/checkpoint primitives (amendment sections 7.6 and 10 parity duty; design
-    docs/superpowers/specs/2026-07-17-q12-live-controller-design.md). It journals the
-    ordinary command lifecycles with real run-input substitution values while the barrier
-    operations run as their own supervisor invocations against the same journal; the closed
-    composer remains the byte/order-parity oracle and this controller may not fork a second
-    authority. This revision journals amendment section 5 group 1 (the operator.self-check
-    genesis); later rounds extend the sequence.
+    docs/superpowers/specs/2026-07-17-q12-live-controller-design.md). Every ordinary
+    lifecycle and every in-process barrier chain is emitted through the shared primitives in
+    the amendment section 5 forward chronology, so the produced journal is a byte/order twin
+    of run_joined_composer's forward journal on every shared binding — the closed composer
+    remains the parity oracle and this controller forks no second authority.
+
+    R3 (this revision) journals the forward window through amendment section 5 group 13
+    (``deploy.prepare``/completed) — the design section 6a ruling-1 C7 planned-exit
+    checkpoint (a stopAfter-style stop) — and owns the OQ4 resource-manifest authority: it
+    fsyncs a real checkpoint-bound resource-manifest artifact and steps
+    ``current_resource_manifest_sha256`` to its digest EXACTLY at the two witnesses
+    (``pg.backup``/intent and ``deploy.prepare``/completed), replacing the composer's closed
+    fixture step derivations. Substitution values still come from the seeded fixture
+    derivations so every ``command_sha256`` matches the oracle; real child execution, the
+    final-writer manifest, ``deploy.commit`` and ``activate`` arrive in later rounds.
 
     The production run-root coupling is enforced by Engine.__post_init__ (production=True ->
     /opt/megacampus/backups/q12/<run-id>; otherwise the /tmp fixture shape), so a production
@@ -3086,15 +3129,82 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     engine = Engine(request, executor)
     if engine.journal:
         raise LifecycleError("live composition requires a fresh run root")
-    # Amendment section 4 item 8: every row through quiesced/capability_completed binds 64
-    # zeroes for quiesce_manifest_sha256; the genesis precedes writers.quiesce, so bind ZERO.
+    quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
+    require_lexical_absolute(quiesce_path)
+    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+        raise LifecycleError("live quiesce manifest digest mismatch")
+    values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
+    run_id = str(uuid.UUID(request["run_id"]))
+    chains = request.get("chains") or {}
+
+    def d5(operation: str) -> None:
+        command = resolved_command(manifest, COMMANDS[operation], request)
+        chain = chains.get(operation) or default_joined_chain(operation)
+        engine.retained_chain(operation, chain, command, from_current_head=True)
+
+    def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
+        return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
+
+    # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
+    # digest is the request-global initial value, so the stable-binding walk's first/last pin
+    # holds against a real controller-owned artifact (never the operator-supplied constant of
+    # the 5-invocation window).
     engine.current_quiesce_manifest_sha256 = ZERO
-    # The genesis operator.self-check argv carries no extended placeholders, so its command
-    # binding comes only from the already-hashed run input (run-id / catalog-sha / release-sha);
-    # no resource-manifest-sourced value is consumed yet.
-    engine.append_ordinary_lifecycle(manifest, "operator.self-check", {})
+    resource_manifest_paths = {
+        stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
+        for stage in ("genesis", "snapshot", "targets")
+    }
+    genesis_digest = write_live_resource_manifest(engine, "genesis")
+    request["resource_manifest_sha256"] = genesis_digest
+    engine.current_resource_manifest_sha256 = genesis_digest
+
+    exported_id = values["<exported-id>"]
+    # OQ4 targets identities: the five captured target identities are real deploy.prepare
+    # evidence in production; seeded here (excluded VALUE-only from parity) so the artifact is
+    # recomputable and the step topology is provable.
+    target_identities = tuple(
+        sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
+    )
+
+    # Section 5 forward chronology groups 1-13, mirroring run_joined_composer's forward path
+    # up to the C7 planned-exit checkpoint (deploy.prepare/completed).
+    ordinary("operator.self-check")
+    d5("install")
+    ordinary("writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"])
+
+    # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
+    # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
+    snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
+    engine.current_resource_manifest_sha256 = snapshot_digest
+    ordinary("pg.backup")
+    ordinary("pg.restore")
+    ordinary("migration.base.apply")
+    d5("verify-after-base")
+    ordinary("migration.observability.apply")
+    d5("verify-after-observability")
+    engine.append_controller_milestone(
+        manifest, "migrations_applied", "migration.observability.apply", values
+    )
+    d5("prepare-recovery")
+    ordinary("source.forward")
+    ordinary("reindex.plan")
+    ordinary("reindex.worker.create")
+    ordinary("reindex.execute")
+    ordinary("reindex.verify")
+
+    # OQ4 step 2: record the five captured target identities and step the hash AT
+    # deploy.prepare/completed via resource_step_before_completion (composer parity:
+    # targets_step). This is the last row before the C7 planned exit.
+    targets_digest = write_live_resource_manifest(
+        engine, "targets", snapshot=exported_id, targets=target_identities
+    )
+    ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
+
     engine.reload_durable()
-    return engine.output()
+    output = engine.output()
+    output["resourceManifestPaths"] = resource_manifest_paths
+    return output
 
 
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
