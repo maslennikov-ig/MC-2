@@ -3135,6 +3135,119 @@ def write_quiesce_window_marker(engine: "Engine") -> str:
     return str(path)
 
 
+# R8 Sub-round D (RATIFIED 2026-07-18) — the durable POST-ACTIVATE RESUME WITNESS. Post-activate is
+# receipt-only (it adds NO journal row; the 76-row journal stays a byte/order twin of the composer),
+# so an interrupted post-activate leaves no journal trace to resume from. The witness is a receipt-
+# only side file (NOT a journal row, parity-neutral by construction: born AFTER the journal's last
+# row) that records that the forward writer resume genuinely completed. recover at the activate head
+# dispatches on its PRESENCE (marker-consistent tamper discipline; see recover_post_activate).
+POST_ACTIVATE_RESUME_RECEIPT_NAME = "post-activate-resume-receipt.json"
+POST_ACTIVATE_RESUME_RECEIPT_SCHEMA = "megacampus.q12.post-activate-resume-receipt/v1"
+# The v2 guard_cleanup_complete database-barrier receipt file the cleanup child publishes and the
+# resume child validates (the digest the witness pins). Owned here so recover can re-validate the
+# witness's cleanup_receipt_sha256 against the on-disk receipt without a fixture-side filename.
+DATABASE_BARRIER_RECEIPT_NAME = "database-barrier-receipt.json"
+
+
+def write_post_activate_resume_receipt(
+    run_root: "str | os.PathLike[str]",
+    run_id: str,
+    cleanup_receipt_sha256: str,
+    outcome: str,
+) -> str:
+    """R8 Sub-round D — the ONE shared writer for the durable post-activate resume witness.
+
+    The resume path writes the witness THROUGH this function, ONLY AFTER resume genuinely completes.
+    It carries the EXACT minimal 4-key schema ``{schema_version, run_id, cleanup_receipt_sha256,
+    outcome}`` (``cleanup_receipt_sha256`` = hex64 of the v2 ``guard_cleanup_complete`` receipt the
+    resume child validated), published ATOMICALLY (temp+rename) at 0400 via the SAME
+    ``immutable_publish`` discipline as the cutover-window marker. It is never a journal row.
+
+    FIXTURE-FIRST (R8-A blocked): the fixture resume hook imports CORE and calls this same function,
+    so the atomic-write + 0400 discipline is exercised in fixture tests. Wiring the REAL production
+    resume child (``sudo source-recovery-run.sh writers.resume.forward``) to this same function is
+    round R8-A, currently hard-stopped on a separate contradiction — see the R8-D artifact defer.
+    """
+    if not isinstance(cleanup_receipt_sha256, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", cleanup_receipt_sha256
+    ):
+        raise LifecycleError(
+            "post-activate resume witness requires a sha256 cleanup receipt digest"
+        )
+    if not isinstance(outcome, str) or not outcome:
+        raise LifecycleError("post-activate resume witness requires a non-empty outcome")
+    witness = {
+        "schema_version": POST_ACTIVATE_RESUME_RECEIPT_SCHEMA,
+        "run_id": str(uuid.UUID(run_id)),
+        "cleanup_receipt_sha256": cleanup_receipt_sha256,
+        "outcome": outcome,
+    }
+    path = pathlib.Path(run_root) / POST_ACTIVATE_RESUME_RECEIPT_NAME
+    immutable_publish(path, complete_object(witness), 0o400, [])
+    return str(path)
+
+
+def validate_post_activate_resume_witness(
+    engine: "Engine", request: dict[str, Any], run_id: str, witness_path: pathlib.Path
+) -> None:
+    """R8 Sub-round D tamper discipline (mirrors the W-marker rule: absence ⇒ safe default, invalid
+    ⇒ hard fail). A PRESENT witness must be EXACTLY the receipt the resume path wrote, canonical and
+    0400, pinning the on-disk v2 cleanup receipt — or recover fails closed with a NAMED refusal and
+    does NOT silently re-drive over it (tamper suspicion)."""
+    try:
+        witness_bytes = validate_regular_file(witness_path, mode=0o400)
+    except LifecycleError as error:
+        raise LifecycleError(
+            "post-activate resume witness is unreadable or not a safe 0400 file (tamper suspicion)"
+        ) from error
+    try:
+        witness = json.loads(witness_bytes)
+    except (ValueError, TypeError) as error:
+        raise LifecycleError(
+            "post-activate resume witness is not valid JSON (tamper suspicion)"
+        ) from error
+    if not isinstance(witness, dict) or set(witness) != {
+        "schema_version",
+        "run_id",
+        "cleanup_receipt_sha256",
+        "outcome",
+    }:
+        raise LifecycleError(
+            "post-activate resume witness key set is not exact (tamper suspicion)"
+        )
+    if witness_bytes != complete_object(witness):
+        raise LifecycleError(
+            "post-activate resume witness is not canonical bytes (tamper suspicion)"
+        )
+    if witness["schema_version"] != POST_ACTIVATE_RESUME_RECEIPT_SCHEMA:
+        raise LifecycleError(
+            "post-activate resume witness schema_version is not recognized (tamper suspicion)"
+        )
+    if witness["run_id"] != str(uuid.UUID(run_id)):
+        raise LifecycleError(
+            "post-activate resume witness run_id does not match this run (tamper suspicion)"
+        )
+    digest = witness["cleanup_receipt_sha256"]
+    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise LifecycleError(
+            "post-activate resume witness cleanup_receipt_sha256 is not a sha256 (tamper suspicion)"
+        )
+    # Re-validate the pinned digest against the on-disk v2 cleanup receipt (the receipt the witness
+    # claims to have validated). A mismatch — witness OR receipt tampered — is a hard fail.
+    receipt_path = engine.run_root / DATABASE_BARRIER_RECEIPT_NAME
+    try:
+        receipt_bytes = validate_regular_file(receipt_path, mode=0o400)
+    except LifecycleError as error:
+        raise LifecycleError(
+            "post-activate resume witness references a missing or unsafe cleanup receipt "
+            "(tamper suspicion)"
+        ) from error
+    if sha256(receipt_bytes) != digest:
+        raise LifecycleError(
+            "post-activate resume witness cleanup receipt digest mismatch (tamper suspicion)"
+        )
+
+
 def orchestrate_post_activate_cleanup(
     engine: "Engine", request: dict[str, Any], run_id: str
 ) -> dict[str, Any] | None:
@@ -3475,6 +3588,51 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     )
 
 
+def recover_post_activate(
+    engine: "Engine",
+    request: dict[str, Any],
+    run_id: str,
+    resource_manifest_paths: dict[str, str],
+    marker_path: str,
+) -> dict[str, Any]:
+    """R8 Sub-round D (RATIFIED 2026-07-18) — recover at the POST-ACTIVATE head
+    (``barrier.activate``/``completed``), the THIRD supported recover head. Dispatches ONLY the
+    receipt-only post-activate re-drive: NO forward tail, NO journal row (activate stays the last
+    row). Folds in R8-E (the old activate-head refusal is gone).
+
+    OPTION (ii) receipt-presence dispatch on the durable resume witness (marker-consistent tamper
+    discipline):
+      * witness ABSENT  -> full idempotent re-drive (cleanup -> resume). A stale in-flight v2
+        cleanup receipt with NO witness does NOT short-circuit; absence is the safe default. The
+        resume child writes the witness only AFTER resume genuinely completes.
+      * witness PRESENT-but-INVALID -> NAMED hard fail (never re-drive over it); see
+        ``validate_post_activate_resume_witness``.
+      * witness PRESENT-and-VALID -> no-op success naming the state ("post-activate already
+        complete").
+
+    CHAIN FIRST: the full durable-chain validation walk already ran during Engine construction in
+    ``run_recover`` (before this dispatch), so a broken/short chain never reaches the witness check.
+    The 0400 cutover-window marker is byte-untouched throughout (this path never writes it).
+    """
+    witness_path = engine.run_root / POST_ACTIVATE_RESUME_RECEIPT_NAME
+    if os.path.lexists(witness_path):
+        validate_post_activate_resume_witness(engine, request, run_id, witness_path)
+        output = finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=run_id, post_activate=False,
+        )
+        output["postActivate"] = None
+        output["postActivateRecoverOutcome"] = "post-activate already complete"
+    else:
+        output = finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=run_id, post_activate=True,
+        )
+        output["postActivateRecoverOutcome"] = "post-activate re-driven"
+    output["postActivateResumeReceiptPath"] = str(witness_path)
+    return output
+
+
 def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """R5 Sub-round D — the RECOVER controller (orchestrator RULING 2, non-negotiable).
 
@@ -3573,6 +3731,15 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             engine, request, manifest, values, quiesce_bytes, run_id,
             resource_manifest_paths, marker_path, ordinary, d5,
             include_fwm=False,
+        )
+    if head["command_id"] == "barrier.activate" and head["outcome"] == "completed":
+        # R8 Sub-round D (RATIFIED 2026-07-18): the THIRD supported recover head. A completed 76-row
+        # run recovered again lands here (the "past activate" case — folded R8-E, no longer a
+        # refusal). Dispatch ONLY the receipt-only post-activate re-drive (NO forward tail, NO
+        # journal row). The full durable-chain validation walk already ran during Engine
+        # construction above (CHAIN FIRST), so a broken chain never reaches the witness check.
+        return recover_post_activate(
+            engine, request, run_id, resource_manifest_paths, marker_path
         )
     # RULING 2 option (a) requirement 1: a barrier head is resumed idempotently by the STANDALONE
     # supervisor for that operation (resume_retained_chain), which recover deliberately leaves

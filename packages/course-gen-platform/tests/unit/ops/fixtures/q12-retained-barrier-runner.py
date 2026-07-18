@@ -366,7 +366,7 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             "database_capability_deleted": True,
         }
         receipt_body = CORE.complete_object(receipt_object)
-        receipt_path = run_root / "database-barrier-receipt.json"
+        receipt_path = run_root / CORE.DATABASE_BARRIER_RECEIPT_NAME
         CORE.immutable_publish(receipt_path, receipt_body, 0o400, [])
         receipt_digest = CORE.sha256(receipt_body)
         return {
@@ -386,7 +386,7 @@ class LiveOrdinaryExecutor(NoIoExecutor):
         run_id = context["run_id"]
         # Fail-closed validation, a byte twin of q12-writer-resume.py's forward branch
         # (:1088-1134). run_live does NOT reimplement this gate — it lives HERE, in the child.
-        barrier_path = run_root / "database-barrier-receipt.json"
+        barrier_path = run_root / CORE.DATABASE_BARRIER_RECEIPT_NAME
         barrier_bytes = barrier_path.read_bytes()
         barrier = json.loads(barrier_bytes)
         if set(barrier) != {
@@ -446,10 +446,20 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             )
         ):
             raise CORE.LifecycleError("database barrier probe receipt binding is invalid")
+        # R8 Sub-round D: AFTER resume genuinely completes (the fail-closed validation above passed),
+        # write the durable post-activate resume witness THROUGH the SAME shared CORE writer the
+        # production resume child will use (R8-A). This exercises the atomic-write + 0400 discipline
+        # in fixture tests and is what recover's receipt-presence dispatch reads. FIXTURE-FIRST: the
+        # real resume child wiring to this function is R8-A (currently hard-stopped).
+        validated_receipt_sha256 = CORE.sha256(barrier_bytes)
+        resume_receipt_path = CORE.write_post_activate_resume_receipt(
+            run_root, run_id, validated_receipt_sha256, "resumed"
+        )
         return {
             "status": "resumed",
             "ok": True,
-            "validated_receipt_sha256": CORE.sha256(barrier_bytes),
+            "validated_receipt_sha256": validated_receipt_sha256,
+            "resume_receipt_path": resume_receipt_path,
         }
 
 
