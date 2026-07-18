@@ -307,7 +307,7 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round A: injectable or
     // to the SAME capability digest the side file carries (proving the seam never forked the
     // capability binding, only the result payload).
     const ordinaryKeys = Object.keys(live.resultPaths).filter(key => key.startsWith('ordinary:'));
-    expect(ordinaryKeys.length).toBe(12);
+    expect(ordinaryKeys.length).toBe(13);
     for (const key of ordinaryKeys) {
       const commandId = key.split(':')[1];
       const liveResult = JSON.parse(readFileSync(live.resultPaths[key], 'utf8')) as Record<
@@ -335,13 +335,13 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round A: injectable or
 
     // (c) the run_live executor audit shows exactly one real child execution per ordinary
     // lifecycle journaled, ADDED ON TOP OF the pre-existing D5 barrier-chain claim
-    // delegations (install/verify-after-base/verify-after-observability/prepare-recovery —
-    // the 4 in-process groups the forward window reaches through the C7 planned exit), which
-    // already crossed a real sandboxed claim-launcher boundary before this round and are
-    // unrelated to the ordinary-execution seam.
-    const D5_CLAIM_DELEGATIONS_THROUGH_C7 = 4;
-    expect(live.childExecutions).toBe(ordinaryKeys.length + D5_CLAIM_DELEGATIONS_THROUGH_C7);
-    expect(live.childExecutions).toBe(16);
+    // delegations. Since R5 Sub-round B run_live drives the full forward window, so the
+    // in-process barriers are install/verify-after-base/verify-after-observability/
+    // prepare-recovery AND the group-16 activate barrier (5 groups), each of which crosses a
+    // real sandboxed claim-launcher boundary and is unrelated to the ordinary-execution seam.
+    const D5_CLAIM_DELEGATIONS = 5;
+    expect(live.childExecutions).toBe(ordinaryKeys.length + D5_CLAIM_DELEGATIONS);
+    expect(live.childExecutions).toBe(18);
   });
 });
 
@@ -389,15 +389,17 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round B: real deployed
     expect(audit.claimProcessBoundary).toBe(true);
     expect(audit.launcherOwnedClaimMutation).toBe(true);
 
-    // (c) each of the 4 in-process barrier claims present in groups 1-13
-    // (install/verify-after-base/verify-after-observability/prepare-recovery) produced a
-    // retained barrier result THROUGH the real wrapper (Engine.finish's per-barrier side
-    // file — distinct from the "ordinary:" side files asserted in Sub-round A).
+    // (c) each of the 5 in-process barrier claims in the full forward window
+    // (install/verify-after-base/verify-after-observability/prepare-recovery from groups 1-13,
+    // plus the group-16 activate barrier) produced a retained barrier result THROUGH the real
+    // wrapper (Engine.finish's per-barrier side file — distinct from the "ordinary:" side files
+    // asserted in Sub-round A).
     const barrierKeys = [
       'install:cutover',
       'verify-after-base:cutover',
       'verify-after-observability:cutover',
       'prepare-recovery:cutover',
+      'activate:cutover',
     ];
     for (const key of barrierKeys) {
       const path = live.resultPaths[key];

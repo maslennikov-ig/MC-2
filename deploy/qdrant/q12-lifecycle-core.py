@@ -3236,6 +3236,14 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         "forward", inventory, resolved_command(manifest, "writers.resume.forward", request)
     )
 
+    # Section 5 forward chronology groups 15-16, closing the forward window as a byte/order
+    # twin of run_joined_composer's forward tail (forward_tail_through_activation_ready ->
+    # d5("activate")): deploy.commit records the activation-ready milestone and barrier.activate
+    # flips the cutover barrier from the current head. The activate selector CAS binds the live
+    # checkpoint head exactly as the composer's does.
+    ordinary("deploy.commit")
+    d5("activate")
+
     engine.reload_durable()
     output = engine.output()
     output["resourceManifestPaths"] = resource_manifest_paths
