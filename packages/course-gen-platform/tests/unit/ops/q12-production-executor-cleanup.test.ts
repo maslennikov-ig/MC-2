@@ -66,7 +66,8 @@ describe('Q12 R8-B-1: REAL ProductionExecutor post-activate FILE-ARTIFACT seam',
     const command = out.command as { argv: string[]; command_sha256: string };
     expect(Array.isArray(command.argv)).toBe(true);
     expect(command.argv).toContain('cleanup');
-    expect(command.argv[command.argv.length - 3]).toBe('--expected-post-migration-catalog-sha256');
+    expect(command.argv[command.argv.length - 2]).toBe('--expected-post-migration-catalog-sha256');
+    expect(command.argv[command.argv.length - 1]).toBe(out.expected_catalog_sha256);
     expect(command.argv).toContain('--q12-db-capability-file');
     expect(command.command_sha256).toMatch(HEX64);
 
