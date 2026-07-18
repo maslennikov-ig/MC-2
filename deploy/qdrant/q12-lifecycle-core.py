@@ -5823,6 +5823,67 @@ class LivePlanExecutor:
         if returncode != 0:
             raise LifecycleError("snapshot coordinator session failed")
 
+    def produce_run_root_baseline(
+        self, request: dict[str, Any], workdir: pathlib.Path, run_root: pathlib.Path
+    ) -> pathlib.Path:
+        """OQ6: publish the run-root pre-maintenance source baseline that pg.backup q12
+        mode consumes (backup-supabase.sh:918-926). It is captured by reusing
+        q12-source-manifest.ts `capture` verbatim (its own projection, which
+        validateTransition later diffs the backup-time cutover against, :1258-1352) —
+        with no --baseline it sets baseline == cutover == the capture (:1449) — through a
+        held REPEATABLE READ snapshot from the shared coordinator. It MUST run before
+        barrier.install, the maintenance edge that deactivates cron (:1513) and sets
+        read-only (:1531/:1548), so the capture records cron active + writable.
+
+        The manifest tool connects via libpq (PGSERVICE/PGSERVICEFILE + SET TRANSACTION
+        SNAPSHOT, q12-source-manifest.ts:154), so self._source_service must be the source
+        libpq env; production derives it from the source DSN, a container test injects a
+        loopback env. The exported snapshot is visible cross-session, so the coordinator may
+        use the docker-exec or the libpq path. The file is published immutably 0400."""
+        tsx = self.repo_root / "packages/course-gen-platform/node_modules/.bin/tsx"
+        if not os.access(str(tsx), os.X_OK):
+            raise LifecycleError(f"tsx runner is unavailable: {tsx}")
+        tool = self.repo_root / "deploy/postgres/q12-source-manifest.ts"
+        if self._source_service is None:
+            self._source_service = self._source_service_env(request, workdir)
+        coordinator, snapshot = self._open_snapshot_coordinator(request, workdir)
+        try:
+            # The intermediate manifest is written under the run root (production
+            # /opt/megacampus/backups/q12/<run-id>, fixture /tmp/mc2-q12-*), so the manifest
+            # tool's fixture-only client-override lockdown keys off a path whose prod/fixture
+            # shape matches the run — the plan workdir is /tmp-shaped in both prod and test.
+            out = run_root / "source-manifest-baseline.json"
+            capture_env = {**self._base_env(), **self._source_service, "TMPDIR": "/tmp"}
+            # The manifest tool's fixture-only client override is inert in production (unset);
+            # a real-PG17 test propagates it and the tool's own lockdown gates it on the
+            # fixture output namespace above.
+            override = os.environ.get("MC2_Q12_MANIFEST_PSQL")
+            if override:
+                capture_env["MC2_Q12_MANIFEST_PSQL"] = override
+            completed = subprocess.run(
+                [str(tsx), str(tool), "capture", "--snapshot", snapshot, "--output", str(out)],
+                cwd=str(self.repo_root),
+                env=capture_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise LifecycleError(
+                    "source baseline capture failed: "
+                    + completed.stderr.decode("utf-8", "replace").strip()
+                )
+            manifest = json.loads(out.read_bytes())
+            baseline = manifest.get("baseline") if isinstance(manifest, dict) else None
+            if not isinstance(baseline, dict):
+                raise LifecycleError("source baseline capture produced no baseline object")
+            out.unlink()
+            baseline_path = run_root / "baseline.json"
+            immutable_publish(baseline_path, complete_object(baseline), 0o400, [])
+        finally:
+            self._close_snapshot_coordinator(coordinator)
+        return baseline_path
+
     def _drill_flow(
         self, request: dict[str, Any], workdir: pathlib.Path, run_id: str
     ) -> tuple[dict[str, Any], dict[str, str]]:

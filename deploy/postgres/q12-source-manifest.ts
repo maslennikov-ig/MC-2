@@ -1,13 +1,38 @@
 #!/usr/bin/env -S pnpm exec tsx
 import { createHash } from 'node:crypto';
 import { closeSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 type JsonObject = Record<string, unknown>;
 
-const PSQL = '/usr/lib/postgresql/17/bin/psql';
+// The production backup path runs this tool on the server with a deliberately hardcoded
+// absolute PostgreSQL 17 client (a hardening: the client binary is never influenced by the
+// caller's environment). Local real-PG17 tests have no host client and must reach a
+// container psql, so a fixture-only override is honored under the SAME production-seam
+// lockdown the plan mode established (/tmp/mc2-q12-* fixture namespace): the override
+// MC2_Q12_MANIFEST_PSQL is used ONLY when the tool's --output path is in that fixture
+// namespace, is HARD-REFUSED (never silently falls back) if set against any other path, and
+// is entirely inert in production (the variable is never set there). ACTIVE_PSQL is resolved
+// once per invocation from the parsed flags in main().
+const HARDCODED_PSQL = '/usr/lib/postgresql/17/bin/psql';
+let ACTIVE_PSQL = HARDCODED_PSQL;
+
+function resolveActivePsql(flags: Map<string, string>): string {
+  const override = process.env.MC2_Q12_MANIFEST_PSQL;
+  if (override === undefined || override === '') return HARDCODED_PSQL;
+  const output = flags.get('--output');
+  const fixture = output !== undefined && /^\/tmp\/mc2-q12-[^/]+\//.test(resolve(output));
+  if (!fixture) {
+    fail(
+      'MC2_Q12_MANIFEST_PSQL is a fixture-only client override and is refused outside the ' +
+        '/tmp/mc2-q12- output namespace'
+    );
+  }
+  return override;
+}
+
 const SCHEMA = 'megacampus.supabase-source-manifest/v1';
 const SNAPSHOT_PATTERN = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+$/;
 
@@ -69,7 +94,7 @@ function quoteLiteral(value: string): string {
 
 function runPsql(sql: string): string {
   const result = spawnSync(
-    PSQL,
+    ACTIVE_PSQL,
     [
       '-X',
       '--no-psqlrc',
@@ -1422,6 +1447,7 @@ function compare(flags: Map<string, string>): void {
 function main(): void {
   const [command, ...rest] = process.argv.slice(2);
   const flags = parseFlags(rest);
+  ACTIVE_PSQL = resolveActivePsql(flags);
   if (command === 'compare') {
     compare(flags);
     return;

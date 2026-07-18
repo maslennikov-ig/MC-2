@@ -95,6 +95,20 @@ Stream: `mc2-jz6y0.13` (this worktree `codex/q12-plan-builder`).
   same `phase.jsonl` and the combined journal matches the composer's `d5()`+`ordinary()`
   interleave.
 - **GREEN + verify** (real-PG17 for child execution; no-docker for parity).
+- **NON-NEGOTIABLE R4 ACCEPTANCE CRITERION (deferred from R2, orchestrator-pinned
+  2026-07-18):** R4 builds the full-Supabase real-source harness (a disposable source seeded
+  to satisfy `barrier.install`'s strict expected shape — `inventory_counts`
+  public:47/auth:22/storage:5, 8 active cron, the exact `guarded_relations`,
+  `q12-database-barrier.sh:363-408`) because in-process barriers run the real
+  `barrier.install` here. On that harness, R4 MUST prove the **full validateTransition
+  POSITIVE that R2 could not**: R2's `produce_run_root_baseline` captures `baseline.json`
+  from the pre-maintenance source; then the real `barrier.install` transitions the source to
+  the maintenance/cutover state (cron off, read-only on, the complete `q12_guard` machinery +
+  guarded-relations delta); then `q12-source-manifest.ts capture --snapshot <id> --baseline
+baseline.json` (or `verify-transition`) MUST PASS (`validateTransition`,
+  `q12-source-manifest.ts:1258-1352`). **R4 cannot close without this end-to-end
+  baseline→real-install-cutover positive** — it is the acceptance R2 explicitly deferred, not
+  optional.
 
 ## Round 5 — real forward FWM producer (OQ3 forward)
 
@@ -172,7 +186,69 @@ Stream: `mc2-jz6y0.13` (this worktree `codex/q12-plan-builder`).
     (one process, trivial parity, but changes the operator procedure and holds `cutover.lock`
     across the whole window), or (b) shell out to the 5 supervisor invocations (preserves the
     current procedure, splits lock custody). This shapes R4 and the lease/FD-9 model; resolve
-    with the design review before R4.
+    with the design review before R4. **RESOLVED (2026-07-18): option (a) in-process** — see
+    design §6a. C7 is a planned controller exit + `recover`-resume; no lock held across it.
+
+- **R2 done** (RED `4dd31e5f` → GREEN `a2799ec6`). Added
+  `LivePlanExecutor.produce_run_root_baseline`: held-snapshot coordinator +
+  `q12-source-manifest.ts capture` (no `--baseline`, so `baseline == cutover == the capture`,
+  `:1449`) → `.baseline` → run-root `baseline.json` 0400, intermediate written under the run
+  root then removed. **Security-surface change** to `q12-source-manifest.ts`: a fixture-only
+  `MC2_Q12_MANIFEST_PSQL` client override under the plan-mode production-seam lockdown —
+  honored ONLY for a `/tmp/mc2-q12-` output namespace, HARD-REFUSED (named error, never silent
+  fallback) for any other path, inert in production (var never set; hardcoded
+  `/usr/lib/postgresql/17/bin/psql` byte-unchanged without it). Verified: 3 pure seam tests
+  (override-used on fixture path via a sentinel wrapper; hard-fail refusal on a production
+  path with the override never invoked; hardcoded client used with no var) + the real-PG17
+  producer proof (0400 baseline, 8 active cron, intermediate removed) + the three distinct
+  named `validateTransition` negatives — no-`q12_guard` "q12_guard schema", 7-cron "cron
+  cardinality", lossy barrier-digest "baseline.cron_jobs must be an array". Frozen bytes
+  untouched; tsc 0; zero leftover containers. Full baseline→real-install-cutover POSITIVE is
+  the pinned R4 acceptance (above). Coordinator note: the docker-exec coordinator's exported
+  snapshot is visible cross-session to the libpq capture, so the earlier "service-file path,
+  NOT docker-exec" line in the build spec below is superseded — either coordinator path works.
+- **R2 build spec (ready to execute; all rulings in).** Producer: on `LivePlanExecutor`,
+  open the snapshot coordinator (`_open_snapshot_coordinator`, service-file/`psql` path — NOT
+  the docker-exec path, because `q12-source-manifest.ts` connects via libpq
+  `PGSERVICE`/`PGSERVICEFILE` + `SET TRANSACTION SNAPSHOT`, `q12-source-manifest.ts:154`),
+  run `q12-source-manifest.ts capture --snapshot <exported-id> --output <tmp>` **without**
+  `--baseline` (so `baseline == cutover == the capture`, `:1449`) using the same source
+  service env, parse `.baseline`, and `immutable_publish` it to `<run-root>/baseline.json`
+  0400 uid 1000; close the coordinator. Real-PG17 RED (reuse the round-8..19 harness: docker
+  `postgres:17.10-bookworm` with `-p 127.0.0.1::5432`, `readyPostgres`, a TLS-less service
+  file to the mapped port):
+  - **Seed a Supabase-shaped source** (`capture()` requirements, `q12-source-manifest.ts`):
+    `CREATE EXTENSION pgcrypto SCHEMA extensions` (for `extensions.digest`, `:310`); a faked
+    `cron` schema + `cron.job` table (columns `jobid,schedule,command,nodename,nodeport,
+database,username,active`, `:309-312`) with **8 rows all `active=true`**; a faked `net`
+    schema + `net.http_request_queue` table (empty → count 0, `:313`); the guarded relations
+    (public + the `auth`/`storage` trigger-privileged + `cron.job` + `net.http_request_queue`
+    authoritative set, `:246`); `supabase_migrations.schema_migrations` optional (COALESCE'd,
+    `:314`).
+  - **Produce** `baseline.json` via the producer at this pre-maintenance state (cron active,
+    writable).
+  - **Simulate cutover** = baseline + ONLY the sanctioned deltas: `UPDATE cron.job SET
+active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; create the
+    `q12_guard` schema + its GUARD_TABLES relations (owner postgres, kind r, postgres-only
+    ACL); apply the guard-delta on guarded relations. Then run `q12-source-manifest.ts capture
+--snapshot <id2> --baseline baseline.json` (or `verify-transition`) and assert it
+    PASSES — `validateTransition` requires baseline==cutover after normalizing exactly those
+    deltas (`:1258-1352`), so any incidental diff fails (this is the correctness bar).
+  - **Negative:** feed the lossy `database-barrier-baseline.json` digest projection as
+    `--baseline` → `validateTransition` fails (proves the full capture is required, OQ6).
+    Frozen bytes untouched; the producer reuses `q12-source-manifest.ts` verbatim (no new
+    structural query). Note: `q12-source-manifest.ts` is NOT frozen-sha-pinned, but the producer
+    must not modify it — it invokes it.
+
+- **R3 constraint (blessed 2026-07-18).** `resource_manifest_sha256` joins the pinned parity
+  exclusion set VALUE-only, enumerated explicitly beside `capability_manifest_sha256` /
+  `entry_hash` / `previous_hash`, only on rows carrying a real artifact digest (initial + the
+  two stepped rows); substitution values are seeded to the fixture derivations so
+  `command_sha256` parity holds. **Added constraint:** the parity test must still assert the
+  step TOPOLOGY of the excluded field — it changes exactly at `pg.backup/intent` and
+  `deploy.prepare/completed`, is carried unchanged elsewhere, and the first/last pins hold
+  (`validate_stable_binding_walk:342-356`). Exclusion covers the byte value, never the
+  stepping structure. Same principle for any future mode-divergent field.
 
 ## Open risks carried forward
 

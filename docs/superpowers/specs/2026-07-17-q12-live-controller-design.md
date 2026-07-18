@@ -425,6 +425,52 @@ under the plan below.
 
 ---
 
+## 6a. Post-ratification refinements (recorded 2026-07-18)
+
+The orchestrator ratified the design and ruled the four open decisions; these refine the
+sections above (evidence re-verified against the same byte-identical files):
+
+1. **Barrier orchestration = in-process (§5.2 refined).** The controller drives the five
+   barriers **in-process via `retained_chain`** (like the composer's `d5()`), not as five
+   separate supervisor invocations — one authority, one `LeaseSession`, trivial composer
+   parity, no lock/FD custody handoff. The standalone supervisor CLI invocations stay
+   byte-untouched and remain the manual/recovery entrypoint. **The C7 pause is a planned
+   controller EXIT at a checkpoint (a `stopAfter`-style stop after group 13) plus a
+   `recover`-resume — the controller must NOT hold `cutover.lock` across the multi-hour C7
+   pause.** R4 is shaped accordingly.
+
+2. **OQ6 producer corrected.** `baseline.json` is produced by reusing
+   **`q12-source-manifest.ts capture --snapshot <id>`** (with no `--baseline`, it sets
+   `baseline = cutover = the capture`, `q12-source-manifest.ts:1449`) through the plan
+   snapshot coordinator, extracting the `.baseline` field to `<run-root>/baseline.json`
+   (0400). This is the projection `validateTransition` diffs against; the earlier idea of
+   re-deriving via the frozen `q12-structural-catalog.sql` is the **wrong projection** and is
+   withdrawn.
+
+3. **OQ6 baseline timing pinned (pre-`barrier.install`), with evidence.** `validateTransition`
+   requires the baseline to carry cron `active=true` and `default_transaction_read_only=off`.
+   `barrier.install` IS the maintenance edge: it requires exactly 8 **active** cron rows
+   pre-mutation (`q12-database-barrier.sh:1504-1506`), captures `q12_guard.baseline` from that
+   pre-mutation state (`:952-969`), then **deactivates cron** (`:1513`
+   `UPDATE cron.job SET active=false WHERE active`) and **sets read-only** (`:1531`, `:1548`
+   `ALTER DATABASE postgres SET default_transaction_read_only=on`). Therefore the controller
+   must capture `baseline.json` **before group 2 (`barrier.install`)** — at/after genesis
+   (group 1), while the source is still cron-active and writable. This corrects §5.2's OQ6 row
+   ("inside the held snapshot session", which is post-quiesce/post-install and would yield an
+   invalid `active=false` baseline).
+
+4. **Parity exclusion set is explicit + pinned (per ruling 1).** Every parity test enumerates
+   the excluded physical-binding fields verbatim — `capability_manifest_sha256`, `entry_hash`,
+   `previous_hash` (they transitively carry the journal file's device+inode). **Open point
+   carried to R3:** `resource_manifest_sha256` on the two stepped rows (`pg.backup/intent`,
+   `deploy.prepare/completed`) binds the real checkpoint-bound resource-manifest **artifact
+   digest** in production vs. the composer's fixture step derivation
+   (`sha256("q12:resource-step:snapshot:<run-id>")`), so it cannot match across
+   fixture-vs-production and would need to join the pinned exclusion set **on those rows only**
+   — flagged for the orchestrator's blessing before R3's stepped-row parity test, since ruling
+   1 requires exclusions be blessed, not ad-hoc. (Substitution VALUES sourced from the artifact
+   are seeded to the fixture derivations in the parity test, so `command_sha256` parity holds.)
+
 ## 7. Bounded implementation (see the companion plan)
 
 `docs/superpowers/plans/2026-07-17-q12-live-controller.md` bounds the work into TDD
