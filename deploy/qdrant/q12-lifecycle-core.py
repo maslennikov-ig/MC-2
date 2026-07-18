@@ -3438,6 +3438,107 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     )
 
 
+def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
+    """R5 Sub-round D — the RECOVER controller (orchestrator RULING 2, non-negotiable).
+
+    run_recover resumes an INTERRUPTED forward cutover from an EXISTING run root: unlike run_live
+    (which requires a fresh run root) it requires a NON-EMPTY durable journal, rehydrates it
+    through the same Engine, and re-drives the remaining forward tail so the completed journal is
+    the SAME byte/order twin of the composer's 76 rows an uninterrupted forward run would have
+    produced on that root (plus the RULING 1 post-activate cleanup+resume).
+
+    RULING 2 fixes the SUPPORTED resume set to exactly two clean checkpoints and makes every
+    other head a NAMED fail-closed refusal — never a heuristic/best-effort continuation:
+
+      * head == deploy.prepare/completed (the C7 planned-exit checkpoint)
+            -> continue the forward tail FROM group 14 (FWM) via drive_forward_tail.
+      * head == writers.resume.forward/accepted (the crash-after-FWM restart)
+            -> continue FROM group 15 (deploy.commit) via drive_forward_tail(include_fwm=False).
+      * ANY other durable head (including a mid-barrier partial that has not reached its clean
+        completed boundary — those route through the existing run_supervisor/resume_retained_chain
+        machinery, not run_recover) -> raise a NAMED LifecycleError naming phase/outcome/command.
+
+    Crash-anywhere idempotence is probed further at R8; an unsupported-but-real head surfacing
+    later is a normal finding, not a scope breach.
+    """
+    manifest = load_manifest()
+    run_root = pathlib.Path(request["run_root"])
+    require_lexical_absolute(run_root)
+
+    # Fail closed on an absent/empty durable journal BEFORE constructing the Engine (the opposite
+    # of run_live's fresh-root guard): recover has nothing to resume without durable rows.
+    journal_path = run_root / "phase.jsonl"
+    if not journal_path.exists():
+        raise LifecycleError("recover requires a non-empty durable journal")
+    journal_bytes = validate_regular_file(journal_path, mode=0o600)
+    lines = journal_bytes.splitlines()
+    if not lines:
+        raise LifecycleError("recover requires a non-empty durable journal")
+    durable_tail = json.loads(lines[-1])
+
+    # Restore the request-global resource-manifest pin from durable truth (like run_claim), so the
+    # Engine's stable-binding walk anchors row-0/row-last to the journal's own stepped domain
+    # rather than the fixture placeholder. The tail carries the targets step (or the genesis pin
+    # for a pre-pg.backup head), always a legal request-global value for the walk.
+    request["resource_manifest_sha256"] = durable_tail["resource_manifest_sha256"]
+
+    engine = Engine(request, executor)
+    if not engine.journal:
+        raise LifecycleError("recover requires a non-empty durable journal")
+
+    quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
+    require_lexical_absolute(quiesce_path)
+    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+        raise LifecycleError("recover quiesce manifest digest mismatch")
+    values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
+    run_id = str(uuid.UUID(request["run_id"]))
+    chains = request.get("chains") or {}
+
+    # Restore the in-memory stepped domains to the durable head so every resumed row carries the
+    # exact resource/quiesce values an uninterrupted run would have at this point (Engine.append
+    # reads current_*). __post_init__ already set resource from the (now durable-derived) request
+    # value; pin both explicitly from the head for clarity and future-proofing.
+    head = engine.journal[-1]
+    engine.current_resource_manifest_sha256 = head["resource_manifest_sha256"]
+    engine.current_quiesce_manifest_sha256 = head["quiesce_manifest_sha256"]
+
+    def d5(operation: str) -> None:
+        command = resolved_command(manifest, COMMANDS[operation], request)
+        chain = chains.get(operation) or default_joined_chain(operation)
+        engine.retained_chain(operation, chain, command, from_current_head=True)
+
+    def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
+        return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
+
+    # The forward run's out-of-band run-root artifacts are already durable on this root; recover
+    # reconstructs their paths for the output augmentation exactly as run_live emits them.
+    resource_manifest_paths = {
+        stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
+        for stage in ("genesis", "snapshot", "targets")
+    }
+    marker_path = str(engine.run_root / "quiesce-window-mode.json")
+
+    # DISPATCH on the durable head. Only the two RULING 2 checkpoints resume; everything else is a
+    # named fail-closed refusal (never heuristic continuation).
+    if head["command_id"] == "deploy.prepare" and head["outcome"] == "completed":
+        return drive_forward_tail(
+            engine, request, manifest, values, quiesce_bytes, run_id,
+            resource_manifest_paths, marker_path, ordinary, d5,
+            include_fwm=True,
+        )
+    if head["command_id"] == "writers.resume.forward" and head["outcome"] == "accepted":
+        return drive_forward_tail(
+            engine, request, manifest, values, quiesce_bytes, run_id,
+            resource_manifest_paths, marker_path, ordinary, d5,
+            include_fwm=False,
+        )
+    raise LifecycleError(
+        "recover does not support resuming from "
+        f"phase={head['phase']} outcome={head['outcome']} command={head['command_id']}"
+    )
+
+
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     validate_request(request)
     manifest = load_manifest()
