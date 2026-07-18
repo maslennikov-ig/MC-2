@@ -144,6 +144,9 @@ or child-env change.
 - **Untouched:** the frozen `q12-command-manifest.json` (`aaec6fc2…`), the `writers.quiesce`
   argv/env, `q12-database-barrier.sh` (`134255ce…`), `q12-structural-catalog.sql`
   (`0b8a943f…`).
+  _(Historical, 2026-07-18: the barrier sha `134255ce…` here was superseded by `3673ee49…`
+  per the ratified barrier-fix round; this W amendment did not touch the barrier — the
+  succession is from the separate PG17 barrier-fix round.)_
 - The live controller's side (writing the marker before it invokes `writers.quiesce`) is a
   separate Task-9 controller round; it depends on this W amendment landing first for the
   cutover window to open, but the marker-writing itself is inert until the W side reads it.

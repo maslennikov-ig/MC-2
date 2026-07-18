@@ -39,6 +39,9 @@ round):**
   (`aaec6fc2…`), `q12-database-barrier.sh` (`134255ce…`), `q12-structural-catalog.sql`
   (`0b8a943f…`). **If any frozen-manifest change turns out to be required, that is a hard
   STOP — report, do not touch.**
+  _(Historical, 2026-07-18: the barrier sha `134255ce…` here was superseded by
+  `3673ee49…` per the ratified barrier-fix round (PG17 ACL/fd/dialect); the current frozen
+  barrier is `3673ee49…` and this constraint stands against the current bytes.)_
 - One command authority only: the controller consumes the frozen 20-command manifest
   through the existing `load_manifest()` / `resolved_command()` primitives and journals
   through the existing `Engine` serializer/capability/object/checkpoint primitives. **No
@@ -419,6 +422,8 @@ and the §8 fail-closed additions (`:435-452`).
    later shows a producer genuinely cannot be built without adding a manifest entry or
    changing frozen barrier/SQL bytes, **stop and report** — do not modify `aaec6fc2…` /
    `134255ce…` / `0b8a943f…`.
+   _(Historical, 2026-07-18: `134255ce…` here was superseded by `3673ee49…` per the
+   ratified barrier-fix round; the current frozen barrier is `3673ee49…`.)_
 
 Nothing else in OQ2–OQ6 requires an owner ruling; they are implementable within Task-9
 under the plan below.
