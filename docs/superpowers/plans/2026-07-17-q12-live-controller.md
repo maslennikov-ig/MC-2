@@ -720,6 +720,37 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   a scope extension). `q12-live-controller.test.ts` 13/13 (the two barrier-head negatives now also
   assert the `q12-live-cutover.sh install` / `… activate` pointer); `tsc --noEmit` 0; frozen bytes
   unchanged; no W-owned file touched.
+- **R8-I-A done** (RED → GREEN → docs; design §6b, RULING R8-A/R8-C ratified 2026-07-18). The
+  **journaled post-activate `barrier.cleanup` CLEANUP SEGMENT** in `run_live`. RULING 1's
+  receipt-only-after-activate (§6a item 5 / R5-E) is **REVERSED for the real path** (§6a item 6);
+  the receipt-only **RESUME** half is PRESERVED and now **frozen-forced** by the barrier's
+  tail-contiguity rule (`q12-database-barrier.sh:511-513`). Three additive `q12-lifecycle-core.py`
+  extensions, all OUTSIDE the `OPERATIONS`/`COMMANDS`/`MANIFEST_COMMAND_IDS` coupling (§6b.4 — no
+  manifest entry, `load_manifest`'s exact-set assert untouched): **(a)** a
+  `guard_cleanup_complete`/`barrier.cleanup` grammar branch in `validate_journal_entry_grammar` +
+  the `database_barrier_receipt` accepted-object pairing (same function, a sub-part of (a), not a
+  4th path); **(b)** a cleanup capability class in `reload_durable` keyed `cleanup:<epoch>` off the
+  non-manifest command id (no OPERATIONS retained-copy/graph binding); **(c)** a new direct
+  `Engine.append` caller (`publish_cleanup_capability`/`move_cleanup_capability`/`append_cleanup_row`)
+  fed the barrier-child-provided `command_sha256` (the ordinary/retained/milestone callers KeyError
+  through `resolved_command`). `run_live` post-activate now journals the §6b.1 **5-row** lifecycle
+  (intent → capability_issued → capability_claimed → [real frozen barrier `cleanup` child runs
+  here] → capability_completed → accepted binding sha256(v2 receipt)), promotes the archived v1
+  receipt to the **exact 10-key `database-barrier-receipt/v2`** the forward resume gate requires,
+  and a final `reload_durable` proves the controller's own durable walk accepts the extended 81-row
+  journal. The **frozen `q12-database-barrier.sh cleanup` child runs FOR REAL** against the
+  controller's own journal via a per-invocation `/tmp/mc2-q12-barrier-cleanup-*` **protected
+  test-mode sandbox** (`RealBarrierCleanupChild` in the runner) — no docker/PG (the barrier's own
+  test-mode reconnect gate is skipped, the exact sandbox the R4-B/database-barrier rounds use; the
+  real full-PG17 window is downstream **R8-B**). The forward **76-row prefix stays byte-unchanged**;
+  R5-A/R5-C/R5-D parity assertions are rescoped to that prefix (§6b.3). The shared test
+  `derive_run_id` now yields a deterministic **UUIDv4** (the barrier requires `--run-id` UUIDv4,
+  `:72`); composer+live derive from the same helper so parity holds. `run_recover` **dispatch is
+  untouched** (R8-I-B): a full run now fails closed on the new `barrier.cleanup/accepted` head
+  (named refusal, no supervisor pointer). `q12-live-controller.test.ts` 13/13 (incl. the new R8-I-A
+  real-barrier test); cross-fixture regression 205 + 380 pass; `tsc --noEmit` 0; frozen trio
+  sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS; runner carries 0
+  forbidden serializer literals.
 
 ## Open risks carried forward
 
