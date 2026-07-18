@@ -10,9 +10,11 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from typing import Any
@@ -32,6 +34,384 @@ FIXTURE_COORDINATION_LOCK = pathlib.Path(
     "/tmp/.mc2-q12-retained-barrier-fixture.lock"
 )
 FIXTURE_COORDINATION_TIMEOUT_SECONDS = 120.0
+
+# Design §6b.1 R8-I-A: driving the FROZEN q12-database-barrier.sh `cleanup` child FOR REAL
+# against the controller's own journal. The child runs in the frozen barrier's own protected
+# TEST MODE (the sandbox the R4-B/database-barrier rounds already use) so NO real PostgreSQL is
+# needed here — the real full-PG17 window is downstream R8-B. The child validates the journal to
+# the guard_cleanup_complete/capability_claimed boundary, performs the (sandboxed) DB cleanup,
+# and publishes the 18-key terminal proof; the controller owns the journal + the v1->v2 promotion.
+FROZEN_BARRIER = REPO_ROOT / "deploy/qdrant/q12-database-barrier.sh"
+BARRIER_TEST_MODE_TOKEN = "mc2-synthetic-q12-database-barrier-test-only"
+CAPABILITY_SENTINEL = "q12-capability-synthetic-sentinel"
+URI_PASSWORD_SENTINEL = "q12-uri-password-synthetic-sentinel"
+
+
+def _barrier_expected_catalog() -> dict[str, Any]:
+    """The frozen barrier's expected-post-migration-catalog/v1 (the reusable shape the
+    deployed-barrier test uses), enough for the cleanup child's baseline/terminal checks."""
+    public_relations = [
+        {
+            "schema": "public",
+            "name": f"public_table_{index:02d}",
+            "oid": 100 + index,
+            "relkind": "p" if index == 0 else "r",
+            "parent_oid": 100 if index == 1 else None,
+            "owner": "postgres",
+        }
+        for index in range(47)
+    ]
+    auth_relations = [
+        {
+            "schema": "auth",
+            "name": f"auth_table_{index:02d}",
+            "oid": 200 + index,
+            "relkind": "r",
+            "parent_oid": None,
+            "owner": "postgres",
+        }
+        for index in range(22)
+    ]
+    storage_relations = [
+        {
+            "schema": "storage",
+            "name": name,
+            "oid": 300 + index,
+            "relkind": "r",
+            "parent_oid": None,
+            "owner": "postgres",
+        }
+        for index, name in enumerate(
+            ["buckets", "buckets_analytics", "objects", "s3_multipart_uploads",
+             "s3_multipart_uploads_parts"]
+        )
+    ]
+    return {
+        "schema_version": "megacampus.q12.expected-post-migration-catalog/v1",
+        "database": "postgres",
+        "database_owner": "postgres",
+        "release_sha": "1" * 40,
+        "migration_frontier": "20260704150249",
+        "baseline_structural_sha256": "a" * 64,
+        "expected_post_migration_catalog_sha256": "b" * 64,
+        "inventory_counts": {"public": 47, "auth": 22, "storage": 5, "cron_jobs": 8,
+                             "pg_net_queue": 0},
+        "guarded_relations": [
+            *public_relations,
+            *auth_relations,
+            *storage_relations,
+            {"schema": "cron", "name": "job", "oid": 400, "relkind": "r",
+             "parent_oid": None, "owner": "postgres"},
+            {"schema": "net", "name": "http_request_queue", "oid": 401, "relkind": "r",
+             "parent_oid": None, "owner": "postgres"},
+        ],
+        "cron_jobs": [
+            {"jobid": index + 1, "username": "postgres", "command_sha256": str(index) * 64}
+            for index in range(8)
+        ],
+        "migrations": {
+            "20260711140000": {
+                "catalog_sha256": "c" * 64,
+                "migration_file_sha256": "e" * 64,
+                "relations": [
+                    {"schema": "public", "name": "document_evidence_runs", "relkind": "r",
+                     "parent_schema": None, "parent_name": None, "owner": "postgres"},
+                ],
+            },
+            "20260711151000": {
+                "catalog_sha256": "b" * 64,
+                "migration_file_sha256": "f" * 64,
+                "relations": [
+                    {"schema": "public", "name": "document_evidence_observability_totals",
+                     "relkind": "r", "parent_schema": None, "parent_name": None,
+                     "owner": "postgres"},
+                ],
+            },
+        },
+    }
+
+
+def _barrier_probe_object(run_id: str, expected_catalog_sha256: str) -> dict[str, Any]:
+    """The megacampus.q12.database-barrier-probes/v1 object the forward resume gate re-validates
+    (q12-writer-resume.py:1108-1133) and the cleanup v1 receipt binds."""
+    return {
+        "schema_version": "megacampus.q12.database-barrier-probes/v1",
+        "run_id": run_id,
+        "expected_catalog_sha256": expected_catalog_sha256,
+        "completed_at": "2026-07-18T00:00:00.000Z",
+        "probes": {
+            "postgrest_anon": "rejected",
+            "postgrest_authenticated": "rejected",
+            "postgrest_service_role_without_capability": "rejected",
+            "postgrest_service_role_with_capability": "rolled_back",
+            "postgrest_preference_applied": "tx=rollback",
+            "auth_profile": "rejected_zero_residue",
+            "storage_object": "rejected_zero_metadata_zero_bytes",
+            "cron_rpc": "rejected_exact_jobs_unchanged",
+            "pg_net_rpc": "rejected_zero_queue_zero_external_request",
+            "direct_supervisor": "rolled_back",
+        },
+        "residue": {
+            "guard_probe_rows": 0,
+            "auth_rows": 0,
+            "storage_metadata_rows": 0,
+            "storage_object_bytes": 0,
+            "cron_job_set_unchanged": True,
+            "pg_net_queue_rows": 0,
+            "external_requests": 0,
+        },
+    }
+
+
+class RealBarrierCleanupChild:
+    """Builds the frozen barrier's protected-test-mode sandbox from the controller's OWN journal
+    and runs `q12-database-barrier.sh cleanup` FOR REAL against it (no real PG — the barrier's own
+    test-mode reconnect gate is skipped, exactly as the R4-B/database-barrier rounds sandbox it).
+
+    Split into prepare()/execute() because the controller must journal rows 1-3 (intent ->
+    capability_issued -> capability_claimed) BEFORE the barrier can validate to the claimed
+    boundary: prepare() lays out the static scaffolding + computes the frozen cleanup invocation's
+    own command (argv + command_sha256), and execute() copies the by-then-extended controller
+    journal into the sandbox, binds the input checkpoint, and invokes the real child.
+    """
+
+    def __init__(self, controller_run_root: pathlib.Path, run_id: str,
+                 controller_expected_catalog_sha256: str) -> None:
+        self.controller_run_root = controller_run_root
+        self.run_id = run_id
+        self.controller_expected_catalog_sha256 = controller_expected_catalog_sha256
+        # The frozen barrier's protected test root MUST be a real /tmp/mc2-q12-barrier-* directory
+        # (q12-database-barrier.sh:95), so the sandbox is a top-level temp dir (not under the
+        # controller run root), created 0700 by mkdtemp, and torn down after the child exits.
+        self.sandbox = pathlib.Path(
+            tempfile.mkdtemp(prefix="mc2-q12-barrier-cleanup-", dir="/tmp")
+        )
+        self.trust_root = self.sandbox
+        self.barrier_run_root = self.sandbox / "backups" / "q12" / run_id
+        self.capability_file = self.barrier_run_root / "secrets" / "db-capability"
+        self.catalog_file = self.barrier_run_root / "expected-catalog.json"
+        self.baseline_file = self.barrier_run_root / "database-barrier-baseline.json"
+        self.receipt_file = self.barrier_run_root / "database-barrier-receipt.json"
+        self.probe_file = self.barrier_run_root / "database-barrier-probe-receipt.json"
+        self.terminal_proof_file = (
+            self.barrier_run_root / "database-barrier-cleanup-terminal-proof.json"
+        )
+        self.command_sha256: str | None = None
+        self.catalog_sha256: str | None = None
+
+    def _write_protected(self, path: pathlib.Path, body: bytes, mode: int) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(body)
+        os.chmod(path, mode)
+
+    def prepare(self) -> dict[str, Any]:
+        for directory in (
+            self.sandbox / "project" / "packages" / "course-gen-platform",
+            self.sandbox / "secrets",
+            self.barrier_run_root / "secrets",
+        ):
+            directory.mkdir(parents=True, exist_ok=True)
+        # The frozen barrier rejects any group/world-writable parent in the chain up to the trust
+        # boundary (require_safe_parent_chain), so every created directory must be mode 0700.
+        for directory in (
+            self.sandbox,
+            self.sandbox / "secrets",
+            self.sandbox / "project",
+            self.sandbox / "project" / "packages",
+            self.sandbox / "project" / "packages" / "course-gen-platform",
+            self.sandbox / "backups",
+            self.sandbox / "backups" / "q12",
+            self.barrier_run_root,
+            self.barrier_run_root / "secrets",
+        ):
+            os.chmod(directory, 0o700)
+        db_url = self.sandbox / "secrets" / "supabase_db_url"
+        ca_file = self.sandbox / "secrets" / "prod-ca.crt"
+        self._write_protected(
+            db_url,
+            (
+                f"postgresql://postgres.diqooqbuchsliypgwksu:{URI_PASSWORD_SENTINEL}"
+                "@aws-1-us-east-2.pooler.supabase.com:5432/postgres\n"
+            ).encode("utf-8"),
+            0o600,
+        )
+        self._write_protected(ca_file, b"synthetic-ca\n", 0o644)
+        self._write_protected(
+            self.capability_file, f"{CAPABILITY_SENTINEL}\n".encode("utf-8"), 0o400
+        )
+        catalog = _barrier_expected_catalog()
+        catalog_body = (json.dumps(catalog, indent=2) + "\n").encode("utf-8")
+        self._write_protected(self.catalog_file, catalog_body, 0o400)
+        self.catalog_sha256 = CORE.sha256(catalog_body)
+        probe = _barrier_probe_object(self.run_id, self.catalog_sha256)
+        probe_body = CORE.complete_object(probe)
+        self._write_protected(self.probe_file, probe_body, 0o400)
+        probe_sha256 = CORE.sha256(probe_body)
+        capability_sha256 = CORE.sha256(CAPABILITY_SENTINEL.encode("utf-8"))
+        guarded_relations_sha256 = CORE.sha256(CORE.canonical(catalog["guarded_relations"]))
+        baseline_projection = {
+            "baseline_structural_catalog_sha256": catalog["baseline_structural_sha256"],
+            "database_default_sha256": "6" * 64,
+            "cron_jobs_sha256": "7" * 64,
+            "guarded_relations_sha256": guarded_relations_sha256,
+            "pg_net_queue_count": 0,
+        }
+        baseline = {
+            "schema_version": "megacampus.q12.database-barrier-baseline/v1",
+            "run_id": self.run_id,
+            "state": "maintenance_guarded_baseline",
+            "source_baseline_sha256": "8" * 64,
+            "baseline_sha256": CORE.sha256(CORE.canonical(baseline_projection)),
+            "predecessor_checkpoint_sha256": "9" * 64,
+            "predecessor_journal_entry_hash": "a" * 64,
+            "resource_manifest_sha256": "b" * 64,
+            "expected_post_migration_catalog_sha256": catalog[
+                "expected_post_migration_catalog_sha256"
+            ],
+            "database_capability_sha256": capability_sha256,
+            "baseline": baseline_projection,
+        }
+        self._write_protected(self.baseline_file, CORE.complete_object(baseline), 0o400)
+        receipt = {
+            "schema_version": "megacampus.q12.database-barrier-receipt/v1",
+            "run_id": self.run_id,
+            "state": "activated",
+            "zero_guard_residue": False,
+            "expected_catalog_sha256": self.catalog_sha256,
+            "last_command": "activate",
+            "rollback_probes_verified": True,
+            "probe_receipt_sha256": probe_sha256,
+        }
+        receipt_body = CORE.complete_object(receipt)
+        self._write_protected(self.receipt_file, receipt_body, 0o400)
+        self._write_protected(
+            self.barrier_run_root / "database-barrier-receipt-v1-before-cleanup.json",
+            receipt_body,
+            0o400,
+        )
+        fake_node = self.sandbox / "fake-node"
+        self._write_protected(
+            fake_node,
+            (
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ ( "$3" == cleanup || "$3" == rollback ) && '
+                '-n "${MC2_Q12_FAKE_TERMINAL_RESULT:-}" ]]; then\n'
+                '  [[ -n "${14:-}" ]] || exit 84\n'
+                '  printf \'%s\\n\' "$MC2_Q12_FAKE_TERMINAL_RESULT" > "${14}"\n'
+                "fi\n"
+            ).encode("utf-8"),
+            0o700,
+        )
+        self.fake_node = fake_node
+        self.db_url = db_url
+        self.ca_file = ca_file
+        self.terminal_child_result = {
+            "structural_catalog_sha256": catalog["expected_post_migration_catalog_sha256"],
+            "database_default_sha256": baseline_projection["database_default_sha256"],
+            "cron_jobs_sha256": baseline_projection["cron_jobs_sha256"],
+            "guard_residue": {
+                "q12_guard_schema_count": 0,
+                "q12_guard_relation_count": 0,
+                "q12_guard_function_count": 0,
+                "q12_guard_type_count": 0,
+                "q12_guard_trigger_count": 0,
+                "q12_guard_event_trigger_count": 0,
+                "barrier_era_session_count": 0,
+            },
+        }
+        argv = [
+            "bash",
+            str(FROZEN_BARRIER),
+            "cleanup",
+            "--run-id",
+            self.run_id,
+            "--db-url-file",
+            str(db_url),
+            "--ca-file",
+            str(ca_file),
+            "--q12-db-capability-file",
+            str(self.capability_file),
+            "--expected-post-migration-catalog",
+            str(self.catalog_file),
+            "--expected-post-migration-catalog-sha256",
+            self.catalog_sha256,
+        ]
+        self.argv = argv
+        self.command_sha256 = CORE.sha256(CORE.canonical(argv))
+        self.probe_sha256 = probe_sha256
+        return {"argv": argv, "command_sha256": self.command_sha256}
+
+    def execute(self) -> None:
+        # Copy the controller's OWN journal (76 forward rows + the 3 cleanup rows) into the
+        # barrier sandbox; the frozen child validates these exact bytes to the claimed boundary.
+        controller_journal = (self.controller_run_root / "phase.jsonl").read_bytes()
+        sandbox_journal = self.barrier_run_root / "phase.jsonl"
+        self._write_protected(sandbox_journal, controller_journal, 0o600)
+        rows = [json.loads(line) for line in controller_journal.splitlines()]
+        head = rows[-1]
+        if not (
+            head["phase"] == "guard_cleanup_complete"
+            and head["outcome"] == "capability_claimed"
+            and head["command_id"] == "barrier.cleanup"
+        ):
+            raise CORE.LifecycleError("barrier cleanup child requires a claimed-boundary head")
+        journal_stat = sandbox_journal.stat()
+        # The frozen barrier's child input checkpoint IS the core's own cutover-checkpoint
+        # projection of the claimed head (identical key set, CORE.CHECKPOINT_KEYS): reuse the
+        # controller-published phase-checkpoint.json (authored by Engine.append, NOT reimplemented
+        # here) and rebind ONLY journal_device/journal_inode to the sandbox journal copy the barrier
+        # will stat. Reusing the core projection keeps this adapter free of any serializer schema.
+        core_checkpoint = json.loads(
+            (self.controller_run_root / "phase-checkpoint.json").read_bytes()
+        )
+        if core_checkpoint["journal_entry_hash"] != head["entry_hash"]:
+            raise CORE.LifecycleError("controller checkpoint is not at the claimed cleanup head")
+        core_checkpoint["journal_device"] = str(journal_stat.st_dev)
+        core_checkpoint["journal_inode"] = str(journal_stat.st_ino)
+        self._write_protected(
+            self.barrier_run_root
+            / f"database-barrier-input-checkpoint-cleanup-{head['lease_epoch']}.json",
+            CORE.complete_object(core_checkpoint),
+            0o600,
+        )
+        environ = {
+            "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
+            "LC_ALL": "C",
+            "LANG": "C",
+            "MC2_Q12_BARRIER_TEST_MODE": BARRIER_TEST_MODE_TOKEN,
+            "MC2_Q12_BARRIER_TEST_ROOT": str(self.trust_root),
+            "MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY": str(self.sandbox / "project"),
+            "MC2_Q12_BARRIER_TEST_NODE": str(self.fake_node),
+            "MC2_Q12_FAKE_TERMINAL_RESULT": CORE.canonical(self.terminal_child_result).decode(
+                "utf-8"
+            ),
+        }
+        completed = subprocess.run(
+            self.argv,
+            check=False,
+            close_fds=True,
+            env=environ,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            shutil.rmtree(self.sandbox, ignore_errors=True)
+            raise CORE.LifecycleError(
+                "frozen barrier cleanup child failed: "
+                f"rc={completed.returncode} {completed.stderr.strip()}"
+            )
+        if not self.terminal_proof_file.exists():
+            shutil.rmtree(self.sandbox, ignore_errors=True)
+            raise CORE.LifecycleError("frozen barrier cleanup child produced no terminal proof")
+        # Capture the child's real terminal proof digest + the v1 receipt bytes (the archive
+        # source) BEFORE tearing down the barrier-side sandbox.
+        self.terminal_proof_sha256 = CORE.sha256(self.terminal_proof_file.read_bytes())
+        self.v1_receipt_bytes = self.receipt_file.read_bytes()
+        shutil.rmtree(self.sandbox, ignore_errors=True)
 
 
 def acquire_fixture_coordination_lock() -> int:
@@ -298,59 +678,46 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             "status": "accepted",
         }
 
-    # R5 Sub-round E (orchestrator RULING 1 — post-activate cleanup is RECEIPT-ONLY): the
-    # post-activate barrier-cleanup and forward-writer-resume seam. run_live invokes these AFTER
-    # the 76th journal row and RECORDS the returned outcomes on output["postActivate"] — they
-    # NEVER touch the journal, a capability digest, a checkpoint, self.child_executions, or an
-    # accepted_object_sha256 (the R4 child-execution count stays pinned at 18). Here the cleanup
-    # child is fixture-seeded (real docker/PG17 + `q12-database-barrier.sh cleanup` is round R8);
-    # it emits a v2 guard_cleanup_complete receipt (+ probe receipt) shaped EXACTLY so the REAL
-    # W-owned q12-writer-resume.py forward branch (:1088-1134) would accept it, and the resume
-    # child re-reads and fail-closed VALIDATES that same projection before reporting "resumed".
+    # Design §6b.1 R8-I-A — POST-ACTIVATE CLEANUP IS JOURNALED, barrier run FOR REAL. The
+    # controller journals the guard_cleanup_complete/barrier.cleanup rows itself (through the core
+    # append cleanup caller); this seam owns only the file-artifact production the frozen barrier
+    # and §6b.5 assign to the controller side: it runs the REAL frozen q12-database-barrier.sh
+    # cleanup child against the controller's OWN journal (no real PG — the barrier's own protected
+    # test mode is used, exactly as the R4-B/database-barrier rounds sandbox the DB child), then
+    # promotes the archived v1 receipt to the exact 10-key v2 the forward resume gate requires and
+    # records the db-capability deletion. prepare() returns the frozen cleanup command's own
+    # command_sha256 for the rows; execute() runs the child AFTER rows 1-3 exist.
 
-    def execute_barrier_cleanup(self, context: dict[str, Any]) -> dict[str, Any]:
+    def prepare_barrier_cleanup(self, context: dict[str, Any]) -> dict[str, Any]:
+        self._cleanup_child = RealBarrierCleanupChild(
+            pathlib.Path(context["run_root"]),
+            context["run_id"],
+            context["expected_catalog_sha256"],
+        )
+        return self._cleanup_child.prepare()
+
+    def execute_barrier_cleanup(
+        self, context: dict[str, Any], command: dict[str, Any]
+    ) -> dict[str, Any]:
+        child = self._cleanup_child
+        # Run the frozen barrier cleanup child FOR REAL: it validates the controller journal to
+        # the claimed boundary, performs the sandboxed DB cleanup, and publishes the terminal proof.
+        child.execute()
         run_root = pathlib.Path(context["run_root"])
         run_id = context["run_id"]
         expected_catalog_sha256 = context["expected_catalog_sha256"]
-        # The probe receipt (megacampus.q12.database-barrier-probes/v1): exact key set + the exact
-        # nested probes/residue projections q12-writer-resume.py:1108-1133 enforces on the forward
-        # branch. completed_at is a fixed-shape UTC millisecond timestamp (the consumer regex).
-        probe_object = {
-            "schema_version": "megacampus.q12.database-barrier-probes/v1",
-            "run_id": run_id,
-            "expected_catalog_sha256": expected_catalog_sha256,
-            "completed_at": "2026-07-18T00:00:00.000Z",
-            "probes": {
-                "postgrest_anon": "rejected",
-                "postgrest_authenticated": "rejected",
-                "postgrest_service_role_without_capability": "rejected",
-                "postgrest_service_role_with_capability": "rolled_back",
-                "postgrest_preference_applied": "tx=rollback",
-                "auth_profile": "rejected_zero_residue",
-                "storage_object": "rejected_zero_metadata_zero_bytes",
-                "cron_rpc": "rejected_exact_jobs_unchanged",
-                "pg_net_rpc": "rejected_zero_queue_zero_external_request",
-                "direct_supervisor": "rolled_back",
-            },
-            "residue": {
-                "guard_probe_rows": 0,
-                "auth_rows": 0,
-                "storage_metadata_rows": 0,
-                "storage_object_bytes": 0,
-                "cron_job_set_unchanged": True,
-                "pg_net_queue_rows": 0,
-                "external_requests": 0,
-            },
-        }
+        # Controller-side probe receipt in the controller run root (the forward resume gate re-reads
+        # it, q12-writer-resume.py:1108-1133). Its digest binds the v2 receipt's probe_receipt_sha256.
+        probe_object = _barrier_probe_object(run_id, expected_catalog_sha256)
         probe_body = CORE.complete_object(probe_object)
         probe_path = run_root / "database-barrier-probe-receipt.json"
         CORE.immutable_publish(probe_path, probe_body, 0o400, [])
         probe_digest = CORE.sha256(probe_body)
-        # The v2 database-barrier receipt (megacampus.q12.database-barrier-receipt/v2): the exact
-        # 10-key terminal authority q12-writer-resume.py:1090-1104 requires for the forward branch
-        # (state guard_cleanup_complete, last_command cleanup, rollback_probes_verified True,
-        # probe_receipt_sha256 == the probe file digest, zero_guard_residue/database_capability_
-        # deleted True, hex64 expected/terminal bindings).
+        # v1 -> v2 promotion: archive the activate v1 receipt (0400), then write the exact 10-key
+        # megacampus.q12.database-barrier-receipt/v2 the forward resume gate requires key-for-key
+        # (q12-writer-resume.py:1090-1104). terminal_proof_sha256 binds the REAL barrier-child proof.
+        archive_path = run_root / "database-barrier-receipt-v1-before-cleanup.json"
+        CORE.immutable_publish(archive_path, child.v1_receipt_bytes, 0o400, [])
         receipt_object = {
             "schema_version": "megacampus.q12.database-barrier-receipt/v2",
             "run_id": run_id,
@@ -360,9 +727,7 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             "last_command": "cleanup",
             "rollback_probes_verified": True,
             "probe_receipt_sha256": probe_digest,
-            "terminal_proof_sha256": CORE.sha256(
-                f"q12-database-barrier-cleanup-terminal-proof:{run_id}".encode()
-            ),
+            "terminal_proof_sha256": child.terminal_proof_sha256,
             "database_capability_deleted": True,
         }
         receipt_body = CORE.complete_object(receipt_object)
@@ -374,8 +739,11 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             "ok": True,
             "cleanup_receipt_path": str(receipt_path),
             "cleanup_receipt_sha256": receipt_digest,
+            "cleanup_receipt_archive_path": str(archive_path),
             "probe_receipt_path": str(probe_path),
             "probe_receipt_sha256": probe_digest,
+            "terminal_proof_sha256": child.terminal_proof_sha256,
+            "command_sha256": command["command_sha256"],
             "receipt": receipt_object,
         }
 
@@ -556,7 +924,14 @@ def write_audit(
 
 
 def derive_run_id(run_root: pathlib.Path) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, str(run_root)))
+    # Deterministic per-root run id, shaped as a lower-case UUIDv4. R8-I-A drives the FROZEN
+    # q12-database-barrier.sh cleanup child against the controller's own journal, and the frozen
+    # barrier requires --run-id to be a UUIDv4 (`-4xxx-[89ab]xxx-`, q12-database-barrier.sh:72).
+    # The composer and the live controller both derive their run id here, so forcing the v4 shape
+    # (version + RFC-4122 variant bits over the same uuid5 entropy) is parity-neutral: both twins
+    # still bind the identical id, only now barrier-acceptable.
+    seed = uuid.uuid5(uuid.NAMESPACE_URL, str(run_root))
+    return str(uuid.UUID(int=seed.int, version=4))
 
 
 def open_directory_chain(path: pathlib.Path, label: str) -> int:

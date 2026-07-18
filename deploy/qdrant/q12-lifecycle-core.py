@@ -75,6 +75,13 @@ FWM_ROW_PHASES = {
     "writers.resume.forward": "prepared_quiesced",
     "writers.resume.rollback": "rollback_preparing",
 }
+# Design §6b (R8 post-activation amendment): the journaled post-activate cleanup segment.
+# barrier.cleanup is NOT a manifest command (§6b.4 — never in OPERATIONS/COMMANDS/
+# MANIFEST_COMMAND_IDS); its grammar authority is the frozen barrier's own tail validator
+# (deploy/qdrant/q12-database-barrier.sh:507-553). All rows carry phase CLEANUP_PHASE.
+CLEANUP_COMMAND_ID = "barrier.cleanup"
+CLEANUP_PHASE = "guard_cleanup_complete"
+DATABASE_BARRIER_RECEIPT_KIND = "database_barrier_receipt"
 
 
 @dataclass
@@ -237,7 +244,12 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
     if not (
         (accepted_kind == "none" and accepted_hash is None)
         or (
-            accepted_kind in ("final_writer_manifest", "writer_quiesce_manifest")
+            accepted_kind
+            in (
+                "final_writer_manifest",
+                "writer_quiesce_manifest",
+                DATABASE_BARRIER_RECEIPT_KIND,
+            )
             and isinstance(accepted_hash, str)
             and re.fullmatch(r"[0-9a-f]{64}", accepted_hash)
         )
@@ -285,6 +297,34 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
             valid = phase == target_phase
         elif valid and outcome == "completed":
             valid = phase == target_phase or MILESTONE_WITNESSES.get(phase) == command_id
+        else:
+            valid = False
+    elif command_id == CLEANUP_COMMAND_ID:
+        # Design §6b.1 / §6b.4 extension (a): the journaled post-activate cleanup lifecycle.
+        # This branch mirrors the frozen barrier tail grammar (q12-database-barrier.sh:507-553):
+        # every row carries phase guard_cleanup_complete; the intent row carries no capability
+        # (capability_manifest_sha256 == 0×64) and no accepted object; the capability_issued/
+        # recovery_reacquired/capability_claimed/capability_completed rows bind a real host
+        # capability and carry no accepted object; the terminal accepted row binds the promoted
+        # database_barrier_receipt digest. barrier.cleanup is NOT resolved through the manifest —
+        # command_sha256 is the barrier-child-provided cleanup argv digest (non-zero).
+        valid = phase == CLEANUP_PHASE and entry["command_sha256"] != ZERO
+        if valid and outcome == "intent":
+            valid = accepted_kind == "none" and entry["capability_manifest_sha256"] == ZERO
+        elif valid and outcome in (
+            "capability_issued",
+            "recovery_reacquired",
+            "capability_claimed",
+            "capability_completed",
+        ):
+            valid = accepted_kind == "none" and entry["capability_manifest_sha256"] != ZERO
+        elif valid and outcome == "accepted":
+            valid = (
+                accepted_kind == DATABASE_BARRIER_RECEIPT_KIND
+                and isinstance(accepted_hash, str)
+                and bool(re.fullmatch(r"[0-9a-f]{64}", accepted_hash))
+                and entry["capability_manifest_sha256"] != ZERO
+            )
         else:
             valid = False
     else:
@@ -1083,7 +1123,13 @@ class Engine:
                     operation is None
                     and capability["command_id"] in ORDINARY_COMMAND_IDS
                 )
-                if operation is None and not ordinary:
+                # Design §6b.4 extension (b): the post-activate cleanup capability class. It is
+                # keyed off the non-manifest barrier.cleanup command_id, OUTSIDE the OPERATIONS/
+                # ORDINARY_COMMAND_IDS coupling, so reconstructing it never forces a manifest entry.
+                cleanup_capability = (
+                    operation is None and capability["command_id"] == CLEANUP_COMMAND_ID
+                )
+                if operation is None and not ordinary and not cleanup_capability:
                     raise LifecycleError("unknown capability command")
                 epoch = capability["lease_epoch"]
                 if not EPOCH_RE.fullmatch(epoch):
@@ -1130,17 +1176,20 @@ class Engine:
                         not in (ZERO, self.request["quiesce_manifest_sha256"])
                     ):
                         raise LifecycleError("capability stable binding mismatch")
-                key = (
-                    f"ordinary:{capability['command_id']}:{epoch}"
-                    if ordinary
-                    else f"{operation}:{epoch}"
-                )
+                if ordinary:
+                    key = f"ordinary:{capability['command_id']}:{epoch}"
+                elif cleanup_capability:
+                    key = f"cleanup:{epoch}"
+                else:
+                    key = f"{operation}:{epoch}"
                 if key in seen_capabilities:
                     raise LifecycleError("capability present in multiple states")
                 expected_name = f"{capability['command_id']}--{epoch}.json"
                 if path.name != expected_name:
                     raise LifecycleError("capability filename mismatch")
-                if not ordinary and (
+                # The retained-barrier-capability-checkpoint copy binding is an OPERATIONS-barrier
+                # concern (publish_copy); ordinary and cleanup capabilities carry no retained copy.
+                if not ordinary and not cleanup_capability and (
                     key not in retained_digests
                     or capability["capability_input_checkpoint_sha256"]
                     != retained_digests[key]
@@ -1616,6 +1665,81 @@ class Engine:
         fsync_directory(target.parent)
         self.capabilities[f"ordinary:{command_id}:cutover"] = str(target)
         return target
+
+    # Design §6b.1 / §6b.4 extension (c): the post-activate cleanup capability + a direct
+    # Engine.append caller for the barrier.cleanup rows. append_ordinary_lifecycle /
+    # retained_chain / append_controller_milestone all route through resolved_command
+    # (manifest["commands"][command_id]) and KeyError on the non-manifest "barrier.cleanup";
+    # retained_chain is keyed on OPERATIONS (which excludes cleanup). These callers feed
+    # Engine.append the barrier-child-provided command authority directly — Engine.append stays
+    # the one journaling primitive (§2 / §10 hold); no second resolver/journaling authority is
+    # forked, and no manifest entry is created.
+    def publish_cleanup_capability(
+        self, command: dict[str, Any], checkpoint_hash: str
+    ) -> tuple[pathlib.Path, dict[str, Any], str]:
+        capability = {
+            "schema_version": "megacampus.q12.host-command-capability/v1",
+            "run_id": self.request["run_id"],
+            "command_id": CLEANUP_COMMAND_ID,
+            "command_sha256": command["command_sha256"],
+            "release_sha": self.request["release_sha"],
+            "operator_digest": self.request["operator_digest"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
+            "resume_authority_sha256": None,
+            "capability_input_checkpoint_sha256": checkpoint_hash,
+            "lease_epoch": "cutover",
+            "supersedes_capability_sha256": None,
+        }
+        if set(capability) != CAPABILITY_KEYS:
+            raise AssertionError("internal capability projection mismatch")
+        data = complete_object(capability)
+        path = self.run_root / "capabilities" / "issued" / f"{CLEANUP_COMMAND_ID}--cutover.json"
+        immutable_publish(path, data, 0o400, self.trace)
+        digest = sha256(data)
+        self.capabilities["cleanup:cutover"] = str(path)
+        return path, capability, digest
+
+    def move_cleanup_capability(self, source_state: str, target_state: str) -> pathlib.Path:
+        source = (
+            self.run_root
+            / "capabilities"
+            / source_state
+            / f"{CLEANUP_COMMAND_ID}--cutover.json"
+        )
+        target = self.run_root / "capabilities" / target_state / source.name
+        rename_noreplace(source, target)
+        fsync_directory(source.parent)
+        fsync_directory(target.parent)
+        self.capabilities["cleanup:cutover"] = str(target)
+        return target
+
+    def append_cleanup_row(
+        self,
+        outcome: str,
+        command_sha256: str,
+        capability_hash: str,
+        *,
+        accepted_kind: str = "none",
+        accepted_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Journal one guard_cleanup_complete / barrier.cleanup row through Engine.append.
+
+        The frozen barrier tail grammar (q12-database-barrier.sh:507-553) authors these rows;
+        Engine.append writes the caller-supplied command_id / command_sha256 with no manifest
+        check (JOURNAL_KEYS carries no manifest constraint), so this caller never needs a
+        manifest command. The epoch stays "cutover" for the base (no-recovery) lifecycle.
+        """
+        return self.append(
+            CLEANUP_PHASE,
+            outcome,
+            CLEANUP_COMMAND_ID,
+            command_sha256,
+            "cutover",
+            capability_hash,
+            accepted_kind=accepted_kind,
+            accepted_hash=accepted_hash,
+        )
 
     def append_ordinary_lifecycle(
         self,
@@ -3138,39 +3262,45 @@ def write_quiesce_window_marker(engine: "Engine") -> str:
 def orchestrate_post_activate_cleanup(
     engine: "Engine", request: dict[str, Any], run_id: str
 ) -> dict[str, Any] | None:
-    """Orchestrator RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY.
+    """Design §6b (R8-A/R8-C, ratified 2026-07-18) — POST-ACTIVATE CLEANUP IS JOURNALED.
 
-    The frozen amendment §5 / D5J chronology ends at ``barrier.activate`` (the 76th journal
-    row) and the journal grammar has NO cleanup ``command_id``. Therefore run_live adds NO
-    journal row for the post-activate barrier cleanup or the forward writer resume — the 76-row
-    journal stays a byte/order twin of the closed composer. Instead, AFTER activate, run_live
-    ORCHESTRATES two children through an executor seam (fixture-seeded in tests; the real
-    docker/PG17 cleanup + ``sudo source-recovery-run.sh writers.resume.forward`` are round R8):
+    RULING 1's "receipt-only, no journal row after activate" (§6a item 5 / R5-E) is REVERSED for
+    the real path (§6a item 6): after ``barrier.activate`` (the 76th journal row) the controller
+    JOURNALS the frozen barrier's ``guard_cleanup_complete`` capability lifecycle with
+    ``command_id=barrier.cleanup`` (§6b.1), runs the frozen ``q12-database-barrier.sh cleanup``
+    child FOR REAL against that journal, promotes the archived v1 receipt to the exact 10-key v2
+    ``database-barrier-receipt/v2``, deletes the db capability, and binds the promoted digest in
+    the terminal ``accepted`` row. The RESUME half stays receipt-only — ``writers.resume.forward``
+    journals NO rows here — now FROZEN-FORCED by the barrier's tail-contiguity rule
+    (q12-database-barrier.sh:511-513): any resume row after the cleanup block would break the
+    barrier's own grammar.
 
-      1. the barrier cleanup, which produces the v2 ``guard_cleanup_complete`` database-barrier
-         receipt (schema ``megacampus.q12.database-barrier-receipt/v2``) plus its
-         ``megacampus.q12.database-barrier-probes/v1`` probe receipt; and
-      2. the forward resume child, which fail-closed VALIDATES that receipt (the exact gate the
-         W-owned ``q12-writer-resume.py`` forward branch enforces) and resumes the writers.
+    Base (no-recovery) 5-row lifecycle, all ``phase=guard_cleanup_complete``,
+    ``command_id=barrier.cleanup`` (§6b.1):
 
-    run_live does NOT reimplement the receipt gate — the fail-closed validation lives in the
-    children. It INVOKES them via the seam and RECORDS their outcomes on the result
-    (operator-visible truth, since the cleanup is deliberately not journaled). The seam mirrors
-    the R4 ``execute_ordinary`` pattern: when the executor exposes both hooks, run_live drives
-    them and returns the recorded ``{"cleanup": ..., "resume": ...}`` outcome; when either hook
-    is absent (the closed composer's plain executor, or a production wiring that has not yet
-    seeded the post-activate children) it degrades safely to ``None`` (no post-activate
-    recording) rather than fabricating an unbacked receipt.
+      1. intent               (capability_manifest_sha256 = 0×64; no capability yet)
+      2. capability_issued    (host-command-capability/v1 issued; digest bound)
+      3. capability_claimed   (the CLAIMED BOUNDARY the barrier requires, :546-553)
+         — the frozen barrier child runs HERE: validates the journal to the claimed boundary,
+           performs the DB guard cleanup, publishes the 18-key terminal proof, and exits 0 —
+      4. capability_completed (completed-capability renamed into completed/)
+      5. accepted             (accepted_object_kind=database_barrier_receipt, binding sha256(v2))
+
+    barrier.cleanup is NOT a manifest command (§6b.4): the rows are journaled through the direct
+    Engine.append cleanup caller (extension c), never through resolved_command. The barrier
+    scaffolding + real invocation + the v1 archive / v2 promotion / db-capability deletion file
+    artifacts are produced by the executor seam (fixture-owned in tests, the real docker/PG17
+    full-PG window is downstream R8-B); the controller owns the JOURNAL authority.
+
+    When the executor lacks the post-activate hooks it degrades safely to ``None`` (the closed
+    composer's plain executor, or an un-seeded production wiring) rather than fabricating an
+    unbacked lifecycle; a PRODUCTION run fails closed with a named error (the writers would
+    otherwise stay quiesced forever after an activated barrier).
     """
+    prepare_hook = getattr(engine.executor, "prepare_barrier_cleanup", None)
     cleanup_hook = getattr(engine.executor, "execute_barrier_cleanup", None)
     resume_hook = getattr(engine.executor, "execute_forward_resume", None)
-    if cleanup_hook is None or resume_hook is None:
-        # R5 Sub-round F SAFETY GATE (production only): a PRODUCTION cutover that has already
-        # ACTIVATED (the 76th journal row) and then silently skipped the post-activate cleanup +
-        # forward resume would leave the paused writers NEVER RESUMED — a severe incident. The real
-        # docker/PG17 cleanup + resume executor hooks are wired in round R8; until then a production
-        # run MUST fail closed with a NAMED error rather than returning None. The fixture path
-        # (non-production, hooks present) is unaffected and keeps degrading to None when absent.
+    if prepare_hook is None or cleanup_hook is None or resume_hook is None:
         if request.get("production") is True:
             raise LifecycleError(
                 "post-activate cleanup/resume executor not wired (deferred to R8)"
@@ -3181,16 +3311,52 @@ def orchestrate_post_activate_cleanup(
         "run_id": run_id,
         "expected_catalog_sha256": request["expected_catalog_sha256"],
     }
-    cleanup = cleanup_hook(context)
-    # Light orchestration binding ONLY (this is NOT the receipt gate, which the resume child
-    # owns): the recorded cleanup must carry a hex64 receipt digest, and the resume child must
-    # report validating exactly that receipt. Anything else is a controller-side wiring fault.
+    # The frozen cleanup invocation's own command authority (argv + sha256(canonical(argv))). The
+    # rows carry this barrier-child-provided command_sha256, NOT a manifest-resolved one (§6b.4).
+    command = prepare_hook(context)
+    command_sha256 = command.get("command_sha256")
+    if not isinstance(command_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", command_sha256):
+        raise LifecycleError("post-activate cleanup command digest is not a sha256")
+
+    # Rows 1-3: intent -> capability_issued -> capability_claimed, bringing the journal head to
+    # the guard_cleanup_complete/capability_claimed boundary the barrier demands (:546-553).
+    engine.append_cleanup_row("intent", command_sha256, ZERO)
+    checkpoint_hash = sha256(engine.checkpoint_path.read_bytes())
+    _, _capability, digest = engine.publish_cleanup_capability(command, checkpoint_hash)
+    engine.append_cleanup_row("capability_issued", command_sha256, digest)
+    engine.move_cleanup_capability("issued", "claimed")
+    engine.append_cleanup_row("capability_claimed", command_sha256, digest)
+
+    # The frozen barrier cleanup child runs FOR REAL here: it validates the journal to the claimed
+    # boundary, performs the DB guard cleanup, publishes the terminal proof, and exits 0 WITHOUT
+    # writing any receipt. The seam then archives v1 -> database-barrier-receipt-v1-before-cleanup
+    # .json (0400), promotes the receipt to the exact 10-key v2, and deletes the db capability.
+    cleanup = cleanup_hook(context, command)
     receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
     if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
         raise LifecycleError("post-activate cleanup receipt digest is not a sha256")
+
+    # Rows 4-5: capability_completed -> accepted (binding the promoted v2 receipt digest).
+    engine.move_cleanup_capability("claimed", "completed")
+    engine.append_cleanup_row("capability_completed", command_sha256, digest)
+    engine.append_cleanup_row(
+        "accepted",
+        command_sha256,
+        digest,
+        accepted_kind=DATABASE_BARRIER_RECEIPT_KIND,
+        accepted_hash=receipt_sha256,
+    )
+
+    # RESUME HALF — RECEIPT-ONLY (frozen-forced by the barrier tail-contiguity rule): the resume
+    # child fail-closed VALIDATES the v2 receipt and unpauses the writers, journaling NOTHING.
     resume = resume_hook(context, cleanup)
     if resume.get("validated_receipt_sha256") != receipt_sha256:
         raise LifecycleError("post-activate resume validated a different cleanup receipt")
+
+    # Fail closed unless the controller's OWN durable walk accepts the extended journal + the
+    # reconstructed barrier.cleanup capability (extensions a + b): the produced journal must be a
+    # valid durable chain, not just barrier-acceptable, so a later recover (R8-I-B) rehydrates it.
+    engine.reload_durable()
     return {"cleanup": cleanup, "resume": resume}
 
 
