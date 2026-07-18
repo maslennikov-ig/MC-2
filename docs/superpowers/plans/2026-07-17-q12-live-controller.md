@@ -95,6 +95,20 @@ Stream: `mc2-jz6y0.13` (this worktree `codex/q12-plan-builder`).
   same `phase.jsonl` and the combined journal matches the composer's `d5()`+`ordinary()`
   interleave.
 - **GREEN + verify** (real-PG17 for child execution; no-docker for parity).
+- **NON-NEGOTIABLE R4 ACCEPTANCE CRITERION (deferred from R2, orchestrator-pinned
+  2026-07-18):** R4 builds the full-Supabase real-source harness (a disposable source seeded
+  to satisfy `barrier.install`'s strict expected shape — `inventory_counts`
+  public:47/auth:22/storage:5, 8 active cron, the exact `guarded_relations`,
+  `q12-database-barrier.sh:363-408`) because in-process barriers run the real
+  `barrier.install` here. On that harness, R4 MUST prove the **full validateTransition
+  POSITIVE that R2 could not**: R2's `produce_run_root_baseline` captures `baseline.json`
+  from the pre-maintenance source; then the real `barrier.install` transitions the source to
+  the maintenance/cutover state (cron off, read-only on, the complete `q12_guard` machinery +
+  guarded-relations delta); then `q12-source-manifest.ts capture --snapshot <id> --baseline
+baseline.json` (or `verify-transition`) MUST PASS (`validateTransition`,
+  `q12-source-manifest.ts:1258-1352`). **R4 cannot close without this end-to-end
+  baseline→real-install-cutover positive** — it is the acceptance R2 explicitly deferred, not
+  optional.
 
 ## Round 5 — real forward FWM producer (OQ3 forward)
 
