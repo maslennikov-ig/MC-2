@@ -363,6 +363,54 @@ active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; c
   section added). Sub-round C (real-PG17 positive) remains PENDING the same two orchestrator
   rulings — not attempted here.
 
+- **R4 Sub-round C done (validateTransition positive) — SANCTIONED HARD STOP, not a pass.**
+  RED-only (`test(q12): RED R4 Sub-round C real barrier install vs validateTransition`); no
+  GREEN commit exists because GREEN is unreachable without editing the frozen
+  `q12-database-barrier.sh` (out of scope). Built the full real-PG17 harness the round demanded:
+  a disposable, full-Supabase-shaped `postgres:17.10-bookworm` source (47 public / 22 auth / 5
+  named storage / 8 active `cron.job` / empty `net.http_request_queue`, real oids/owners queried
+  live for the 76-relation `guarded_relations` set, a programmatically derived
+  `--expected-catalog` that the UNMODIFIED barrier's frozen jq schema gate
+  (`q12-database-barrier.sh:362-413`) accepts), plus an unprivileged `unshare --user --mount
+--net` namespace scoped to just the `barrier.sh install` invocation (private loopback + a
+  namespace-local `/etc/hosts` override for the frozen production hostname — never the host's
+  real `/etc/hosts`), and a new `q12-pooler-identity-proxy.py` TLS front end that terminates the
+  barrier's mandatory SSLRequest/TLS handshake for that hostname and rewrites only the wire
+  StartupMessage's `user` field (pooler tenant name → the disposable source's real `postgres`
+  role, mirroring Supabase's own pooler), relaying every other byte unmodified into the
+  container via `docker exec` (control channel only, no host network route needed). Driving the
+  REAL, byte-verified barrier for real against real PostgreSQL 17.10 surfaced a genuine,
+  reproducible defect in the barrier's own frozen fresh-install ACL lockdown: its
+  `REVOKE ALL ON TYPE q12_guard.<name> FROM PUBLIC` loop iterates every `pg_type` row in the
+  `q12_guard` namespace with no `typtype`/`typelem` filter, including the four implicit array
+  types Postgres auto-creates alongside every base/composite type
+  (`_active_run`/`_baseline`/`_migration_guards`/`_probe`). PostgreSQL 17.10 categorically
+  refuses `GRANT`/`REVOKE` on array types (`cannot set privileges of array types` / "Set the
+  privileges of the element type instead", `aclchk.c ExecGrant_Type_check`), confirmed
+  independently and deterministically outside the harness too (`CREATE TABLE zzz_test(id int);
+REVOKE ALL ON TYPE _zzz_test FROM PUBLIC;` → the same error on a bare PG17.10 container). The
+  very first real fresh `install` therefore aborts mid-tx1 and rolls back cleanly (`q12_guard`
+  absent afterward; cron/read-only unchanged — no partial/corrupt state), so
+  `q12-source-manifest.ts capture` correctly reports `unexpected baseline-to-cutover delta:
+cron activity` (nothing transitioned). This is unavoidable without a frozen-byte edit to
+  `q12-database-barrier.sh`, which is out of scope for this stream (Option B: byte-untouched) —
+  a sanctioned hard stop per this round's own instructions, reported rather than hidden or
+  worked around by stubbing/weakening anything. New files:
+  `tests/unit/ops/q12-live-real-barrier-cutover.test.ts` (the RED positive test, gated
+  `MC2_Q12_REAL_PG17=1`), `tests/unit/ops/fixtures/q12-live-real-barrier-cutover-runner.py` (the
+  harness), `tests/unit/ops/fixtures/q12-pooler-identity-proxy.py` (the TLS+identity front end).
+  No production file changed. The 4-suite no-docker regression (`q12-live-controller` +
+  `q12-live-cutover` + `q12-retained-barrier-quiesce-seam` +
+  `q12-retained-barrier-w-composition-seam`) stays 303/303; `tsc --noEmit` = 0; frozen bytes
+  unchanged (`q12-command-manifest.json` `aaec6fc2…`, `q12-database-barrier.sh` `134255ce…`,
+  `q12-structural-catalog.sql` prefix `0b8a943f…`); zero leftover docker containers/networks/
+  volumes verified after every run. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r4.md` (Sub-round C section added). **R4 does
+  NOT close**: the plan's own text is explicit that "R4 cannot close without this end-to-end
+  baseline→real-install-cutover positive" — that positive is now proven blocked by a real
+  barrier defect, not by any harness gap, and fixing it requires an explicitly authorized,
+  separate round that touches the frozen barrier script.
+
 ## Open risks carried forward
 
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
