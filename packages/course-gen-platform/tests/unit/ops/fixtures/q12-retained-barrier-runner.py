@@ -774,6 +774,16 @@ LIVE_SPEC_KEYS = {
     "production",
     "quiesceManifestPath",
     "executeActualWrapper",
+    "stopAfter",
+}
+
+RECOVER_SPEC_KEYS = {
+    "runRoot",
+    "recoverController",
+    "runId",
+    "production",
+    "quiesceManifestPath",
+    "executeActualWrapper",
 }
 
 
@@ -876,8 +886,79 @@ def run_live_fixture(spec: dict) -> int:
         request["quiesce_manifest_path"] = quiesce_manifest_path
     if spec.get("production") is True:
         request["production"] = True
+    # R5 Sub-round D: an optional named checkpoint at which run_live stops cleanly and returns its
+    # partial output (a stopped run does NOT run post-activate). Absent => the full 76-row window.
+    if spec.get("stopAfter") is not None:
+        request["stop_after"] = spec["stopAfter"]
     try:
         output = CORE.run_live(request, executor)
+    except Exception as error:  # noqa: BLE001 - fixture surfaces the message
+        write_audit(root, executor)
+        print(str(error), file=sys.stderr)
+        return 2
+    output["childExecutions"] = executor.child_executions
+    write_audit(root, executor, output)
+    sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
+def run_recover_fixture(spec: dict) -> int:
+    """Drive the R5 Sub-round D RECOVER controller (run_recover) on an EXISTING run root.
+
+    Mirrors run_live_fixture's request base + executor + canonical-lease handling, but targets a
+    run root a prior run_live(stop_after=...) already left a partial durable journal on (a
+    separate process; the lease was released when it exited, so recover re-acquires it here). The
+    runId MUST be pinned to the same id that partial run used so the rehydrated journal binds.
+    """
+    unknown = set(spec) - RECOVER_SPEC_KEYS
+    if unknown:
+        raise RuntimeError(f"unknown recover fixture key: {sorted(unknown)}")
+    root = fixture_root(spec["runRoot"])
+    acquire_fixture_coordination_lock()
+    canonical_lock_path = root.parent / "cutover.lock"
+    if canonical_lock_path.exists():
+        canonical_lock_path.chmod(0o600)
+    lease_fd = os.open(canonical_lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    if lease_fd != 9:
+        os.dup2(lease_fd, 9)
+        os.close(lease_fd)
+        lease_fd = 9
+    fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lock_stat = os.fstat(lease_fd)
+    executor = (
+        LiveSandboxedDeployedWrapperExecutor(root)
+        if spec.get("executeActualWrapper")
+        else LiveOrdinaryExecutor()
+    )
+    executor.root = root
+    expected_catalog = root / "expected-post-migration-catalog.json"
+    if not expected_catalog.exists():
+        expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
+        expected_catalog.chmod(0o400)
+    quiesce_manifest_path = spec.get("quiesceManifestPath")
+    quiesce_manifest_sha256 = (
+        quiesce_manifest_sha256_readonly(quiesce_manifest_path)
+        if quiesce_manifest_path is not None
+        else "0" * 64
+    )
+    request = {
+        "run_root": str(root),
+        "run_id": spec.get("runId") or derive_run_id(root),
+        "release_sha": "0123456789abcdef0123456789abcdef01234567",
+        "operator_digest": "1" * 64,
+        "resource_manifest_sha256": "2" * 64,
+        "quiesce_manifest_sha256": quiesce_manifest_sha256,
+        "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
+        "rotation_required": False,
+        "lease_fd": 9,
+        "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
+    }
+    if quiesce_manifest_path is not None:
+        request["quiesce_manifest_path"] = quiesce_manifest_path
+    if spec.get("production") is True:
+        request["production"] = True
+    try:
+        output = CORE.run_recover(request, executor)
     except Exception as error:  # noqa: BLE001 - fixture surfaces the message
         write_audit(root, executor)
         print(str(error), file=sys.stderr)
@@ -985,6 +1066,8 @@ def main() -> int:
         raise RuntimeError("caller quiesce digest override is forbidden")
     if spec.get("liveController"):
         return run_live_fixture(spec)
+    if spec.get("recoverController"):
+        return run_recover_fixture(spec)
     if "joinedProfile" in spec:
         return run_joined_fixture(spec)
     root = fixture_root(spec["runRoot"])

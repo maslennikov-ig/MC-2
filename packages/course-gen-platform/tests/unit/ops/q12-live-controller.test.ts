@@ -8,7 +8,9 @@ import {
   deriveRootRetainedBarrierFixtureRunId,
   materializeJoinedRetainedBarrierFixture,
   materializeLiveController,
+  materializeRecover,
   runFwmNegative,
+  runRecoverExpectingRefusal,
   sha,
   validateStableBindingWalk,
 } from './fixtures/q12-retained-barrier-contract.js';
@@ -697,5 +699,206 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate
       expect(row.command_id).not.toBe('barrier.cleanup');
       expect(row.command_id).not.toBe('writers.resume.forward.cleanup');
     }
+  });
+});
+
+// R5 Sub-round D (orchestrator RULING 2 — RECOVER SCOPE) closes the R5-C deferred
+// marker-lifetime assertion: the SECOND observation point, "the cutover-window marker is present
+// BEFORE the group-3 writers.quiesce row", which needed the run_live mid-run stop seam that only
+// landed with R5-D. run_live(stop_after="writers.quiesce.pre") stops cleanly after group 2
+// (barrier.install) and BEFORE journaling writers.quiesce; the marker is already on disk.
+describe('Q12 live cutover controller (Task-9) — R5 Sub-round C close: marker present before group-3 writers.quiesce', () => {
+  it('has the exact 0400 cutover marker on disk before the writers.quiesce row is journaled', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+    const stopped = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+      stopAfter: 'writers.quiesce.pre',
+    });
+
+    // (a) the partial journal stopped after group 2: barrier.install/completed is the head, and
+    // there is NO writers.quiesce row yet (the group-3 command has not run).
+    const head = stopped.journalEntries.at(-1)!;
+    expect(head.command_id).toBe('barrier.install');
+    expect(head.outcome).toBe('completed');
+    expect(stopped.journalEntries.some(r => r.command_id === 'writers.quiesce')).toBe(false);
+
+    // (b) yet the marker is ALREADY present with EXACTLY the three keys the W-side
+    // window_is_cutover() exact() check requires, 0400, mode=cutover, run_id === the run.
+    expect(stopped.quiesceWindowMarkerPath).toBeTruthy();
+    expect(stopped.quiesceWindowMarkerPath!.endsWith('/quiesce-window-mode.json')).toBe(true);
+    expect(existsSync(stopped.quiesceWindowMarkerPath!)).toBe(true);
+    expect(statSync(stopped.quiesceWindowMarkerPath!).mode & 0o777).toBe(0o400);
+    const marker = JSON.parse(readFileSync(stopped.quiesceWindowMarkerPath!, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(marker).sort()).toEqual(['mode', 'run_id', 'schema_version']);
+    expect(marker.schema_version).toBe('megacampus.q12.quiesce-window-mode/v1');
+    expect(marker.mode).toBe('cutover');
+    expect(marker.run_id).toBe(runId);
+
+    // (c) a stopped run does NOT run post-activate.
+    expect(stopped.postActivate).toBeNull();
+  });
+});
+
+// R5 Sub-round D (orchestrator RULING 2 — RECOVER SCOPE, non-negotiable): run_recover resumes an
+// interrupted forward cutover from an EXISTING run root and reproduces the SAME 76-row composer
+// twin + post-activate an uninterrupted run would have. It supports EXACTLY two clean checkpoints
+// — the C7 planned-exit head (deploy.prepare/completed) and the crash-after-FWM restart
+// (writers.resume.forward/accepted) — and FAILS CLOSED with a NAMED refusal on every other head,
+// never a heuristic continuation.
+describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover', () => {
+  it('recovers from the C7 planned-exit head (deploy.prepare/completed) to the full 76-row twin + post-activate', async () => {
+    const composerRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    const quiescePath = writeQuiesceManifest(composerRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: composerRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const liveRoot = root();
+
+    // stop the forward run at the C7 head — the journal ends at deploy.prepare/completed.
+    const stopped = await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+      stopAfter: 'deploy.prepare',
+    });
+    const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
+    expect(stopped.journalEntries.length).toBe(c7End);
+    const stoppedHead = stopped.journalEntries.at(-1)!;
+    expect(stoppedHead.command_id).toBe('deploy.prepare');
+    expect(stoppedHead.outcome).toBe('completed');
+    expect(stopped.postActivate).toBeNull();
+
+    // recover on the SAME run root: the completed journal is length 76 and a full byte/order twin
+    // of the composer under the ratified R5-A parity exclusions.
+    const recovered = await materializeRecover({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(recovered.journalEntries.length).toBe(76);
+    expect(recovered.journalEntries.map(withParityExclusions)).toEqual(
+      composer.journalEntries.map(withParityExclusions)
+    );
+
+    // recover RESUMED (appended) — it did not rewrite the prefix: the first c7End rows are the
+    // stopped partial journal byte-for-byte.
+    expect(recovered.journalEntries.slice(0, c7End)).toEqual(stopped.journalEntries);
+
+    // post-activate (R5-E, reused) is recorded on the recovered run.
+    expect(recovered.postActivate).toBeTruthy();
+    expect(recovered.postActivate!.cleanup.status).toBe('guard_cleanup_complete');
+    expect(recovered.postActivate!.resume.status).toBe('resumed');
+    expect(recovered.postActivate!.resume.validated_receipt_sha256).toBe(
+      recovered.postActivate!.cleanup.cleanup_receipt_sha256
+    );
+  });
+
+  it('recovers from the crash-after-FWM restart (writers.resume.forward/accepted) to the full 76-row twin + post-activate', async () => {
+    const composerRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    const quiescePath = writeQuiesceManifest(composerRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: composerRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const liveRoot = root();
+
+    // stop AFTER the group-14 FWM accepted row — the journal ends at writers.resume.forward/accepted.
+    const stopped = await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+      stopAfter: 'final-writer-manifest',
+    });
+    const fwmEnd = witnessIndex(composer.journalEntries, 'writers.resume.forward', 'accepted') + 1;
+    expect(stopped.journalEntries.length).toBe(fwmEnd);
+    const stoppedHead = stopped.journalEntries.at(-1)!;
+    expect(stoppedHead.command_id).toBe('writers.resume.forward');
+    expect(stoppedHead.outcome).toBe('accepted');
+    expect(stopped.postActivate).toBeNull();
+    // the FWM artifact is already on disk (it is what the resume must NOT republish).
+    expect(stopped.forwardFinalWriterManifestPath).toBeTruthy();
+
+    const recovered = await materializeRecover({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(recovered.journalEntries.length).toBe(76);
+    expect(recovered.journalEntries.map(withParityExclusions)).toEqual(
+      composer.journalEntries.map(withParityExclusions)
+    );
+    // resumed from group 15 (deploy.commit): the FWM prefix is preserved byte-for-byte.
+    expect(recovered.journalEntries.slice(0, fwmEnd)).toEqual(stopped.journalEntries);
+    expect(recovered.postActivate).toBeTruthy();
+    expect(recovered.postActivate!.cleanup.status).toBe('guard_cleanup_complete');
+    expect(recovered.postActivate!.resume.status).toBe('resumed');
+  });
+
+  it('fails closed with a NAMED refusal on an unsupported durable head and does NOT continue', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+
+    // --- unsupported mid-forward head: stop before writers.quiesce => head barrier.install/completed,
+    // which is neither the C7 head nor the crash-after-FWM head. ---
+    const liveRoot = root();
+    await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+      stopAfter: 'writers.quiesce.pre',
+    });
+    const journalPath = join(liveRoot, 'phase.jsonl');
+    const before = readFileSync(journalPath);
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    expect(refusal.error).toMatch(/recover does not support resuming from/u);
+    expect(refusal.error).toMatch(/command=barrier\.install/u);
+    expect(refusal.error).toMatch(/outcome=completed/u);
+    expect(refusal.error).toMatch(/phase=maintenance_guarded/u);
+    // it did NOT continue: the durable journal is byte-for-byte unchanged.
+    expect(readFileSync(journalPath)).toEqual(before);
+
+    // --- empty journal: a fresh run root with no durable rows. ---
+    const emptyRefusal = await runRecoverExpectingRefusal({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(emptyRefusal.ok).toBe(false);
+    expect(emptyRefusal.error).toMatch(/recover requires a non-empty durable journal/u);
+
+    // --- a head PAST activate: a full uninterrupted forward run (76 rows) has nothing to resume. ---
+    const fullRoot = root();
+    const full = await materializeLiveController({
+      runRoot: fullRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(full.journalEntries.length).toBe(76);
+    const pastActivate = await runRecoverExpectingRefusal({
+      runRoot: fullRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(pastActivate.ok).toBe(false);
+    expect(pastActivate.error).toMatch(/recover does not support resuming from/u);
+    expect(pastActivate.error).toMatch(/command=barrier\.activate/u);
   });
 });

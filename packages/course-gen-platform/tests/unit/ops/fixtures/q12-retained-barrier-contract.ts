@@ -567,6 +567,29 @@ export interface LiveControllerFixtureSpec {
    * (executor-audit.json in runRoot) reports `actualDeployedWrapper` when this is set.
    */
   executeActualWrapper?: boolean;
+  /**
+   * R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
+   * cleanly and returns its (partial) output. A stopped run does NOT run post-activate. Absent =>
+   * the full 76-row window + post-activate exactly as before. The three checkpoints are the
+   * crash/restart boundaries run_recover resumes from, plus the R5-C before-group-3 marker point:
+   *   "writers.quiesce.pre"   -> stop after group 2 (barrier.install), BEFORE the writers.quiesce row
+   *   "deploy.prepare"        -> stop at the C7 planned-exit head (deploy.prepare/completed)
+   *   "final-writer-manifest" -> stop after the group-14 FWM accepted row (crash-after-FWM)
+   */
+  stopAfter?: 'writers.quiesce.pre' | 'deploy.prepare' | 'final-writer-manifest';
+}
+
+/**
+ * R5 Sub-round D RECOVER controller (run_recover) spec. Targets an EXISTING run root a prior
+ * materializeLiveController({ stopAfter }) call already left a partial durable journal on; the
+ * runId must be pinned to that same run's id so the rehydrated journal binds.
+ */
+export interface RecoverControllerFixtureSpec {
+  runRoot: string;
+  runId?: string;
+  production?: boolean;
+  quiesceManifestPath?: string;
+  executeActualWrapper?: boolean;
 }
 
 /**
@@ -629,6 +652,72 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
     quiesceWindowMarkerPath: output.quiesceWindowMarkerPath ?? null,
     postActivate: output.postActivate ?? null,
   };
+}
+
+/**
+ * R5 Sub-round D: drive the RECOVER controller (run_recover) on an EXISTING run root a prior
+ * materializeLiveController({ stopAfter }) call left a partial durable journal on. Returns the
+ * SAME output shape materializeLiveController does, so a recovered run can be compared row-for-row
+ * against the composer's 76-row forward twin (and its postActivate asserted). run_recover fails
+ * closed (a rejected child, surfaced as a throw) on any durable head it does not support.
+ */
+export async function materializeRecover(spec: RecoverControllerFixtureSpec): Promise<{
+  journalEntries: Record<string, unknown>[];
+  resourceManifestPaths: Record<string, string>;
+  resultPaths: Record<string, string>;
+  childExecutions: number;
+  forwardFinalWriterManifestPath: string | null;
+  quiesceWindowMarkerPath: string | null;
+  postActivate: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
+}> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+    input: JSON.stringify({ recoverController: true, ...spec }),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status !== 0) {
+    throw new Error(`recover controller runner failed (${child.status}): ${child.stderr.trim()}`);
+  }
+  const output = JSON.parse(child.stdout) as {
+    journalEntries: Record<string, unknown>[];
+    resourceManifestPaths?: Record<string, string>;
+    resultPaths?: [string, string][];
+    childExecutions?: number;
+    forwardFinalWriterManifestPath?: string | null;
+    quiesceWindowMarkerPath?: string | null;
+    postActivate?: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
+  };
+  return {
+    journalEntries: output.journalEntries,
+    resourceManifestPaths: output.resourceManifestPaths ?? {},
+    resultPaths: Object.fromEntries(output.resultPaths ?? []),
+    childExecutions: output.childExecutions ?? 0,
+    forwardFinalWriterManifestPath: output.forwardFinalWriterManifestPath ?? null,
+    quiesceWindowMarkerPath: output.quiesceWindowMarkerPath ?? null,
+    postActivate: output.postActivate ?? null,
+  };
+}
+
+/**
+ * R5 Sub-round D: assert run_recover fails closed on an unsupported durable head. Returns the
+ * NAMED refusal message run_recover raised (fixture exit 2 => stderr), so a test can prove it
+ * names the phase/outcome/command and did NOT continue.
+ */
+export async function runRecoverExpectingRefusal(
+  spec: RecoverControllerFixtureSpec
+): Promise<{ ok: boolean; error: string }> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+    input: JSON.stringify({ recoverController: true, ...spec }),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status === 0) return { ok: true, error: '' };
+  if (child.status === 2) return { ok: false, error: child.stderr.trim() };
+  throw new Error(`recover controller runner failed (${child.status}): ${child.stderr.trim()}`);
 }
 
 /**
