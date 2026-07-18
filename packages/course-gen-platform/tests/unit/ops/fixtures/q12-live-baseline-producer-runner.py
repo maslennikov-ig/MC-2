@@ -79,16 +79,26 @@ def main() -> int:
         work = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-plan-work-", dir="/tmp"))
         run_root = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-plan-", dir="/tmp"))
         run_root.chmod(0o700)
-        wrapper = work / "psql-wrapper.sh"
-        wrapper.write_text(f'#!/bin/sh\nexec {DOCKER} exec -u postgres -i {cid} psql "$@"\n')
-        wrapper.chmod(0o755)
-        os.environ["MC2_Q12_MANIFEST_PSQL"] = str(wrapper)
+        # The manifest tool + coordinator reach the source through the real hardcoded host
+        # PostgreSQL 17 client over libpq (production route), via a loopback service file to the
+        # container's published port. Seeding stays on docker-exec; the TOOL is byte-untouched.
+        published = subprocess.run(
+            [DOCKER, "port", cid, "5432/tcp"], capture_output=True, text=True
+        ).stdout.strip()
+        port = published.rsplit(":", 1)[-1]
+        service_file = work / "source.service"
+        service_file.write_text(
+            f"[q12plan]\nhost=127.0.0.1\nport={port}\ndbname=postgres\nuser=postgres\n"
+            f"password={PW}\nsslmode=disable\n"
+        )
+        service_file.chmod(0o600)
+        service_env = {"PGSERVICEFILE": str(service_file), "PGSERVICE": "q12plan"}
 
         request = {"run_root": str(run_root), "run_id": str(uuid.uuid4())}
         executor = core.LivePlanExecutor()
         executor.docker = DOCKER
-        executor.source_container = cid
-        executor._source_service = {}
+        executor.source_container = None
+        executor._source_service = service_env
 
         baseline = executor.produce_run_root_baseline(request, work, run_root)
         baseline_bytes = baseline.read_bytes()
@@ -99,7 +109,7 @@ def main() -> int:
             try:
                 env = {
                     "PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C", "LANG": "C",
-                    "TMPDIR": "/tmp", "MC2_Q12_MANIFEST_PSQL": str(wrapper),
+                    "TMPDIR": "/tmp", **service_env,
                 }
                 completed = subprocess.run(
                     [str(TSX), str(TOOL), "capture", "--snapshot", snapshot,

@@ -5848,22 +5848,15 @@ class LivePlanExecutor:
             self._source_service = self._source_service_env(request, workdir)
         coordinator, snapshot = self._open_snapshot_coordinator(request, workdir)
         try:
-            # The intermediate manifest is written under the run root (production
-            # /opt/megacampus/backups/q12/<run-id>, fixture /tmp/mc2-q12-*), so the manifest
-            # tool's fixture-only client-override lockdown keys off a path whose prod/fixture
-            # shape matches the run — the plan workdir is /tmp-shaped in both prod and test.
+            # The manifest tool connects to the source through its own hardcoded PostgreSQL 17
+            # client over libpq (PGSERVICE/PGSERVICEFILE + SET TRANSACTION SNAPSHOT); production
+            # supplies the source DSN, a real-PG17 test a loopback service file to a published
+            # container port. The tool byte is left untouched.
             out = run_root / "source-manifest-baseline.json"
-            capture_env = {**self._base_env(), **self._source_service, "TMPDIR": "/tmp"}
-            # The manifest tool's fixture-only client override is inert in production (unset);
-            # a real-PG17 test propagates it and the tool's own lockdown gates it on the
-            # fixture output namespace above.
-            override = os.environ.get("MC2_Q12_MANIFEST_PSQL")
-            if override:
-                capture_env["MC2_Q12_MANIFEST_PSQL"] = override
             completed = subprocess.run(
                 [str(tsx), str(tool), "capture", "--snapshot", snapshot, "--output", str(out)],
                 cwd=str(self.repo_root),
-                env=capture_env,
+                env={**self._base_env(), **self._source_service, "TMPDIR": "/tmp"},
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
