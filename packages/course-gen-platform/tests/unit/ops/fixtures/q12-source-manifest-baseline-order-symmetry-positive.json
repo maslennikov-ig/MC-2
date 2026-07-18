@@ -1,0 +1,1620 @@
+{
+  "baseline": {
+    "catalog": {
+      "constraints": [],
+      "functions": [],
+      "indexes": [],
+      "object_acls": [],
+      "object_owners": [],
+      "triggers": []
+    },
+    "cron_jobs": [
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 1,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 2,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 3,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 4,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 5,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 6,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 7,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": true,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 8,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      }
+    ],
+    "database": {
+      "acl": [],
+      "allow_connections": true,
+      "builtin_locale": null,
+      "collate": "C",
+      "collation_version": null,
+      "comment": null,
+      "connection_limit": -1,
+      "ctype": "C",
+      "encoding": "UTF8",
+      "icu_locale": null,
+      "icu_rules": null,
+      "is_template": false,
+      "locale_provider": "c",
+      "name": "postgres",
+      "owner": "postgres",
+      "provider_locale": null,
+      "security_labels": [],
+      "settings": [["default_transaction_read_only", "off"]],
+      "size_bytes": 1000,
+      "tablespace": "pg_default"
+    },
+    "extensions": [],
+    "memberships": [],
+    "migration_frontier": "",
+    "parameter_acls": [],
+    "pg_net_queue_count": "0",
+    "pg_participants": [],
+    "relations": [
+      {
+        "acl": [],
+        "kind": "r",
+        "name": "app_table_b",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": [],
+        "kind": "r",
+        "name": "app_table_a",
+        "owner": "postgres",
+        "schema": "public"
+      }
+    ],
+    "role_settings": [],
+    "roles": [],
+    "schemas": [
+      {
+        "name": "app_y",
+        "owner": "postgres"
+      },
+      {
+        "name": "app_x",
+        "owner": "postgres"
+      }
+    ],
+    "server_version": "17.10"
+  },
+  "cutover_snapshot": {
+    "catalog": {
+      "constraints": [
+        {
+          "definition": "CHECK (capability_sha256 ~ '^[a-f0-9]{64}$'::text)",
+          "name": "active_run_capability_sha256_check",
+          "schema": "q12_guard",
+          "table": "active_run",
+          "type": "c"
+        },
+        {
+          "definition": "CHECK (expected_catalog_sha256 ~ '^[a-f0-9]{64}$'::text)",
+          "name": "active_run_expected_catalog_sha256_check",
+          "schema": "q12_guard",
+          "table": "active_run",
+          "type": "c"
+        },
+        {
+          "definition": "PRIMARY KEY (singleton)",
+          "name": "active_run_pkey",
+          "schema": "q12_guard",
+          "table": "active_run",
+          "type": "p"
+        },
+        {
+          "definition": "CHECK (singleton)",
+          "name": "active_run_singleton_check",
+          "schema": "q12_guard",
+          "table": "active_run",
+          "type": "c"
+        },
+        {
+          "definition": "CHECK (baseline_sha256 ~ '^[a-f0-9]{64}$'::text)",
+          "name": "baseline_baseline_sha256_check",
+          "schema": "q12_guard",
+          "table": "baseline",
+          "type": "c"
+        },
+        {
+          "definition": "PRIMARY KEY (singleton)",
+          "name": "baseline_pkey",
+          "schema": "q12_guard",
+          "table": "baseline",
+          "type": "p"
+        },
+        {
+          "definition": "CHECK (singleton)",
+          "name": "baseline_singleton_check",
+          "schema": "q12_guard",
+          "table": "baseline",
+          "type": "c"
+        },
+        {
+          "definition": "CHECK (catalog_sha256 ~ '^[a-f0-9]{64}$'::text)",
+          "name": "migration_guards_catalog_sha256_check",
+          "schema": "q12_guard",
+          "table": "migration_guards",
+          "type": "c"
+        },
+        {
+          "definition": "CHECK (migration_file_sha256 ~ '^[a-f0-9]{64}$'::text)",
+          "name": "migration_guards_migration_file_sha256_check",
+          "schema": "q12_guard",
+          "table": "migration_guards",
+          "type": "c"
+        },
+        {
+          "definition": "PRIMARY KEY (migration)",
+          "name": "migration_guards_pkey",
+          "schema": "q12_guard",
+          "table": "migration_guards",
+          "type": "p"
+        },
+        {
+          "definition": "PRIMARY KEY (probe_id)",
+          "name": "probe_pkey",
+          "schema": "q12_guard",
+          "table": "probe",
+          "type": "p"
+        }
+      ],
+      "functions": [
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.assert_capability()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE active q12_guard.active_run%ROWTYPE; supplied text;\nBEGIN\n  SELECT * INTO STRICT active FROM q12_guard.active_run WHERE singleton;\n  IF session_user='postgres' THEN\n    supplied := current_setting('megacampus.q12_capability',true);\n  ELSIF session_user='authenticator'\n    AND COALESCE((current_setting('request.jwt.claims',true)::jsonb->>'role'),'')='service_role' THEN\n    supplied := current_setting('request.headers',true)::jsonb->>'x-q12-capability';\n  ELSE\n    RAISE EXCEPTION 'Q12 database writes are maintenance-guarded';\n  END IF;\n  IF encode(extensions.digest(COALESCE(supplied,''),'sha256'),'hex') IS DISTINCT FROM active.capability_sha256 THEN\n    RAISE EXCEPTION 'Q12 database writes require the active run capability';\n  END IF;\nEND $function$\n",
+          "identity": "assert_capability()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.assert_controller_binding()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE active q12_guard.active_run%ROWTYPE;\nBEGIN\n  IF session_user IS DISTINCT FROM 'postgres' THEN\n    RAISE EXCEPTION 'Q12 controller binding requires the direct postgres role';\n  END IF;\n  PERFORM q12_guard.assert_capability();\n  SELECT * INTO STRICT active FROM q12_guard.active_run WHERE singleton;\n  IF active.run_id IS DISTINCT FROM NULLIF(current_setting('megacampus.q12_run_id',true),'')::uuid\n    OR active.capability_sha256 IS DISTINCT FROM current_setting('megacampus.q12_capability_sha256',true)\n    OR active.expected_catalog_sha256 IS DISTINCT FROM current_setting('megacampus.q12_expected_catalog_sha256',true)\n    OR active.expected_catalog IS DISTINCT FROM NULLIF(current_setting('megacampus.q12_expected_catalog',true),'')::jsonb THEN\n    RAISE EXCEPTION 'Q12 stored run truth differs from the current file-backed controller invocation';\n  END IF;\nEND $function$\n",
+          "identity": "assert_controller_binding()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.enforce_ddl_barrier()\n RETURNS event_trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nBEGIN\n  PERFORM q12_guard.assert_capability();\nEND $function$\n",
+          "identity": "enforce_ddl_barrier()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.enforce_write_barrier()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nBEGIN\n  PERFORM q12_guard.assert_capability();\n  IF TG_TABLE_SCHEMA='q12_guard' THEN\n    IF TG_TABLE_NAME='migration_guards' AND TG_OP='INSERT' THEN RETURN NEW; END IF;\n    IF TG_TABLE_NAME='active_run' AND TG_OP='UPDATE'\n      AND OLD.singleton IS NOT DISTINCT FROM NEW.singleton\n      AND OLD.run_id IS NOT DISTINCT FROM NEW.run_id\n      AND OLD.capability_sha256 IS NOT DISTINCT FROM NEW.capability_sha256\n      AND OLD.expected_catalog_sha256 IS NOT DISTINCT FROM NEW.expected_catalog_sha256\n      AND OLD.expected_catalog IS NOT DISTINCT FROM NEW.expected_catalog\n      AND OLD.activated=false AND NEW.activated=true THEN RETURN NEW;\n    END IF;\n    RAISE EXCEPTION 'Q12 durable guard truth is append-only';\n  END IF;\n  IF TG_OP='DELETE' THEN RETURN OLD; ELSIF TG_OP='TRUNCATE' THEN RETURN NULL; ELSE RETURN NEW; END IF;\nEND $function$\n",
+          "identity": "enforce_write_barrier()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.extend_guard(p_migration text, p_expected_relations jsonb, p_migration_file_sha256 text, p_expected_catalog_sha256 text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE expected jsonb; relation record; captured_relations jsonb;\nBEGIN\n  PERFORM q12_guard.assert_capability();\n  SELECT expected_catalog INTO expected FROM q12_guard.active_run WHERE singleton FOR UPDATE;\n  IF p_migration NOT IN ('20260711140000','20260711151000') OR\n     p_expected_relations IS DISTINCT FROM expected->'migrations'->p_migration->'relations' OR\n     p_migration_file_sha256 IS DISTINCT FROM expected->'migrations'->p_migration->>'migration_file_sha256' OR\n     p_expected_catalog_sha256 IS DISTINCT FROM expected->'migrations'->p_migration->>'catalog_sha256' THEN\n    RAISE EXCEPTION 'migration guard extension differs from the frozen catalog';\n  END IF;\n  IF p_migration='20260711151000' AND NOT EXISTS (\n    SELECT 1 FROM q12_guard.migration_guards WHERE migration='20260711140000'\n  ) THEN RAISE EXCEPTION 'observability guard extension requires the committed base guard'; END IF;\n  SELECT jsonb_agg(jsonb_build_object(\n      'schema',x.schema,'name',x.name,'oid',c.oid::bigint,'relkind',c.relkind::text,\n      'parent_schema',x.parent_schema,'parent_name',x.parent_name,\n      'parent_oid',inheritance.inhparent::bigint,'owner',owner.rolname\n    ) ORDER BY x.schema,x.name)\n  INTO captured_relations\n  FROM jsonb_to_recordset(p_expected_relations)\n    AS x(schema text,name text,relkind \"char\",parent_schema text,parent_name text,owner text)\n  JOIN pg_namespace n ON n.nspname=x.schema\n  JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=x.name AND c.relkind=x.relkind\n  JOIN pg_roles owner ON owner.oid=c.relowner AND owner.rolname=x.owner\n  LEFT JOIN pg_inherits inheritance ON inheritance.inhrelid=c.oid\n  LEFT JOIN pg_class parent ON parent.oid=inheritance.inhparent\n  LEFT JOIN pg_namespace parent_namespace ON parent_namespace.oid=parent.relnamespace\n  WHERE (x.parent_schema IS NULL AND inheritance.inhparent IS NULL)\n     OR (x.parent_schema IS NOT NULL AND parent_namespace.nspname=x.parent_schema AND parent.relname=x.parent_name);\n  IF captured_relations IS NULL OR jsonb_array_length(captured_relations)<>jsonb_array_length(p_expected_relations) THEN\n    RAISE EXCEPTION 'new migration stable relation catalog drift';\n  END IF;\n  FOR relation IN SELECT * FROM jsonb_to_recordset(captured_relations)\n    AS x(schema text,name text,oid oid,relkind \"char\",parent_schema text,parent_name text,parent_oid oid,owner text)\n    ORDER BY schema,name\n  LOOP\n    IF relation.parent_oid IS NULL THEN\n      EXECUTE format('CREATE TRIGGER q12_guard_row BEFORE INSERT OR UPDATE OR DELETE ON %I.%I FOR EACH ROW EXECUTE FUNCTION q12_guard.enforce_write_barrier()',relation.schema,relation.name);\n    END IF;\n    EXECUTE format('CREATE TRIGGER q12_guard_truncate BEFORE TRUNCATE ON %I.%I FOR EACH STATEMENT EXECUTE FUNCTION q12_guard.enforce_write_barrier()',relation.schema,relation.name);\n  END LOOP;\n  INSERT INTO q12_guard.migration_guards(\n    migration,catalog_sha256,migration_file_sha256,stable_expected,relation_set\n  ) VALUES(\n    p_migration,p_expected_catalog_sha256,p_migration_file_sha256,p_expected_relations,captured_relations\n  );\nEND $function$\n",
+          "identity": "extend_guard(p_migration text, p_expected_relations jsonb, p_migration_file_sha256 text, p_expected_catalog_sha256 text)",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.quiesce_client_backends()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE client record; terminated boolean;\nBEGIN\n  PERFORM q12_guard.assert_controller_binding();\n  FOR client IN\n    SELECT pid,usename,state,xact_start,backend_xid,backend_xmin,backend_type\n    FROM pg_stat_activity\n    WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'\n    ORDER BY pid\n  LOOP\n    -- Supautils deliberately skips reserved/superuser roles. The source-owned\n    -- supabase_admin clients are therefore a trusted managed-service boundary:\n    -- only an exact idle, transaction-free client is accepted; all ordinary\n    -- clients must be terminated successfully.\n    IF client.usename='supabase_admin' THEN\n      IF client.state IS DISTINCT FROM 'idle' OR client.xact_start IS NOT NULL\n        OR client.backend_xid IS NOT NULL OR client.backend_xmin IS NOT NULL\n        OR client.backend_type IS DISTINCT FROM 'client backend' THEN\n        RAISE EXCEPTION 'unquiesced managed supabase_admin client blocks Q12 visibility proof';\n      END IF;\n    ELSE\n      BEGIN\n        terminated := pg_terminate_backend(client.pid,5000);\n      EXCEPTION WHEN insufficient_privilege THEN\n        RAISE EXCEPTION 'unterminable non-allowlisted client blocks Q12 visibility proof';\n      END;\n      IF terminated IS DISTINCT FROM true THEN\n        RAISE EXCEPTION 'client termination did not complete during Q12 visibility proof';\n      END IF;\n    END IF;\n  END LOOP;\nEND $function$\n",
+          "identity": "quiesce_client_backends()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.verify_activated_state()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE saved jsonb; current_database_setting jsonb;\nBEGIN\n  PERFORM q12_guard.assert_controller_binding();\n  SELECT baseline INTO STRICT saved FROM q12_guard.baseline WHERE singleton;\n  SELECT COALESCE((SELECT to_jsonb(setting) FROM pg_db_role_setting setting\n    WHERE setdatabase=(SELECT oid FROM pg_database WHERE datname='postgres') AND setrole=0),'null'::jsonb)\n    INTO current_database_setting;\n  IF NOT (SELECT activated FROM q12_guard.active_run WHERE singleton)\n    OR current_database_setting IS DISTINCT FROM saved->'database_settings'\n    OR (SELECT jsonb_agg(to_jsonb(current_job) ORDER BY jobid) FROM cron.job current_job)\n         IS DISTINCT FROM saved->'cron_jobs'\n    OR (SELECT count(*) FROM net.http_request_queue) IS DISTINCT FROM (saved->>'pg_net_queue_count')::bigint\n    OR (SELECT array_agg(relation.relname::text ORDER BY relation.relname::text)\n        FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace\n        WHERE namespace.nspname='q12_guard' AND relation.relkind='r')\n         IS DISTINCT FROM ARRAY['active_run','baseline','migration_guards']\n    OR (SELECT array_agg(function_object.proname::text ORDER BY function_object.proname::text)\n        FROM pg_proc function_object JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace\n        WHERE namespace.nspname='q12_guard')\n         IS DISTINCT FROM ARRAY['assert_capability','assert_controller_binding','enforce_ddl_barrier','enforce_write_barrier','extend_guard','quiesce_client_backends','verify_activated_state','verify_capability','verify_expected_guards','verify_install_resume_state']\n    OR (SELECT array_agg(type_object.typname::text ORDER BY type_object.typname::text)\n        FROM pg_type type_object JOIN pg_namespace namespace ON namespace.oid=type_object.typnamespace\n        WHERE namespace.nspname='q12_guard')\n         IS DISTINCT FROM ARRAY['_active_run','_baseline','_migration_guards','active_run','baseline','migration_guards']\n    OR EXISTS (SELECT 1 FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace\n        WHERE namespace.nspname='q12_guard' AND relation.relkind IN ('r','p','S')\n          AND (relation.relkind<>'r' OR relation.relowner<>'postgres'::regrole))\n    OR EXISTS (SELECT 1 FROM pg_proc function_object JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace\n        WHERE namespace.nspname='q12_guard' AND (function_object.proowner<>'postgres'::regrole\n          OR NOT function_object.prosecdef\n          OR function_object.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog, q12_guard']))\n    OR EXISTS (SELECT 1 FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace\n        CROSS JOIN LATERAL aclexplode(COALESCE(relation.relacl,acldefault('r',relation.relowner))) acl\n        WHERE namespace.nspname='q12_guard' AND acl.grantee<>relation.relowner)\n    OR EXISTS (SELECT 1 FROM pg_proc function_object JOIN pg_namespace namespace ON namespace.oid=function_object.pronamespace\n        CROSS JOIN LATERAL aclexplode(COALESCE(function_object.proacl,acldefault('f',function_object.proowner))) acl\n        WHERE namespace.nspname='q12_guard' AND acl.grantee<>function_object.proowner)\n    OR EXISTS (SELECT 1 FROM pg_namespace namespace\n        CROSS JOIN LATERAL aclexplode(COALESCE(namespace.nspacl,acldefault('n',namespace.nspowner))) acl\n        WHERE namespace.nspname='q12_guard'\n          AND (namespace.nspowner<>'postgres'::regrole OR acl.grantee<>namespace.nspowner))\n    OR EXISTS (SELECT 1 FROM pg_type type_object JOIN pg_namespace namespace ON namespace.oid=type_object.typnamespace\n        CROSS JOIN LATERAL aclexplode(COALESCE(type_object.typacl,acldefault('T',type_object.typowner))) acl\n        WHERE namespace.nspname='q12_guard' AND type_object.typcategory <> 'A'\n          AND (type_object.typowner<>'postgres'::regrole OR acl.grantee<>type_object.typowner))\n    OR COALESCE((SELECT array_agg(migration ORDER BY migration) FROM q12_guard.migration_guards),ARRAY[]::text[])\n         IS DISTINCT FROM ARRAY['20260711140000','20260711151000']\n    OR EXISTS (\n      SELECT 1 FROM q12_guard.migration_guards guard CROSS JOIN q12_guard.active_run active\n      WHERE guard.catalog_sha256 IS DISTINCT FROM active.expected_catalog->'migrations'->guard.migration->>'catalog_sha256'\n        OR guard.migration_file_sha256 IS DISTINCT FROM active.expected_catalog->'migrations'->guard.migration->>'migration_file_sha256'\n        OR guard.stable_expected IS DISTINCT FROM active.expected_catalog->'migrations'->guard.migration->'relations'\n        OR (SELECT jsonb_agg(value - 'oid' - 'parent_oid' ORDER BY value->>'schema',value->>'name')\n            FROM jsonb_array_elements(guard.relation_set)) IS DISTINCT FROM guard.stable_expected\n    )\n    OR NOT EXISTS (\n      SELECT 1 FROM pg_event_trigger event_trigger\n      JOIN pg_roles owner ON owner.oid=event_trigger.evtowner\n      JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid\n      JOIN pg_namespace function_namespace ON function_namespace.oid=function_object.pronamespace\n      WHERE event_trigger.evtname='q12_guard_ddl_command_start'\n        AND owner.rolname='postgres' AND event_trigger.evtevent='ddl_command_start'\n        AND event_trigger.evtenabled='O' AND event_trigger.evttags IS NULL\n        AND function_namespace.nspname='q12_guard' AND function_object.proname='enforce_ddl_barrier'\n        AND pg_get_function_identity_arguments(function_object.oid)=''\n    )\n    OR (SELECT count(*) FROM pg_event_trigger event_trigger\n        JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid\n        JOIN pg_namespace function_namespace ON function_namespace.oid=function_object.pronamespace\n        WHERE function_namespace.nspname='q12_guard') <> 1\n    OR EXISTS (\n      WITH expected(table_name,trigger_name,trigger_type) AS (\n        VALUES\n          ('active_run','q12_guard_immutable',31::smallint),\n          ('active_run','q12_guard_immutable_truncate',34::smallint),\n          ('baseline','q12_guard_immutable',31::smallint),\n          ('baseline','q12_guard_immutable_truncate',34::smallint),\n          ('migration_guards','q12_guard_immutable',31::smallint),\n          ('migration_guards','q12_guard_immutable_truncate',34::smallint)\n      ), actual AS (\n        SELECT relation.relname::text,trigger_object.tgname::text,trigger_object.tgtype\n        FROM pg_trigger trigger_object\n        JOIN pg_class relation ON relation.oid=trigger_object.tgrelid\n        JOIN pg_namespace relation_namespace ON relation_namespace.oid=relation.relnamespace\n        JOIN pg_proc function_object ON function_object.oid=trigger_object.tgfoid\n        JOIN pg_namespace function_namespace ON function_namespace.oid=function_object.pronamespace\n        WHERE function_namespace.nspname='q12_guard' AND function_object.proname='enforce_write_barrier'\n          AND NOT trigger_object.tgisinternal\n      ), delta AS (\n        (SELECT * FROM expected EXCEPT SELECT * FROM actual)\n        UNION ALL\n        (SELECT * FROM actual EXCEPT SELECT * FROM expected)\n      ) SELECT 1 FROM delta\n    )\n  THEN RAISE EXCEPTION 'exact durable activated Q12 state drift'; END IF;\nEND $function$\n",
+          "identity": "verify_activated_state()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.verify_capability()\n RETURNS TABLE(run_id uuid, expected_catalog_sha256 text, activated boolean)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nBEGIN\n  PERFORM q12_guard.assert_capability();\n  RETURN QUERY SELECT active.run_id,active.expected_catalog_sha256,active.activated\n    FROM q12_guard.active_run active WHERE active.singleton;\nEND $function$\n",
+          "identity": "verify_capability()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.verify_expected_guards(p_after_migration text DEFAULT NULL::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE expected jsonb; expected_relations jsonb; required_migrations text[];\n  structural_actual text; structural_expected text;\nBEGIN\n  PERFORM q12_guard.assert_controller_binding();\n  SELECT expected_catalog INTO expected FROM q12_guard.active_run WHERE singleton;\n  IF p_after_migration IS NULL THEN required_migrations := ARRAY[]::text[];\n  ELSIF p_after_migration='20260711140000' THEN required_migrations := ARRAY['20260711140000'];\n  ELSIF p_after_migration='20260711151000' THEN required_migrations := ARRAY['20260711140000','20260711151000'];\n  ELSE RAISE EXCEPTION 'unsupported migration guard checkpoint';\n  END IF;\n  IF COALESCE((SELECT array_agg(migration ORDER BY migration) FROM q12_guard.migration_guards),ARRAY[]::text[])\n       IS DISTINCT FROM required_migrations\n    OR EXISTS (\n      SELECT 1 FROM q12_guard.migration_guards guard\n      WHERE guard.catalog_sha256 IS DISTINCT FROM expected->'migrations'->guard.migration->>'catalog_sha256'\n        OR guard.migration_file_sha256 IS DISTINCT FROM expected->'migrations'->guard.migration->>'migration_file_sha256'\n        OR guard.stable_expected IS DISTINCT FROM expected->'migrations'->guard.migration->'relations'\n        OR (SELECT jsonb_agg(value - 'oid' - 'parent_oid' ORDER BY value->>'schema',value->>'name')\n            FROM jsonb_array_elements(guard.relation_set)) IS DISTINCT FROM guard.stable_expected\n    ) THEN RAISE EXCEPTION 'migration guard publication set missing or changed';\n  END IF;\n  expected_relations := expected->'guarded_relations';\n  IF '20260711140000'=ANY(required_migrations) THEN\n    expected_relations := expected_relations || (SELECT relation_set FROM q12_guard.migration_guards WHERE migration='20260711140000');\n  END IF;\n  IF '20260711151000'=ANY(required_migrations) THEN\n    expected_relations := expected_relations || (SELECT relation_set FROM q12_guard.migration_guards WHERE migration='20260711151000');\n  END IF;\n  IF EXISTS (\n    SELECT 1 FROM jsonb_to_recordset(expected_relations)\n      AS e(schema text,name text,oid oid,relkind \"char\",parent_oid oid,owner text)\n    LEFT JOIN pg_namespace n ON n.nspname=e.schema\n    LEFT JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=e.name AND c.oid=e.oid AND c.relkind=e.relkind\n    LEFT JOIN pg_roles owner ON owner.oid=c.relowner AND owner.rolname=e.owner\n    LEFT JOIN pg_inherits inheritance ON inheritance.inhrelid=c.oid\n    WHERE c.oid IS NULL OR owner.oid IS NULL OR inheritance.inhparent IS DISTINCT FROM e.parent_oid\n  ) THEN RAISE EXCEPTION 'guarded relation identity/owner/partition drift'; END IF;\n\n  IF p_after_migration IS NULL THEN\n    structural_expected := expected->>'baseline_structural_sha256';\n  ELSIF p_after_migration='20260711140000' THEN\n    structural_expected := expected->'migrations'->'20260711140000'->>'catalog_sha256';\n  ELSE\n    structural_expected := expected->>'expected_post_migration_catalog_sha256';\n  END IF;\n  SELECT canonical.structural_sha256 INTO STRICT structural_actual\n  FROM (\nWITH\nstructural_namespaces AS (\n  SELECT n.oid, n.nspname, n.nspowner AS owner_oid, owner.rolname AS owner, n.nspacl\n  FROM pg_catalog.pg_namespace n\n  JOIN pg_catalog.pg_roles owner ON owner.oid = n.nspowner\n  WHERE n.nspname <> 'information_schema'\n    AND n.nspname <> 'q12_guard'\n    AND n.nspname !~ '^pg_'\n),\nschema_less_comment_classes AS (\n  SELECT classoid\n  FROM (VALUES\n    ('pg_catalog.pg_am'::regclass),\n    ('pg_catalog.pg_cast'::regclass),\n    ('pg_catalog.pg_event_trigger'::regclass),\n    ('pg_catalog.pg_foreign_data_wrapper'::regclass),\n    ('pg_catalog.pg_foreign_server'::regclass),\n    ('pg_catalog.pg_language'::regclass),\n    ('pg_catalog.pg_publication'::regclass),\n    ('pg_catalog.pg_subscription'::regclass),\n    ('pg_catalog.pg_transform'::regclass)\n  ) classes(classoid)\n),\nschema_less_security_label_classes AS (\n  SELECT classoid\n  FROM (VALUES\n    ('pg_catalog.pg_event_trigger'::regclass),\n    ('pg_catalog.pg_language'::regclass),\n    ('pg_catalog.pg_publication'::regclass),\n    ('pg_catalog.pg_subscription'::regclass)\n  ) classes(classoid)\n),\ndatabase_row AS (\n  SELECT jsonb_build_object(\n    'owner', owner.rolname,\n    'encoding', pg_catalog.pg_encoding_to_char(database_object.encoding),\n    'locale_provider', database_object.datlocprovider::text,\n    'collation', database_object.datcollate,\n    'ctype', database_object.datctype,\n    'icu_locale', to_jsonb(database_object)->>'daticulocale',\n    'icu_rules', to_jsonb(database_object)->>'daticurules',\n    'builtin_locale', to_jsonb(database_object)->>'datbuiltinlocale',\n    'locale', to_jsonb(database_object)->>'datlocale',\n    'collation_version', database_object.datcollversion,\n    'tablespace', tablespace.spcname,\n    'connection_limit', database_object.datconnlimit,\n    'allow_connections', database_object.datallowconn,\n    'is_template', database_object.datistemplate,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(\n        database_object.datacl,\n        pg_catalog.acldefault('d', database_object.datdba)\n      )) item\n    ), '[]'::jsonb),\n    'settings', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'role', normalized.role_name,\n        'settings', normalized.settings\n      ) ORDER BY normalized.role_name)\n      FROM (\n        SELECT COALESCE(role.rolname, '') AS role_name,\n          jsonb_agg(setting ORDER BY setting) AS settings\n        FROM pg_catalog.pg_db_role_setting configured\n        LEFT JOIN pg_catalog.pg_roles role ON role.oid = configured.setrole\n        CROSS JOIN LATERAL pg_catalog.unnest(configured.setconfig) setting\n        WHERE configured.setdatabase = database_object.oid\n          AND pg_catalog.split_part(setting, '=', 1) <> ALL (\n            ARRAY['default_transaction_read_only','cron.database_name','cron.launch_active_jobs']\n          )\n        GROUP BY COALESCE(role.rolname, '')\n      ) normalized\n    ), '[]'::jsonb),\n    'comment', pg_catalog.shobj_description(database_object.oid, 'pg_database'),\n    'security_labels', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'provider', security_label.provider,\n        'label', security_label.label\n      ) ORDER BY security_label.provider)\n      FROM pg_catalog.pg_shseclabel security_label\n      WHERE security_label.classoid = 'pg_catalog.pg_database'::regclass\n        AND security_label.objoid = database_object.oid\n    ), '[]'::jsonb)\n  ) AS value\n  FROM pg_catalog.pg_database database_object\n  JOIN pg_catalog.pg_roles owner ON owner.oid = database_object.datdba\n  JOIN pg_catalog.pg_tablespace tablespace ON tablespace.oid = database_object.dattablespace\n  WHERE database_object.datname = pg_catalog.current_database()\n),\nschema_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', namespace.nspname,\n    'owner', namespace.owner,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(namespace.nspacl, pg_catalog.acldefault('n', namespace.owner_oid))) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname), '[]'::jsonb) AS value\n  FROM structural_namespaces namespace\n),\nrelation_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', relation.relname,\n    'relkind', relation.relkind::text,\n    'parents', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'schema', parent_namespace.nspname,\n        'name', parent.relname\n      ) ORDER BY parent_namespace.nspname, parent.relname)\n      FROM pg_catalog.pg_inherits inheritance\n      JOIN pg_catalog.pg_class parent ON parent.oid = inheritance.inhparent\n      JOIN pg_catalog.pg_namespace parent_namespace ON parent_namespace.oid = parent.relnamespace\n      WHERE inheritance.inhrelid = relation.oid\n    ), '[]'::jsonb),\n    'owner', owner.rolname,\n    'persistence', relation.relpersistence::text,\n    'replica_identity', relation.relreplident::text,\n    'row_security', relation.relrowsecurity,\n    'force_row_security', relation.relforcerowsecurity,\n    'partition_bound', pg_catalog.pg_get_expr(relation.relpartbound, relation.oid, true),\n    'partition_key', CASE WHEN relation.relkind = 'p' THEN pg_catalog.pg_get_partkeydef(relation.oid) ELSE NULL END,\n    'view_definition', CASE WHEN relation.relkind IN ('v', 'm')\n      THEN pg_catalog.pg_get_viewdef(relation.oid, true) ELSE NULL END,\n    'options', COALESCE((\n      SELECT jsonb_agg(option ORDER BY option)\n      FROM pg_catalog.unnest(COALESCE(relation.reloptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'tablespace', tablespace.spcname,\n    'access_method', access_method.amname,\n    'populated', relation.relispopulated,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(\n        relation.relacl,\n        pg_catalog.acldefault((CASE WHEN relation.relkind = 'S' THEN 's' ELSE 'r' END)::\"char\", relation.relowner)\n      )) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, relation.relname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_class relation\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = relation.relowner\n  LEFT JOIN pg_catalog.pg_tablespace tablespace ON tablespace.oid = relation.reltablespace\n  LEFT JOIN pg_catalog.pg_am access_method ON access_method.oid = relation.relam\n  WHERE relation.relkind IN ('r', 'p', 'v', 'm', 'f', 'S', 'c')\n),\ncolumn_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'relation', relation.relname,\n    'position', attribute.attnum,\n    'name', attribute.attname,\n    'type', pg_catalog.format_type(attribute.atttypid, attribute.atttypmod),\n    'not_null', attribute.attnotnull,\n    'identity', attribute.attidentity::text,\n    'generated', attribute.attgenerated::text,\n    'storage', attribute.attstorage::text,\n    'compression', attribute.attcompression::text,\n    'statistics_target', attribute.attstattarget,\n    'local', attribute.attislocal,\n    'inheritance_count', attribute.attinhcount,\n    'has_missing', attribute.atthasmissing,\n    'missing_value', to_jsonb(attribute.attmissingval),\n    'options', COALESCE((\n      SELECT jsonb_agg(option ORDER BY option)\n      FROM pg_catalog.unnest(COALESCE(attribute.attoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'fdw_options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(attribute.attfdwoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'collation_schema', collation_namespace.nspname,\n    'collation_name', collation_object.collname,\n    'default', pg_catalog.pg_get_expr(default_value.adbin, default_value.adrelid, true),\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(attribute.attacl, ARRAY[]::aclitem[])) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, relation.relname, attribute.attnum), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_attribute attribute\n  JOIN pg_catalog.pg_class relation ON relation.oid = attribute.attrelid\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n  LEFT JOIN pg_catalog.pg_attrdef default_value\n    ON default_value.adrelid = attribute.attrelid AND default_value.adnum = attribute.attnum\n  LEFT JOIN pg_catalog.pg_collation collation_object ON collation_object.oid = attribute.attcollation\n  LEFT JOIN pg_catalog.pg_namespace collation_namespace ON collation_namespace.oid = collation_object.collnamespace\n  WHERE attribute.attnum > 0 AND NOT attribute.attisdropped\n    AND relation.relkind IN ('r', 'p', 'v', 'm', 'f', 'c')\n),\nsequence_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', relation.relname,\n    'owner', owner.rolname,\n    'data_type', pg_catalog.format_type(sequence.seqtypid, NULL),\n    'start', sequence.seqstart,\n    'increment', sequence.seqincrement,\n    'minimum', sequence.seqmin,\n    'maximum', sequence.seqmax,\n    'cache', sequence.seqcache,\n    'cycle', sequence.seqcycle,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(relation.relacl, pg_catalog.acldefault('s', relation.relowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, relation.relname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_sequence sequence\n  JOIN pg_catalog.pg_class relation ON relation.oid = sequence.seqrelid\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = relation.relowner\n),\nextension_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', extension.extname,\n    'version', extension.extversion,\n    'schema', namespace.nspname,\n    'owner', owner.rolname,\n    'relocatable', extension.extrelocatable,\n    'comment', pg_catalog.obj_description(extension.oid, 'pg_extension'),\n    'security_labels', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'provider', security_label.provider,\n        'label', security_label.label\n      ) ORDER BY security_label.provider)\n      FROM pg_catalog.pg_seclabel security_label\n      WHERE security_label.classoid = 'pg_catalog.pg_extension'::regclass\n        AND security_label.objoid = extension.oid\n        AND security_label.objsubid = 0\n    ), '[]'::jsonb)\n  ) ORDER BY extension.extname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_extension extension\n  JOIN pg_catalog.pg_namespace namespace ON namespace.oid = extension.extnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = extension.extowner\n),\ntype_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', type_object.typname,\n    'owner', owner.rolname,\n    'kind', type_object.typtype::text,\n    'category', type_object.typcategory::text,\n    'preferred', type_object.typispreferred,\n    'defined', type_object.typisdefined,\n    'delimiter', type_object.typdelim::text,\n    'collation_schema', collation_namespace.nspname,\n    'collation_name', collation_object.collname,\n    'domain_base_type', CASE WHEN type_object.typtype = 'd'\n      THEN pg_catalog.format_type(type_object.typbasetype, type_object.typtypmod) ELSE NULL END,\n    'domain_not_null', type_object.typnotnull,\n    'domain_default', type_object.typdefault,\n    'enum_labels', COALESCE((\n      SELECT jsonb_agg(enum.enumlabel ORDER BY enum.enumsortorder)\n      FROM pg_catalog.pg_enum enum WHERE enum.enumtypid = type_object.oid\n    ), '[]'::jsonb),\n    'range_subtype', pg_catalog.format_type(range.rngsubtype, NULL),\n    'range_collation_schema', range_collation_namespace.nspname,\n    'range_collation_name', range_collation.collname,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(type_object.typacl, pg_catalog.acldefault('T', type_object.typowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, type_object.typname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_type type_object\n  JOIN structural_namespaces namespace ON namespace.oid = type_object.typnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = type_object.typowner\n  LEFT JOIN pg_catalog.pg_collation collation_object ON collation_object.oid = type_object.typcollation\n  LEFT JOIN pg_catalog.pg_namespace collation_namespace ON collation_namespace.oid = collation_object.collnamespace\n  LEFT JOIN pg_catalog.pg_range range ON range.rngtypid = type_object.oid\n  LEFT JOIN pg_catalog.pg_collation range_collation ON range_collation.oid = range.rngcollation\n  LEFT JOIN pg_catalog.pg_namespace range_collation_namespace\n    ON range_collation_namespace.oid = range_collation.collnamespace\n),\naccess_method_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', access_method.amname,\n    'type', access_method.amtype::text,\n    'handler_schema', handler_namespace.nspname,\n    'handler_name', handler.proname,\n    'handler_identity_arguments', pg_catalog.pg_get_function_identity_arguments(handler.oid)\n  ) ORDER BY access_method.amname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_am access_method\n  JOIN pg_catalog.pg_proc handler ON handler.oid = access_method.amhandler\n  JOIN pg_catalog.pg_namespace handler_namespace ON handler_namespace.oid = handler.pronamespace\n),\ncast_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'source_type', pg_catalog.format_type(cast_object.castsource, NULL),\n    'target_type', pg_catalog.format_type(cast_object.casttarget, NULL),\n    'context', cast_object.castcontext::text,\n    'method', cast_object.castmethod::text,\n    'function_schema', function_namespace.nspname,\n    'function_name', function_object.proname,\n    'function_identity_arguments', CASE WHEN function_object.oid IS NULL THEN NULL\n      ELSE pg_catalog.pg_get_function_identity_arguments(function_object.oid) END\n  ) ORDER BY pg_catalog.format_type(cast_object.castsource, NULL),\n    pg_catalog.format_type(cast_object.casttarget, NULL)), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_cast cast_object\n  LEFT JOIN pg_catalog.pg_proc function_object ON function_object.oid = cast_object.castfunc\n  LEFT JOIN pg_catalog.pg_namespace function_namespace\n    ON function_namespace.oid = function_object.pronamespace\n),\ncollation_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', collation_object.collname,\n    'owner', owner.rolname,\n    'provider', collation_object.collprovider::text,\n    'deterministic', collation_object.collisdeterministic,\n    'encoding', collation_object.collencoding,\n    'collate', collation_object.collcollate,\n    'ctype', collation_object.collctype,\n    'locale', collation_object.colllocale,\n    'icu_rules', collation_object.collicurules,\n    'version', collation_object.collversion\n  ) ORDER BY namespace.nspname, collation_object.collname, collation_object.collencoding),\n    '[]'::jsonb) AS value\n  FROM pg_catalog.pg_collation collation_object\n  JOIN structural_namespaces namespace ON namespace.oid = collation_object.collnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = collation_object.collowner\n),\nconversion_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', conversion.conname,\n    'owner', owner.rolname,\n    'source_encoding', pg_catalog.pg_encoding_to_char(conversion.conforencoding),\n    'target_encoding', pg_catalog.pg_encoding_to_char(conversion.contoencoding),\n    'default', conversion.condefault,\n    'function_schema', function_namespace.nspname,\n    'function_name', function_object.proname,\n    'function_identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid)\n  ) ORDER BY namespace.nspname, conversion.conname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_conversion conversion\n  JOIN structural_namespaces namespace ON namespace.oid = conversion.connamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = conversion.conowner\n  JOIN pg_catalog.pg_proc function_object ON function_object.oid = conversion.conproc\n  JOIN pg_catalog.pg_namespace function_namespace\n    ON function_namespace.oid = function_object.pronamespace\n),\nforeign_data_wrapper_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', wrapper.fdwname,\n    'owner', owner.rolname,\n    'handler_schema', handler_namespace.nspname,\n    'handler_name', handler.proname,\n    'handler_identity_arguments', CASE WHEN handler.oid IS NULL THEN NULL\n      ELSE pg_catalog.pg_get_function_identity_arguments(handler.oid) END,\n    'validator_schema', validator_namespace.nspname,\n    'validator_name', validator.proname,\n    'validator_identity_arguments', CASE WHEN validator.oid IS NULL THEN NULL\n      ELSE pg_catalog.pg_get_function_identity_arguments(validator.oid) END,\n    'options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(wrapper.fdwoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(wrapper.fdwacl,\n        pg_catalog.acldefault('F', wrapper.fdwowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY wrapper.fdwname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_foreign_data_wrapper wrapper\n  JOIN pg_catalog.pg_roles owner ON owner.oid = wrapper.fdwowner\n  LEFT JOIN pg_catalog.pg_proc handler ON handler.oid = wrapper.fdwhandler\n  LEFT JOIN pg_catalog.pg_namespace handler_namespace ON handler_namespace.oid = handler.pronamespace\n  LEFT JOIN pg_catalog.pg_proc validator ON validator.oid = wrapper.fdwvalidator\n  LEFT JOIN pg_catalog.pg_namespace validator_namespace\n    ON validator_namespace.oid = validator.pronamespace\n),\nforeign_server_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', server.srvname,\n    'owner', owner.rolname,\n    'foreign_data_wrapper', wrapper.fdwname,\n    'type', server.srvtype,\n    'version', server.srvversion,\n    'options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(server.srvoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(server.srvacl,\n        pg_catalog.acldefault('S', server.srvowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY server.srvname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_foreign_server server\n  JOIN pg_catalog.pg_foreign_data_wrapper wrapper ON wrapper.oid = server.srvfdw\n  JOIN pg_catalog.pg_roles owner ON owner.oid = server.srvowner\n),\nuser_mapping_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'server', server.srvname,\n    'user', CASE WHEN user_mapping.umuser = 0 THEN 'PUBLIC' ELSE role.rolname END,\n    'options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(user_mapping.umoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb)\n  ) ORDER BY server.srvname,\n    CASE WHEN user_mapping.umuser = 0 THEN 'PUBLIC' ELSE role.rolname END), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_user_mapping user_mapping\n  JOIN pg_catalog.pg_foreign_server server ON server.oid = user_mapping.umserver\n  LEFT JOIN pg_catalog.pg_roles role ON role.oid = user_mapping.umuser\n),\nlanguage_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', language.lanname,\n    'owner', owner.rolname,\n    'procedural', language.lanispl,\n    'trusted', language.lanpltrusted,\n    'call_handler', call_handler.proname,\n    'call_handler_schema', call_handler_namespace.nspname,\n    'inline_handler', inline_handler.proname,\n    'inline_handler_schema', inline_handler_namespace.nspname,\n    'validator', validator.proname,\n    'validator_schema', validator_namespace.nspname,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(language.lanacl,\n        pg_catalog.acldefault('l', language.lanowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY language.lanname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_language language\n  JOIN pg_catalog.pg_roles owner ON owner.oid = language.lanowner\n  LEFT JOIN pg_catalog.pg_proc call_handler ON call_handler.oid = language.lanplcallfoid\n  LEFT JOIN pg_catalog.pg_namespace call_handler_namespace\n    ON call_handler_namespace.oid = call_handler.pronamespace\n  LEFT JOIN pg_catalog.pg_proc inline_handler ON inline_handler.oid = language.laninline\n  LEFT JOIN pg_catalog.pg_namespace inline_handler_namespace\n    ON inline_handler_namespace.oid = inline_handler.pronamespace\n  LEFT JOIN pg_catalog.pg_proc validator ON validator.oid = language.lanvalidator\n  LEFT JOIN pg_catalog.pg_namespace validator_namespace\n    ON validator_namespace.oid = validator.pronamespace\n),\noperator_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', operator_object.oprname,\n    'owner', owner.rolname,\n    'kind', operator_object.oprkind::text,\n    'can_merge', operator_object.oprcanmerge,\n    'can_hash', operator_object.oprcanhash,\n    'left_type', operator_identity.left_type,\n    'right_type', operator_identity.right_type,\n    'result_type', pg_catalog.format_type(operator_object.oprresult, NULL),\n    'function_schema', function_namespace.nspname,\n    'function_name', function_object.proname,\n    'function_identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid),\n    'restriction_schema', restriction_namespace.nspname,\n    'restriction_name', restriction_function.proname,\n    'join_schema', join_namespace.nspname,\n    'join_name', join_function.proname,\n    'commutator', CASE WHEN commutator.oid IS NULL THEN NULL ELSE\n      pg_catalog.format('%I.%I(%s,%s)', commutator_namespace.nspname, commutator.oprname,\n        pg_catalog.format_type(commutator.oprleft, NULL),\n        pg_catalog.format_type(commutator.oprright, NULL)) END,\n    'negator', CASE WHEN negator.oid IS NULL THEN NULL ELSE\n      pg_catalog.format('%I.%I(%s,%s)', negator_namespace.nspname, negator.oprname,\n        pg_catalog.format_type(negator.oprleft, NULL),\n        pg_catalog.format_type(negator.oprright, NULL)) END\n  ) ORDER BY namespace.nspname, operator_object.oprname,\n    COALESCE(operator_identity.left_type, ''),\n    COALESCE(operator_identity.right_type, '')), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_operator operator_object\n  JOIN structural_namespaces namespace ON namespace.oid = operator_object.oprnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = operator_object.oprowner\n  JOIN pg_catalog.pg_proc function_object ON function_object.oid = operator_object.oprcode\n  JOIN pg_catalog.pg_namespace function_namespace\n    ON function_namespace.oid = function_object.pronamespace\n  LEFT JOIN pg_catalog.pg_proc restriction_function ON restriction_function.oid = operator_object.oprrest\n  LEFT JOIN pg_catalog.pg_namespace restriction_namespace\n    ON restriction_namespace.oid = restriction_function.pronamespace\n  LEFT JOIN pg_catalog.pg_proc join_function ON join_function.oid = operator_object.oprjoin\n  LEFT JOIN pg_catalog.pg_namespace join_namespace ON join_namespace.oid = join_function.pronamespace\n  LEFT JOIN pg_catalog.pg_operator commutator ON commutator.oid = operator_object.oprcom\n  LEFT JOIN pg_catalog.pg_namespace commutator_namespace\n    ON commutator_namespace.oid = commutator.oprnamespace\n  LEFT JOIN pg_catalog.pg_operator negator ON negator.oid = operator_object.oprnegate\n  LEFT JOIN pg_catalog.pg_namespace negator_namespace ON negator_namespace.oid = negator.oprnamespace\n  CROSS JOIN LATERAL (\n    SELECT CASE WHEN operator_object.oprleft = 0 THEN NULL\n        ELSE pg_catalog.format_type(operator_object.oprleft, NULL) END AS left_type,\n      CASE WHEN operator_object.oprright = 0 THEN NULL\n        ELSE pg_catalog.format_type(operator_object.oprright, NULL) END AS right_type\n  ) operator_identity\n),\noperator_family_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', operator_family.opfname,\n    'owner', owner.rolname,\n    'access_method', access_method.amname,\n    'operators', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'strategy', family_operator.amopstrategy,\n        'purpose', family_operator.amoppurpose::text,\n        'left_type', member_identity.left_type,\n        'right_type', member_identity.right_type,\n        'operator_schema', member_namespace.nspname,\n        'operator_name', member_operator.oprname,\n        'sort_family_schema', sort_family_namespace.nspname,\n        'sort_family_name', sort_family.opfname\n      ) ORDER BY member_identity.left_type, member_identity.right_type,\n        family_operator.amopstrategy, family_operator.amoppurpose,\n        member_namespace.nspname, member_operator.oprname,\n        COALESCE(sort_family_namespace.nspname, ''), COALESCE(sort_family.opfname, ''))\n      FROM pg_catalog.pg_amop family_operator\n      JOIN pg_catalog.pg_operator member_operator ON member_operator.oid = family_operator.amopopr\n      JOIN pg_catalog.pg_namespace member_namespace\n        ON member_namespace.oid = member_operator.oprnamespace\n      LEFT JOIN pg_catalog.pg_opfamily sort_family\n        ON sort_family.oid = family_operator.amopsortfamily\n      LEFT JOIN pg_catalog.pg_namespace sort_family_namespace\n        ON sort_family_namespace.oid = sort_family.opfnamespace\n      CROSS JOIN LATERAL (\n        SELECT pg_catalog.format_type(family_operator.amoplefttype, NULL) AS left_type,\n          pg_catalog.format_type(family_operator.amoprighttype, NULL) AS right_type\n      ) member_identity\n      WHERE family_operator.amopfamily = operator_family.oid\n    ), '[]'::jsonb),\n    'functions', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'number', family_function.amprocnum,\n        'left_type', member_identity.left_type,\n        'right_type', member_identity.right_type,\n        'function_schema', member_namespace.nspname,\n        'function_name', member_function.proname,\n        'function_identity_arguments', pg_catalog.pg_get_function_identity_arguments(member_function.oid)\n      ) ORDER BY member_identity.left_type, member_identity.right_type,\n        family_function.amprocnum, member_namespace.nspname, member_function.proname,\n        pg_catalog.pg_get_function_identity_arguments(member_function.oid))\n      FROM pg_catalog.pg_amproc family_function\n      JOIN pg_catalog.pg_proc member_function ON member_function.oid = family_function.amproc\n      JOIN pg_catalog.pg_namespace member_namespace\n        ON member_namespace.oid = member_function.pronamespace\n      CROSS JOIN LATERAL (\n        SELECT pg_catalog.format_type(family_function.amproclefttype, NULL) AS left_type,\n          pg_catalog.format_type(family_function.amprocrighttype, NULL) AS right_type\n      ) member_identity\n      WHERE family_function.amprocfamily = operator_family.oid\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, operator_family.opfname, access_method.amname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_opfamily operator_family\n  JOIN structural_namespaces namespace ON namespace.oid = operator_family.opfnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = operator_family.opfowner\n  JOIN pg_catalog.pg_am access_method ON access_method.oid = operator_family.opfmethod\n),\noperator_class_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', operator_class.opcname,\n    'owner', owner.rolname,\n    'access_method', access_method.amname,\n    'family_schema', family_namespace.nspname,\n    'family_name', operator_family.opfname,\n    'input_type', pg_catalog.format_type(operator_class.opcintype, NULL),\n    'default', operator_class.opcdefault,\n    'key_type', CASE WHEN operator_class.opckeytype = 0 THEN NULL\n      ELSE pg_catalog.format_type(operator_class.opckeytype, NULL) END\n  ) ORDER BY namespace.nspname, operator_class.opcname, access_method.amname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_opclass operator_class\n  JOIN structural_namespaces namespace ON namespace.oid = operator_class.opcnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = operator_class.opcowner\n  JOIN pg_catalog.pg_am access_method ON access_method.oid = operator_class.opcmethod\n  JOIN pg_catalog.pg_opfamily operator_family ON operator_family.oid = operator_class.opcfamily\n  JOIN pg_catalog.pg_namespace family_namespace ON family_namespace.oid = operator_family.opfnamespace\n),\nextended_statistics_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', statistics.stxname,\n    'owner', owner.rolname,\n    'relation_schema', relation_namespace.nspname,\n    'relation_name', relation.relname,\n    'definition', pg_catalog.pg_get_statisticsobjdef(statistics.oid),\n    'target', statistics.stxstattarget,\n    'kinds', COALESCE((\n      SELECT jsonb_agg(kind::text ORDER BY kind::text)\n      FROM pg_catalog.unnest(statistics.stxkind) kind\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, statistics.stxname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_statistic_ext statistics\n  JOIN structural_namespaces namespace ON namespace.oid = statistics.stxnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = statistics.stxowner\n  JOIN pg_catalog.pg_class relation ON relation.oid = statistics.stxrelid\n  JOIN pg_catalog.pg_namespace relation_namespace ON relation_namespace.oid = relation.relnamespace\n),\ntext_search_parser_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', parser.prsname,\n    'start', start_function.proname,\n    'token', token_function.proname,\n    'end', end_function.proname,\n    'headline', headline_function.proname,\n    'lex_types', lex_types_function.proname\n  ) ORDER BY namespace.nspname, parser.prsname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_ts_parser parser\n  JOIN structural_namespaces namespace ON namespace.oid = parser.prsnamespace\n  JOIN pg_catalog.pg_proc start_function ON start_function.oid = parser.prsstart\n  JOIN pg_catalog.pg_proc token_function ON token_function.oid = parser.prstoken\n  JOIN pg_catalog.pg_proc end_function ON end_function.oid = parser.prsend\n  LEFT JOIN pg_catalog.pg_proc headline_function ON headline_function.oid = parser.prsheadline\n  JOIN pg_catalog.pg_proc lex_types_function ON lex_types_function.oid = parser.prslextype\n),\ntext_search_template_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', template.tmplname,\n    'init_schema', init_namespace.nspname,\n    'init_name', init_function.proname,\n    'lexize_schema', lexize_namespace.nspname,\n    'lexize_name', lexize_function.proname\n  ) ORDER BY namespace.nspname, template.tmplname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_ts_template template\n  JOIN structural_namespaces namespace ON namespace.oid = template.tmplnamespace\n  LEFT JOIN pg_catalog.pg_proc init_function ON init_function.oid = template.tmplinit\n  LEFT JOIN pg_catalog.pg_namespace init_namespace ON init_namespace.oid = init_function.pronamespace\n  JOIN pg_catalog.pg_proc lexize_function ON lexize_function.oid = template.tmpllexize\n  JOIN pg_catalog.pg_namespace lexize_namespace ON lexize_namespace.oid = lexize_function.pronamespace\n),\ntext_search_dictionary_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', dictionary.dictname,\n    'owner', owner.rolname,\n    'template_schema', template_namespace.nspname,\n    'template_name', template.tmplname,\n    'init_options', dictionary.dictinitoption\n  ) ORDER BY namespace.nspname, dictionary.dictname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_ts_dict dictionary\n  JOIN structural_namespaces namespace ON namespace.oid = dictionary.dictnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = dictionary.dictowner\n  JOIN pg_catalog.pg_ts_template template ON template.oid = dictionary.dicttemplate\n  JOIN pg_catalog.pg_namespace template_namespace ON template_namespace.oid = template.tmplnamespace\n),\ntext_search_configuration_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', configuration.cfgname,\n    'owner', owner.rolname,\n    'parser_schema', parser_namespace.nspname,\n    'parser_name', parser.prsname,\n    'mappings', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'token_type', mapping_group.maptokentype,\n        'dictionaries', mapping_group.dictionaries\n      ) ORDER BY mapping_group.maptokentype)\n      FROM (\n        SELECT configuration_mapping.maptokentype,\n          jsonb_agg(jsonb_build_object(\n            'schema', dictionary_namespace.nspname,\n            'name', dictionary.dictname\n          ) ORDER BY configuration_mapping.mapseqno) AS dictionaries\n        FROM pg_catalog.pg_ts_config_map configuration_mapping\n        JOIN pg_catalog.pg_ts_dict dictionary ON dictionary.oid = configuration_mapping.mapdict\n        JOIN pg_catalog.pg_namespace dictionary_namespace\n          ON dictionary_namespace.oid = dictionary.dictnamespace\n        WHERE configuration_mapping.mapcfg = configuration.oid\n        GROUP BY configuration_mapping.maptokentype\n      ) mapping_group\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, configuration.cfgname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_ts_config configuration\n  JOIN structural_namespaces namespace ON namespace.oid = configuration.cfgnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = configuration.cfgowner\n  JOIN pg_catalog.pg_ts_parser parser ON parser.oid = configuration.cfgparser\n  JOIN pg_catalog.pg_namespace parser_namespace ON parser_namespace.oid = parser.prsnamespace\n),\ntransform_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'type', pg_catalog.format_type(transform.trftype, NULL),\n    'language', language.lanname,\n    'from_sql_schema', from_sql_namespace.nspname,\n    'from_sql_name', from_sql.proname,\n    'from_sql_identity_arguments', CASE WHEN from_sql.oid IS NULL THEN NULL\n      ELSE pg_catalog.pg_get_function_identity_arguments(from_sql.oid) END,\n    'to_sql_schema', to_sql_namespace.nspname,\n    'to_sql_name', to_sql.proname,\n    'to_sql_identity_arguments', CASE WHEN to_sql.oid IS NULL THEN NULL\n      ELSE pg_catalog.pg_get_function_identity_arguments(to_sql.oid) END\n  ) ORDER BY pg_catalog.format_type(transform.trftype, NULL), language.lanname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_transform transform\n  JOIN pg_catalog.pg_language language ON language.oid = transform.trflang\n  LEFT JOIN pg_catalog.pg_proc from_sql ON from_sql.oid = transform.trffromsql\n  LEFT JOIN pg_catalog.pg_namespace from_sql_namespace\n    ON from_sql_namespace.oid = from_sql.pronamespace\n  LEFT JOIN pg_catalog.pg_proc to_sql ON to_sql.oid = transform.trftosql\n  LEFT JOIN pg_catalog.pg_namespace to_sql_namespace ON to_sql_namespace.oid = to_sql.pronamespace\n),\npublication_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', publication.pubname,\n    'owner', owner.rolname,\n    'all_tables', publication.puballtables,\n    'insert', publication.pubinsert,\n    'update', publication.pubupdate,\n    'delete', publication.pubdelete,\n    'truncate', publication.pubtruncate,\n    'via_partition_root', publication.pubviaroot,\n    'schemas', COALESCE((\n      SELECT jsonb_agg(namespace.nspname ORDER BY namespace.nspname)\n      FROM pg_catalog.pg_publication_namespace publication_namespace\n      JOIN pg_catalog.pg_namespace namespace ON namespace.oid = publication_namespace.pnnspid\n      WHERE publication_namespace.pnpubid = publication.oid\n    ), '[]'::jsonb),\n    'relations', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'schema', namespace.nspname,\n        'name', relation.relname,\n        'row_filter', pg_catalog.pg_get_expr(publication_relation.prqual,\n          publication_relation.prrelid, true),\n        'columns', COALESCE((\n          SELECT jsonb_agg(attribute.attname ORDER BY attribute.attnum)\n          FROM pg_catalog.unnest(publication_relation.prattrs::smallint[]) attribute_number(attnum)\n          JOIN pg_catalog.pg_attribute attribute\n            ON attribute.attrelid = publication_relation.prrelid\n           AND attribute.attnum = attribute_number.attnum\n        ), '[]'::jsonb)\n      ) ORDER BY namespace.nspname, relation.relname)\n      FROM pg_catalog.pg_publication_rel publication_relation\n      JOIN pg_catalog.pg_class relation ON relation.oid = publication_relation.prrelid\n      JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace\n      WHERE publication_relation.prpubid = publication.oid\n    ), '[]'::jsonb)\n  ) ORDER BY publication.pubname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_publication publication\n  JOIN pg_catalog.pg_roles owner ON owner.oid = publication.pubowner\n),\nsubscription_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', subscription.subname,\n    'owner', owner.rolname,\n    'enabled', subscription.subenabled,\n    'binary', subscription.subbinary,\n    'streaming', subscription.substream::text,\n    'two_phase_state', subscription.subtwophasestate::text,\n    'disable_on_error', subscription.subdisableonerr,\n    'password_required', subscription.subpasswordrequired,\n    'run_as_owner', subscription.subrunasowner,\n    'failover', subscription.subfailover,\n    'connection_sha256', encode(extensions.digest(convert_to(subscription.subconninfo, 'UTF8'),\n      'sha256'), 'hex'),\n    'slot_name', subscription.subslotname,\n    'synchronous_commit', subscription.subsynccommit,\n    'publications', COALESCE((\n      SELECT jsonb_agg(publication_name ORDER BY publication_name)\n      FROM pg_catalog.unnest(subscription.subpublications) publication_name\n    ), '[]'::jsonb),\n    'origin', subscription.suborigin\n  ) ORDER BY subscription.subname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_subscription subscription\n  JOIN pg_catalog.pg_roles owner ON owner.oid = subscription.subowner\n  WHERE subscription.subdbid = (SELECT oid FROM pg_catalog.pg_database\n    WHERE datname = pg_catalog.current_database())\n),\nforeign_table_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', relation.relname,\n    'server', server.srvname,\n    'server_owner', server_owner.rolname,\n    'server_type', server.srvtype,\n    'server_version', server.srvversion,\n    'server_comment', pg_catalog.obj_description(server.oid, 'pg_foreign_server'),\n    'server_security_labels', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'provider', security_label.provider,\n        'label', security_label.label\n      ) ORDER BY security_label.provider)\n      FROM pg_catalog.pg_seclabel security_label\n      WHERE security_label.classoid = 'pg_catalog.pg_foreign_server'::regclass\n        AND security_label.objoid = server.oid\n        AND security_label.objsubid = 0\n    ), '[]'::jsonb),\n    'fdw', wrapper.fdwname,\n    'fdw_owner', wrapper_owner.rolname,\n    'fdw_comment', pg_catalog.obj_description(wrapper.oid, 'pg_foreign_data_wrapper'),\n    'fdw_security_labels', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'provider', security_label.provider,\n        'label', security_label.label\n      ) ORDER BY security_label.provider)\n      FROM pg_catalog.pg_seclabel security_label\n      WHERE security_label.classoid = 'pg_catalog.pg_foreign_data_wrapper'::regclass\n        AND security_label.objoid = wrapper.oid\n        AND security_label.objsubid = 0\n    ), '[]'::jsonb),\n    'server_options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(server.srvoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'server_acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(server.srvacl, pg_catalog.acldefault('S', server.srvowner))) item\n    ), '[]'::jsonb),\n    'fdw_options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(wrapper.fdwoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb),\n    'fdw_acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(wrapper.fdwacl, pg_catalog.acldefault('F', wrapper.fdwowner))) item\n    ), '[]'::jsonb),\n    'table_options', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'name', pg_catalog.split_part(option, '=', 1),\n        'value_sha256', encode(extensions.digest(convert_to(\n          pg_catalog.substr(option, pg_catalog.strpos(option, '=') + 1), 'UTF8'\n        ), 'sha256'), 'hex')\n      ) ORDER BY pg_catalog.split_part(option, '=', 1))\n      FROM pg_catalog.unnest(COALESCE(foreign_table.ftoptions, ARRAY[]::text[])) option\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, relation.relname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_foreign_table foreign_table\n  JOIN pg_catalog.pg_class relation ON relation.oid = foreign_table.ftrelid\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n  JOIN pg_catalog.pg_foreign_server server ON server.oid = foreign_table.ftserver\n  JOIN pg_catalog.pg_foreign_data_wrapper wrapper ON wrapper.oid = server.srvfdw\n  JOIN pg_catalog.pg_roles server_owner ON server_owner.oid = server.srvowner\n  JOIN pg_catalog.pg_roles wrapper_owner ON wrapper_owner.oid = wrapper.fdwowner\n),\nindex_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', index_relation.relname,\n    'table_schema', table_namespace.nspname,\n    'table_name', table_relation.relname,\n    'owner', owner.rolname,\n    'definition', pg_catalog.pg_get_indexdef(index_relation.oid),\n    'valid', index.indisvalid,\n    'ready', index.indisready,\n    'live', index.indislive,\n    'unique', index.indisunique,\n    'primary', index.indisprimary,\n    'exclusion', index.indisexclusion,\n    'replica_identity', index.indisreplident,\n    'clustered', index.indisclustered,\n    'immediate', index.indimmediate,\n    'check_xmin', index.indcheckxmin,\n    'nulls_not_distinct', index.indnullsnotdistinct,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(index_relation.relacl, pg_catalog.acldefault('r', index_relation.relowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, index_relation.relname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_index index\n  JOIN pg_catalog.pg_class index_relation ON index_relation.oid = index.indexrelid\n  JOIN structural_namespaces namespace ON namespace.oid = index_relation.relnamespace\n  JOIN pg_catalog.pg_class table_relation ON table_relation.oid = index.indrelid\n  JOIN pg_catalog.pg_namespace table_namespace ON table_namespace.oid = table_relation.relnamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = index_relation.relowner\n),\nconstraint_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', constraint_object.conname,\n    'relation_schema', relation_namespace.nspname,\n    'relation_name', relation.relname,\n    'domain_schema', domain_namespace.nspname,\n    'domain_name', domain_type.typname,\n    'type', constraint_object.contype::text,\n    'definition', pg_catalog.pg_get_constraintdef(constraint_object.oid, true),\n    'deferrable', constraint_object.condeferrable,\n    'deferred', constraint_object.condeferred,\n    'validated', constraint_object.convalidated,\n    'no_inherit', constraint_object.connoinherit\n  ) ORDER BY namespace.nspname, constraint_object.conname, relation_namespace.nspname, relation.relname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_constraint constraint_object\n  JOIN structural_namespaces namespace ON namespace.oid = constraint_object.connamespace\n  LEFT JOIN pg_catalog.pg_class relation ON relation.oid = constraint_object.conrelid\n  LEFT JOIN pg_catalog.pg_namespace relation_namespace ON relation_namespace.oid = relation.relnamespace\n  LEFT JOIN pg_catalog.pg_type domain_type ON domain_type.oid = constraint_object.contypid\n  LEFT JOIN pg_catalog.pg_namespace domain_namespace ON domain_namespace.oid = domain_type.typnamespace\n),\nfunction_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', procedure.proname,\n    'identity_arguments', pg_catalog.pg_get_function_identity_arguments(procedure.oid),\n    'owner', owner.rolname,\n    'kind', procedure.prokind::text,\n    'security_definer', procedure.prosecdef,\n    'leakproof', procedure.proleakproof,\n    'strict', procedure.proisstrict,\n    'volatility', procedure.provolatile::text,\n    'parallel', procedure.proparallel::text,\n    'returns_set', procedure.proretset,\n    'configuration', COALESCE((\n      SELECT jsonb_agg(setting ORDER BY setting)\n      FROM pg_catalog.unnest(COALESCE(procedure.proconfig, ARRAY[]::text[])) setting\n    ), '[]'::jsonb),\n    'definition', CASE WHEN procedure.prokind IN ('f', 'p', 'w')\n      THEN pg_catalog.pg_get_functiondef(procedure.oid)\n      ELSE jsonb_build_object(\n        'arguments', pg_catalog.pg_get_function_arguments(procedure.oid),\n        'result', pg_catalog.pg_get_function_result(procedure.oid),\n        'language', language.lanname,\n        'source', procedure.prosrc\n      )::text END,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(COALESCE(procedure.proacl, pg_catalog.acldefault('f', procedure.proowner))) item\n    ), '[]'::jsonb)\n  ) ORDER BY namespace.nspname, procedure.proname, pg_catalog.pg_get_function_identity_arguments(procedure.oid)), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_proc procedure\n  JOIN structural_namespaces namespace ON namespace.oid = procedure.pronamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = procedure.proowner\n  JOIN pg_catalog.pg_language language ON language.oid = procedure.prolang\n),\ntrigger_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'relation', relation.relname,\n    'name', trigger_object.tgname,\n    'definition', pg_catalog.pg_get_triggerdef(trigger_object.oid, true),\n    'enabled', trigger_object.tgenabled::text\n  ) ORDER BY namespace.nspname, relation.relname, trigger_object.tgname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_trigger trigger_object\n  JOIN pg_catalog.pg_class relation ON relation.oid = trigger_object.tgrelid\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n  JOIN pg_catalog.pg_proc procedure ON procedure.oid = trigger_object.tgfoid\n  JOIN pg_catalog.pg_namespace procedure_namespace ON procedure_namespace.oid = procedure.pronamespace\n  WHERE NOT trigger_object.tgisinternal\n    AND NOT (procedure_namespace.nspname = 'q12_guard' AND procedure.proname = 'enforce_write_barrier')\n),\nevent_trigger_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'name', event_trigger.evtname,\n    'owner', owner.rolname,\n    'event', event_trigger.evtevent,\n    'enabled', event_trigger.evtenabled::text,\n    'tags', COALESCE((\n      SELECT jsonb_agg(tag ORDER BY tag)\n      FROM pg_catalog.unnest(COALESCE(event_trigger.evttags, ARRAY[]::text[])) tag\n    ), '[]'::jsonb),\n    'function_schema', function_namespace.nspname,\n    'function_name', function_object.proname,\n    'function_identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid)\n  ) ORDER BY event_trigger.evtname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_event_trigger event_trigger\n  JOIN pg_catalog.pg_roles owner ON owner.oid = event_trigger.evtowner\n  JOIN pg_catalog.pg_proc function_object ON function_object.oid = event_trigger.evtfoid\n  JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n  WHERE event_trigger.evtname <> 'q12_guard_ddl_command_start'\n),\nrule_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'relation', relation.relname,\n    'name', rewrite_rule.rulename,\n    'event', rewrite_rule.ev_type::text,\n    'enabled', rewrite_rule.ev_enabled::text,\n    'instead', rewrite_rule.is_instead,\n    'definition', pg_catalog.pg_get_ruledef(rewrite_rule.oid, true)\n  ) ORDER BY namespace.nspname, relation.relname, rewrite_rule.rulename), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_rewrite rewrite_rule\n  JOIN pg_catalog.pg_class relation ON relation.oid = rewrite_rule.ev_class\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n),\naggregate_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'name', procedure.proname,\n    'identity_arguments', pg_catalog.pg_get_function_identity_arguments(procedure.oid),\n    'owner', owner.rolname,\n    'kind', aggregate_object.aggkind::text,\n    'direct_arguments', aggregate_object.aggnumdirectargs,\n    'transition_function', CASE WHEN aggregate_object.aggtransfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggtransfn\n    ) END,\n    'final_function', CASE WHEN aggregate_object.aggfinalfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggfinalfn\n    ) END,\n    'combine_function', CASE WHEN aggregate_object.aggcombinefn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggcombinefn\n    ) END,\n    'serial_function', CASE WHEN aggregate_object.aggserialfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggserialfn\n    ) END,\n    'deserial_function', CASE WHEN aggregate_object.aggdeserialfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggdeserialfn\n    ) END,\n    'moving_transition_function', CASE WHEN aggregate_object.aggmtransfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggmtransfn\n    ) END,\n    'moving_inverse_function', CASE WHEN aggregate_object.aggminvtransfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggminvtransfn\n    ) END,\n    'moving_final_function', CASE WHEN aggregate_object.aggmfinalfn = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', function_namespace.nspname, 'name', function_object.proname,\n        'identity_arguments', pg_catalog.pg_get_function_identity_arguments(function_object.oid))\n      FROM pg_catalog.pg_proc function_object\n      JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid = function_object.pronamespace\n      WHERE function_object.oid = aggregate_object.aggmfinalfn\n    ) END,\n    'transition_type', (\n      SELECT jsonb_build_object('schema', type_namespace.nspname, 'name', type_object.typname)\n      FROM pg_catalog.pg_type type_object\n      JOIN pg_catalog.pg_namespace type_namespace ON type_namespace.oid = type_object.typnamespace\n      WHERE type_object.oid = aggregate_object.aggtranstype\n    ),\n    'moving_transition_type', CASE WHEN aggregate_object.aggmtranstype = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object('schema', type_namespace.nspname, 'name', type_object.typname)\n      FROM pg_catalog.pg_type type_object\n      JOIN pg_catalog.pg_namespace type_namespace ON type_namespace.oid = type_object.typnamespace\n      WHERE type_object.oid = aggregate_object.aggmtranstype\n    ) END,\n    'transition_space', aggregate_object.aggtransspace,\n    'moving_transition_space', aggregate_object.aggmtransspace,\n    'final_extra', aggregate_object.aggfinalextra,\n    'moving_final_extra', aggregate_object.aggmfinalextra,\n    'final_modify', aggregate_object.aggfinalmodify::text,\n    'moving_final_modify', aggregate_object.aggmfinalmodify::text,\n    'sort_operator', CASE WHEN aggregate_object.aggsortop = 0 THEN NULL ELSE (\n      SELECT jsonb_build_object(\n        'schema', operator_namespace.nspname,\n        'name', operator_object.oprname,\n        'left_type', CASE WHEN operator_object.oprleft = 0 THEN NULL ELSE\n          jsonb_build_object('schema', left_namespace.nspname, 'name', left_type.typname) END,\n        'right_type', CASE WHEN operator_object.oprright = 0 THEN NULL ELSE\n          jsonb_build_object('schema', right_namespace.nspname, 'name', right_type.typname) END\n      )\n      FROM pg_catalog.pg_operator operator_object\n      JOIN pg_catalog.pg_namespace operator_namespace ON operator_namespace.oid = operator_object.oprnamespace\n      LEFT JOIN pg_catalog.pg_type left_type ON left_type.oid = operator_object.oprleft\n      LEFT JOIN pg_catalog.pg_namespace left_namespace ON left_namespace.oid = left_type.typnamespace\n      LEFT JOIN pg_catalog.pg_type right_type ON right_type.oid = operator_object.oprright\n      LEFT JOIN pg_catalog.pg_namespace right_namespace ON right_namespace.oid = right_type.typnamespace\n      WHERE operator_object.oid = aggregate_object.aggsortop\n    ) END,\n    'initial_value', aggregate_object.agginitval,\n    'moving_initial_value', aggregate_object.aggminitval\n  ) ORDER BY namespace.nspname, procedure.proname,\n    pg_catalog.pg_get_function_identity_arguments(procedure.oid)), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_aggregate aggregate_object\n  JOIN pg_catalog.pg_proc procedure ON procedure.oid = aggregate_object.aggfnoid\n  JOIN structural_namespaces namespace ON namespace.oid = procedure.pronamespace\n  JOIN pg_catalog.pg_roles owner ON owner.oid = procedure.proowner\n),\npolicy_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'schema', namespace.nspname,\n    'relation', relation.relname,\n    'name', policy.polname,\n    'permissive', policy.polpermissive,\n    'command', policy.polcmd::text,\n    'roles', COALESCE((\n      SELECT jsonb_agg(\n        CASE WHEN role_oid.oid = 0 THEN 'PUBLIC' ELSE role.rolname END\n        ORDER BY CASE WHEN role_oid.oid = 0 THEN 'PUBLIC' ELSE role.rolname END\n      )\n      FROM pg_catalog.unnest(policy.polroles) AS role_oid(oid)\n      LEFT JOIN pg_catalog.pg_roles role ON role.oid = role_oid.oid\n    ), '[]'::jsonb),\n    'using', pg_catalog.pg_get_expr(policy.polqual, policy.polrelid, true),\n    'with_check', pg_catalog.pg_get_expr(policy.polwithcheck, policy.polrelid, true)\n  ) ORDER BY namespace.nspname, relation.relname, policy.polname), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_policy policy\n  JOIN pg_catalog.pg_class relation ON relation.oid = policy.polrelid\n  JOIN structural_namespaces namespace ON namespace.oid = relation.relnamespace\n),\ndefault_acl_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'role', role.rolname,\n    'schema', namespace.nspname,\n    'object_type', default_acl.defaclobjtype::text,\n    'acl', COALESCE((\n      SELECT jsonb_agg(item::text ORDER BY item::text)\n      FROM pg_catalog.unnest(default_acl.defaclacl) item\n    ), '[]'::jsonb)\n  ) ORDER BY role.rolname, namespace.nspname, default_acl.defaclobjtype), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_default_acl default_acl\n  JOIN pg_catalog.pg_roles role ON role.oid = default_acl.defaclrole\n  LEFT JOIN structural_namespaces namespace ON namespace.oid = default_acl.defaclnamespace\n  WHERE default_acl.defaclnamespace = 0 OR namespace.oid IS NOT NULL\n),\nparameter_acl_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'parameter', parameter_acl.parname,\n    'grantor', COALESCE(grantor.rolname, 'PUBLIC'),\n    'grantee', CASE WHEN exploded.grantee = 0 THEN 'PUBLIC' ELSE grantee.rolname END,\n    'privilege', exploded.privilege_type,\n    'grantable', exploded.is_grantable\n  ) ORDER BY parameter_acl.parname, COALESCE(grantor.rolname, 'PUBLIC'),\n    CASE WHEN exploded.grantee = 0 THEN 'PUBLIC' ELSE grantee.rolname END,\n    exploded.privilege_type, exploded.is_grantable), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_parameter_acl parameter_acl\n  CROSS JOIN LATERAL pg_catalog.aclexplode(parameter_acl.paracl) exploded\n  LEFT JOIN pg_catalog.pg_roles grantor ON grantor.oid = exploded.grantor\n  LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid = exploded.grantee\n),\ncomment_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'object_type', identified.type,\n    'schema', identified.schema,\n    'name', identified.name,\n    'identity', identified.identity,\n    'subobject_id', description.objsubid,\n    'comment', description.description\n  ) ORDER BY identified.type, identified.schema, identified.identity, description.objsubid), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_description description\n  CROSS JOIN LATERAL pg_identify_object(\n    description.classoid, description.objoid, description.objsubid\n  ) identified\n  WHERE identified.schema IN (SELECT nspname FROM structural_namespaces)\n     OR (identified.type = 'schema' AND identified.identity IN (SELECT nspname FROM structural_namespaces))\n     OR (description.classoid IN (SELECT classoid FROM schema_less_comment_classes)\n       AND (description.classoid <> 'pg_catalog.pg_event_trigger'::regclass\n         OR identified.identity <> 'q12_guard_ddl_command_start'))\n),\nsecurity_label_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'object_type', identified.type,\n    'schema', identified.schema,\n    'name', identified.name,\n    'identity', identified.identity,\n    'subobject_id', security_label.objsubid,\n    'provider', security_label.provider,\n    'label', security_label.label\n  ) ORDER BY identified.type, identified.schema, identified.identity, security_label.objsubid, security_label.provider), '[]'::jsonb) AS value\n  FROM pg_catalog.pg_seclabel security_label\n  CROSS JOIN LATERAL pg_identify_object(\n    security_label.classoid, security_label.objoid, security_label.objsubid\n  ) identified\n  WHERE identified.schema IN (SELECT nspname FROM structural_namespaces)\n     OR (identified.type = 'schema' AND identified.identity IN (SELECT nspname FROM structural_namespaces))\n     OR (security_label.classoid IN (SELECT classoid FROM schema_less_security_label_classes)\n       AND (security_label.classoid <> 'pg_catalog.pg_event_trigger'::regclass\n         OR identified.identity <> 'q12_guard_ddl_command_start'))\n),\nmigration_rows AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object(\n    'version', migration.version,\n    'name', migration.name,\n    'statements', to_jsonb(migration.statements)\n  ) ORDER BY migration.version), '[]'::jsonb) AS value\n  FROM supabase_migrations.schema_migrations migration\n),\npayload_row AS (\n  SELECT jsonb_build_object(\n    'schema_version', 'megacampus.q12.structural-catalog-payload/v1',\n    'database', database_row.value,\n    'schemas', schema_rows.value,\n    'relations', relation_rows.value,\n    'columns', column_rows.value,\n    'sequences', sequence_rows.value,\n    'extensions', extension_rows.value,\n    'types', type_rows.value,\n    'access_methods', access_method_rows.value,\n    'casts', cast_rows.value,\n    'collations', collation_rows.value,\n    'conversions', conversion_rows.value,\n    'foreign_data_wrappers', foreign_data_wrapper_rows.value,\n    'foreign_servers', foreign_server_rows.value,\n    'foreign_tables', foreign_table_rows.value,\n    'user_mappings', user_mapping_rows.value,\n    'indexes', index_rows.value,\n    'constraints', constraint_rows.value,\n    'functions', function_rows.value,\n    'languages', language_rows.value,\n    'operators', operator_rows.value,\n    'operator_families', operator_family_rows.value,\n    'operator_classes', operator_class_rows.value,\n    'triggers', trigger_rows.value,\n    'event_triggers', event_trigger_rows.value,\n    'rules', rule_rows.value,\n    'aggregates', aggregate_rows.value,\n    'policies', policy_rows.value,\n    'extended_statistics', extended_statistics_rows.value,\n    'text_search_parsers', text_search_parser_rows.value,\n    'text_search_templates', text_search_template_rows.value,\n    'text_search_dictionaries', text_search_dictionary_rows.value,\n    'text_search_configurations', text_search_configuration_rows.value,\n    'transforms', transform_rows.value,\n    'publications', publication_rows.value,\n    'subscriptions', subscription_rows.value,\n    'default_acls', default_acl_rows.value,\n    'parameter_acls', parameter_acl_rows.value,\n    'comments', comment_rows.value,\n    'security_labels', security_label_rows.value,\n    'migration_history', migration_rows.value\n  ) AS payload\n  FROM database_row, schema_rows, relation_rows, column_rows, sequence_rows, extension_rows, type_rows,\n    access_method_rows, cast_rows, collation_rows, conversion_rows, foreign_data_wrapper_rows,\n    foreign_server_rows, foreign_table_rows, user_mapping_rows, index_rows, constraint_rows,\n    function_rows, language_rows, operator_rows, operator_family_rows, operator_class_rows,\n    trigger_rows, event_trigger_rows, rule_rows, aggregate_rows, policy_rows,\n    extended_statistics_rows, text_search_parser_rows, text_search_template_rows,\n    text_search_dictionary_rows, text_search_configuration_rows, transform_rows,\n    publication_rows, subscription_rows, default_acl_rows, parameter_acl_rows, comment_rows,\n    security_label_rows, migration_rows\n)\nSELECT payload,\n  encode(extensions.digest(convert_to(payload::text, 'UTF8'), 'sha256'), 'hex') AS structural_sha256\nFROM payload_row\n\n  ) canonical;\n  IF structural_actual IS DISTINCT FROM structural_expected THEN\n    RAISE EXCEPTION 'canonical structural catalog drift at guard checkpoint';\n  END IF;\n\n  -- Compare the complete expected and actual trigger tuples. Partition leaf row\n  -- clones are bound to the explicit root by root.tgrelid; TRUNCATE is explicit\n  -- on every root, leaf, and standalone relation.\n  IF EXISTS (\n    WITH relation_expected AS (\n      SELECT * FROM jsonb_to_recordset(expected_relations)\n        AS e(schema text,name text,oid oid,relkind \"char\",parent_oid oid,owner text)\n    ), expected_trigger AS (\n      SELECT oid AS relid,'q12_guard_row'::name AS tgname,31::smallint AS tgtype,\n        COALESCE(parent_oid,0::oid) AS parent_relid,'O'::\"char\" AS tgenabled,0::oid AS tgconstraint\n      FROM relation_expected\n      UNION ALL\n      SELECT oid,'q12_guard_truncate'::name,34::smallint,0::oid,'O'::\"char\",0::oid\n      FROM relation_expected\n      UNION ALL\n      SELECT format('q12_guard.%I',internal_table)::regclass::oid,\n        'q12_guard_immutable'::name,31::smallint,0::oid,'O'::\"char\",0::oid\n      FROM unnest(ARRAY['active_run','baseline','migration_guards']) internal_table\n      UNION ALL\n      SELECT format('q12_guard.%I',internal_table)::regclass::oid,\n        'q12_guard_immutable_truncate'::name,34::smallint,0::oid,'O'::\"char\",0::oid\n      FROM unnest(ARRAY['active_run','baseline','migration_guards']) internal_table\n      UNION ALL\n      SELECT 'q12_guard.probe'::regclass::oid,'q12_guard_row'::name,31::smallint,0::oid,'O'::\"char\",0::oid\n      UNION ALL\n      SELECT 'q12_guard.probe'::regclass::oid,'q12_guard_truncate'::name,34::smallint,0::oid,'O'::\"char\",0::oid\n    ), actual_trigger AS (\n      SELECT t.tgrelid,t.tgname,t.tgtype,\n        CASE WHEN t.tgparentid=0 THEN 0::oid ELSE root.tgrelid END AS parent_relid,\n        t.tgenabled,t.tgconstraint\n      FROM pg_trigger t\n      JOIN pg_proc p ON p.oid=t.tgfoid\n      JOIN pg_namespace n ON n.oid=p.pronamespace\n      LEFT JOIN pg_trigger root ON root.oid=t.tgparentid\n      WHERE n.nspname='q12_guard' AND p.proname='enforce_write_barrier' AND NOT t.tgisinternal\n    ), trigger_delta AS (\n      (SELECT * FROM expected_trigger EXCEPT SELECT * FROM actual_trigger)\n      UNION ALL\n      (SELECT * FROM actual_trigger EXCEPT SELECT * FROM expected_trigger)\n    ) SELECT 1 FROM trigger_delta\n  ) THEN RAISE EXCEPTION 'exact Q12 row/TRUNCATE trigger set or tgparentid drift'; END IF;\n\n  IF (SELECT array_agg(c.relname::text ORDER BY c.relname::text) FROM pg_class c\n      JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='q12_guard' AND c.relkind='r')\n       IS DISTINCT FROM ARRAY['active_run','baseline','migration_guards','probe']\n    OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace\n      WHERE n.nspname='q12_guard' AND c.relkind IN ('r','p','S')\n        AND (c.relkind<>'r' OR c.relowner<>'postgres'::regrole))\n    OR (SELECT array_agg(p.proname::text ORDER BY p.proname::text) FROM pg_proc p\n      JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='q12_guard')\n       IS DISTINCT FROM ARRAY['assert_capability','assert_controller_binding','enforce_ddl_barrier','enforce_write_barrier','extend_guard','quiesce_client_backends','verify_activated_state','verify_capability','verify_expected_guards','verify_install_resume_state']\n    OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace\n      WHERE n.nspname='q12_guard' AND (p.proowner<>'postgres'::regrole OR NOT p.prosecdef\n        OR p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog, q12_guard']))\n    OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace\n      CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl,acldefault('r',c.relowner))) acl\n      WHERE n.nspname='q12_guard' AND acl.grantee<>c.relowner)\n    OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace\n      CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) acl\n      WHERE n.nspname='q12_guard' AND acl.grantee<>p.proowner)\n    OR EXISTS (SELECT 1 FROM pg_namespace n\n      CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl,acldefault('n',n.nspowner))) acl\n      WHERE n.nspname='q12_guard' AND (n.nspowner<>'postgres'::regrole OR acl.grantee<>n.nspowner))\n    OR EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace\n      CROSS JOIN LATERAL aclexplode(COALESCE(t.typacl,acldefault('T',t.typowner))) acl\n      WHERE n.nspname='q12_guard' AND t.typcategory <> 'A' AND (t.typowner<>'postgres'::regrole OR acl.grantee<>t.typowner))\n    OR (SELECT array_agg(t.typname::text ORDER BY t.typname::text) FROM pg_type t\n      JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='q12_guard')\n       IS DISTINCT FROM ARRAY['_active_run','_baseline','_migration_guards','_probe','active_run','baseline','migration_guards','probe']\n    OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace\n      WHERE n.nspname='q12_guard' AND (\n        (p.proname='extend_guard' AND p.proargnames IS DISTINCT FROM\n          ARRAY['p_migration','p_expected_relations','p_migration_file_sha256','p_expected_catalog_sha256'])\n        OR (p.proname='verify_expected_guards' AND p.proargnames IS DISTINCT FROM ARRAY['p_after_migration'])\n      ))\n    OR NOT EXISTS (\n      SELECT 1 FROM pg_event_trigger event_trigger\n      JOIN pg_roles owner ON owner.oid=event_trigger.evtowner\n      JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid\n      JOIN pg_namespace function_namespace ON function_namespace.oid=function_object.pronamespace\n      WHERE event_trigger.evtname='q12_guard_ddl_command_start'\n        AND owner.rolname='postgres' AND event_trigger.evtevent='ddl_command_start'\n        AND event_trigger.evtenabled='O' AND event_trigger.evttags IS NULL\n        AND function_namespace.nspname='q12_guard'\n        AND function_object.proname='enforce_ddl_barrier'\n        AND pg_get_function_identity_arguments(function_object.oid)=''\n    )\n    OR (SELECT count(*) FROM pg_event_trigger event_trigger\n      JOIN pg_proc function_object ON function_object.oid=event_trigger.evtfoid\n      JOIN pg_namespace function_namespace ON function_namespace.oid=function_object.pronamespace\n      WHERE function_namespace.nspname='q12_guard') <> 1\n  THEN RAISE EXCEPTION 'q12_guard exact owner/object/ACL/function set drift'; END IF;\nEND $function$\n",
+          "identity": "verify_expected_guards(p_after_migration text)",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "definition": "CREATE OR REPLACE FUNCTION q12_guard.verify_install_resume_state()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'q12_guard'\nAS $function$\nDECLARE saved jsonb; current_database_setting jsonb;\n  saved_other_settings jsonb; current_other_settings jsonb; current_default text;\nBEGIN\n  PERFORM q12_guard.assert_controller_binding();\n  PERFORM q12_guard.verify_expected_guards(NULL);\n  SELECT baseline INTO STRICT saved FROM q12_guard.baseline WHERE singleton;\n  SELECT COALESCE((SELECT to_jsonb(setting) FROM pg_db_role_setting setting\n    WHERE setdatabase=(SELECT oid FROM pg_database WHERE datname='postgres') AND setrole=0),'null'::jsonb)\n    INTO current_database_setting;\n  SELECT COALESCE(jsonb_agg(value ORDER BY value),'[]'::jsonb) INTO saved_other_settings\n    FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(saved->'database_settings'->'setconfig')='array'\n      THEN saved->'database_settings'->'setconfig' ELSE '[]'::jsonb END) item(value)\n    WHERE value NOT LIKE 'default_transaction_read_only=%';\n  SELECT max(value) FILTER (WHERE value LIKE 'default_transaction_read_only=%')\n    INTO current_default\n    FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(current_database_setting->'setconfig')='array'\n      THEN current_database_setting->'setconfig' ELSE '[]'::jsonb END) item(value);\n  SELECT COALESCE(jsonb_agg(value ORDER BY value),'[]'::jsonb) INTO current_other_settings\n    FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(current_database_setting->'setconfig')='array'\n      THEN current_database_setting->'setconfig' ELSE '[]'::jsonb END) item(value)\n    WHERE value NOT LIKE 'default_transaction_read_only=%';\n  IF ((CASE WHEN jsonb_typeof(saved->'database_settings')='object' THEN saved->'database_settings' ELSE '{}'::jsonb END) - 'setconfig')\n       IS DISTINCT FROM\n     ((CASE WHEN jsonb_typeof(current_database_setting)='object' THEN current_database_setting ELSE '{}'::jsonb END) - 'setconfig')\n    OR saved_other_settings IS DISTINCT FROM current_other_settings\n    OR (current_default IS DISTINCT FROM saved->>'default_transaction_read_only'\n      AND current_default IS DISTINCT FROM 'default_transaction_read_only=on')\n    OR (SELECT activated FROM q12_guard.active_run WHERE singleton)\n    OR (SELECT count(*) FROM cron.job WHERE active)<>0\n    OR (SELECT count(*) FROM net.http_request_queue)<>0 THEN\n    RAISE EXCEPTION 'durable install resume state drift';\n  END IF;\nEND $function$\n",
+          "identity": "verify_install_resume_state()",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        }
+      ],
+      "indexes": [
+        {
+          "definition": "CREATE UNIQUE INDEX active_run_pkey ON q12_guard.active_run USING btree (singleton)",
+          "name": "active_run_pkey",
+          "schema": "q12_guard",
+          "table": "active_run"
+        },
+        {
+          "definition": "CREATE UNIQUE INDEX baseline_pkey ON q12_guard.baseline USING btree (singleton)",
+          "name": "baseline_pkey",
+          "schema": "q12_guard",
+          "table": "baseline"
+        },
+        {
+          "definition": "CREATE UNIQUE INDEX migration_guards_pkey ON q12_guard.migration_guards USING btree (migration)",
+          "name": "migration_guards_pkey",
+          "schema": "q12_guard",
+          "table": "migration_guards"
+        },
+        {
+          "definition": "CREATE UNIQUE INDEX probe_pkey ON q12_guard.probe USING btree (probe_id)",
+          "name": "probe_pkey",
+          "schema": "q12_guard",
+          "table": "probe"
+        }
+      ],
+      "object_acls": [
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "assert_capability()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "assert_controller_binding()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "enforce_ddl_barrier()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "enforce_write_barrier()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "extend_guard(p_migration text, p_expected_relations jsonb, p_migration_file_sha256 text, p_expected_catalog_sha256 text)",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "quiesce_client_backends()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "verify_activated_state()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "verify_capability()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "verify_expected_guards(p_after_migration text)",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "verify_install_resume_state()",
+          "object_type": "function",
+          "privilege": "EXECUTE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "DELETE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "INSERT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "MAINTAIN",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "REFERENCES",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "SELECT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "TRIGGER",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "TRUNCATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "relation",
+          "privilege": "UPDATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "DELETE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "INSERT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "MAINTAIN",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "REFERENCES",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "SELECT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "TRIGGER",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "TRUNCATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "relation",
+          "privilege": "UPDATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "DELETE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "INSERT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "MAINTAIN",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "REFERENCES",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "SELECT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "TRIGGER",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "TRUNCATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "privilege": "UPDATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "DELETE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "INSERT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "MAINTAIN",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "REFERENCES",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "SELECT",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "TRIGGER",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "TRUNCATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "relation",
+          "privilege": "UPDATE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "q12_guard",
+          "object_type": "schema",
+          "privilege": "CREATE",
+          "schema": null
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "q12_guard",
+          "object_type": "schema",
+          "privilege": "USAGE",
+          "schema": null
+        },
+        {
+          "grantable": false,
+          "grantee": "PUBLIC",
+          "grantor": "postgres",
+          "identity": "_active_run",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "_active_run",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "PUBLIC",
+          "grantor": "postgres",
+          "identity": "_baseline",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "_baseline",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "PUBLIC",
+          "grantor": "postgres",
+          "identity": "_migration_guards",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "_migration_guards",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "PUBLIC",
+          "grantor": "postgres",
+          "identity": "_probe",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "_probe",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "active_run",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "baseline",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "migration_guards",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        },
+        {
+          "grantable": false,
+          "grantee": "postgres",
+          "grantor": "postgres",
+          "identity": "probe",
+          "object_type": "type",
+          "privilege": "USAGE",
+          "schema": "q12_guard"
+        }
+      ],
+      "object_owners": [
+        {
+          "identity": "active_run.activated",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.capability_sha256",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.expected_catalog",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.expected_catalog_sha256",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.run_id",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.singleton",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.baseline",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.baseline_sha256",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.singleton",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.catalog_sha256",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.migration",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.migration_file_sha256",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.relation_set",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.stable_expected",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe.probe_id",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe.touched_at",
+          "object_type": "column",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.active_run_capability_sha256_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.active_run_expected_catalog_sha256_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.active_run_pkey",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.active_run_singleton_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.baseline_baseline_sha256_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.baseline_pkey",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.baseline_singleton_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.migration_guards_catalog_sha256_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.migration_guards_migration_file_sha256_check",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.migration_guards_pkey",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe.probe_pkey",
+          "object_type": "constraint",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "assert_capability()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "assert_controller_binding()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "enforce_ddl_barrier()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "enforce_write_barrier()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "extend_guard(p_migration text, p_expected_relations jsonb, p_migration_file_sha256 text, p_expected_catalog_sha256 text)",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "quiesce_client_backends()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "verify_activated_state()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "verify_capability()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "verify_expected_guards(p_after_migration text)",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "verify_install_resume_state()",
+          "object_type": "function",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run_pkey",
+          "object_type": "index",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline_pkey",
+          "object_type": "index",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards_pkey",
+          "object_type": "index",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe_pkey",
+          "object_type": "index",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run",
+          "object_type": "relation",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline",
+          "object_type": "relation",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards",
+          "object_type": "relation",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe",
+          "object_type": "relation",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "q12_guard",
+          "object_type": "schema",
+          "owner": "postgres",
+          "schema": null
+        },
+        {
+          "identity": "active_run.q12_guard_immutable",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run.q12_guard_immutable_truncate",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.q12_guard_immutable",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline.q12_guard_immutable_truncate",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.q12_guard_immutable",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards.q12_guard_immutable_truncate",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe.q12_guard_row",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe.q12_guard_truncate",
+          "object_type": "trigger",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "_active_run",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "_baseline",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "_migration_guards",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "_probe",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "active_run",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "baseline",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "migration_guards",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        },
+        {
+          "identity": "probe",
+          "object_type": "type",
+          "owner": "postgres",
+          "schema": "q12_guard"
+        }
+      ],
+      "triggers": [
+        {
+          "definition": "CREATE TRIGGER q12_guard_immutable BEFORE INSERT OR DELETE OR UPDATE ON q12_guard.active_run FOR EACH ROW EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_immutable",
+          "schema": "q12_guard",
+          "table": "active_run"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_immutable_truncate BEFORE TRUNCATE ON q12_guard.active_run FOR EACH STATEMENT EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_immutable_truncate",
+          "schema": "q12_guard",
+          "table": "active_run"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_immutable BEFORE INSERT OR DELETE OR UPDATE ON q12_guard.baseline FOR EACH ROW EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_immutable",
+          "schema": "q12_guard",
+          "table": "baseline"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_immutable_truncate BEFORE TRUNCATE ON q12_guard.baseline FOR EACH STATEMENT EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_immutable_truncate",
+          "schema": "q12_guard",
+          "table": "baseline"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_immutable BEFORE INSERT OR DELETE OR UPDATE ON q12_guard.migration_guards FOR EACH ROW EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_immutable",
+          "schema": "q12_guard",
+          "table": "migration_guards"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_immutable_truncate BEFORE TRUNCATE ON q12_guard.migration_guards FOR EACH STATEMENT EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_immutable_truncate",
+          "schema": "q12_guard",
+          "table": "migration_guards"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_row BEFORE INSERT OR DELETE OR UPDATE ON q12_guard.probe FOR EACH ROW EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_row",
+          "schema": "q12_guard",
+          "table": "probe"
+        },
+        {
+          "definition": "CREATE TRIGGER q12_guard_truncate BEFORE TRUNCATE ON q12_guard.probe FOR EACH STATEMENT EXECUTE FUNCTION q12_guard.enforce_write_barrier()",
+          "name": "q12_guard_truncate",
+          "schema": "q12_guard",
+          "table": "probe"
+        }
+      ]
+    },
+    "cron_jobs": [
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 1,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 2,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 3,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 4,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 5,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 6,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 7,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      },
+      {
+        "active": false,
+        "command_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "database": "postgres",
+        "jobid": 8,
+        "nodename": "localhost",
+        "nodeport": 5432,
+        "schedule": "*/5 * * * *",
+        "username": "postgres"
+      }
+    ],
+    "database": {
+      "acl": [],
+      "allow_connections": true,
+      "builtin_locale": null,
+      "collate": "C",
+      "collation_version": null,
+      "comment": null,
+      "connection_limit": -1,
+      "ctype": "C",
+      "encoding": "UTF8",
+      "icu_locale": null,
+      "icu_rules": null,
+      "is_template": false,
+      "locale_provider": "c",
+      "name": "postgres",
+      "owner": "postgres",
+      "provider_locale": null,
+      "security_labels": [],
+      "settings": [["default_transaction_read_only", "on"]],
+      "size_bytes": 1000,
+      "tablespace": "pg_default"
+    },
+    "extensions": [],
+    "memberships": [],
+    "migration_frontier": "",
+    "parameter_acls": [],
+    "pg_net_queue_count": "0",
+    "pg_participants": [],
+    "relations": [
+      {
+        "acl": [
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "DELETE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "INSERT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "SELECT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "UPDATE"
+          }
+        ],
+        "kind": "r",
+        "name": "active_run",
+        "owner": "postgres",
+        "schema": "q12_guard"
+      },
+      {
+        "acl": [
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "DELETE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "INSERT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "SELECT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "UPDATE"
+          }
+        ],
+        "kind": "r",
+        "name": "baseline",
+        "owner": "postgres",
+        "schema": "q12_guard"
+      },
+      {
+        "acl": [
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "DELETE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "INSERT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "SELECT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "UPDATE"
+          }
+        ],
+        "kind": "r",
+        "name": "migration_guards",
+        "owner": "postgres",
+        "schema": "q12_guard"
+      },
+      {
+        "acl": [
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "DELETE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "INSERT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "SELECT"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantable": false,
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "privilege": "UPDATE"
+          }
+        ],
+        "kind": "r",
+        "name": "probe",
+        "owner": "postgres",
+        "schema": "q12_guard"
+      },
+      {
+        "acl": [],
+        "kind": "r",
+        "name": "app_table_a",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": [],
+        "kind": "r",
+        "name": "app_table_b",
+        "owner": "postgres",
+        "schema": "public"
+      }
+    ],
+    "role_settings": [],
+    "roles": [],
+    "schemas": [
+      {
+        "name": "q12_guard",
+        "owner": "postgres"
+      },
+      {
+        "name": "app_x",
+        "owner": "postgres"
+      },
+      {
+        "name": "app_y",
+        "owner": "postgres"
+      }
+    ],
+    "server_version": "17.10"
+  },
+  "schema": "megacampus.supabase-source-manifest/v1"
+}

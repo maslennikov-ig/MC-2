@@ -53,12 +53,104 @@ import { describe, expect, it } from 'vitest';
 // SCOPE OF THIS ROUND: the mandated acceptance is the barrier reaching
 // `maintenance_guarded` end-to-end (receipt + q12_guard install surface
 // below), NOT the full R4 chain through `deploy/postgres/q12-source-
-// manifest.ts` validateTransition. That tool is frozen/out of scope for this
-// round (its hardcoded q12_guard function allowlist is a known, separate,
-// pre-existing 5-vs-10 drift against the barrier's real function set,
-// unrelated to any fix in this round) and remains a distinct, tracked,
-// deferred concern for a future round. `capture_rc`/`capture_stderr` are
-// captured for diagnostic visibility only and are not asserted on here.
+// manifest.ts` validateTransition. `capture_rc`/`capture_stderr` are captured
+// for diagnostic visibility only and are not asserted on here.
+//
+// UPDATE (guard-surface reconciliation round, base 3596aa72): the
+// then-hardcoded 5-vs-10 q12_guard function allowlist noted above is fixed
+// (GUARD_FUNCTIONS/GUARD_TRIGGERS/ACL exact-sets reconciled to the barrier's
+// real install -- see q12-source-manifest-guard-surface.test.ts for the
+// no-docker positive/negative proof). Driving the REAL end-to-end capture
+// with that fix applied surfaced two further, layered, pre-existing defects
+// in q12-source-manifest.ts's OWN catalogSql() capture query, unrelated to
+// the allowlist and out of scope for the allowlist-reconciliation mandate:
+//   1. FIXED (this round): `object_owners`/`object_acls`/`comments`/
+//      `security_labels` each UNION ALL several branches into one shared
+//      `identity` output column; several branches project a bare `name`-typed
+//      source column (e.g. `n.nspname`, `c.relname`, `t.typname`, `e.extname`)
+//      un-cast, alongside branches that already produce `text` via `||`
+//      concatenation (e.g. function identity with arguments). PostgreSQL
+//      resolves the UNION's output column type to `name` in that mix
+//      (confirmed via `pg_typeof`), silently truncating every row -- even the
+//      `text`-computed ones -- to NAMEDATALEN-1 (63) bytes. This corrupted
+//      `extend_guard(...)`'s captured identity specifically, which the
+//      now-complete allowlist compares in full (not just by function name),
+//      newly exposing a bug that no prior round's capture ever reached.
+//      Fixed by adding explicit `::text` casts to every bare `name`-typed
+//      branch column feeding those four UNION blocks.
+//   2. STILL OPEN, NOT fixed here (STOP-and-report, distinct concern): with
+//      (1) fixed, capture progresses past every q12_guard-specific check and
+//      fails on a single, unrelated relation -- `cron.job`'s row_sha256
+//      differs between baseline and cutover (confirmed via a temporary
+//      reportManifestDiff probe). This is expected content drift (the
+//      barrier's cutover deactivates every cron job, so `cron.job`'s row
+//      bytes legitimately change), but validateTransition only normalizes
+//      the separate top-level `cron_jobs` summary array's `active` flag
+//      before comparing -- it does not equivalently normalize the
+//      `relations` section's authoritative row-content hash for `cron.job`.
+//      This is a cron-activation-state modeling gap, not a q12_guard-surface
+//      allowlist question, so it is out of scope for the guard-surface
+//      reconciliation round and is tracked as a distinct, deferred defect.
+//
+// UPDATE (defect-4 fold-in, same source-manifest round): the "STILL OPEN"
+// cron.job row_sha256 defect above is FIXED -- relationHash() now excludes
+// ONLY the `active` column, ONLY for the pg_cron authoritative relation
+// cron.job, so the SANCTIONED barrier.install active-flip no longer diverges
+// cron.job's row_sha256 between baseline and cutover (see the focused,
+// no-barrier real-PG17 proof in q12-cron-row-hash-normalization.test.ts /
+// fixtures/q12-cron-row-hash-normalization-runner.py: an active-only flip
+// leaves row_sha256 unchanged; a real command tamper on top of that same
+// flip still changes it -- fail-closed). Driving the REAL end-to-end capture
+// here (this test) with that fix applied surfaced a DIFFERENT, unrelated,
+// pre-existing defect (a 7th defect, STOP-and-report, NOT chased per the
+// defect-4 mandate's own scope boundary): with cron.job's row_sha256 now
+// matching (confirmed via a temporary reportManifestDiff probe -- the
+// `relations` arrays are set-equal, zero source-only/target-only entries),
+// capture STILL fails, now solely because the derived `relations_sha256`
+// digest is ORDER-sensitive while `relations` itself is not: baseline.relations
+// keeps catalogSql()'s natural SQL order (`ORDER BY nspname,relname,relkind`,
+// never reordered for the baseline view), but validateTransition's own
+// `cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the
+// CUTOVER view by `canonical()`-string `localeCompare` (a key-alphabetical,
+// content-driven order, not schema/name) before the q12_guard filter, and
+// that resorted order is what becomes the final `cutover.relations` — so the
+// two views' relation arrays are set-equal but sequence-different, and the
+// order-sensitive `relations_sha256` hash diverges even though the content is
+// identical. This was never reached by any prior round because the
+// (now-fixed) cron.job content mismatch always failed first and masked it.
+// This is a relations-ordering/hash-derivation defect in validateTransition
+// itself, wholly unrelated to cron/active and out of scope for this
+// tightly-bounded cron normalization; it is NOT fixed here.
+//
+// UPDATE (defect-7 in-round bounded plumbing fix, same source-manifest
+// round): the "7th defect" above is FIXED -- validateTransition sorted the
+// CUTOVER projections of `database.settings`, `schemas`, and `relations` via
+// its own `sortedArray()` helper before comparing them to baseline, but never
+// sorted the BASELINE counterpart the same way (baseline kept catalogSql()'s
+// natural SQL capture order), so a content-identical set that merely
+// sequenced differently spuriously diverged at the byte-strict final
+// comparison. Fixed, behavior-preservingly, by sorting the baseline
+// counterpart with the SAME `sortedArray()` call and reassigning it, at all
+// three sites -- mirroring this function's own already-symmetric cron_jobs
+// idiom (`baselineJobs`/`cutoverJobs`, both `sortedArray()`'d) immediately
+// above. See q12-source-manifest-baseline-order-symmetry.test.ts for the
+// no-docker RED->GREEN proof (a synthetic, non-canonically-ordered baseline
+// relation/schema pair) and its accompanying content-divergence negative
+// (fail-closed preserved: a genuine content change riding along the same
+// order shuffle still fails).
+//
+// Fourth order-symmetry site (RESOLVED, orchestrator-authorized): the same
+// class also existed at this function's own cron_jobs handling -- it sorts
+// BOTH `baselineJobs`/`cutoverJobs` into LOCALs and reassigns
+// `cutover.cron_jobs = normalizedCutoverJobs`, but never reassigned
+// `baseline.cron_jobs` to the sorted `baselineJobs`, so baseline kept SQL
+// capture order (ascending jobid) while cutover ended in canonical-string
+// order and the two diverged at the byte-strict comparison exactly like the
+// three sites. Fixed as the ratified 4th site (`baseline.cron_jobs =
+// baselineJobs`, provably order-only via the per-index before===normalized
+// equality). With all four sites symmetric, the REAL end-to-end capture now
+// reaches capture_rc=0 -- the full R4 Sub-round C validateTransition POSITIVE
+// (asserted below), the acceptance R2 deferred.
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
@@ -153,8 +245,13 @@ describe.runIf(REAL_PG17)(
       ]);
       expect(out.post_mortem_q12_guard_event_trigger_count).toBe(1);
 
-      // Diagnostic only, not asserted: capture_rc against the frozen, out-of-
-      // scope q12-source-manifest.ts validateTransition (see file header).
+      // R4 Sub-round C acceptance (defect-3/4/7 all landed): the real
+      // baseline->barrier.install-cutover q12-source-manifest.ts capture now
+      // passes validateTransition end-to-end — the full validateTransition
+      // POSITIVE that R2 deferred. No q12_guard-surface rejection, no cron
+      // active-flip false positive, no baseline-vs-cutover ordering divergence.
+      expect(out.capture_rc, out.capture_stderr).toBe(0);
+      expect(out.capture_stderr).not.toMatch(/baseline-to-cutover delta|source manifest failed/u);
     }, 260_000);
   }
 );

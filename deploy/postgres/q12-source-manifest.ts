@@ -258,45 +258,45 @@ WITH database_row AS (
     'policies', COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY schemaname,tablename,policyname) FROM pg_policies p),'[]'::jsonb),
     'default_acls', COALESCE((SELECT jsonb_agg(jsonb_build_object('owner',pg_get_userbyid(d.defaclrole),'schema',n.nspname,'object_type',d.defaclobjtype::text,'grantor',pg_get_userbyid(a.grantor),'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,'privilege',a.privilege_type,'grantable',a.is_grantable) ORDER BY d.defaclrole,n.nspname,d.defaclobjtype,a.grantor,a.grantee,a.privilege_type,a.is_grantable) FROM pg_default_acl d LEFT JOIN pg_namespace n ON n.oid=d.defaclnamespace CROSS JOIN LATERAL aclexplode(d.defaclacl) a),'[]'::jsonb),
     'object_owners', COALESCE((SELECT jsonb_agg(to_jsonb(item) ORDER BY object_type,schema,identity) FROM (
-      SELECT 'schema' object_type, NULL::text schema, n.nspname identity, pg_get_userbyid(n.nspowner) owner FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'relation',n.nspname,c.relname,pg_get_userbyid(c.relowner) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p','S','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'index' object_type,n.nspname,c.relname,pg_get_userbyid(c.relowner) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('i','I') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'column' object_type,n.nspname,c.relname||'.'||att.attname,pg_get_userbyid(c.relowner) FROM pg_attribute att JOIN pg_class c ON c.oid=att.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE att.attnum>0 AND NOT att.attisdropped AND c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'function',n.nspname,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',pg_get_userbyid(p.proowner) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'type',n.nspname,t.typname,pg_get_userbyid(t.typowner) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'extension' object_type,NULL::text,e.extname,pg_get_userbyid(e.extowner) FROM pg_extension e
-      UNION ALL SELECT 'constraint' object_type,n.nspname,c.relname||'.'||x.conname,pg_get_userbyid(c.relowner) FROM pg_constraint x JOIN pg_class c ON c.oid=x.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'trigger' object_type,n.nspname,c.relname||'.'||t.tgname,pg_get_userbyid(c.relowner) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'policy' object_type,n.nspname,c.relname||'.'||p.polname,pg_get_userbyid(c.relowner) FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      SELECT 'schema' object_type, NULL::text schema, n.nspname::text identity, pg_get_userbyid(n.nspowner) owner FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'relation',n.nspname::text,c.relname::text,pg_get_userbyid(c.relowner) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p','S','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'index' object_type,n.nspname::text,c.relname::text,pg_get_userbyid(c.relowner) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('i','I') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'column' object_type,n.nspname::text,c.relname||'.'||att.attname,pg_get_userbyid(c.relowner) FROM pg_attribute att JOIN pg_class c ON c.oid=att.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE att.attnum>0 AND NOT att.attisdropped AND c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'function',n.nspname::text,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',pg_get_userbyid(p.proowner) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'type',n.nspname::text,t.typname::text,pg_get_userbyid(t.typowner) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'extension' object_type,NULL::text,e.extname::text,pg_get_userbyid(e.extowner) FROM pg_extension e
+      UNION ALL SELECT 'constraint' object_type,n.nspname::text,c.relname||'.'||x.conname,pg_get_userbyid(c.relowner) FROM pg_constraint x JOIN pg_class c ON c.oid=x.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'trigger' object_type,n.nspname::text,c.relname||'.'||t.tgname,pg_get_userbyid(c.relowner) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'policy' object_type,n.nspname::text,c.relname||'.'||p.polname,pg_get_userbyid(c.relowner) FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
     ) item),'[]'::jsonb),
     'object_acls', COALESCE((SELECT jsonb_agg(to_jsonb(item) ORDER BY object_type,schema,identity,grantor,grantee,privilege,grantable) FROM (
-      SELECT 'schema' object_type,NULL::text schema,n.nspname identity,pg_get_userbyid(a.grantor) grantor,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END grantee,a.privilege_type privilege,a.is_grantable grantable FROM pg_namespace n CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'relation',n.nspname,c.relname,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl,acldefault(CASE WHEN c.relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,c.relowner))) a WHERE c.relkind IN ('r','p','S','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'column' object_type,n.nspname,c.relname||'.'||att.attname,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_attribute att JOIN pg_class c ON c.oid=att.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(att.attacl) a WHERE att.attnum>0 AND NOT att.attisdropped AND att.attacl IS NOT NULL AND c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'function',n.nspname,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'type',n.nspname,t.typname,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace CROSS JOIN LATERAL aclexplode(COALESCE(t.typacl,acldefault('T',t.typowner))) a WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      SELECT 'schema' object_type,NULL::text schema,n.nspname::text identity,pg_get_userbyid(a.grantor) grantor,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END grantee,a.privilege_type privilege,a.is_grantable grantable FROM pg_namespace n CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'relation',n.nspname::text,c.relname::text,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl,acldefault(CASE WHEN c.relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,c.relowner))) a WHERE c.relkind IN ('r','p','S','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'column' object_type,n.nspname::text,c.relname||'.'||att.attname,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_attribute att JOIN pg_class c ON c.oid=att.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(att.attacl) a WHERE att.attnum>0 AND NOT att.attisdropped AND att.attacl IS NOT NULL AND c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'function',n.nspname::text,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'type',n.nspname::text,t.typname::text,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace CROSS JOIN LATERAL aclexplode(COALESCE(t.typacl,acldefault('T',t.typowner))) a WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
     ) item),'[]'::jsonb),
     'comments', COALESCE((SELECT jsonb_agg(to_jsonb(item) ORDER BY object_type,schema,identity) FROM (
-      SELECT 'schema' object_type,NULL::text schema,n.nspname identity,obj_description(n.oid,'pg_namespace') comment FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT CASE WHEN c.relkind IN ('i','I') THEN 'index' ELSE 'relation' END,n.nspname,c.relname,obj_description(c.oid,'pg_class') FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p','S','v','m','f','i','I') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'column' object_type,n.nspname,c.relname||'.'||att.attname,col_description(c.oid,att.attnum) FROM pg_attribute att JOIN pg_class c ON c.oid=att.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE att.attnum>0 AND NOT att.attisdropped AND c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'function',n.nspname,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',obj_description(p.oid,'pg_proc') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'type',n.nspname,t.typname,obj_description(t.oid,'pg_type') FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'extension' object_type,NULL::text,e.extname,obj_description(e.oid,'pg_extension') FROM pg_extension e
-      UNION ALL SELECT 'constraint' object_type,n.nspname,c.relname||'.'||x.conname,obj_description(x.oid,'pg_constraint') FROM pg_constraint x JOIN pg_class c ON c.oid=x.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'trigger' object_type,n.nspname,c.relname||'.'||t.tgname,obj_description(t.oid,'pg_trigger') FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'policy' object_type,n.nspname,c.relname||'.'||p.polname,obj_description(p.oid,'pg_policy') FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      SELECT 'schema' object_type,NULL::text schema,n.nspname::text identity,obj_description(n.oid,'pg_namespace') comment FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT CASE WHEN c.relkind IN ('i','I') THEN 'index' ELSE 'relation' END,n.nspname::text,c.relname::text,obj_description(c.oid,'pg_class') FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p','S','v','m','f','i','I') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'column' object_type,n.nspname::text,c.relname||'.'||att.attname,col_description(c.oid,att.attnum) FROM pg_attribute att JOIN pg_class c ON c.oid=att.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE att.attnum>0 AND NOT att.attisdropped AND c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'function',n.nspname::text,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',obj_description(p.oid,'pg_proc') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'type',n.nspname::text,t.typname::text,obj_description(t.oid,'pg_type') FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'extension' object_type,NULL::text,e.extname::text,obj_description(e.oid,'pg_extension') FROM pg_extension e
+      UNION ALL SELECT 'constraint' object_type,n.nspname::text,c.relname||'.'||x.conname,obj_description(x.oid,'pg_constraint') FROM pg_constraint x JOIN pg_class c ON c.oid=x.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'trigger' object_type,n.nspname::text,c.relname||'.'||t.tgname,obj_description(t.oid,'pg_trigger') FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'policy' object_type,n.nspname::text,c.relname||'.'||p.polname,obj_description(p.oid,'pg_policy') FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
     ) item WHERE comment IS NOT NULL),'[]'::jsonb),
     'security_labels', COALESCE((SELECT jsonb_agg(to_jsonb(item) ORDER BY object_type,schema,identity,provider,label) FROM (
-      SELECT 'schema' object_type,NULL::text schema,n.nspname identity,l.provider,l.label FROM pg_seclabel l JOIN pg_namespace n ON l.classoid='pg_namespace'::regclass AND l.objoid=n.oid WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT CASE WHEN c.relkind IN ('i','I') THEN 'index' ELSE 'relation' END,n.nspname,c.relname,l.provider,l.label FROM pg_seclabel l JOIN pg_class c ON l.classoid='pg_class'::regclass AND l.objoid=c.oid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND c.relkind IN ('r','p','S','v','m','f','i','I') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'column' object_type,n.nspname,c.relname||'.'||att.attname,l.provider,l.label FROM pg_seclabel l JOIN pg_class c ON l.classoid='pg_class'::regclass AND l.objoid=c.oid JOIN pg_attribute att ON att.attrelid=c.oid AND att.attnum=l.objsubid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid>0 AND NOT att.attisdropped AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'function',n.nspname,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',l.provider,l.label FROM pg_seclabel l JOIN pg_proc p ON l.classoid='pg_proc'::regclass AND l.objoid=p.oid JOIN pg_namespace n ON n.oid=p.pronamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'type',n.nspname,t.typname,l.provider,l.label FROM pg_seclabel l JOIN pg_type t ON l.classoid='pg_type'::regclass AND l.objoid=t.oid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'extension' object_type,NULL::text,e.extname,l.provider,l.label FROM pg_seclabel l JOIN pg_extension e ON l.classoid='pg_extension'::regclass AND l.objoid=e.oid WHERE l.objsubid=0
-      UNION ALL SELECT 'constraint' object_type,n.nspname,c.relname||'.'||x.conname,l.provider,l.label FROM pg_seclabel l JOIN pg_constraint x ON l.classoid='pg_constraint'::regclass AND l.objoid=x.oid JOIN pg_class c ON c.oid=x.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'trigger' object_type,n.nspname,c.relname||'.'||t.tgname,l.provider,l.label FROM pg_seclabel l JOIN pg_trigger t ON l.classoid='pg_trigger'::regclass AND l.objoid=t.oid JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND NOT t.tgisinternal AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
-      UNION ALL SELECT 'policy' object_type,n.nspname,c.relname||'.'||p.polname,l.provider,l.label FROM pg_seclabel l JOIN pg_policy p ON l.classoid='pg_policy'::regclass AND l.objoid=p.oid JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      SELECT 'schema' object_type,NULL::text schema,n.nspname::text identity,l.provider,l.label FROM pg_seclabel l JOIN pg_namespace n ON l.classoid='pg_namespace'::regclass AND l.objoid=n.oid WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT CASE WHEN c.relkind IN ('i','I') THEN 'index' ELSE 'relation' END,n.nspname::text,c.relname::text,l.provider,l.label FROM pg_seclabel l JOIN pg_class c ON l.classoid='pg_class'::regclass AND l.objoid=c.oid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND c.relkind IN ('r','p','S','v','m','f','i','I') AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'column' object_type,n.nspname::text,c.relname||'.'||att.attname,l.provider,l.label FROM pg_seclabel l JOIN pg_class c ON l.classoid='pg_class'::regclass AND l.objoid=c.oid JOIN pg_attribute att ON att.attrelid=c.oid AND att.attnum=l.objsubid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid>0 AND NOT att.attisdropped AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'function',n.nspname::text,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',l.provider,l.label FROM pg_seclabel l JOIN pg_proc p ON l.classoid='pg_proc'::regclass AND l.objoid=p.oid JOIN pg_namespace n ON n.oid=p.pronamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'type',n.nspname::text,t.typname::text,l.provider,l.label FROM pg_seclabel l JOIN pg_type t ON l.classoid='pg_type'::regclass AND l.objoid=t.oid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'extension' object_type,NULL::text,e.extname::text,l.provider,l.label FROM pg_seclabel l JOIN pg_extension e ON l.classoid='pg_extension'::regclass AND l.objoid=e.oid WHERE l.objsubid=0
+      UNION ALL SELECT 'constraint' object_type,n.nspname::text,c.relname||'.'||x.conname,l.provider,l.label FROM pg_seclabel l JOIN pg_constraint x ON l.classoid='pg_constraint'::regclass AND l.objoid=x.oid JOIN pg_class c ON c.oid=x.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'trigger' object_type,n.nspname::text,c.relname||'.'||t.tgname,l.provider,l.label FROM pg_seclabel l JOIN pg_trigger t ON l.classoid='pg_trigger'::regclass AND l.objoid=t.oid JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND NOT t.tgisinternal AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
+      UNION ALL SELECT 'policy' object_type,n.nspname::text,c.relname||'.'||p.polname,l.provider,l.label FROM pg_seclabel l JOIN pg_policy p ON l.classoid='pg_policy'::regclass AND l.objoid=p.oid JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE l.objsubid=0 AND n.nspname !~ '^pg_' AND n.nspname<>'information_schema'
     ) item),'[]'::jsonb)
   ) value
 )
@@ -329,11 +329,26 @@ function relationHash(
     ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)};`
     : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;';
   const qualified = `"${schema.replaceAll('"', '""')}"."${relation.replaceAll('"', '""')}"`;
+  // barrier.install deactivates every cron job (cron.job.active true->false)
+  // as its own SANCTIONED maintenance delta; validateTransition already
+  // normalizes that exact delta at the top-level `cron_jobs` SUMMARY (its
+  // exactField set for each expected cron job is {jobid,username,
+  // command_sha256} -- no `active`). This relation-level row hash has to stay
+  // coherent with that same normalization, or the two projections disagree
+  // about whether one identical sanctioned delta is a violation. So, and
+  // ONLY for the pg_cron authoritative relation cron.job, the row hash is
+  // computed over every column EXCEPT `active`; every other cron.job column
+  // (jobid, schedule, command, nodename, nodeport, database, username,
+  // jobname, ...) stays fully hash-bound, `active` itself remains validated
+  // by the barrier (cron 0/8) plus the cron_jobs summary, and every other
+  // relation is completely unaffected by this branch.
+  const rowExpression =
+    schema === 'cron' && relation === 'job' ? `(to_jsonb(t) - 'active')` : 'to_jsonb(t)';
   const sql = `${begin}
 COPY (
   SELECT jsonb_build_object(
     'row_count', count(*)::text,
-    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(to_jsonb(t)::text, E'\\n' ORDER BY to_jsonb(t)::text), ''), 'UTF8'), 'sha256'), 'hex')
+    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(${rowExpression}::text, E'\\n' ORDER BY ${rowExpression}::text), ''), 'UTF8'), 'sha256'), 'hex')
   ) FROM ${qualified} t
 ) TO STDOUT;
 COMMIT;`;
@@ -954,14 +969,36 @@ function refreshDerivedHashes(view: JsonObject): void {
 }
 
 const GUARD_TABLES = new Set(['active_run', 'baseline', 'migration_guards', 'probe']);
+// Exact-set, fail-closed: this is every CREATE FUNCTION q12_guard.* the barrier
+// installs (deploy/qdrant/q12-database-barrier.sh install), reconciled to the
+// barrier's real CREATE bytes -- 10 functions, no more, no fewer. The five
+// zero-arg entries use the bare `name()` identity form; extend_guard and
+// verify_expected_guards keep their full identity-argument lists (the barrier
+// declares `p_after_migration text DEFAULT NULL`, but pg_get_function_identity_
+// arguments strips the DEFAULT clause from the identity).
 const GUARD_FUNCTIONS = new Set([
   'assert_capability()',
+  'assert_controller_binding()',
+  'enforce_ddl_barrier()',
   'enforce_write_barrier()',
   'extend_guard(p_migration text, p_expected_relations jsonb, p_migration_file_sha256 text, p_expected_catalog_sha256 text)',
+  'quiesce_client_backends()',
+  'verify_activated_state()',
   'verify_capability()',
   'verify_expected_guards(p_after_migration text)',
+  'verify_install_resume_state()',
 ]);
+const GUARD_FUNCTION_NAMES = [...GUARD_FUNCTIONS]
+  .map(identity => identity.slice(0, identity.indexOf('(')))
+  .sort();
 const GUARD_INDEXES = new Set([...GUARD_TABLES].map(name => `${name}_pkey`));
+// PostgreSQL implicitly creates one array type alongside every base/composite
+// type; it categorically refuses GRANT/REVOKE on array types, so these four
+// keep an un-revocable default PUBLIC USAGE grant even after the barrier's
+// owner-only ACL lockdown (the barrier's own ACL-lockdown loop and its own
+// verify_expected_guards both exclude typcategory='A' for exactly this
+// reason -- this constant reconciles to that authority, not a new exemption).
+const ARRAY_TYPE_NAMES = new Set([...GUARD_TABLES].map(name => `_${name}`));
 const GUARD_COLUMNS = new Set([
   'active_run.singleton',
   'active_run.run_id',
@@ -993,6 +1030,24 @@ const GUARD_CONSTRAINTS = new Set([
   'migration_guards.migration_guards_migration_file_sha256_check',
   'probe.probe_pkey',
 ]);
+// Exact-set, fail-closed: every trigger the barrier installs INSIDE the
+// q12_guard schema itself (identity is `table.name`) -- the two
+// q12_guard_row/q12_guard_truncate triggers on q12_guard.probe (the only
+// guard-owned table meant to accept live writes), plus the append-only-guard
+// q12_guard_immutable/q12_guard_immutable_truncate pair on each of the three
+// durable, append-only guard tables. This is distinct from the EXTERNAL
+// q12_guard_row/q12_guard_truncate triggers the barrier installs on the 76
+// guarded relations outside q12_guard (see isExternalGuardTrigger).
+const GUARD_TRIGGERS = new Set([
+  'active_run.q12_guard_immutable',
+  'active_run.q12_guard_immutable_truncate',
+  'baseline.q12_guard_immutable',
+  'baseline.q12_guard_immutable_truncate',
+  'migration_guards.q12_guard_immutable',
+  'migration_guards.q12_guard_immutable_truncate',
+  'probe.q12_guard_row',
+  'probe.q12_guard_truncate',
+]);
 
 function approvedGuardIdentity(objectType: unknown, identity: unknown): boolean {
   if (typeof objectType !== 'string' || typeof identity !== 'string') return false;
@@ -1012,7 +1067,7 @@ function approvedGuardIdentity(objectType: unknown, identity: unknown): boolean 
       GUARD_FUNCTIONS.has(`${identity.slice(0, identity.indexOf('('))}()`)
     );
   if (objectType === 'trigger') {
-    return identity === 'probe.q12_guard_row' || identity === 'probe.q12_guard_truncate';
+    return GUARD_TRIGGERS.has(identity);
   }
   return false;
 }
@@ -1061,12 +1116,26 @@ function filterApprovedGuardCatalog(key: string, value: unknown[]): unknown[] {
         item.definition.includes('SECURITY DEFINER');
     } else if (key === 'triggers') {
       approved =
-        item.table === 'probe' && isExternalGuardTrigger({ ...item, schema: 'guard-probe' });
+        typeof item.table === 'string' &&
+        typeof item.name === 'string' &&
+        GUARD_TRIGGERS.has(`${item.table}.${item.name}`) &&
+        typeof item.definition === 'string' &&
+        item.definition.includes('q12_guard.enforce_write_barrier()');
     } else if (key === 'object_owners' || key === 'object_acls') {
+      const isUnrevocableArrayTypePublicUsage =
+        key === 'object_acls' &&
+        item.object_type === 'type' &&
+        typeof item.identity === 'string' &&
+        ARRAY_TYPE_NAMES.has(item.identity) &&
+        item.grantor === 'postgres' &&
+        item.grantee === 'PUBLIC' &&
+        item.privilege === 'USAGE';
       approved =
         approvedGuardIdentity(item.object_type, item.identity) &&
         (key !== 'object_owners' || item.owner === 'postgres') &&
-        (key !== 'object_acls' || (item.grantor === 'postgres' && item.grantee === 'postgres'));
+        (key !== 'object_acls' ||
+          isUnrevocableArrayTypePublicUsage ||
+          (item.grantor === 'postgres' && item.grantee === 'postgres'));
     }
     if (!approved) fail(`unexpected baseline-to-cutover delta: extra q12_guard ${key} object`);
     return false;
@@ -1109,13 +1178,7 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
   );
   assertExactSet(
     functions.filter(item => item.schema === 'q12_guard').map(item => functionName(item.identity)),
-    [
-      'assert_capability',
-      'enforce_write_barrier',
-      'extend_guard',
-      'verify_capability',
-      'verify_expected_guards',
-    ],
+    GUARD_FUNCTION_NAMES,
     'q12_guard function set'
   );
 
@@ -1124,8 +1187,7 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
       `${String(relation.schema)}.${String(relation.name)}.q12_guard_row`,
       `${String(relation.schema)}.${String(relation.name)}.q12_guard_truncate`,
     ]),
-    'q12_guard.probe.q12_guard_row',
-    'q12_guard.probe.q12_guard_truncate',
+    ...[...GUARD_TRIGGERS].map(identity => `q12_guard.${identity}`),
   ];
   const triggers = array(catalog.triggers, 'cutover.catalog.triggers').map(raw =>
     object(raw, 'guard trigger')
@@ -1137,11 +1199,27 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
       item.schema === 'q12_guard'
   );
   for (const trigger of guardTriggers) {
+    // Triggers on the 76 EXTERNAL guarded relations must be the exact
+    // q12_guard_row/q12_guard_truncate pair (isExternalGuardTrigger's own name
+    // check); triggers living inside the q12_guard schema itself may use
+    // either that same external-style pair (q12_guard.probe, the one guard
+    // table that accepts live writes) or the append-only-guard immutable pair
+    // (q12_guard.active_run/baseline/migration_guards) -- GUARD_TRIGGERS is
+    // the exact-set authority for which q12_guard-schema table/name tuples are
+    // real. Every guard trigger, regardless of name, must fire the same
+    // q12_guard.enforce_write_barrier() function.
+    const definition = trigger.definition;
+    const firesEnforceWriteBarrier =
+      typeof definition === 'string' && definition.includes('q12_guard.enforce_write_barrier()');
+    const isApprovedInternalGuardTrigger =
+      trigger.schema === 'q12_guard' &&
+      GUARD_TRIGGERS.has(`${String(trigger.table)}.${String(trigger.name)}`);
+    const isApprovedExternalGuardTrigger =
+      trigger.schema !== 'q12_guard' &&
+      (trigger.name === 'q12_guard_row' || trigger.name === 'q12_guard_truncate');
     if (
-      !isExternalGuardTrigger({
-        ...trigger,
-        schema: trigger.schema === 'q12_guard' ? 'guard-probe' : trigger.schema,
-      })
+      !firesEnforceWriteBarrier ||
+      !(isApprovedInternalGuardTrigger || isApprovedExternalGuardTrigger)
     ) {
       fail('unexpected baseline-to-cutover delta: guard trigger definition');
     }
@@ -1157,19 +1235,12 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
     ...[...GUARD_TABLES].map(identity => `relation:q12_guard:${identity}`),
     ...[...GUARD_INDEXES].map(identity => `index:q12_guard:${identity}`),
     ...[...GUARD_COLUMNS].map(identity => `column:q12_guard:${identity}`),
-    ...[
-      'assert_capability',
-      'enforce_write_barrier',
-      'extend_guard',
-      'verify_capability',
-      'verify_expected_guards',
-    ].map(identity => `function:q12_guard:${identity}`),
+    ...GUARD_FUNCTION_NAMES.map(identity => `function:q12_guard:${identity}`),
     ...[...GUARD_TABLES, ...[...GUARD_TABLES].map(name => `_${name}`)].map(
       identity => `type:q12_guard:${identity}`
     ),
     ...[...GUARD_CONSTRAINTS].map(identity => `constraint:q12_guard:${identity}`),
-    'trigger:q12_guard:probe.q12_guard_row',
-    'trigger:q12_guard:probe.q12_guard_truncate',
+    ...[...GUARD_TRIGGERS].map(identity => `trigger:q12_guard:${identity}`),
     ...guardedRelations.flatMap(relation => [
       `trigger:${String(relation.schema)}:${String(relation.name)}.q12_guard_row`,
       `trigger:${String(relation.schema)}:${String(relation.name)}.q12_guard_truncate`,
@@ -1206,29 +1277,40 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
     'q12_guard complete owner set'
   );
 
+  // PostgreSQL 17 added the MAINTAIN table privilege (VACUUM/ANALYZE/CLUSTER/
+  // REINDEX/REFRESH MATERIALIZED VIEW), so every real q12_guard table ACL row
+  // set now has 8 privileges, not 7.
   const aclPrivileges = new Map<string, string[]>([
     ['schema:q12_guard', ['CREATE', 'USAGE']],
     ...[...GUARD_TABLES].map(
       name =>
         [
           `relation:${name}`,
-          ['DELETE', 'INSERT', 'REFERENCES', 'SELECT', 'TRIGGER', 'TRUNCATE', 'UPDATE'],
+          ['DELETE', 'INSERT', 'MAINTAIN', 'REFERENCES', 'SELECT', 'TRIGGER', 'TRUNCATE', 'UPDATE'],
         ] as [string, string[]]
     ),
-    ...[
-      'assert_capability',
-      'enforce_write_barrier',
-      'extend_guard',
-      'verify_capability',
-      'verify_expected_guards',
-    ].map(name => [`function:${name}`, ['EXECUTE']] as [string, string[]]),
+    ...GUARD_FUNCTION_NAMES.map(name => [`function:${name}`, ['EXECUTE']] as [string, string[]]),
     ...[...GUARD_TABLES, ...[...GUARD_TABLES].map(name => `_${name}`)].map(
       name => [`type:${name}`, ['USAGE']] as [string, string[]]
     ),
   ]);
-  const expectedAcls = [...aclPrivileges].flatMap(([identity, privileges]) =>
-    privileges.map(privilege => `${identity}:postgres:postgres:${privilege}:true`)
-  );
+  // A materialized (REVOKE-touched) or default owner ACL entry for a self-
+  // grant is never itself WITH GRANT OPTION, so every real q12_guard ACL row
+  // observed on the actual installed barrier has is_grantable=false (not
+  // true); this reconciles the expectation to that observed, deterministic
+  // Postgres ACL-materialization behavior.
+  const expectedAcls = [
+    ...[...aclPrivileges].flatMap(([identity, privileges]) =>
+      privileges.map(privilege => `${identity}:postgres:postgres:${privilege}:false`)
+    ),
+    // PostgreSQL categorically refuses GRANT/REVOKE on array types (the
+    // barrier's own ACL-lockdown loop and its own verify_expected_guards both
+    // exclude typcategory='A' for exactly this reason), so each implicit
+    // array type Postgres auto-creates alongside a q12_guard base/composite
+    // type keeps its un-revocable default PUBLIC USAGE grant. This reconciles
+    // to the barrier's own authoritative exemption, not a new one.
+    ...[...GUARD_TABLES].map(name => `type:_${name}:postgres:PUBLIC:USAGE:false`),
+  ];
   const acls = array(catalog.object_acls, 'cutover.catalog.object_acls').map(raw =>
     object(raw, 'guard ACL')
   );
@@ -1239,7 +1321,17 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
   );
   assertExactSet(
     guardAcls.map(item => {
-      if (item.grantor !== 'postgres' || item.grantee !== 'postgres')
+      const isUnrevocableArrayTypePublicUsage =
+        item.object_type === 'type' &&
+        typeof item.identity === 'string' &&
+        ARRAY_TYPE_NAMES.has(item.identity) &&
+        item.grantor === 'postgres' &&
+        item.grantee === 'PUBLIC' &&
+        item.privilege === 'USAGE';
+      if (
+        !isUnrevocableArrayTypePublicUsage &&
+        (item.grantor !== 'postgres' || item.grantee !== 'postgres')
+      )
         fail('q12_guard ACL is not owner-only');
       const identity =
         item.object_type === 'schema'
@@ -1276,6 +1368,17 @@ function validateTransition(
     return normalized;
   });
   cutover.cron_jobs = normalizedCutoverJobs;
+  // Fourth site of this function's order-symmetry class (peer of the
+  // relations/schemas/database.settings baseline sorts below): reassign the
+  // BASELINE side to its already-sorted local `baselineJobs` too. cutover.cron_jobs
+  // was just reassigned to the canonically-sorted `normalizedCutoverJobs`, but
+  // baseline.cron_jobs otherwise keeps its SQL capture order (ascending jobid), so
+  // the final canonical(baseline) vs canonical(cutover) comparison would diverge on
+  // ARRAY ORDER alone. Provably order-only: the per-index canonical equality
+  // asserted just above (before === normalized) already proves the baseline jobs
+  // equal the normalized cutover jobs content-wise; only ordering is made coherent.
+  // No cron job is added, removed, or reprojected.
+  baseline.cron_jobs = baselineJobs;
 
   const baselineDatabase = object(baseline.database, 'baseline.database');
   const cutoverDatabase = object(cutover.database, 'cutover.database');
@@ -1292,10 +1395,23 @@ function validateTransition(
   ) {
     fail('unexpected baseline-to-cutover delta: database settings');
   }
+  // Consistency with this function's own cron_jobs symmetric-sort idiom above
+  // (baselineJobs/cutoverJobs, both sortedArray()'d): sort the BASELINE
+  // counterpart canonically too, the same way cutoverDatabase.settings itself
+  // was sorted above, so the clone below carries a canonically-ordered array
+  // on both sides instead of whichever order the SQL capture happened to
+  // produce.
+  baselineDatabase.settings = sortedArray(baselineDatabase.settings, 'baseline.database.settings');
   cutoverDatabase.settings = structuredClone(baselineDatabase.settings);
   cutoverDatabase.size_bytes = baselineDatabase.size_bytes;
 
   const cutoverSchemas = sortedArray(cutover.schemas, 'cutover.schemas');
+  // Consistency with the cron_jobs symmetric-sort idiom above: sort the
+  // BASELINE counterpart the same canonical way cutover.schemas just was, or
+  // the final baseline-vs-cutover comparison (via refreshDerivedHashes's
+  // order-sensitive schemas_sha256) spuriously diverges on ARRAY ORDER alone,
+  // even when the schema SETS are content-equal.
+  baseline.schemas = sortedArray(baseline.schemas, 'baseline.schemas');
   const guardSchemas = cutoverSchemas.filter(value => object(value, 'schema').name === 'q12_guard');
   if (
     guardSchemas.length !== 1 ||
@@ -1304,6 +1420,12 @@ function validateTransition(
     fail('unexpected baseline-to-cutover delta: q12_guard schema');
   cutover.schemas = cutoverSchemas.filter(value => object(value, 'schema').name !== 'q12_guard');
   const cutoverRelations = sortedArray(cutover.relations, 'cutover.relations');
+  // Consistency with the cron_jobs symmetric-sort idiom above: sort the
+  // BASELINE counterpart the same canonical way cutover.relations just was,
+  // or the final baseline-vs-cutover comparison (via refreshDerivedHashes's
+  // order-sensitive relations_sha256) spuriously diverges on ARRAY ORDER
+  // alone, even when the relation SETS are content-equal.
+  baseline.relations = sortedArray(baseline.relations, 'baseline.relations');
   const guardRelations = cutoverRelations.filter(
     value => object(value, 'relation').schema === 'q12_guard'
   );
