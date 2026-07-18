@@ -3114,6 +3114,26 @@ def write_live_resource_manifest(
     return sha256(body)
 
 
+def write_quiesce_window_marker(engine: "Engine") -> str:
+    """Design note (2026-07-17-q12-quiesce-window-mode-note §57): write the caller-declared
+    cutover-window marker the W-side ``q12-writer-resume.py`` ``window_is_cutover()`` consumes
+    out-of-band, before ``writers.quiesce`` runs. It is NOT a journal row (parity-neutral): it
+    is a side artifact carrying EXACTLY the three keys the consumer's exact() check requires
+    (``schema_version``/``run_id``/``mode``), published 0400 with the same fsync/atomic
+    discipline as every other run-root artifact. The controller is the only actor that knows the
+    run is a join-era cutover, so it is the declarer.
+    """
+    marker_object = {
+        "schema_version": "megacampus.q12.quiesce-window-mode/v1",
+        "run_id": engine.request["run_id"],
+        "mode": "cutover",
+    }
+    body = complete_object(marker_object)
+    path = engine.run_root / "quiesce-window-mode.json"
+    immutable_publish(path, body, 0o400, engine.trace)
+    return str(path)
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
@@ -3193,6 +3213,11 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
     )
 
+    # Caller-declared cutover-window marker (design note §57): written BEFORE the group-3
+    # writers.quiesce command so the W-side run_quiesce/resume-forward gate opens the cutover
+    # window. Out-of-band side artifact, never a journal row (parity-neutral).
+    marker_path = write_quiesce_window_marker(engine)
+
     # Section 5 forward chronology groups 1-13, mirroring run_joined_composer's forward path
     # up to the C7 planned-exit checkpoint (deploy.prepare/completed).
     ordinary("operator.self-check")
@@ -3251,6 +3276,7 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     output["forwardFinalWriterManifestPath"] = (
         str(forward_path) if forward_path.exists() else None
     )
+    output["quiesceWindowMarkerPath"] = marker_path
     return output
 
 
