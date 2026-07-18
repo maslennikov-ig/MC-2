@@ -1161,6 +1161,7 @@ LIVE_SPEC_KEYS = {
     "executeActualWrapper",
     "stopAfter",
     "cleanupCrashAfter",
+    "barrierClaimCrash",
 }
 
 RECOVER_SPEC_KEYS = {
@@ -1247,6 +1248,16 @@ def run_live_fixture(spec: dict) -> int:
     )
     executor.root = root
     executor.cleanup_crash_after = spec.get("cleanupCrashAfter")
+    # R8-I-C (§6b.6): crash MID-`barrier.<op>` AT capability_claimed, scoped to EXACTLY this one
+    # barrier via the per-command frontier_claim_command / frontier_claim_fault="claim-row" seam
+    # (launch_claim passes --fault claim-row ONLY when the delegated command_id matches; every other
+    # barrier claim runs unfaulted). The claim child journals capability_claimed then raises "injected
+    # stop at claim-row"; launch_claim reports restartRequired -> delegate_claim raises, so run_live
+    # rejects with the durable head left at barrier.<op>/capability_claimed.
+    barrier_claim_crash = spec.get("barrierClaimCrash")
+    if barrier_claim_crash is not None:
+        executor.frontier_claim_command = f"barrier.{barrier_claim_crash}"
+        executor.frontier_claim_fault = "claim-row"
     expected_catalog = root / "expected-post-migration-catalog.json"
     if not expected_catalog.exists():
         expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")

@@ -18,11 +18,13 @@ import {
   materializeLiveController,
   materializeRecover,
   materializeRootRetainedBarrierFixture,
+  materializeSupervisor,
   parseLeaseEpoch,
   runFwmNegative,
   runRecoverExpectingRefusal,
   sha,
   validateStableBindingWalk,
+  type RetainedBarrierOperation,
 } from './fixtures/q12-retained-barrier-contract.js';
 
 // Task-9 live cutover controller (run_live), amendment §10 / design
@@ -1185,5 +1187,228 @@ describe('Q12 live cutover controller (Task-9) — R8-I-B: generalized Option A 
     expect(refusal.error).not.toMatch(/does not support resuming/u);
     // marker byte-unchanged (chain failure never reaches dispatch/post-activate).
     expect(readFileSync(join(liveRoot, 'quiesce-window-mode.json'))).toEqual(markerBefore);
+  });
+});
+
+// R8-I-C (design §6b.6, ratified R8-C composed-recovery obligation): the composed mid-barrier
+// ACCEPTANCE PROBES. Each probe drives ONE durable journal through the FULL composition on a single
+// run root, proving the §5.5 procedure converges end-to-end (§6b.2 condition 3):
+//   (i)   run_live (fixture executors) uninterrupted -> snapshot the INDEPENDENT twin oracle;
+//   (ii)  on a fresh root, run_live with a mid-`barrier.<op>` crash AT capability_claimed (a TWO-
+//         PROCESS lease-reacquisition boundary: the barrier resumes under a SEPARATE supervisor);
+//   (iii) recover FAILS CLOSED on the claimed-but-not-completed head with the EXACT
+//         `q12-live-cutover.sh <op>` pointer AND leaves the durable journal byte-unchanged (cond. 7);
+//   (iv)  the STANDALONE supervisor (`q12-live-cutover.sh <op>` -> run_supervisor,
+//         resume_retained_chain) completes the barrier to `barrier.<op>/completed` under
+//         cutover-recovery-1 — append-only, so the pre-crash rows survive byte-for-byte;
+//   (v)   recover resumes the shared forward sequence from the group after the now-completed barrier,
+//         driving to the FULL composed journal (through activate + the post-activate cleanup segment);
+//   (vi)  assert composed == the DERIVED expected journal (FULL row bytes, the EXISTING field-level
+//         exclusions only) + the explicit +2 row-count arithmetic (83 vs 81 for one resumed barrier).
+//
+// THE DERIVED-JOURNAL ORACLE (the SOLE primary oracle; condition 4). The prior "uninterrupted-
+// equality" oracle was UNSATISFIABLE — FOUND DEFECT #11: the composition is a two-process lease
+// reacquisition (q12-lifecycle-core.py:3922 sets lease_reacquired = new_session and durable-journal;
+// pinned by q12-live-cutover.test.ts:94-132), so the resumed barrier completes under
+// cutover-recovery-1 with EXTRA rows and can never equal an uninterrupted twin. The "in-process
+// recoveryReissues=1 twin" oracle was ALSO unsatisfiable — FOUND DEFECT #12: the in-process reissue
+// at retained_chain:2258-2298 emits a SINGLE claim under the recovery epoch and never preserves the
+// pre-crash `capability_claimed/cutover` row, whereas the two-process crash-at-claimed preserves it
+// append-only, so they differ by one row. The RATIFIED oracle DERIVES the expected journal from the
+// INDEPENDENT uninterrupted twin + the pinned recovery-shape CONSTANTS (never from running the
+// composed procedure): keep the three pre-crash rows (intent/cutover, capability_issued/cutover,
+// capability_claimed/cutover) byte-as-is; INSERT `recovery_reacquired`/cutover-recovery-1 + a SECOND
+// `capability_claimed`/cutover-recovery-1 immediately after the pre-crash claim; step the barrier's
+// `completed` row's lease_epoch to cutover-recovery-1 (consecutive per the frozen epoch grammar
+// q12-database-barrier.sh:514-518). Everything OUTSIDE that barrier group is byte/order-identical.
+describe('Q12 live cutover controller (Task-9) — R8-I-C: §6b.6 composed mid-barrier recovery probes', () => {
+  // Build the DERIVED expected journal (condition 1) from the INDEPENDENT twin + the ratified
+  // recovery-shape constants. NON-CIRCULAR by construction: never reads the composed journal.
+  function deriveComposedRecoveryExpected(
+    twin: readonly Record<string, unknown>[],
+    barrierCommand: string
+  ): Record<string, unknown>[] {
+    const claimedIndex = twin.findIndex(
+      row => row.command_id === barrierCommand && row.outcome === 'capability_claimed'
+    );
+    if (claimedIndex < 0) {
+      throw new Error(`derived: no ${barrierCommand} capability_claimed row in the twin`);
+    }
+    const completedIndex = twin.findIndex(
+      row => row.command_id === barrierCommand && row.outcome === 'completed'
+    );
+    // the uninterrupted barrier group is the contiguous 4-row intent/issued/claimed/completed chain.
+    if (completedIndex !== claimedIndex + 1) {
+      throw new Error(
+        `derived: ${barrierCommand} group is not a contiguous claimed->completed pair`
+      );
+    }
+    const preCrashClaim = twin[claimedIndex];
+    expect(preCrashClaim.lease_epoch).toBe('cutover');
+    // the ratified recovery-shape INSERTION (pinned by q12-live-cutover.test.ts:94-132 + the frozen
+    // consecutive cutover -> cutover-recovery-1 epoch grammar q12-database-barrier.sh:514-518). The
+    // two inserted rows clone the pre-crash claim's shared fields (phase/command_sha256/quiesce/
+    // accepted-object/etc.) and only step outcome + lease_epoch — the blessed-excluded per-run fields
+    // (capability/entry/previous/resource hashes) are stripped before comparison, so their cloned
+    // values are irrelevant.
+    const reacquired = {
+      ...preCrashClaim,
+      outcome: 'recovery_reacquired',
+      lease_epoch: 'cutover-recovery-1',
+    };
+    const secondClaim = {
+      ...preCrashClaim,
+      outcome: 'capability_claimed',
+      lease_epoch: 'cutover-recovery-1',
+    };
+    const steppedCompleted = { ...twin[completedIndex], lease_epoch: 'cutover-recovery-1' };
+    const rows = [
+      ...twin.slice(0, claimedIndex + 1),
+      reacquired,
+      secondClaim,
+      steppedCompleted,
+      ...twin.slice(completedIndex + 1),
+    ];
+    // renumber seq consecutively — seq is NOT excluded, and the two inserted rows shift the tail by +2
+    // exactly as the composed journal's own seq does.
+    return rows.map((row, index) => ({ ...row, seq: index + 1 }));
+  }
+
+  async function proveComposedRecovery(operation: RetainedBarrierOperation): Promise<void> {
+    const barrierCommand = `barrier.${operation}`;
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+
+    // (i) uninterrupted run_live twin (the INDEPENDENT 81-row oracle).
+    const twin = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(twin.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+
+    // (ii) fresh root: run_live with a mid-`barrier.<op>` crash AT capability_claimed. The scoped
+    // frontier_claim_command/claim-row fault crashes ONLY this barrier's delegated claim; run_live
+    // rejects and leaves the durable journal head at barrier.<op>/capability_claimed (lease cutover).
+    const liveRoot = root();
+    await expect(
+      materializeLiveController({
+        runRoot: liveRoot,
+        runId,
+        quiesceManifestPath: quiescePath,
+        barrierClaimCrash: operation,
+      })
+    ).rejects.toThrow();
+    const journalPath = join(liveRoot, 'phase.jsonl');
+    const crashedRows = readFileSync(journalPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    const crashHead = crashedRows.at(-1)!;
+    expect(crashHead.command_id).toBe(barrierCommand);
+    expect(crashHead.outcome).toBe('capability_claimed');
+    expect(crashHead.lease_epoch).toBe('cutover');
+
+    // (iii) FAIL-CLOSED pre-supervisor (condition 7): recover on the mid-lifecycle claimed head
+    // refuses with the EXACT standalone-supervisor pointer AND leaves the durable journal byte-
+    // unchanged. This is the mechanism the operator follows before the supervisor step.
+    const beforeRefusal = readFileSync(journalPath);
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    expect(refusal.error).toMatch(/recover does not support resuming from/u);
+    expect(refusal.error).toMatch(new RegExp(`command=barrier\\.${operation}`, 'u'));
+    expect(refusal.error).toMatch(/outcome=capability_claimed/u);
+    expect(refusal.error).toMatch(new RegExp(`q12-live-cutover\\.sh ${operation}`, 'u'));
+    expect(readFileSync(journalPath)).toEqual(beforeRefusal);
+
+    // (iv) the STANDALONE supervisor completes the crashed barrier to barrier.<op>/completed under
+    // cutover-recovery-1: a two-process lease reacquisition that APPENDS recovery_reacquired + a
+    // second capability_claimed + completed while preserving the pre-crash rows byte-for-byte.
+    const supervised = await materializeSupervisor({ runRoot: liveRoot, runId, operation });
+    expect(supervised.journalEntries.slice(0, crashedRows.length)).toEqual(crashedRows);
+    const supervisedTail = supervised.journalEntries.slice(crashedRows.length);
+    expect(supervisedTail.map(r => [r.command_id, r.outcome, r.lease_epoch])).toEqual([
+      [barrierCommand, 'recovery_reacquired', 'cutover-recovery-1'],
+      [barrierCommand, 'capability_claimed', 'cutover-recovery-1'],
+      [barrierCommand, 'completed', 'cutover-recovery-1'],
+    ]);
+
+    // (v) recover resumes the shared forward sequence from the group after the now-completed barrier,
+    // driving to the FULL composed journal (through activate + the post-activate cleanup segment).
+    const composed = await materializeRecover({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+
+    // (vi) DERIVED-JOURNAL oracle. expected is built from the INDEPENDENT twin + the recovery-shape
+    // constants (condition 1/3), NEVER from `composed`.
+    const derived = deriveComposedRecoveryExpected(twin.journalEntries, barrierCommand);
+
+    // condition 4: explicit row-count arithmetic — composed == uninterrupted + 2 per resumed barrier.
+    expect(composed.journalEntries.length).toBe(twin.journalEntries.length + 2);
+    expect(composed.journalEntries.length).toBe(FORWARD_PREFIX + 5 + 2); // 83 vs 81
+
+    // condition 2: FULL-ROW-BYTES equality under the EXISTING field-level exclusions ONLY (the blessed
+    // set + the FWM/cleanup row-scoped drops = withConvergenceExclusions). lease_epoch is NOT excluded
+    // — asserted exactly (cutover for the pre-crash rows, cutover-recovery-1 for the inserted +
+    // completed rows). A genuine implementation divergence here is a FOUND DEFECT, not an oracle issue.
+    expect(composed.journalEntries.map(withConvergenceExclusions)).toEqual(
+      derived.map(withConvergenceExclusions)
+    );
+
+    // condition 2 (cont.): the two INSERTED rows asserted as FULL row shapes, not mere presence.
+    const insertedIndex = composed.journalEntries.findIndex(
+      r => r.command_id === barrierCommand && r.outcome === 'recovery_reacquired'
+    );
+    expect(insertedIndex).toBeGreaterThan(0);
+    const preCrashClaimComposed = composed.journalEntries[insertedIndex - 1];
+    expect(preCrashClaimComposed).toMatchObject({
+      command_id: barrierCommand,
+      outcome: 'capability_claimed',
+      lease_epoch: 'cutover',
+    });
+    const [reacquiredRow, secondClaimRow, steppedCompletedRow] = composed.journalEntries.slice(
+      insertedIndex,
+      insertedIndex + 3
+    );
+    for (const row of [reacquiredRow, secondClaimRow]) {
+      expect(row.command_id).toBe(barrierCommand);
+      expect(row.command_sha256).toBe(preCrashClaimComposed.command_sha256);
+      expect(row.phase).toBe(preCrashClaimComposed.phase);
+      expect(row.lease_epoch).toBe('cutover-recovery-1');
+      expect(row.accepted_object_kind).toBe('none');
+      expect(row.accepted_object_sha256).toBeNull();
+    }
+    expect(reacquiredRow.outcome).toBe('recovery_reacquired');
+    expect(secondClaimRow.outcome).toBe('capability_claimed');
+    expect(steppedCompletedRow).toMatchObject({
+      command_id: barrierCommand,
+      outcome: 'completed',
+      lease_epoch: 'cutover-recovery-1',
+    });
+
+    // the composed run drove the full post-activate cleanup + receipt-only resume (it converged fully,
+    // not just to the barrier).
+    expect(composed.postActivate).toBeTruthy();
+    expect(composed.postActivate!.cleanup.status).toBe('guard_cleanup_complete');
+    expect(composed.postActivate!.resume.status).toBe('resumed');
+  }
+
+  it('install (first barrier, group 2): composed mid-barrier recovery converges to the derived twin (+2)', async () => {
+    await proveComposedRecovery('install');
+  });
+
+  it('verify-after-base (mid-forward barrier, group 7): composed mid-barrier recovery converges (+2)', async () => {
+    await proveComposedRecovery('verify-after-base');
+  });
+
+  it('activate (last barrier, group 16 -> cleanup): composed mid-barrier recovery converges (+2)', async () => {
+    await proveComposedRecovery('activate');
   });
 });
