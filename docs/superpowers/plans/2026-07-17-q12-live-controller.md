@@ -839,6 +839,35 @@ mismatch"`, and leaves no `phase.jsonl`). NO change to `orchestrate_post_activat
   run_recover resume fail-closed) + its `q12-production-executor-cleanup-runner.py`. Target suite
   controller+ProductionExecutor **26/26**; cross-fixture regression **460/460**; `tsc --noEmit` 0;
   frozen trio sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest.
+- **R8-B-2-i done** (real-PG17 TDD; the barrier VERIFY chain extension — NO core change). Extends the
+  R4 install harness (`q12-live-real-barrier-cutover-runner.py`) through the frozen
+  `q12-database-barrier.sh verify-extended` subcommand against the SAME disposable PostgreSQL 17.10
+  source. NEW gated `q12-live-real-verify-chain.test.ts` + `q12-live-real-verify-chain-runner.py`
+  (imports/reuses the R4 runner's SEED*SQL/identity/proxy/namespace/catalog helpers — not a fork).
+  The runner: (1) captures the REAL post-migration structural sha256s in a pre-install rolled-back
+  preflight (`baseline` / after-base / after-base+obs), baking them into the immutable expected
+  catalog so `q12_guard.verify_expected_guards` recomputes and matches at each checkpoint; (2) drives
+  `install` → `maintenance_guarded`; (3) replays a REAL base migration (`public.document_evidence*
+  runs`CREATE TABLE + a REAL`q12_guard.extend_guard`under the stored capability — the production`applyQ12BasePacket`guard-publication step) then a REAL`verify-extended --after-migration
+  20260711140000`→`20260711140000_guard_verified`; (4) replays the REAL observability migration
+(`public.document_evidence_observability_totals`+ extend_guard) then`verify-extended
+  --after-migration 20260711151000`→`20260711151000_guard_verified`. Neither verify-extended is
+DB-stubbed: each runs the frozen barrier's real DB command through the same unprivileged
+user+mount+net namespace + pooler-identity TLS proxy as R4 (no `MC2_Q12_BARRIER_TEST_MODE`DB
+relaxation). **Byte-match**: both real receipts equal, key-for-key, the frozen verify-extended
+receipt shape the forward`prepare-recovery` predecessor gate consumes
+(`q12-database-barrier.sh:347-357`) — `state=<mig>\_guard_verified`, `last_command=verify-extended`,
+`zero_guard_residue=false`, `rollback_probes_verified=true`, `probe_receipt_sha256`bound hex64 —
+and the guard surface (4 tables / 10 functions / 1 event trigger / exact`migration_guards`set) is
+proven by verify-extended returning rc 0 (its own exhaustive guard-surface asserts hold against the
+real DB) and re-read as an independent post-mortem. **No FOUND DEFECT** — the real artifacts match
+the frozen barrier's own verify-extended output and the forward-path contract. Real run ~114s
+(parity with R4 ~116s); no-docker controller+ProductionExecutor **26/26**;`tsc --noEmit`0; frozen
+trio sha256 byte-identical; no W-owned/core file touched; gated test SKIPS without`MC2_Q12_REAL_PG17=1` (no docker in ordinary CI). Note (out of scope, for R8-B-2-ii/iii): the
+ROLLBACK predecessor gate (`q12-database-barrier.sh:685`/`q12-writer-resume.py:1188-1194`) expects
+a `guard_verified`predecessor archive to carry`rollback_probes_verified=false`, whereas the frozen
+barrier writes `true` for verify-extended — a pre-existing frozen rollback-path expectation to
+  re-examine when the rollback leg is driven, NOT a divergence in this forward sub-round's artifacts.
 
 ## Open risks carried forward
 
