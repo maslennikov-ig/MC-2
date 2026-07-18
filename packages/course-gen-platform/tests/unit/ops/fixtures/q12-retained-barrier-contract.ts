@@ -568,15 +568,53 @@ export interface LiveControllerFixtureSpec {
    */
   executeActualWrapper?: boolean;
   /**
-   * R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
+   * R5-D / R8-I-B stop_after SEAM: an optional named checkpoint at which the forward run stops
    * cleanly and returns its (partial) output. A stopped run does NOT run post-activate. Absent =>
-   * the full 76-row window + post-activate exactly as before. The three checkpoints are the
-   * crash/restart boundaries run_recover resumes from, plus the R5-C before-group-3 marker point:
-   *   "writers.quiesce.pre"   -> stop after group 2 (barrier.install), BEFORE the writers.quiesce row
-   *   "deploy.prepare"        -> stop at the C7 planned-exit head (deploy.prepare/completed)
-   *   "final-writer-manifest" -> stop after the group-14 FWM accepted row (crash-after-FWM)
+   * the full 81-row window + post-activate exactly as before. The checkpoints are the crash/restart
+   * boundaries run_recover resumes from (§6b.2), plus the R5-C before-group-3 marker point:
+   *   "writers.quiesce.pre"       -> stop after group 2 (barrier.install), BEFORE writers.quiesce
+   *   "barrier.verify-after-base" -> stop after group 7's verify-after-base barrier (R8-I-B head)
+   *   "deploy.prepare"            -> stop at the C7 planned-exit head (deploy.prepare/completed)
+   *   "final-writer-manifest"     -> stop after the group-14 FWM accepted row (crash-after-FWM)
+   *   "barrier.activate"          -> stop after group 16 (barrier.activate), BEFORE cleanup (R8-I-B)
    */
-  stopAfter?: 'writers.quiesce.pre' | 'deploy.prepare' | 'final-writer-manifest';
+  stopAfter?:
+    | 'writers.quiesce.pre'
+    | 'barrier.verify-after-base'
+    | 'deploy.prepare'
+    | 'final-writer-manifest'
+    | 'barrier.activate';
+  /**
+   * R8-I-B: inject a crash INSIDE the journaled post-activate cleanup segment (after the
+   * guard_cleanup_complete/capability_claimed row, before the barrier child ran), so a mid-cleanup
+   * durable head can be constructed for the recover convergence probe. run_live rejects (the crash
+   * surfaces as a throw); the partial journal is left on the run root for recover to resume.
+   */
+  cleanupCrashAfter?: 'capability_claimed';
+  /**
+   * R8-I-C (§6b.6 composed mid-barrier recovery): crash run_live MID-`barrier.<op>`-barrier AT
+   * capability_claimed (claimed-but-not-completed), scoped to EXACTLY this one barrier via the
+   * per-command frontier_claim_command / frontier_claim_fault="claim-row" seam (every OTHER barrier
+   * claim runs unfaulted). run_live rejects; the partial durable journal is left on the run root with
+   * `barrier.<op>/capability_claimed` as its head — the two-process lease-reacquisition boundary the
+   * standalone supervisor (`q12-live-cutover.sh <op>`) then completes under cutover-recovery-1.
+   */
+  barrierClaimCrash?: RetainedBarrierOperation;
+}
+
+/**
+ * R8-I-C SUPERVISOR controller (run_supervisor via the `q12-live-cutover.sh <op>` path) spec. Targets
+ * an EXISTING run root a prior `materializeLiveController({ barrierClaimCrash })` call left a mid-
+ * `barrier.<op>` durable journal on (crashed at capability_claimed). A SEPARATE process reacquires the
+ * released lease and drives `resume_retained_chain` to complete the barrier to its
+ * `barrier.<op>/completed` head under cutover-recovery-1; runId MUST be pinned to that run's id.
+ */
+export interface SupervisorControllerFixtureSpec {
+  runRoot: string;
+  runId?: string;
+  operation: RetainedBarrierOperation;
+  production?: boolean;
+  executeActualWrapper?: boolean;
 }
 
 /**
@@ -698,6 +736,35 @@ export async function materializeRecover(spec: RecoverControllerFixtureSpec): Pr
     quiesceWindowMarkerPath: output.quiesceWindowMarkerPath ?? null,
     postActivate: output.postActivate ?? null,
   };
+}
+
+/**
+ * R8-I-C (§6b.6): drive the STANDALONE SUPERVISOR (run_supervisor via the `q12-live-cutover.sh <op>`
+ * path) on an EXISTING run root a prior `materializeLiveController({ barrierClaimCrash })` left a mid-
+ * `barrier.<op>` crash journal on (head = capability_claimed). A SEPARATE process reacquires the
+ * released canonical lease and drives `resume_retained_chain`, completing the crashed barrier to its
+ * `barrier.<op>/completed` head under cutover-recovery-1 (the two-process lease reacquisition pinned by
+ * q12-live-cutover.test.ts:94-132). Returns the FULL durable journal after the supervisor appended the
+ * recovery-shape rows, so a test can prove the recovery_reacquired + second capability_claimed +
+ * completed rows landed byte-appended after the preserved pre-crash rows.
+ */
+export async function materializeSupervisor(
+  spec: SupervisorControllerFixtureSpec
+): Promise<{ journalEntries: Record<string, unknown>[] }> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+    input: JSON.stringify({ supervisorController: true, ...spec }),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status !== 0) {
+    throw new Error(
+      `supervisor controller runner failed (${child.status}): ${child.stderr.trim()}`
+    );
+  }
+  const output = JSON.parse(child.stdout) as { journalEntries: Record<string, unknown>[] };
+  return { journalEntries: output.journalEntries };
 }
 
 /**

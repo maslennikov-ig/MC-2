@@ -720,6 +720,97 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   a scope extension). `q12-live-controller.test.ts` 13/13 (the two barrier-head negatives now also
   assert the `q12-live-cutover.sh install` / `… activate` pointer); `tsc --noEmit` 0; frozen bytes
   unchanged; no W-owned file touched.
+- **R8-I-A done** (RED → GREEN → docs; design §6b, RULING R8-A/R8-C ratified 2026-07-18). The
+  **journaled post-activate `barrier.cleanup` CLEANUP SEGMENT** in `run_live`. RULING 1's
+  receipt-only-after-activate (§6a item 5 / R5-E) is **REVERSED for the real path** (§6a item 6);
+  the receipt-only **RESUME** half is PRESERVED and now **frozen-forced** by the barrier's
+  tail-contiguity rule (`q12-database-barrier.sh:511-513`). Three additive `q12-lifecycle-core.py`
+  extensions, all OUTSIDE the `OPERATIONS`/`COMMANDS`/`MANIFEST_COMMAND_IDS` coupling (§6b.4 — no
+  manifest entry, `load_manifest`'s exact-set assert untouched): **(a)** a
+  `guard_cleanup_complete`/`barrier.cleanup` grammar branch in `validate_journal_entry_grammar` +
+  the `database_barrier_receipt` accepted-object pairing (same function, a sub-part of (a), not a
+  4th path); **(b)** a cleanup capability class in `reload_durable` keyed `cleanup:<epoch>` off the
+  non-manifest command id (no OPERATIONS retained-copy/graph binding); **(c)** a new direct
+  `Engine.append` caller (`publish_cleanup_capability`/`move_cleanup_capability`/`append_cleanup_row`)
+  fed the barrier-child-provided `command_sha256` (the ordinary/retained/milestone callers KeyError
+  through `resolved_command`). `run_live` post-activate now journals the §6b.1 **5-row** lifecycle
+  (intent → capability_issued → capability_claimed → [real frozen barrier `cleanup` child runs
+  here] → capability_completed → accepted binding sha256(v2 receipt)), promotes the archived v1
+  receipt to the **exact 10-key `database-barrier-receipt/v2`** the forward resume gate requires,
+  and a final `reload_durable` proves the controller's own durable walk accepts the extended 81-row
+  journal. The **frozen `q12-database-barrier.sh cleanup` child runs FOR REAL** against the
+  controller's own journal via a per-invocation `/tmp/mc2-q12-barrier-cleanup-*` **protected
+  test-mode sandbox** (`RealBarrierCleanupChild` in the runner) — no docker/PG (the barrier's own
+  test-mode reconnect gate is skipped, the exact sandbox the R4-B/database-barrier rounds use; the
+  real full-PG17 window is downstream **R8-B**). The forward **76-row prefix stays byte-unchanged**;
+  R5-A/R5-C/R5-D parity assertions are rescoped to that prefix (§6b.3). The shared test
+  `derive_run_id` now yields a deterministic **UUIDv4** (the barrier requires `--run-id` UUIDv4,
+  `:72`); composer+live derive from the same helper so parity holds. `run_recover` **dispatch is
+  untouched** (R8-I-B): a full run now fails closed on the new `barrier.cleanup/accepted` head
+  (named refusal, no supervisor pointer). `q12-live-controller.test.ts` 13/13 (incl. the new R8-I-A
+  real-barrier test); cross-fixture regression 205 + 380 pass; `tsc --noEmit` 0; frozen trio
+  sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS; runner carries 0
+  forbidden serializer literals.
+- **R8-I-B done** (RED → GREEN → docs; design §6b.2, RULING R8-C = Option A ratified 2026-07-18).
+  The **generalized recover head-dispatch**. `run_recover`'s R5 two-head `if` chain is replaced by
+  ONE table, `_RECOVER_RESUME_FROM`, covering all 8 clean completed-group boundary head classes;
+  each resumes the SHARED `drive_forward_sequence` from the group AFTER the head, converging
+  **byte/order-identical to an uninterrupted 81-row twin** (§6b.2 condition 3). To make the forward
+  sequence **resumable-from-any-group**, `drive_forward_tail` (groups 14-16+cleanup only) is
+  generalized into `drive_forward_sequence`, which walks `_FORWARD_STEP_ORDER` (the linear groups
+  1-16 + FWM) with a `resume_from` start step and the existing `stop_after` seam; BOTH `run_live`
+  and `run_recover` drive it, so `run_live`'s **81-row journal is byte-unchanged** (proven: all
+  R5/R8-I-A tests + the R8-I-B twin comparisons stay green). The recover walk request-global is
+  re-pinned to the **genesis row** (`entries[0]`) so a resume from a mid-window snapshot-segment
+  head still converges the full-journal `validate_stable_binding_walk`. Head map: **1** install/
+  completed→group 3, **2** verify-after-base/completed→migration.observability.apply, **3**
+  verify-after-observability/completed→migrations_applied, **4** prepare-recovery/completed→
+  source.forward, **5** activate/completed→cleanup segment (**subsumes R8-D**), **6** deploy.prepare/
+  completed→FWM [R5], **7** writers.resume.forward/accepted→deploy.commit [R5], **8** barrier.cleanup/
+  - → converge the cleanup segment (**subsumes R8-E**: accepted = idempotent no-op; mid-cleanup =
+    continue from the interrupted outcome). `orchestrate_post_activate_cleanup` is made **resumable**
+    (skip durable rows, reconstruct the immutable capability digest, reuse the durable
+    `command_sha256`, re-run/reuse the barrier child; fresh path byte-identical). **Fail-closed
+    remains** for mid-lifecycle barrier heads (with the R5-D2 standalone-supervisor pointer, now
+    **amended in lockstep** to fire ONLY for a claimed-but-not-completed head), unknown `command_id`s,
+    and any broken/short chain (rejected by the chain walk BEFORE dispatch — CHAIN FIRST). Two
+    behavior-preserving stop checkpoints (`barrier.verify-after-base`, `barrier.activate`) + a
+    `cleanupCrashAfter` fixture crash probe were added to construct the barrier-completed and
+    mid-cleanup recover heads §6b.6 requires. `q12-live-controller.test.ts` **20/20** (7 new R8-I-B
+    tests: 3 barrier-head convergence, cleanup-accepted no-op, mid-cleanup crash resume, mid-lifecycle
+    fail-closed, CHAIN FIRST); cross-fixture regression (quiesce-seam, w-composition-seam,
+    source-recovery-runtime, live-cutover, live-cutover-cli) **460/460**; `tsc --noEmit` 0; frozen
+    trio sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The
+    §6b.6 real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round covers the fixture leg.
+
+- **R8-I-C done** (RED → GREEN → docs; design §6b.6, ratified R8-C composed-recovery obligation). The
+  **composed mid-barrier recovery ACCEPTANCE PROBES** — one durable journal per barrier head class
+  (**install** group 2, **verify-after-base** group 7, **activate** group 16 → cleanup) proving the
+  §5.5 procedure converges end-to-end on a SINGLE journal. Each probe: (i) `run_live` uninterrupted →
+  the independent 81-row twin; (ii) fresh root, `run_live` crashes MID-`barrier.<op>` AT
+  `capability_claimed` (scoped `barrierClaimCrash` = `frontier_claim_command`/`claim-row` fault, ONLY
+  this barrier's delegated claim); (iii) `recover` FAILS CLOSED with the exact `q12-live-cutover.sh
+<op>` pointer + durable journal byte-unchanged; (iv) the STANDALONE supervisor (`supervisorController`
+  → `run_supervisor`/`resume_retained_chain`, a SEPARATE process reacquiring the released lease)
+  completes the barrier to `barrier.<op>/completed` under `cutover-recovery-1`, append-only; (v)
+  `recover` resumes the shared `drive_forward_sequence` from the next group to the full composed
+  journal (through activate + the post-activate cleanup segment). **The oracle is the DERIVED expected
+  journal** (uninterrupted twin + the recovery-shape insertion: keep the three pre-crash rows byte-as-
+  is, INSERT `recovery_reacquired` + a second `capability_claimed` under `cutover-recovery-1`, step the
+  `completed` row's `lease_epoch` to `cutover-recovery-1`), constructed IN THE TEST from the INDEPENDENT
+  twin + the pinned constants (`q12-live-cutover.test.ts:94-132` + `q12-database-barrier.sh:514-518`),
+  NEVER from the composed procedure. Equality is FULL row bytes under the existing exclusions only
+  (`lease_epoch` NOT excluded — asserted exactly) + explicit **+2 row-count arithmetic** (83 vs 81).
+  **Two found defects killed the earlier oracle candidates and are recorded in §6b.6 with provenance:
+  #11** (uninterrupted-equality unsatisfiable — two-process lease reacquisition, `q12-lifecycle-
+core.py:3922` + the pinned test) and **#12** (in-process `recoveryReissues=1` equality unsatisfiable
+  — `retained_chain:2258-2298` single-claim-under-recovery-epoch vs the append-only pre-crash claim).
+  **All 3 classes compose (composed == derived, +2); no divergence, no found defect this round.** NO
+  `run_live`/`run_joined_composer`/`retained_chain`/recover-dispatch/cleanup-grammar body change —
+  fixture/test/docs only; `q12-lifecycle-core.py` byte-untouched. `q12-live-controller.test.ts`
+  **23/23** (3 new R8-I-C probes); cross-fixture regression **460/460**; `tsc --noEmit` 0; frozen trio
+  sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The §6b.6
+  real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round delivers the fixture leg.
 
 ## Open risks carried forward
 

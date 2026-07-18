@@ -75,6 +75,13 @@ FWM_ROW_PHASES = {
     "writers.resume.forward": "prepared_quiesced",
     "writers.resume.rollback": "rollback_preparing",
 }
+# Design §6b (R8 post-activation amendment): the journaled post-activate cleanup segment.
+# barrier.cleanup is NOT a manifest command (§6b.4 — never in OPERATIONS/COMMANDS/
+# MANIFEST_COMMAND_IDS); its grammar authority is the frozen barrier's own tail validator
+# (deploy/qdrant/q12-database-barrier.sh:507-553). All rows carry phase CLEANUP_PHASE.
+CLEANUP_COMMAND_ID = "barrier.cleanup"
+CLEANUP_PHASE = "guard_cleanup_complete"
+DATABASE_BARRIER_RECEIPT_KIND = "database_barrier_receipt"
 
 
 @dataclass
@@ -237,7 +244,12 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
     if not (
         (accepted_kind == "none" and accepted_hash is None)
         or (
-            accepted_kind in ("final_writer_manifest", "writer_quiesce_manifest")
+            accepted_kind
+            in (
+                "final_writer_manifest",
+                "writer_quiesce_manifest",
+                DATABASE_BARRIER_RECEIPT_KIND,
+            )
             and isinstance(accepted_hash, str)
             and re.fullmatch(r"[0-9a-f]{64}", accepted_hash)
         )
@@ -285,6 +297,34 @@ def validate_journal_entry_grammar(entry: dict[str, Any]) -> None:
             valid = phase == target_phase
         elif valid and outcome == "completed":
             valid = phase == target_phase or MILESTONE_WITNESSES.get(phase) == command_id
+        else:
+            valid = False
+    elif command_id == CLEANUP_COMMAND_ID:
+        # Design §6b.1 / §6b.4 extension (a): the journaled post-activate cleanup lifecycle.
+        # This branch mirrors the frozen barrier tail grammar (q12-database-barrier.sh:507-553):
+        # every row carries phase guard_cleanup_complete; the intent row carries no capability
+        # (capability_manifest_sha256 == 0×64) and no accepted object; the capability_issued/
+        # recovery_reacquired/capability_claimed/capability_completed rows bind a real host
+        # capability and carry no accepted object; the terminal accepted row binds the promoted
+        # database_barrier_receipt digest. barrier.cleanup is NOT resolved through the manifest —
+        # command_sha256 is the barrier-child-provided cleanup argv digest (non-zero).
+        valid = phase == CLEANUP_PHASE and entry["command_sha256"] != ZERO
+        if valid and outcome == "intent":
+            valid = accepted_kind == "none" and entry["capability_manifest_sha256"] == ZERO
+        elif valid and outcome in (
+            "capability_issued",
+            "recovery_reacquired",
+            "capability_claimed",
+            "capability_completed",
+        ):
+            valid = accepted_kind == "none" and entry["capability_manifest_sha256"] != ZERO
+        elif valid and outcome == "accepted":
+            valid = (
+                accepted_kind == DATABASE_BARRIER_RECEIPT_KIND
+                and isinstance(accepted_hash, str)
+                and bool(re.fullmatch(r"[0-9a-f]{64}", accepted_hash))
+                and entry["capability_manifest_sha256"] != ZERO
+            )
         else:
             valid = False
     else:
@@ -1083,7 +1123,13 @@ class Engine:
                     operation is None
                     and capability["command_id"] in ORDINARY_COMMAND_IDS
                 )
-                if operation is None and not ordinary:
+                # Design §6b.4 extension (b): the post-activate cleanup capability class. It is
+                # keyed off the non-manifest barrier.cleanup command_id, OUTSIDE the OPERATIONS/
+                # ORDINARY_COMMAND_IDS coupling, so reconstructing it never forces a manifest entry.
+                cleanup_capability = (
+                    operation is None and capability["command_id"] == CLEANUP_COMMAND_ID
+                )
+                if operation is None and not ordinary and not cleanup_capability:
                     raise LifecycleError("unknown capability command")
                 epoch = capability["lease_epoch"]
                 if not EPOCH_RE.fullmatch(epoch):
@@ -1130,17 +1176,20 @@ class Engine:
                         not in (ZERO, self.request["quiesce_manifest_sha256"])
                     ):
                         raise LifecycleError("capability stable binding mismatch")
-                key = (
-                    f"ordinary:{capability['command_id']}:{epoch}"
-                    if ordinary
-                    else f"{operation}:{epoch}"
-                )
+                if ordinary:
+                    key = f"ordinary:{capability['command_id']}:{epoch}"
+                elif cleanup_capability:
+                    key = f"cleanup:{epoch}"
+                else:
+                    key = f"{operation}:{epoch}"
                 if key in seen_capabilities:
                     raise LifecycleError("capability present in multiple states")
                 expected_name = f"{capability['command_id']}--{epoch}.json"
                 if path.name != expected_name:
                     raise LifecycleError("capability filename mismatch")
-                if not ordinary and (
+                # The retained-barrier-capability-checkpoint copy binding is an OPERATIONS-barrier
+                # concern (publish_copy); ordinary and cleanup capabilities carry no retained copy.
+                if not ordinary and not cleanup_capability and (
                     key not in retained_digests
                     or capability["capability_input_checkpoint_sha256"]
                     != retained_digests[key]
@@ -1616,6 +1665,81 @@ class Engine:
         fsync_directory(target.parent)
         self.capabilities[f"ordinary:{command_id}:cutover"] = str(target)
         return target
+
+    # Design §6b.1 / §6b.4 extension (c): the post-activate cleanup capability + a direct
+    # Engine.append caller for the barrier.cleanup rows. append_ordinary_lifecycle /
+    # retained_chain / append_controller_milestone all route through resolved_command
+    # (manifest["commands"][command_id]) and KeyError on the non-manifest "barrier.cleanup";
+    # retained_chain is keyed on OPERATIONS (which excludes cleanup). These callers feed
+    # Engine.append the barrier-child-provided command authority directly — Engine.append stays
+    # the one journaling primitive (§2 / §10 hold); no second resolver/journaling authority is
+    # forked, and no manifest entry is created.
+    def publish_cleanup_capability(
+        self, command: dict[str, Any], checkpoint_hash: str
+    ) -> tuple[pathlib.Path, dict[str, Any], str]:
+        capability = {
+            "schema_version": "megacampus.q12.host-command-capability/v1",
+            "run_id": self.request["run_id"],
+            "command_id": CLEANUP_COMMAND_ID,
+            "command_sha256": command["command_sha256"],
+            "release_sha": self.request["release_sha"],
+            "operator_digest": self.request["operator_digest"],
+            "resource_manifest_sha256": self.current_resource_manifest_sha256,
+            "quiesce_manifest_sha256": self.current_quiesce_manifest_sha256,
+            "resume_authority_sha256": None,
+            "capability_input_checkpoint_sha256": checkpoint_hash,
+            "lease_epoch": "cutover",
+            "supersedes_capability_sha256": None,
+        }
+        if set(capability) != CAPABILITY_KEYS:
+            raise AssertionError("internal capability projection mismatch")
+        data = complete_object(capability)
+        path = self.run_root / "capabilities" / "issued" / f"{CLEANUP_COMMAND_ID}--cutover.json"
+        immutable_publish(path, data, 0o400, self.trace)
+        digest = sha256(data)
+        self.capabilities["cleanup:cutover"] = str(path)
+        return path, capability, digest
+
+    def move_cleanup_capability(self, source_state: str, target_state: str) -> pathlib.Path:
+        source = (
+            self.run_root
+            / "capabilities"
+            / source_state
+            / f"{CLEANUP_COMMAND_ID}--cutover.json"
+        )
+        target = self.run_root / "capabilities" / target_state / source.name
+        rename_noreplace(source, target)
+        fsync_directory(source.parent)
+        fsync_directory(target.parent)
+        self.capabilities["cleanup:cutover"] = str(target)
+        return target
+
+    def append_cleanup_row(
+        self,
+        outcome: str,
+        command_sha256: str,
+        capability_hash: str,
+        *,
+        accepted_kind: str = "none",
+        accepted_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Journal one guard_cleanup_complete / barrier.cleanup row through Engine.append.
+
+        The frozen barrier tail grammar (q12-database-barrier.sh:507-553) authors these rows;
+        Engine.append writes the caller-supplied command_id / command_sha256 with no manifest
+        check (JOURNAL_KEYS carries no manifest constraint), so this caller never needs a
+        manifest command. The epoch stays "cutover" for the base (no-recovery) lifecycle.
+        """
+        return self.append(
+            CLEANUP_PHASE,
+            outcome,
+            CLEANUP_COMMAND_ID,
+            command_sha256,
+            "cutover",
+            capability_hash,
+            accepted_kind=accepted_kind,
+            accepted_hash=accepted_hash,
+        )
 
     def append_ordinary_lifecycle(
         self,
@@ -3138,59 +3262,146 @@ def write_quiesce_window_marker(engine: "Engine") -> str:
 def orchestrate_post_activate_cleanup(
     engine: "Engine", request: dict[str, Any], run_id: str
 ) -> dict[str, Any] | None:
-    """Orchestrator RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY.
+    """Design §6b (R8-A/R8-C, ratified 2026-07-18) — POST-ACTIVATE CLEANUP IS JOURNALED.
 
-    The frozen amendment §5 / D5J chronology ends at ``barrier.activate`` (the 76th journal
-    row) and the journal grammar has NO cleanup ``command_id``. Therefore run_live adds NO
-    journal row for the post-activate barrier cleanup or the forward writer resume — the 76-row
-    journal stays a byte/order twin of the closed composer. Instead, AFTER activate, run_live
-    ORCHESTRATES two children through an executor seam (fixture-seeded in tests; the real
-    docker/PG17 cleanup + ``sudo source-recovery-run.sh writers.resume.forward`` are round R8):
+    RULING 1's "receipt-only, no journal row after activate" (§6a item 5 / R5-E) is REVERSED for
+    the real path (§6a item 6): after ``barrier.activate`` (the 76th journal row) the controller
+    JOURNALS the frozen barrier's ``guard_cleanup_complete`` capability lifecycle with
+    ``command_id=barrier.cleanup`` (§6b.1), runs the frozen ``q12-database-barrier.sh cleanup``
+    child FOR REAL against that journal, promotes the archived v1 receipt to the exact 10-key v2
+    ``database-barrier-receipt/v2``, deletes the db capability, and binds the promoted digest in
+    the terminal ``accepted`` row. The RESUME half stays receipt-only — ``writers.resume.forward``
+    journals NO rows here — now FROZEN-FORCED by the barrier's tail-contiguity rule
+    (q12-database-barrier.sh:511-513): any resume row after the cleanup block would break the
+    barrier's own grammar.
 
-      1. the barrier cleanup, which produces the v2 ``guard_cleanup_complete`` database-barrier
-         receipt (schema ``megacampus.q12.database-barrier-receipt/v2``) plus its
-         ``megacampus.q12.database-barrier-probes/v1`` probe receipt; and
-      2. the forward resume child, which fail-closed VALIDATES that receipt (the exact gate the
-         W-owned ``q12-writer-resume.py`` forward branch enforces) and resumes the writers.
+    Base (no-recovery) 5-row lifecycle, all ``phase=guard_cleanup_complete``,
+    ``command_id=barrier.cleanup`` (§6b.1):
 
-    run_live does NOT reimplement the receipt gate — the fail-closed validation lives in the
-    children. It INVOKES them via the seam and RECORDS their outcomes on the result
-    (operator-visible truth, since the cleanup is deliberately not journaled). The seam mirrors
-    the R4 ``execute_ordinary`` pattern: when the executor exposes both hooks, run_live drives
-    them and returns the recorded ``{"cleanup": ..., "resume": ...}`` outcome; when either hook
-    is absent (the closed composer's plain executor, or a production wiring that has not yet
-    seeded the post-activate children) it degrades safely to ``None`` (no post-activate
-    recording) rather than fabricating an unbacked receipt.
+      1. intent               (capability_manifest_sha256 = 0×64; no capability yet)
+      2. capability_issued    (host-command-capability/v1 issued; digest bound)
+      3. capability_claimed   (the CLAIMED BOUNDARY the barrier requires, :546-553)
+         — the frozen barrier child runs HERE: validates the journal to the claimed boundary,
+           performs the DB guard cleanup, publishes the 18-key terminal proof, and exits 0 —
+      4. capability_completed (completed-capability renamed into completed/)
+      5. accepted             (accepted_object_kind=database_barrier_receipt, binding sha256(v2))
+
+    barrier.cleanup is NOT a manifest command (§6b.4): the rows are journaled through the direct
+    Engine.append cleanup caller (extension c), never through resolved_command. The barrier
+    scaffolding + real invocation + the v1 archive / v2 promotion / db-capability deletion file
+    artifacts are produced by the executor seam (fixture-owned in tests, the real docker/PG17
+    full-PG window is downstream R8-B); the controller owns the JOURNAL authority.
+
+    When the executor lacks the post-activate hooks it degrades safely to ``None`` (the closed
+    composer's plain executor, or an un-seeded production wiring) rather than fabricating an
+    unbacked lifecycle; a PRODUCTION run fails closed with a named error (the writers would
+    otherwise stay quiesced forever after an activated barrier).
     """
+    prepare_hook = getattr(engine.executor, "prepare_barrier_cleanup", None)
     cleanup_hook = getattr(engine.executor, "execute_barrier_cleanup", None)
     resume_hook = getattr(engine.executor, "execute_forward_resume", None)
-    if cleanup_hook is None or resume_hook is None:
-        # R5 Sub-round F SAFETY GATE (production only): a PRODUCTION cutover that has already
-        # ACTIVATED (the 76th journal row) and then silently skipped the post-activate cleanup +
-        # forward resume would leave the paused writers NEVER RESUMED — a severe incident. The real
-        # docker/PG17 cleanup + resume executor hooks are wired in round R8; until then a production
-        # run MUST fail closed with a NAMED error rather than returning None. The fixture path
-        # (non-production, hooks present) is unaffected and keeps degrading to None when absent.
+    if prepare_hook is None or cleanup_hook is None or resume_hook is None:
         if request.get("production") is True:
             raise LifecycleError(
                 "post-activate cleanup/resume executor not wired (deferred to R8)"
             )
         return None
+    # Design §6b.2 (R8-I-B): the post-activate segment is RESUMABLE. The durable head tells us how far
+    # a prior (crashed) attempt reached; recover re-drives ONLY the missing rows, converging
+    # idempotently. A fully-complete run recovered again (head == barrier.cleanup/accepted) is a no-op.
+    head = engine.journal[-1]
+    reached = head["outcome"] if head["command_id"] == CLEANUP_COMMAND_ID else None
+    if reached == "accepted":
+        return None
+    _CLEANUP_ORDER = ("intent", "capability_issued", "capability_claimed", "capability_completed")
+
+    def durable(outcome: str) -> bool:
+        return reached is not None and _CLEANUP_ORDER.index(reached) >= _CLEANUP_ORDER.index(outcome)
+
     context = {
         "run_root": str(engine.run_root),
         "run_id": run_id,
         "expected_catalog_sha256": request["expected_catalog_sha256"],
     }
-    cleanup = cleanup_hook(context)
-    # Light orchestration binding ONLY (this is NOT the receipt gate, which the resume child
-    # owns): the recorded cleanup must carry a hex64 receipt digest, and the resume child must
-    # report validating exactly that receipt. Anything else is a controller-side wiring fault.
-    receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
-    if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
-        raise LifecycleError("post-activate cleanup receipt digest is not a sha256")
+    # The frozen cleanup invocation's own command authority (argv + sha256(canonical(argv))). The
+    # rows carry this barrier-child-provided command_sha256, NOT a manifest-resolved one (§6b.4). On
+    # a resume the durable cleanup rows already fixed command_sha256, so reuse the durable head's
+    # value for the re-driven rows: all cleanup rows carry ONE consistent digest (the frozen barrier
+    # does not bind command_sha256 to its argv, §6b.5); the fresh prepare digest still drives the
+    # child's sandbox argv. A first (fresh) attempt uses the prepare-hook digest.
+    command = prepare_hook(context)
+    fresh_sha256 = command.get("command_sha256")
+    if not isinstance(fresh_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", fresh_sha256):
+        raise LifecycleError("post-activate cleanup command digest is not a sha256")
+    command_sha256 = head["command_sha256"] if reached is not None else fresh_sha256
+    capability_command = command if reached is None else {**command, "command_sha256": command_sha256}
+
+    # Rows 1-3: intent -> capability_issued -> capability_claimed, bringing the journal head to the
+    # guard_cleanup_complete/capability_claimed boundary the barrier demands (:546-553). On a resume,
+    # already-durable rows are skipped and the immutable capability digest is reconstructed from the
+    # durable capability object (blessed-excluded per-run value, but a stable file digest).
+    if not durable("intent"):
+        engine.append_cleanup_row("intent", command_sha256, ZERO)
+    if durable("capability_issued"):
+        digest = sha256(
+            validate_regular_file(
+                pathlib.Path(engine.capabilities["cleanup:cutover"]), mode=0o400
+            )
+        )
+    else:
+        checkpoint_hash = sha256(engine.checkpoint_path.read_bytes())
+        _, _capability, digest = engine.publish_cleanup_capability(
+            capability_command, checkpoint_hash
+        )
+        engine.append_cleanup_row("capability_issued", command_sha256, digest)
+    if not durable("capability_claimed"):
+        engine.move_cleanup_capability("issued", "claimed")
+        engine.append_cleanup_row("capability_claimed", command_sha256, digest)
+
+    # The frozen barrier cleanup child runs FOR REAL between claimed and completed: it validates the
+    # journal to the claimed boundary, performs the DB guard cleanup, publishes the terminal proof,
+    # and exits 0 WITHOUT writing any receipt. The seam then archives v1 ->
+    # database-barrier-receipt-v1-before-cleanup.json (0400), promotes the receipt to the exact 10-key
+    # v2, and deletes the db capability. If the completed row is ALREADY durable the child ran in the
+    # crashed attempt (the child requires a claimed head and would reject a completed one), so the
+    # on-disk v2 receipt is reused instead of re-running.
+    if durable("capability_completed"):
+        receipt_path = engine.run_root / "database-barrier-receipt.json"
+        receipt_bytes = validate_regular_file(receipt_path, mode=0o400)
+        receipt_sha256 = sha256(receipt_bytes)
+        cleanup = {
+            "status": "guard_cleanup_complete",
+            "ok": True,
+            "cleanup_receipt_path": str(receipt_path),
+            "cleanup_receipt_sha256": receipt_sha256,
+        }
+    else:
+        cleanup = cleanup_hook(context, command)
+        receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
+        if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
+            raise LifecycleError("post-activate cleanup receipt digest is not a sha256")
+        engine.move_cleanup_capability("claimed", "completed")
+        engine.append_cleanup_row("capability_completed", command_sha256, digest)
+
+    # Row 5: accepted (binding the promoted v2 receipt digest).
+    engine.append_cleanup_row(
+        "accepted",
+        command_sha256,
+        digest,
+        accepted_kind=DATABASE_BARRIER_RECEIPT_KIND,
+        accepted_hash=receipt_sha256,
+    )
+
+    # RESUME HALF — RECEIPT-ONLY (frozen-forced by the barrier tail-contiguity rule): the resume
+    # child fail-closed VALIDATES the v2 receipt and unpauses the writers, journaling NOTHING.
     resume = resume_hook(context, cleanup)
     if resume.get("validated_receipt_sha256") != receipt_sha256:
         raise LifecycleError("post-activate resume validated a different cleanup receipt")
+
+    # Fail closed unless the controller's OWN durable walk accepts the extended journal + the
+    # reconstructed barrier.cleanup capability (extensions a + b): the produced journal must be a
+    # valid durable chain, not just barrier-acceptable, so a later recover (R8-I-B) rehydrates it.
+    engine.reload_durable()
     return {"cleanup": cleanup, "resume": resume}
 
 
@@ -3223,7 +3434,68 @@ def finalize_forward_output(
     return output
 
 
-def drive_forward_tail(
+# Design §6b.2 (R8-I-B, Option A): the LINEAR forward step sequence (amendment §5 groups 1-16 +
+# the group-14 FWM), shared by run_live AND run_recover through drive_forward_sequence so a resumed
+# run re-drives the EXACT rows an uninterrupted run would from any clean completed-group boundary.
+# Every step id is either an ordinary command_id, a barrier operation, the migrations_applied
+# milestone, or the "final-writer-manifest" FWM publication. Byte-parity is structural: both drivers
+# emit these steps through the same ordinary()/d5() callers on the same Engine.
+_FORWARD_STEP_ORDER = (
+    "operator.self-check",          # group 1  genesis
+    "install",                      # group 2  barrier
+    "writers.quiesce",              # group 3
+    "pg.backup",                    # groups 4-5 (snapshot resource-step folded in)
+    "pg.restore",                   # group 6
+    "migration.base.apply",         # group 6
+    "verify-after-base",            # group 7  barrier
+    "migration.observability.apply",# group 7
+    "verify-after-observability",   # group 8  barrier
+    "migrations_applied",           # group 9  controller milestone
+    "prepare-recovery",             # group 10 barrier
+    "source.forward",               # group 11
+    "reindex.plan",                 # group 12
+    "reindex.worker.create",        # group 12
+    "reindex.execute",              # group 12
+    "reindex.verify",               # group 13
+    "deploy.prepare",               # group 13 (targets resource-step folded in)
+    "final-writer-manifest",        # group 14 FWM
+    "deploy.commit",                # group 15
+    "activate",                     # group 16 barrier
+)
+# resume_from sentinel meaning "every forward step is already durable; drive ONLY the post-activate
+# cleanup segment" (the barrier.activate/completed and barrier.cleanup recover heads, §6b.2 rows 5 & 8).
+_POST_ACTIVATE_SENTINEL = "__post_activate__"
+# stop_after checkpoint -> the step AFTER which run_live returns its PARTIAL output (no post-activate).
+# The three original R5 checkpoints are byte-preserved; the two barrier-completed-head stops
+# ("barrier.verify-after-base", "barrier.activate") are R8-I-B additions used to construct the
+# barrier-completed recover heads whose convergence §6b.6 requires (behavior-preserving: absent =>
+# the full 81-row window exactly as before).
+_STOP_AFTER_STEP = {
+    "writers.quiesce.pre": "install",
+    "barrier.verify-after-base": "verify-after-base",
+    "deploy.prepare": "deploy.prepare",
+    "final-writer-manifest": "final-writer-manifest",
+    "barrier.activate": "activate",
+}
+# Design §6b.2 (R8-I-B Option A): the generalized recover head-dispatch table. Each clean
+# completed-group boundary head maps to the forward step drive_forward_sequence RESUMES from (the
+# group AFTER that head); barrier.activate/completed maps to the _POST_ACTIVATE_SENTINEL (its "tail"
+# is the journaled cleanup segment — rows 5). barrier.cleanup heads (any outcome, row 8) also map to
+# the sentinel and converge the cleanup segment idempotently (handled separately since they key on
+# command_id, not outcome). Every mapped resume converges byte/order-identical to an uninterrupted
+# 81-row run (§6b.2 condition 3): the resumed rows come from the same ordinary()/d5()/cleanup callers.
+_RECOVER_RESUME_FROM = {
+    ("barrier.install", "completed"): "writers.quiesce",                        # head 1: group 2 -> 3
+    ("barrier.verify-after-base", "completed"): "migration.observability.apply",# head 2: group 7 cont.
+    ("barrier.verify-after-observability", "completed"): "migrations_applied",  # head 3: group 8 -> 9
+    ("barrier.prepare-recovery", "completed"): "source.forward",                # head 4: group 10 -> 11
+    ("barrier.activate", "completed"): _POST_ACTIVATE_SENTINEL,                 # head 5: group 16 -> cleanup
+    ("deploy.prepare", "completed"): "final-writer-manifest",                   # head 6: C7 -> group 14
+    ("writers.resume.forward", "accepted"): "deploy.commit",                    # head 7: group 14 -> 15
+}
+
+
+def drive_forward_sequence(
     engine: "Engine",
     request: dict[str, Any],
     manifest: dict[str, Any],
@@ -3232,56 +3504,106 @@ def drive_forward_tail(
     run_id: str,
     resource_manifest_paths: dict[str, str],
     marker_path: str,
+    exported_id: str,
+    target_identities: tuple[str, ...],
     ordinary: Callable[..., dict[str, Any]],
     d5: Callable[[str], None],
     *,
-    include_fwm: bool = True,
+    resume_from: str | None = None,
     stop_after: str | None = None,
 ) -> dict[str, Any]:
-    """Amendment section 5 forward tail: group 14 (FWM) -> 15 (deploy.commit) -> 16 (activate)
-    -> durable reload -> output augmentation -> RULING 1 post-activate cleanup+resume.
+    """Design §6b.2 (R8-I-B): the ONE resumable forward driver both run_live and run_recover share.
 
-    Extracted from run_live's tail so run_recover can re-drive the exact same rows onto an
-    existing (rehydrated) run root. The default call (include_fwm=True, stop_after=None) is a
-    byte-for-byte reproduction of run_live's original inline tail.
+    Walks ``_FORWARD_STEP_ORDER`` (amendment §5 groups 1-16 + the group-14 FWM), then reloads the
+    durable journal, augments the output, and runs the RULING R8-A journaled post-activate cleanup
+    segment (via ``finalize_forward_output(post_activate=True)``).
 
-    ``include_fwm=False`` skips group 14 because the durable head is already the forward FWM
-    accepted row (crash-after-FWM resume); the tail then starts at deploy.commit. ``stop_after
-    == "final-writer-manifest"`` publishes the FWM and returns the partial output WITHOUT the
-    commit/activate rows or the post-activate orchestration (the crash-after-FWM checkpoint).
+    ``resume_from=None`` (run_live) drives the whole sequence from group 1; a step id (run_recover)
+    RESUMES at that step, skipping every already-durable predecessor so the resumed rows are the
+    exact byte/order twin an uninterrupted run would append from that boundary. ``resume_from ==
+    _POST_ACTIVATE_SENTINEL`` skips ALL forward steps and drives only the post-activate cleanup
+    segment (the barrier.activate/completed and barrier.cleanup recover heads).
+
+    ``stop_after`` names a checkpoint (``_STOP_AFTER_STEP``) after which run_live stops cleanly and
+    returns its PARTIAL output WITHOUT the post-activate segment. This is the crash/restart boundary
+    machinery; recover never passes it (a recover always drives to convergence).
     """
-    if include_fwm:
+    def finalize(post_activate: bool) -> dict[str, Any]:
+        return finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=(run_id if post_activate else None), post_activate=post_activate,
+        )
+
+    if resume_from == _POST_ACTIVATE_SENTINEL:
+        # Groups 1-16 already durable (barrier.activate/completed or a barrier.cleanup head): drive
+        # only the post-activate cleanup segment, converging idempotently (§6b.2 rows 5 & 8).
+        return finalize(True)
+
+    def step_pg_backup() -> None:
+        # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
+        # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
+        snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
+        engine.current_resource_manifest_sha256 = snapshot_digest
+        ordinary("pg.backup")
+
+    def step_deploy_prepare() -> None:
+        # OQ4 step 2: record the five captured target identities and step the hash AT
+        # deploy.prepare/completed via resource_step_before_completion (composer parity: targets_step).
+        targets_digest = write_live_resource_manifest(
+            engine, "targets", snapshot=exported_id, targets=target_identities
+        )
+        ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
+
+    def step_fwm() -> None:
         # Section 5 group 14: the forward final-writer manifest (FWM), a byte/order twin of
-        # run_joined_composer's publish_final_writer_manifest("forward", ...) call. The inventory
-        # stays the FIXTURE derivation (deterministic from run_id + quiesce bytes) exactly like
-        # the composer.
+        # run_joined_composer's publish_final_writer_manifest("forward", ...) call.
         inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
         engine.publish_final_writer_manifest(
             "forward",
             inventory,
             resolved_command(manifest, "writers.resume.forward", request),
         )
-        if stop_after == "final-writer-manifest":
-            return finalize_forward_output(
-                engine, request, resource_manifest_paths, marker_path,
-                run_id=None, post_activate=False,
-            )
 
-    # Section 5 groups 15-16, closing the forward window as a byte/order twin of
-    # run_joined_composer's forward tail: deploy.commit records the activation-ready milestone
-    # and barrier.activate flips the cutover barrier from the current head (its selector CAS
-    # binds the live checkpoint head exactly as the composer's does).
-    ordinary("deploy.commit")
-    d5("activate")
+    actions: dict[str, Callable[[], Any]] = {
+        "operator.self-check": lambda: ordinary("operator.self-check"),
+        "install": lambda: d5("install"),
+        "writers.quiesce": lambda: ordinary(
+            "writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"]
+        ),
+        "pg.backup": step_pg_backup,
+        "pg.restore": lambda: ordinary("pg.restore"),
+        "migration.base.apply": lambda: ordinary("migration.base.apply"),
+        "verify-after-base": lambda: d5("verify-after-base"),
+        "migration.observability.apply": lambda: ordinary("migration.observability.apply"),
+        "verify-after-observability": lambda: d5("verify-after-observability"),
+        "migrations_applied": lambda: engine.append_controller_milestone(
+            manifest, "migrations_applied", "migration.observability.apply", values
+        ),
+        "prepare-recovery": lambda: d5("prepare-recovery"),
+        "source.forward": lambda: ordinary("source.forward"),
+        "reindex.plan": lambda: ordinary("reindex.plan"),
+        "reindex.worker.create": lambda: ordinary("reindex.worker.create"),
+        "reindex.execute": lambda: ordinary("reindex.execute"),
+        "reindex.verify": lambda: ordinary("reindex.verify"),
+        "deploy.prepare": step_deploy_prepare,
+        "final-writer-manifest": step_fwm,
+        "deploy.commit": lambda: ordinary("deploy.commit"),
+        "activate": lambda: d5("activate"),
+    }
 
-    # RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY (after the 76th journal row): orchestrate
-    # the barrier cleanup + forward writer resume as children and RECORD their receipt-backed
-    # outcomes. This adds NO journal row (the 76-row forward journal stays a byte/order twin of
-    # the composer). See orchestrate_post_activate_cleanup.
-    return finalize_forward_output(
-        engine, request, resource_manifest_paths, marker_path,
-        run_id=run_id, post_activate=True,
-    )
+    stop_step = _STOP_AFTER_STEP.get(stop_after)
+    started = resume_from is None
+    for step_id in _FORWARD_STEP_ORDER:
+        if not started:
+            if step_id == resume_from:
+                started = True
+            else:
+                continue
+        actions[step_id]()
+        if stop_step == step_id:
+            # A stopped run returns its partial output and does NOT run the post-activate segment.
+            return finalize(False)
+    return finalize(True)
 
 
 def require_post_activate_executor(request: dict[str, Any], executor: Executor) -> None:
@@ -3371,14 +3693,15 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
 
     # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
     # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
-    # the full 76-row window + post-activate exactly as before. The three checkpoints are the
-    # crash/restart boundaries run_recover resumes from (plus the R5-C before-group-3 marker
-    # observation point):
-    #   "writers.quiesce.pre"    -> stop after group 2 (d5 install), BEFORE journaling writers.quiesce
-    #   "deploy.prepare"         -> stop at the C7 planned-exit head (deploy.prepare/completed)
-    #   "final-writer-manifest"  -> stop after the group-14 FWM accepted row (crash-after-FWM)
+    # the full 81-row window (76 forward + 5 cleanup) exactly as before. The checkpoints are the
+    # crash/restart boundaries run_recover resumes from (§6b.2):
+    #   "writers.quiesce.pre"      -> stop after group 2 (barrier.install), BEFORE writers.quiesce
+    #   "barrier.verify-after-base"-> stop after group 7's verify-after-base barrier (R8-I-B)
+    #   "deploy.prepare"           -> stop at the C7 planned-exit head (deploy.prepare/completed)
+    #   "final-writer-manifest"    -> stop after the group-14 FWM accepted row (crash-after-FWM)
+    #   "barrier.activate"         -> stop after group 16 (barrier.activate), BEFORE cleanup (R8-I-B)
     stop_after = request.get("stop_after")
-    if stop_after not in (None, "writers.quiesce.pre", "deploy.prepare", "final-writer-manifest"):
+    if stop_after is not None and stop_after not in _STOP_AFTER_STEP:
         raise LifecycleError(f"unknown live stop_after checkpoint: {stop_after}")
 
     # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
@@ -3407,59 +3730,10 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # window. Out-of-band side artifact, never a journal row (parity-neutral).
     marker_path = write_quiesce_window_marker(engine)
 
-    # Section 5 forward chronology groups 1-13, mirroring run_joined_composer's forward path
-    # up to the C7 planned-exit checkpoint (deploy.prepare/completed).
-    ordinary("operator.self-check")
-    d5("install")
-    if stop_after == "writers.quiesce.pre":
-        # R5-C before-group-3 observation point: the cutover-window marker is already on disk
-        # (written above, before this group), and NO writers.quiesce row exists yet.
-        return finalize_forward_output(
-            engine, request, resource_manifest_paths, marker_path,
-            run_id=None, post_activate=False,
-        )
-    ordinary("writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"])
-
-    # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
-    # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
-    snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
-    engine.current_resource_manifest_sha256 = snapshot_digest
-    ordinary("pg.backup")
-    ordinary("pg.restore")
-    ordinary("migration.base.apply")
-    d5("verify-after-base")
-    ordinary("migration.observability.apply")
-    d5("verify-after-observability")
-    engine.append_controller_milestone(
-        manifest, "migrations_applied", "migration.observability.apply", values
-    )
-    d5("prepare-recovery")
-    ordinary("source.forward")
-    ordinary("reindex.plan")
-    ordinary("reindex.worker.create")
-    ordinary("reindex.execute")
-    ordinary("reindex.verify")
-
-    # OQ4 step 2: record the five captured target identities and step the hash AT
-    # deploy.prepare/completed via resource_step_before_completion (composer parity:
-    # targets_step). This is the last row before the C7 planned exit.
-    targets_digest = write_live_resource_manifest(
-        engine, "targets", snapshot=exported_id, targets=target_identities
-    )
-    ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
-    if stop_after == "deploy.prepare":
-        # C7 planned-exit checkpoint: the journal ends at deploy.prepare/completed, the exact head
-        # run_recover resumes the forward tail (from group 14) from.
-        return finalize_forward_output(
-            engine, request, resource_manifest_paths, marker_path,
-            run_id=None, post_activate=False,
-        )
-
-    # Section 5 forward chronology groups 14-16 + durable reload + output augmentation +
-    # RULING 1 post-activate cleanup/resume, extracted so run_recover re-drives the identical
-    # tail onto a rehydrated run root. stop_after="final-writer-manifest" stops inside the tail
-    # after the group-14 FWM accepted row.
-    return drive_forward_tail(
+    # Section 5 forward chronology groups 1-16 + the group-14 FWM + durable reload + output
+    # augmentation + RULING R8-A journaled post-activate cleanup segment, all through the ONE
+    # resumable driver run_recover also uses (§6b.2). resume_from=None => drive from group 1.
+    return drive_forward_sequence(
         engine,
         request,
         manifest,
@@ -3468,9 +3742,11 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         run_id,
         resource_manifest_paths,
         marker_path,
+        exported_id,
+        target_identities,
         ordinary,
         d5,
-        include_fwm=True,
+        resume_from=None,
         stop_after=stop_after,
     )
 
@@ -3515,13 +3791,18 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     lines = journal_bytes.splitlines()
     if not lines:
         raise LifecycleError("recover requires a non-empty durable journal")
-    durable_tail = json.loads(lines[-1])
 
     # Restore the request-global resource-manifest pin from durable truth (like run_claim), so the
-    # Engine's stable-binding walk anchors row-0/row-last to the journal's own stepped domain
-    # rather than the fixture placeholder. The tail carries the targets step (or the genesis pin
-    # for a pre-pg.backup head), always a legal request-global value for the walk.
-    request["resource_manifest_sha256"] = durable_tail["resource_manifest_sha256"]
+    # Engine's stable-binding walk anchors row-0/row-last to the journal's own stepped domain rather
+    # than the fixture placeholder. Design §6b.2: pin to the GENESIS row's value (entries[0]) rather
+    # than the durable TAIL. entries[0] is ALWAYS the request-global value an uninterrupted run_live
+    # carries throughout (run_live sets request["resource_manifest_sha256"] = genesis_digest and
+    # never re-pins it), so it is a legal walk anchor both for the partial durable journal at
+    # construction (== entries[0]) AND for the FULL journal after a resume completes (still ==
+    # entries[0]), even when the resume head sits in the mid-window snapshot segment (whose value
+    # equals neither entries[0] nor entries[-1] of the completed run).
+    genesis_row = json.loads(lines[0])
+    request["resource_manifest_sha256"] = genesis_row["resource_manifest_sha256"]
 
     engine = Engine(request, executor)
     if not engine.journal:
@@ -3553,36 +3834,50 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
 
     # The forward run's out-of-band run-root artifacts are already durable on this root; recover
-    # reconstructs their paths for the output augmentation exactly as run_live emits them.
+    # reconstructs their paths for the output augmentation exactly as run_live emits them. The
+    # exported-snapshot id and the five target identities are DETERMINISTIC (run_id-derived, exactly
+    # as run_live seeds them), so a resume that re-drives a mid-window step re-writes byte-identical
+    # checkpoint-bound resource-manifest artifacts (immutable_publish is idempotent).
     resource_manifest_paths = {
         stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
         for stage in ("genesis", "snapshot", "targets")
     }
     marker_path = str(engine.run_root / "quiesce-window-mode.json")
+    exported_id = values["<exported-id>"]
+    target_identities = tuple(
+        sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
+    )
 
-    # DISPATCH on the durable head. Only the two RULING 2 checkpoints resume; everything else is a
-    # named fail-closed refusal (never heuristic continuation).
-    if head["command_id"] == "deploy.prepare" and head["outcome"] == "completed":
-        return drive_forward_tail(
+    def resume(resume_from: str) -> dict[str, Any]:
+        return drive_forward_sequence(
             engine, request, manifest, values, quiesce_bytes, run_id,
-            resource_manifest_paths, marker_path, ordinary, d5,
-            include_fwm=True,
+            resource_manifest_paths, marker_path, exported_id, target_identities,
+            ordinary, d5, resume_from=resume_from,
         )
-    if head["command_id"] == "writers.resume.forward" and head["outcome"] == "accepted":
-        return drive_forward_tail(
-            engine, request, manifest, values, quiesce_bytes, run_id,
-            resource_manifest_paths, marker_path, ordinary, d5,
-            include_fwm=False,
-        )
-    # RULING 2 option (a) requirement 1: a barrier head is resumed idempotently by the STANDALONE
-    # supervisor for that operation (resume_retained_chain), which recover deliberately leaves
-    # byte-untouched as the manual/recovery entrypoint. Point the operator at that exact command so
-    # the next step comes from the error text, not archaeology; recover then continues from the
-    # resulting supported head. (Whether that composition holds end-to-end is proven at R8's
-    # execution smoke + the server custody rehearsal, per the design §5.5 procedure.)
+
+    # DISPATCH on the durable head — the generalized Option A table (design §6b.2). Every clean
+    # completed-group boundary head resumes the shared forward driver from the group AFTER it, and
+    # every barrier.cleanup head (row 8) converges the post-activate cleanup segment idempotently.
     head_command = head["command_id"]
+    resume_from = _RECOVER_RESUME_FROM.get((head_command, head["outcome"]))
+    if resume_from is None and head_command == CLEANUP_COMMAND_ID:
+        # Head 8: a barrier.cleanup head (any outcome) — re-drive/converge the cleanup segment. A
+        # fully-complete accepted head is an idempotent no-op; a mid-cleanup head continues the
+        # segment (orchestrate_post_activate_cleanup resumes from the interrupted outcome, §6b.2).
+        resume_from = _POST_ACTIVATE_SENTINEL
+    if resume_from is not None:
+        return resume(resume_from)
+
+    # FAIL CLOSED (named refusal, never heuristic continuation). Design §6b.2 + the R5-D2 pointer
+    # amended IN LOCKSTEP: a barrier head that reaches the table above is a COMPLETED head and never
+    # arrives here, so the standalone-supervisor pointer is appended ONLY for a MID-LIFECYCLE barrier
+    # head (claimed-but-not-completed). Under Option A that composition is now TRUE by construction:
+    # the operator runs the standalone supervisor to advance the barrier to its completed head, which
+    # is a SUPPORTED table row, and recover then resumes from the group after it. A completed barrier
+    # head is already supported (recover resumes directly), so its message must not — and does not —
+    # promise a step recover then rejects.
     next_step = ""
-    if head_command.startswith("barrier."):
+    if head_command.startswith("barrier.") and head["outcome"] != "completed":
         operation = head_command[len("barrier.") :]
         if operation in OPERATIONS:
             next_step = (
