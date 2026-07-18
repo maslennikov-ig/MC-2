@@ -720,6 +720,36 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   a scope extension). `q12-live-controller.test.ts` 13/13 (the two barrier-head negatives now also
   assert the `q12-live-cutover.sh install` / `… activate` pointer); `tsc --noEmit` 0; frozen bytes
   unchanged; no W-owned file touched.
+- **R8 Sub-round D done** (RED `fef172dfc` → GREEN `36c68697e` → docs). RATIFIED RULING
+  (2026-07-18): `barrier.activate`/`completed` becomes the **THIRD** supported `run_recover` head,
+  dispatching ONLY the receipt-only post-activate re-drive — NO forward tail, NO journal row
+  (activate stays the last row). **R8-E is folded in** (no refusal remains at the activate head; a
+  complete 76-row run recovered again is now a no-op success, not a refusal — the old "past
+  activate" negative sub-case was converted). Mechanism = **OPTION (ii) receipt-presence dispatch**
+  on a durable resume **witness** `<run_root>/post-activate-resume-receipt.json` (exact 4-key schema
+  `{schema_version, run_id, cleanup_receipt_sha256, outcome}`, written ATOMICALLY temp+rename at
+  0400 via the same `immutable_publish` discipline as the cutover-window marker, by the resume path
+  ONLY after resume genuinely completes; parity-neutral by construction — born after the journal's
+  last row, adds no journal row). Dispatch (marker-consistent tamper discipline): witness ABSENT ⇒
+  full idempotent re-drive (cleanup → resume; a stale in-flight v2 cleanup receipt with NO witness
+  does NOT short-circuit); PRESENT-and-VALID ⇒ no-op success naming `post-activate already
+complete`; PRESENT-but-INVALID (unreadable / non-0400 / schema mismatch / extra-or-missing keys /
+  non-canonical / wrong `run_id` / `cleanup_receipt_sha256` mismatching the re-validated on-disk v2
+  receipt) ⇒ NAMED hard fail (`post-activate resume witness … (tamper suspicion)`), never re-driving
+  over it. **CHAIN FIRST:** the full durable-chain validation walk runs during Engine construction
+  BEFORE any dispatch, so a corrupted chain fails on `journal entry hash mismatch`, not the witness
+  (proven by a dedicated test). **SINGLE writer:** `write_post_activate_resume_receipt(run_root,
+run_id, cleanup_receipt_sha256, outcome)` in `q12-lifecycle-core.py`; the resume path writes the
+  witness through it and the FIXTURE resume hook (`LiveOrdinaryExecutor.execute_forward_resume`)
+  imports CORE and calls the SAME function, so the atomic-write + 0400 discipline is exercised in
+  fixture tests. Pre-flight (`require_post_activate_executor`) stays the FIRST statement. The 0400
+  cutover marker is byte-untouched after recover; the composer 76-row twin is unchanged.
+  `q12-live-controller.test.ts` 20/20 (7 new: crash-before-cleanup, crash-after-cleanup-before-
+  resume, crash-after-resume/valid-witness no-op, tampered-witness fail, wrong-run_id fail, folded
+  R8-E no-op, chain-first); the 5-suite set 325/325; `tsc --noEmit` 0; frozen trio bytes unchanged;
+  no W-owned file touched. **R8-A DEFER:** wiring the REAL production resume child (`sudo
+source-recovery-run.sh writers.resume.forward`) to the same shared writer is round R8-A, currently
+  hard-stopped on a separate contradiction — FIXTURE-FIRST until then.
 
 ## Open risks carried forward
 

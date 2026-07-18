@@ -395,9 +395,20 @@ predecessor-CAS + `O_APPEND|O_DSYNC`, never concurrently.
   `writers.resume.rollback` — matching the composer's rollback branch (`:3013-3053`) for
   parity.
 - **Composed recover procedure (RULING 2 option (a), 2026-07-18).** `run_recover` supports
-  resuming from exactly the two clean forward checkpoints — the C7 head
+  resuming from exactly **three** clean checkpoints — the two forward tail heads, the C7 head
   (`deploy.prepare`/`completed`) and the crash-after-FWM head
-  (`writers.resume.forward`/`accepted`). It FAILS CLOSED (named refusal, never heuristic
+  (`writers.resume.forward`/`accepted`), plus the **post-activate head**
+  (`barrier.activate`/`completed`, R8 Sub-round D, ratified 2026-07-18). At the post-activate
+  head recover dispatches ONLY the receipt-only post-activate re-drive (NO forward tail, NO
+  journal row — activate stays the last row) via **receipt-presence dispatch on a durable resume
+  witness** (`<run_root>/post-activate-resume-receipt.json`, 0400): witness ABSENT ⇒ idempotent
+  re-drive (cleanup → resume, which writes the witness); PRESENT-and-VALID ⇒ no-op success
+  ("post-activate already complete", the folded-in R8-E case of a complete run recovered again);
+  PRESENT-but-INVALID ⇒ named hard fail (tamper suspicion, never re-drive over it). The full
+  durable-chain validation walk (Engine construction) runs BEFORE this dispatch, so a broken
+  chain never reaches the witness check. (Wiring the REAL production resume child to the same
+  shared witness writer is R8-A, currently hard-stopped on a separate contradiction — FIXTURE-
+  FIRST for now.) It FAILS CLOSED (named refusal, never heuristic
   continuation) on every other durable head, including a **mid-barrier partial** (a
   `barrier.<op>` head that has not reached its clean supported checkpoint). Mid-barrier heads
   are deliberately NOT resumed by `recover`; they belong to the STANDALONE supervisor
