@@ -19,6 +19,7 @@ import unicodedata
 import uuid
 import weakref
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Any, Protocol
 
 ZERO = "0" * 64
@@ -3183,6 +3184,96 @@ def orchestrate_post_activate_cleanup(
     return {"cleanup": cleanup, "resume": resume}
 
 
+def finalize_forward_output(
+    engine: "Engine",
+    request: dict[str, Any],
+    resource_manifest_paths: dict[str, str],
+    marker_path: str,
+    *,
+    run_id: str | None,
+    post_activate: bool,
+) -> dict[str, Any]:
+    """Reload the durable journal and project the run_live output augmentation.
+
+    Byte-for-byte the tail run_live has always produced (durable reload, then the three
+    operator-visible run-root artifact paths). ``post_activate`` gates the RULING 1 receipt-only
+    cleanup+resume orchestration: a full/resumed run to activate records it; a stopped run
+    (``stop_after``) returns its partial output WITHOUT running post-activate.
+    """
+    engine.reload_durable()
+    output = engine.output()
+    output["resourceManifestPaths"] = resource_manifest_paths
+    forward_path = engine.run_root / f"final-writer-manifest-forward-{request['run_id']}.json"
+    output["forwardFinalWriterManifestPath"] = (
+        str(forward_path) if forward_path.exists() else None
+    )
+    output["quiesceWindowMarkerPath"] = marker_path
+    if post_activate:
+        output["postActivate"] = orchestrate_post_activate_cleanup(engine, request, run_id)
+    return output
+
+
+def drive_forward_tail(
+    engine: "Engine",
+    request: dict[str, Any],
+    manifest: dict[str, Any],
+    values: dict[str, str],
+    quiesce_bytes: bytes,
+    run_id: str,
+    resource_manifest_paths: dict[str, str],
+    marker_path: str,
+    ordinary: Callable[..., dict[str, Any]],
+    d5: Callable[[str], None],
+    *,
+    include_fwm: bool = True,
+    stop_after: str | None = None,
+) -> dict[str, Any]:
+    """Amendment section 5 forward tail: group 14 (FWM) -> 15 (deploy.commit) -> 16 (activate)
+    -> durable reload -> output augmentation -> RULING 1 post-activate cleanup+resume.
+
+    Extracted from run_live's tail so run_recover can re-drive the exact same rows onto an
+    existing (rehydrated) run root. The default call (include_fwm=True, stop_after=None) is a
+    byte-for-byte reproduction of run_live's original inline tail.
+
+    ``include_fwm=False`` skips group 14 because the durable head is already the forward FWM
+    accepted row (crash-after-FWM resume); the tail then starts at deploy.commit. ``stop_after
+    == "final-writer-manifest"`` publishes the FWM and returns the partial output WITHOUT the
+    commit/activate rows or the post-activate orchestration (the crash-after-FWM checkpoint).
+    """
+    if include_fwm:
+        # Section 5 group 14: the forward final-writer manifest (FWM), a byte/order twin of
+        # run_joined_composer's publish_final_writer_manifest("forward", ...) call. The inventory
+        # stays the FIXTURE derivation (deterministic from run_id + quiesce bytes) exactly like
+        # the composer.
+        inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
+        engine.publish_final_writer_manifest(
+            "forward",
+            inventory,
+            resolved_command(manifest, "writers.resume.forward", request),
+        )
+        if stop_after == "final-writer-manifest":
+            return finalize_forward_output(
+                engine, request, resource_manifest_paths, marker_path,
+                run_id=None, post_activate=False,
+            )
+
+    # Section 5 groups 15-16, closing the forward window as a byte/order twin of
+    # run_joined_composer's forward tail: deploy.commit records the activation-ready milestone
+    # and barrier.activate flips the cutover barrier from the current head (its selector CAS
+    # binds the live checkpoint head exactly as the composer's does).
+    ordinary("deploy.commit")
+    d5("activate")
+
+    # RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY (after the 76th journal row): orchestrate
+    # the barrier cleanup + forward writer resume as children and RECORD their receipt-backed
+    # outcomes. This adds NO journal row (the 76-row forward journal stays a byte/order twin of
+    # the composer). See orchestrate_post_activate_cleanup.
+    return finalize_forward_output(
+        engine, request, resource_manifest_paths, marker_path,
+        run_id=run_id, post_activate=True,
+    )
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
@@ -3241,6 +3332,18 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
         return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
 
+    # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
+    # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
+    # the full 76-row window + post-activate exactly as before. The three checkpoints are the
+    # crash/restart boundaries run_recover resumes from (plus the R5-C before-group-3 marker
+    # observation point):
+    #   "writers.quiesce.pre"    -> stop after group 2 (d5 install), BEFORE journaling writers.quiesce
+    #   "deploy.prepare"         -> stop at the C7 planned-exit head (deploy.prepare/completed)
+    #   "final-writer-manifest"  -> stop after the group-14 FWM accepted row (crash-after-FWM)
+    stop_after = request.get("stop_after")
+    if stop_after not in (None, "writers.quiesce.pre", "deploy.prepare", "final-writer-manifest"):
+        raise LifecycleError(f"unknown live stop_after checkpoint: {stop_after}")
+
     # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
     # digest is the request-global initial value, so the stable-binding walk's first/last pin
     # holds against a real controller-owned artifact (never the operator-supplied constant of
@@ -3271,6 +3374,13 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # up to the C7 planned-exit checkpoint (deploy.prepare/completed).
     ordinary("operator.self-check")
     d5("install")
+    if stop_after == "writers.quiesce.pre":
+        # R5-C before-group-3 observation point: the cutover-window marker is already on disk
+        # (written above, before this group), and NO writers.quiesce row exists yet.
+        return finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=None, post_activate=False,
+        )
     ordinary("writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"])
 
     # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
@@ -3300,40 +3410,32 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         engine, "targets", snapshot=exported_id, targets=target_identities
     )
     ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
+    if stop_after == "deploy.prepare":
+        # C7 planned-exit checkpoint: the journal ends at deploy.prepare/completed, the exact head
+        # run_recover resumes the forward tail (from group 14) from.
+        return finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=None, post_activate=False,
+        )
 
-    # Section 5 forward chronology group 14: the forward final-writer manifest (FWM),
-    # a byte/order twin of run_joined_composer's publish_final_writer_manifest("forward", ...)
-    # call. The inventory stays the FIXTURE derivation (deterministic from run_id + quiesce
-    # bytes) exactly like the composer.
-    inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
-    engine.publish_final_writer_manifest(
-        "forward", inventory, resolved_command(manifest, "writers.resume.forward", request)
+    # Section 5 forward chronology groups 14-16 + durable reload + output augmentation +
+    # RULING 1 post-activate cleanup/resume, extracted so run_recover re-drives the identical
+    # tail onto a rehydrated run root. stop_after="final-writer-manifest" stops inside the tail
+    # after the group-14 FWM accepted row.
+    return drive_forward_tail(
+        engine,
+        request,
+        manifest,
+        values,
+        quiesce_bytes,
+        run_id,
+        resource_manifest_paths,
+        marker_path,
+        ordinary,
+        d5,
+        include_fwm=True,
+        stop_after=stop_after,
     )
-
-    # Section 5 forward chronology groups 15-16, closing the forward window as a byte/order
-    # twin of run_joined_composer's forward tail (forward_tail_through_activation_ready ->
-    # d5("activate")): deploy.commit records the activation-ready milestone and barrier.activate
-    # flips the cutover barrier from the current head. The activate selector CAS binds the live
-    # checkpoint head exactly as the composer's does.
-    ordinary("deploy.commit")
-    d5("activate")
-
-    engine.reload_durable()
-    output = engine.output()
-    output["resourceManifestPaths"] = resource_manifest_paths
-    forward_path = engine.run_root / f"final-writer-manifest-forward-{request['run_id']}.json"
-    output["forwardFinalWriterManifestPath"] = (
-        str(forward_path) if forward_path.exists() else None
-    )
-    output["quiesceWindowMarkerPath"] = marker_path
-
-    # RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY (after the 76th journal row, around the
-    # durable reload): orchestrate the barrier cleanup + forward writer resume as children and
-    # RECORD their receipt-backed outcomes on the result. This adds NO journal row (the 76-row
-    # forward journal stays a byte/order twin of the composer); the cleanup receipt is the
-    # operator-visible proof that lives outside the journal. See orchestrate_post_activate_cleanup.
-    output["postActivate"] = orchestrate_post_activate_cleanup(engine, request, run_id)
-    return output
 
 
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
