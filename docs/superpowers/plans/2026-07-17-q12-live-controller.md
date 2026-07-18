@@ -570,6 +570,26 @@ type-check` 0 across every workspace. Frozen bytes unchanged (`q12-command-manif
   `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5b.md`. Next unblocked: R5 Sub-round C
   (`quiesce-window-mode.json` cutover-marker write + lifetime assertion). R5-D/E (recover +
   real-PG17 post-activate legs) stay held for the two pending rulings.
+- **R5 Sub-round C done** (RED `4070ed81e` → GREEN `c5bd9f698`). `run_live` now writes the
+  caller-declared `quiesce-window-mode.json` cutover marker (design note §57) as its FIRST
+  forward step, before the group-3 `writers.quiesce` command: a new
+  `write_quiesce_window_marker(engine)` helper builds EXACTLY the three keys the W-side
+  `q12-writer-resume.py` `window_is_cutover()` `exact()` check requires (`schema_version` =
+  `megacampus.q12.quiesce-window-mode/v1`, `run_id`, `mode` = `cutover`), canonicalizes via the
+  shared `complete_object()`, and publishes it to `<run-root>/quiesce-window-mode.json` through
+  `immutable_publish(..., 0o400, engine.trace)` (same fsync/atomic discipline as every other
+  run-root artifact). It is a side artifact — never a journal row — so the full 76-row forward
+  twin is byte-unchanged (parity-neutral, proven by the R5-B twin test staying green). `run_live`
+  surfaces `output["quiesceWindowMarkerPath"]`. Test asserts exact-key projection, schema/mode/
+  run_id constants, 0400, parity-neutrality (length 76 + full twin), and post-activate
+  persistence. `q12-live-controller.test.ts` 8/8; 4-suite regression 306/306; `tsc --noEmit` 0;
+  frozen bytes unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched;
+  `run_joined_composer` body byte-unchanged. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5c.md`. **Deferred (flagged):** the
+  marker-lifetime "present BEFORE the group-3 row" observation point needs a `run_live` mid-run
+  stop/checkpoint seam (the C7-stop machinery held for ruling 2 / R5-D); this round delivers the
+  write + post-activate observation point. Consumer-side missing/stray/wrong-run_id negatives are
+  W-amendment-owned. R5-D/E remain held for the two pending rulings.
 
 ## Open risks carried forward
 
