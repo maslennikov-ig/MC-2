@@ -3125,15 +3125,27 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     of run_joined_composer's forward journal on every shared binding — the closed composer
     remains the parity oracle and this controller forks no second authority.
 
-    R3 (this revision) journals the forward window through amendment section 5 group 13
+    R3 journaled the forward window through amendment section 5 group 13
     (``deploy.prepare``/completed) — the design section 6a ruling-1 C7 planned-exit
     checkpoint (a stopAfter-style stop) — and owns the OQ4 resource-manifest authority: it
     fsyncs a real checkpoint-bound resource-manifest artifact and steps
     ``current_resource_manifest_sha256`` to its digest EXACTLY at the two witnesses
     (``pg.backup``/intent and ``deploy.prepare``/completed), replacing the composer's closed
     fixture step derivations. Substitution values still come from the seeded fixture
-    derivations so every ``command_sha256`` matches the oracle; real child execution, the
-    final-writer manifest, ``deploy.commit`` and ``activate`` arrive in later rounds.
+    derivations so every ``command_sha256`` matches the oracle.
+
+    R5 Sub-round A (this revision) extends the journal one group further: amendment
+    section 5 group 14, the forward final-writer manifest (FWM) — a byte/order twin of the
+    composer's ``publish_final_writer_manifest("forward", inventory, ...)`` call. The FWM
+    inventory stays the FIXTURE derivation (``derive_root_writer_inventory``, deterministic
+    from run_id + quiesce bytes, amendment section 6 item 3) exactly like the composer; only
+    the FWM object's root-independent fields (schema_version, run_id, mode, release_sha,
+    expected_catalog_sha256, writer_quiesce_manifest_sha256, lease_epoch, final_writers,
+    held_writers) are byte-parity fields. The two physical fields
+    (publication_intent_journal_entry_hash, input_checkpoint_sha256) carry the journal's
+    device+inode and are per-run-root, so the FWM accepted row's accepted_object_sha256
+    (which hashes the whole file, physical fields included) joins the value-only exclusion
+    set for that one row only. ``deploy.commit`` and ``activate`` remain later rounds.
 
     The production run-root coupling is enforced by Engine.__post_init__ (production=True ->
     /opt/megacampus/backups/q12/<run-id>; otherwise the /tmp fixture shape), so a production
@@ -3215,9 +3227,22 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     )
     ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
 
+    # Section 5 forward chronology group 14: the forward final-writer manifest (FWM),
+    # a byte/order twin of run_joined_composer's publish_final_writer_manifest("forward", ...)
+    # call. The inventory stays the FIXTURE derivation (deterministic from run_id + quiesce
+    # bytes) exactly like the composer.
+    inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
+    engine.publish_final_writer_manifest(
+        "forward", inventory, resolved_command(manifest, "writers.resume.forward", request)
+    )
+
     engine.reload_durable()
     output = engine.output()
     output["resourceManifestPaths"] = resource_manifest_paths
+    forward_path = engine.run_root / f"final-writer-manifest-forward-{request['run_id']}.json"
+    output["forwardFinalWriterManifestPath"] = (
+        str(forward_path) if forward_path.exists() else None
+    )
     return output
 
 
