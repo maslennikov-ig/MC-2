@@ -275,6 +275,40 @@ active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; c
   (`validate_stable_binding_walk:342-356`). Exclusion covers the byte value, never the
   stepping structure. Same principle for any future mode-divergent field.
 
+- **R4 Sub-round A done** (RED `a478a210` → GREEN `292d5177`). Added an injectable,
+  **parity-neutral** ordinary-execution seam: `append_ordinary_lifecycle` now delegates to an
+  optional `executor.execute_ordinary(command, capability)` hook when present, falling back to
+  the original hardcoded `"q12-joined-fixture"` result VERBATIM otherwise. Either branch's
+  result is written ONLY to the per-command side file
+  (`ordinary-command-result-<id>-cutover.json`) — the journal append, phase, capability digest,
+  checkpoint, and `accepted_object_sha256` are all untouched, so the journal stays byte/order
+  twin of the composer oracle regardless of which branch runs. A `LifecycleError` guards the
+  hook's `capability_sha256` against the row digest before the existing `RESULT_KEYS` shape
+  check. The seam is **run_live-scoped only**: a new `LiveOrdinaryExecutor(NoIoExecutor)`
+  fixture subclass adds `execute_ordinary` (real-shaped result, deterministic
+  `result_sha256 = sha256("q12-live-real-child:<command_id>:<run_id>")`,
+  `child_executions += 1`) and is wired ONLY into `run_live_fixture`; `run_joined_fixture` (the
+  composer) keeps the plain `NoIoExecutor`, so the closed composer's ordinary results stay
+  byte-identical to before this round. `materializeLiveController` additively exposes
+  `resultPaths` (`Engine.results`) and `childExecutions` (the run_live executor audit's
+  `child_executions`) for the new assertions. Verified: groups-1-13 journal twin still holds
+  under the blessed exclusion set; each ordinary side result file now carries the real-child
+  `result_sha256` (distinct from the composer's same-key side file); `childExecutions` == 16
+  (12 ordinary lifecycles via the new seam + 4 pre-existing D5 barrier-chain sandboxed claim
+  delegations through the C7 window — install/verify-after-base/verify-after-observability/
+  prepare-recovery — unrelated to this seam). All 301 composer/seam tests + the 3 R3
+  live-controller tests stay green; the new R4 assertion passes. tsc 0; frozen bytes
+  unchanged. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r4.md`.
+  - **Sub-round C (the NON-NEGOTIABLE real-PG17 `barrier.install`→`validateTransition`
+    positive, above) is PENDING two orchestrator rulings:** the CI identity strategy for the
+    real `barrier.install` run, and the OQ1 scope boundary. Not attempted in Sub-round A.
+  - **Two later-round pins carried from the W-amendment review**, recorded here for the future
+    live-quiesce/resume controller round: (1) `run_live` must write
+    `quiesce-window-mode.json` BEFORE `writers.quiesce` and keep it alive through
+    post-`activate` resume (marker-lifetime assertion); (2) a deferred P3 to consider deriving
+    resume-time mode from the immutable quiesce-manifest `barrier.state` instead of the mutable
+    marker, plus extra malformed-marker/reverse-flip negatives.
+
 ## Open risks carried forward
 
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
