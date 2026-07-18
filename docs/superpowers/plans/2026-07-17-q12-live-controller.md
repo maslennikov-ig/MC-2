@@ -812,6 +812,34 @@ core.py:3922` + the pinned test) and **#12** (in-process `recoveryReissues=1` eq
   sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The §6b.6
   real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round delivers the fixture leg.
 
+- **R8-B-1 done** (RED → GREEN → docs; design §6b.1, the REAL `ProductionExecutor` post-activate
+  **FILE-ARTIFACT** half). `ProductionExecutor` gains `prepare_barrier_cleanup` (resolves the frozen
+  `q12-database-barrier.sh cleanup` `{argv, command_sha256}`) and `execute_barrier_cleanup`, the
+  production twin of the fixture's `LiveOrdinaryExecutor.execute_barrier_cleanup` file-artifact steps.
+  It **mirrors the `execute()`/`launch_claim()` delegation discipline — consume producer artifacts,
+  never fabricate**: it reads the barrier child's on-disk 18-key terminal proof + the prepare-recovery
+  probe-receipt bootstrap via `validate_regular_file(0o400)`, binds their real digests, archives the
+  activate v1 receipt byte-exact to `database-barrier-receipt-v1-before-cleanup.json` (0400,
+  `immutable_publish`), promotes in place to the exact 10-key `database-barrier-receipt/v2` (0400,
+  `atomic_replace`; `state=guard_cleanup_complete`, `database_capability_deleted=true`), and unlinks
+  the db-capability — a **byte twin of the fixture's v2** for the same inputs (the seam consumes the
+  probe receipt rather than re-writing it; on-disk bytes + v2 digest identical, no contract
+  divergence). The REAL full-window `q12-database-barrier.sh cleanup` child that PRODUCES the terminal
+  proof against a disposable PG17 is **R8-B-2** (no docker/PG this round). `require_post_activate_
+executor` is split into two named checks (pre-flight-first preserved): the file-artifact half
+  (`execute_barrier_cleanup`, now real) keeps the generic `"…not wired (deferred to R8)"`; the resume
+  half (`execute_forward_resume`, the **server-side owner-custody** child, deliberately absent) gets
+  the resume-SPECIFIC `"writers.resume.forward requires the server-side owner-custody executor (not
+wired here)"`, so a production run still fails closed — now for the resume reason (proven pre-flight-
+  first: a `/tmp` root under `production=true` gets the resume error, NOT `"production run root
+mismatch"`, and leaves no `phase.jsonl`). NO change to `orchestrate_post_activate_cleanup`, the
+  journaled cleanup grammar (R8-I-A), `run_recover` dispatch (R8-I-B), the composer body, or
+  `stop_after`; the fixture executors keep all three hooks so every R5/R8-I test is unaffected. NEW
+  no-docker `q12-production-executor-cleanup.test.ts` (**3/3**: file-artifact byte-twin + run_live/
+  run_recover resume fail-closed) + its `q12-production-executor-cleanup-runner.py`. Target suite
+  controller+ProductionExecutor **26/26**; cross-fixture regression **460/460**; `tsc --noEmit` 0;
+  frozen trio sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest.
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface
