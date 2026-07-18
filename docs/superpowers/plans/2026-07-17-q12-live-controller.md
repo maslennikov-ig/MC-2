@@ -189,24 +189,22 @@ baseline.json` (or `verify-transition`) MUST PASS (`validateTransition`,
     with the design review before R4. **RESOLVED (2026-07-18): option (a) in-process** — see
     design §6a. C7 is a planned controller exit + `recover`-resume; no lock held across it.
 
-- **R2 done** (RED `4dd31e5f` → GREEN `a2799ec6`). Added
+- **R2 done** (RED `4dd31e5f` → GREEN `a2799ec6`, revised to Option B `da5b172a`). Added
   `LivePlanExecutor.produce_run_root_baseline`: held-snapshot coordinator +
   `q12-source-manifest.ts capture` (no `--baseline`, so `baseline == cutover == the capture`,
   `:1449`) → `.baseline` → run-root `baseline.json` 0400, intermediate written under the run
-  root then removed. **Security-surface change** to `q12-source-manifest.ts`: a fixture-only
-  `MC2_Q12_MANIFEST_PSQL` client override under the plan-mode production-seam lockdown —
-  honored ONLY for a `/tmp/mc2-q12-` output namespace, HARD-REFUSED (named error, never silent
-  fallback) for any other path, inert in production (var never set; hardcoded
-  `/usr/lib/postgresql/17/bin/psql` byte-unchanged without it). Verified: 3 pure seam tests
-  (override-used on fixture path via a sentinel wrapper; hard-fail refusal on a production
-  path with the override never invoked; hardcoded client used with no var) + the real-PG17
-  producer proof (0400 baseline, 8 active cron, intermediate removed) + the three distinct
-  named `validateTransition` negatives — no-`q12_guard` "q12_guard schema", 7-cron "cron
-  cardinality", lossy barrier-digest "baseline.cron_jobs must be an array". Frozen bytes
-  untouched; tsc 0; zero leftover containers. Full baseline→real-install-cutover POSITIVE is
-  the pinned R4 acceptance (above). Coordinator note: the docker-exec coordinator's exported
-  snapshot is visible cross-session to the libpq capture, so the earlier "service-file path,
-  NOT docker-exec" line in the build spec below is superseded — either coordinator path works.
+  root then removed. **Connection (Option B, orchestrator-ruled):** `q12-source-manifest.ts` is
+  BYTE-UNTOUCHED — once host `postgresql-client-17` was installed, the producer + test drive
+  the tool through its own hardcoded `/usr/lib/postgresql/17/bin/psql` over libpq
+  (`PGSERVICE`/`PGSERVICEFILE` + `SET TRANSACTION SNAPSHOT`); the real-PG17 test uses a loopback
+  service file to the container's published port (coordinator on the same libpq route; snapshot
+  cross-session; seeding on docker-exec). The `MC2_Q12_MANIFEST_PSQL` fixture-only lockdown seam
+  explored first was REVERTED — zero change to the reviewed tool beats a blessed seam. Verified:
+  the real-PG17 producer proof (0400 baseline, 8 active cron, intermediate removed) + the three
+  distinct named `validateTransition` negatives — no-`q12_guard` "q12_guard schema", 7-cron
+  "cron cardinality", lossy barrier-digest "baseline.cron_jobs must be an array". Frozen bytes
+  untouched; `q12-source-manifest.ts` byte-identical to pre-R2; tsc 0; zero leftover containers.
+  Full baseline→real-install-cutover POSITIVE is the pinned R4 acceptance (above).
 - **R2 build spec (ready to execute; all rulings in).** Producer: on `LivePlanExecutor`,
   open the snapshot coordinator (`_open_snapshot_coordinator`, service-file/`psql` path — NOT
   the docker-exec path, because `q12-source-manifest.ts` connects via libpq
