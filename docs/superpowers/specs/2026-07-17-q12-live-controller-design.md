@@ -39,6 +39,9 @@ round):**
   (`aaec6fc2…`), `q12-database-barrier.sh` (`134255ce…`), `q12-structural-catalog.sql`
   (`0b8a943f…`). **If any frozen-manifest change turns out to be required, that is a hard
   STOP — report, do not touch.**
+  _(Historical, 2026-07-18: the barrier sha `134255ce…` here was superseded by
+  `3673ee49…` per the ratified barrier-fix round (PG17 ACL/fd/dialect); the current frozen
+  barrier is `3673ee49…` and this constraint stands against the current bytes.)_
 - One command authority only: the controller consumes the frozen 20-command manifest
   through the existing `load_manifest()` / `resolved_command()` primitives and journals
   through the existing `Engine` serializer/capability/object/checkpoint primitives. **No
@@ -391,6 +394,28 @@ predecessor-CAS + `O_APPEND|O_DSYNC`, never concurrently.
   bound to `writers.resume.rollback`, and the barrier `rollback` → v2 receipt →
   `writers.resume.rollback` — matching the composer's rollback branch (`:3013-3053`) for
   parity.
+- **Composed recover procedure (RULING 2 option (a), 2026-07-18).** `run_recover` supports
+  resuming from exactly the two clean forward checkpoints — the C7 head
+  (`deploy.prepare`/`completed`) and the crash-after-FWM head
+  (`writers.resume.forward`/`accepted`). It FAILS CLOSED (named refusal, never heuristic
+  continuation) on every other durable head, including a **mid-barrier partial** (a
+  `barrier.<op>` head that has not reached its clean supported checkpoint). Mid-barrier heads
+  are deliberately NOT resumed by `recover`; they belong to the STANDALONE supervisor
+  entrypoint (`q12-live-cutover.sh <op> …`), which `recover` leaves byte-untouched and whose
+  `resume_retained_chain` is idempotent. The **operator procedure** for a mid-barrier crash
+  is therefore a two-step composition:
+  1. re-run the standalone supervisor for the crashed operation:
+     `q12-live-cutover.sh <op> …` (idempotent barrier resume, `resume_retained_chain`);
+  2. then run `q12-live-cutover.sh recover …`, which continues from the now-advanced,
+     supported head.
+     To make this actionable at 3am, `run_recover`'s named refusal for a `barrier.<op>` head
+     **includes the exact step-1 command** (`… ; re-run the standalone supervisor
+'q12-live-cutover.sh <op>' to resume this barrier, then run recover`) — the operator gets
+     the next step from the error text, not archaeology (implemented R5 Sub-round D2).
+     **R8 obligation:** the R8 execution smoke + the server custody rehearsal MUST prove this
+     composition actually holds on a single journal (mid-barrier crash → standalone supervisor
+     re-run → `recover` continue). If it does not compose end-to-end, that is a **found defect**
+     (a real R5-D2 follow-up), not a scope extension.
 
 ### 5.6 Parity duty (the §10 obligation)
 
@@ -419,6 +444,8 @@ and the §8 fail-closed additions (`:435-452`).
    later shows a producer genuinely cannot be built without adding a manifest entry or
    changing frozen barrier/SQL bytes, **stop and report** — do not modify `aaec6fc2…` /
    `134255ce…` / `0b8a943f…`.
+   _(Historical, 2026-07-18: `134255ce…` here was superseded by `3673ee49…` per the
+   ratified barrier-fix round; the current frozen barrier is `3673ee49…`.)_
 
 Nothing else in OQ2–OQ6 requires an owner ruling; they are implementable within Task-9
 under the plan below.
@@ -470,6 +497,15 @@ sections above (evidence re-verified against the same byte-identical files):
    — flagged for the orchestrator's blessing before R3's stepped-row parity test, since ruling
    1 requires exclusions be blessed, not ad-hoc. (Substitution VALUES sourced from the artifact
    are seeded to the fixture derivations in the parity test, so `command_sha256` parity holds.)
+
+5. **§5.2 "post" row wording corrected (ruling 1c, receipt-only).** The §5.2 forward-sequence
+   `post` row's prose ("orchestrate `q12-database-barrier.sh cleanup` → v2 `guard_cleanup_complete`
+   … `writers.resume.forward`") read as if the post-activate cleanup/resume were journaled steps;
+   they are NOT. The frozen §5/D5J chronology ends at `barrier.activate` (76 rows) and the journal
+   grammar has no cleanup `command_id`, so the cleanup is RECEIPT-ONLY: `run_live` adds no journal
+   row and instead RECORDS the v2 receipt-backed cleanup + resume outcomes off-journal
+   (`output["postActivate"]`). The bytes win over the prose — same correction class as the R1
+   parity-wording note. (Implemented R5 Sub-round E.)
 
 ## 7. Bounded implementation (see the companion plan)
 

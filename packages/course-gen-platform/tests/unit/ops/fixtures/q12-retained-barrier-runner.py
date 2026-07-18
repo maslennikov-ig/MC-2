@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import stat
 import subprocess
 import sys
@@ -295,6 +296,160 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             "capability_sha256": CORE.sha256(CORE.complete_object(capability)),
             "result_sha256": CORE.sha256(f"q12-live-real-child:{command_id}:{run_id}".encode()),
             "status": "accepted",
+        }
+
+    # R5 Sub-round E (orchestrator RULING 1 — post-activate cleanup is RECEIPT-ONLY): the
+    # post-activate barrier-cleanup and forward-writer-resume seam. run_live invokes these AFTER
+    # the 76th journal row and RECORDS the returned outcomes on output["postActivate"] — they
+    # NEVER touch the journal, a capability digest, a checkpoint, self.child_executions, or an
+    # accepted_object_sha256 (the R4 child-execution count stays pinned at 18). Here the cleanup
+    # child is fixture-seeded (real docker/PG17 + `q12-database-barrier.sh cleanup` is round R8);
+    # it emits a v2 guard_cleanup_complete receipt (+ probe receipt) shaped EXACTLY so the REAL
+    # W-owned q12-writer-resume.py forward branch (:1088-1134) would accept it, and the resume
+    # child re-reads and fail-closed VALIDATES that same projection before reporting "resumed".
+
+    def execute_barrier_cleanup(self, context: dict[str, Any]) -> dict[str, Any]:
+        run_root = pathlib.Path(context["run_root"])
+        run_id = context["run_id"]
+        expected_catalog_sha256 = context["expected_catalog_sha256"]
+        # The probe receipt (megacampus.q12.database-barrier-probes/v1): exact key set + the exact
+        # nested probes/residue projections q12-writer-resume.py:1108-1133 enforces on the forward
+        # branch. completed_at is a fixed-shape UTC millisecond timestamp (the consumer regex).
+        probe_object = {
+            "schema_version": "megacampus.q12.database-barrier-probes/v1",
+            "run_id": run_id,
+            "expected_catalog_sha256": expected_catalog_sha256,
+            "completed_at": "2026-07-18T00:00:00.000Z",
+            "probes": {
+                "postgrest_anon": "rejected",
+                "postgrest_authenticated": "rejected",
+                "postgrest_service_role_without_capability": "rejected",
+                "postgrest_service_role_with_capability": "rolled_back",
+                "postgrest_preference_applied": "tx=rollback",
+                "auth_profile": "rejected_zero_residue",
+                "storage_object": "rejected_zero_metadata_zero_bytes",
+                "cron_rpc": "rejected_exact_jobs_unchanged",
+                "pg_net_rpc": "rejected_zero_queue_zero_external_request",
+                "direct_supervisor": "rolled_back",
+            },
+            "residue": {
+                "guard_probe_rows": 0,
+                "auth_rows": 0,
+                "storage_metadata_rows": 0,
+                "storage_object_bytes": 0,
+                "cron_job_set_unchanged": True,
+                "pg_net_queue_rows": 0,
+                "external_requests": 0,
+            },
+        }
+        probe_body = CORE.complete_object(probe_object)
+        probe_path = run_root / "database-barrier-probe-receipt.json"
+        CORE.immutable_publish(probe_path, probe_body, 0o400, [])
+        probe_digest = CORE.sha256(probe_body)
+        # The v2 database-barrier receipt (megacampus.q12.database-barrier-receipt/v2): the exact
+        # 10-key terminal authority q12-writer-resume.py:1090-1104 requires for the forward branch
+        # (state guard_cleanup_complete, last_command cleanup, rollback_probes_verified True,
+        # probe_receipt_sha256 == the probe file digest, zero_guard_residue/database_capability_
+        # deleted True, hex64 expected/terminal bindings).
+        receipt_object = {
+            "schema_version": "megacampus.q12.database-barrier-receipt/v2",
+            "run_id": run_id,
+            "state": "guard_cleanup_complete",
+            "expected_catalog_sha256": expected_catalog_sha256,
+            "zero_guard_residue": True,
+            "last_command": "cleanup",
+            "rollback_probes_verified": True,
+            "probe_receipt_sha256": probe_digest,
+            "terminal_proof_sha256": CORE.sha256(
+                f"q12-database-barrier-cleanup-terminal-proof:{run_id}".encode()
+            ),
+            "database_capability_deleted": True,
+        }
+        receipt_body = CORE.complete_object(receipt_object)
+        receipt_path = run_root / "database-barrier-receipt.json"
+        CORE.immutable_publish(receipt_path, receipt_body, 0o400, [])
+        receipt_digest = CORE.sha256(receipt_body)
+        return {
+            "status": "guard_cleanup_complete",
+            "ok": True,
+            "cleanup_receipt_path": str(receipt_path),
+            "cleanup_receipt_sha256": receipt_digest,
+            "probe_receipt_path": str(probe_path),
+            "probe_receipt_sha256": probe_digest,
+            "receipt": receipt_object,
+        }
+
+    def execute_forward_resume(
+        self, context: dict[str, Any], cleanup: dict[str, Any]
+    ) -> dict[str, Any]:
+        run_root = pathlib.Path(context["run_root"])
+        run_id = context["run_id"]
+        # Fail-closed validation, a byte twin of q12-writer-resume.py's forward branch
+        # (:1088-1134). run_live does NOT reimplement this gate — it lives HERE, in the child.
+        barrier_path = run_root / "database-barrier-receipt.json"
+        barrier_bytes = barrier_path.read_bytes()
+        barrier = json.loads(barrier_bytes)
+        if set(barrier) != {
+            "schema_version",
+            "run_id",
+            "state",
+            "expected_catalog_sha256",
+            "zero_guard_residue",
+            "last_command",
+            "rollback_probes_verified",
+            "probe_receipt_sha256",
+            "terminal_proof_sha256",
+            "database_capability_deleted",
+        }:
+            raise CORE.LifecycleError("database barrier receipt key set is not exact")
+        if barrier_bytes != CORE.complete_object(barrier):
+            raise CORE.LifecycleError("database barrier receipt is not canonical bytes")
+        hex64 = lambda value: isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+        if not (
+            barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v2"
+            and barrier["run_id"] == run_id
+            and barrier["state"] == "guard_cleanup_complete"
+            and barrier["zero_guard_residue"] is True
+            and barrier["database_capability_deleted"] is True
+            and hex64(barrier["expected_catalog_sha256"])
+            and hex64(barrier["terminal_proof_sha256"])
+        ):
+            raise CORE.LifecycleError("database barrier receipt v2 is not exact terminal authority")
+        if not (
+            barrier["last_command"] == "cleanup"
+            and barrier["rollback_probes_verified"] is True
+            and hex64(barrier["probe_receipt_sha256"])
+        ):
+            raise CORE.LifecycleError("forward cleanup receipt is invalid")
+        probe_path = run_root / "database-barrier-probe-receipt.json"
+        probe_bytes = probe_path.read_bytes()
+        if CORE.sha256(probe_bytes) != barrier["probe_receipt_sha256"]:
+            raise CORE.LifecycleError("database barrier probe receipt hash mismatch")
+        probe = json.loads(probe_bytes)
+        if set(probe) != {
+            "schema_version",
+            "run_id",
+            "expected_catalog_sha256",
+            "completed_at",
+            "probes",
+            "residue",
+        }:
+            raise CORE.LifecycleError("database barrier probe receipt key set is not exact")
+        if not (
+            probe["schema_version"] == "megacampus.q12.database-barrier-probes/v1"
+            and probe["run_id"] == run_id
+            and probe["expected_catalog_sha256"] == barrier["expected_catalog_sha256"]
+            and isinstance(probe["completed_at"], str)
+            and re.fullmatch(
+                r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z",
+                probe["completed_at"],
+            )
+        ):
+            raise CORE.LifecycleError("database barrier probe receipt binding is invalid")
+        return {
+            "status": "resumed",
+            "ok": True,
+            "validated_receipt_sha256": CORE.sha256(barrier_bytes),
         }
 
 
@@ -619,6 +774,16 @@ LIVE_SPEC_KEYS = {
     "production",
     "quiesceManifestPath",
     "executeActualWrapper",
+    "stopAfter",
+}
+
+RECOVER_SPEC_KEYS = {
+    "runRoot",
+    "recoverController",
+    "runId",
+    "production",
+    "quiesceManifestPath",
+    "executeActualWrapper",
 }
 
 
@@ -721,6 +886,10 @@ def run_live_fixture(spec: dict) -> int:
         request["quiesce_manifest_path"] = quiesce_manifest_path
     if spec.get("production") is True:
         request["production"] = True
+    # R5 Sub-round D: an optional named checkpoint at which run_live stops cleanly and returns its
+    # partial output (a stopped run does NOT run post-activate). Absent => the full 76-row window.
+    if spec.get("stopAfter") is not None:
+        request["stop_after"] = spec["stopAfter"]
     try:
         output = CORE.run_live(request, executor)
     except Exception as error:  # noqa: BLE001 - fixture surfaces the message
@@ -733,7 +902,119 @@ def run_live_fixture(spec: dict) -> int:
     return 0
 
 
+def run_recover_fixture(spec: dict) -> int:
+    """Drive the R5 Sub-round D RECOVER controller (run_recover) on an EXISTING run root.
+
+    Mirrors run_live_fixture's request base + executor + canonical-lease handling, but targets a
+    run root a prior run_live(stop_after=...) already left a partial durable journal on (a
+    separate process; the lease was released when it exited, so recover re-acquires it here). The
+    runId MUST be pinned to the same id that partial run used so the rehydrated journal binds.
+    """
+    unknown = set(spec) - RECOVER_SPEC_KEYS
+    if unknown:
+        raise RuntimeError(f"unknown recover fixture key: {sorted(unknown)}")
+    root = fixture_root(spec["runRoot"])
+    acquire_fixture_coordination_lock()
+    canonical_lock_path = root.parent / "cutover.lock"
+    if canonical_lock_path.exists():
+        canonical_lock_path.chmod(0o600)
+    lease_fd = os.open(canonical_lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    if lease_fd != 9:
+        os.dup2(lease_fd, 9)
+        os.close(lease_fd)
+        lease_fd = 9
+    fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lock_stat = os.fstat(lease_fd)
+    executor = (
+        LiveSandboxedDeployedWrapperExecutor(root)
+        if spec.get("executeActualWrapper")
+        else LiveOrdinaryExecutor()
+    )
+    executor.root = root
+    expected_catalog = root / "expected-post-migration-catalog.json"
+    if not expected_catalog.exists():
+        expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
+        expected_catalog.chmod(0o400)
+    quiesce_manifest_path = spec.get("quiesceManifestPath")
+    quiesce_manifest_sha256 = (
+        quiesce_manifest_sha256_readonly(quiesce_manifest_path)
+        if quiesce_manifest_path is not None
+        else "0" * 64
+    )
+    request = {
+        "run_root": str(root),
+        "run_id": spec.get("runId") or derive_run_id(root),
+        "release_sha": "0123456789abcdef0123456789abcdef01234567",
+        "operator_digest": "1" * 64,
+        "resource_manifest_sha256": "2" * 64,
+        "quiesce_manifest_sha256": quiesce_manifest_sha256,
+        "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
+        "rotation_required": False,
+        "lease_fd": 9,
+        "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
+    }
+    if quiesce_manifest_path is not None:
+        request["quiesce_manifest_path"] = quiesce_manifest_path
+    if spec.get("production") is True:
+        request["production"] = True
+    try:
+        output = CORE.run_recover(request, executor)
+    except Exception as error:  # noqa: BLE001 - fixture surfaces the message
+        write_audit(root, executor)
+        print(str(error), file=sys.stderr)
+        return 2
+    output["childExecutions"] = executor.child_executions
+    write_audit(root, executor, output)
+    sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
+def run_fwm_negative_fixture(spec: dict) -> int:
+    """R5 Sub-round A negatives: publish_final_writer_manifest fail-closed proofs.
+
+    A focused, real (non-mocked) call into the production
+    ``Engine.publish_final_writer_manifest``/``derive_root_writer_inventory`` on a fresh
+    fixture run root, exercising the exact same code path run_live and run_joined_composer
+    both use. Two cases: "bad-mode" (mode outside forward/rollback) and "no-targets" (a
+    forward-mode publish against an inventory with no target identities).
+    """
+    case = spec["case"]
+    root = fixture_root(spec["runRoot"])
+    request = {
+        "run_root": str(root),
+        "run_id": spec["runId"],
+        "release_sha": "0123456789abcdef0123456789abcdef01234567",
+        "operator_digest": "1" * 64,
+        "resource_manifest_sha256": "2" * 64,
+        "quiesce_manifest_sha256": "0" * 64,
+        "rotation_required": False,
+    }
+    executor = NoIoExecutor()
+    executor.root = root
+    engine = CORE.Engine(request, executor)
+    try:
+        if case == "bad-mode":
+            engine.publish_final_writer_manifest("sideways", None, {"command_sha256": "a" * 64})
+        elif case == "no-targets":
+            quiesce_bytes = pathlib.Path(spec["quiesceManifestPath"]).read_bytes()
+            inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=False)
+            engine.publish_final_writer_manifest(
+                "forward", inventory, {"command_sha256": "a" * 64}
+            )
+        else:
+            raise RuntimeError(f"unknown fwm negative case: {case}")
+    except CORE.LifecycleError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print("unexpectedly succeeded", file=sys.stderr)
+    return 3
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--fwm-negative":
+        if len(sys.argv) != 2:
+            raise RuntimeError("invalid fwm-negative arguments")
+        return run_fwm_negative_fixture(json.load(sys.stdin))
     if len(sys.argv) > 1 and sys.argv[1] == "--derive-run-id":
         if len(sys.argv) != 2:
             raise RuntimeError("invalid run-id derivation arguments")
@@ -785,6 +1066,8 @@ def main() -> int:
         raise RuntimeError("caller quiesce digest override is forbidden")
     if spec.get("liveController"):
         return run_live_fixture(spec)
+    if spec.get("recoverController"):
+        return run_recover_fixture(spec)
     if "joinedProfile" in spec:
         return run_joined_fixture(spec)
     root = fixture_root(spec["runRoot"])

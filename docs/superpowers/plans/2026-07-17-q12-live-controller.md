@@ -513,6 +513,214 @@ probe_receipt_sha256:null}`; q12_guard schema present with its 4 tables + 10 fun
   (`aaec6fc2…`) + structural-catalog (`0b8a943f…`) untouched; barrier
   (`3673ee49…`) not re-edited; `q12-source-manifest.ts` (`902cd6a1…`) not re-edited.
 
+- **R5 Sub-round A done** (RED `5bc73c08` → GREEN `36f43593`). `run_live` now journals
+  amendment §5 group 14 — the forward final-writer manifest (FWM) — immediately after
+  `deploy.prepare`/completed, mirroring the composer's
+  `publish_final_writer_manifest("forward", inventory, ...)` call verbatim (`inventory =
+engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)` stays the FIXTURE
+  derivation, deterministic from run_id + quiesce bytes, exactly like the composer). `run_live`
+  now journals 68 rows total (1-66 unchanged + FWM rows 67-68: `prepared_quiesced`/intent and
+  `prepared_quiesced`/accepted with `accepted_object_kind=final_writer_manifest`); its output
+  surfaces `forwardFinalWriterManifestPath`, mirroring the composer's own output augmentation.
+  **Resolves the R3 C7-boundary flag** with the ratified 3-part FWM parity split: (1) FWM row
+  structure (rows 67-68 as above, `command_sha256` byte-equal to the composer's); (2) the full
+  68-row journal twin under the closed 4-field blessed exclusion set PLUS a new row-scoped
+  exclusion (`withParityExclusions`) that ALSO drops `accepted_object_sha256` on the FWM
+  accepted row ONLY (`command_id==='writers.resume.forward' && outcome==='accepted'`) — every
+  other row (1-67, 69+) keeps exactly the 4-field blessed set unchanged; (3) a SEPARATE
+  FWM-content byte parity, read directly off both `final-writer-manifest-forward-<run-id>.json`
+  files, stripping the two per-run-root physical fields
+  (`publication_intent_journal_entry_hash`, `input_checkpoint_sha256` — both carry the
+  journal's device+inode) and comparing the canonicalized remainders byte-for-byte; all 9
+  root-independent FWM fields (`schema_version`, `run_id`, `mode`, `release_sha`,
+  `expected_catalog_sha256`, `writer_quiesce_manifest_sha256`, `lease_epoch`, `final_writers`,
+  `held_writers`) byte-matched on the first attempt — no field misclassification found. A
+  self-consistency check (mirroring R3's resource-manifest proof) confirms the live FWM file is
+  a real 0400 artifact whose `sha256` IS the live row-68 `accepted_object_sha256`. Two fail-closed
+  negatives via a new `--fwm-negative` seam driving the real
+  `Engine.publish_final_writer_manifest`/`derive_root_writer_inventory` directly: an invalid
+  mode raises "final writer manifest mode mismatch"; a forward publish against an inventory
+  with no target identities raises "forward manifest requires target identities". The
+  pre-existing R3/R4 groups-1-13 twin assertions were updated from a full-length check to a
+  PREFIX check (`live.journalEntries.slice(0, c7End)`), since `run_live` now journals past
+  group 13. All 4 no-docker suites green (305/305: `q12-live-controller` + `q12-live-cutover` +
+  `q12-retained-barrier-quiesce-seam` + `q12-retained-barrier-w-composition-seam`); `pnpm
+type-check` 0 across every workspace. Frozen bytes unchanged (`q12-command-manifest.json`
+  `aaec6fc2…`, `q12-database-barrier.sh` `3673ee49…`, `q12-structural-catalog.sql`
+  `0b8a943f…`); `q12-writer-resume.py`/`source-recovery-run.sh`/`q12-source-manifest.ts`
+  untouched; `run_joined_composer`'s own body byte-unchanged (only `run_live`'s docstring/body
+  were touched). Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5.md`. `deploy.commit`
+  and `activate` (groups 15-16) remain later rounds (R5 Sub-round B / R6+).
+- **R5 Sub-round B done** (RED `c48f2ca93` → GREEN `1cda05ad7`). `run_live` now closes the
+  forward window: after the group-14 FWM it appends `ordinary("deploy.commit")` (group 15,
+  rows 69-72 at `activation_ready`) then `d5("activate")` (group 16, rows 73-76: selector/intent
+  at `activation_committing`, then capability_issued/claimed/completed at `activated`), before
+  `reload_durable()` — a verbatim mirror of `run_joined_composer`'s
+  `forward_tail_through_activation_ready()` + `d5("activate")` tail. `run_live` now journals the
+  **full 76 forward rows**, and the R5-A parity test is widened to a full-76-row twin
+  (`live.journalEntries.map(withParityExclusions)` deep-equals the whole composer forward
+  journal, not `slice(0,68)`), plus a Part 1b structural check pinning the deploy.commit/activate
+  row grammar. The FWM stays rows 67-68 of 76; its 3-part parity split and self-consistency
+  assertions are unchanged. Forced (non-weakening) count corrections in the R4 tests since
+  `run_live` gained one ordinary lifecycle and one in-process barrier that both cross the real
+  child boundary: R4-A `ordinaryKeys` 12→13 and `childExecutions` 16→18 (D5 delegations 4→5),
+  R4-B `barrierKeys` gains `activate:cutover`. `q12-live-controller.test.ts` 7/7; `tsc --noEmit`
+  0; frozen bytes unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched;
+  `run_joined_composer` body byte-unchanged. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5b.md`. Next unblocked: R5 Sub-round C
+  (`quiesce-window-mode.json` cutover-marker write + lifetime assertion). R5-D/E (recover +
+  real-PG17 post-activate legs) stay held for the two pending rulings.
+- **R5 Sub-round C done** (RED `4070ed81e` → GREEN `c5bd9f698`). `run_live` now writes the
+  caller-declared `quiesce-window-mode.json` cutover marker (design note §57) as its FIRST
+  forward step, before the group-3 `writers.quiesce` command: a new
+  `write_quiesce_window_marker(engine)` helper builds EXACTLY the three keys the W-side
+  `q12-writer-resume.py` `window_is_cutover()` `exact()` check requires (`schema_version` =
+  `megacampus.q12.quiesce-window-mode/v1`, `run_id`, `mode` = `cutover`), canonicalizes via the
+  shared `complete_object()`, and publishes it to `<run-root>/quiesce-window-mode.json` through
+  `immutable_publish(..., 0o400, engine.trace)` (same fsync/atomic discipline as every other
+  run-root artifact). It is a side artifact — never a journal row — so the full 76-row forward
+  twin is byte-unchanged (parity-neutral, proven by the R5-B twin test staying green). `run_live`
+  surfaces `output["quiesceWindowMarkerPath"]`. Test asserts exact-key projection, schema/mode/
+  run_id constants, 0400, parity-neutrality (length 76 + full twin), and post-activate
+  persistence. `q12-live-controller.test.ts` 8/8; 4-suite regression 306/306; `tsc --noEmit` 0;
+  frozen bytes unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched;
+  `run_joined_composer` body byte-unchanged. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5c.md`. **Deferred (flagged):** the
+  marker-lifetime "present BEFORE the group-3 row" observation point needs a `run_live` mid-run
+  stop/checkpoint seam (the C7-stop machinery held for ruling 2 / R5-D); this round delivers the
+  write + post-activate observation point. Consumer-side missing/stray/wrong-run_id negatives are
+  W-amendment-owned. R5-D/E remain held for the two pending rulings.
+
+- **R5 Sub-round E done** (RED `1ca451f56` → GREEN `942da4f62` → docs). Orchestrator RULING 1
+  (post-activate cleanup is RECEIPT-ONLY) implemented: the frozen §5/D5J chronology ends at
+  `barrier.activate` (76 journal rows) and the grammar has no cleanup `command_id`, so `run_live`
+  adds NO journal row for the post-activate cleanup or resume. After the 76th row (around
+  `reload_durable`), a new `orchestrate_post_activate_cleanup(engine, request, run_id)` drives, via
+  an executor seam mirroring the R4 `execute_ordinary` pattern, two children: `execute_barrier_
+cleanup` emits a v2 `megacampus.q12.database-barrier-receipt/v2` `guard_cleanup_complete` receipt
+  (+ its `megacampus.q12.database-barrier-probes/v1` probe receipt), both 0400 canonical artifacts
+  written via `immutable_publish`; `execute_forward_resume` is a fail-closed byte twin of the
+  W-owned `q12-writer-resume.py` forward branch (`:1088-1134`) that VALIDATES that exact receipt
+  projection and reports `resumed`. `run_live` does NOT reimplement the receipt gate (it lives in
+  the children); it INVOKES them, does a light orchestration binding only (hex64 receipt digest;
+  the resume child must report validating that same receipt), and RECORDS the outcomes on
+  `output["postActivate"] = {"cleanup": …, "resume": …}` (operator-visible truth, since the cleanup
+  is deliberately not journaled). Absent hooks degrade safely to `None`. The seam never touches the
+  journal, a capability digest, a checkpoint, `self.child_executions` (R4's count stays 18), or an
+  `accepted_object_sha256`, so the 76-row forward journal stays a byte/order twin of the composer.
+  Test asserts (a) recorded cleanup/resume ok+status, (b) the v2 receipt shape (exact 10-key set,
+  schema/state/last_command=cleanup/rollback_probes_verified/probe binding) so the real forward
+  gate would accept it — with the receipt file being a real 0400 canonical artifact whose digest is
+  the recorded sha256 and the probe file digest matching `probe_receipt_sha256`, and (c)
+  parity-neutrality (length 76 + full twin, no cleanup/resume command_id in any row).
+  `q12-live-controller.test.ts` 9/9; 4-suite regression 307/307; `tsc --noEmit` 0; frozen bytes
+  unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched; `run_joined_composer`
+  body byte-unchanged. Design §5.2 "post" row wording corrected in §6a item 5 (ruling 1c). Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5e.md`. **Deferred (flagged):** the real
+  docker/PG17 `q12-database-barrier.sh cleanup` child and the real `sudo source-recovery-run.sh
+writers.resume.forward` are round R8 (this round seeds fixture children that emit/validate
+  receipt-shaped artifacts); the full terminal-proof/baseline/archive file cross-checks beyond the
+  receipt projection at `:1088-1134` also ride on R8's real gate.
+- **R5 Sub-round D done** (refactor `f41a20577` → RED `78e8d797e` → GREEN `320257631` → docs).
+  Orchestrator RULING 2 (RECOVER SCOPE) implemented as `run_recover(request, executor)`. First a
+  behavior-preserving refactor extracted `run_live`'s forward tail (§5 groups 14 FWM → 15
+  `deploy.commit` → 16 `activate` → `reload_durable` → output augmentation → RULING 1 post-activate)
+  into a reusable `drive_forward_tail(...)` plus a `finalize_forward_output(...)` projector, and
+  added an optional `request["stop_after"]` seam with three named checkpoints
+  (`"writers.quiesce.pre"` = stop after group 2 `barrier.install`, before the `writers.quiesce`
+  row; `"deploy.prepare"` = the C7 planned-exit head; `"final-writer-manifest"` = after the group-14
+  FWM accepted row). Absent `stop_after` reproduces the full 76-row window + post-activate
+  byte-for-byte; a stopped run returns its partial output and does NOT run post-activate.
+  `run_recover` requires a NON-EMPTY durable journal (the opposite of `run_live`'s fresh-root
+  guard), rehydrates it through the same `Engine`, restores the request-global resource pin from
+  the durable tail (like `run_claim`) and the stepped resource/quiesce domains from the head, then
+  DISPATCHES on the durable head: `deploy.prepare`/`completed` → `drive_forward_tail` from group 14;
+  `writers.resume.forward`/`accepted` → `drive_forward_tail(include_fwm=False)` from group 15; ANY
+  other head (incl. a mid-barrier partial — those route through the existing
+  `run_supervisor`/`resume_retained_chain` machinery, not `run_recover`) or an empty journal →
+  NAMED fail-closed `LifecycleError` naming phase/outcome/command, never a heuristic continuation.
+  A resumed run reproduces the SAME 76-row composer twin + post-activate an uninterrupted run would
+  have (proven by asserting `recovered.slice(0, prefix)` equals the stopped partial byte-for-byte
+  AND the full `withParityExclusions` twin). Tests: R5-C before-group-3 marker close (via
+  `stop_after="writers.quiesce.pre"`: the 0400 3-key `quiesce-window-mode.json` is present with NO
+  `writers.quiesce` row yet); recover-from-C7 and recover-from-crash-after-FWM to the 76-row twin +
+  `postActivate`; and NAMED fail-closed negatives (unsupported mid-forward head naming
+  `command=barrier.install`/`outcome=completed`/`phase=maintenance_guarded` with the durable journal
+  proven byte-unchanged, empty journal, and a head past activate naming `command=barrier.activate`).
+  `q12-live-controller.test.ts` 13/13; 4-suite regression 311/311; `tsc --noEmit` 0; frozen bytes
+  unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched; `run_joined_composer`
+  body byte-unchanged. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5d.md`.
+  **Scope note (flagged):** per RULING 2 (`recover supports resuming from exactly (a) and (b)`) +
+  the hard fail-closed requirement, `run_recover` supports ONLY the two clean checkpoints and fails
+  closed on every other head including mid-barrier partials; deeper mid-barrier resume-and-proceed
+  is deliberately NOT wired into `run_recover` this round (it remains the existing
+  `resume_retained_chain` path). Crash-anywhere idempotence is probed further at R8.
+- **R5 Sub-round F done** (RED `9bcc3a38e` → GREEN `bb8f93679` → docs). Operator-reachable
+  `live`/`recover` CLI wiring. `q12-live-cutover.sh` now routes `$1 == live` → `mode=live` and
+  `$1 == recover` → `mode=recover` (a pure `elif` insertion before the existing closing `fi`; the
+  `plan`/`--plan` decision+action and the `mode=supervisor` default and the `exec` line are
+  byte-identical). `parser()` adds `live` + `recover` subparsers, each carrying the identical
+  operator argv both controllers consume: `--run-id`, `--release-sha`, `--operator-digest`,
+  `--resource-manifest-sha256`, `--quiesce-manifest-sha256`, `--expected-catalog-sha256`,
+  `--quiesce-manifest-path`. `main()` gains one `arguments.mode in ("live", "recover")` branch
+  (inserted before the `run_claim` fallthrough, so `plan`/`supervisor`/`claim`/`smoke` dispatch is
+  byte-unchanged) that mirrors the supervisor branch's production seam — run root
+  `/opt/megacampus/backups/q12/<run-id>`, canonical parent `cutover.lock` inherited on FD9 under an
+  exclusive `flock`, `production: True` — plus the `quiesce_manifest_path`/digest, expected catalog,
+  release/operator fields `run_live`/`run_recover` read, then dispatches
+  `controller = run_live if mode == "live" else run_recover` with `ProductionExecutor()`.
+  **SAFETY GATE (production-only):** `ProductionExecutor` does NOT yet expose the R8
+  `execute_barrier_cleanup`/`execute_forward_resume` hooks, and a production cutover that ACTIVATES
+  (76th row) and then silently skips the post-activate cleanup+resume would leave the paused writers
+  NEVER RESUMED. So `orchestrate_post_activate_cleanup` now FAILS CLOSED with a NAMED
+  `LifecycleError("post-activate cleanup/resume executor not wired (deferred to R8)")` when the
+  hooks are absent AND `request.get("production") is True`; the non-production fixture path
+  (hooks present, or absent → `None`) is unchanged, so all R5-E tests stay green. `recover` reuses
+  the same post-activate path via `drive_forward_tail`, so the gate protects it too. This makes the
+  R5-F CLI a real, safe routing skeleton that fails closed until R8 wires the children, not a silent
+  half-cutover. Tests (new focused file `q12-live-cutover-cli.test.ts`, since
+  `q12-live-cutover.test.ts` is at the 1500-line eslint cap): shell routing (`live`/`recover`/`plan
+--help` through the real shell exit 0 in argparse before `main()` touches `/opt/megacampus`, and
+  the `plan`/`supervisor` source bytes are asserted verbatim); argparse subparsers exist + unknown
+  mode errors; `main()` dispatch structure (source) routes live→run_live / recover→run_recover
+  through the production seam with plan/supervisor/claim/smoke unchanged; and the production
+  fail-closed gate proven at the exact `orchestrate_post_activate_cleanup` seam both controllers
+  funnel through (the `/opt/megacampus` production root is not writable in CI, so the gate is tested
+  at the seam, not via a full production cutover). `q12-live-cutover-cli.test.ts` 6/6; the required
+  4-suite set + `q12-live-cutover-cli` + shell-driving `q12-command-manifest`/`q12-migration-plan`
+  ran 386/386 (12 skipped); `tsc --noEmit` 0; frozen bytes unchanged
+  (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched; core+shell diff is purely
+  additive (zero deletions). Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5f.md`.
+  **Deferred (flagged):** the real docker/PG17 post-activate `execute_barrier_cleanup` +
+  `execute_forward_resume` hooks on `ProductionExecutor` remain round R8; until then a production
+  `live`/`recover` correctly fails closed at the post-activate boundary rather than half-cutting.
+- **R5 Sub-round F fix — pre-flight gate placement** (RED `94645fdae` → GREEN `5d3bfdb80` → docs).
+  Orchestrator review found the fail-closed gate was RIGHT in direction but WRONG as the sole gate:
+  it fired inside `orchestrate_post_activate_cleanup`, i.e. AFTER the 76th row (`activate` — the
+  point of no return), so a production run would journal all the way through activate and only then
+  refuse, stranding an activated barrier with writers quiesced and post-activate unrun. Fix: a new
+  `require_post_activate_executor(request, executor)` runs as the FIRST statement of both `run_live`
+  and `run_recover` — before `Engine` construction / the genesis row / any run-root mutation — and
+  fails closed with the same named error when `production is True` and the executor lacks the R8
+  hooks, so the run NEVER STARTS. The original late gate is kept as defense-in-depth. Proven by a
+  Python probe: production `run_live`/`run_recover` + a hookless executor → the named refusal with a
+  COMPLETELY EMPTY run root (`list(root.iterdir()) == []` — no `phase.jsonl`, no capabilities dir),
+  and the pre-flight returns `None` for non-production. `q12-live-controller.test.ts` 13/13;
+  `q12-live-cutover-cli.test.ts` 7/7; `tsc` 0; frozen bytes intact; no W-owned file touched.
+- **R5 Sub-round D2 done** (RED `501fc065a` → GREEN `7f758c569` → docs). RULING-2 option (a)
+  requirement 1: `run_recover`'s named fail-closed refusal for a mid-barrier (`barrier.<op>`) head
+  now appends the actionable next step — `… ; re-run the standalone supervisor
+'q12-live-cutover.sh <op>' to resume this barrier, then run recover` (op derived from the head's
+  `command_id`, guarded by `op in OPERATIONS`). Still fully fail-closed (no continuation; the
+  durable journal stays byte-unchanged after refusal); only the error text gained the operator
+  pointer so the 3am next step comes from the error, not archaeology. The composed operator
+  procedure (mid-barrier crash → standalone supervisor re-run → `recover` continue) is written into
+  design §5.5, with the explicit R8 obligation that the R8 execution smoke + server custody
+  rehearsal PROVE the composition holds on a single journal (a failure there is a found defect, not
+  a scope extension). `q12-live-controller.test.ts` 13/13 (the two barrier-head negatives now also
+  assert the `q12-live-cutover.sh install` / `… activate` pointer); `tsc --noEmit` 0; frozen bytes
+  unchanged; no W-owned file touched.
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface

@@ -19,6 +19,7 @@ import unicodedata
 import uuid
 import weakref
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Any, Protocol
 
 ZERO = "0" * 64
@@ -3114,6 +3115,198 @@ def write_live_resource_manifest(
     return sha256(body)
 
 
+def write_quiesce_window_marker(engine: "Engine") -> str:
+    """Design note (2026-07-17-q12-quiesce-window-mode-note §57): write the caller-declared
+    cutover-window marker the W-side ``q12-writer-resume.py`` ``window_is_cutover()`` consumes
+    out-of-band, before ``writers.quiesce`` runs. It is NOT a journal row (parity-neutral): it
+    is a side artifact carrying EXACTLY the three keys the consumer's exact() check requires
+    (``schema_version``/``run_id``/``mode``), published 0400 with the same fsync/atomic
+    discipline as every other run-root artifact. The controller is the only actor that knows the
+    run is a join-era cutover, so it is the declarer.
+    """
+    marker_object = {
+        "schema_version": "megacampus.q12.quiesce-window-mode/v1",
+        "run_id": engine.request["run_id"],
+        "mode": "cutover",
+    }
+    body = complete_object(marker_object)
+    path = engine.run_root / "quiesce-window-mode.json"
+    immutable_publish(path, body, 0o400, engine.trace)
+    return str(path)
+
+
+def orchestrate_post_activate_cleanup(
+    engine: "Engine", request: dict[str, Any], run_id: str
+) -> dict[str, Any] | None:
+    """Orchestrator RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY.
+
+    The frozen amendment §5 / D5J chronology ends at ``barrier.activate`` (the 76th journal
+    row) and the journal grammar has NO cleanup ``command_id``. Therefore run_live adds NO
+    journal row for the post-activate barrier cleanup or the forward writer resume — the 76-row
+    journal stays a byte/order twin of the closed composer. Instead, AFTER activate, run_live
+    ORCHESTRATES two children through an executor seam (fixture-seeded in tests; the real
+    docker/PG17 cleanup + ``sudo source-recovery-run.sh writers.resume.forward`` are round R8):
+
+      1. the barrier cleanup, which produces the v2 ``guard_cleanup_complete`` database-barrier
+         receipt (schema ``megacampus.q12.database-barrier-receipt/v2``) plus its
+         ``megacampus.q12.database-barrier-probes/v1`` probe receipt; and
+      2. the forward resume child, which fail-closed VALIDATES that receipt (the exact gate the
+         W-owned ``q12-writer-resume.py`` forward branch enforces) and resumes the writers.
+
+    run_live does NOT reimplement the receipt gate — the fail-closed validation lives in the
+    children. It INVOKES them via the seam and RECORDS their outcomes on the result
+    (operator-visible truth, since the cleanup is deliberately not journaled). The seam mirrors
+    the R4 ``execute_ordinary`` pattern: when the executor exposes both hooks, run_live drives
+    them and returns the recorded ``{"cleanup": ..., "resume": ...}`` outcome; when either hook
+    is absent (the closed composer's plain executor, or a production wiring that has not yet
+    seeded the post-activate children) it degrades safely to ``None`` (no post-activate
+    recording) rather than fabricating an unbacked receipt.
+    """
+    cleanup_hook = getattr(engine.executor, "execute_barrier_cleanup", None)
+    resume_hook = getattr(engine.executor, "execute_forward_resume", None)
+    if cleanup_hook is None or resume_hook is None:
+        # R5 Sub-round F SAFETY GATE (production only): a PRODUCTION cutover that has already
+        # ACTIVATED (the 76th journal row) and then silently skipped the post-activate cleanup +
+        # forward resume would leave the paused writers NEVER RESUMED — a severe incident. The real
+        # docker/PG17 cleanup + resume executor hooks are wired in round R8; until then a production
+        # run MUST fail closed with a NAMED error rather than returning None. The fixture path
+        # (non-production, hooks present) is unaffected and keeps degrading to None when absent.
+        if request.get("production") is True:
+            raise LifecycleError(
+                "post-activate cleanup/resume executor not wired (deferred to R8)"
+            )
+        return None
+    context = {
+        "run_root": str(engine.run_root),
+        "run_id": run_id,
+        "expected_catalog_sha256": request["expected_catalog_sha256"],
+    }
+    cleanup = cleanup_hook(context)
+    # Light orchestration binding ONLY (this is NOT the receipt gate, which the resume child
+    # owns): the recorded cleanup must carry a hex64 receipt digest, and the resume child must
+    # report validating exactly that receipt. Anything else is a controller-side wiring fault.
+    receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
+    if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
+        raise LifecycleError("post-activate cleanup receipt digest is not a sha256")
+    resume = resume_hook(context, cleanup)
+    if resume.get("validated_receipt_sha256") != receipt_sha256:
+        raise LifecycleError("post-activate resume validated a different cleanup receipt")
+    return {"cleanup": cleanup, "resume": resume}
+
+
+def finalize_forward_output(
+    engine: "Engine",
+    request: dict[str, Any],
+    resource_manifest_paths: dict[str, str],
+    marker_path: str,
+    *,
+    run_id: str | None,
+    post_activate: bool,
+) -> dict[str, Any]:
+    """Reload the durable journal and project the run_live output augmentation.
+
+    Byte-for-byte the tail run_live has always produced (durable reload, then the three
+    operator-visible run-root artifact paths). ``post_activate`` gates the RULING 1 receipt-only
+    cleanup+resume orchestration: a full/resumed run to activate records it; a stopped run
+    (``stop_after``) returns its partial output WITHOUT running post-activate.
+    """
+    engine.reload_durable()
+    output = engine.output()
+    output["resourceManifestPaths"] = resource_manifest_paths
+    forward_path = engine.run_root / f"final-writer-manifest-forward-{request['run_id']}.json"
+    output["forwardFinalWriterManifestPath"] = (
+        str(forward_path) if forward_path.exists() else None
+    )
+    output["quiesceWindowMarkerPath"] = marker_path
+    if post_activate:
+        output["postActivate"] = orchestrate_post_activate_cleanup(engine, request, run_id)
+    return output
+
+
+def drive_forward_tail(
+    engine: "Engine",
+    request: dict[str, Any],
+    manifest: dict[str, Any],
+    values: dict[str, str],
+    quiesce_bytes: bytes,
+    run_id: str,
+    resource_manifest_paths: dict[str, str],
+    marker_path: str,
+    ordinary: Callable[..., dict[str, Any]],
+    d5: Callable[[str], None],
+    *,
+    include_fwm: bool = True,
+    stop_after: str | None = None,
+) -> dict[str, Any]:
+    """Amendment section 5 forward tail: group 14 (FWM) -> 15 (deploy.commit) -> 16 (activate)
+    -> durable reload -> output augmentation -> RULING 1 post-activate cleanup+resume.
+
+    Extracted from run_live's tail so run_recover can re-drive the exact same rows onto an
+    existing (rehydrated) run root. The default call (include_fwm=True, stop_after=None) is a
+    byte-for-byte reproduction of run_live's original inline tail.
+
+    ``include_fwm=False`` skips group 14 because the durable head is already the forward FWM
+    accepted row (crash-after-FWM resume); the tail then starts at deploy.commit. ``stop_after
+    == "final-writer-manifest"`` publishes the FWM and returns the partial output WITHOUT the
+    commit/activate rows or the post-activate orchestration (the crash-after-FWM checkpoint).
+    """
+    if include_fwm:
+        # Section 5 group 14: the forward final-writer manifest (FWM), a byte/order twin of
+        # run_joined_composer's publish_final_writer_manifest("forward", ...) call. The inventory
+        # stays the FIXTURE derivation (deterministic from run_id + quiesce bytes) exactly like
+        # the composer.
+        inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
+        engine.publish_final_writer_manifest(
+            "forward",
+            inventory,
+            resolved_command(manifest, "writers.resume.forward", request),
+        )
+        if stop_after == "final-writer-manifest":
+            return finalize_forward_output(
+                engine, request, resource_manifest_paths, marker_path,
+                run_id=None, post_activate=False,
+            )
+
+    # Section 5 groups 15-16, closing the forward window as a byte/order twin of
+    # run_joined_composer's forward tail: deploy.commit records the activation-ready milestone
+    # and barrier.activate flips the cutover barrier from the current head (its selector CAS
+    # binds the live checkpoint head exactly as the composer's does).
+    ordinary("deploy.commit")
+    d5("activate")
+
+    # RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY (after the 76th journal row): orchestrate
+    # the barrier cleanup + forward writer resume as children and RECORD their receipt-backed
+    # outcomes. This adds NO journal row (the 76-row forward journal stays a byte/order twin of
+    # the composer). See orchestrate_post_activate_cleanup.
+    return finalize_forward_output(
+        engine, request, resource_manifest_paths, marker_path,
+        run_id=run_id, post_activate=True,
+    )
+
+
+def require_post_activate_executor(request: dict[str, Any], executor: Executor) -> None:
+    """R5 Sub-round F PRE-FLIGHT gate (production only): refuse to START a forward cutover whose
+    executor cannot run the post-activate cleanup + forward resume.
+
+    The late gate in ``orchestrate_post_activate_cleanup`` fires only AFTER ``activate`` — the
+    point of no return — which in production would journal all the way through activate and only
+    THEN discover it cannot resume the writers, stranding an activated barrier with the writers
+    still quiesced and post-activate unrun, at the worst possible moment. This pre-flight fires at
+    the TOP of ``run_live``/``run_recover`` — BEFORE the genesis row, before Engine construction,
+    before any run-root mutation — so a production run whose ``ProductionExecutor`` lacks the real
+    docker/PG17 post-activate hooks (wired in round R8) never starts. The late gate stays as
+    defense-in-depth (e.g. a future path where the hooks vanish mid-run). Non-production fixture
+    runs are unaffected.
+    """
+    if request.get("production") is not True:
+        return
+    if (
+        getattr(executor, "execute_barrier_cleanup", None) is None
+        or getattr(executor, "execute_forward_resume", None) is None
+    ):
+        raise LifecycleError("post-activate cleanup/resume executor not wired (deferred to R8)")
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
@@ -3125,20 +3318,36 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     of run_joined_composer's forward journal on every shared binding — the closed composer
     remains the parity oracle and this controller forks no second authority.
 
-    R3 (this revision) journals the forward window through amendment section 5 group 13
+    R3 journaled the forward window through amendment section 5 group 13
     (``deploy.prepare``/completed) — the design section 6a ruling-1 C7 planned-exit
     checkpoint (a stopAfter-style stop) — and owns the OQ4 resource-manifest authority: it
     fsyncs a real checkpoint-bound resource-manifest artifact and steps
     ``current_resource_manifest_sha256`` to its digest EXACTLY at the two witnesses
     (``pg.backup``/intent and ``deploy.prepare``/completed), replacing the composer's closed
     fixture step derivations. Substitution values still come from the seeded fixture
-    derivations so every ``command_sha256`` matches the oracle; real child execution, the
-    final-writer manifest, ``deploy.commit`` and ``activate`` arrive in later rounds.
+    derivations so every ``command_sha256`` matches the oracle.
+
+    R5 Sub-round A (this revision) extends the journal one group further: amendment
+    section 5 group 14, the forward final-writer manifest (FWM) — a byte/order twin of the
+    composer's ``publish_final_writer_manifest("forward", inventory, ...)`` call. The FWM
+    inventory stays the FIXTURE derivation (``derive_root_writer_inventory``, deterministic
+    from run_id + quiesce bytes, amendment section 6 item 3) exactly like the composer; only
+    the FWM object's root-independent fields (schema_version, run_id, mode, release_sha,
+    expected_catalog_sha256, writer_quiesce_manifest_sha256, lease_epoch, final_writers,
+    held_writers) are byte-parity fields. The two physical fields
+    (publication_intent_journal_entry_hash, input_checkpoint_sha256) carry the journal's
+    device+inode and are per-run-root, so the FWM accepted row's accepted_object_sha256
+    (which hashes the whole file, physical fields included) joins the value-only exclusion
+    set for that one row only. ``deploy.commit`` and ``activate`` remain later rounds.
 
     The production run-root coupling is enforced by Engine.__post_init__ (production=True ->
     /opt/megacampus/backups/q12/<run-id>; otherwise the /tmp fixture shape), so a production
     request against a non-production root fails closed there.
     """
+    # R5-F PRE-FLIGHT: refuse a production run whose executor cannot run post-activate BEFORE any
+    # journal row / run-root mutation, so it never journals through activate (the point of no
+    # return) only to strand there. Defense-in-depth late gate stays in the post-activate seam.
+    require_post_activate_executor(request, executor)
     manifest = load_manifest()
     engine = Engine(request, executor)
     if engine.journal:
@@ -3159,6 +3368,18 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
 
     def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
         return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
+
+    # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
+    # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
+    # the full 76-row window + post-activate exactly as before. The three checkpoints are the
+    # crash/restart boundaries run_recover resumes from (plus the R5-C before-group-3 marker
+    # observation point):
+    #   "writers.quiesce.pre"    -> stop after group 2 (d5 install), BEFORE journaling writers.quiesce
+    #   "deploy.prepare"         -> stop at the C7 planned-exit head (deploy.prepare/completed)
+    #   "final-writer-manifest"  -> stop after the group-14 FWM accepted row (crash-after-FWM)
+    stop_after = request.get("stop_after")
+    if stop_after not in (None, "writers.quiesce.pre", "deploy.prepare", "final-writer-manifest"):
+        raise LifecycleError(f"unknown live stop_after checkpoint: {stop_after}")
 
     # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
     # digest is the request-global initial value, so the stable-binding walk's first/last pin
@@ -3181,10 +3402,22 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
     )
 
+    # Caller-declared cutover-window marker (design note §57): written BEFORE the group-3
+    # writers.quiesce command so the W-side run_quiesce/resume-forward gate opens the cutover
+    # window. Out-of-band side artifact, never a journal row (parity-neutral).
+    marker_path = write_quiesce_window_marker(engine)
+
     # Section 5 forward chronology groups 1-13, mirroring run_joined_composer's forward path
     # up to the C7 planned-exit checkpoint (deploy.prepare/completed).
     ordinary("operator.self-check")
     d5("install")
+    if stop_after == "writers.quiesce.pre":
+        # R5-C before-group-3 observation point: the cutover-window marker is already on disk
+        # (written above, before this group), and NO writers.quiesce row exists yet.
+        return finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=None, post_activate=False,
+        )
     ordinary("writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"])
 
     # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
@@ -3214,11 +3447,152 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         engine, "targets", snapshot=exported_id, targets=target_identities
     )
     ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
+    if stop_after == "deploy.prepare":
+        # C7 planned-exit checkpoint: the journal ends at deploy.prepare/completed, the exact head
+        # run_recover resumes the forward tail (from group 14) from.
+        return finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=None, post_activate=False,
+        )
 
-    engine.reload_durable()
-    output = engine.output()
-    output["resourceManifestPaths"] = resource_manifest_paths
-    return output
+    # Section 5 forward chronology groups 14-16 + durable reload + output augmentation +
+    # RULING 1 post-activate cleanup/resume, extracted so run_recover re-drives the identical
+    # tail onto a rehydrated run root. stop_after="final-writer-manifest" stops inside the tail
+    # after the group-14 FWM accepted row.
+    return drive_forward_tail(
+        engine,
+        request,
+        manifest,
+        values,
+        quiesce_bytes,
+        run_id,
+        resource_manifest_paths,
+        marker_path,
+        ordinary,
+        d5,
+        include_fwm=True,
+        stop_after=stop_after,
+    )
+
+
+def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
+    """R5 Sub-round D — the RECOVER controller (orchestrator RULING 2, non-negotiable).
+
+    run_recover resumes an INTERRUPTED forward cutover from an EXISTING run root: unlike run_live
+    (which requires a fresh run root) it requires a NON-EMPTY durable journal, rehydrates it
+    through the same Engine, and re-drives the remaining forward tail so the completed journal is
+    the SAME byte/order twin of the composer's 76 rows an uninterrupted forward run would have
+    produced on that root (plus the RULING 1 post-activate cleanup+resume).
+
+    RULING 2 fixes the SUPPORTED resume set to exactly two clean checkpoints and makes every
+    other head a NAMED fail-closed refusal — never a heuristic/best-effort continuation:
+
+      * head == deploy.prepare/completed (the C7 planned-exit checkpoint)
+            -> continue the forward tail FROM group 14 (FWM) via drive_forward_tail.
+      * head == writers.resume.forward/accepted (the crash-after-FWM restart)
+            -> continue FROM group 15 (deploy.commit) via drive_forward_tail(include_fwm=False).
+      * ANY other durable head (including a mid-barrier partial that has not reached its clean
+        completed boundary — those route through the existing run_supervisor/resume_retained_chain
+        machinery, not run_recover) -> raise a NAMED LifecycleError naming phase/outcome/command.
+
+    Crash-anywhere idempotence is probed further at R8; an unsupported-but-real head surfacing
+    later is a normal finding, not a scope breach.
+    """
+    # R5-F PRE-FLIGHT (same exposure as run_live): recover from the C7 head drives the tail through
+    # activate then post-activate, so a production recover whose executor cannot run post-activate
+    # must fail closed BEFORE touching the run root, not after re-activating.
+    require_post_activate_executor(request, executor)
+    manifest = load_manifest()
+    run_root = pathlib.Path(request["run_root"])
+    require_lexical_absolute(run_root)
+
+    # Fail closed on an absent/empty durable journal BEFORE constructing the Engine (the opposite
+    # of run_live's fresh-root guard): recover has nothing to resume without durable rows.
+    journal_path = run_root / "phase.jsonl"
+    if not journal_path.exists():
+        raise LifecycleError("recover requires a non-empty durable journal")
+    journal_bytes = validate_regular_file(journal_path, mode=0o600)
+    lines = journal_bytes.splitlines()
+    if not lines:
+        raise LifecycleError("recover requires a non-empty durable journal")
+    durable_tail = json.loads(lines[-1])
+
+    # Restore the request-global resource-manifest pin from durable truth (like run_claim), so the
+    # Engine's stable-binding walk anchors row-0/row-last to the journal's own stepped domain
+    # rather than the fixture placeholder. The tail carries the targets step (or the genesis pin
+    # for a pre-pg.backup head), always a legal request-global value for the walk.
+    request["resource_manifest_sha256"] = durable_tail["resource_manifest_sha256"]
+
+    engine = Engine(request, executor)
+    if not engine.journal:
+        raise LifecycleError("recover requires a non-empty durable journal")
+
+    quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
+    require_lexical_absolute(quiesce_path)
+    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+        raise LifecycleError("recover quiesce manifest digest mismatch")
+    values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
+    run_id = str(uuid.UUID(request["run_id"]))
+    chains = request.get("chains") or {}
+
+    # Restore the in-memory stepped domains to the durable head so every resumed row carries the
+    # exact resource/quiesce values an uninterrupted run would have at this point (Engine.append
+    # reads current_*). __post_init__ already set resource from the (now durable-derived) request
+    # value; pin both explicitly from the head for clarity and future-proofing.
+    head = engine.journal[-1]
+    engine.current_resource_manifest_sha256 = head["resource_manifest_sha256"]
+    engine.current_quiesce_manifest_sha256 = head["quiesce_manifest_sha256"]
+
+    def d5(operation: str) -> None:
+        command = resolved_command(manifest, COMMANDS[operation], request)
+        chain = chains.get(operation) or default_joined_chain(operation)
+        engine.retained_chain(operation, chain, command, from_current_head=True)
+
+    def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
+        return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
+
+    # The forward run's out-of-band run-root artifacts are already durable on this root; recover
+    # reconstructs their paths for the output augmentation exactly as run_live emits them.
+    resource_manifest_paths = {
+        stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
+        for stage in ("genesis", "snapshot", "targets")
+    }
+    marker_path = str(engine.run_root / "quiesce-window-mode.json")
+
+    # DISPATCH on the durable head. Only the two RULING 2 checkpoints resume; everything else is a
+    # named fail-closed refusal (never heuristic continuation).
+    if head["command_id"] == "deploy.prepare" and head["outcome"] == "completed":
+        return drive_forward_tail(
+            engine, request, manifest, values, quiesce_bytes, run_id,
+            resource_manifest_paths, marker_path, ordinary, d5,
+            include_fwm=True,
+        )
+    if head["command_id"] == "writers.resume.forward" and head["outcome"] == "accepted":
+        return drive_forward_tail(
+            engine, request, manifest, values, quiesce_bytes, run_id,
+            resource_manifest_paths, marker_path, ordinary, d5,
+            include_fwm=False,
+        )
+    # RULING 2 option (a) requirement 1: a barrier head is resumed idempotently by the STANDALONE
+    # supervisor for that operation (resume_retained_chain), which recover deliberately leaves
+    # byte-untouched as the manual/recovery entrypoint. Point the operator at that exact command so
+    # the next step comes from the error text, not archaeology; recover then continues from the
+    # resulting supported head. (Whether that composition holds end-to-end is proven at R8's
+    # execution smoke + the server custody rehearsal, per the design §5.5 procedure.)
+    head_command = head["command_id"]
+    next_step = ""
+    if head_command.startswith("barrier."):
+        operation = head_command[len("barrier.") :]
+        if operation in OPERATIONS:
+            next_step = (
+                f"; re-run the standalone supervisor 'q12-live-cutover.sh {operation}' to resume "
+                "this barrier, then run recover"
+            )
+    raise LifecycleError(
+        "recover does not support resuming from "
+        f"phase={head['phase']} outcome={head['outcome']} command={head_command}{next_step}"
+    )
 
 
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
@@ -6330,6 +6704,20 @@ def parser() -> argparse.ArgumentParser:
     smoke.add_argument("action", choices=("observe",))
     smoke.add_argument("--run-id", required=True)
     smoke.add_argument("--observation-fixture", required=True)
+    # R5 Sub-round F — operator-reachable forward-cutover controllers. `live` drives a fresh
+    # forward cutover (run_live); `recover` resumes an interrupted one from an existing run root
+    # (run_recover). Both build the SAME production request as supervisor (run-root shape, canonical
+    # cutover.lock FD9 lease, production=True) plus the fields run_live/run_recover consume, so both
+    # subparsers carry the identical operator-supplied argv surface.
+    for name in ("live", "recover"):
+        controller = commands.add_parser(name)
+        controller.add_argument("--run-id", required=True)
+        controller.add_argument("--release-sha", required=True)
+        controller.add_argument("--operator-digest", required=True)
+        controller.add_argument("--resource-manifest-sha256", required=True)
+        controller.add_argument("--quiesce-manifest-sha256", required=True)
+        controller.add_argument("--expected-catalog-sha256", required=True)
+        controller.add_argument("--quiesce-manifest-path", required=True)
     return root
 
 
@@ -6385,6 +6773,39 @@ def main() -> int:
             "production": True,
         }
         output = run_supervisor(request, ProductionExecutor())
+        sys.stdout.buffer.write(complete_object(output))
+        return 0
+    if arguments.mode in ("live", "recover"):
+        # R5 Sub-round F: mirror the supervisor branch's production seam discipline (run-root shape
+        # /opt/megacampus/backups/q12/<run-id>, canonical parent cutover.lock inherited on FD9 under
+        # an exclusive flock, production=True) and add exactly the fields run_live/run_recover
+        # consume (quiesce manifest path/digest, expected catalog, release/operator identity).
+        run_root = pathlib.Path(f"/opt/megacampus/backups/q12/{arguments.run_id}")
+        ensure_directory(run_root)
+        lock_path = run_root.parent / "cutover.lock"
+        lease_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        if lease_fd != 9:
+            os.dup2(lease_fd, 9)
+            os.close(lease_fd)
+            lease_fd = 9
+        fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_stat = os.fstat(lease_fd)
+        request = {
+            "run_root": str(run_root),
+            "run_id": arguments.run_id,
+            "release_sha": arguments.release_sha,
+            "operator_digest": arguments.operator_digest,
+            "resource_manifest_sha256": arguments.resource_manifest_sha256,
+            "quiesce_manifest_sha256": arguments.quiesce_manifest_sha256,
+            "expected_catalog_sha256": arguments.expected_catalog_sha256,
+            "quiesce_manifest_path": arguments.quiesce_manifest_path,
+            "rotation_required": False,
+            "lease_fd": 9,
+            "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
+            "production": True,
+        }
+        controller = run_live if arguments.mode == "live" else run_recover
+        output = controller(request, ProductionExecutor())
         sys.stdout.buffer.write(complete_object(output))
         return 0
     output = run_claim(arguments, ProductionExecutor())
