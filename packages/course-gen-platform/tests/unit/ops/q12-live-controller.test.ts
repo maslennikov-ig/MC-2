@@ -123,6 +123,11 @@ function withParityExclusions(row: Record<string, unknown>): Record<string, unkn
   return rest;
 }
 
+// The forward cutover window is 76 journal rows ending at barrier.activate. Since R8-I-A the live
+// controller journals a 5-row guard_cleanup_complete/barrier.cleanup segment AFTER it (§6b.1); the
+// forward twin parity stays scoped to this 76-row PREFIX (§6a item 4 / §6b.3), never the full length.
+const FORWARD_PREFIX = 76;
+
 function resourceAt(rows: readonly Record<string, unknown>[], index: number): string {
   return String(rows[index].resource_manifest_sha256);
 }
@@ -448,7 +453,9 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final
     );
     expect(fwmIntentIndex).toBe(66); // row 67
     expect(fwmAcceptedIndex).toBe(67); // row 68
-    expect(live.journalEntries.length).toBe(76);
+    // Since R8-I-A the live journal continues past the 76-row forward window into the journaled
+    // cleanup segment; the FWM/deploy.commit/activate rows all live inside the untouched prefix.
+    expect(live.journalEntries.length).toBe(FORWARD_PREFIX + 5);
 
     // --- Part 1b: groups 15-16 — deploy.commit (rows 69-72) + barrier.activate (73-76) ---
     expect(live.journalEntries.slice(68, 76).map(r => [r.phase, r.outcome, r.command_id])).toEqual([
@@ -474,8 +481,9 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final
     );
 
     // --- Part 2: FULL-JOURNAL TWIN across all 76 forward rows, row-scoped exclusion on the
-    // FWM accepted row only (every other row keeps the closed 4-field blessed set). ---
-    expect(live.journalEntries.map(withParityExclusions)).toEqual(
+    // FWM accepted row only (every other row keeps the closed 4-field blessed set). The twin is
+    // scoped to the 76-row forward PREFIX (§6b.3); the cleanup segment has its own R8-I-A proof. ---
+    expect(live.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
       composer.journalEntries.map(withParityExclusions)
     );
 
@@ -579,11 +587,10 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round C: cutover-windo
     expect(marker.mode).toBe('cutover');
     expect(marker.run_id).toBe(runId);
 
-    // (c) parity-neutral: adding the marker write left the journal byte-identical to the
-    // composer — run_live still journals the full 76-row forward twin under the blessed
-    // exclusions, and the marker added no journal row.
-    expect(live.journalEntries.length).toBe(76);
-    expect(live.journalEntries.map(withParityExclusions)).toEqual(
+    // (c) parity-neutral: adding the marker write left the forward window byte-identical to the
+    // composer — run_live still journals the 76-row forward twin under the blessed exclusions, and
+    // the marker added no journal row (the cleanup segment after it is proven in the R8-I-A block).
+    expect(live.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
       composer.journalEntries.map(withParityExclusions)
     );
 
@@ -593,19 +600,18 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round C: cutover-windo
   });
 });
 
-// R5 Sub-round E (orchestrator RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY): the frozen
-// D5J §5 chronology ends at activate (76 journal rows) and the journal grammar has NO cleanup
-// command_id, so run_live adds NO journal row for the cleanup or the post-activate resume. After
-// the 76th row, run_live ORCHESTRATES — as children (fixture-seeded here; real docker/PG17 is
-// round R8) via an executor seam — (1) the barrier cleanup, which produces a v2
-// guard_cleanup_complete database-barrier receipt (+ probe receipt), and (2) the forward resume
-// child, which fail-closed VALIDATES that receipt and resumes writers. run_live does NOT
-// reimplement the receipt gate (it lives in the children); it INVOKES them and RECORDS their
-// outcomes on the result (operator-visible truth, since the cleanup is deliberately not in the
-// journal). The seeded receipt is shaped so the REAL q12-writer-resume.py forward gate
-// (:1088-1134) would accept it.
-describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate receipt-only cleanup + resume', () => {
-  it('records the post-activate v2 cleanup receipt + forward resume outcomes without adding a journal row', async () => {
+// R8-I-A (design §6b, RULING R8-A/R8-C, ratified 2026-07-18 — POST-ACTIVATE CLEANUP IS JOURNALED):
+// RULING 1's "receipt-only / no journal row after activate" (§6a item 5 / R5-E) is REVERSED for the
+// real path (§6a item 6). After barrier.activate (the 76th row) run_live now JOURNALS the frozen
+// barrier's 5-row guard_cleanup_complete/barrier.cleanup capability lifecycle (§6b.1), runs the
+// FROZEN q12-database-barrier.sh cleanup child FOR REAL against that journal (no real PG — the
+// barrier's own protected test mode, the same sandbox the R4-B/database-barrier rounds use),
+// promotes the archived v1 receipt to the exact 10-key v2 database-barrier-receipt/v2, deletes the
+// db capability, and binds the promoted digest in the terminal accepted row. The RESUME half stays
+// RECEIPT-ONLY — writers.resume.forward journals NO rows — now FROZEN-FORCED by the barrier's
+// tail-contiguity rule (q12-database-barrier.sh:511-513). The forward 76-row prefix is byte-unchanged.
+describe('Q12 live cutover controller (Task-9) — R8-I-A: journaled post-activate barrier.cleanup segment', () => {
+  it('journals the 5-row guard_cleanup_complete/barrier.cleanup lifecycle, runs the real frozen barrier cleanup child, and promotes the exact 10-key v2 receipt while keeping the 76-row prefix byte-unchanged', async () => {
     const quiesceRoot = root();
     const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
     const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
@@ -620,7 +626,46 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate
       quiesceManifestPath: quiescePath,
     });
 
-    // (a) run_live RECORDS the post-activate cleanup + resume outcomes with an ok/status each.
+    // (a) the 76-row FORWARD PREFIX stays a byte/order twin of the composer under the blessed
+    // exclusions — everything strictly AFTER the activate row is the only change (§6a item 6 scope
+    // guard). The composer twin ends at the 76th row; the live journal now continues past it.
+    expect(composer.journalEntries.length).toBe(FORWARD_PREFIX);
+    expect(live.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
+      composer.journalEntries.map(withParityExclusions)
+    );
+
+    // (b) exactly 5 journaled cleanup rows follow, all phase guard_cleanup_complete /
+    // command_id barrier.cleanup, in the §6b.1 order, and NOTHING else (the resume is receipt-only).
+    expect(live.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    const cleanupRows = live.journalEntries.slice(FORWARD_PREFIX);
+    expect(cleanupRows.map(r => [r.phase, r.outcome, r.command_id])).toEqual([
+      ['guard_cleanup_complete', 'intent', 'barrier.cleanup'],
+      ['guard_cleanup_complete', 'capability_issued', 'barrier.cleanup'],
+      ['guard_cleanup_complete', 'capability_claimed', 'barrier.cleanup'],
+      ['guard_cleanup_complete', 'capability_completed', 'barrier.cleanup'],
+      ['guard_cleanup_complete', 'accepted', 'barrier.cleanup'],
+    ]);
+    // intent carries NO capability (0×64, barrier :551); the issued/claimed/completed rows bind ONE
+    // real host capability; the accepted row binds the v2 database_barrier_receipt digest (§6b.1).
+    const zero = '0'.repeat(64);
+    expect(cleanupRows[0].capability_manifest_sha256).toBe(zero);
+    expect(cleanupRows[0].accepted_object_kind).toBe('none');
+    const capDigest = cleanupRows[1].capability_manifest_sha256 as string;
+    expect(capDigest).toMatch(/^[0-9a-f]{64}$/u);
+    expect(capDigest).not.toBe(zero);
+    for (const index of [2, 3, 4]) {
+      expect(cleanupRows[index].capability_manifest_sha256).toBe(capDigest);
+    }
+    for (const index of [1, 2, 3]) {
+      expect(cleanupRows[index].accepted_object_kind).toBe('none');
+      expect(cleanupRows[index].accepted_object_sha256).toBeNull();
+    }
+    // the terminal accepted row binds the promoted v2 receipt digest.
+    expect(cleanupRows[4].accepted_object_kind).toBe('database_barrier_receipt');
+    const acceptedDigest = cleanupRows[4].accepted_object_sha256 as string;
+    expect(acceptedDigest).toMatch(/^[0-9a-f]{64}$/u);
+
+    // (c) the post-activate result records the real cleanup + the receipt-only resume outcomes.
     expect(live.postActivate).toBeTruthy();
     const cleanup = live.postActivate!.cleanup;
     const resume = live.postActivate!.resume;
@@ -628,29 +673,19 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate
     expect(cleanup.ok).toBe(true);
     expect(resume.status).toBe('resumed');
     expect(resume.ok).toBe(true);
-
-    // the cleanup receipt sha256 is recorded (hex64) and the resume child validated EXACTLY that
-    // receipt (run_live's light orchestration join — NOT the receipt gate, which is the child's).
     const receiptSha = cleanup.cleanup_receipt_sha256 as string;
     expect(receiptSha).toMatch(/^[0-9a-f]{64}$/u);
+    // the accepted row binds EXACTLY the promoted v2 receipt digest, and the resume validated it.
+    expect(acceptedDigest).toBe(receiptSha);
     expect(resume.validated_receipt_sha256).toBe(receiptSha);
 
-    // (b) the recorded cleanup receipt is a v2 guard_cleanup_complete receipt shaped so the REAL
-    // q12-writer-resume.py forward branch (:1088-1104) would accept it: schema v2 + state +
-    // last_command=cleanup + rollback_probes_verified True + hex64 probe, run_id/expected/terminal
-    // bindings, zero_guard_residue + database_capability_deleted True.
+    // (d) the terminal_proof_sha256 in the v2 receipt is the digest of the REAL frozen barrier
+    // child's terminal proof (not a synthesized constant): the seam surfaces it and it is hex64.
+    expect(cleanup.terminal_proof_sha256).toMatch(/^[0-9a-f]{64}$/u);
+
+    // (e) the promoted receipt is the EXACT 10-key megacampus.q12.database-barrier-receipt/v2 the
+    // real forward resume gate requires key-for-key (q12-writer-resume.py:1090-1104).
     const receipt = cleanup.receipt as Record<string, unknown>;
-    expect(receipt.schema_version).toBe('megacampus.q12.database-barrier-receipt/v2');
-    expect(receipt.state).toBe('guard_cleanup_complete');
-    expect(receipt.last_command).toBe('cleanup');
-    expect(receipt.rollback_probes_verified).toBe(true);
-    expect(receipt.zero_guard_residue).toBe(true);
-    expect(receipt.database_capability_deleted).toBe(true);
-    expect(receipt.run_id).toBe(runId);
-    expect(receipt.probe_receipt_sha256).toMatch(/^[0-9a-f]{64}$/u);
-    expect(receipt.expected_catalog_sha256).toMatch(/^[0-9a-f]{64}$/u);
-    expect(receipt.terminal_proof_sha256).toMatch(/^[0-9a-f]{64}$/u);
-    // the exact v2 receipt key set the real gate's exact() enforces (no more, no less).
     expect(Object.keys(receipt).sort()).toEqual(
       [
         'database_capability_deleted',
@@ -665,9 +700,16 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate
         'zero_guard_residue',
       ].sort()
     );
+    expect(receipt.schema_version).toBe('megacampus.q12.database-barrier-receipt/v2');
+    expect(receipt.state).toBe('guard_cleanup_complete');
+    expect(receipt.last_command).toBe('cleanup');
+    expect(receipt.rollback_probes_verified).toBe(true);
+    expect(receipt.zero_guard_residue).toBe(true);
+    expect(receipt.database_capability_deleted).toBe(true);
+    expect(receipt.run_id).toBe(runId);
+    expect(receipt.terminal_proof_sha256).toBe(cleanup.terminal_proof_sha256);
 
-    // the receipt is a real 0400 artifact whose digest IS the recorded cleanup_receipt_sha256,
-    // and it is canonical bytes + newline (the real gate's canonical_json(barrier)+b"\n" check).
+    // (f) the v2 receipt is a real 0400 canonical artifact whose digest IS the accepted binding.
     const receiptPath = cleanup.cleanup_receipt_path as string;
     expect(receiptPath.endsWith('/database-barrier-receipt.json')).toBe(true);
     const receiptBytes = readFileSync(receiptPath);
@@ -675,29 +717,18 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate
     expect(statSync(receiptPath).mode & 0o777).toBe(0o400);
     expect(receiptBytes.toString('utf8')).toBe(`${canonical(receipt)}\n`);
 
-    // the probe receipt is a real 0400 artifact whose digest IS the receipt's probe binding
-    // (the real gate's probe_file.digest == barrier.probe_receipt_sha256 check).
-    const probePath = cleanup.probe_receipt_path as string;
-    expect(probePath.endsWith('/database-barrier-probe-receipt.json')).toBe(true);
-    const probeBytes = readFileSync(probePath);
-    expect(sha(probeBytes)).toBe(receipt.probe_receipt_sha256);
-    expect(statSync(probePath).mode & 0o777).toBe(0o400);
-    const probe = JSON.parse(probeBytes.toString('utf8')) as Record<string, unknown>;
-    expect(probe.schema_version).toBe('megacampus.q12.database-barrier-probes/v1');
-    expect(probe.run_id).toBe(runId);
-    expect(probe.expected_catalog_sha256).toBe(receipt.expected_catalog_sha256);
+    // (g) the activate v1 receipt was archived to database-barrier-receipt-v1-before-cleanup.json
+    // (0400), the frozen barrier's required predecessor archive (§6b.1, barrier :643).
+    const archivePath = cleanup.cleanup_receipt_archive_path as string;
+    expect(archivePath.endsWith('/database-barrier-receipt-v1-before-cleanup.json')).toBe(true);
+    expect(existsSync(archivePath)).toBe(true);
+    expect(statSync(archivePath).mode & 0o777).toBe(0o400);
 
-    // (c) PARITY-NEUTRAL: still exactly 76 rows and a full byte/order twin of the composer under
-    // the blessed/withParityExclusions helpers — the receipt-only cleanup/resume added NO journal
-    // row (the grammar has no cleanup/resume command_id).
-    expect(live.journalEntries.length).toBe(76);
-    expect(live.journalEntries.map(withParityExclusions)).toEqual(
-      composer.journalEntries.map(withParityExclusions)
-    );
-    for (const row of live.journalEntries) {
-      expect(row.command_id).not.toBe('cleanup');
+    // (h) the db capability lifecycle capability is durable in completed/ (the reconstructed
+    // cleanup capability class, extension b) — run_live's own final reload_durable already accepted
+    // the extended 81-row journal, so no chain/capability rejection remains.
+    for (const row of live.journalEntries.slice(0, FORWARD_PREFIX)) {
       expect(row.command_id).not.toBe('barrier.cleanup');
-      expect(row.command_id).not.toBe('writers.resume.forward.cleanup');
     }
   });
 });
@@ -785,8 +816,10 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
       runId,
       quiesceManifestPath: quiescePath,
     });
-    expect(recovered.journalEntries.length).toBe(76);
-    expect(recovered.journalEntries.map(withParityExclusions)).toEqual(
+    // Since R8-I-A a recovered run reproduces the 76-row forward twin (prefix, §6b.3) AND drives the
+    // journaled cleanup segment via the shared drive_forward_tail, so the completed journal is 81 rows.
+    expect(recovered.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    expect(recovered.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
       composer.journalEntries.map(withParityExclusions)
     );
 
@@ -835,8 +868,10 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
       runId,
       quiesceManifestPath: quiescePath,
     });
-    expect(recovered.journalEntries.length).toBe(76);
-    expect(recovered.journalEntries.map(withParityExclusions)).toEqual(
+    // Since R8-I-A a recovered run reproduces the 76-row forward twin (prefix, §6b.3) AND drives the
+    // journaled cleanup segment via the shared drive_forward_tail, so the completed journal is 81 rows.
+    expect(recovered.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    expect(recovered.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
       composer.journalEntries.map(withParityExclusions)
     );
     // resumed from group 15 (deploy.commit): the FWM prefix is preserved byte-for-byte.
@@ -888,14 +923,22 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     expect(emptyRefusal.ok).toBe(false);
     expect(emptyRefusal.error).toMatch(/recover requires a non-empty durable journal/u);
 
-    // --- a head PAST activate: a full uninterrupted forward run (76 rows) has nothing to resume. ---
+    // --- a head PAST activate: a full uninterrupted forward run now ends at the journaled cleanup
+    // segment (81 rows, head guard_cleanup_complete/accepted/barrier.cleanup). The R5 two-head recover
+    // DISPATCH is untouched in R8-I-A (the generalized Option A table is R8-I-B), so this head is
+    // still unsupported and fails closed — now naming the cleanup head. barrier.cleanup is NOT an
+    // OPERATIONS barrier, so there is no standalone-supervisor pointer for it (only barrier.<op> heads
+    // get one). ---
     const fullRoot = root();
     const full = await materializeLiveController({
       runRoot: fullRoot,
       runId,
       quiesceManifestPath: quiescePath,
     });
-    expect(full.journalEntries.length).toBe(76);
+    expect(full.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    const fullHead = full.journalEntries.at(-1)!;
+    expect(fullHead.command_id).toBe('barrier.cleanup');
+    expect(fullHead.outcome).toBe('accepted');
     const pastActivate = await runRecoverExpectingRefusal({
       runRoot: fullRoot,
       runId,
@@ -903,8 +946,9 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     });
     expect(pastActivate.ok).toBe(false);
     expect(pastActivate.error).toMatch(/recover does not support resuming from/u);
-    expect(pastActivate.error).toMatch(/command=barrier\.activate/u);
-    // barrier.activate => the pointer names the activate operation.
-    expect(pastActivate.error).toMatch(/q12-live-cutover\.sh activate/u);
+    expect(pastActivate.error).toMatch(/command=barrier\.cleanup/u);
+    expect(pastActivate.error).toMatch(/outcome=accepted/u);
+    // no OPERATIONS supervisor pointer for the non-barrier cleanup head.
+    expect(pastActivate.error).not.toMatch(/q12-live-cutover\.sh/u);
   });
 });
