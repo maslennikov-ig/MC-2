@@ -590,3 +590,112 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round C: cutover-windo
     expect(existsSync(live.quiesceWindowMarkerPath!)).toBe(true);
   });
 });
+
+// R5 Sub-round E (orchestrator RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY): the frozen
+// D5J §5 chronology ends at activate (76 journal rows) and the journal grammar has NO cleanup
+// command_id, so run_live adds NO journal row for the cleanup or the post-activate resume. After
+// the 76th row, run_live ORCHESTRATES — as children (fixture-seeded here; real docker/PG17 is
+// round R8) via an executor seam — (1) the barrier cleanup, which produces a v2
+// guard_cleanup_complete database-barrier receipt (+ probe receipt), and (2) the forward resume
+// child, which fail-closed VALIDATES that receipt and resumes writers. run_live does NOT
+// reimplement the receipt gate (it lives in the children); it INVOKES them and RECORDS their
+// outcomes on the result (operator-visible truth, since the cleanup is deliberately not in the
+// journal). The seeded receipt is shaped so the REAL q12-writer-resume.py forward gate
+// (:1088-1134) would accept it.
+describe('Q12 live cutover controller (Task-9) — R5 Sub-round E: post-activate receipt-only cleanup + resume', () => {
+  it('records the post-activate v2 cleanup receipt + forward resume outcomes without adding a journal row', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: quiesceRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const live = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+
+    // (a) run_live RECORDS the post-activate cleanup + resume outcomes with an ok/status each.
+    expect(live.postActivate).toBeTruthy();
+    const cleanup = live.postActivate!.cleanup;
+    const resume = live.postActivate!.resume;
+    expect(cleanup.status).toBe('guard_cleanup_complete');
+    expect(cleanup.ok).toBe(true);
+    expect(resume.status).toBe('resumed');
+    expect(resume.ok).toBe(true);
+
+    // the cleanup receipt sha256 is recorded (hex64) and the resume child validated EXACTLY that
+    // receipt (run_live's light orchestration join — NOT the receipt gate, which is the child's).
+    const receiptSha = cleanup.cleanup_receipt_sha256 as string;
+    expect(receiptSha).toMatch(/^[0-9a-f]{64}$/u);
+    expect(resume.validated_receipt_sha256).toBe(receiptSha);
+
+    // (b) the recorded cleanup receipt is a v2 guard_cleanup_complete receipt shaped so the REAL
+    // q12-writer-resume.py forward branch (:1088-1104) would accept it: schema v2 + state +
+    // last_command=cleanup + rollback_probes_verified True + hex64 probe, run_id/expected/terminal
+    // bindings, zero_guard_residue + database_capability_deleted True.
+    const receipt = cleanup.receipt as Record<string, unknown>;
+    expect(receipt.schema_version).toBe('megacampus.q12.database-barrier-receipt/v2');
+    expect(receipt.state).toBe('guard_cleanup_complete');
+    expect(receipt.last_command).toBe('cleanup');
+    expect(receipt.rollback_probes_verified).toBe(true);
+    expect(receipt.zero_guard_residue).toBe(true);
+    expect(receipt.database_capability_deleted).toBe(true);
+    expect(receipt.run_id).toBe(runId);
+    expect(receipt.probe_receipt_sha256).toMatch(/^[0-9a-f]{64}$/u);
+    expect(receipt.expected_catalog_sha256).toMatch(/^[0-9a-f]{64}$/u);
+    expect(receipt.terminal_proof_sha256).toMatch(/^[0-9a-f]{64}$/u);
+    // the exact v2 receipt key set the real gate's exact() enforces (no more, no less).
+    expect(Object.keys(receipt).sort()).toEqual(
+      [
+        'database_capability_deleted',
+        'expected_catalog_sha256',
+        'last_command',
+        'probe_receipt_sha256',
+        'rollback_probes_verified',
+        'run_id',
+        'schema_version',
+        'state',
+        'terminal_proof_sha256',
+        'zero_guard_residue',
+      ].sort()
+    );
+
+    // the receipt is a real 0400 artifact whose digest IS the recorded cleanup_receipt_sha256,
+    // and it is canonical bytes + newline (the real gate's canonical_json(barrier)+b"\n" check).
+    const receiptPath = cleanup.cleanup_receipt_path as string;
+    expect(receiptPath.endsWith('/database-barrier-receipt.json')).toBe(true);
+    const receiptBytes = readFileSync(receiptPath);
+    expect(sha(receiptBytes)).toBe(receiptSha);
+    expect(statSync(receiptPath).mode & 0o777).toBe(0o400);
+    expect(receiptBytes.toString('utf8')).toBe(`${canonical(receipt)}\n`);
+
+    // the probe receipt is a real 0400 artifact whose digest IS the receipt's probe binding
+    // (the real gate's probe_file.digest == barrier.probe_receipt_sha256 check).
+    const probePath = cleanup.probe_receipt_path as string;
+    expect(probePath.endsWith('/database-barrier-probe-receipt.json')).toBe(true);
+    const probeBytes = readFileSync(probePath);
+    expect(sha(probeBytes)).toBe(receipt.probe_receipt_sha256);
+    expect(statSync(probePath).mode & 0o777).toBe(0o400);
+    const probe = JSON.parse(probeBytes.toString('utf8')) as Record<string, unknown>;
+    expect(probe.schema_version).toBe('megacampus.q12.database-barrier-probes/v1');
+    expect(probe.run_id).toBe(runId);
+    expect(probe.expected_catalog_sha256).toBe(receipt.expected_catalog_sha256);
+
+    // (c) PARITY-NEUTRAL: still exactly 76 rows and a full byte/order twin of the composer under
+    // the blessed/withParityExclusions helpers — the receipt-only cleanup/resume added NO journal
+    // row (the grammar has no cleanup/resume command_id).
+    expect(live.journalEntries.length).toBe(76);
+    expect(live.journalEntries.map(withParityExclusions)).toEqual(
+      composer.journalEntries.map(withParityExclusions)
+    );
+    for (const row of live.journalEntries) {
+      expect(row.command_id).not.toBe('cleanup');
+      expect(row.command_id).not.toBe('barrier.cleanup');
+      expect(row.command_id).not.toBe('writers.resume.forward.cleanup');
+    }
+  });
+});

@@ -592,6 +592,14 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
    *  (<run-root>/quiesce-window-mode.json), the out-of-band signal the W-side
    *  q12-writer-resume.py window_is_cutover() consumes. Never a journal row (parity-neutral). */
   quiesceWindowMarkerPath: string | null;
+  /** R5 Sub-round E (RULING 1 — post-activate cleanup is RECEIPT-ONLY): the post-activate
+   *  cleanup + forward-resume outcomes run_live RECORDS after activate (after the 76th journal
+   *  row). The frozen §5 chronology ends at activate and the journal grammar has no cleanup
+   *  command_id, so this is NOT a journal row — it is operator-visible truth carried on the
+   *  result. `cleanup` carries the v2 `guard_cleanup_complete` database-barrier receipt (+ its
+   *  sha256 and the probe receipt digest); `resume` carries the forward writer-resume child's
+   *  fail-closed validation outcome. null when the executor exposes no post-activate seam. */
+  postActivate: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
 }> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
@@ -610,6 +618,7 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
     childExecutions?: number;
     forwardFinalWriterManifestPath?: string | null;
     quiesceWindowMarkerPath?: string | null;
+    postActivate?: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
   };
   return {
     journalEntries: output.journalEntries,
@@ -618,6 +627,7 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
     childExecutions: output.childExecutions ?? 0,
     forwardFinalWriterManifestPath: output.forwardFinalWriterManifestPath ?? null,
     quiesceWindowMarkerPath: output.quiesceWindowMarkerPath ?? null,
+    postActivate: output.postActivate ?? null,
   };
 }
 
