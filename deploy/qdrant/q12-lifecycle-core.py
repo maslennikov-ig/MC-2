@@ -3066,6 +3066,37 @@ def run_joined_composer(request: dict[str, Any], executor: Executor) -> dict[str
     return output
 
 
+def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
+    """Task-9 live cutover controller — the production twin of run_joined_composer.
+
+    Drives the real forward window through the SAME Engine and serializer/capability/
+    object/checkpoint primitives (amendment sections 7.6 and 10 parity duty; design
+    docs/superpowers/specs/2026-07-17-q12-live-controller-design.md). It journals the
+    ordinary command lifecycles with real run-input substitution values while the barrier
+    operations run as their own supervisor invocations against the same journal; the closed
+    composer remains the byte/order-parity oracle and this controller may not fork a second
+    authority. This revision journals amendment section 5 group 1 (the operator.self-check
+    genesis); later rounds extend the sequence.
+
+    The production run-root coupling is enforced by Engine.__post_init__ (production=True ->
+    /opt/megacampus/backups/q12/<run-id>; otherwise the /tmp fixture shape), so a production
+    request against a non-production root fails closed there.
+    """
+    manifest = load_manifest()
+    engine = Engine(request, executor)
+    if engine.journal:
+        raise LifecycleError("live composition requires a fresh run root")
+    # Amendment section 4 item 8: every row through quiesced/capability_completed binds 64
+    # zeroes for quiesce_manifest_sha256; the genesis precedes writers.quiesce, so bind ZERO.
+    engine.current_quiesce_manifest_sha256 = ZERO
+    # The genesis operator.self-check argv carries no extended placeholders, so its command
+    # binding comes only from the already-hashed run input (run-id / catalog-sha / release-sha);
+    # no resource-manifest-sourced value is consumed yet.
+    engine.append_ordinary_lifecycle(manifest, "operator.self-check", {})
+    engine.reload_durable()
+    return engine.output()
+
+
 def run_supervisor(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     validate_request(request)
     manifest = load_manifest()
