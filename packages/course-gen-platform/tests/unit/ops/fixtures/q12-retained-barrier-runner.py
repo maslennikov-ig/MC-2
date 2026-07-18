@@ -275,6 +275,29 @@ class NoIoExecutor:
         CORE.fsync_directory(checkpoint_path.parent)
 
 
+class LiveOrdinaryExecutor(NoIoExecutor):
+    """R4 Sub-round A: run_live-scoped ordinary-execution seam (no-I/O, real-shaped result).
+
+    Adds execute_ordinary ONLY on run_live's own executor — run_joined_fixture keeps the
+    plain NoIoExecutor (no execute_ordinary attribute), so the closed composer's ordinary
+    results stay the original "q12-joined-fixture" projection untouched. The result here is
+    real-shaped (same RESULT_KEYS, capability_sha256 bound to the row digest) and
+    deterministically distinct from that fixture tag, without ever touching the journal.
+    """
+
+    def execute_ordinary(self, command: dict[str, Any], capability: dict[str, Any]) -> dict[str, Any]:
+        self.child_executions += 1
+        run_id = capability["run_id"]
+        command_id = capability["command_id"]
+        return {
+            "schema_version": "megacampus.q12.retained-command-result/v1",
+            "command_id": command_id,
+            "capability_sha256": CORE.sha256(CORE.complete_object(capability)),
+            "result_sha256": CORE.sha256(f"q12-live-real-child:{command_id}:{run_id}".encode()),
+            "status": "accepted",
+        }
+
+
 class SandboxedDeployedWrapperExecutor(NoIoExecutor):
     """Runs the unmodified shell launcher; only its fixed child is sandbox-mounted."""
 
@@ -316,6 +339,22 @@ class SandboxedDeployedWrapperExecutor(NoIoExecutor):
         self.child_executions += int(bool(response["childExecuted"]))
         self.durable_reloads += 1
         return response
+
+
+class LiveSandboxedDeployedWrapperExecutor(SandboxedDeployedWrapperExecutor, LiveOrdinaryExecutor):
+    """R4 Sub-round B: run_live's in-process barrier claims (barrier.install, ...) cross the
+    REAL deployed q12-capability-run.sh wrapper (unmodified; only its DB-barrier child is
+    sandbox-faked) via SandboxedDeployedWrapperExecutor.launch_claim, while ordinary
+    lifecycles keep Sub-round A's LiveOrdinaryExecutor.execute_ordinary seam. Multiple
+    inheritance composes both without duplicating either method: MRO resolves launch_claim
+    from SandboxedDeployedWrapperExecutor and execute_ordinary from LiveOrdinaryExecutor, both
+    sharing NoIoExecutor's state. The barrier claim result lands ONLY in the per-barrier
+    retained-result side file (Engine.finish -> self.results), never the journal, so the
+    journal stays a byte/order twin of the closed composer regardless of which barrier
+    executor variant runs (design
+    docs/superpowers/specs/2026-07-17-q12-live-controller-design.md §3/§6.4; the real-DB
+    transition itself is a separate real-PG17 round — the DB-barrier child stays sandbox-faked
+    here)."""
 
 
 def write_audit(
@@ -573,7 +612,14 @@ def run_joined_fixture(spec: dict) -> int:
     return 0
 
 
-LIVE_SPEC_KEYS = {"runRoot", "liveController", "runId", "production", "quiesceManifestPath"}
+LIVE_SPEC_KEYS = {
+    "runRoot",
+    "liveController",
+    "runId",
+    "production",
+    "quiesceManifestPath",
+    "executeActualWrapper",
+}
 
 
 def quiesce_manifest_sha256_readonly(raw_path: Any) -> str:
@@ -638,7 +684,16 @@ def run_live_fixture(spec: dict) -> int:
         lease_fd = 9
     fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     lock_stat = os.fstat(lease_fd)
-    executor = NoIoExecutor()
+    # R4 Sub-round A: run_live gets the ordinary-execution seam; run_joined_fixture (the
+    # composer) keeps the plain NoIoExecutor above, so the seam never reaches the oracle.
+    # R4 Sub-round B: when executeActualWrapper is set, the barrier claims ALSO cross the
+    # real deployed q12-capability-run.sh wrapper (SandboxedDeployedWrapperExecutor), composed
+    # with the same ordinary-execution seam via LiveSandboxedDeployedWrapperExecutor.
+    executor = (
+        LiveSandboxedDeployedWrapperExecutor(root)
+        if spec.get("executeActualWrapper")
+        else LiveOrdinaryExecutor()
+    )
     executor.root = root
     expected_catalog = root / "expected-post-migration-catalog.json"
     if not expected_catalog.exists():
@@ -672,6 +727,7 @@ def run_live_fixture(spec: dict) -> int:
         write_audit(root, executor)
         print(str(error), file=sys.stderr)
         return 2
+    output["childExecutions"] = executor.child_executions
     write_audit(root, executor, output)
     sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
     return 0

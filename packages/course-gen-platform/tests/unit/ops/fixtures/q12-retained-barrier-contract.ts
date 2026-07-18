@@ -559,6 +559,14 @@ export interface LiveControllerFixtureSpec {
    * is identical across the two journals; the controller reads it read-only.
    */
   quiesceManifestPath?: string;
+  /**
+   * R4 Sub-round B: drive run_live's in-process barrier chain (barrier.install, ...) through
+   * the REAL deployed q12-capability-run.sh wrapper in a bwrap sandbox (only the DB-barrier
+   * child is sandbox-faked; the wrapper itself runs unmodified). Additive: without this flag
+   * run_live keeps Sub-round A's plain LiveOrdinaryExecutor. The executor audit
+   * (executor-audit.json in runRoot) reports `actualDeployedWrapper` when this is set.
+   */
+  executeActualWrapper?: boolean;
 }
 
 /**
@@ -571,6 +579,12 @@ export interface LiveControllerFixtureSpec {
 export async function materializeLiveController(spec: LiveControllerFixtureSpec): Promise<{
   journalEntries: Record<string, unknown>[];
   resourceManifestPaths: Record<string, string>;
+  /** R4 Sub-round A: run_live's per-ordinary-lifecycle side result file paths, keyed like
+   *  Engine.results (e.g. "ordinary:<command_id>:cutover"). */
+  resultPaths: Record<string, string>;
+  /** R4 Sub-round A: the run_live executor's real-child execution count (executor-audit.json
+   *  childExecutions), surfaced directly on the output for convenience. */
+  childExecutions: number;
 }> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
@@ -585,10 +599,14 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
   const output = JSON.parse(child.stdout) as {
     journalEntries: Record<string, unknown>[];
     resourceManifestPaths?: Record<string, string>;
+    resultPaths?: [string, string][];
+    childExecutions?: number;
   };
   return {
     journalEntries: output.journalEntries,
     resourceManifestPaths: output.resourceManifestPaths ?? {},
+    resultPaths: Object.fromEntries(output.resultPaths ?? []),
+    childExecutions: output.childExecutions ?? 0,
   };
 }
 

@@ -154,6 +154,38 @@ baseline.json` (or `verify-transition`) MUST PASS (`validateTransition`,
 
 ---
 
+## Pre-window gate — server-side full-path `run_live` rehearsal (NON-NEGOTIABLE, orchestrator-pinned 2026-07-18)
+
+The R4 acceptance (Sub-round C) proves the **real `barrier.install` transition passes the real
+`validateTransition`** by invoking the barrier directly against a disposable seeded container
+(ruling 1 option (b)) — it deliberately isolates the DB-transition claim from the uid-1000 /
+`/opt/megacampus` / canonical-lease **custody** machinery. Sub-round B proves the in-process
+barrier chain runs through the **real** `q12-capability-run.sh` wrapper no-docker
+(`SandboxedDeployedWrapperExecutor`/bwrap). Neither exercises the full uid-1000/`/opt`/lease
+custody path end-to-end — and that exact class of never-executed path burned this program four
+times (the plan-mode rehearsals #1–#13 exist for the same reason).
+
+**Therefore, before the cutover window opens, a server-side full-path `run_live` rehearsal is a
+hard gate (peer of R8, non-negotiable):**
+
+- Runs **on megacampus-prod as `claude-deploy` (uid/gid 1000 there)**, against a **real**
+  production-shaped run root `/opt/megacampus/backups/q12/<fresh-run-id>` and the canonical
+  `cutover.lock` (FD-9 lease), i.e. the exact identity/lease custody the disposable-container
+  CI test structurally cannot reproduce.
+- Drives the **real in-process `barrier.install`** (and as much of the retained_chain +
+  ordinary-execution + C7 planned-exit + `recover`-resume path as is safe) through `run_live`.
+- Executes only against a **DISPOSABLE seeded container source** (the full-Supabase seed shape),
+  **never the production database**; no prod mutation.
+- Closes the uid-1000/`/opt`/lease custody path for real — exactly as rehearsals #1–#13 closed
+  the plan path — and its evidence is a window-open precondition recorded in the C0 window
+  packet. Until it passes, the window MUST NOT open.
+
+This gate is server action and requires explicit current-task owner authorization at execution
+time (per the repo contract); it is authored here as a pinned plan requirement, not run by the
+local TDD rounds.
+
+---
+
 ## Verification contract (per round)
 
 - Real-PG17 suite green (disposable PG17), no-docker suite green (only the pre-existing
@@ -275,8 +307,170 @@ active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; c
   (`validate_stable_binding_walk:342-356`). Exclusion covers the byte value, never the
   stepping structure. Same principle for any future mode-divergent field.
 
+- **R4 Sub-round A done** (RED `a478a210` → GREEN `292d5177`). Added an injectable,
+  **parity-neutral** ordinary-execution seam: `append_ordinary_lifecycle` now delegates to an
+  optional `executor.execute_ordinary(command, capability)` hook when present, falling back to
+  the original hardcoded `"q12-joined-fixture"` result VERBATIM otherwise. Either branch's
+  result is written ONLY to the per-command side file
+  (`ordinary-command-result-<id>-cutover.json`) — the journal append, phase, capability digest,
+  checkpoint, and `accepted_object_sha256` are all untouched, so the journal stays byte/order
+  twin of the composer oracle regardless of which branch runs. A `LifecycleError` guards the
+  hook's `capability_sha256` against the row digest before the existing `RESULT_KEYS` shape
+  check. The seam is **run_live-scoped only**: a new `LiveOrdinaryExecutor(NoIoExecutor)`
+  fixture subclass adds `execute_ordinary` (real-shaped result, deterministic
+  `result_sha256 = sha256("q12-live-real-child:<command_id>:<run_id>")`,
+  `child_executions += 1`) and is wired ONLY into `run_live_fixture`; `run_joined_fixture` (the
+  composer) keeps the plain `NoIoExecutor`, so the closed composer's ordinary results stay
+  byte-identical to before this round. `materializeLiveController` additively exposes
+  `resultPaths` (`Engine.results`) and `childExecutions` (the run_live executor audit's
+  `child_executions`) for the new assertions. Verified: groups-1-13 journal twin still holds
+  under the blessed exclusion set; each ordinary side result file now carries the real-child
+  `result_sha256` (distinct from the composer's same-key side file); `childExecutions` == 16
+  (12 ordinary lifecycles via the new seam + 4 pre-existing D5 barrier-chain sandboxed claim
+  delegations through the C7 window — install/verify-after-base/verify-after-observability/
+  prepare-recovery — unrelated to this seam). All 301 composer/seam tests + the 3 R3
+  live-controller tests stay green; the new R4 assertion passes. tsc 0; frozen bytes
+  unchanged. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r4.md`.
+  - **Sub-round C (the NON-NEGOTIABLE real-PG17 `barrier.install`→`validateTransition`
+    positive, above) is PENDING two orchestrator rulings:** the CI identity strategy for the
+    real `barrier.install` run, and the OQ1 scope boundary. Not attempted in Sub-round A.
+  - **Two later-round pins carried from the W-amendment review**, recorded here for the future
+    live-quiesce/resume controller round: (1) `run_live` must write
+    `quiesce-window-mode.json` BEFORE `writers.quiesce` and keep it alive through
+    post-`activate` resume (marker-lifetime assertion); (2) a deferred P3 to consider deriving
+    resume-time mode from the immutable quiesce-manifest `barrier.state` instead of the mutable
+    marker, plus extra malformed-marker/reverse-flip negatives.
+
+- **R4 Sub-round B done** (RED `605d359b2` → GREEN `70ee913a4`), no-docker ORCHESTRATOR-REQUIRED
+  proof that `run_live`'s in-process barrier chain (`d5()` → `engine.retained_chain` →
+  `delegate_claim` → `executor.launch_claim`) drives the REAL deployed claim wrapper
+  `deploy/qdrant/q12-capability-run.sh` end to end — unmodified, run verbatim under `bwrap`,
+  with only its DB-barrier child (`q12-database-barrier.sh`) sandbox-faked (the real-PG17/DB
+  transition stays a separate later round). No production file changed: Sub-round A's finding
+  that the barrier claim path is already executor-injected meant only the fixture needed
+  wiring. `fixtures/q12-retained-barrier-runner.py` adds
+  `LiveSandboxedDeployedWrapperExecutor(SandboxedDeployedWrapperExecutor, LiveOrdinaryExecutor)`
+  (multiple inheritance composing the real-wrapper `launch_claim` with Sub-round A's
+  `execute_ordinary`, no duplicated method bodies) selected via a new
+  `executeActualWrapper?: boolean` on `LiveControllerFixtureSpec`
+  (`fixtures/q12-retained-barrier-contract.ts`, additive). `bwrap` (bubblewrap 0.11.1) was
+  already present and ran cleanly — no harness fix needed. Verified: groups-1-13 journal twin
+  still holds under the blessed exclusion set; `executor-audit.json` reports
+  `actualDeployedWrapper === true`; each of the 4 in-process barrier claims
+  (install/verify-after-base/verify-after-observability/prepare-recovery) produced a retained
+  barrier result through the real wrapper. Suites 303/303 (302 prior + 1 new); tsc 0; frozen
+  bytes unchanged. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r4.md` (Sub-round B
+  section added). Sub-round C (real-PG17 positive) remains PENDING the same two orchestrator
+  rulings — not attempted here.
+
+- **R4 Sub-round C done (validateTransition positive) — SANCTIONED HARD STOP, not a pass.**
+  RED-only (`test(q12): RED R4 Sub-round C real barrier install vs validateTransition`); no
+  GREEN commit exists because GREEN is unreachable without editing the frozen
+  `q12-database-barrier.sh` (out of scope). Built the full real-PG17 harness the round demanded:
+  a disposable, full-Supabase-shaped `postgres:17.10-bookworm` source (47 public / 22 auth / 5
+  named storage / 8 active `cron.job` / empty `net.http_request_queue`, real oids/owners queried
+  live for the 76-relation `guarded_relations` set, a programmatically derived
+  `--expected-catalog` that the UNMODIFIED barrier's frozen jq schema gate
+  (`q12-database-barrier.sh:362-413`) accepts), plus an unprivileged `unshare --user --mount
+--net` namespace scoped to just the `barrier.sh install` invocation (private loopback + a
+  namespace-local `/etc/hosts` override for the frozen production hostname — never the host's
+  real `/etc/hosts`), and a new `q12-pooler-identity-proxy.py` TLS front end that terminates the
+  barrier's mandatory SSLRequest/TLS handshake for that hostname and rewrites only the wire
+  StartupMessage's `user` field (pooler tenant name → the disposable source's real `postgres`
+  role, mirroring Supabase's own pooler), relaying every other byte unmodified into the
+  container via `docker exec` (control channel only, no host network route needed). Driving the
+  REAL, byte-verified barrier for real against real PostgreSQL 17.10 surfaced a genuine,
+  reproducible defect in the barrier's own frozen fresh-install ACL lockdown: its
+  `REVOKE ALL ON TYPE q12_guard.<name> FROM PUBLIC` loop iterates every `pg_type` row in the
+  `q12_guard` namespace with no `typtype`/`typelem` filter, including the four implicit array
+  types Postgres auto-creates alongside every base/composite type
+  (`_active_run`/`_baseline`/`_migration_guards`/`_probe`). PostgreSQL 17.10 categorically
+  refuses `GRANT`/`REVOKE` on array types (`cannot set privileges of array types` / "Set the
+  privileges of the element type instead", `aclchk.c ExecGrant_Type_check`), confirmed
+  independently and deterministically outside the harness too (`CREATE TABLE zzz_test(id int);
+REVOKE ALL ON TYPE _zzz_test FROM PUBLIC;` → the same error on a bare PG17.10 container). The
+  very first real fresh `install` therefore aborts mid-tx1 and rolls back cleanly (`q12_guard`
+  absent afterward; cron/read-only unchanged — no partial/corrupt state), so
+  `q12-source-manifest.ts capture` correctly reports `unexpected baseline-to-cutover delta:
+cron activity` (nothing transitioned). This is unavoidable without a frozen-byte edit to
+  `q12-database-barrier.sh`, which is out of scope for this stream (Option B: byte-untouched) —
+  a sanctioned hard stop per this round's own instructions, reported rather than hidden or
+  worked around by stubbing/weakening anything. New files:
+  `tests/unit/ops/q12-live-real-barrier-cutover.test.ts` (the RED positive test, gated
+  `MC2_Q12_REAL_PG17=1`), `tests/unit/ops/fixtures/q12-live-real-barrier-cutover-runner.py` (the
+  harness), `tests/unit/ops/fixtures/q12-pooler-identity-proxy.py` (the TLS+identity front end).
+  No production file changed. The 4-suite no-docker regression (`q12-live-controller` +
+  `q12-live-cutover` + `q12-retained-barrier-quiesce-seam` +
+  `q12-retained-barrier-w-composition-seam`) stays 303/303; `tsc --noEmit` = 0; frozen bytes
+  unchanged (`q12-command-manifest.json` `aaec6fc2…`, `q12-database-barrier.sh` `134255ce…`,
+  `q12-structural-catalog.sql` prefix `0b8a943f…`); zero leftover docker containers/networks/
+  volumes verified after every run. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r4.md` (Sub-round C section added). **R4 does
+  NOT close**: the plan's own text is explicit that "R4 cannot close without this end-to-end
+  baseline→real-install-cutover positive" — that positive is now proven blocked by a real
+  barrier defect, not by any harness gap, and fixing it requires an explicitly authorized,
+  separate round that touches the frozen barrier script.
+
+- **Frozen-barrier-fix round done (real barrier.install reaches `maintenance_guarded`
+  end-to-end).** The explicitly authorized round that edits `q12-database-barrier.sh` (the
+  frozen-byte constraint lifted for this stream only; cascade to the frozen-trio contract and
+  W-tuple field 4 is a separate, tracked follow-up, not executed here). Two rounds landed on
+  this branch: the ACL array-type fix (`c4c05d762`, `typcategory <> 'A'` at the four owner-only
+  scan/loop sites) and this round's catalog-fd-consumption + PG-dialect fixes. RED
+  (`test(q12): RED frozen-barrier-fix round`) extended the R4 Sub-round C harness (jobname
+  gap in the synthetic `cron.job` fixture — real Supabase `pg_cron` has a nullable `jobname`
+  column the barrier's install Node runner requires; the fixture's table lacked it) and
+  rewrote the acceptance to this round's actual mandate (barrier reaches `maintenance_guarded`
+  with an exact receipt + q12_guard install-surface proof, not the full R4
+  validateTransition chain, since `q12-source-manifest.ts` stays frozen/out of scope and has
+  its own known, separate, pre-existing 5-vs-10 q12_guard-function-set drift against the
+  barrier). GREEN (`fix(q12): barrier catalog-fd double-consumption + PG-dialect
+precedence/scalar fixes`) fixed: (1) the catalog-fd double consumption at
+  `q12-database-barrier.sh:361` — `expected_json="$(cat <&"$catalog_fd")"` consumed the shared
+  fd-13 open-file-description to EOF, so the install Node runner's later by-number
+  `fs.readFileSync(Number(catalogFd))` read landed at EOF and returned an empty string,
+  breaking the very first `current_setting('megacampus.q12_expected_catalog')::jsonb` cast in
+  tx1 with "invalid input syntax for type json" — fixed by reading via `/proc/self/fd/13`
+  (a fresh, independent file description) instead, matching the pattern already used at the
+  barrier's six other catalog reads; (2) an operator-precedence bug in
+  `verify_install_resume_state()`/the prepare-recovery readiness check (two sites): Postgres's
+  additive `-` binds tighter than `->`, so `saved->'database_settings' - 'setconfig'` parsed
+  as `saved -> ('database_settings' - 'setconfig')`, an ambiguous "unknown - unknown" operator
+  error between two untyped literals — fixed with explicit parens; (3) a missing scalar guard
+  in the same two expressions — `saved->'database_settings'` is the jsonb scalar `null` on a
+  database's very first install (no `pg_db_role_setting` row yet), and jsonb `-` refuses
+  scalars ("cannot delete from scalar") — fixed with a `jsonb_typeof(...)='object'` guard
+  mirroring the pattern already used three times in the same function. All three were latent
+  (never exercised until the ACL bug, then the fd bug, stopped masking them in turn) and are
+  execution-enabling, behavior-preserving PG-dialect/plumbing corrections — no validation
+  semantics, guard/type/count set, receipt shape, identity pin, or ACL policy changed. Verified
+  end-to-end on the real-PG17 harness: barrier rc==0; receipt
+  `{state:"maintenance_guarded", last_command:"install", rollback_probes_verified:false,
+probe_receipt_sha256:null}`; q12_guard schema present with its 4 tables + 10 functions +
+  1 event trigger; cron 0/8 active; `default_transaction_read_only`==on. The three original RED
+  modes (ACL loop abort, ACL residual `_active_run|0|USAGE`, fd-consumption empty-catalog JSON
+  error) were independently re-verified against isolated SQL/fd repros before the fixes landed.
+  No-docker suite 303/303; `tsc --noEmit` 0; `q12-command-manifest.json` `aaec6fc2…` and
+  `q12-structural-catalog.sql` `0b8a943f…` unchanged; zero leftover docker. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-barrier-pg17-acl-fix.md`. **Cascade
+  (not executed here, orchestrator's next step):** the final barrier sha256 replaces
+  `134255ce…` in the frozen-trio contract; the W-tuple field-4 `activation_barrier_sha256`
+  needs a Layer-1 amendment and fields 5-9 need a repro-tool re-run; a byte-verified server
+  reinstall is the team-lead's pre-window step. R4's full validateTransition chain (the
+  `q12-source-manifest.ts` function-set drift) remains open and untouched by this round.
+
 ## Open risks carried forward
 
+- **`q12-source-manifest.ts` q12_guard function-set drift (found this round, untouched).** The
+  tool's `validateExactGuardDelta` hardcodes a 5-function `q12_guard` allowlist
+  (`assert_capability, enforce_write_barrier, extend_guard, verify_capability,
+verify_expected_guards`); the real, current barrier installs 10 (adds
+  `assert_controller_binding, enforce_ddl_barrier, quiesce_client_backends,
+verify_activated_state, verify_install_resume_state`). This is why the real-PG17 harness's
+  diagnostic `capture` step still fails ("unexpected baseline-to-cutover delta: q12_guard
+  function set") even after the barrier reaches `maintenance_guarded`. `q12-source-manifest.ts`
+  is frozen/out of scope for the barrier-fix round; reconciling the allowlist is a separate,
+  explicitly-scoped future round (full R4 validateTransition closure).
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
   onward re-sequences (quiesce after `prepare-recovery`) and the D5J §5 chronology must be
   re-frozen first — a larger design-amendment stop. R1 and the parity harness are ruling

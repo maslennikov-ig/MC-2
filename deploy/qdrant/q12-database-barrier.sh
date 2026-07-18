@@ -358,7 +358,7 @@ if [[ $command_name == prepare-recovery ]]; then
     fail 'prepare-recovery requires the exact final verified migration receipt'
 fi
 
-expected_json="$(cat <&"$catalog_fd")"
+expected_json="$(cat "/proc/self/fd/$catalog_fd")"
 jq -e --arg schema "$EXPECTED_SCHEMA" '
   (keys | sort) == (["schema_version","database","database_owner","release_sha","migration_frontier","baseline_structural_sha256","expected_post_migration_catalog_sha256","inventory_counts","guarded_relations","cron_jobs","migrations"] | sort) and
   .schema_version == $schema and .database == "postgres" and .database_owner == "postgres" and
@@ -1248,7 +1248,7 @@ $STRUCTURAL_CATALOG_SQL
       WHERE n.nspname='q12_guard' AND (n.nspowner<>'postgres'::regrole OR acl.grantee<>n.nspowner))
     OR EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
       CROSS JOIN LATERAL aclexplode(COALESCE(t.typacl,acldefault('T',t.typowner))) acl
-      WHERE n.nspname='q12_guard' AND (t.typowner<>'postgres'::regrole OR acl.grantee<>t.typowner))
+      WHERE n.nspname='q12_guard' AND t.typcategory <> 'A' AND (t.typowner<>'postgres'::regrole OR acl.grantee<>t.typowner))
     OR (SELECT array_agg(t.typname::text ORDER BY t.typname::text) FROM pg_type t
       JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='q12_guard')
        IS DISTINCT FROM ARRAY['_active_run','_baseline','_migration_guards','_probe','active_run','baseline','migration_guards','probe']
@@ -1300,7 +1300,9 @@ BEGIN
     FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(current_database_setting->'setconfig')='array'
       THEN current_database_setting->'setconfig' ELSE '[]'::jsonb END) item(value)
     WHERE value NOT LIKE 'default_transaction_read_only=%';
-  IF (saved->'database_settings' - 'setconfig') IS DISTINCT FROM (current_database_setting - 'setconfig')
+  IF ((CASE WHEN jsonb_typeof(saved->'database_settings')='object' THEN saved->'database_settings' ELSE '{}'::jsonb END) - 'setconfig')
+       IS DISTINCT FROM
+     ((CASE WHEN jsonb_typeof(current_database_setting)='object' THEN current_database_setting ELSE '{}'::jsonb END) - 'setconfig')
     OR saved_other_settings IS DISTINCT FROM current_other_settings
     OR (current_default IS DISTINCT FROM saved->>'default_transaction_read_only'
       AND current_default IS DISTINCT FROM 'default_transaction_read_only=on')
@@ -1356,7 +1358,7 @@ BEGIN
           AND (namespace.nspowner<>'postgres'::regrole OR acl.grantee<>namespace.nspowner))
     OR EXISTS (SELECT 1 FROM pg_type type_object JOIN pg_namespace namespace ON namespace.oid=type_object.typnamespace
         CROSS JOIN LATERAL aclexplode(COALESCE(type_object.typacl,acldefault('T',type_object.typowner))) acl
-        WHERE namespace.nspname='q12_guard'
+        WHERE namespace.nspname='q12_guard' AND type_object.typcategory <> 'A'
           AND (type_object.typowner<>'postgres'::regrole OR acl.grantee<>type_object.typowner))
     OR COALESCE((SELECT array_agg(migration ORDER BY migration) FROM q12_guard.migration_guards),ARRAY[]::text[])
          IS DISTINCT FROM ARRAY['20260711140000','20260711151000']
@@ -1452,8 +1454,16 @@ BEGIN
     FOR grantee IN SELECT r.rolname FROM aclexplode(COALESCE(object.relacl,acldefault('r',object.relowner))) a JOIN pg_roles r ON r.oid=a.grantee WHERE a.grantee<>object.relowner
     LOOP EXECUTE format('REVOKE ALL ON TABLE q12_guard.%I FROM %I',object.relname,grantee); END LOOP;
   END LOOP;
+  -- PostgreSQL categorically refuses GRANT/REVOKE on array types ("cannot set
+  -- privileges of array types") and leaves an unset array typacl NULL, which
+  -- resolves via acldefault('T', typowner) to PUBLIC=USAGE for grantee 0 (not
+  -- the owner). PostgreSQL defines an array type's effective privileges as
+  -- following its element type, so an owner-only composite rowtype guarantees
+  -- its auto-generated array type carries no independently grantable ACL --
+  -- excluding typcategory='A' rows from these owner-only scans loses no ACL
+  -- guarantee.
   FOR object IN SELECT t.typname,t.typowner,t.typacl FROM pg_type t
-    JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='q12_guard'
+    JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='q12_guard' AND t.typcategory <> 'A'
   LOOP
     EXECUTE format('REVOKE ALL ON TYPE q12_guard.%I FROM PUBLIC',object.typname);
     FOR grantee IN SELECT r.rolname FROM aclexplode(COALESCE(object.typacl,acldefault('T',object.typowner))) a
@@ -1465,7 +1475,7 @@ BEGIN
     OR EXISTS (SELECT 1 FROM pg_namespace n CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.nspname='q12_guard' AND a.grantee<>n.nspowner)
     OR EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
       CROSS JOIN LATERAL aclexplode(COALESCE(t.typacl,acldefault('T',t.typowner))) a
-      WHERE n.nspname='q12_guard' AND a.grantee<>t.typowner)
+      WHERE n.nspname='q12_guard' AND t.typcategory <> 'A' AND a.grantee<>t.typowner)
   THEN RAISE EXCEPTION 'q12_guard ACL is not owner-only'; END IF;
   IF (SELECT array_agg(c.relname::text ORDER BY c.relname::text) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='q12_guard' AND c.relkind='r')
        IS DISTINCT FROM ARRAY['active_run','baseline','migration_guards','probe']
@@ -1602,7 +1612,9 @@ BEGIN
     FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(current_database_setting->'setconfig')='array'
       THEN current_database_setting->'setconfig' ELSE '[]'::jsonb END) item(value)
     WHERE value NOT LIKE 'default_transaction_read_only=%';
-  IF (saved->'database_settings' - 'setconfig') IS DISTINCT FROM (current_database_setting - 'setconfig')
+  IF ((CASE WHEN jsonb_typeof(saved->'database_settings')='object' THEN saved->'database_settings' ELSE '{}'::jsonb END) - 'setconfig')
+       IS DISTINCT FROM
+     ((CASE WHEN jsonb_typeof(current_database_setting)='object' THEN current_database_setting ELSE '{}'::jsonb END) - 'setconfig')
     OR saved_other_settings IS DISTINCT FROM current_other_settings
     OR current_default IS DISTINCT FROM 'default_transaction_read_only=on'
     OR (SELECT activated FROM q12_guard.active_run WHERE singleton)
