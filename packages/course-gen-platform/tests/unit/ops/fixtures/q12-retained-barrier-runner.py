@@ -1173,6 +1173,15 @@ RECOVER_SPEC_KEYS = {
     "executeActualWrapper",
 }
 
+SUPERVISOR_SPEC_KEYS = {
+    "runRoot",
+    "supervisorController",
+    "runId",
+    "operation",
+    "production",
+    "executeActualWrapper",
+}
+
 
 def quiesce_manifest_sha256_readonly(raw_path: Any) -> str:
     """Safely digest an absolute owner-only 0400 quiesce manifest.
@@ -1367,6 +1376,87 @@ def run_recover_fixture(spec: dict) -> int:
     return 0
 
 
+def run_supervisor_controller_fixture(spec: dict) -> int:
+    """R8-I-C (§6b.6): drive the STANDALONE SUPERVISOR (run_supervisor, the ``q12-live-cutover.sh
+    <op>`` path) on an EXISTING run root a prior ``run_live(barrierClaimCrash=<op>)`` left a mid-
+    ``barrier.<op>`` crash journal on (head = capability_claimed).
+
+    This is a SEPARATE process from the crashed run_live: the crash released the canonical lease when
+    it exited, so this reacquires it here (``run_supervisor`` sets ``lease_reacquired = new_session
+    and durable-journal``). ``run_supervisor`` sees the barrier's durable selector row and drives
+    ``resume_retained_chain``, which completes the crashed barrier to its ``barrier.<op>/completed``
+    head under ``cutover-recovery-1`` (recovery_reacquired + a second capability_claimed + completed),
+    superseding the pre-crash ``cutover`` capability — the two-process lease reacquisition pinned by
+    q12-live-cutover.test.ts:94-132.
+
+    The request's ``resource_manifest_sha256`` / ``quiesce_manifest_sha256`` are pinned from the
+    durable HEAD row (the crashed barrier's claimed row) so the appended recovery-shape rows carry the
+    SAME stepped-domain values as the pre-crash rows an uninterrupted twin carries at this barrier.
+    """
+    unknown = set(spec) - SUPERVISOR_SPEC_KEYS
+    if unknown:
+        raise RuntimeError(f"unknown supervisor fixture key: {sorted(unknown)}")
+    operation = spec["operation"]
+    if operation not in CORE.OPERATIONS:
+        raise RuntimeError(f"unknown supervisor operation: {operation}")
+    root = fixture_root(spec["runRoot"])
+    acquire_fixture_coordination_lock()
+    canonical_lock_path = root.parent / "cutover.lock"
+    if canonical_lock_path.exists():
+        canonical_lock_path.chmod(0o600)
+    lease_fd = os.open(canonical_lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    if lease_fd != 9:
+        os.dup2(lease_fd, 9)
+        os.close(lease_fd)
+        lease_fd = 9
+    fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lock_stat = os.fstat(lease_fd)
+    executor = (
+        LiveSandboxedDeployedWrapperExecutor(root)
+        if spec.get("executeActualWrapper")
+        else LiveOrdinaryExecutor()
+    )
+    executor.root = root
+    expected_catalog = root / "expected-post-migration-catalog.json"
+    if not expected_catalog.exists():
+        expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
+        expected_catalog.chmod(0o400)
+    # Pin resource/quiesce from the durable head (the crashed barrier's claimed row) so the
+    # supervisor's recovery rows carry the barrier's own stepped-domain values.
+    journal_path = root / "phase.jsonl"
+    lines = journal_path.read_bytes().splitlines()
+    if not lines:
+        raise RuntimeError("supervisor requires a non-empty durable journal")
+    head = json.loads(lines[-1])
+    request = {
+        "run_root": str(root),
+        "run_id": spec.get("runId") or derive_run_id(root),
+        "mode": "forward",
+        "completed": [],
+        "chains": {operation: CORE.default_joined_chain(operation)},
+        "release_sha": "0123456789abcdef0123456789abcdef01234567",
+        "operator_digest": "1" * 64,
+        "resource_manifest_sha256": head["resource_manifest_sha256"],
+        "quiesce_manifest_sha256": head["quiesce_manifest_sha256"],
+        "expected_catalog_sha256": CORE.sha256(expected_catalog.read_bytes()),
+        "rotation_required": False,
+        "lease_fd": 9,
+        "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
+    }
+    if spec.get("production") is True:
+        request["production"] = True
+    try:
+        output = run_supervisor(request, executor)
+    except Exception as error:  # noqa: BLE001 - fixture surfaces the message
+        write_audit(root, executor)
+        print(str(error), file=sys.stderr)
+        return 2
+    output["childExecutions"] = executor.child_executions
+    write_audit(root, executor, output)
+    sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
 def run_fwm_negative_fixture(spec: dict) -> int:
     """R5 Sub-round A negatives: publish_final_writer_manifest fail-closed proofs.
 
@@ -1466,6 +1556,8 @@ def main() -> int:
         return run_live_fixture(spec)
     if spec.get("recoverController"):
         return run_recover_fixture(spec)
+    if spec.get("supervisorController"):
+        return run_supervisor_controller_fixture(spec)
     if "joinedProfile" in spec:
         return run_joined_fixture(spec)
     root = fixture_root(spec["runRoot"])
