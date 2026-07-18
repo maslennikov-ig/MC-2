@@ -40,14 +40,22 @@ verification:
   - '`pnpm type-check` (canonical workspace gate, `pnpm -r type-check`): exit 0, before and after. (A bare, non-canonical `pnpm exec tsc --noEmit` at the repo root also picks up deploy/postgres/run-restore-cleanup.ts via a separate, non-package-scoped root tsconfig.json; that file has 4 pre-existing TS2722 errors, confirmed present with q12-source-manifest.ts fully reverted via `git stash`, i.e. unrelated to and unaffected by this round. q12-source-manifest.ts itself has zero errors under that config too.)'
   - 'Frozen bytes unchanged: q12-command-manifest.json sha256 aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841; q12-database-barrier.sh sha256 3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9; q12-structural-catalog.sql sha256 0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e. q12-writer-resume.py and source-recovery-run.sh untouched (git diff --stat empty).'
   - 'Zero leftover docker after every round (docker ps -a --filter name=mc2-q12 empty at each checkpoint and at final handoff).'
+  - 'DEFECT-4 FOLD-IN (same source-manifest round). RED (focused fixture, real PostgreSQL 17.10, no barrier): q12-cron-row-hash-normalization-runner.py flips ONLY cron.job.active (true->false) on a real seeded cron.job table and re-captures via the real, unmodified `q12-source-manifest.ts capture`; with the fix reverted (`git stash`), baseline row_sha256 `da72285063b793a44a5f899d8b30b5ef6414eda291d4e54c0f517f88396196f3` != sanctioned (active-only-flip) row_sha256 `2f84f332a4e7e873c665dcf445b71c12fae39c329b801d92d388b712824309eb` -- the exact defect, reproduced live.'
+  - 'GREEN (same focused fixture, fix applied): baseline row_sha256 `16c184f52590c81dd6e5485bbae1a6654523f4539fcd0515663a14637fd0e535` == sanctioned (active-only-flip) row_sha256 `16c184f52590c81dd6e5485bbae1a6654523f4539fcd0515663a14637fd0e535` -- identical. Official vitest run: `SUPABASE_URL=... SUPABASE_SERVICE_KEY=... MC2_Q12_REAL_PG17=1 pnpm exec vitest run --config vitest.config.unit.ts tests/unit/ops/q12-cron-row-hash-normalization.test.ts` -> 1 passed (1), 122.01s.'
+  - "MANDATORY TAMPER NEGATIVE (same run, fail-closed proof): after the SAME active flip, an additional REAL content mutation (`UPDATE cron.job SET command = command || ' -- tampered' WHERE jobid = 1`) still yields a DIFFERENT row_sha256 (`e42c5688c4227e6eb575f8a3caf9d1c584dbe8c0b3eca1cf37fc58fade6dd317`, distinct from both baseline and sanctioned) -- excluding `active` does not hide `command`/other-column tampering. Asserted in the same test file."
+  - 'STOP-AND-REPORT (7th, unrelated, out-of-scope defect surfaced by applying the defect-4 fix to the full C harness): re-running q12-live-real-barrier-cutover-runner.py (MC2_Q12_REAL_PG17=1) with the cron fix applied still yields `capture_rc=1`, `capture_stderr="source manifest failed: unexpected baseline-to-cutover delta"` (barrier_rc=0, receipt_state=maintenance_guarded, unchanged). A temporary, reverted reportManifestDiff probe confirmed the `relations` arrays are now SET-EQUAL (zero source-only/target-only entries -- the cron.job content mismatch is fully resolved) but the derived `relations_sha256` still differs (`a9cfe531...` vs `7c3e09c2...`), because it is order-sensitive while `relations` itself is compared as a set: baseline.relations keeps catalogSql()''s natural SQL order, but validateTransition''s own `cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the cutover view by `canonical()`-string `localeCompare` (content-driven, not schema/name) before becoming the final `cutover.relations`, so the two arrays are set-equal but sequence-different. This is a relations-ordering/hash-derivation defect in validateTransition itself, wholly unrelated to cron/active, and per the round''s own STOP condition it is reported here, NOT chased or fixed.'
+  - 'No-docker suites re-run with the final defect-4 fix in place (q12-live-controller + q12-live-cutover + retained-barrier-quiesce-seam + retained-barrier-w-composition-seam + q12-source-manifest-guard-surface): 305/305, unchanged. `pnpm exec tsc --noEmit -p packages/course-gen-platform` (canonical package-scoped invocation): exit 0. Frozen bytes re-confirmed unchanged (see hashes above); q12-writer-resume.py and source-recovery-run.sh untouched. Zero leftover docker confirmed after every defect-4 run.'
 changed_files:
   - deploy/postgres/q12-source-manifest.ts
   - packages/course-gen-platform/tests/unit/ops/q12-live-real-barrier-cutover.test.ts
   - packages/course-gen-platform/tests/unit/ops/q12-source-manifest-guard-surface.test.ts
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-source-manifest-guard-surface-positive.json
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-source-manifest-guard-surface-negative.json
+  - packages/course-gen-platform/tests/unit/ops/q12-cron-row-hash-normalization.test.ts
+  - packages/course-gen-platform/tests/unit/ops/fixtures/q12-cron-row-hash-normalization-runner.py
 explicit_defers:
-  - "cron.job row_sha256 baseline-vs-cutover drift (STOP-and-report above): validateTransition compares the `relations` section's authoritative row-content hash for cron.job without normalizing the barrier's legitimate cron-deactivation content change, the way it already normalizes the separate top-level cron_jobs summary array's `active` flag. This blocks true end-to-end real-capture GREEN (capture_rc=0) even after the guard-surface and UNION-truncation fixes. Out of scope for this round (not a q12_guard-surface question); needs its own semantics decision (what should row_sha256 compare against post-cutover?) and TDD round. Recommend a dedicated Beads issue."
+  - 'cron.job row_sha256 baseline-vs-cutover drift: FIXED in the defect-4 fold-in below (relationHash() now excludes ONLY the `active` column, ONLY for cron.job).'
+  - "NEW (defect-4 fold-in, 7th defect, STOP-and-report, NOT fixed): validateTransition's `relations_sha256` digest is order-sensitive while its own `relations` set-comparison is not -- baseline.relations keeps catalogSql()'s natural SQL order, but `cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the cutover view by a content-driven `canonical()`-string comparison (not schema/name) before it becomes the final `cutover.relations`, so a fully content-identical relation set can still produce a diverging `relations_sha256`. This is what now blocks true end-to-end `capture_rc=0` against a real barrier.install cutover (the cron.job content mismatch that previously masked it is fixed). Out of scope for this cron-scoped fold-in; needs its own TDD round (make `cutoverRelations`'/`relations_sha256`'s ordering basis consistent, or make `refreshDerivedHashes`'s digest order-independent). Recommend a dedicated Beads issue."
   - "The same bare-name/text UNION-type-resolution hazard this round fixed for q12_guard's object_owners/object_acls/comments/security_labels branches is a general correctness risk for catalogSql()'s coverage of the REAL production schemas (public/auth/storage/cron/net) too -- any sufficiently long function identity, or any future PostgreSQL version/schema shape where a comment/security-label row's identity exceeds 63 bytes, would silently truncate the same way. This round's ::text casts close the concrete, evidenced case (q12_guard); a broader audit of catalogSql() for the same hazard on non-q12_guard schemas was not performed here (out of scope: the mandate was the q12_guard-surface allowlist) and is worth a follow-up sweep."
 ---
 
@@ -96,13 +104,13 @@ against the barrier's real CREATE bytes — see provenance table below):
   correct; no changes needed (see provenance table).
 - **ACL exact-set** (found necessary for GREEN, derived unambiguously from
   the barrier's own bytes and from real PostgreSQL 17 ACL-materialization
-  behavior, not guessed): (1) every real q12_guard ACL row observed
+  behavior, not guessed): (1) every real q12*guard ACL row observed
   `is_grantable=false`, not the previously-assumed `true`; (2) PostgreSQL 17
   added the `MAINTAIN` table privilege, so each of the 4 guard tables now
   carries 8 ACL rows, not 7; (3) the 4 implicit array types
   (`_active_run`/`_baseline`/`_migration_guards`/`_probe`) keep an
   un-revocable default `PUBLIC USAGE` grant because PostgreSQL categorically
-  refuses `GRANT`/`REVOKE` on array types — this is the barrier's _own_,
+  refuses `GRANT`/`REVOKE` on array types — this is the barrier's \_own*,
   already-documented exemption (its ACL-lockdown loop and its own
   `verify_expected_guards` both exclude `typcategory='A'` for exactly this
   reason), now mirrored as an explicit, narrow, fail-closed exception in the
@@ -261,3 +269,131 @@ USAGE` exemption and corrected the `grantable` assumption (all
   verified via `pg_typeof` before/after against the real barrier-installed
   schema, but the orchestrator should review it with the same scrutiny as
   the allowlist changes.
+
+# Defect-4 fold-in (same source-manifest round)
+
+RATIFIED, tightly-bounded validation-semantics amendment: `relationHash()` in
+`deploy/postgres/q12-source-manifest.ts` now excludes ONLY the `active`
+column, ONLY for the pg_cron authoritative relation `cron.job`, when computing
+its RELATIONS-section `row_sha256`. `barrier.install` deactivates every cron
+job (`cron.job.active` true→false) as its own SANCTIONED maintenance delta;
+`validateTransition` already normalizes that exact delta at the top-level
+`cron_jobs` SUMMARY (its `exactField` set is
+`{jobid,username,command_sha256}` — no `active`). Before this fold-in, the
+separate RELATIONS-section row hash was NOT coherent with that same
+normalization: it hashed `to_jsonb(t)` over every `cron.job` column including
+`active`, so the identical sanctioned delta made baseline vs. cutover
+`row_sha256` diverge and `validateTransition` rejected an otherwise-legitimate
+cutover. This was the "STILL OPEN" defect this artifact's earlier section
+(above) explicitly deferred.
+
+## The fix
+
+```diff
+   const qualified = `"${schema.replaceAll('"', '""')}"."${relation.replaceAll('"', '""')}"`;
++  // barrier.install deactivates every cron job (cron.job.active true->false)
++  // as its own SANCTIONED maintenance delta; validateTransition already
++  // normalizes that exact delta at the top-level `cron_jobs` SUMMARY ...
++  const rowExpression =
++    schema === 'cron' && relation === 'job' ? `(to_jsonb(t) - 'active')` : 'to_jsonb(t)';
+   const sql = `${begin}
+ COPY (
+   SELECT jsonb_build_object(
+     'row_count', count(*)::text,
+-    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(to_jsonb(t)::text, E'\n' ORDER BY to_jsonb(t)::text), ''), 'UTF8'), 'sha256'), 'hex')
++    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(${rowExpression}::text, E'\n' ORDER BY ${rowExpression}::text), ''), 'UTF8'), 'sha256'), 'hex')
+   ) FROM ${qualified} t
+ ) TO STDOUT;
+ COMMIT;`;
+```
+
+Branch is exact-scoped (`schema === 'cron' && relation === 'job'`); every
+other relation's SQL is byte-identical to before; every other `cron.job`
+column (`jobid`, `schedule`, `command`, `nodename`, `nodeport`, `database`,
+`username`, `jobname`, …) stays fully hash-bound.
+
+## RED → GREEN → tamper-negative (focused fixture, real PostgreSQL 17.10)
+
+A NEW, focused, no-barrier real-PG17 fixture
+(`q12-cron-row-hash-normalization-runner.py` +
+`q12-cron-row-hash-normalization.test.ts`) drives the REAL, unmodified
+`q12-source-manifest.ts capture` command against a disposable source with a
+real `cron.job` table — deliberately NOT the full barrier harness, since the
+barrier's write-barrier trigger would otherwise need to be routed around to
+mutate `cron.job` post-install, and the full harness independently hits the
+unrelated 7th defect (below) that would otherwise obscure this fix's own
+proof. Three captures, each a fresh REPEATABLE READ snapshot after the prior
+mutation: baseline (active=true) → sanctioned (ONLY active flipped false) →
+tampered (sanctioned, PLUS a real `command` mutation on one row).
+
+- **RED** (fix reverted via `git stash`): `baseline.row_sha256` (
+  `da72285063b793a44a5f899d8b30b5ef6414eda291d4e54c0f517f88396196f3`) !=
+  `sanctioned.row_sha256` (
+  `2f84f332a4e7e873c665dcf445b71c12fae39c329b801d92d388b712824309eb`) — the
+  active-only flip alone changed the hash. Defect reproduced live.
+- **GREEN** (fix applied): `baseline.row_sha256` == `sanctioned.row_sha256`
+  == `16c184f52590c81dd6e5485bbae1a6654523f4539fcd0515663a14637fd0e535` —
+  identical. Official vitest acceptance:
+  `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=synthetic-test-key MC2_Q12_REAL_PG17=1 pnpm exec vitest run --config vitest.config.unit.ts tests/unit/ops/q12-cron-row-hash-normalization.test.ts`
+  → 1 passed (1), 122.01s.
+- **TAMPER NEGATIVE (mandatory, fail-closed)**: on top of the SAME active
+  flip, a real content mutation
+  (`UPDATE cron.job SET command = command || ' -- tampered' WHERE jobid = 1`)
+  yields `tampered.row_sha256` =
+  `e42c5688c4227e6eb575f8a3caf9d1c584dbe8c0b3eca1cf37fc58fade6dd317` —
+  distinct from BOTH `baseline` and `sanctioned`. Excluding `active` does not
+  hide `command` (or, by the same SQL mechanism, any other column) tampering.
+
+## STOP-and-report: a 7th, unrelated, out-of-scope defect
+
+Re-running the FULL R4 Sub-round C harness
+(`q12-live-real-barrier-cutover-runner.py`, real `barrier.install` against a
+disposable, full-Supabase-shaped source) with the defect-4 fix applied:
+`barrier_rc=0`, `receipt_state=maintenance_guarded` (unchanged), but
+`capture_rc` is STILL `1` — `capture_stderr = "source manifest failed:
+unexpected baseline-to-cutover delta"`.
+
+A temporary, reverted `reportManifestDiff` probe isolated this precisely: the
+`relations` arrays are now SET-EQUAL (zero source-only/target-only entries —
+the `cron.job` content mismatch this fold-in targeted is fully resolved), but
+the derived `relations_sha256` still diverges
+(`a9cfe5316185aa47c7c93ef9a325329984312e23546765c7b194f9dd50360c34` vs.
+`7c3e09c260d8ad6f5a03f8c74562610770139a617269c86f612fa11b0bccccb5`). Root
+cause: `relations_sha256` is order-sensitive (it hashes the canonical
+serialization of the array in its given sequence) while `relations` itself is
+compared by `validateTransition`'s set-based logic. `baseline.relations`
+keeps `catalogSql()`'s natural SQL order (`ORDER BY nspname, relname,
+relkind`, never resorted). `validateTransition`'s own
+`cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the
+CUTOVER view by `canonical()`-string `localeCompare` — a key-alphabetical,
+content-driven order (`acl` sorts first, not `schema`/`name`) — before the
+q12_guard filter, and that resorted order becomes the final
+`cutover.relations`. So the two views end up set-equal but
+sequence-different, and the order-sensitive digest diverges even though the
+content is byte-identical. This was never reached by any prior round because
+the (now-fixed) `cron.job` content mismatch always failed first and masked
+it.
+
+Per the round's explicit STOP condition, this is reported, NOT fixed: it is a
+relations-ordering/hash-derivation defect in `validateTransition` itself,
+wholly unrelated to `cron`/`active`, and chasing it would exceed this
+fold-in's tight cron-normalization scope.
+
+## Final verification (defect-4 fold-in)
+
+- No-docker suites (q12-live-controller + q12-live-cutover +
+  retained-barrier-quiesce-seam + retained-barrier-w-composition-seam +
+  q12-source-manifest-guard-surface): 305/305, unchanged.
+- New focused fixture (q12-cron-row-hash-normalization): 1/1.
+- `pnpm exec tsc --noEmit -p packages/course-gen-platform`: exit 0.
+- Frozen bytes unchanged: q12-command-manifest.json
+  `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`;
+  q12-database-barrier.sh
+  `3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9`;
+  q12-structural-catalog.sql
+  `0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e`.
+  q12-writer-resume.py and source-recovery-run.sh untouched.
+- Zero leftover docker after every run (`docker ps -a --filter name=mc2-q12`
+  empty at each checkpoint and at final handoff).
+- FINAL `deploy/postgres/q12-source-manifest.ts` sha256:
+  `9d098edc4f26aad71ee2bb6135fbd86371c378e888b25870c9c4af411f47e935`.

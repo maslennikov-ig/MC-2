@@ -91,6 +91,36 @@ import { describe, expect, it } from 'vitest';
 //      This is a cron-activation-state modeling gap, not a q12_guard-surface
 //      allowlist question, so it is out of scope for the guard-surface
 //      reconciliation round and is tracked as a distinct, deferred defect.
+//
+// UPDATE (defect-4 fold-in, same source-manifest round): the "STILL OPEN"
+// cron.job row_sha256 defect above is FIXED -- relationHash() now excludes
+// ONLY the `active` column, ONLY for the pg_cron authoritative relation
+// cron.job, so the SANCTIONED barrier.install active-flip no longer diverges
+// cron.job's row_sha256 between baseline and cutover (see the focused,
+// no-barrier real-PG17 proof in q12-cron-row-hash-normalization.test.ts /
+// fixtures/q12-cron-row-hash-normalization-runner.py: an active-only flip
+// leaves row_sha256 unchanged; a real command tamper on top of that same
+// flip still changes it -- fail-closed). Driving the REAL end-to-end capture
+// here (this test) with that fix applied surfaced a DIFFERENT, unrelated,
+// pre-existing defect (a 7th defect, STOP-and-report, NOT chased per the
+// defect-4 mandate's own scope boundary): with cron.job's row_sha256 now
+// matching (confirmed via a temporary reportManifestDiff probe -- the
+// `relations` arrays are set-equal, zero source-only/target-only entries),
+// capture STILL fails, now solely because the derived `relations_sha256`
+// digest is ORDER-sensitive while `relations` itself is not: baseline.relations
+// keeps catalogSql()'s natural SQL order (`ORDER BY nspname,relname,relkind`,
+// never reordered for the baseline view), but validateTransition's own
+// `cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the
+// CUTOVER view by `canonical()`-string `localeCompare` (a key-alphabetical,
+// content-driven order, not schema/name) before the q12_guard filter, and
+// that resorted order is what becomes the final `cutover.relations` — so the
+// two views' relation arrays are set-equal but sequence-different, and the
+// order-sensitive `relations_sha256` hash diverges even though the content is
+// identical. This was never reached by any prior round because the
+// (now-fixed) cron.job content mismatch always failed first and masked it.
+// This is a relations-ordering/hash-derivation defect in validateTransition
+// itself, wholly unrelated to cron/active and out of scope for this
+// tightly-bounded cron normalization; it is NOT fixed here.
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
