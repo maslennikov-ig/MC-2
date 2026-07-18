@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -531,5 +531,62 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final
     });
     expect(noTargets.ok).toBe(false);
     expect(noTargets.error).toMatch(/forward manifest requires target identities/u);
+  });
+});
+
+// R5 Sub-round C (design note docs/superpowers/specs/2026-07-17-q12-quiesce-window-mode-note.md
+// §57 "caller-declared run-root mode marker"): run_live writes the cutover-window marker the
+// W-side q12-writer-resume.py window_is_cutover() consumes OUT-OF-BAND. It is never a journal
+// row (parity-neutral), carries EXACTLY the three keys the consumer's exact() check requires
+// (schema_version/run_id/mode) with the required constants, is a 0400 artifact, and persists
+// through the whole forward window (present at post-activate). The SECOND observation point in
+// the marker-lifetime duty — "present before the group-3 writers.quiesce row" — needs a
+// run_live mid-run stop/checkpoint seam and is deferred to R5 Sub-round D (the C7-stop
+// machinery held for orchestrator ruling 2). The consumer-side malformed/missing/stray/wrong
+// run_id negatives are already owned by the W-amendment test (qdrant-source-recovery-runtime,
+// per the design note's recorded reviewer endorsement).
+describe('Q12 live cutover controller (Task-9) — R5 Sub-round C: cutover-window marker', () => {
+  it('writes the exact quiesce-window-mode.json cutover marker (0400), parity-neutral, present at post-activate', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: quiesceRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const live = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+
+    // (a) the marker path is surfaced and is the canonical run-root file name the consumer reads.
+    expect(live.quiesceWindowMarkerPath).toBeTruthy();
+    expect(live.quiesceWindowMarkerPath!.endsWith('/quiesce-window-mode.json')).toBe(true);
+
+    // (b) 0400, and EXACTLY the three keys window_is_cutover() requires (exact projection) with
+    // the consumer's required constants: schema pin, mode=cutover, and run_id === the run.
+    expect(statSync(live.quiesceWindowMarkerPath!).mode & 0o777).toBe(0o400);
+    const marker = JSON.parse(readFileSync(live.quiesceWindowMarkerPath!, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(marker).sort()).toEqual(['mode', 'run_id', 'schema_version']);
+    expect(marker.schema_version).toBe('megacampus.q12.quiesce-window-mode/v1');
+    expect(marker.mode).toBe('cutover');
+    expect(marker.run_id).toBe(runId);
+
+    // (c) parity-neutral: adding the marker write left the journal byte-identical to the
+    // composer — run_live still journals the full 76-row forward twin under the blessed
+    // exclusions, and the marker added no journal row.
+    expect(live.journalEntries.length).toBe(76);
+    expect(live.journalEntries.map(withParityExclusions)).toEqual(
+      composer.journalEntries.map(withParityExclusions)
+    );
+
+    // post-activate persistence: the marker survives the whole window (still present after the
+    // group-16 activate row, i.e. after run_live returns).
+    expect(existsSync(live.quiesceWindowMarkerPath!)).toBe(true);
   });
 });

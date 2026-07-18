@@ -588,6 +588,10 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
   /** R5 Sub-round A: run_live's forward final-writer manifest (FWM) artifact path, mirroring
    *  the composer's forwardFinalWriterManifestPath output augmentation. */
   forwardFinalWriterManifestPath: string | null;
+  /** R5 Sub-round C: run_live's caller-declared cutover-window marker path
+   *  (<run-root>/quiesce-window-mode.json), the out-of-band signal the W-side
+   *  q12-writer-resume.py window_is_cutover() consumes. Never a journal row (parity-neutral). */
+  quiesceWindowMarkerPath: string | null;
 }> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
@@ -605,6 +609,7 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
     resultPaths?: [string, string][];
     childExecutions?: number;
     forwardFinalWriterManifestPath?: string | null;
+    quiesceWindowMarkerPath?: string | null;
   };
   return {
     journalEntries: output.journalEntries,
@@ -612,6 +617,7 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
     resultPaths: Object.fromEntries(output.resultPaths ?? []),
     childExecutions: output.childExecutions ?? 0,
     forwardFinalWriterManifestPath: output.forwardFinalWriterManifestPath ?? null,
+    quiesceWindowMarkerPath: output.quiesceWindowMarkerPath ?? null,
   };
 }
 
