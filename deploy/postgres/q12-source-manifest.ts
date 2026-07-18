@@ -329,11 +329,26 @@ function relationHash(
     ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)};`
     : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;';
   const qualified = `"${schema.replaceAll('"', '""')}"."${relation.replaceAll('"', '""')}"`;
+  // barrier.install deactivates every cron job (cron.job.active true->false)
+  // as its own SANCTIONED maintenance delta; validateTransition already
+  // normalizes that exact delta at the top-level `cron_jobs` SUMMARY (its
+  // exactField set for each expected cron job is {jobid,username,
+  // command_sha256} -- no `active`). This relation-level row hash has to stay
+  // coherent with that same normalization, or the two projections disagree
+  // about whether one identical sanctioned delta is a violation. So, and
+  // ONLY for the pg_cron authoritative relation cron.job, the row hash is
+  // computed over every column EXCEPT `active`; every other cron.job column
+  // (jobid, schedule, command, nodename, nodeport, database, username,
+  // jobname, ...) stays fully hash-bound, `active` itself remains validated
+  // by the barrier (cron 0/8) plus the cron_jobs summary, and every other
+  // relation is completely unaffected by this branch.
+  const rowExpression =
+    schema === 'cron' && relation === 'job' ? `(to_jsonb(t) - 'active')` : 'to_jsonb(t)';
   const sql = `${begin}
 COPY (
   SELECT jsonb_build_object(
     'row_count', count(*)::text,
-    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(to_jsonb(t)::text, E'\\n' ORDER BY to_jsonb(t)::text), ''), 'UTF8'), 'sha256'), 'hex')
+    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(${rowExpression}::text, E'\\n' ORDER BY ${rowExpression}::text), ''), 'UTF8'), 'sha256'), 'hex')
   ) FROM ${qualified} t
 ) TO STDOUT;
 COMMIT;`;
