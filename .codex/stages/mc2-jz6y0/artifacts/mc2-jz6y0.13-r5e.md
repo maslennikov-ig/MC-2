@@ -65,6 +65,18 @@ explicit_defers:
     fail-closed receipt validation deliberately lives in the resume child (mirroring the W-owned
     q12-writer-resume.py boundary), per RULING 1 ("run_live does NOT reimplement the receipt
     gate"). No live-side negative re-implements the child''s validation.'
+  - 'P3 TEST-DOUBLE FIDELITY GAP (flagged for the R5 review; recorded during R5-F, no code change):
+    the R5-E FIXTURE resume validator ``LiveOrdinaryExecutor.execute_forward_resume``
+    (packages/course-gen-platform/tests/unit/ops/fixtures/q12-retained-barrier-runner.py:428-448)
+    validates the probe receipt''s exact key-set, schema_version, run_id, expected_catalog binding,
+    and completed_at format, but does NOT re-check the nested ``probes``/``residue`` VALUES against
+    the expected constants — the REAL W-owned gate DOES, at q12-writer-resume.py:1131-1134
+    (``probe["probes"] == expected_probes and probe["residue"] == expected_residue``). The real gate
+    is UNTOUCHED and the fixture producer ``execute_barrier_cleanup`` emits the correct nested
+    values, so no test currently exercises a wrong-nested-value receipt through the fixture double.
+    This is a fixture (test-double) fidelity gap only, not a product gate gap; the real forward
+    resume child at R8 carries the full nested-value equality. FLAGGED for the R5 review, not fixed
+    here (out of R5-F scope; W-owned file untouched).'
 ---
 
 # Summary

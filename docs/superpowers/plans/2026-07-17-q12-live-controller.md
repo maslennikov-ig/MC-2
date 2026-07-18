@@ -655,6 +655,45 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   closed on every other head including mid-barrier partials; deeper mid-barrier resume-and-proceed
   is deliberately NOT wired into `run_recover` this round (it remains the existing
   `resume_retained_chain` path). Crash-anywhere idempotence is probed further at R8.
+- **R5 Sub-round F done** (RED `9bcc3a38e` → GREEN `bb8f93679` → docs). Operator-reachable
+  `live`/`recover` CLI wiring. `q12-live-cutover.sh` now routes `$1 == live` → `mode=live` and
+  `$1 == recover` → `mode=recover` (a pure `elif` insertion before the existing closing `fi`; the
+  `plan`/`--plan` decision+action and the `mode=supervisor` default and the `exec` line are
+  byte-identical). `parser()` adds `live` + `recover` subparsers, each carrying the identical
+  operator argv both controllers consume: `--run-id`, `--release-sha`, `--operator-digest`,
+  `--resource-manifest-sha256`, `--quiesce-manifest-sha256`, `--expected-catalog-sha256`,
+  `--quiesce-manifest-path`. `main()` gains one `arguments.mode in ("live", "recover")` branch
+  (inserted before the `run_claim` fallthrough, so `plan`/`supervisor`/`claim`/`smoke` dispatch is
+  byte-unchanged) that mirrors the supervisor branch's production seam — run root
+  `/opt/megacampus/backups/q12/<run-id>`, canonical parent `cutover.lock` inherited on FD9 under an
+  exclusive `flock`, `production: True` — plus the `quiesce_manifest_path`/digest, expected catalog,
+  release/operator fields `run_live`/`run_recover` read, then dispatches
+  `controller = run_live if mode == "live" else run_recover` with `ProductionExecutor()`.
+  **SAFETY GATE (production-only):** `ProductionExecutor` does NOT yet expose the R8
+  `execute_barrier_cleanup`/`execute_forward_resume` hooks, and a production cutover that ACTIVATES
+  (76th row) and then silently skips the post-activate cleanup+resume would leave the paused writers
+  NEVER RESUMED. So `orchestrate_post_activate_cleanup` now FAILS CLOSED with a NAMED
+  `LifecycleError("post-activate cleanup/resume executor not wired (deferred to R8)")` when the
+  hooks are absent AND `request.get("production") is True`; the non-production fixture path
+  (hooks present, or absent → `None`) is unchanged, so all R5-E tests stay green. `recover` reuses
+  the same post-activate path via `drive_forward_tail`, so the gate protects it too. This makes the
+  R5-F CLI a real, safe routing skeleton that fails closed until R8 wires the children, not a silent
+  half-cutover. Tests (new focused file `q12-live-cutover-cli.test.ts`, since
+  `q12-live-cutover.test.ts` is at the 1500-line eslint cap): shell routing (`live`/`recover`/`plan
+--help` through the real shell exit 0 in argparse before `main()` touches `/opt/megacampus`, and
+  the `plan`/`supervisor` source bytes are asserted verbatim); argparse subparsers exist + unknown
+  mode errors; `main()` dispatch structure (source) routes live→run_live / recover→run_recover
+  through the production seam with plan/supervisor/claim/smoke unchanged; and the production
+  fail-closed gate proven at the exact `orchestrate_post_activate_cleanup` seam both controllers
+  funnel through (the `/opt/megacampus` production root is not writable in CI, so the gate is tested
+  at the seam, not via a full production cutover). `q12-live-cutover-cli.test.ts` 6/6; the required
+  4-suite set + `q12-live-cutover-cli` + shell-driving `q12-command-manifest`/`q12-migration-plan`
+  ran 386/386 (12 skipped); `tsc --noEmit` 0; frozen bytes unchanged
+  (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched; core+shell diff is purely
+  additive (zero deletions). Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5f.md`.
+  **Deferred (flagged):** the real docker/PG17 post-activate `execute_barrier_cleanup` +
+  `execute_forward_resume` hooks on `ProductionExecutor` remain round R8; until then a production
+  `live`/`recover` correctly fails closed at the post-activate boundary rather than half-cutting.
 
 ## Open risks carried forward
 
