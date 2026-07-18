@@ -45,6 +45,13 @@ verification:
   - "MANDATORY TAMPER NEGATIVE (same run, fail-closed proof): after the SAME active flip, an additional REAL content mutation (`UPDATE cron.job SET command = command || ' -- tampered' WHERE jobid = 1`) still yields a DIFFERENT row_sha256 (`e42c5688c4227e6eb575f8a3caf9d1c584dbe8c0b3eca1cf37fc58fade6dd317`, distinct from both baseline and sanctioned) -- excluding `active` does not hide `command`/other-column tampering. Asserted in the same test file."
   - 'STOP-AND-REPORT (7th, unrelated, out-of-scope defect surfaced by applying the defect-4 fix to the full C harness): re-running q12-live-real-barrier-cutover-runner.py (MC2_Q12_REAL_PG17=1) with the cron fix applied still yields `capture_rc=1`, `capture_stderr="source manifest failed: unexpected baseline-to-cutover delta"` (barrier_rc=0, receipt_state=maintenance_guarded, unchanged). A temporary, reverted reportManifestDiff probe confirmed the `relations` arrays are now SET-EQUAL (zero source-only/target-only entries -- the cron.job content mismatch is fully resolved) but the derived `relations_sha256` still differs (`a9cfe531...` vs `7c3e09c2...`), because it is order-sensitive while `relations` itself is compared as a set: baseline.relations keeps catalogSql()''s natural SQL order, but validateTransition''s own `cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the cutover view by `canonical()`-string `localeCompare` (content-driven, not schema/name) before becoming the final `cutover.relations`, so the two arrays are set-equal but sequence-different. This is a relations-ordering/hash-derivation defect in validateTransition itself, wholly unrelated to cron/active, and per the round''s own STOP condition it is reported here, NOT chased or fixed.'
   - 'No-docker suites re-run with the final defect-4 fix in place (q12-live-controller + q12-live-cutover + retained-barrier-quiesce-seam + retained-barrier-w-composition-seam + q12-source-manifest-guard-surface): 305/305, unchanged. `pnpm exec tsc --noEmit -p packages/course-gen-platform` (canonical package-scoped invocation): exit 0. Frozen bytes re-confirmed unchanged (see hashes above); q12-writer-resume.py and source-recovery-run.sh untouched. Zero leftover docker confirmed after every defect-4 run.'
+  - 'DEFECT-7 IN-ROUND FIX (same source-manifest round). RED (no-docker fixture, `q12-source-manifest-baseline-order-symmetry.test.ts` + its `-positive.json` fixture, fix reverted via `git stash` of `q12-source-manifest.ts` only): `verify-transition` against a fixture whose baseline `relations`/`schemas` are content-identical to cutover but listed in non-canonical (reverse-of-sorted) order fails closed with the generic `source manifest failed: unexpected baseline-to-cutover delta` (exit 1) -- the order-only defect, reproduced live without any barrier/docker involvement.'
+  - "GREEN (same fixture, fix applied): `verify-transition --manifest q12-source-manifest-baseline-order-symmetry-positive.json` -> `baseline-to-cutover transition equality passed` (exit 0). Real-PG17 end-to-end corroboration: driving the REAL `q12-live-real-barrier-cutover-runner.py` harness with the three-site fix applied, `barrier_rc=0`/`receipt_state=maintenance_guarded` unchanged; a temporary, reverted order-aware dump-and-diff probe (the tool's own `reportManifestDiff` cannot surface order-only divergences, since it treats arrays as sets) confirmed the three fixed sites (`relations`, `schemas`, `database.settings`) are fully order-normalized post-fix, with exactly ONE remaining divergence left in the whole manifest: the top-level `cron_jobs` array (see STOP-and-report below)."
+  - 'MANDATORY CONTENT-DIVERGENCE NEGATIVE (same fixture pair, fail-closed proof): `q12-source-manifest-baseline-order-symmetry-content-negative.json` -- identical order shuffle PLUS a genuine relation/schema `owner` content change -- still fails (`unexpected baseline-to-cutover delta`, exit 1) both with and without the fix. The symmetric sort reorders only; it does not mask real content deltas.'
+  - "database.settings site: NOT independently reproducible as a pass/fail fixture -- immediately after the sort, validateTransition unconditionally overwrites `cutoverDatabase.settings = structuredClone(baselineDatabase.settings)`, so cutover's settings array is always a literal clone of baseline's regardless of pre-sort order; the two can never diverge in sequence at the final comparison by construction. Asserted STRUCTURALLY instead (a dedicated no-docker unit test reads the tool's own source text and asserts the baseline sort line exists and runs strictly before the clone line), per this fix's own documented fallback for a site with no constructible functional case."
+  - 'STOP-AND-REPORT (an 8th, unrelated, out-of-scope defect surfaced by this same fix): re-running the FULL real-PG17 end-to-end harness with the three-site fix applied still yields `capture_rc=1`, `capture_stderr="source manifest failed: unexpected baseline-to-cutover delta"` (barrier_rc=0, receipt_state=maintenance_guarded, unchanged). The order-aware diagnostic probe isolated the SOLE remaining divergence to the top-level `cron_jobs` array: validateTransition''s own cron_jobs symmetric-sort idiom (`baselineJobs`/`cutoverJobs`, both `sortedArray()`''d) sorts BOTH sides as LOCAL variables for cardinality/normalization only, and reassigns `cutover.cron_jobs = normalizedCutoverJobs` (built from the sorted `cutoverJobs`), but never reassigns `baseline.cron_jobs` itself to the sorted `baselineJobs` order -- so `baseline.cron_jobs` keeps catalogSql()''s natural SQL capture order (ascending `jobid`) while `cutover.cron_jobs` ends up in `sortedArray()`''s canonical-string order, diverging at the final byte-strict comparison exactly like the three sites this round fixed. Confirmed live: a temporary, reverted diagnostic reassignment of `baseline.cron_jobs` to the sorted order, added ON TOP of the three-site fix, brought the REAL end-to-end capture to `capture_rc=0`. This is a 4th instance of the SAME order-symmetry defect class, at the exact site this round''s own mandate cited as already correct/symmetric -- a wrong premise in the diagnosis, not a new class of bug -- but per this round''s own explicit STOP condition ("do NOT chase beyond the three sort sites") it is reported here, NOT fixed: fixing it would mean editing a 4th site beyond the three pre-approved and reviewed here.'
+  - 'No-docker suites re-run with the defect-7 fix in place (q12-live-controller + q12-live-cutover + retained-barrier-quiesce-seam + retained-barrier-w-composition-seam + q12-source-manifest-guard-surface + q12-source-manifest-baseline-order-symmetry): 309/309 (305 previous + 4 new), unchanged/passing. `pnpm exec tsc --noEmit -p packages/course-gen-platform`: exit 0. Frozen bytes re-confirmed unchanged (see hashes above); q12-writer-resume.py and source-recovery-run.sh untouched. Zero leftover docker confirmed after every run (`docker ps -a --filter name=mc2-q12` empty at each checkpoint).'
+  - 'FINAL `deploy/postgres/q12-source-manifest.ts` sha256 (defect-7 fix): `bdf08ddef855c733eb4ba9dba431881df45912ebbc2e0b394dc05cde86815a80`.'
 changed_files:
   - deploy/postgres/q12-source-manifest.ts
   - packages/course-gen-platform/tests/unit/ops/q12-live-real-barrier-cutover.test.ts
@@ -53,9 +60,13 @@ changed_files:
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-source-manifest-guard-surface-negative.json
   - packages/course-gen-platform/tests/unit/ops/q12-cron-row-hash-normalization.test.ts
   - packages/course-gen-platform/tests/unit/ops/fixtures/q12-cron-row-hash-normalization-runner.py
+  - packages/course-gen-platform/tests/unit/ops/q12-source-manifest-baseline-order-symmetry.test.ts
+  - packages/course-gen-platform/tests/unit/ops/fixtures/q12-source-manifest-baseline-order-symmetry-positive.json
+  - packages/course-gen-platform/tests/unit/ops/fixtures/q12-source-manifest-baseline-order-symmetry-content-negative.json
 explicit_defers:
   - 'cron.job row_sha256 baseline-vs-cutover drift: FIXED in the defect-4 fold-in below (relationHash() now excludes ONLY the `active` column, ONLY for cron.job).'
-  - "NEW (defect-4 fold-in, 7th defect, STOP-and-report, NOT fixed): validateTransition's `relations_sha256` digest is order-sensitive while its own `relations` set-comparison is not -- baseline.relations keeps catalogSql()'s natural SQL order, but `cutoverRelations = sortedArray(cutover.relations, ...)` re-sorts the cutover view by a content-driven `canonical()`-string comparison (not schema/name) before it becomes the final `cutover.relations`, so a fully content-identical relation set can still produce a diverging `relations_sha256`. This is what now blocks true end-to-end `capture_rc=0` against a real barrier.install cutover (the cron.job content mismatch that previously masked it is fixed). Out of scope for this cron-scoped fold-in; needs its own TDD round (make `cutoverRelations`'/`relations_sha256`'s ordering basis consistent, or make `refreshDerivedHashes`'s digest order-independent). Recommend a dedicated Beads issue."
+  - "FIXED (defect-7 in-round fix, below): validateTransition's `relations_sha256`/`schemas_sha256` digests (and the full-object comparison for `database.settings`) were order-sensitive because only the CUTOVER projections were canonically sorted before comparison; baseline was never sorted the same way. Fixed by sorting the baseline counterpart at all three sites, mirroring the tool's own already-symmetric cron_jobs idiom."
+  - "NEW (defect-7 fold-in, 8th defect, STOP-and-report, NOT fixed): the tool's own cron_jobs symmetric-sort idiom sorts baselineJobs/cutoverJobs as LOCAL variables only and never reassigns baseline.cron_jobs to that sorted order (only cutover.cron_jobs is reassigned, to the sorted-then-normalized array), so baseline.cron_jobs vs cutover.cron_jobs still diverge in ORDER at the final byte-strict comparison -- a 4th instance of the same order-symmetry defect class, at a site this round's mandate incorrectly cited as already correct. This is what now blocks true end-to-end `capture_rc=0` against a real barrier.install cutover. Out of scope for this three-site-bounded round; needs its own TDD round (reassign `baseline.cron_jobs = baselineJobs` the same way `baseline.relations`/`baseline.schemas`/`baselineDatabase.settings` were reassigned here). Recommend a dedicated Beads issue."
   - "The same bare-name/text UNION-type-resolution hazard this round fixed for q12_guard's object_owners/object_acls/comments/security_labels branches is a general correctness risk for catalogSql()'s coverage of the REAL production schemas (public/auth/storage/cron/net) too -- any sufficiently long function identity, or any future PostgreSQL version/schema shape where a comment/security-label row's identity exceeds 63 bytes, would silently truncate the same way. This round's ::text casts close the concrete, evidenced case (q12_guard); a broader audit of catalogSql() for the same hazard on non-q12_guard schemas was not performed here (out of scope: the mandate was the q12_guard-surface allowlist) and is worth a follow-up sweep."
 ---
 
@@ -397,3 +408,146 @@ fold-in's tight cron-normalization scope.
   empty at each checkpoint and at final handoff).
 - FINAL `deploy/postgres/q12-source-manifest.ts` sha256:
   `9d098edc4f26aad71ee2bb6135fbd86371c378e888b25870c9c4af411f47e935`.
+
+# Defect-7 in-round bounded plumbing fix (same source-manifest round)
+
+RATIFIED, tightly-bounded, behavior-preserving coherence fix: `validateTransition()`
+in `deploy/postgres/q12-source-manifest.ts` sorted the CUTOVER projections of
+`database.settings`, `schemas`, and `relations` via the tool's own `sortedArray()`
+helper before the byte-strict final comparison, but never sorted the BASELINE
+counterpart the same way — baseline kept `catalogSql()`'s natural SQL capture
+order throughout. Since the final acceptance
+(`canonical(baseline) !== canonical(cutover)`) compares full arrays, not sets, a
+content-identical relation/schema set that merely differed in SEQUENCE between
+baseline and cutover spuriously failed. This mirrors the tool's own
+already-symmetric `cron_jobs` idiom (`baselineJobs`/`cutoverJobs`, both
+`sortedArray()`'d) at the three sites that were missing it.
+
+## The fix
+
+At each of the three sites, sort the baseline counterpart with the exact same
+`sortedArray()` call and label style already used for the cutover side, and
+reassign it, before the final `refreshDerivedHashes(baseline)`/comparison:
+
+```diff
++  baselineDatabase.settings = sortedArray(baselineDatabase.settings, 'baseline.database.settings');
+   cutoverDatabase.settings = structuredClone(baselineDatabase.settings);
+   cutoverDatabase.size_bytes = baselineDatabase.size_bytes;
+
+   const cutoverSchemas = sortedArray(cutover.schemas, 'cutover.schemas');
++  baseline.schemas = sortedArray(baseline.schemas, 'baseline.schemas');
+   const guardSchemas = cutoverSchemas.filter(...);
+   ...
+   const cutoverRelations = sortedArray(cutover.relations, 'cutover.relations');
++  baseline.relations = sortedArray(baseline.relations, 'baseline.relations');
+   const guardRelations = cutoverRelations.filter(...);
+```
+
+Nothing is added, removed, or reprojected: no filter, guard check, `exactField`,
+or the final byte-strict comparison itself changed — only the two baseline
+arrays are canonically reordered to match how their cutover counterparts were
+already being reordered.
+
+## RED -> GREEN (no-docker fixture)
+
+A new, self-contained, no-docker fixture pair
+(`q12-source-manifest-baseline-order-symmetry-positive.json` /
+`-content-negative.json`, built from the guard-surface fixture's real
+barrier-derived q12_guard scaffold plus two synthetic `public` relations/two
+synthetic schemas) drives the REAL, unmodified `verify-transition` CLI:
+
+- **RED** (fix reverted via `git stash -- deploy/postgres/q12-source-manifest.ts`):
+  the positive fixture (baseline `relations`/`schemas` content-identical to
+  cutover but listed in non-canonical, reverse-of-sorted order) fails —
+  `source manifest failed: unexpected baseline-to-cutover delta` (exit 1).
+- **GREEN** (fix applied): same fixture — `baseline-to-cutover transition
+equality passed` (exit 0).
+- **MANDATORY CONTENT-DIVERGENCE NEGATIVE**: the same order shuffle plus a
+  genuine `owner` content change on one relation and one schema still fails —
+  `unexpected baseline-to-cutover delta` (exit 1) — both with and without the
+  fix. The symmetric sort reorders only; it never masks a real content delta.
+- **`database.settings`**: not independently reproducible as a pass/fail
+  fixture (`cutoverDatabase.settings` is unconditionally overwritten with a
+  literal clone of `baselineDatabase.settings` immediately after the sort, so
+  the two can never diverge in sequence by construction). Asserted
+  STRUCTURALLY instead: a dedicated no-docker test reads the tool's own
+  source text and asserts the baseline sort line exists and precedes the
+  clone line.
+
+Official vitest run:
+`SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=synthetic-test-key pnpm exec vitest run --config vitest.config.unit.ts tests/unit/ops/q12-source-manifest-baseline-order-symmetry.test.ts`
+→ 4 passed (4).
+
+## Real-PG17 corroboration
+
+Driving the REAL `q12-live-real-barrier-cutover-runner.py` harness (real
+`barrier.install` against a disposable `postgres:17.10-bookworm` source) with
+the three-site fix applied: `barrier_rc=0`, `receipt_state=maintenance_guarded`
+(unchanged). A temporary, reverted order-aware dump-and-diff probe (the tool's
+own `reportManifestDiff` treats arrays as sets and so cannot surface an
+order-only divergence; a small standalone order-aware deep-diff script was used
+instead, then discarded) confirmed the three fixed sites (`relations`,
+`schemas`, `database.settings`) are now fully order-normalized between baseline
+and cutover — with exactly ONE remaining divergence left in the entire
+manifest: the top-level `cron_jobs` array.
+
+## STOP-and-report: an 8th, unrelated, out-of-scope defect
+
+Re-running the FULL real-PG17 end-to-end harness with the three-site fix
+applied: `capture_rc` is STILL `1` —
+`capture_stderr = "source manifest failed: unexpected baseline-to-cutover delta"`
+(`barrier_rc=0`, `receipt_state=maintenance_guarded`, unchanged).
+
+Root cause (confirmed via the order-aware probe): `validateTransition`'s own
+cron_jobs symmetric-sort idiom (`baselineJobs`/`cutoverJobs`, both
+`sortedArray()`'d, cited in this round's own mandate as "the tool's OWN correct
+idiom") sorts BOTH sides as LOCAL variables, used only for cardinality
+checking and to build `normalizedCutoverJobs` — but only `cutover.cron_jobs` is
+ever reassigned (`cutover.cron_jobs = normalizedCutoverJobs`, built from the
+sorted `cutoverJobs`). `baseline.cron_jobs` itself is never reassigned to the
+sorted `baselineJobs` order, so it keeps `catalogSql()`'s natural SQL capture
+order (ascending `jobid`), while `cutover.cron_jobs` ends up in
+`sortedArray()`'s canonical-string order — diverging at the final byte-strict
+comparison exactly like the three sites this round fixed.
+
+Confirmed live: a temporary, reverted diagnostic reassignment of
+`baseline.cron_jobs = baselineJobs` added ON TOP of the three-site fix brought
+the REAL end-to-end capture to `capture_rc=0`. This proves (a) the three-site
+fix is correct and complete for its own scope, and (b) the cron_jobs order gap
+is the SOLE remaining blocker to full end-to-end `capture_rc=0`.
+
+This is a 4th instance of the SAME order-symmetry defect class, but at a site
+this round's own mandate explicitly (and, it turns out, incorrectly) cited as
+already correct/symmetric — not a new defect class, but a wrong premise in the
+diagnosis. Per this round's own explicit STOP condition ("do NOT chase beyond
+the three sort sites"), it is reported here, NOT fixed: fixing it would mean
+editing a 4th site beyond the three pre-approved and reviewed in this round.
+Recommend a dedicated Beads issue and a follow-up TDD round scoped to
+reassigning `baseline.cron_jobs` the same way the three sites here were fixed.
+
+Since GREEN (real end-to-end `capture_rc=0`) was not reached, the C acceptance
+prerequisite this round targeted remains unmet; `q12-live-real-barrier-cutover.test.ts`'s
+header comment is updated to document this accurately (a new "UPDATE
+(defect-7 in-round bounded plumbing fix...)" section plus its own
+STOP-and-report), but its assertions are UNCHANGED — `capture_rc`/`capture_stderr`
+remain diagnostic-only, not asserted on, per the file's existing, unmodified
+scope note.
+
+## Final verification (defect-7 fix)
+
+- No-docker suites (q12-live-controller + q12-live-cutover +
+  retained-barrier-quiesce-seam + retained-barrier-w-composition-seam +
+  q12-source-manifest-guard-surface + q12-source-manifest-baseline-order-symmetry):
+  309/309 (305 previous + 4 new).
+- `pnpm exec tsc --noEmit -p packages/course-gen-platform`: exit 0.
+- Frozen bytes unchanged: q12-command-manifest.json
+  `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`;
+  q12-database-barrier.sh
+  `3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9`;
+  q12-structural-catalog.sql
+  `0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e`.
+  q12-writer-resume.py and source-recovery-run.sh untouched.
+- Zero leftover docker after every run (`docker ps -a --filter name=mc2-q12`
+  empty at each checkpoint and at final handoff).
+- FINAL `deploy/postgres/q12-source-manifest.ts` sha256:
+  `bdf08ddef855c733eb4ba9dba431881df45912ebbc2e0b394dc05cde86815a80`.
