@@ -341,6 +341,22 @@ class SandboxedDeployedWrapperExecutor(NoIoExecutor):
         return response
 
 
+class LiveSandboxedDeployedWrapperExecutor(SandboxedDeployedWrapperExecutor, LiveOrdinaryExecutor):
+    """R4 Sub-round B: run_live's in-process barrier claims (barrier.install, ...) cross the
+    REAL deployed q12-capability-run.sh wrapper (unmodified; only its DB-barrier child is
+    sandbox-faked) via SandboxedDeployedWrapperExecutor.launch_claim, while ordinary
+    lifecycles keep Sub-round A's LiveOrdinaryExecutor.execute_ordinary seam. Multiple
+    inheritance composes both without duplicating either method: MRO resolves launch_claim
+    from SandboxedDeployedWrapperExecutor and execute_ordinary from LiveOrdinaryExecutor, both
+    sharing NoIoExecutor's state. The barrier claim result lands ONLY in the per-barrier
+    retained-result side file (Engine.finish -> self.results), never the journal, so the
+    journal stays a byte/order twin of the closed composer regardless of which barrier
+    executor variant runs (design
+    docs/superpowers/specs/2026-07-17-q12-live-controller-design.md §3/§6.4; the real-DB
+    transition itself is a separate real-PG17 round — the DB-barrier child stays sandbox-faked
+    here)."""
+
+
 def write_audit(
     root: pathlib.Path, executor: NoIoExecutor, output: dict[str, Any] | None = None
 ) -> None:
@@ -596,7 +612,14 @@ def run_joined_fixture(spec: dict) -> int:
     return 0
 
 
-LIVE_SPEC_KEYS = {"runRoot", "liveController", "runId", "production", "quiesceManifestPath"}
+LIVE_SPEC_KEYS = {
+    "runRoot",
+    "liveController",
+    "runId",
+    "production",
+    "quiesceManifestPath",
+    "executeActualWrapper",
+}
 
 
 def quiesce_manifest_sha256_readonly(raw_path: Any) -> str:
@@ -663,7 +686,14 @@ def run_live_fixture(spec: dict) -> int:
     lock_stat = os.fstat(lease_fd)
     # R4 Sub-round A: run_live gets the ordinary-execution seam; run_joined_fixture (the
     # composer) keeps the plain NoIoExecutor above, so the seam never reaches the oracle.
-    executor = LiveOrdinaryExecutor()
+    # R4 Sub-round B: when executeActualWrapper is set, the barrier claims ALSO cross the
+    # real deployed q12-capability-run.sh wrapper (SandboxedDeployedWrapperExecutor), composed
+    # with the same ordinary-execution seam via LiveSandboxedDeployedWrapperExecutor.
+    executor = (
+        LiveSandboxedDeployedWrapperExecutor(root)
+        if spec.get("executeActualWrapper")
+        else LiveOrdinaryExecutor()
+    )
     executor.root = root
     expected_catalog = root / "expected-post-migration-catalog.json"
     if not expected_catalog.exists():

@@ -559,6 +559,14 @@ export interface LiveControllerFixtureSpec {
    * is identical across the two journals; the controller reads it read-only.
    */
   quiesceManifestPath?: string;
+  /**
+   * R4 Sub-round B: drive run_live's in-process barrier chain (barrier.install, ...) through
+   * the REAL deployed q12-capability-run.sh wrapper in a bwrap sandbox (only the DB-barrier
+   * child is sandbox-faked; the wrapper itself runs unmodified). Additive: without this flag
+   * run_live keeps Sub-round A's plain LiveOrdinaryExecutor. The executor audit
+   * (executor-audit.json in runRoot) reports `actualDeployedWrapper` when this is set.
+   */
+  executeActualWrapper?: boolean;
 }
 
 /**
