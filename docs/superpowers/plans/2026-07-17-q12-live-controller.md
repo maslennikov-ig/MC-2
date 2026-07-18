@@ -621,6 +621,40 @@ cleanup` emits a v2 `megacampus.q12.database-barrier-receipt/v2` `guard_cleanup_
 writers.resume.forward` are round R8 (this round seeds fixture children that emit/validate
   receipt-shaped artifacts); the full terminal-proof/baseline/archive file cross-checks beyond the
   receipt projection at `:1088-1134` also ride on R8's real gate.
+- **R5 Sub-round D done** (refactor `f41a20577` → RED `78e8d797e` → GREEN `320257631` → docs).
+  Orchestrator RULING 2 (RECOVER SCOPE) implemented as `run_recover(request, executor)`. First a
+  behavior-preserving refactor extracted `run_live`'s forward tail (§5 groups 14 FWM → 15
+  `deploy.commit` → 16 `activate` → `reload_durable` → output augmentation → RULING 1 post-activate)
+  into a reusable `drive_forward_tail(...)` plus a `finalize_forward_output(...)` projector, and
+  added an optional `request["stop_after"]` seam with three named checkpoints
+  (`"writers.quiesce.pre"` = stop after group 2 `barrier.install`, before the `writers.quiesce`
+  row; `"deploy.prepare"` = the C7 planned-exit head; `"final-writer-manifest"` = after the group-14
+  FWM accepted row). Absent `stop_after` reproduces the full 76-row window + post-activate
+  byte-for-byte; a stopped run returns its partial output and does NOT run post-activate.
+  `run_recover` requires a NON-EMPTY durable journal (the opposite of `run_live`'s fresh-root
+  guard), rehydrates it through the same `Engine`, restores the request-global resource pin from
+  the durable tail (like `run_claim`) and the stepped resource/quiesce domains from the head, then
+  DISPATCHES on the durable head: `deploy.prepare`/`completed` → `drive_forward_tail` from group 14;
+  `writers.resume.forward`/`accepted` → `drive_forward_tail(include_fwm=False)` from group 15; ANY
+  other head (incl. a mid-barrier partial — those route through the existing
+  `run_supervisor`/`resume_retained_chain` machinery, not `run_recover`) or an empty journal →
+  NAMED fail-closed `LifecycleError` naming phase/outcome/command, never a heuristic continuation.
+  A resumed run reproduces the SAME 76-row composer twin + post-activate an uninterrupted run would
+  have (proven by asserting `recovered.slice(0, prefix)` equals the stopped partial byte-for-byte
+  AND the full `withParityExclusions` twin). Tests: R5-C before-group-3 marker close (via
+  `stop_after="writers.quiesce.pre"`: the 0400 3-key `quiesce-window-mode.json` is present with NO
+  `writers.quiesce` row yet); recover-from-C7 and recover-from-crash-after-FWM to the 76-row twin +
+  `postActivate`; and NAMED fail-closed negatives (unsupported mid-forward head naming
+  `command=barrier.install`/`outcome=completed`/`phase=maintenance_guarded` with the durable journal
+  proven byte-unchanged, empty journal, and a head past activate naming `command=barrier.activate`).
+  `q12-live-controller.test.ts` 13/13; 4-suite regression 311/311; `tsc --noEmit` 0; frozen bytes
+  unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched; `run_joined_composer`
+  body byte-unchanged. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5d.md`.
+  **Scope note (flagged):** per RULING 2 (`recover supports resuming from exactly (a) and (b)`) +
+  the hard fail-closed requirement, `run_recover` supports ONLY the two clean checkpoints and fails
+  closed on every other head including mid-barrier partials; deeper mid-barrier resume-and-proceed
+  is deliberately NOT wired into `run_recover` this round (it remains the existing
+  `resume_retained_chain` path). Crash-anywhere idempotence is probed further at R8.
 
 ## Open risks carried forward
 
