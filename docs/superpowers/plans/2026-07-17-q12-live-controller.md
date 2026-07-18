@@ -783,6 +783,35 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
     trio sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The
     §6b.6 real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round covers the fixture leg.
 
+- **R8-I-C done** (RED → GREEN → docs; design §6b.6, ratified R8-C composed-recovery obligation). The
+  **composed mid-barrier recovery ACCEPTANCE PROBES** — one durable journal per barrier head class
+  (**install** group 2, **verify-after-base** group 7, **activate** group 16 → cleanup) proving the
+  §5.5 procedure converges end-to-end on a SINGLE journal. Each probe: (i) `run_live` uninterrupted →
+  the independent 81-row twin; (ii) fresh root, `run_live` crashes MID-`barrier.<op>` AT
+  `capability_claimed` (scoped `barrierClaimCrash` = `frontier_claim_command`/`claim-row` fault, ONLY
+  this barrier's delegated claim); (iii) `recover` FAILS CLOSED with the exact `q12-live-cutover.sh
+<op>` pointer + durable journal byte-unchanged; (iv) the STANDALONE supervisor (`supervisorController`
+  → `run_supervisor`/`resume_retained_chain`, a SEPARATE process reacquiring the released lease)
+  completes the barrier to `barrier.<op>/completed` under `cutover-recovery-1`, append-only; (v)
+  `recover` resumes the shared `drive_forward_sequence` from the next group to the full composed
+  journal (through activate + the post-activate cleanup segment). **The oracle is the DERIVED expected
+  journal** (uninterrupted twin + the recovery-shape insertion: keep the three pre-crash rows byte-as-
+  is, INSERT `recovery_reacquired` + a second `capability_claimed` under `cutover-recovery-1`, step the
+  `completed` row's `lease_epoch` to `cutover-recovery-1`), constructed IN THE TEST from the INDEPENDENT
+  twin + the pinned constants (`q12-live-cutover.test.ts:94-132` + `q12-database-barrier.sh:514-518`),
+  NEVER from the composed procedure. Equality is FULL row bytes under the existing exclusions only
+  (`lease_epoch` NOT excluded — asserted exactly) + explicit **+2 row-count arithmetic** (83 vs 81).
+  **Two found defects killed the earlier oracle candidates and are recorded in §6b.6 with provenance:
+  #11** (uninterrupted-equality unsatisfiable — two-process lease reacquisition, `q12-lifecycle-
+core.py:3922` + the pinned test) and **#12** (in-process `recoveryReissues=1` equality unsatisfiable
+  — `retained_chain:2258-2298` single-claim-under-recovery-epoch vs the append-only pre-crash claim).
+  **All 3 classes compose (composed == derived, +2); no divergence, no found defect this round.** NO
+  `run_live`/`run_joined_composer`/`retained_chain`/recover-dispatch/cleanup-grammar body change —
+  fixture/test/docs only; `q12-lifecycle-core.py` byte-untouched. `q12-live-controller.test.ts`
+  **23/23** (3 new R8-I-C probes); cross-fixture regression **460/460**; `tsc --noEmit` 0; frozen trio
+  sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The §6b.6
+  real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round delivers the fixture leg.
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface

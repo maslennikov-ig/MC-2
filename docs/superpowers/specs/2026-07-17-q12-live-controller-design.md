@@ -865,18 +865,66 @@ prose. Minimum coverage — **one probe per barrier head class**:
 2. **activate** (the last barrier, group 16 → the journaled post-activate cleanup segment, §6b.1).
 
 Each probe: drive `run_live` (fixture executors) to a full uninterrupted run and snapshot its durable
-journal as the **twin oracle**; then, on a fresh root, drive `run_live` with a mid-barrier crash for
-that op (leave the barrier claimed-but-not-completed); run the **standalone supervisor** for that op
-(`q12-live-cutover.sh <op>` → `run_supervisor`, idempotent `resume_retained_chain`) to complete the
-barrier to its `barrier.<op>/completed` head; then run `recover`, which per §6b.2 resumes
-`drive_forward_tail` from the next group (for `activate`, this drives the journaled cleanup segment).
-**Assert the resumed journal is byte/order-equivalent to the uninterrupted twin** (under the same
-blessed exclusions the R5 parity proof uses) — proving the composition converges (§6b.2 condition 3).
-Also assert the mid-lifecycle (claimed-but-not-completed) head, BEFORE the supervisor step, fails
-closed with the supervisor-pointer refusal. If any class does not compose end-to-end, that is a
-**found defect** to STOP-and-report before fixing (per the R8-C ruling), not a silent workaround. The
-real-PG17 leg of these probes (`MC2_Q12_REAL_PG17=1`) is the downstream R8-B/real-execution round;
-the fixture leg is required by THIS amendment's implementation.
+journal as the **independent twin**; then, on a fresh root, drive `run_live` with a mid-barrier crash
+for that op (leave the barrier claimed-but-not-completed); run the **standalone supervisor** for that
+op (`q12-live-cutover.sh <op>` → `run_supervisor`, idempotent `resume_retained_chain`) to complete the
+barrier to its `barrier.<op>/completed` head; then run `recover`, which per §6b.2 resumes the shared
+`drive_forward_sequence` from the next group (for `activate`, this drives the journaled cleanup
+segment). Also assert the mid-lifecycle (claimed-but-not-completed) head, BEFORE the supervisor step,
+fails closed with the supervisor-pointer refusal AND leaves the durable journal byte-unchanged.
+
+**The acceptance oracle is the DERIVED expected journal (condition 4 below is the SOLE primary
+oracle), NOT byte-equivalence to the uninterrupted twin.** Construct the expected journal IN THE TEST
+(never by running the composed procedure) as: the uninterrupted `run_live` twin, with — at the resumed
+barrier group ONLY — the ratified recovery-shape **INSERTION**: keep the pre-crash rows byte-as-is
+(`intent`/cutover, `capability_issued`/cutover, `capability_claimed`/cutover); INSERT
+`recovery_reacquired`/`cutover-recovery-1` + a SECOND `capability_claimed`/`cutover-recovery-1`
+immediately AFTER the pre-crash `capability_claimed/cutover`; the barrier's `completed` row's
+`lease_epoch` steps to `cutover-recovery-1`. Everything OUTSIDE that barrier group is byte/order-
+identical to the twin. Then assert:
+
+1. **Full-row-byte equality**: composed == derived, under the EXISTING field-level exclusions only
+   (`capability_manifest_sha256`, `entry_hash`, `previous_hash`, `resource_manifest_sha256` at its
+   established row scoping, the FWM/cleanup row-scoped `accepted_object_sha256`/`command_sha256`).
+   `lease_epoch` is **NOT** excluded — asserted exactly (cutover for pre-crash rows,
+   `cutover-recovery-1` for the inserted + completed rows; consecutive per the frozen grammar
+   `q12-database-barrier.sh:514-518`). The two INSERTED rows are asserted as FULL row shapes (phase,
+   outcome, command_id, command_sha256, epoch, accepted-object fields), not mere presence.
+2. **Explicit row-count arithmetic**: composed == uninterrupted + 2 per resumed barrier (83 vs 81 for
+   one resumed barrier).
+3. **Non-circularity** holds by construction: expected derives from the INDEPENDENT twin + the ratified
+   recovery-shape CONSTANTS (pinned by `q12-live-cutover.test.ts:94-132` + the frozen epoch grammar),
+   NEVER from running the composed procedure.
+
+> **⚠ PRE-MERGE REVIEWER FLAG (ratified design-text change, covered by the R8-C ruling).** The
+> acceptance-oracle wording above was CHANGED from "byte-equivalent to the uninterrupted twin" to the
+> derived-journal oracle. Two found defects made the prior oracle candidates unsatisfiable and are
+> recorded here with provenance:
+>
+> - **Found defect #11 — uninterrupted-equality is unsatisfiable.** The composed probe is a
+>   **two-process lease reacquisition**: the crash-at-`capability_claimed` `run_live` exits (releasing
+>   the canonical lease) and a SEPARATE `q12-live-cutover.sh <op>` supervisor process reacquires it
+>   (`q12-lifecycle-core.py:3922` sets `lease_reacquired = new_session and bool(engine.journal)`), so
+>   the resumed barrier completes under `cutover-recovery-1` with EXTRA rows (`recovery_reacquired` +
+>   a second `capability_claimed`) and can NEVER equal an uninterrupted twin. The two-process contract
+>   is pinned by `q12-live-cutover.test.ts:94-132`.
+> - **Found defect #12 — in-process-reissue-equality is unsatisfiable.** An in-process
+>   `recoveryReissues=1` twin (`retained_chain:2258-2298`) emits a SINGLE claim under the recovery
+>   epoch and never emits/preserves the pre-crash `capability_claimed/cutover` row, whereas the
+>   two-process crash-at-claimed preserves that pre-crash row append-only — so they differ by one row.
+>
+> The COMPOSITION is CORRECT (it matches the pinned two-process contract `q12-live-cutover.test.ts:94-132`);
+> only the oracle spec was corrected. No `run_live`/`run_joined_composer`/`retained_chain`/recover-
+> dispatch/cleanup-grammar body changed; the fixture leg is test/fixture/docs only.
+
+If any class does not compose end-to-end (composed ≠ derived), that is a **found defect** to
+STOP-and-report before fixing (per the R8-C ruling), not a silent workaround. The real-PG17 leg of
+these probes (`MC2_Q12_REAL_PG17=1`) is the downstream R8-B/real-execution round; the fixture leg is
+required by THIS amendment's implementation. **IMPLEMENTED R8-I-C** (fixture leg): the composed crash
+seam is the scoped `barrierClaimCrash` (`frontier_claim_command`/`frontier_claim_fault="claim-row"`),
+the standalone-supervisor step is the `supervisorController` fixture entrypoint
+(`run_supervisor_controller_fixture`), and the three probes + fail-closed legs live in
+`q12-live-controller.test.ts` (R8-I-C describe block).
 
 ## 7. Bounded implementation (see the companion plan)
 
