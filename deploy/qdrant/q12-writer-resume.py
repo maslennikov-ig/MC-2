@@ -220,6 +220,21 @@ def policy(value):
 def identity(writer):
     return {key: writer[key] for key in IDENTITY_KEYS}
 
+def window_is_cutover():
+    marker_path = os.path.join(run_root, "quiesce-window-mode.json")
+    if not os.path.lexists(marker_path):
+        return False
+    marker_file = Opened(marker_path, "quiesce window mode marker", 0o400)
+    marker = marker_file.json()
+    exact(marker, {"schema_version", "run_id", "mode"}, "quiesce window mode marker")
+    require(
+        marker["schema_version"] == "megacampus.q12.quiesce-window-mode/v1"
+        and marker["run_id"] == run_id
+        and marker["mode"] == "cutover",
+        "quiesce window mode marker is invalid",
+    )
+    return True
+
 def docker(*args, capture=True):
     result = subprocess.run([docker_bin, *args], text=True, stdout=subprocess.PIPE if capture else subprocess.DEVNULL, stderr=subprocess.PIPE, env=docker_environment, close_fds=True)
     if result.returncode != 0:
@@ -322,17 +337,30 @@ def run_quiesce():
         "expected_catalog_sha256", "last_command", "rollback_probes_verified",
         "probe_receipt_sha256",
     }, "database barrier receipt")
-    require(
-        barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v1"
-        and barrier["run_id"] == run_id
-        and barrier["state"] == "recovery_ready_guarded"
-        and barrier["zero_guard_residue"] is False
-        and barrier["last_command"] == "prepare-recovery"
-        and barrier["rollback_probes_verified"] is True
-        and hex64(barrier["expected_catalog_sha256"])
-        and hex64(barrier["probe_receipt_sha256"]),
-        "database barrier receipt is not quiesce-ready",
-    )
+    if window_is_cutover():
+        require(
+            barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v1"
+            and barrier["run_id"] == run_id
+            and barrier["state"] == "maintenance_guarded"
+            and barrier["zero_guard_residue"] is False
+            and barrier["last_command"] == "install"
+            and barrier["rollback_probes_verified"] is False
+            and barrier["probe_receipt_sha256"] is None
+            and hex64(barrier["expected_catalog_sha256"]),
+            "database barrier receipt is not cutover-quiesce-ready",
+        )
+    else:
+        require(
+            barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v1"
+            and barrier["run_id"] == run_id
+            and barrier["state"] == "recovery_ready_guarded"
+            and barrier["zero_guard_residue"] is False
+            and barrier["last_command"] == "prepare-recovery"
+            and barrier["rollback_probes_verified"] is True
+            and hex64(barrier["expected_catalog_sha256"])
+            and hex64(barrier["probe_receipt_sha256"]),
+            "database barrier receipt is not quiesce-ready",
+        )
     db_capability_path = os.path.join(run_root, "secrets", "db-capability")
     db_capability_stat = os.lstat(db_capability_path)
     require(
@@ -1243,9 +1271,23 @@ quiesce = quiesce_file.json()
 exact(quiesce, {"schema_version","run_id","status","barrier","writers"}, "writer quiesce manifest")
 require(quiesce["schema_version"] == "megacampus.q12.writer-quiesce/v1" and quiesce["run_id"] == run_id and quiesce["status"] == "quiesced" and isinstance(quiesce["writers"], list) and len(quiesce["writers"]) == 10, "writer quiesce manifest is invalid")
 exact(quiesce["barrier"], {"state","zero_guard_residue","expected_catalog_sha256","probe_receipt_sha256"}, "writer quiesce barrier")
-require(quiesce["barrier"]["state"] == "recovery_ready_guarded" and quiesce["barrier"]["zero_guard_residue"] is False and quiesce["barrier"]["expected_catalog_sha256"] == barrier["expected_catalog_sha256"] and hex64(quiesce["barrier"]["probe_receipt_sha256"]), "writer quiesce barrier binding is invalid")
-if mode == "forward":
-    require(quiesce["barrier"]["probe_receipt_sha256"] == barrier["probe_receipt_sha256"], "writer quiesce probe receipt binding is invalid")
+if window_is_cutover():
+    require(
+        quiesce["barrier"]["state"] == "maintenance_guarded"
+        and quiesce["barrier"]["zero_guard_residue"] is False
+        and quiesce["barrier"]["expected_catalog_sha256"] == barrier["expected_catalog_sha256"]
+        and quiesce["barrier"]["probe_receipt_sha256"] is None,
+        "writer quiesce barrier binding is invalid",
+    )
+    # forward: no probe-equality binding here by design — the group-3 cutover
+    # quiesce manifest cannot carry a probe receipt that does not exist yet.
+    # The resume-time probe receipt is still fully validated by the cleanup
+    # receipt's own checks (:1076 hex64+rollback_probes_verified, :1078 file
+    # digest match); see the amendment note and the artifact's Risks section.
+else:
+    require(quiesce["barrier"]["state"] == "recovery_ready_guarded" and quiesce["barrier"]["zero_guard_residue"] is False and quiesce["barrier"]["expected_catalog_sha256"] == barrier["expected_catalog_sha256"] and hex64(quiesce["barrier"]["probe_receipt_sha256"]), "writer quiesce barrier binding is invalid")
+    if mode == "forward":
+        require(quiesce["barrier"]["probe_receipt_sha256"] == barrier["probe_receipt_sha256"], "writer quiesce probe receipt binding is invalid")
 original = {}
 for item in quiesce["writers"]:
     exact(item, {"class","id","name","project","service","config_files","working_dir","image_id","image_ref","prior_running","prior_status","healthcheck_present","prior_health_status","prior_restart_policy","temporary_restart_policy"}, "quiesced writer")
