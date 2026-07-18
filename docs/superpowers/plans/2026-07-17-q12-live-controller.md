@@ -694,6 +694,19 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   **Deferred (flagged):** the real docker/PG17 post-activate `execute_barrier_cleanup` +
   `execute_forward_resume` hooks on `ProductionExecutor` remain round R8; until then a production
   `live`/`recover` correctly fails closed at the post-activate boundary rather than half-cutting.
+- **R5 Sub-round F fix — pre-flight gate placement** (RED `94645fdae` → GREEN `5d3bfdb80` → docs).
+  Orchestrator review found the fail-closed gate was RIGHT in direction but WRONG as the sole gate:
+  it fired inside `orchestrate_post_activate_cleanup`, i.e. AFTER the 76th row (`activate` — the
+  point of no return), so a production run would journal all the way through activate and only then
+  refuse, stranding an activated barrier with writers quiesced and post-activate unrun. Fix: a new
+  `require_post_activate_executor(request, executor)` runs as the FIRST statement of both `run_live`
+  and `run_recover` — before `Engine` construction / the genesis row / any run-root mutation — and
+  fails closed with the same named error when `production is True` and the executor lacks the R8
+  hooks, so the run NEVER STARTS. The original late gate is kept as defense-in-depth. Proven by a
+  Python probe: production `run_live`/`run_recover` + a hookless executor → the named refusal with a
+  COMPLETELY EMPTY run root (`list(root.iterdir()) == []` — no `phase.jsonl`, no capabilities dir),
+  and the pre-flight returns `None` for non-production. `q12-live-controller.test.ts` 13/13;
+  `q12-live-cutover-cli.test.ts` 7/7; `tsc` 0; frozen bytes intact; no W-owned file touched.
 - **R5 Sub-round D2 done** (RED `501fc065a` → GREEN `7f758c569` → docs). RULING-2 option (a)
   requirement 1: `run_recover`'s named fail-closed refusal for a mid-barrier (`barrier.<op>`) head
   now appends the actionable next step — `… ; re-run the standalone supervisor
