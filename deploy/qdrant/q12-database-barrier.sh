@@ -358,7 +358,7 @@ if [[ $command_name == prepare-recovery ]]; then
     fail 'prepare-recovery requires the exact final verified migration receipt'
 fi
 
-expected_json="$(cat <&"$catalog_fd")"
+expected_json="$(cat "/proc/self/fd/$catalog_fd")"
 jq -e --arg schema "$EXPECTED_SCHEMA" '
   (keys | sort) == (["schema_version","database","database_owner","release_sha","migration_frontier","baseline_structural_sha256","expected_post_migration_catalog_sha256","inventory_counts","guarded_relations","cron_jobs","migrations"] | sort) and
   .schema_version == $schema and .database == "postgres" and .database_owner == "postgres" and
@@ -1300,7 +1300,9 @@ BEGIN
     FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(current_database_setting->'setconfig')='array'
       THEN current_database_setting->'setconfig' ELSE '[]'::jsonb END) item(value)
     WHERE value NOT LIKE 'default_transaction_read_only=%';
-  IF (saved->'database_settings' - 'setconfig') IS DISTINCT FROM (current_database_setting - 'setconfig')
+  IF ((CASE WHEN jsonb_typeof(saved->'database_settings')='object' THEN saved->'database_settings' ELSE '{}'::jsonb END) - 'setconfig')
+       IS DISTINCT FROM
+     ((CASE WHEN jsonb_typeof(current_database_setting)='object' THEN current_database_setting ELSE '{}'::jsonb END) - 'setconfig')
     OR saved_other_settings IS DISTINCT FROM current_other_settings
     OR (current_default IS DISTINCT FROM saved->>'default_transaction_read_only'
       AND current_default IS DISTINCT FROM 'default_transaction_read_only=on')
@@ -1610,7 +1612,9 @@ BEGIN
     FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(current_database_setting->'setconfig')='array'
       THEN current_database_setting->'setconfig' ELSE '[]'::jsonb END) item(value)
     WHERE value NOT LIKE 'default_transaction_read_only=%';
-  IF (saved->'database_settings' - 'setconfig') IS DISTINCT FROM (current_database_setting - 'setconfig')
+  IF ((CASE WHEN jsonb_typeof(saved->'database_settings')='object' THEN saved->'database_settings' ELSE '{}'::jsonb END) - 'setconfig')
+       IS DISTINCT FROM
+     ((CASE WHEN jsonb_typeof(current_database_setting)='object' THEN current_database_setting ELSE '{}'::jsonb END) - 'setconfig')
     OR saved_other_settings IS DISTINCT FROM current_other_settings
     OR current_default IS DISTINCT FROM 'default_transaction_read_only=on'
     OR (SELECT activated FROM q12_guard.active_run WHERE singleton)
