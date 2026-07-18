@@ -137,12 +137,17 @@ describe('Q12 live cutover controller (Task-9) — R3 resource-manifest 2-step b
       quiesceManifestPath: quiescePath,
     });
 
-    // Full-forward twin: same row count and same rows on every shared binding. seq is NOT
-    // excluded (the exclusion set is blessed and closed), so the controller must reproduce
-    // the composer's exact interleave of ordinary lifecycles and in-process barrier chains.
-    expect(live.journalEntries.length).toBe(composer.journalEntries.length);
+    // Twin through group 13 (deploy.prepare/completed = the design §6a C7 planned-exit
+    // checkpoint): same row count and same rows on every shared binding versus the composer's
+    // forward prefix. seq is NOT excluded (the exclusion set is blessed and closed), so the
+    // controller must reproduce the composer's exact interleave of ordinary lifecycles and
+    // in-process barrier chains. The group-14 FWM, deploy.commit and activate are later rounds
+    // (the FWM's accepted_object_sha256 is itself per-run-root — it embeds the checkpoint
+    // digest — and is out of scope until the FWM round).
+    const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
+    expect(live.journalEntries.length).toBe(c7End);
     expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
-      composer.journalEntries.map(withoutBlessedExclusions)
+      composer.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)
     );
 
     // --- Resource step TOPOLOGY (asserted despite the value exclusion) ---
@@ -150,15 +155,13 @@ describe('Q12 live cutover controller (Task-9) — R3 resource-manifest 2-step b
     const prepareCompleted = witnessIndex(live.journalEntries, 'deploy.prepare', 'completed');
     const genesisDigest = resourceAt(live.journalEntries, 0);
     const snapshotDigest = resourceAt(live.journalEntries, backupIntent);
-    const targetsDigest = resourceAt(live.journalEntries, live.journalEntries.length - 1);
+    const targetsDigest = resourceAt(live.journalEntries, prepareCompleted);
 
     // three distinct real-artifact digests, none equal to the composer's fixture derivations
     expect(new Set([genesisDigest, snapshotDigest, targetsDigest]).size).toBe(3);
     expect(genesisDigest).not.toBe(resourceAt(composer.journalEntries, 0));
     expect(snapshotDigest).not.toBe(resourceAt(composer.journalEntries, backupIntent));
-    expect(targetsDigest).not.toBe(
-      resourceAt(composer.journalEntries, composer.journalEntries.length - 1)
-    );
+    expect(targetsDigest).not.toBe(resourceAt(composer.journalEntries, c7End - 1));
 
     // the field changes EXACTLY at the two witnesses and is carried unchanged elsewhere
     live.journalEntries.forEach((row, index) => {
@@ -189,7 +192,7 @@ describe('Q12 live cutover controller (Task-9) — R3 resource-manifest 2-step b
     expect(segmentOf('barrier.install')).toEqual(new Set([genesisDigest]));
     expect(segmentOf('barrier.verify-after-base')).toEqual(new Set([snapshotDigest]));
     expect(segmentOf('barrier.verify-after-observability')).toEqual(new Set([snapshotDigest]));
-    expect(segmentOf('barrier.activate')).toEqual(new Set([targetsDigest]));
+    expect(segmentOf('barrier.prepare-recovery')).toEqual(new Set([snapshotDigest]));
 
     // --- the three artifacts are real, fsynced, 0400, and their digests ARE the row values ---
     for (const [stage, digest] of [
