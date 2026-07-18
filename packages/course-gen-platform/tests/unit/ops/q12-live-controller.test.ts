@@ -420,7 +420,7 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round B: real deployed
 // digest of the whole FWM file), and (3) a SEPARATE byte parity of the FWM file content itself
 // once its two per-run-root physical fields are stripped.
 describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final-writer manifest (FWM) parity', () => {
-  it('journals the group-14 FWM as a byte/order twin of the composer with root-independent FWM-content byte parity', async () => {
+  it('journals groups 14-16 (FWM, deploy.commit, barrier.activate) as a full 76-row byte/order twin of the composer with root-independent FWM-content byte parity', async () => {
     const composerRoot = root();
     const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
     const quiescePath = writeQuiesceManifest(composerRoot, runId);
@@ -444,7 +444,19 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final
     );
     expect(fwmIntentIndex).toBe(66); // row 67
     expect(fwmAcceptedIndex).toBe(67); // row 68
-    expect(live.journalEntries.length).toBe(68);
+    expect(live.journalEntries.length).toBe(76);
+
+    // --- Part 1b: groups 15-16 — deploy.commit (rows 69-72) + barrier.activate (73-76) ---
+    expect(live.journalEntries.slice(68, 76).map(r => [r.phase, r.outcome, r.command_id])).toEqual([
+      ['activation_ready', 'intent', 'deploy.commit'],
+      ['activation_ready', 'capability_issued', 'deploy.commit'],
+      ['activation_ready', 'capability_claimed', 'deploy.commit'],
+      ['activation_ready', 'completed', 'deploy.commit'],
+      ['activation_committing', 'intent', 'barrier.activate'],
+      ['activated', 'capability_issued', 'barrier.activate'],
+      ['activated', 'capability_claimed', 'barrier.activate'],
+      ['activated', 'completed', 'barrier.activate'],
+    ]);
     expect(live.journalEntries[fwmIntentIndex].phase).toBe('prepared_quiesced');
     expect(live.journalEntries[fwmAcceptedIndex].phase).toBe('prepared_quiesced');
     expect(live.journalEntries[fwmAcceptedIndex].accepted_object_kind).toBe(
@@ -457,10 +469,10 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final
       composer.journalEntries[fwmAcceptedIndex].command_sha256
     );
 
-    // --- Part 2: FULL-JOURNAL TWIN through 68 rows, row-scoped exclusion on the FWM
-    // accepted row only (every other row keeps the closed 4-field blessed set). ---
+    // --- Part 2: FULL-JOURNAL TWIN across all 76 forward rows, row-scoped exclusion on the
+    // FWM accepted row only (every other row keeps the closed 4-field blessed set). ---
     expect(live.journalEntries.map(withParityExclusions)).toEqual(
-      composer.journalEntries.slice(0, 68).map(withParityExclusions)
+      composer.journalEntries.map(withParityExclusions)
     );
 
     // --- Part 3: SEPARATE FWM-content byte parity on the root-independent fields ---
