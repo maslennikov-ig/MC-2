@@ -571,6 +571,12 @@ export interface LiveControllerFixtureSpec {
 export async function materializeLiveController(spec: LiveControllerFixtureSpec): Promise<{
   journalEntries: Record<string, unknown>[];
   resourceManifestPaths: Record<string, string>;
+  /** R4 Sub-round A: run_live's per-ordinary-lifecycle side result file paths, keyed like
+   *  Engine.results (e.g. "ordinary:<command_id>:cutover"). */
+  resultPaths: Record<string, string>;
+  /** R4 Sub-round A: the run_live executor's real-child execution count (executor-audit.json
+   *  childExecutions), surfaced directly on the output for convenience. */
+  childExecutions: number;
 }> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
@@ -585,10 +591,14 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
   const output = JSON.parse(child.stdout) as {
     journalEntries: Record<string, unknown>[];
     resourceManifestPaths?: Record<string, string>;
+    resultPaths?: [string, string][];
+    childExecutions?: number;
   };
   return {
     journalEntries: output.journalEntries,
     resourceManifestPaths: output.resourceManifestPaths ?? {},
+    resultPaths: Object.fromEntries(output.resultPaths ?? []),
+    childExecutions: output.childExecutions ?? 0,
   };
 }
 

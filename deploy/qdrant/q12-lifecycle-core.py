@@ -1641,7 +1641,7 @@ class Engine:
             selector_phase, "intent", command_id, command["command_sha256"], "cutover", carried
         )
         checkpoint_hash = sha256(self.checkpoint_path.read_bytes())
-        _, _, digest = self.publish_ordinary_capability(command_id, command, checkpoint_hash)
+        _, capability, digest = self.publish_ordinary_capability(command_id, command, checkpoint_hash)
         self.append(
             target_phase,
             "capability_issued",
@@ -1659,21 +1659,35 @@ class Engine:
             "cutover",
             digest,
         )
-        result = {
-            "schema_version": "megacampus.q12.retained-command-result/v1",
-            "command_id": command_id,
-            "capability_sha256": digest,
-            "result_sha256": sha256(
-                canonical(
-                    {
-                        "command_id": command_id,
-                        "run_id": self.request["run_id"],
-                        "evidence": "q12-joined-fixture",
-                    }
-                )
-            ),
-            "status": "accepted",
-        }
+        # R4 Sub-round A (design docs/superpowers/specs/2026-07-17-q12-live-controller-design.md
+        # §3/§6.4): an injectable, parity-neutral ordinary-execution seam. When the caller's
+        # executor exposes execute_ordinary, this delegates to it for a real child result;
+        # otherwise (the closed composer's plain executor) it falls back to the original
+        # hardcoded fixture projection VERBATIM. Either way the result is written ONLY to the
+        # per-command side file below — it never feeds the journal, a capability digest, a
+        # checkpoint, or an accepted_object_sha256 — so the journal stays a byte/order twin of
+        # the composer oracle regardless of which branch runs.
+        hook = getattr(self.executor, "execute_ordinary", None)
+        if hook is not None:
+            result = hook(command, capability)
+            if result.get("capability_sha256") != digest:
+                raise LifecycleError("ordinary executor result capability binding mismatch")
+        else:
+            result = {
+                "schema_version": "megacampus.q12.retained-command-result/v1",
+                "command_id": command_id,
+                "capability_sha256": digest,
+                "result_sha256": sha256(
+                    canonical(
+                        {
+                            "command_id": command_id,
+                            "run_id": self.request["run_id"],
+                            "evidence": "q12-joined-fixture",
+                        }
+                    )
+                ),
+                "status": "accepted",
+            }
         if set(result) != RESULT_KEYS:
             raise AssertionError("internal result projection mismatch")
         result_path = self.run_root / f"ordinary-command-result-{command_id}-cutover.json"

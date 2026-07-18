@@ -275,6 +275,29 @@ class NoIoExecutor:
         CORE.fsync_directory(checkpoint_path.parent)
 
 
+class LiveOrdinaryExecutor(NoIoExecutor):
+    """R4 Sub-round A: run_live-scoped ordinary-execution seam (no-I/O, real-shaped result).
+
+    Adds execute_ordinary ONLY on run_live's own executor — run_joined_fixture keeps the
+    plain NoIoExecutor (no execute_ordinary attribute), so the closed composer's ordinary
+    results stay the original "q12-joined-fixture" projection untouched. The result here is
+    real-shaped (same RESULT_KEYS, capability_sha256 bound to the row digest) and
+    deterministically distinct from that fixture tag, without ever touching the journal.
+    """
+
+    def execute_ordinary(self, command: dict[str, Any], capability: dict[str, Any]) -> dict[str, Any]:
+        self.child_executions += 1
+        run_id = capability["run_id"]
+        command_id = capability["command_id"]
+        return {
+            "schema_version": "megacampus.q12.retained-command-result/v1",
+            "command_id": command_id,
+            "capability_sha256": CORE.sha256(CORE.complete_object(capability)),
+            "result_sha256": CORE.sha256(f"q12-live-real-child:{command_id}:{run_id}".encode()),
+            "status": "accepted",
+        }
+
+
 class SandboxedDeployedWrapperExecutor(NoIoExecutor):
     """Runs the unmodified shell launcher; only its fixed child is sandbox-mounted."""
 
@@ -638,7 +661,9 @@ def run_live_fixture(spec: dict) -> int:
         lease_fd = 9
     fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     lock_stat = os.fstat(lease_fd)
-    executor = NoIoExecutor()
+    # R4 Sub-round A: run_live gets the ordinary-execution seam; run_joined_fixture (the
+    # composer) keeps the plain NoIoExecutor above, so the seam never reaches the oracle.
+    executor = LiveOrdinaryExecutor()
     executor.root = root
     expected_catalog = root / "expected-post-migration-catalog.json"
     if not expected_catalog.exists():
@@ -672,6 +697,7 @@ def run_live_fixture(spec: dict) -> int:
         write_audit(root, executor)
         print(str(error), file=sys.stderr)
         return 2
+    output["childExecutions"] = executor.child_executions
     write_audit(root, executor, output)
     sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
     return 0
