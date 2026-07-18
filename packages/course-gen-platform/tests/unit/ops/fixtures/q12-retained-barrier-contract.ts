@@ -568,15 +568,29 @@ export interface LiveControllerFixtureSpec {
    */
   executeActualWrapper?: boolean;
   /**
-   * R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
+   * R5-D / R8-I-B stop_after SEAM: an optional named checkpoint at which the forward run stops
    * cleanly and returns its (partial) output. A stopped run does NOT run post-activate. Absent =>
-   * the full 76-row window + post-activate exactly as before. The three checkpoints are the
-   * crash/restart boundaries run_recover resumes from, plus the R5-C before-group-3 marker point:
-   *   "writers.quiesce.pre"   -> stop after group 2 (barrier.install), BEFORE the writers.quiesce row
-   *   "deploy.prepare"        -> stop at the C7 planned-exit head (deploy.prepare/completed)
-   *   "final-writer-manifest" -> stop after the group-14 FWM accepted row (crash-after-FWM)
+   * the full 81-row window + post-activate exactly as before. The checkpoints are the crash/restart
+   * boundaries run_recover resumes from (§6b.2), plus the R5-C before-group-3 marker point:
+   *   "writers.quiesce.pre"       -> stop after group 2 (barrier.install), BEFORE writers.quiesce
+   *   "barrier.verify-after-base" -> stop after group 7's verify-after-base barrier (R8-I-B head)
+   *   "deploy.prepare"            -> stop at the C7 planned-exit head (deploy.prepare/completed)
+   *   "final-writer-manifest"     -> stop after the group-14 FWM accepted row (crash-after-FWM)
+   *   "barrier.activate"          -> stop after group 16 (barrier.activate), BEFORE cleanup (R8-I-B)
    */
-  stopAfter?: 'writers.quiesce.pre' | 'deploy.prepare' | 'final-writer-manifest';
+  stopAfter?:
+    | 'writers.quiesce.pre'
+    | 'barrier.verify-after-base'
+    | 'deploy.prepare'
+    | 'final-writer-manifest'
+    | 'barrier.activate';
+  /**
+   * R8-I-B: inject a crash INSIDE the journaled post-activate cleanup segment (after the
+   * guard_cleanup_complete/capability_claimed row, before the barrier child ran), so a mid-cleanup
+   * durable head can be constructed for the recover convergence probe. run_live rejects (the crash
+   * surfaces as a throw); the partial journal is left on the run root for recover to resume.
+   */
+  cleanupCrashAfter?: 'capability_claimed';
 }
 
 /**

@@ -3389,7 +3389,52 @@ def finalize_forward_output(
     return output
 
 
-def drive_forward_tail(
+# Design §6b.2 (R8-I-B, Option A): the LINEAR forward step sequence (amendment §5 groups 1-16 +
+# the group-14 FWM), shared by run_live AND run_recover through drive_forward_sequence so a resumed
+# run re-drives the EXACT rows an uninterrupted run would from any clean completed-group boundary.
+# Every step id is either an ordinary command_id, a barrier operation, the migrations_applied
+# milestone, or the "final-writer-manifest" FWM publication. Byte-parity is structural: both drivers
+# emit these steps through the same ordinary()/d5() callers on the same Engine.
+_FORWARD_STEP_ORDER = (
+    "operator.self-check",          # group 1  genesis
+    "install",                      # group 2  barrier
+    "writers.quiesce",              # group 3
+    "pg.backup",                    # groups 4-5 (snapshot resource-step folded in)
+    "pg.restore",                   # group 6
+    "migration.base.apply",         # group 6
+    "verify-after-base",            # group 7  barrier
+    "migration.observability.apply",# group 7
+    "verify-after-observability",   # group 8  barrier
+    "migrations_applied",           # group 9  controller milestone
+    "prepare-recovery",             # group 10 barrier
+    "source.forward",               # group 11
+    "reindex.plan",                 # group 12
+    "reindex.worker.create",        # group 12
+    "reindex.execute",              # group 12
+    "reindex.verify",               # group 13
+    "deploy.prepare",               # group 13 (targets resource-step folded in)
+    "final-writer-manifest",        # group 14 FWM
+    "deploy.commit",                # group 15
+    "activate",                     # group 16 barrier
+)
+# resume_from sentinel meaning "every forward step is already durable; drive ONLY the post-activate
+# cleanup segment" (the barrier.activate/completed and barrier.cleanup recover heads, §6b.2 rows 5 & 8).
+_POST_ACTIVATE_SENTINEL = "__post_activate__"
+# stop_after checkpoint -> the step AFTER which run_live returns its PARTIAL output (no post-activate).
+# The three original R5 checkpoints are byte-preserved; the two barrier-completed-head stops
+# ("barrier.verify-after-base", "barrier.activate") are R8-I-B additions used to construct the
+# barrier-completed recover heads whose convergence §6b.6 requires (behavior-preserving: absent =>
+# the full 81-row window exactly as before).
+_STOP_AFTER_STEP = {
+    "writers.quiesce.pre": "install",
+    "barrier.verify-after-base": "verify-after-base",
+    "deploy.prepare": "deploy.prepare",
+    "final-writer-manifest": "final-writer-manifest",
+    "barrier.activate": "activate",
+}
+
+
+def drive_forward_sequence(
     engine: "Engine",
     request: dict[str, Any],
     manifest: dict[str, Any],
@@ -3398,56 +3443,106 @@ def drive_forward_tail(
     run_id: str,
     resource_manifest_paths: dict[str, str],
     marker_path: str,
+    exported_id: str,
+    target_identities: tuple[str, ...],
     ordinary: Callable[..., dict[str, Any]],
     d5: Callable[[str], None],
     *,
-    include_fwm: bool = True,
+    resume_from: str | None = None,
     stop_after: str | None = None,
 ) -> dict[str, Any]:
-    """Amendment section 5 forward tail: group 14 (FWM) -> 15 (deploy.commit) -> 16 (activate)
-    -> durable reload -> output augmentation -> RULING 1 post-activate cleanup+resume.
+    """Design §6b.2 (R8-I-B): the ONE resumable forward driver both run_live and run_recover share.
 
-    Extracted from run_live's tail so run_recover can re-drive the exact same rows onto an
-    existing (rehydrated) run root. The default call (include_fwm=True, stop_after=None) is a
-    byte-for-byte reproduction of run_live's original inline tail.
+    Walks ``_FORWARD_STEP_ORDER`` (amendment §5 groups 1-16 + the group-14 FWM), then reloads the
+    durable journal, augments the output, and runs the RULING R8-A journaled post-activate cleanup
+    segment (via ``finalize_forward_output(post_activate=True)``).
 
-    ``include_fwm=False`` skips group 14 because the durable head is already the forward FWM
-    accepted row (crash-after-FWM resume); the tail then starts at deploy.commit. ``stop_after
-    == "final-writer-manifest"`` publishes the FWM and returns the partial output WITHOUT the
-    commit/activate rows or the post-activate orchestration (the crash-after-FWM checkpoint).
+    ``resume_from=None`` (run_live) drives the whole sequence from group 1; a step id (run_recover)
+    RESUMES at that step, skipping every already-durable predecessor so the resumed rows are the
+    exact byte/order twin an uninterrupted run would append from that boundary. ``resume_from ==
+    _POST_ACTIVATE_SENTINEL`` skips ALL forward steps and drives only the post-activate cleanup
+    segment (the barrier.activate/completed and barrier.cleanup recover heads).
+
+    ``stop_after`` names a checkpoint (``_STOP_AFTER_STEP``) after which run_live stops cleanly and
+    returns its PARTIAL output WITHOUT the post-activate segment. This is the crash/restart boundary
+    machinery; recover never passes it (a recover always drives to convergence).
     """
-    if include_fwm:
+    def finalize(post_activate: bool) -> dict[str, Any]:
+        return finalize_forward_output(
+            engine, request, resource_manifest_paths, marker_path,
+            run_id=(run_id if post_activate else None), post_activate=post_activate,
+        )
+
+    if resume_from == _POST_ACTIVATE_SENTINEL:
+        # Groups 1-16 already durable (barrier.activate/completed or a barrier.cleanup head): drive
+        # only the post-activate cleanup segment, converging idempotently (§6b.2 rows 5 & 8).
+        return finalize(True)
+
+    def step_pg_backup() -> None:
+        # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
+        # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
+        snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
+        engine.current_resource_manifest_sha256 = snapshot_digest
+        ordinary("pg.backup")
+
+    def step_deploy_prepare() -> None:
+        # OQ4 step 2: record the five captured target identities and step the hash AT
+        # deploy.prepare/completed via resource_step_before_completion (composer parity: targets_step).
+        targets_digest = write_live_resource_manifest(
+            engine, "targets", snapshot=exported_id, targets=target_identities
+        )
+        ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
+
+    def step_fwm() -> None:
         # Section 5 group 14: the forward final-writer manifest (FWM), a byte/order twin of
-        # run_joined_composer's publish_final_writer_manifest("forward", ...) call. The inventory
-        # stays the FIXTURE derivation (deterministic from run_id + quiesce bytes) exactly like
-        # the composer.
+        # run_joined_composer's publish_final_writer_manifest("forward", ...) call.
         inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
         engine.publish_final_writer_manifest(
             "forward",
             inventory,
             resolved_command(manifest, "writers.resume.forward", request),
         )
-        if stop_after == "final-writer-manifest":
-            return finalize_forward_output(
-                engine, request, resource_manifest_paths, marker_path,
-                run_id=None, post_activate=False,
-            )
 
-    # Section 5 groups 15-16, closing the forward window as a byte/order twin of
-    # run_joined_composer's forward tail: deploy.commit records the activation-ready milestone
-    # and barrier.activate flips the cutover barrier from the current head (its selector CAS
-    # binds the live checkpoint head exactly as the composer's does).
-    ordinary("deploy.commit")
-    d5("activate")
+    actions: dict[str, Callable[[], Any]] = {
+        "operator.self-check": lambda: ordinary("operator.self-check"),
+        "install": lambda: d5("install"),
+        "writers.quiesce": lambda: ordinary(
+            "writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"]
+        ),
+        "pg.backup": step_pg_backup,
+        "pg.restore": lambda: ordinary("pg.restore"),
+        "migration.base.apply": lambda: ordinary("migration.base.apply"),
+        "verify-after-base": lambda: d5("verify-after-base"),
+        "migration.observability.apply": lambda: ordinary("migration.observability.apply"),
+        "verify-after-observability": lambda: d5("verify-after-observability"),
+        "migrations_applied": lambda: engine.append_controller_milestone(
+            manifest, "migrations_applied", "migration.observability.apply", values
+        ),
+        "prepare-recovery": lambda: d5("prepare-recovery"),
+        "source.forward": lambda: ordinary("source.forward"),
+        "reindex.plan": lambda: ordinary("reindex.plan"),
+        "reindex.worker.create": lambda: ordinary("reindex.worker.create"),
+        "reindex.execute": lambda: ordinary("reindex.execute"),
+        "reindex.verify": lambda: ordinary("reindex.verify"),
+        "deploy.prepare": step_deploy_prepare,
+        "final-writer-manifest": step_fwm,
+        "deploy.commit": lambda: ordinary("deploy.commit"),
+        "activate": lambda: d5("activate"),
+    }
 
-    # RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY (after the 76th journal row): orchestrate
-    # the barrier cleanup + forward writer resume as children and RECORD their receipt-backed
-    # outcomes. This adds NO journal row (the 76-row forward journal stays a byte/order twin of
-    # the composer). See orchestrate_post_activate_cleanup.
-    return finalize_forward_output(
-        engine, request, resource_manifest_paths, marker_path,
-        run_id=run_id, post_activate=True,
-    )
+    stop_step = _STOP_AFTER_STEP.get(stop_after)
+    started = resume_from is None
+    for step_id in _FORWARD_STEP_ORDER:
+        if not started:
+            if step_id == resume_from:
+                started = True
+            else:
+                continue
+        actions[step_id]()
+        if stop_step == step_id:
+            # A stopped run returns its partial output and does NOT run the post-activate segment.
+            return finalize(False)
+    return finalize(True)
 
 
 def require_post_activate_executor(request: dict[str, Any], executor: Executor) -> None:
@@ -3537,14 +3632,15 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
 
     # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
     # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
-    # the full 76-row window + post-activate exactly as before. The three checkpoints are the
-    # crash/restart boundaries run_recover resumes from (plus the R5-C before-group-3 marker
-    # observation point):
-    #   "writers.quiesce.pre"    -> stop after group 2 (d5 install), BEFORE journaling writers.quiesce
-    #   "deploy.prepare"         -> stop at the C7 planned-exit head (deploy.prepare/completed)
-    #   "final-writer-manifest"  -> stop after the group-14 FWM accepted row (crash-after-FWM)
+    # the full 81-row window (76 forward + 5 cleanup) exactly as before. The checkpoints are the
+    # crash/restart boundaries run_recover resumes from (§6b.2):
+    #   "writers.quiesce.pre"      -> stop after group 2 (barrier.install), BEFORE writers.quiesce
+    #   "barrier.verify-after-base"-> stop after group 7's verify-after-base barrier (R8-I-B)
+    #   "deploy.prepare"           -> stop at the C7 planned-exit head (deploy.prepare/completed)
+    #   "final-writer-manifest"    -> stop after the group-14 FWM accepted row (crash-after-FWM)
+    #   "barrier.activate"         -> stop after group 16 (barrier.activate), BEFORE cleanup (R8-I-B)
     stop_after = request.get("stop_after")
-    if stop_after not in (None, "writers.quiesce.pre", "deploy.prepare", "final-writer-manifest"):
+    if stop_after is not None and stop_after not in _STOP_AFTER_STEP:
         raise LifecycleError(f"unknown live stop_after checkpoint: {stop_after}")
 
     # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
@@ -3573,59 +3669,10 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # window. Out-of-band side artifact, never a journal row (parity-neutral).
     marker_path = write_quiesce_window_marker(engine)
 
-    # Section 5 forward chronology groups 1-13, mirroring run_joined_composer's forward path
-    # up to the C7 planned-exit checkpoint (deploy.prepare/completed).
-    ordinary("operator.self-check")
-    d5("install")
-    if stop_after == "writers.quiesce.pre":
-        # R5-C before-group-3 observation point: the cutover-window marker is already on disk
-        # (written above, before this group), and NO writers.quiesce row exists yet.
-        return finalize_forward_output(
-            engine, request, resource_manifest_paths, marker_path,
-            run_id=None, post_activate=False,
-        )
-    ordinary("writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"])
-
-    # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
-    # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
-    snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
-    engine.current_resource_manifest_sha256 = snapshot_digest
-    ordinary("pg.backup")
-    ordinary("pg.restore")
-    ordinary("migration.base.apply")
-    d5("verify-after-base")
-    ordinary("migration.observability.apply")
-    d5("verify-after-observability")
-    engine.append_controller_milestone(
-        manifest, "migrations_applied", "migration.observability.apply", values
-    )
-    d5("prepare-recovery")
-    ordinary("source.forward")
-    ordinary("reindex.plan")
-    ordinary("reindex.worker.create")
-    ordinary("reindex.execute")
-    ordinary("reindex.verify")
-
-    # OQ4 step 2: record the five captured target identities and step the hash AT
-    # deploy.prepare/completed via resource_step_before_completion (composer parity:
-    # targets_step). This is the last row before the C7 planned exit.
-    targets_digest = write_live_resource_manifest(
-        engine, "targets", snapshot=exported_id, targets=target_identities
-    )
-    ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
-    if stop_after == "deploy.prepare":
-        # C7 planned-exit checkpoint: the journal ends at deploy.prepare/completed, the exact head
-        # run_recover resumes the forward tail (from group 14) from.
-        return finalize_forward_output(
-            engine, request, resource_manifest_paths, marker_path,
-            run_id=None, post_activate=False,
-        )
-
-    # Section 5 forward chronology groups 14-16 + durable reload + output augmentation +
-    # RULING 1 post-activate cleanup/resume, extracted so run_recover re-drives the identical
-    # tail onto a rehydrated run root. stop_after="final-writer-manifest" stops inside the tail
-    # after the group-14 FWM accepted row.
-    return drive_forward_tail(
+    # Section 5 forward chronology groups 1-16 + the group-14 FWM + durable reload + output
+    # augmentation + RULING R8-A journaled post-activate cleanup segment, all through the ONE
+    # resumable driver run_recover also uses (§6b.2). resume_from=None => drive from group 1.
+    return drive_forward_sequence(
         engine,
         request,
         manifest,
@@ -3634,9 +3681,11 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         run_id,
         resource_manifest_paths,
         marker_path,
+        exported_id,
+        target_identities,
         ordinary,
         d5,
-        include_fwm=True,
+        resume_from=None,
         stop_after=stop_after,
     )
 
@@ -3681,13 +3730,18 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     lines = journal_bytes.splitlines()
     if not lines:
         raise LifecycleError("recover requires a non-empty durable journal")
-    durable_tail = json.loads(lines[-1])
 
     # Restore the request-global resource-manifest pin from durable truth (like run_claim), so the
-    # Engine's stable-binding walk anchors row-0/row-last to the journal's own stepped domain
-    # rather than the fixture placeholder. The tail carries the targets step (or the genesis pin
-    # for a pre-pg.backup head), always a legal request-global value for the walk.
-    request["resource_manifest_sha256"] = durable_tail["resource_manifest_sha256"]
+    # Engine's stable-binding walk anchors row-0/row-last to the journal's own stepped domain rather
+    # than the fixture placeholder. Design §6b.2: pin to the GENESIS row's value (entries[0]) rather
+    # than the durable TAIL. entries[0] is ALWAYS the request-global value an uninterrupted run_live
+    # carries throughout (run_live sets request["resource_manifest_sha256"] = genesis_digest and
+    # never re-pins it), so it is a legal walk anchor both for the partial durable journal at
+    # construction (== entries[0]) AND for the FULL journal after a resume completes (still ==
+    # entries[0]), even when the resume head sits in the mid-window snapshot segment (whose value
+    # equals neither entries[0] nor entries[-1] of the completed run).
+    genesis_row = json.loads(lines[0])
+    request["resource_manifest_sha256"] = genesis_row["resource_manifest_sha256"]
 
     engine = Engine(request, executor)
     if not engine.journal:
@@ -3719,27 +3773,32 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
 
     # The forward run's out-of-band run-root artifacts are already durable on this root; recover
-    # reconstructs their paths for the output augmentation exactly as run_live emits them.
+    # reconstructs their paths for the output augmentation exactly as run_live emits them. The
+    # exported-snapshot id and the five target identities are DETERMINISTIC (run_id-derived, exactly
+    # as run_live seeds them), so a resume that re-drives a mid-window step re-writes byte-identical
+    # checkpoint-bound resource-manifest artifacts (immutable_publish is idempotent).
     resource_manifest_paths = {
         stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
         for stage in ("genesis", "snapshot", "targets")
     }
     marker_path = str(engine.run_root / "quiesce-window-mode.json")
+    exported_id = values["<exported-id>"]
+    target_identities = tuple(
+        sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
+    )
 
-    # DISPATCH on the durable head. Only the two RULING 2 checkpoints resume; everything else is a
-    # named fail-closed refusal (never heuristic continuation).
+    def resume(resume_from: str) -> dict[str, Any]:
+        return drive_forward_sequence(
+            engine, request, manifest, values, quiesce_bytes, run_id,
+            resource_manifest_paths, marker_path, exported_id, target_identities,
+            ordinary, d5, resume_from=resume_from,
+        )
+
+    # DISPATCH on the durable head (R5 two-head set; the generalized Option A table is R8-I-B GREEN).
     if head["command_id"] == "deploy.prepare" and head["outcome"] == "completed":
-        return drive_forward_tail(
-            engine, request, manifest, values, quiesce_bytes, run_id,
-            resource_manifest_paths, marker_path, ordinary, d5,
-            include_fwm=True,
-        )
+        return resume("final-writer-manifest")
     if head["command_id"] == "writers.resume.forward" and head["outcome"] == "accepted":
-        return drive_forward_tail(
-            engine, request, manifest, values, quiesce_bytes, run_id,
-            resource_manifest_paths, marker_path, ordinary, d5,
-            include_fwm=False,
-        )
+        return resume("deploy.commit")
     # RULING 2 option (a) requirement 1: a barrier head is resumed idempotently by the STANDALONE
     # supervisor for that operation (resume_retained_chain), which recover deliberately leaves
     # byte-untouched as the manual/recovery entrypoint. Point the operator at that exact command so

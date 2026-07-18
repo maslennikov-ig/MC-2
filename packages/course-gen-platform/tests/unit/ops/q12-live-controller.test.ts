@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -9,6 +17,8 @@ import {
   materializeJoinedRetainedBarrierFixture,
   materializeLiveController,
   materializeRecover,
+  materializeRootRetainedBarrierFixture,
+  parseLeaseEpoch,
   runFwmNegative,
   runRecoverExpectingRefusal,
   sha,
@@ -127,6 +137,25 @@ function withParityExclusions(row: Record<string, unknown>): Record<string, unkn
 // controller journals a 5-row guard_cleanup_complete/barrier.cleanup segment AFTER it (§6b.1); the
 // forward twin parity stays scoped to this 76-row PREFIX (§6a item 4 / §6b.3), never the full length.
 const FORWARD_PREFIX = 76;
+
+// R8-I-B (§6b.2) CONVERGENCE exclusion: the whole 81-row journal of a recover-resumed run must be
+// byte/order-equivalent to an uninterrupted twin under the blessed exclusions PLUS a row-scoped drop
+// of command_sha256 + accepted_object_sha256 on the barrier.cleanup rows. The cleanup rows'
+// command_sha256 is the FROZEN cleanup argv digest, which references a random per-invocation /tmp
+// sandbox path (RealBarrierCleanupChild), and the accepted row's accepted_object_sha256 binds the v2
+// receipt whose terminal_proof_sha256 comes from the barrier child's proof (journal-identity-bound):
+// both are inherently per-run, exactly the physical-binding class the blessed set already excludes
+// (same row-scoping shape the FWM accepted row already uses). Every other cleanup-row field
+// (schema/run_id/seq/phase/outcome/timestamp/release_sha/operator_digest/command_id/lease_epoch/
+// rotation_required/quiesce_manifest_sha256/accepted_object_kind) is deterministic and IS compared.
+function withConvergenceExclusions(row: Record<string, unknown>): Record<string, unknown> {
+  const rest = withParityExclusions(row);
+  if (row.command_id === 'barrier.cleanup') {
+    delete rest.command_sha256;
+    delete rest.accepted_object_sha256;
+  }
+  return rest;
+}
 
 function resourceAt(rows: readonly Record<string, unknown>[], index: number): string {
   return String(rows[index].resource_manifest_sha256);
@@ -881,40 +910,15 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     expect(recovered.postActivate!.resume.status).toBe('resumed');
   });
 
-  it('fails closed with a NAMED refusal on an unsupported durable head and does NOT continue', async () => {
+  it('fails closed with a NAMED refusal on an empty durable journal', async () => {
+    // Under Option A (R8-I-B) the barrier.install/completed and barrier.cleanup/accepted heads this
+    // test used to reject are now SUPPORTED (see the R8-I-B block: install resumes, cleanup converges
+    // no-op). The remaining unconditional fail-closed case is an absent/empty durable journal —
+    // recover has nothing to resume. (Mid-lifecycle-barrier + unknown-head refusals are proven in the
+    // R8-I-B block against the generalized dispatch.)
     const quiesceRoot = root();
     const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
     const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
-
-    // --- unsupported mid-forward head: stop before writers.quiesce => head barrier.install/completed,
-    // which is neither the C7 head nor the crash-after-FWM head. ---
-    const liveRoot = root();
-    await materializeLiveController({
-      runRoot: liveRoot,
-      runId,
-      quiesceManifestPath: quiescePath,
-      stopAfter: 'writers.quiesce.pre',
-    });
-    const journalPath = join(liveRoot, 'phase.jsonl');
-    const before = readFileSync(journalPath);
-    const refusal = await runRecoverExpectingRefusal({
-      runRoot: liveRoot,
-      runId,
-      quiesceManifestPath: quiescePath,
-    });
-    expect(refusal.ok).toBe(false);
-    expect(refusal.error).toMatch(/recover does not support resuming from/u);
-    expect(refusal.error).toMatch(/command=barrier\.install/u);
-    expect(refusal.error).toMatch(/outcome=completed/u);
-    expect(refusal.error).toMatch(/phase=maintenance_guarded/u);
-    // RULING-2 option (a) requirement 1: a barrier head's refusal POINTS the operator at the exact
-    // standalone supervisor command to re-run (idempotent barrier resume), so the 3am next step
-    // comes from the error, not archaeology. barrier.install => q12-live-cutover.sh install.
-    expect(refusal.error).toMatch(/q12-live-cutover\.sh install/u);
-    // it did NOT continue: the durable journal is byte-for-byte unchanged.
-    expect(readFileSync(journalPath)).toEqual(before);
-
-    // --- empty journal: a fresh run root with no durable rows. ---
     const emptyRefusal = await runRecoverExpectingRefusal({
       runRoot: root(),
       runId,
@@ -922,16 +926,96 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     });
     expect(emptyRefusal.ok).toBe(false);
     expect(emptyRefusal.error).toMatch(/recover requires a non-empty durable journal/u);
+  });
+});
 
-    // --- a head PAST activate: a full uninterrupted forward run now ends at the journaled cleanup
-    // segment (81 rows, head guard_cleanup_complete/accepted/barrier.cleanup). The R5 two-head recover
-    // DISPATCH is untouched in R8-I-A (the generalized Option A table is R8-I-B), so this head is
-    // still unsupported and fails closed — now naming the cleanup head. barrier.cleanup is NOT an
-    // OPERATIONS barrier, so there is no standalone-supervisor pointer for it (only barrier.<op> heads
-    // get one). ---
-    const fullRoot = root();
+// R8-I-B (design §6b.2, RULING R8-C = Option A, ratified 2026-07-18): run_recover's dispatch is
+// GENERALIZED from the R5 two-head set to ONE table covering every clean completed-group boundary
+// head of the frozen 76-row chronology PLUS the post-activate cleanup heads (8 head classes). A
+// resumed run re-drives the forward sequence from the NEXT group through the SHARED
+// drive_forward_sequence, converging BYTE/ORDER-identical to an uninterrupted 81-row twin (§6b.2
+// condition 3). Journal-head evidence ONLY — the withdrawn witness-file mechanism is gone. Named
+// fail-closed REMAINS for mid-lifecycle barrier heads (with the standalone-supervisor pointer),
+// unknown command_ids, and any broken/short chain (rejected by the chain walk BEFORE dispatch).
+describe('Q12 live cutover controller (Task-9) — R8-I-B: generalized Option A recover head-dispatch', () => {
+  // Drive an uninterrupted twin + an interrupted run stopped at a barrier's completed head, recover
+  // the interrupted run, and assert the resumed 81-row journal converges to the twin.
+  async function proveBarrierHeadConverges(
+    stopAfter: 'writers.quiesce.pre' | 'barrier.verify-after-base' | 'barrier.activate',
+    expectedHeadCommand: string
+  ): Promise<void> {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+
+    // twin: an uninterrupted full run (81 rows) with the SAME run id + quiesce manifest.
+    const twin = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(twin.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+
+    // interrupted: stop cleanly at the barrier's completed head.
+    const liveRoot = root();
+    const stopped = await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+      stopAfter,
+    });
+    const stoppedHead = stopped.journalEntries.at(-1)!;
+    expect(stoppedHead.command_id).toBe(expectedHeadCommand);
+    expect(stoppedHead.outcome).toBe('completed');
+    expect(stopped.postActivate).toBeNull();
+    const stoppedLen = stopped.journalEntries.length;
+    expect(stoppedLen).toBeLessThan(FORWARD_PREFIX + 5);
+
+    // recover: resumes the forward sequence from the NEXT group, converging to the 81-row window.
+    const recovered = await materializeRecover({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(recovered.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    // recover APPENDED — it did not rewrite the durable prefix (byte-for-byte identical rows).
+    expect(recovered.journalEntries.slice(0, stoppedLen)).toEqual(stopped.journalEntries);
+    // the 76-row forward prefix is a strict byte/order twin of the uninterrupted run (blessed set).
+    expect(recovered.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
+      twin.journalEntries.slice(0, FORWARD_PREFIX).map(withParityExclusions)
+    );
+    // the WHOLE 81-row journal converges to the uninterrupted twin under the convergence exclusions.
+    expect(recovered.journalEntries.map(withConvergenceExclusions)).toEqual(
+      twin.journalEntries.map(withConvergenceExclusions)
+    );
+    // post-activate cleanup + receipt-only resume are recorded, receipt-bound.
+    expect(recovered.postActivate).toBeTruthy();
+    expect(recovered.postActivate!.cleanup.status).toBe('guard_cleanup_complete');
+    expect(recovered.postActivate!.resume.status).toBe('resumed');
+    expect(recovered.postActivate!.resume.validated_receipt_sha256).toBe(
+      recovered.postActivate!.cleanup.cleanup_receipt_sha256
+    );
+  }
+
+  it('head 1 — barrier.install/completed (group 2): recover resumes from group 3 and converges', async () => {
+    await proveBarrierHeadConverges('writers.quiesce.pre', 'barrier.install');
+  });
+
+  it('head 2 — barrier.verify-after-base/completed (group 7): recover resumes from group 7 continuation and converges', async () => {
+    await proveBarrierHeadConverges('barrier.verify-after-base', 'barrier.verify-after-base');
+  });
+
+  it('head 5 — barrier.activate/completed (group 16): recover drives the journaled cleanup segment and converges', async () => {
+    await proveBarrierHeadConverges('barrier.activate', 'barrier.activate');
+  });
+
+  it('head 8 — barrier.cleanup/accepted (fully complete): recover is an idempotent no-op (journal + marker byte-unchanged)', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+    const liveRoot = root();
     const full = await materializeLiveController({
-      runRoot: fullRoot,
+      runRoot: liveRoot,
       runId,
       quiesceManifestPath: quiescePath,
     });
@@ -939,16 +1023,167 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     const fullHead = full.journalEntries.at(-1)!;
     expect(fullHead.command_id).toBe('barrier.cleanup');
     expect(fullHead.outcome).toBe('accepted');
-    const pastActivate = await runRecoverExpectingRefusal({
-      runRoot: fullRoot,
+    const journalBefore = readFileSync(join(liveRoot, 'phase.jsonl'));
+    const markerBefore = readFileSync(join(liveRoot, 'quiesce-window-mode.json'));
+
+    // a fully-complete run recovered again converges idempotently (folds in the old R8-D/R8-E no-op).
+    const recovered = await materializeRecover({
+      runRoot: liveRoot,
       runId,
       quiesceManifestPath: quiescePath,
     });
-    expect(pastActivate.ok).toBe(false);
-    expect(pastActivate.error).toMatch(/recover does not support resuming from/u);
-    expect(pastActivate.error).toMatch(/command=barrier\.cleanup/u);
-    expect(pastActivate.error).toMatch(/outcome=accepted/u);
-    // no OPERATIONS supervisor pointer for the non-barrier cleanup head.
-    expect(pastActivate.error).not.toMatch(/q12-live-cutover\.sh/u);
+    expect(recovered.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    // NO re-drive, NO new row: the durable journal + the 0400 cutover marker are byte-for-byte unchanged.
+    expect(readFileSync(join(liveRoot, 'phase.jsonl'))).toEqual(journalBefore);
+    expect(readFileSync(join(liveRoot, 'quiesce-window-mode.json'))).toEqual(markerBefore);
+    // it converged to the SAME durable chain (no fresh post-activate cleanup was recorded).
+    expect(recovered.journalEntries).toEqual(full.journalEntries);
+    expect(recovered.postActivate).toBeNull();
+  });
+
+  it('head 8 — mid-cleanup crash (barrier.cleanup/capability_claimed): recover resumes the cleanup segment and converges', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+
+    const twin = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(twin.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+
+    // crash INSIDE the cleanup segment after the capability_claimed row (rows 1-3 durable).
+    const liveRoot = root();
+    await expect(
+      materializeLiveController({
+        runRoot: liveRoot,
+        runId,
+        quiesceManifestPath: quiescePath,
+        cleanupCrashAfter: 'capability_claimed',
+      })
+    ).rejects.toThrow();
+    const crashedRows = readFileSync(join(liveRoot, 'phase.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    expect(crashedRows.length).toBe(FORWARD_PREFIX + 3);
+    const crashHead = crashedRows.at(-1)!;
+    expect(crashHead.command_id).toBe('barrier.cleanup');
+    expect(crashHead.outcome).toBe('capability_claimed');
+
+    // recover resumes the cleanup segment from the interrupted outcome, appending rows 4-5.
+    const recovered = await materializeRecover({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(recovered.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+    // rows 1-3 (durable) are preserved byte-for-byte; recover only appended the completed + accepted rows.
+    expect(recovered.journalEntries.slice(0, FORWARD_PREFIX + 3)).toEqual(crashedRows);
+    expect(
+      recovered.journalEntries
+        .slice(FORWARD_PREFIX + 3)
+        .map(r => [r.phase, r.outcome, r.command_id])
+    ).toEqual([
+      ['guard_cleanup_complete', 'capability_completed', 'barrier.cleanup'],
+      ['guard_cleanup_complete', 'accepted', 'barrier.cleanup'],
+    ]);
+    // converges to the uninterrupted twin under the convergence exclusions.
+    expect(recovered.journalEntries.map(withConvergenceExclusions)).toEqual(
+      twin.journalEntries.map(withConvergenceExclusions)
+    );
+    expect(recovered.postActivate).toBeTruthy();
+    expect(recovered.postActivate!.resume.status).toBe('resumed');
+  });
+
+  it('mid-lifecycle barrier head (claimed-not-completed) fails closed WITH the standalone-supervisor pointer', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+
+    // build a barrier journal that stops MID-lifecycle at capability_claimed (not completed) via the
+    // supervisor fixture — the head a mid-barrier crash leaves before the standalone-supervisor step.
+    const midRoot = root();
+    await materializeRootRetainedBarrierFixture({
+      runRoot: midRoot,
+      mode: 'forward',
+      completed: [],
+      chains: {
+        install: {
+          operation: 'install',
+          stopAfter: 'claimed',
+          installTransaction: 'not-committed',
+          rootEpoch: parseLeaseEpoch('cutover'),
+          cutoverCopyBeforeRecoveryRoot: 'absent',
+          recoveryReissues: 0,
+          publicationWindowOrphans: 0,
+          completionMode: 'normal',
+          faultAfter: 'none',
+        },
+      },
+    });
+    const journalPath = join(midRoot, 'phase.jsonl');
+    const before = readFileSync(journalPath);
+    const head = JSON.parse(before.toString('utf8').trim().split('\n').at(-1)!) as Record<
+      string,
+      unknown
+    >;
+    expect(head.command_id).toBe('barrier.install');
+    expect(head.outcome).toBe('capability_claimed');
+
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: midRoot,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    expect(refusal.error).toMatch(/recover does not support resuming from/u);
+    expect(refusal.error).toMatch(/command=barrier\.install/u);
+    expect(refusal.error).toMatch(/outcome=capability_claimed/u);
+    // a MID-LIFECYCLE barrier head keeps the standalone-supervisor pointer (the R5-D2 mechanism):
+    // the operator runs it to advance the barrier to its completed head, which recover then resumes.
+    expect(refusal.error).toMatch(/q12-live-cutover\.sh install/u);
+    // it did NOT continue: the durable journal is byte-for-byte unchanged.
+    expect(readFileSync(journalPath)).toEqual(before);
+  });
+
+  it('CHAIN FIRST: a corrupted durable chain at the head fails on the chain walk, never reaching dispatch', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+    const liveRoot = root();
+    const full = await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(full.journalEntries.length).toBe(FORWARD_PREFIX + 5);
+
+    // corrupt a HASH field (operator_digest) on the durable head row WITHOUT touching
+    // resource_manifest_sha256 (run_recover reads entries[0].resource_manifest_sha256 pre-Engine to
+    // pin the walk), so recover reaches Engine construction — where the full durable-chain validation
+    // walk runs BEFORE any dispatch. The recomputed entry_hash no longer matches the stored one.
+    const journalPath = join(liveRoot, 'phase.jsonl');
+    const rows = readFileSync(journalPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    rows.at(-1)!.operator_digest = `${'0'.repeat(63)}1`;
+    const corrupted = `${rows.map(row => canonical(row)).join('\n')}\n`;
+    chmodSync(journalPath, 0o600);
+    writeFileSync(journalPath, corrupted, { mode: 0o600 });
+    const markerBefore = readFileSync(join(liveRoot, 'quiesce-window-mode.json'));
+
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    // it failed on the CHAIN (Engine reload), not on dispatch — a broken chain never reaches the table.
+    expect(refusal.error).toMatch(/journal entry hash mismatch/u);
+    expect(refusal.error).not.toMatch(/does not support resuming/u);
+    // marker byte-unchanged (chain failure never reaches dispatch/post-activate).
+    expect(readFileSync(join(liveRoot, 'quiesce-window-mode.json'))).toEqual(markerBefore);
   });
 });

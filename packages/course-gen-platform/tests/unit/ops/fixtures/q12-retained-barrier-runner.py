@@ -468,6 +468,10 @@ class NoIoExecutor:
         self.resumed_with_production_shape = False
         self.ancestor_symlink_rejected = False
         self.lease_session_retained_after_failed_validation: bool | None = None
+        # R8-I-B: inject a crash INSIDE the journaled post-activate cleanup segment so a mid-cleanup
+        # durable head (guard_cleanup_complete/capability_claimed/barrier.cleanup) can be constructed
+        # for the recover convergence probe. None => no injected cleanup crash.
+        self.cleanup_crash_after: str | None = None
 
     def _claim_sandbox(self, argv: list[str]) -> tuple[list[str], list[str]]:
         if self.root is None:
@@ -700,6 +704,12 @@ class LiveOrdinaryExecutor(NoIoExecutor):
         self, context: dict[str, Any], command: dict[str, Any]
     ) -> dict[str, Any]:
         child = self._cleanup_child
+        # R8-I-B crash probe: raise AFTER the controller journaled the guard_cleanup_complete/
+        # capability_claimed row (rows 1-3) but BEFORE the barrier child ran / the receipt was
+        # promoted, leaving a mid-cleanup durable head for the recover convergence probe to resume.
+        if getattr(self, "cleanup_crash_after", None) == "capability_claimed":
+            shutil.rmtree(child.sandbox, ignore_errors=True)
+            raise CORE.LifecycleError("injected crash after cleanup capability_claimed")
         # Run the frozen barrier cleanup child FOR REAL: it validates the controller journal to
         # the claimed boundary, performs the sandboxed DB cleanup, and publishes the terminal proof.
         child.execute()
@@ -1150,6 +1160,7 @@ LIVE_SPEC_KEYS = {
     "quiesceManifestPath",
     "executeActualWrapper",
     "stopAfter",
+    "cleanupCrashAfter",
 }
 
 RECOVER_SPEC_KEYS = {
@@ -1235,6 +1246,7 @@ def run_live_fixture(spec: dict) -> int:
         else LiveOrdinaryExecutor()
     )
     executor.root = root
+    executor.cleanup_crash_after = spec.get("cleanupCrashAfter")
     expected_catalog = root / "expected-post-migration-catalog.json"
     if not expected_catalog.exists():
         expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
@@ -1261,8 +1273,8 @@ def run_live_fixture(spec: dict) -> int:
         request["quiesce_manifest_path"] = quiesce_manifest_path
     if spec.get("production") is True:
         request["production"] = True
-    # R5 Sub-round D: an optional named checkpoint at which run_live stops cleanly and returns its
-    # partial output (a stopped run does NOT run post-activate). Absent => the full 76-row window.
+    # R5-D / R8-I-B: an optional named checkpoint at which run_live stops cleanly and returns its
+    # partial output (a stopped run does NOT run post-activate). Absent => the full 81-row window.
     if spec.get("stopAfter") is not None:
         request["stop_after"] = spec["stopAfter"]
     try:
