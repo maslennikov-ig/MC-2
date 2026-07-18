@@ -3284,6 +3284,29 @@ def drive_forward_tail(
     )
 
 
+def require_post_activate_executor(request: dict[str, Any], executor: Executor) -> None:
+    """R5 Sub-round F PRE-FLIGHT gate (production only): refuse to START a forward cutover whose
+    executor cannot run the post-activate cleanup + forward resume.
+
+    The late gate in ``orchestrate_post_activate_cleanup`` fires only AFTER ``activate`` — the
+    point of no return — which in production would journal all the way through activate and only
+    THEN discover it cannot resume the writers, stranding an activated barrier with the writers
+    still quiesced and post-activate unrun, at the worst possible moment. This pre-flight fires at
+    the TOP of ``run_live``/``run_recover`` — BEFORE the genesis row, before Engine construction,
+    before any run-root mutation — so a production run whose ``ProductionExecutor`` lacks the real
+    docker/PG17 post-activate hooks (wired in round R8) never starts. The late gate stays as
+    defense-in-depth (e.g. a future path where the hooks vanish mid-run). Non-production fixture
+    runs are unaffected.
+    """
+    if request.get("production") is not True:
+        return
+    if (
+        getattr(executor, "execute_barrier_cleanup", None) is None
+        or getattr(executor, "execute_forward_resume", None) is None
+    ):
+        raise LifecycleError("post-activate cleanup/resume executor not wired (deferred to R8)")
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
@@ -3321,6 +3344,10 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     /opt/megacampus/backups/q12/<run-id>; otherwise the /tmp fixture shape), so a production
     request against a non-production root fails closed there.
     """
+    # R5-F PRE-FLIGHT: refuse a production run whose executor cannot run post-activate BEFORE any
+    # journal row / run-root mutation, so it never journals through activate (the point of no
+    # return) only to strand there. Defense-in-depth late gate stays in the post-activate seam.
+    require_post_activate_executor(request, executor)
     manifest = load_manifest()
     engine = Engine(request, executor)
     if engine.journal:
@@ -3471,6 +3498,10 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     Crash-anywhere idempotence is probed further at R8; an unsupported-but-real head surfacing
     later is a normal finding, not a scope breach.
     """
+    # R5-F PRE-FLIGHT (same exposure as run_live): recover from the C7 head drives the tail through
+    # activate then post-activate, so a production recover whose executor cannot run post-activate
+    # must fail closed BEFORE touching the run root, not after re-activating.
+    require_post_activate_executor(request, executor)
     manifest = load_manifest()
     run_root = pathlib.Path(request["run_root"])
     require_lexical_absolute(run_root)
