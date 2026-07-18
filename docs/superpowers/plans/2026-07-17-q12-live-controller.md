@@ -694,6 +694,19 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   **Deferred (flagged):** the real docker/PG17 post-activate `execute_barrier_cleanup` +
   `execute_forward_resume` hooks on `ProductionExecutor` remain round R8; until then a production
   `live`/`recover` correctly fails closed at the post-activate boundary rather than half-cutting.
+- **R5 Sub-round D2 done** (RED `501fc065a` → GREEN `7f758c569` → docs). RULING-2 option (a)
+  requirement 1: `run_recover`'s named fail-closed refusal for a mid-barrier (`barrier.<op>`) head
+  now appends the actionable next step — `… ; re-run the standalone supervisor
+'q12-live-cutover.sh <op>' to resume this barrier, then run recover` (op derived from the head's
+  `command_id`, guarded by `op in OPERATIONS`). Still fully fail-closed (no continuation; the
+  durable journal stays byte-unchanged after refusal); only the error text gained the operator
+  pointer so the 3am next step comes from the error, not archaeology. The composed operator
+  procedure (mid-barrier crash → standalone supervisor re-run → `recover` continue) is written into
+  design §5.5, with the explicit R8 obligation that the R8 execution smoke + server custody
+  rehearsal PROVE the composition holds on a single journal (a failure there is a found defect, not
+  a scope extension). `q12-live-controller.test.ts` 13/13 (the two barrier-head negatives now also
+  assert the `q12-live-cutover.sh install` / `… activate` pointer); `tsc --noEmit` 0; frozen bytes
+  unchanged; no W-owned file touched.
 
 ## Open risks carried forward
 
