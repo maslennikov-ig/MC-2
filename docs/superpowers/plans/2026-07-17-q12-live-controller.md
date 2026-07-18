@@ -172,7 +172,51 @@ Stream: `mc2-jz6y0.13` (this worktree `codex/q12-plan-builder`).
     (one process, trivial parity, but changes the operator procedure and holds `cutover.lock`
     across the whole window), or (b) shell out to the 5 supervisor invocations (preserves the
     current procedure, splits lock custody). This shapes R4 and the lease/FD-9 model; resolve
-    with the design review before R4.
+    with the design review before R4. **RESOLVED (2026-07-18): option (a) in-process** — see
+    design §6a. C7 is a planned controller exit + `recover`-resume; no lock held across it.
+
+- **R2 build spec (ready to execute; all rulings in).** Producer: on `LivePlanExecutor`,
+  open the snapshot coordinator (`_open_snapshot_coordinator`, service-file/`psql` path — NOT
+  the docker-exec path, because `q12-source-manifest.ts` connects via libpq
+  `PGSERVICE`/`PGSERVICEFILE` + `SET TRANSACTION SNAPSHOT`, `q12-source-manifest.ts:154`),
+  run `q12-source-manifest.ts capture --snapshot <exported-id> --output <tmp>` **without**
+  `--baseline` (so `baseline == cutover == the capture`, `:1449`) using the same source
+  service env, parse `.baseline`, and `immutable_publish` it to `<run-root>/baseline.json`
+  0400 uid 1000; close the coordinator. Real-PG17 RED (reuse the round-8..19 harness: docker
+  `postgres:17.10-bookworm` with `-p 127.0.0.1::5432`, `readyPostgres`, a TLS-less service
+  file to the mapped port):
+  - **Seed a Supabase-shaped source** (`capture()` requirements, `q12-source-manifest.ts`):
+    `CREATE EXTENSION pgcrypto SCHEMA extensions` (for `extensions.digest`, `:310`); a faked
+    `cron` schema + `cron.job` table (columns `jobid,schedule,command,nodename,nodeport,
+database,username,active`, `:309-312`) with **8 rows all `active=true`**; a faked `net`
+    schema + `net.http_request_queue` table (empty → count 0, `:313`); the guarded relations
+    (public + the `auth`/`storage` trigger-privileged + `cron.job` + `net.http_request_queue`
+    authoritative set, `:246`); `supabase_migrations.schema_migrations` optional (COALESCE'd,
+    `:314`).
+  - **Produce** `baseline.json` via the producer at this pre-maintenance state (cron active,
+    writable).
+  - **Simulate cutover** = baseline + ONLY the sanctioned deltas: `UPDATE cron.job SET
+active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; create the
+    `q12_guard` schema + its GUARD_TABLES relations (owner postgres, kind r, postgres-only
+    ACL); apply the guard-delta on guarded relations. Then run `q12-source-manifest.ts capture
+--snapshot <id2> --baseline baseline.json` (or `verify-transition`) and assert it
+    PASSES — `validateTransition` requires baseline==cutover after normalizing exactly those
+    deltas (`:1258-1352`), so any incidental diff fails (this is the correctness bar).
+  - **Negative:** feed the lossy `database-barrier-baseline.json` digest projection as
+    `--baseline` → `validateTransition` fails (proves the full capture is required, OQ6).
+    Frozen bytes untouched; the producer reuses `q12-source-manifest.ts` verbatim (no new
+    structural query). Note: `q12-source-manifest.ts` is NOT frozen-sha-pinned, but the producer
+    must not modify it — it invokes it.
+
+- **R3 constraint (blessed 2026-07-18).** `resource_manifest_sha256` joins the pinned parity
+  exclusion set VALUE-only, enumerated explicitly beside `capability_manifest_sha256` /
+  `entry_hash` / `previous_hash`, only on rows carrying a real artifact digest (initial + the
+  two stepped rows); substitution values are seeded to the fixture derivations so
+  `command_sha256` parity holds. **Added constraint:** the parity test must still assert the
+  step TOPOLOGY of the excluded field — it changes exactly at `pg.backup/intent` and
+  `deploy.prepare/completed`, is carried unchanged elsewhere, and the first/last pins hold
+  (`validate_stable_binding_walk:342-356`). Exclusion covers the byte value, never the
+  stepping structure. Same principle for any future mode-divergent field.
 
 ## Open risks carried forward
 
