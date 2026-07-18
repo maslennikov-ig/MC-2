@@ -872,6 +872,10 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     expect(refusal.error).toMatch(/command=barrier\.install/u);
     expect(refusal.error).toMatch(/outcome=completed/u);
     expect(refusal.error).toMatch(/phase=maintenance_guarded/u);
+    // RULING-2 option (a) requirement 1: a barrier head's refusal POINTS the operator at the exact
+    // standalone supervisor command to re-run (idempotent barrier resume), so the 3am next step
+    // comes from the error, not archaeology. barrier.install => q12-live-cutover.sh install.
+    expect(refusal.error).toMatch(/q12-live-cutover\.sh install/u);
     // it did NOT continue: the durable journal is byte-for-byte unchanged.
     expect(readFileSync(journalPath)).toEqual(before);
 
@@ -900,5 +904,7 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     expect(pastActivate.ok).toBe(false);
     expect(pastActivate.error).toMatch(/recover does not support resuming from/u);
     expect(pastActivate.error).toMatch(/command=barrier\.activate/u);
+    // barrier.activate => the pointer names the activate operation.
+    expect(pastActivate.error).toMatch(/q12-live-cutover\.sh activate/u);
   });
 });
