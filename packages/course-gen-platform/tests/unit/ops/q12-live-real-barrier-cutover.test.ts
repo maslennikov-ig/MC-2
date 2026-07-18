@@ -53,12 +53,44 @@ import { describe, expect, it } from 'vitest';
 // SCOPE OF THIS ROUND: the mandated acceptance is the barrier reaching
 // `maintenance_guarded` end-to-end (receipt + q12_guard install surface
 // below), NOT the full R4 chain through `deploy/postgres/q12-source-
-// manifest.ts` validateTransition. That tool is frozen/out of scope for this
-// round (its hardcoded q12_guard function allowlist is a known, separate,
-// pre-existing 5-vs-10 drift against the barrier's real function set,
-// unrelated to any fix in this round) and remains a distinct, tracked,
-// deferred concern for a future round. `capture_rc`/`capture_stderr` are
-// captured for diagnostic visibility only and are not asserted on here.
+// manifest.ts` validateTransition. `capture_rc`/`capture_stderr` are captured
+// for diagnostic visibility only and are not asserted on here.
+//
+// UPDATE (guard-surface reconciliation round, base 3596aa72): the
+// then-hardcoded 5-vs-10 q12_guard function allowlist noted above is fixed
+// (GUARD_FUNCTIONS/GUARD_TRIGGERS/ACL exact-sets reconciled to the barrier's
+// real install -- see q12-source-manifest-guard-surface.test.ts for the
+// no-docker positive/negative proof). Driving the REAL end-to-end capture
+// with that fix applied surfaced two further, layered, pre-existing defects
+// in q12-source-manifest.ts's OWN catalogSql() capture query, unrelated to
+// the allowlist and out of scope for the allowlist-reconciliation mandate:
+//   1. FIXED (this round): `object_owners`/`object_acls`/`comments`/
+//      `security_labels` each UNION ALL several branches into one shared
+//      `identity` output column; several branches project a bare `name`-typed
+//      source column (e.g. `n.nspname`, `c.relname`, `t.typname`, `e.extname`)
+//      un-cast, alongside branches that already produce `text` via `||`
+//      concatenation (e.g. function identity with arguments). PostgreSQL
+//      resolves the UNION's output column type to `name` in that mix
+//      (confirmed via `pg_typeof`), silently truncating every row -- even the
+//      `text`-computed ones -- to NAMEDATALEN-1 (63) bytes. This corrupted
+//      `extend_guard(...)`'s captured identity specifically, which the
+//      now-complete allowlist compares in full (not just by function name),
+//      newly exposing a bug that no prior round's capture ever reached.
+//      Fixed by adding explicit `::text` casts to every bare `name`-typed
+//      branch column feeding those four UNION blocks.
+//   2. STILL OPEN, NOT fixed here (STOP-and-report, distinct concern): with
+//      (1) fixed, capture progresses past every q12_guard-specific check and
+//      fails on a single, unrelated relation -- `cron.job`'s row_sha256
+//      differs between baseline and cutover (confirmed via a temporary
+//      reportManifestDiff probe). This is expected content drift (the
+//      barrier's cutover deactivates every cron job, so `cron.job`'s row
+//      bytes legitimately change), but validateTransition only normalizes
+//      the separate top-level `cron_jobs` summary array's `active` flag
+//      before comparing -- it does not equivalently normalize the
+//      `relations` section's authoritative row-content hash for `cron.job`.
+//      This is a cron-activation-state modeling gap, not a q12_guard-surface
+//      allowlist question, so it is out of scope for the guard-surface
+//      reconciliation round and is tracked as a distinct, deferred defect.
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
