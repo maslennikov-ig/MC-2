@@ -83,7 +83,8 @@ CREATE TABLE cron.job (
   nodeport int NOT NULL DEFAULT 5432,
   database text NOT NULL DEFAULT 'postgres',
   username text NOT NULL DEFAULT 'postgres',
-  active boolean NOT NULL DEFAULT true
+  active boolean NOT NULL DEFAULT true,
+  jobname text UNIQUE
 );
 INSERT INTO cron.job (jobid, schedule, command)
   SELECT g, '*/5 * * * *', 'select ' || g FROM generate_series(1,{CRON_COUNT}) g;
@@ -610,6 +611,20 @@ exit "$barrier_rc"
         guard_schema_present = dexec_json(
             "SELECT count(*) AS present FROM pg_namespace WHERE nspname='q12_guard'"
         )[0]["present"]
+        # Post-mortem structural proof of the q12_guard install surface itself
+        # (tables/functions/event trigger), independent of the frozen tool's own
+        # (separately gated) validateTransition acceptance.
+        guard_tables = dexec_json(
+            "SELECT c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "WHERE n.nspname='q12_guard' AND c.relkind='r' ORDER BY c.relname"
+        )
+        guard_functions = dexec_json(
+            "SELECT p.proname AS name FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
+            "WHERE n.nspname='q12_guard' ORDER BY p.proname"
+        )
+        guard_event_trigger_count = dexec_json(
+            "SELECT count(*) AS n FROM pg_event_trigger WHERE evtname='q12_guard_ddl_command_start'"
+        )[0]["n"]
 
         sys.stdout.write(
             json.dumps(
@@ -626,6 +641,7 @@ exit "$barrier_rc"
                     "barrier_rc": barrier_result.returncode,
                     "barrier_stderr": barrier_result.stderr,
                     "barrier_stdout": barrier_result.stdout,
+                    "receipt": receipt_obj,
                     "receipt_state": receipt_obj.get("state") if receipt_obj else None,
                     "post_install_cron_active": post_state["cron_active"],
                     "post_install_read_only": post_state["read_only"],
@@ -633,6 +649,9 @@ exit "$barrier_rc"
                     "capture_stderr": capture_result.stderr,
                     "capture_stdout": capture_result.stdout,
                     "post_mortem_q12_guard_schema_present": bool(guard_schema_present),
+                    "post_mortem_q12_guard_tables": [row["name"] for row in guard_tables],
+                    "post_mortem_q12_guard_functions": [row["name"] for row in guard_functions],
+                    "post_mortem_q12_guard_event_trigger_count": guard_event_trigger_count,
                 }
             )
             + "\n"
