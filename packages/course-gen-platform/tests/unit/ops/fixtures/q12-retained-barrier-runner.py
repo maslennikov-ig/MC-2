@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import stat
 import subprocess
 import sys
@@ -295,6 +296,160 @@ class LiveOrdinaryExecutor(NoIoExecutor):
             "capability_sha256": CORE.sha256(CORE.complete_object(capability)),
             "result_sha256": CORE.sha256(f"q12-live-real-child:{command_id}:{run_id}".encode()),
             "status": "accepted",
+        }
+
+    # R5 Sub-round E (orchestrator RULING 1 — post-activate cleanup is RECEIPT-ONLY): the
+    # post-activate barrier-cleanup and forward-writer-resume seam. run_live invokes these AFTER
+    # the 76th journal row and RECORDS the returned outcomes on output["postActivate"] — they
+    # NEVER touch the journal, a capability digest, a checkpoint, self.child_executions, or an
+    # accepted_object_sha256 (the R4 child-execution count stays pinned at 18). Here the cleanup
+    # child is fixture-seeded (real docker/PG17 + `q12-database-barrier.sh cleanup` is round R8);
+    # it emits a v2 guard_cleanup_complete receipt (+ probe receipt) shaped EXACTLY so the REAL
+    # W-owned q12-writer-resume.py forward branch (:1088-1134) would accept it, and the resume
+    # child re-reads and fail-closed VALIDATES that same projection before reporting "resumed".
+
+    def execute_barrier_cleanup(self, context: dict[str, Any]) -> dict[str, Any]:
+        run_root = pathlib.Path(context["run_root"])
+        run_id = context["run_id"]
+        expected_catalog_sha256 = context["expected_catalog_sha256"]
+        # The probe receipt (megacampus.q12.database-barrier-probes/v1): exact key set + the exact
+        # nested probes/residue projections q12-writer-resume.py:1108-1133 enforces on the forward
+        # branch. completed_at is a fixed-shape UTC millisecond timestamp (the consumer regex).
+        probe_object = {
+            "schema_version": "megacampus.q12.database-barrier-probes/v1",
+            "run_id": run_id,
+            "expected_catalog_sha256": expected_catalog_sha256,
+            "completed_at": "2026-07-18T00:00:00.000Z",
+            "probes": {
+                "postgrest_anon": "rejected",
+                "postgrest_authenticated": "rejected",
+                "postgrest_service_role_without_capability": "rejected",
+                "postgrest_service_role_with_capability": "rolled_back",
+                "postgrest_preference_applied": "tx=rollback",
+                "auth_profile": "rejected_zero_residue",
+                "storage_object": "rejected_zero_metadata_zero_bytes",
+                "cron_rpc": "rejected_exact_jobs_unchanged",
+                "pg_net_rpc": "rejected_zero_queue_zero_external_request",
+                "direct_supervisor": "rolled_back",
+            },
+            "residue": {
+                "guard_probe_rows": 0,
+                "auth_rows": 0,
+                "storage_metadata_rows": 0,
+                "storage_object_bytes": 0,
+                "cron_job_set_unchanged": True,
+                "pg_net_queue_rows": 0,
+                "external_requests": 0,
+            },
+        }
+        probe_body = CORE.complete_object(probe_object)
+        probe_path = run_root / "database-barrier-probe-receipt.json"
+        CORE.immutable_publish(probe_path, probe_body, 0o400, [])
+        probe_digest = CORE.sha256(probe_body)
+        # The v2 database-barrier receipt (megacampus.q12.database-barrier-receipt/v2): the exact
+        # 10-key terminal authority q12-writer-resume.py:1090-1104 requires for the forward branch
+        # (state guard_cleanup_complete, last_command cleanup, rollback_probes_verified True,
+        # probe_receipt_sha256 == the probe file digest, zero_guard_residue/database_capability_
+        # deleted True, hex64 expected/terminal bindings).
+        receipt_object = {
+            "schema_version": "megacampus.q12.database-barrier-receipt/v2",
+            "run_id": run_id,
+            "state": "guard_cleanup_complete",
+            "expected_catalog_sha256": expected_catalog_sha256,
+            "zero_guard_residue": True,
+            "last_command": "cleanup",
+            "rollback_probes_verified": True,
+            "probe_receipt_sha256": probe_digest,
+            "terminal_proof_sha256": CORE.sha256(
+                f"q12-database-barrier-cleanup-terminal-proof:{run_id}".encode()
+            ),
+            "database_capability_deleted": True,
+        }
+        receipt_body = CORE.complete_object(receipt_object)
+        receipt_path = run_root / "database-barrier-receipt.json"
+        CORE.immutable_publish(receipt_path, receipt_body, 0o400, [])
+        receipt_digest = CORE.sha256(receipt_body)
+        return {
+            "status": "guard_cleanup_complete",
+            "ok": True,
+            "cleanup_receipt_path": str(receipt_path),
+            "cleanup_receipt_sha256": receipt_digest,
+            "probe_receipt_path": str(probe_path),
+            "probe_receipt_sha256": probe_digest,
+            "receipt": receipt_object,
+        }
+
+    def execute_forward_resume(
+        self, context: dict[str, Any], cleanup: dict[str, Any]
+    ) -> dict[str, Any]:
+        run_root = pathlib.Path(context["run_root"])
+        run_id = context["run_id"]
+        # Fail-closed validation, a byte twin of q12-writer-resume.py's forward branch
+        # (:1088-1134). run_live does NOT reimplement this gate — it lives HERE, in the child.
+        barrier_path = run_root / "database-barrier-receipt.json"
+        barrier_bytes = barrier_path.read_bytes()
+        barrier = json.loads(barrier_bytes)
+        if set(barrier) != {
+            "schema_version",
+            "run_id",
+            "state",
+            "expected_catalog_sha256",
+            "zero_guard_residue",
+            "last_command",
+            "rollback_probes_verified",
+            "probe_receipt_sha256",
+            "terminal_proof_sha256",
+            "database_capability_deleted",
+        }:
+            raise CORE.LifecycleError("database barrier receipt key set is not exact")
+        if barrier_bytes != CORE.complete_object(barrier):
+            raise CORE.LifecycleError("database barrier receipt is not canonical bytes")
+        hex64 = lambda value: isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+        if not (
+            barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v2"
+            and barrier["run_id"] == run_id
+            and barrier["state"] == "guard_cleanup_complete"
+            and barrier["zero_guard_residue"] is True
+            and barrier["database_capability_deleted"] is True
+            and hex64(barrier["expected_catalog_sha256"])
+            and hex64(barrier["terminal_proof_sha256"])
+        ):
+            raise CORE.LifecycleError("database barrier receipt v2 is not exact terminal authority")
+        if not (
+            barrier["last_command"] == "cleanup"
+            and barrier["rollback_probes_verified"] is True
+            and hex64(barrier["probe_receipt_sha256"])
+        ):
+            raise CORE.LifecycleError("forward cleanup receipt is invalid")
+        probe_path = run_root / "database-barrier-probe-receipt.json"
+        probe_bytes = probe_path.read_bytes()
+        if CORE.sha256(probe_bytes) != barrier["probe_receipt_sha256"]:
+            raise CORE.LifecycleError("database barrier probe receipt hash mismatch")
+        probe = json.loads(probe_bytes)
+        if set(probe) != {
+            "schema_version",
+            "run_id",
+            "expected_catalog_sha256",
+            "completed_at",
+            "probes",
+            "residue",
+        }:
+            raise CORE.LifecycleError("database barrier probe receipt key set is not exact")
+        if not (
+            probe["schema_version"] == "megacampus.q12.database-barrier-probes/v1"
+            and probe["run_id"] == run_id
+            and probe["expected_catalog_sha256"] == barrier["expected_catalog_sha256"]
+            and isinstance(probe["completed_at"], str)
+            and re.fullmatch(
+                r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z",
+                probe["completed_at"],
+            )
+        ):
+            raise CORE.LifecycleError("database barrier probe receipt binding is invalid")
+        return {
+            "status": "resumed",
+            "ok": True,
+            "validated_receipt_sha256": CORE.sha256(barrier_bytes),
         }
 
 

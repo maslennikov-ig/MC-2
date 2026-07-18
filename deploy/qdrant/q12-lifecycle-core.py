@@ -3134,6 +3134,55 @@ def write_quiesce_window_marker(engine: "Engine") -> str:
     return str(path)
 
 
+def orchestrate_post_activate_cleanup(
+    engine: "Engine", request: dict[str, Any], run_id: str
+) -> dict[str, Any] | None:
+    """Orchestrator RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY.
+
+    The frozen amendment §5 / D5J chronology ends at ``barrier.activate`` (the 76th journal
+    row) and the journal grammar has NO cleanup ``command_id``. Therefore run_live adds NO
+    journal row for the post-activate barrier cleanup or the forward writer resume — the 76-row
+    journal stays a byte/order twin of the closed composer. Instead, AFTER activate, run_live
+    ORCHESTRATES two children through an executor seam (fixture-seeded in tests; the real
+    docker/PG17 cleanup + ``sudo source-recovery-run.sh writers.resume.forward`` are round R8):
+
+      1. the barrier cleanup, which produces the v2 ``guard_cleanup_complete`` database-barrier
+         receipt (schema ``megacampus.q12.database-barrier-receipt/v2``) plus its
+         ``megacampus.q12.database-barrier-probes/v1`` probe receipt; and
+      2. the forward resume child, which fail-closed VALIDATES that receipt (the exact gate the
+         W-owned ``q12-writer-resume.py`` forward branch enforces) and resumes the writers.
+
+    run_live does NOT reimplement the receipt gate — the fail-closed validation lives in the
+    children. It INVOKES them via the seam and RECORDS their outcomes on the result
+    (operator-visible truth, since the cleanup is deliberately not journaled). The seam mirrors
+    the R4 ``execute_ordinary`` pattern: when the executor exposes both hooks, run_live drives
+    them and returns the recorded ``{"cleanup": ..., "resume": ...}`` outcome; when either hook
+    is absent (the closed composer's plain executor, or a production wiring that has not yet
+    seeded the post-activate children) it degrades safely to ``None`` (no post-activate
+    recording) rather than fabricating an unbacked receipt.
+    """
+    cleanup_hook = getattr(engine.executor, "execute_barrier_cleanup", None)
+    resume_hook = getattr(engine.executor, "execute_forward_resume", None)
+    if cleanup_hook is None or resume_hook is None:
+        return None
+    context = {
+        "run_root": str(engine.run_root),
+        "run_id": run_id,
+        "expected_catalog_sha256": request["expected_catalog_sha256"],
+    }
+    cleanup = cleanup_hook(context)
+    # Light orchestration binding ONLY (this is NOT the receipt gate, which the resume child
+    # owns): the recorded cleanup must carry a hex64 receipt digest, and the resume child must
+    # report validating exactly that receipt. Anything else is a controller-side wiring fault.
+    receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
+    if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
+        raise LifecycleError("post-activate cleanup receipt digest is not a sha256")
+    resume = resume_hook(context, cleanup)
+    if resume.get("validated_receipt_sha256") != receipt_sha256:
+        raise LifecycleError("post-activate resume validated a different cleanup receipt")
+    return {"cleanup": cleanup, "resume": resume}
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
@@ -3277,6 +3326,13 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         str(forward_path) if forward_path.exists() else None
     )
     output["quiesceWindowMarkerPath"] = marker_path
+
+    # RULING 1 — POST-ACTIVATE CLEANUP IS RECEIPT-ONLY (after the 76th journal row, around the
+    # durable reload): orchestrate the barrier cleanup + forward writer resume as children and
+    # RECORD their receipt-backed outcomes on the result. This adds NO journal row (the 76-row
+    # forward journal stays a byte/order twin of the composer); the cleanup receipt is the
+    # operator-visible proof that lives outside the journal. See orchestrate_post_activate_cleanup.
+    output["postActivate"] = orchestrate_post_activate_cleanup(engine, request, run_id)
     return output
 
 
