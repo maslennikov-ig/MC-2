@@ -254,3 +254,78 @@ describe('Q12 live cutover controller (Task-9) — R3 resource-manifest 2-step b
     );
   });
 });
+
+// R4 Sub-round A (design docs/superpowers/specs/2026-07-17-q12-live-controller-design.md §3/§6.4):
+// an injectable, PARITY-NEUTRAL ordinary-execution seam. run_live's ordinary command
+// lifecycles now execute a real child through the executor; the journal stays byte/order
+// identical to the closed composer (the result object is written ONLY to the per-command
+// side file and never consumes the journal, a capability digest, a checkpoint, or an
+// accepted_object_sha256).
+describe('Q12 live cutover controller (Task-9) — R4 Sub-round A: injectable ordinary execution seam', () => {
+  it('executes a real child per ordinary lifecycle without perturbing the journal twin', async () => {
+    const composerRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    const quiescePath = writeQuiesceManifest(composerRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: composerRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const liveRoot = root();
+    const live = await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+
+    // (a) regression guard: the groups-1-13 journal twin still holds under the blessed
+    // exclusions — the seam must stay parity-neutral (unchanged assertion from the R3 test).
+    const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
+    expect(live.journalEntries.length).toBe(c7End);
+    expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
+      composer.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)
+    );
+
+    // (b) each ordinary lifecycle's side result file (ordinary-command-result-<id>-cutover.json)
+    // now parses to the real-child projection, NOT the composer's "q12-joined-fixture"
+    // projection — while the journal's capability_claimed row for the same command still binds
+    // to the SAME capability digest the side file carries (proving the seam never forked the
+    // capability binding, only the result payload).
+    const ordinaryKeys = Object.keys(live.resultPaths).filter(key => key.startsWith('ordinary:'));
+    expect(ordinaryKeys.length).toBe(12);
+    for (const key of ordinaryKeys) {
+      const commandId = key.split(':')[1];
+      const liveResult = JSON.parse(readFileSync(live.resultPaths[key], 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      const composerResultPath = composer.resultPaths.get(key);
+      expect(composerResultPath, `composer side file for ${key}`).toBeTruthy();
+      const composerResult = JSON.parse(readFileSync(composerResultPath!, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      const expectedRealDigest = sha(
+        Buffer.from(`q12-live-real-child:${commandId}:${runId}`, 'utf8')
+      );
+      expect(liveResult.result_sha256).toBe(expectedRealDigest);
+      expect(liveResult.result_sha256).not.toBe(composerResult.result_sha256);
+
+      const claimedRow = live.journalEntries.find(
+        row => row.command_id === commandId && row.outcome === 'capability_claimed'
+      );
+      expect(claimedRow, `capability_claimed row for ${commandId}`).toBeTruthy();
+      expect(liveResult.capability_sha256).toBe(claimedRow!.capability_manifest_sha256);
+    }
+
+    // (c) the run_live executor audit shows exactly one real child execution per ordinary
+    // lifecycle journaled, ADDED ON TOP OF the pre-existing D5 barrier-chain claim
+    // delegations (install/verify-after-base/verify-after-observability/prepare-recovery —
+    // the 4 in-process groups the forward window reaches through the C7 planned exit), which
+    // already crossed a real sandboxed claim-launcher boundary before this round and are
+    // unrelated to the ordinary-execution seam.
+    const D5_CLAIM_DELEGATIONS_THROUGH_C7 = 4;
+    expect(live.childExecutions).toBe(ordinaryKeys.length + D5_CLAIM_DELEGATIONS_THROUGH_C7);
+    expect(live.childExecutions).toBe(16);
+  });
+});
