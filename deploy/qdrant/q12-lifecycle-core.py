@@ -3165,6 +3165,16 @@ def orchestrate_post_activate_cleanup(
     cleanup_hook = getattr(engine.executor, "execute_barrier_cleanup", None)
     resume_hook = getattr(engine.executor, "execute_forward_resume", None)
     if cleanup_hook is None or resume_hook is None:
+        # R5 Sub-round F SAFETY GATE (production only): a PRODUCTION cutover that has already
+        # ACTIVATED (the 76th journal row) and then silently skipped the post-activate cleanup +
+        # forward resume would leave the paused writers NEVER RESUMED — a severe incident. The real
+        # docker/PG17 cleanup + resume executor hooks are wired in round R8; until then a production
+        # run MUST fail closed with a NAMED error rather than returning None. The fixture path
+        # (non-production, hooks present) is unaffected and keeps degrading to None when absent.
+        if request.get("production") is True:
+            raise LifecycleError(
+                "post-activate cleanup/resume executor not wired (deferred to R8)"
+            )
         return None
     context = {
         "run_root": str(engine.run_root),
@@ -6648,6 +6658,20 @@ def parser() -> argparse.ArgumentParser:
     smoke.add_argument("action", choices=("observe",))
     smoke.add_argument("--run-id", required=True)
     smoke.add_argument("--observation-fixture", required=True)
+    # R5 Sub-round F — operator-reachable forward-cutover controllers. `live` drives a fresh
+    # forward cutover (run_live); `recover` resumes an interrupted one from an existing run root
+    # (run_recover). Both build the SAME production request as supervisor (run-root shape, canonical
+    # cutover.lock FD9 lease, production=True) plus the fields run_live/run_recover consume, so both
+    # subparsers carry the identical operator-supplied argv surface.
+    for name in ("live", "recover"):
+        controller = commands.add_parser(name)
+        controller.add_argument("--run-id", required=True)
+        controller.add_argument("--release-sha", required=True)
+        controller.add_argument("--operator-digest", required=True)
+        controller.add_argument("--resource-manifest-sha256", required=True)
+        controller.add_argument("--quiesce-manifest-sha256", required=True)
+        controller.add_argument("--expected-catalog-sha256", required=True)
+        controller.add_argument("--quiesce-manifest-path", required=True)
     return root
 
 
@@ -6703,6 +6727,39 @@ def main() -> int:
             "production": True,
         }
         output = run_supervisor(request, ProductionExecutor())
+        sys.stdout.buffer.write(complete_object(output))
+        return 0
+    if arguments.mode in ("live", "recover"):
+        # R5 Sub-round F: mirror the supervisor branch's production seam discipline (run-root shape
+        # /opt/megacampus/backups/q12/<run-id>, canonical parent cutover.lock inherited on FD9 under
+        # an exclusive flock, production=True) and add exactly the fields run_live/run_recover
+        # consume (quiesce manifest path/digest, expected catalog, release/operator identity).
+        run_root = pathlib.Path(f"/opt/megacampus/backups/q12/{arguments.run_id}")
+        ensure_directory(run_root)
+        lock_path = run_root.parent / "cutover.lock"
+        lease_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        if lease_fd != 9:
+            os.dup2(lease_fd, 9)
+            os.close(lease_fd)
+            lease_fd = 9
+        fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_stat = os.fstat(lease_fd)
+        request = {
+            "run_root": str(run_root),
+            "run_id": arguments.run_id,
+            "release_sha": arguments.release_sha,
+            "operator_digest": arguments.operator_digest,
+            "resource_manifest_sha256": arguments.resource_manifest_sha256,
+            "quiesce_manifest_sha256": arguments.quiesce_manifest_sha256,
+            "expected_catalog_sha256": arguments.expected_catalog_sha256,
+            "quiesce_manifest_path": arguments.quiesce_manifest_path,
+            "rotation_required": False,
+            "lease_fd": 9,
+            "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
+            "production": True,
+        }
+        controller = run_live if arguments.mode == "live" else run_recover
+        output = controller(request, ProductionExecutor())
         sys.stdout.buffer.write(complete_object(output))
         return 0
     output = run_claim(arguments, ProductionExecutor())
