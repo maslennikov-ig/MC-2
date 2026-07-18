@@ -459,18 +459,54 @@ probe_receipt_sha256:null}`; q12_guard schema present with its 4 tables + 10 fun
   reinstall is the team-lead's pre-window step. R4's full validateTransition chain (the
   `q12-source-manifest.ts` function-set drift) remains open and untouched by this round.
 
+- **Guard-surface allowlist reconciliation round (base `3596aa72`).** Reconciled
+  `q12-source-manifest.ts`'s `q12_guard` allowlist to the barrier's real install, exact-set,
+  fail-closed, one-way (source-manifest expectations moved to match the barrier): `GUARD_FUNCTIONS`
+  5→10 (added `assert_controller_binding()`, `enforce_ddl_barrier()`, `quiesce_client_backends()`,
+  `verify_install_resume_state()`, `verify_activated_state()`); new `GUARD_TRIGGERS` exact-set
+  (2→8, adding the 6 `q12_guard_immutable`/`q12_guard_immutable_truncate` pairs on
+  `active_run`/`baseline`/`migration_guards`); event trigger confirmed NOT surfaced by the
+  capture SQL (no allowlist entry possible/needed); ACL exact-set corrected (`MAINTAIN` privilege
+  added for PG17, `grantable` `true`→`false`, the 4 array types' un-revocable `PUBLIC USAGE`
+  mirrored as an explicit exemption matching the barrier's own `typcategory='A'` exclusion).
+  Beyond the enumerated allowlist, driving this to GREEN against the real barrier surfaced and
+  required fixing a genuine PostgreSQL UNION-type-resolution truncation defect in `catalogSql()`'s
+  `object_owners`/`object_acls`/`comments`/`security_labels` blocks (bare `name`-typed columns
+  mixed with `text`-computed columns in the same UNION column resolve to `name`, silently
+  truncating to 63 bytes; fixed with explicit `::text` casts, root-caused via `pg_typeof` before
+  guessing). A third, unrelated `cron.job` row-hash normalization gap was found and explicitly
+  NOT fixed (STOP-and-report; not a guard-surface question — see Open risks). RED confirmed on
+  real PG17 (`unexpected baseline-to-cutover delta: q12_guard function set`); allowlist GREEN
+  proven three ways (no-docker fixture positive/negative against a real barrier-derived capture,
+  the real end-to-end harness advancing past every q12_guard check, and direct psql
+  introspection). No-docker 305/305 (303 existing + 2 new); `pnpm type-check` 0; frozen bytes
+  (`q12-command-manifest.json` `aaec6fc2…`, `q12-database-barrier.sh` `3673ee49…`,
+  `q12-structural-catalog.sql` `0b8a943f…`) unchanged; zero leftover docker. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-source-manifest-guard-surface.md`.
+
 ## Open risks carried forward
 
-- **`q12-source-manifest.ts` q12_guard function-set drift (found this round, untouched).** The
-  tool's `validateExactGuardDelta` hardcodes a 5-function `q12_guard` allowlist
-  (`assert_capability, enforce_write_barrier, extend_guard, verify_capability,
-verify_expected_guards`); the real, current barrier installs 10 (adds
-  `assert_controller_binding, enforce_ddl_barrier, quiesce_client_backends,
-verify_activated_state, verify_install_resume_state`). This is why the real-PG17 harness's
-  diagnostic `capture` step still fails ("unexpected baseline-to-cutover delta: q12_guard
-  function set") even after the barrier reaches `maintenance_guarded`. `q12-source-manifest.ts`
-  is frozen/out of scope for the barrier-fix round; reconciling the allowlist is a separate,
-  explicitly-scoped future round (full R4 validateTransition closure).
+- **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface
+  reconciliation round above (`GUARD_FUNCTIONS`/`GUARD_TRIGGERS`/ACL exact-sets now match the
+  barrier's real 10-function/8-trigger/full-ACL install). Superseded by the next two items.
+- **`cron.job` row-hash normalization gap (found this round, NOT fixed — STOP-and-report).**
+  With the guard-surface allowlist complete, the real end-to-end capture advances past every
+  q12_guard-specific check and fails only on a generic `unexpected baseline-to-cutover delta`,
+  isolated to `cron.job`'s `row_sha256` differing between baseline and cutover (acl/owner/kind/
+  oid/name identical). This is expected content drift (the barrier deactivates every cron job
+  during cutover), but `validateTransition` only normalizes the separate top-level `cron_jobs`
+  summary array's `active` flag before comparing — it never normalizes the authoritative
+  `relations` section's row-content hash for `cron.job` the same way. Not a q12_guard-surface
+  question; needs its own semantics decision and TDD round before real-capture `capture_rc=0` is
+  achievable end-to-end. Recommend a dedicated Beads issue.
+- **Bare name/text UNION-truncation hazard outside q12_guard (found and partially fixed this
+  round).** `catalogSql()`'s `object_owners`/`object_acls`/`comments`/`security_labels` UNION ALL
+  blocks mixed bare `name`-typed columns with `text`-computed columns in the same output column;
+  PostgreSQL 17.10 resolves that column to `name`, silently truncating every row to
+  NAMEDATALEN-1 (63) bytes (confirmed via `pg_typeof`). Fixed with explicit `::text` casts for the
+  q12_guard-affecting case (evidenced, in scope for GREEN). The same hazard likely still applies
+  to the tool's coverage of the real production schemas (public/auth/storage/cron/net); a
+  broader audit was out of scope for this round and is worth a follow-up sweep.
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
   onward re-sequences (quiesce after `prepare-recovery`) and the D5J §5 chronology must be
   re-frozen first — a larger design-amendment stop. R1 and the parity harness are ruling
