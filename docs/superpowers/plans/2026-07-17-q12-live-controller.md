@@ -341,6 +341,28 @@ active=false`; `ALTER DATABASE postgres SET default_transaction_read_only=on`; c
     resume-time mode from the immutable quiesce-manifest `barrier.state` instead of the mutable
     marker, plus extra malformed-marker/reverse-flip negatives.
 
+- **R4 Sub-round B done** (RED `605d359b2` → GREEN `70ee913a4`), no-docker ORCHESTRATOR-REQUIRED
+  proof that `run_live`'s in-process barrier chain (`d5()` → `engine.retained_chain` →
+  `delegate_claim` → `executor.launch_claim`) drives the REAL deployed claim wrapper
+  `deploy/qdrant/q12-capability-run.sh` end to end — unmodified, run verbatim under `bwrap`,
+  with only its DB-barrier child (`q12-database-barrier.sh`) sandbox-faked (the real-PG17/DB
+  transition stays a separate later round). No production file changed: Sub-round A's finding
+  that the barrier claim path is already executor-injected meant only the fixture needed
+  wiring. `fixtures/q12-retained-barrier-runner.py` adds
+  `LiveSandboxedDeployedWrapperExecutor(SandboxedDeployedWrapperExecutor, LiveOrdinaryExecutor)`
+  (multiple inheritance composing the real-wrapper `launch_claim` with Sub-round A's
+  `execute_ordinary`, no duplicated method bodies) selected via a new
+  `executeActualWrapper?: boolean` on `LiveControllerFixtureSpec`
+  (`fixtures/q12-retained-barrier-contract.ts`, additive). `bwrap` (bubblewrap 0.11.1) was
+  already present and ran cleanly — no harness fix needed. Verified: groups-1-13 journal twin
+  still holds under the blessed exclusion set; `executor-audit.json` reports
+  `actualDeployedWrapper === true`; each of the 4 in-process barrier claims
+  (install/verify-after-base/verify-after-observability/prepare-recovery) produced a retained
+  barrier result through the real wrapper. Suites 303/303 (302 prior + 1 new); tsc 0; frozen
+  bytes unchanged. Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r4.md` (Sub-round B
+  section added). Sub-round C (real-PG17 positive) remains PENDING the same two orchestrator
+  rulings — not attempted here.
+
 ## Open risks carried forward
 
 - **OQ1 is the gating unknown.** If the owner rules Side B (quiesce moves late) instead, R2
