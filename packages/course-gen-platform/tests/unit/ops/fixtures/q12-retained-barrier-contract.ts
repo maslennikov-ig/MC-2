@@ -585,6 +585,9 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
   /** R4 Sub-round A: the run_live executor's real-child execution count (executor-audit.json
    *  childExecutions), surfaced directly on the output for convenience. */
   childExecutions: number;
+  /** R5 Sub-round A: run_live's forward final-writer manifest (FWM) artifact path, mirroring
+   *  the composer's forwardFinalWriterManifestPath output augmentation. */
+  forwardFinalWriterManifestPath: string | null;
 }> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
@@ -601,13 +604,39 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
     resourceManifestPaths?: Record<string, string>;
     resultPaths?: [string, string][];
     childExecutions?: number;
+    forwardFinalWriterManifestPath?: string | null;
   };
   return {
     journalEntries: output.journalEntries,
     resourceManifestPaths: output.resourceManifestPaths ?? {},
     resultPaths: Object.fromEntries(output.resultPaths ?? []),
     childExecutions: output.childExecutions ?? 0,
+    forwardFinalWriterManifestPath: output.forwardFinalWriterManifestPath ?? null,
   };
+}
+
+/**
+ * R5 Sub-round A negatives: invoke the REAL production
+ * Engine.publish_final_writer_manifest/derive_root_writer_inventory on a fresh fixture run
+ * root through a focused seam, so the fail-closed proofs exercise the exact same production
+ * code path run_live and run_joined_composer both use (not a re-implementation).
+ */
+export async function runFwmNegative(spec: {
+  case: 'bad-mode' | 'no-targets';
+  runRoot: string;
+  runId: string;
+  quiesceManifestPath?: string;
+}): Promise<{ ok: boolean; error: string }> {
+  await Promise.resolve();
+  const child = spawnSync('/usr/bin/python3', [RUNNER, '--fwm-negative'], {
+    input: JSON.stringify(spec),
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (child.status === 2) return { ok: false, error: child.stderr.trim() };
+  if (child.status === 3) throw new Error('fwm negative fixture unexpectedly succeeded');
+  throw new Error(`fwm negative fixture failed (${child.status}): ${child.stderr.trim()}`);
 }
 
 /**

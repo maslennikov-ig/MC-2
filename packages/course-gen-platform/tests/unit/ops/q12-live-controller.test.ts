@@ -8,6 +8,7 @@ import {
   deriveRootRetainedBarrierFixtureRunId,
   materializeJoinedRetainedBarrierFixture,
   materializeLiveController,
+  runFwmNegative,
   sha,
   validateStableBindingWalk,
 } from './fixtures/q12-retained-barrier-contract.js';
@@ -105,6 +106,21 @@ function withoutBlessedExclusions(row: Record<string, unknown>): Record<string, 
   return rest;
 }
 
+// R5 Sub-round A row-scoped exclusion (design docs/superpowers/specs/2026-07-17-
+// q12-live-controller-design.md §6a; ratified 3-part FWM parity split). The blessed set stays
+// CLOSED for every row; only the group-14 FWM accepted row (writers.resume.forward/accepted)
+// ALSO drops accepted_object_sha256 — that digest hashes the whole FWM file, which carries the
+// two per-run-root physical fields (publication_intent_journal_entry_hash,
+// input_checkpoint_sha256, both binding the journal's device+inode), so the row's digest itself
+// is per-run-root. Every other row (1-67, 69+) keeps exactly the 4-field blessed set.
+function withParityExclusions(row: Record<string, unknown>): Record<string, unknown> {
+  const rest = withoutBlessedExclusions(row);
+  if (row.command_id === 'writers.resume.forward' && row.outcome === 'accepted') {
+    delete rest.accepted_object_sha256;
+  }
+  return rest;
+}
+
 function resourceAt(rows: readonly Record<string, unknown>[], index: number): string {
   return String(rows[index].resource_manifest_sha256);
 }
@@ -138,15 +154,14 @@ describe('Q12 live cutover controller (Task-9) — R3 resource-manifest 2-step b
     });
 
     // Twin through group 13 (deploy.prepare/completed = the design §6a C7 planned-exit
-    // checkpoint): same row count and same rows on every shared binding versus the composer's
-    // forward prefix. seq is NOT excluded (the exclusion set is blessed and closed), so the
-    // controller must reproduce the composer's exact interleave of ordinary lifecycles and
-    // in-process barrier chains. The group-14 FWM, deploy.commit and activate are later rounds
-    // (the FWM's accepted_object_sha256 is itself per-run-root — it embeds the checkpoint
-    // digest — and is out of scope until the FWM round).
+    // checkpoint): same rows on every shared binding versus the composer's forward PREFIX
+    // through that boundary. seq is NOT excluded (the exclusion set is blessed and closed), so
+    // the controller must reproduce the composer's exact interleave of ordinary lifecycles and
+    // in-process barrier chains. Since R5 Sub-round A, run_live continues past this boundary
+    // to journal the group-14 FWM (see the dedicated R5 Sub-round A describe block below for
+    // that parity proof), so this is now a PREFIX comparison rather than a full-length one.
     const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
-    expect(live.journalEntries.length).toBe(c7End);
-    expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
+    expect(live.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)).toEqual(
       composer.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)
     );
 
@@ -279,10 +294,10 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round A: injectable or
     });
 
     // (a) regression guard: the groups-1-13 journal twin still holds under the blessed
-    // exclusions — the seam must stay parity-neutral (unchanged assertion from the R3 test).
+    // exclusions (a PREFIX comparison since R5 Sub-round A extends run_live past this
+    // boundary to the group-14 FWM) — the seam must stay parity-neutral.
     const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
-    expect(live.journalEntries.length).toBe(c7End);
-    expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
+    expect(live.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)).toEqual(
       composer.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)
     );
 
@@ -356,11 +371,11 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round B: real deployed
     });
 
     // (a) regression guard: the groups-1-13 journal twin still holds under the blessed
-    // exclusions — routing the barrier claims through the real wrapper must stay
-    // parity-neutral, exactly like the ordinary-execution seam (R4 Sub-round A).
+    // exclusions (a PREFIX comparison since R5 Sub-round A extends run_live past this
+    // boundary to the group-14 FWM) — routing the barrier claims through the real wrapper
+    // must stay parity-neutral, exactly like the ordinary-execution seam (R4 Sub-round A).
     const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
-    expect(live.journalEntries.length).toBe(c7End);
-    expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
+    expect(live.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)).toEqual(
       composer.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)
     );
 
@@ -391,5 +406,116 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round B: real deployed
       expect(result.status).toBe('accepted');
       expect(result.schema_version).toBe('megacampus.q12.retained-command-result/v1');
     }
+  });
+});
+
+// R5 Sub-round A (design docs/superpowers/specs/2026-07-17-q12-live-controller-design.md §6a):
+// run_live now journals amendment section 5 group 14 — the forward final-writer manifest
+// (FWM) — as a byte/order twin of run_joined_composer's
+// publish_final_writer_manifest("forward", inventory, ...) call. The FWM inventory stays the
+// FIXTURE derivation (derive_root_writer_inventory, deterministic from run_id + quiesce bytes)
+// exactly like the composer. This round proves the ratified 3-part parity split: (1) the two
+// new rows' structure, (2) the full 68-row journal twin under the blessed exclusions PLUS a
+// row-scoped exclusion for the FWM accepted row's accepted_object_sha256 (a per-run-root
+// digest of the whole FWM file), and (3) a SEPARATE byte parity of the FWM file content itself
+// once its two per-run-root physical fields are stripped.
+describe('Q12 live cutover controller (Task-9) — R5 Sub-round A: forward final-writer manifest (FWM) parity', () => {
+  it('journals the group-14 FWM as a byte/order twin of the composer with root-independent FWM-content byte parity', async () => {
+    const composerRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    const quiescePath = writeQuiesceManifest(composerRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: composerRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const live = await materializeLiveController({
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+
+    // --- Part 1: ROW STRUCTURE — rows 67 (intent) and 68 (accepted) exist in that order ---
+    const fwmIntentIndex = witnessIndex(live.journalEntries, 'writers.resume.forward', 'intent');
+    const fwmAcceptedIndex = witnessIndex(
+      live.journalEntries,
+      'writers.resume.forward',
+      'accepted'
+    );
+    expect(fwmIntentIndex).toBe(66); // row 67
+    expect(fwmAcceptedIndex).toBe(67); // row 68
+    expect(live.journalEntries.length).toBe(68);
+    expect(live.journalEntries[fwmIntentIndex].phase).toBe('prepared_quiesced');
+    expect(live.journalEntries[fwmAcceptedIndex].phase).toBe('prepared_quiesced');
+    expect(live.journalEntries[fwmAcceptedIndex].accepted_object_kind).toBe(
+      'final_writer_manifest'
+    );
+    expect(live.journalEntries[fwmIntentIndex].command_sha256).toBe(
+      composer.journalEntries[fwmIntentIndex].command_sha256
+    );
+    expect(live.journalEntries[fwmAcceptedIndex].command_sha256).toBe(
+      composer.journalEntries[fwmAcceptedIndex].command_sha256
+    );
+
+    // --- Part 2: FULL-JOURNAL TWIN through 68 rows, row-scoped exclusion on the FWM
+    // accepted row only (every other row keeps the closed 4-field blessed set). ---
+    expect(live.journalEntries.map(withParityExclusions)).toEqual(
+      composer.journalEntries.slice(0, 68).map(withParityExclusions)
+    );
+
+    // --- Part 3: SEPARATE FWM-content byte parity on the root-independent fields ---
+    expect(live.forwardFinalWriterManifestPath).toBeTruthy();
+    expect(composer.forwardFinalWriterManifestPath).toBeTruthy();
+    const stripPhysicalFields = (value: Record<string, unknown>): Record<string, unknown> => {
+      const rest = { ...value };
+      delete rest.publication_intent_journal_entry_hash;
+      delete rest.input_checkpoint_sha256;
+      return rest;
+    };
+    const liveFwm = JSON.parse(
+      readFileSync(live.forwardFinalWriterManifestPath!, 'utf8')
+    ) as Record<string, unknown>;
+    const composerFwm = JSON.parse(
+      readFileSync(composer.forwardFinalWriterManifestPath!, 'utf8')
+    ) as Record<string, unknown>;
+    // both physical fields are actually present (proves the strip is meaningful, not a no-op)
+    expect(liveFwm.publication_intent_journal_entry_hash).toBeTruthy();
+    expect(liveFwm.input_checkpoint_sha256).toBeTruthy();
+    expect(canonical(stripPhysicalFields(liveFwm))).toBe(
+      canonical(stripPhysicalFields(composerFwm))
+    );
+    // and they are genuinely per-run-root (differ between the two independent run roots)
+    expect(liveFwm.publication_intent_journal_entry_hash).not.toBe(
+      composerFwm.publication_intent_journal_entry_hash
+    );
+    expect(liveFwm.input_checkpoint_sha256).not.toBe(composerFwm.input_checkpoint_sha256);
+
+    // --- self-consistency: the live FWM file is a real 0400 artifact whose digest IS the
+    // live row-68 accepted_object_sha256 (mirrors the R3 resource-manifest self-consistency
+    // check; proves the excluded value is a real artifact digest, not an arbitrary string). ---
+    const liveFwmBytes = readFileSync(live.forwardFinalWriterManifestPath!);
+    expect(statSync(live.forwardFinalWriterManifestPath!).mode & 0o777).toBe(0o400);
+    expect(sha(liveFwmBytes)).toBe(
+      String(live.journalEntries[fwmAcceptedIndex].accepted_object_sha256)
+    );
+  });
+
+  it('fails closed on an invalid FWM mode and on a forward publish with no target identities', async () => {
+    const quiesceRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+    const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+
+    const badMode = await runFwmNegative({ case: 'bad-mode', runRoot: root(), runId });
+    expect(badMode.ok).toBe(false);
+    expect(badMode.error).toMatch(/final writer manifest mode mismatch/u);
+
+    const noTargets = await runFwmNegative({
+      case: 'no-targets',
+      runRoot: root(),
+      runId,
+      quiesceManifestPath: quiescePath,
+    });
+    expect(noTargets.ok).toBe(false);
+    expect(noTargets.error).toMatch(/forward manifest requires target identities/u);
   });
 });

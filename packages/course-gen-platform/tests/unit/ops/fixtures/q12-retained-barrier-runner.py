@@ -733,7 +733,52 @@ def run_live_fixture(spec: dict) -> int:
     return 0
 
 
+def run_fwm_negative_fixture(spec: dict) -> int:
+    """R5 Sub-round A negatives: publish_final_writer_manifest fail-closed proofs.
+
+    A focused, real (non-mocked) call into the production
+    ``Engine.publish_final_writer_manifest``/``derive_root_writer_inventory`` on a fresh
+    fixture run root, exercising the exact same code path run_live and run_joined_composer
+    both use. Two cases: "bad-mode" (mode outside forward/rollback) and "no-targets" (a
+    forward-mode publish against an inventory with no target identities).
+    """
+    case = spec["case"]
+    root = fixture_root(spec["runRoot"])
+    request = {
+        "run_root": str(root),
+        "run_id": spec["runId"],
+        "release_sha": "0123456789abcdef0123456789abcdef01234567",
+        "operator_digest": "1" * 64,
+        "resource_manifest_sha256": "2" * 64,
+        "quiesce_manifest_sha256": "0" * 64,
+        "rotation_required": False,
+    }
+    executor = NoIoExecutor()
+    executor.root = root
+    engine = CORE.Engine(request, executor)
+    try:
+        if case == "bad-mode":
+            engine.publish_final_writer_manifest("sideways", None, {"command_sha256": "a" * 64})
+        elif case == "no-targets":
+            quiesce_bytes = pathlib.Path(spec["quiesceManifestPath"]).read_bytes()
+            inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=False)
+            engine.publish_final_writer_manifest(
+                "forward", inventory, {"command_sha256": "a" * 64}
+            )
+        else:
+            raise RuntimeError(f"unknown fwm negative case: {case}")
+    except CORE.LifecycleError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print("unexpectedly succeeded", file=sys.stderr)
+    return 3
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--fwm-negative":
+        if len(sys.argv) != 2:
+            raise RuntimeError("invalid fwm-negative arguments")
+        return run_fwm_negative_fixture(json.load(sys.stdin))
     if len(sys.argv) > 1 and sys.argv[1] == "--derive-run-id":
         if len(sys.argv) != 2:
             raise RuntimeError("invalid run-id derivation arguments")
