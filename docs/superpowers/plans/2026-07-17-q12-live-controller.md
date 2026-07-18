@@ -591,6 +591,37 @@ type-check` 0 across every workspace. Frozen bytes unchanged (`q12-command-manif
   write + post-activate observation point. Consumer-side missing/stray/wrong-run_id negatives are
   W-amendment-owned. R5-D/E remain held for the two pending rulings.
 
+- **R5 Sub-round E done** (RED `1ca451f56` → GREEN `942da4f62` → docs). Orchestrator RULING 1
+  (post-activate cleanup is RECEIPT-ONLY) implemented: the frozen §5/D5J chronology ends at
+  `barrier.activate` (76 journal rows) and the grammar has no cleanup `command_id`, so `run_live`
+  adds NO journal row for the post-activate cleanup or resume. After the 76th row (around
+  `reload_durable`), a new `orchestrate_post_activate_cleanup(engine, request, run_id)` drives, via
+  an executor seam mirroring the R4 `execute_ordinary` pattern, two children: `execute_barrier_
+cleanup` emits a v2 `megacampus.q12.database-barrier-receipt/v2` `guard_cleanup_complete` receipt
+  (+ its `megacampus.q12.database-barrier-probes/v1` probe receipt), both 0400 canonical artifacts
+  written via `immutable_publish`; `execute_forward_resume` is a fail-closed byte twin of the
+  W-owned `q12-writer-resume.py` forward branch (`:1088-1134`) that VALIDATES that exact receipt
+  projection and reports `resumed`. `run_live` does NOT reimplement the receipt gate (it lives in
+  the children); it INVOKES them, does a light orchestration binding only (hex64 receipt digest;
+  the resume child must report validating that same receipt), and RECORDS the outcomes on
+  `output["postActivate"] = {"cleanup": …, "resume": …}` (operator-visible truth, since the cleanup
+  is deliberately not journaled). Absent hooks degrade safely to `None`. The seam never touches the
+  journal, a capability digest, a checkpoint, `self.child_executions` (R4's count stays 18), or an
+  `accepted_object_sha256`, so the 76-row forward journal stays a byte/order twin of the composer.
+  Test asserts (a) recorded cleanup/resume ok+status, (b) the v2 receipt shape (exact 10-key set,
+  schema/state/last_command=cleanup/rollback_probes_verified/probe binding) so the real forward
+  gate would accept it — with the receipt file being a real 0400 canonical artifact whose digest is
+  the recorded sha256 and the probe file digest matching `probe_receipt_sha256`, and (c)
+  parity-neutrality (length 76 + full twin, no cleanup/resume command_id in any row).
+  `q12-live-controller.test.ts` 9/9; 4-suite regression 307/307; `tsc --noEmit` 0; frozen bytes
+  unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched; `run_joined_composer`
+  body byte-unchanged. Design §5.2 "post" row wording corrected in §6a item 5 (ruling 1c). Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5e.md`. **Deferred (flagged):** the real
+  docker/PG17 `q12-database-barrier.sh cleanup` child and the real `sudo source-recovery-run.sh
+writers.resume.forward` are round R8 (this round seeds fixture children that emit/validate
+  receipt-shaped artifacts); the full terminal-proof/baseline/archive file cross-checks beyond the
+  receipt projection at `:1088-1134` also ride on R8's real gate.
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface

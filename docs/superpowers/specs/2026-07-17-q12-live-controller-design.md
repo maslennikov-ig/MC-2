@@ -476,6 +476,15 @@ sections above (evidence re-verified against the same byte-identical files):
    1 requires exclusions be blessed, not ad-hoc. (Substitution VALUES sourced from the artifact
    are seeded to the fixture derivations in the parity test, so `command_sha256` parity holds.)
 
+5. **§5.2 "post" row wording corrected (ruling 1c, receipt-only).** The §5.2 forward-sequence
+   `post` row's prose ("orchestrate `q12-database-barrier.sh cleanup` → v2 `guard_cleanup_complete`
+   … `writers.resume.forward`") read as if the post-activate cleanup/resume were journaled steps;
+   they are NOT. The frozen §5/D5J chronology ends at `barrier.activate` (76 rows) and the journal
+   grammar has no cleanup `command_id`, so the cleanup is RECEIPT-ONLY: `run_live` adds no journal
+   row and instead RECORDS the v2 receipt-backed cleanup + resume outcomes off-journal
+   (`output["postActivate"]`). The bytes win over the prose — same correction class as the R1
+   parity-wording note. (Implemented R5 Sub-round E.)
+
 ## 7. Bounded implementation (see the companion plan)
 
 `docs/superpowers/plans/2026-07-17-q12-live-controller.md` bounds the work into TDD
