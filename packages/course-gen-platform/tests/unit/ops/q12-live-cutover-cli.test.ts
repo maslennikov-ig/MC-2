@@ -137,4 +137,37 @@ describe('Q12 live/recover CLI wiring (R5 Sub-round F)', () => {
     expect(child.status).toBe(0);
     expect(child.stdout).toContain('GATE_OK');
   });
+
+  // PRE-FLIGHT GATE (the material fix): the late post-activate gate above fires only AFTER the
+  // 76th row (activate — the point of no return); in production that would journal all the way
+  // through activate and only THEN refuse, stranding an ACTIVATED barrier with writers quiesced
+  // and post-activate unrun. So run_live AND run_recover fail closed at the TOP — BEFORE the
+  // genesis row / any run-root mutation / Engine construction — when a production run's executor
+  // lacks the R8 post-activate hooks. The late gate stays as defense-in-depth.
+  it('refuses a production live/recover BEFORE any journal row when the post-activate hooks are absent', () => {
+    const probe = [
+      'import importlib.util, pathlib, sys, tempfile',
+      's=importlib.util.spec_from_file_location("q12_preflight_probe", sys.argv[1])',
+      'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
+      'for entry in ("run_live", "run_recover"):',
+      ' root=pathlib.Path(tempfile.mkdtemp())',
+      ' raised=None',
+      ' try:\n  getattr(m, entry)({"production": True, "run_root": str(root)}, object())\n except m.LifecycleError as e:\n  raised=str(e)',
+      ' assert raised == "post-activate cleanup/resume executor not wired (deferred to R8)", (entry, raised)',
+      // zero side effects: the run never started — the run root is completely empty (no phase.jsonl,
+      // no capabilities dir), so nothing was journaled and no barrier was activated.
+      ' assert list(root.iterdir()) == [], (entry, "run-root mutated before pre-flight refusal", list(root.iterdir()))',
+      // the pre-flight is production-gated only: a non-production run is unaffected.
+      'assert m.require_post_activate_executor({"production": False}, object()) is None',
+      'assert m.require_post_activate_executor({}, object()) is None',
+      'print("PREFLIGHT_OK")',
+    ].join('\n');
+    const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
+      encoding: 'utf8',
+      env: ENV,
+    });
+    expect(child.stderr).toBe('');
+    expect(child.status).toBe(0);
+    expect(child.stdout).toContain('PREFLIGHT_OK');
+  });
 });
