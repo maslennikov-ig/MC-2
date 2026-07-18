@@ -751,6 +751,37 @@ writers.resume.forward` are round R8 (this round seeds fixture children that emi
   real-barrier test); cross-fixture regression 205 + 380 pass; `tsc --noEmit` 0; frozen trio
   sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS; runner carries 0
   forbidden serializer literals.
+- **R8-I-B done** (RED → GREEN → docs; design §6b.2, RULING R8-C = Option A ratified 2026-07-18).
+  The **generalized recover head-dispatch**. `run_recover`'s R5 two-head `if` chain is replaced by
+  ONE table, `_RECOVER_RESUME_FROM`, covering all 8 clean completed-group boundary head classes;
+  each resumes the SHARED `drive_forward_sequence` from the group AFTER the head, converging
+  **byte/order-identical to an uninterrupted 81-row twin** (§6b.2 condition 3). To make the forward
+  sequence **resumable-from-any-group**, `drive_forward_tail` (groups 14-16+cleanup only) is
+  generalized into `drive_forward_sequence`, which walks `_FORWARD_STEP_ORDER` (the linear groups
+  1-16 + FWM) with a `resume_from` start step and the existing `stop_after` seam; BOTH `run_live`
+  and `run_recover` drive it, so `run_live`'s **81-row journal is byte-unchanged** (proven: all
+  R5/R8-I-A tests + the R8-I-B twin comparisons stay green). The recover walk request-global is
+  re-pinned to the **genesis row** (`entries[0]`) so a resume from a mid-window snapshot-segment
+  head still converges the full-journal `validate_stable_binding_walk`. Head map: **1** install/
+  completed→group 3, **2** verify-after-base/completed→migration.observability.apply, **3**
+  verify-after-observability/completed→migrations_applied, **4** prepare-recovery/completed→
+  source.forward, **5** activate/completed→cleanup segment (**subsumes R8-D**), **6** deploy.prepare/
+  completed→FWM [R5], **7** writers.resume.forward/accepted→deploy.commit [R5], **8** barrier.cleanup/
+  - → converge the cleanup segment (**subsumes R8-E**: accepted = idempotent no-op; mid-cleanup =
+    continue from the interrupted outcome). `orchestrate_post_activate_cleanup` is made **resumable**
+    (skip durable rows, reconstruct the immutable capability digest, reuse the durable
+    `command_sha256`, re-run/reuse the barrier child; fresh path byte-identical). **Fail-closed
+    remains** for mid-lifecycle barrier heads (with the R5-D2 standalone-supervisor pointer, now
+    **amended in lockstep** to fire ONLY for a claimed-but-not-completed head), unknown `command_id`s,
+    and any broken/short chain (rejected by the chain walk BEFORE dispatch — CHAIN FIRST). Two
+    behavior-preserving stop checkpoints (`barrier.verify-after-base`, `barrier.activate`) + a
+    `cleanupCrashAfter` fixture crash probe were added to construct the barrier-completed and
+    mid-cleanup recover heads §6b.6 requires. `q12-live-controller.test.ts` **20/20** (7 new R8-I-B
+    tests: 3 barrier-head convergence, cleanup-accepted no-op, mid-cleanup crash resume, mid-lifecycle
+    fail-closed, CHAIN FIRST); cross-fixture regression (quiesce-seam, w-composition-seam,
+    source-recovery-runtime, live-cutover, live-cutover-cli) **460/460**; `tsc --noEmit` 0; frozen
+    trio sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The
+    §6b.6 real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round covers the fixture leg.
 
 ## Open risks carried forward
 

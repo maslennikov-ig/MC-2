@@ -416,11 +416,14 @@ predecessor-CAS + `O_APPEND|O_DSYNC`, never concurrently.
      composition actually holds on a single journal (mid-barrier crash → standalone supervisor
      re-run → `recover` continue). If it does not compose end-to-end, that is a **found defect**
      (a real R5-D2 follow-up), not a scope extension.
-- **SUPERSEDED — see §6b.2 (R8-C Option A, defect #10, ratified 2026-07-18).** **Operator
-  mid-incident: do NOT follow the "exactly two/three clean checkpoints" story above — see §6b.2
-  (the 8-head recover dispatch).** `recover` is generalized to resume from ANY clean
-  completed-group head (including every `barrier.<op>/completed`), so this clause's two-step
-  mid-barrier composition now holds by construction and is the supported path. The full
+- **SUPERSEDED — see §6b.2 (R8-C Option A, defect #10, ratified 2026-07-18; IMPLEMENTED R8-I-B
+  2026-07-18).** **Operator mid-incident: do NOT follow the "exactly two/three clean checkpoints"
+  story above — see §6b.2 (the 8-head recover dispatch).** `recover` is generalized to resume from
+  ANY clean completed-group head (including every `barrier.<op>/completed`), so this clause's
+  two-step mid-barrier composition now holds by construction and is the supported path. As built
+  (R8-I-B), the dispatch is `run_recover`'s `_RECOVER_RESUME_FROM` table + the `barrier.cleanup`
+  branch driving the shared `drive_forward_sequence`; the mid-lifecycle standalone-supervisor
+  pointer (R5-D2) is retained ONLY for a claimed-but-not-completed barrier head. The full
   supersession record + the required per-barrier-class probes live in §6b.2 / §6b.6.
 
 ### 5.6 Parity duty (the §10 obligation)
@@ -670,6 +673,16 @@ chronology (§3 `:105-112`; the emit order in `run_live` `:3525-3562` + `drive_f
 (`Engine` construction + `reload_durable` `:958-991`, which walks every row through
 `validate_journal_entry_grammar` and `validate_stable_binding_walk`) runs **before** dispatch, so a
 broken/short chain never reaches the table.
+
+> **IMPLEMENTED — R8-I-B (2026-07-18).** The above line refs cite the pre-R8-I-B baseline. As
+> built: `drive_forward_tail` is generalized into the shared, resumable `drive_forward_sequence`
+> (`q12-lifecycle-core.py:3498`, walking `_FORWARD_STEP_ORDER`), which BOTH `run_live` (`:3632`)
+> and `run_recover` (`:3754`) drive. The dispatch table is `_RECOVER_RESUME_FROM` (`:3487`) plus
+> the `barrier.cleanup`-any-outcome branch, both consumed at `run_recover:3862`; each maps to the
+> `_FORWARD_STEP_ORDER` step to resume from (or `_POST_ACTIVATE_SENTINEL` for the cleanup segment).
+> `orchestrate_post_activate_cleanup` (`:3262`) is made resumable (accepted → idempotent no-op;
+> mid-cleanup → continue from the interrupted outcome). The R5-D2 pointer text (`:3888`) is amended
+> in lockstep: appended ONLY for a mid-lifecycle (claimed-but-not-completed) barrier head.
 
 **Supported heads → resume action:**
 
