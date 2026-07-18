@@ -121,6 +121,49 @@ import { describe, expect, it } from 'vitest';
 // This is a relations-ordering/hash-derivation defect in validateTransition
 // itself, wholly unrelated to cron/active and out of scope for this
 // tightly-bounded cron normalization; it is NOT fixed here.
+//
+// UPDATE (defect-7 in-round bounded plumbing fix, same source-manifest
+// round): the "7th defect" above is FIXED -- validateTransition sorted the
+// CUTOVER projections of `database.settings`, `schemas`, and `relations` via
+// its own `sortedArray()` helper before comparing them to baseline, but never
+// sorted the BASELINE counterpart the same way (baseline kept catalogSql()'s
+// natural SQL capture order), so a content-identical set that merely
+// sequenced differently spuriously diverged at the byte-strict final
+// comparison. Fixed, behavior-preservingly, by sorting the baseline
+// counterpart with the SAME `sortedArray()` call and reassigning it, at all
+// three sites -- mirroring this function's own already-symmetric cron_jobs
+// idiom (`baselineJobs`/`cutoverJobs`, both `sortedArray()`'d) immediately
+// above. See q12-source-manifest-baseline-order-symmetry.test.ts for the
+// no-docker RED->GREEN proof (a synthetic, non-canonically-ordered baseline
+// relation/schema pair) and its accompanying content-divergence negative
+// (fail-closed preserved: a genuine content change riding along the same
+// order shuffle still fails).
+//
+// STOP-and-report (an 8th, unrelated, out-of-scope defect surfaced by this
+// same fix): re-running the REAL end-to-end harness here with the three-site
+// fix applied still yields `capture_rc=1`, `capture_stderr="source manifest
+// failed: unexpected baseline-to-cutover delta"` (barrier_rc=0,
+// receipt_state=maintenance_guarded, unchanged). A temporary, reverted
+// dump-and-diff probe (an order-aware deep comparison, since the tool's own
+// `reportManifestDiff` treats arrays as sets and so cannot surface an
+// order-only divergence) isolated the SOLE remaining difference to the
+// top-level `cron_jobs` array itself: this function's own cron_jobs
+// symmetric-sort idiom sorts BOTH `baselineJobs` and `cutoverJobs` as LOCAL
+// variables for cardinality/normalization purposes, and reassigns
+// `cutover.cron_jobs = normalizedCutoverJobs` (built from the sorted
+// `cutoverJobs`), but never reassigns `baseline.cron_jobs` itself to the
+// sorted `baselineJobs` order -- so `baseline.cron_jobs` keeps its natural
+// SQL capture order (e.g. ascending `jobid`) while `cutover.cron_jobs` ends
+// up in `sortedArray()`'s canonical-string order, and the two diverge at the
+// final byte-strict comparison exactly like the three sites this round fixed.
+// Confirmed live: with a temporary, reverted diagnostic reassignment of
+// `baseline.cron_jobs` to the sorted order added on top of the three-site
+// fix, the REAL end-to-end capture reaches `capture_rc=0`. This is a 4th
+// instance of the SAME order-symmetry defect class, at a site this round's
+// mandate explicitly (and, it turns out, incorrectly) cited as already
+// correct/symmetric; per this round's own explicit STOP condition it is
+// reported here, NOT fixed, since fixing it would mean editing a 4th site
+// beyond the three this round was scoped and reviewed for.
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
