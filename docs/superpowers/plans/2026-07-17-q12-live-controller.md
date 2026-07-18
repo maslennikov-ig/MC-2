@@ -513,6 +513,45 @@ probe_receipt_sha256:null}`; q12_guard schema present with its 4 tables + 10 fun
   (`aaec6fc2…`) + structural-catalog (`0b8a943f…`) untouched; barrier
   (`3673ee49…`) not re-edited; `q12-source-manifest.ts` (`902cd6a1…`) not re-edited.
 
+- **R5 Sub-round A done** (RED `5bc73c08` → GREEN `36f43593`). `run_live` now journals
+  amendment §5 group 14 — the forward final-writer manifest (FWM) — immediately after
+  `deploy.prepare`/completed, mirroring the composer's
+  `publish_final_writer_manifest("forward", inventory, ...)` call verbatim (`inventory =
+engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)` stays the FIXTURE
+  derivation, deterministic from run_id + quiesce bytes, exactly like the composer). `run_live`
+  now journals 68 rows total (1-66 unchanged + FWM rows 67-68: `prepared_quiesced`/intent and
+  `prepared_quiesced`/accepted with `accepted_object_kind=final_writer_manifest`); its output
+  surfaces `forwardFinalWriterManifestPath`, mirroring the composer's own output augmentation.
+  **Resolves the R3 C7-boundary flag** with the ratified 3-part FWM parity split: (1) FWM row
+  structure (rows 67-68 as above, `command_sha256` byte-equal to the composer's); (2) the full
+  68-row journal twin under the closed 4-field blessed exclusion set PLUS a new row-scoped
+  exclusion (`withParityExclusions`) that ALSO drops `accepted_object_sha256` on the FWM
+  accepted row ONLY (`command_id==='writers.resume.forward' && outcome==='accepted'`) — every
+  other row (1-67, 69+) keeps exactly the 4-field blessed set unchanged; (3) a SEPARATE
+  FWM-content byte parity, read directly off both `final-writer-manifest-forward-<run-id>.json`
+  files, stripping the two per-run-root physical fields
+  (`publication_intent_journal_entry_hash`, `input_checkpoint_sha256` — both carry the
+  journal's device+inode) and comparing the canonicalized remainders byte-for-byte; all 9
+  root-independent FWM fields (`schema_version`, `run_id`, `mode`, `release_sha`,
+  `expected_catalog_sha256`, `writer_quiesce_manifest_sha256`, `lease_epoch`, `final_writers`,
+  `held_writers`) byte-matched on the first attempt — no field misclassification found. A
+  self-consistency check (mirroring R3's resource-manifest proof) confirms the live FWM file is
+  a real 0400 artifact whose `sha256` IS the live row-68 `accepted_object_sha256`. Two fail-closed
+  negatives via a new `--fwm-negative` seam driving the real
+  `Engine.publish_final_writer_manifest`/`derive_root_writer_inventory` directly: an invalid
+  mode raises "final writer manifest mode mismatch"; a forward publish against an inventory
+  with no target identities raises "forward manifest requires target identities". The
+  pre-existing R3/R4 groups-1-13 twin assertions were updated from a full-length check to a
+  PREFIX check (`live.journalEntries.slice(0, c7End)`), since `run_live` now journals past
+  group 13. All 4 no-docker suites green (305/305: `q12-live-controller` + `q12-live-cutover` +
+  `q12-retained-barrier-quiesce-seam` + `q12-retained-barrier-w-composition-seam`); `pnpm
+type-check` 0 across every workspace. Frozen bytes unchanged (`q12-command-manifest.json`
+  `aaec6fc2…`, `q12-database-barrier.sh` `3673ee49…`, `q12-structural-catalog.sql`
+  `0b8a943f…`); `q12-writer-resume.py`/`source-recovery-run.sh`/`q12-source-manifest.ts`
+  untouched; `run_joined_composer`'s own body byte-unchanged (only `run_live`'s docstring/body
+  were touched). Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5.md`. `deploy.commit`
+  and `activate` (groups 15-16) remain later rounds (R5 Sub-round B / R6+).
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface
