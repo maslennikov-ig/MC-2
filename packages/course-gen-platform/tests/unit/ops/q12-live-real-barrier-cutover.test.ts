@@ -139,31 +139,18 @@ import { describe, expect, it } from 'vitest';
 // (fail-closed preserved: a genuine content change riding along the same
 // order shuffle still fails).
 //
-// STOP-and-report (an 8th, unrelated, out-of-scope defect surfaced by this
-// same fix): re-running the REAL end-to-end harness here with the three-site
-// fix applied still yields `capture_rc=1`, `capture_stderr="source manifest
-// failed: unexpected baseline-to-cutover delta"` (barrier_rc=0,
-// receipt_state=maintenance_guarded, unchanged). A temporary, reverted
-// dump-and-diff probe (an order-aware deep comparison, since the tool's own
-// `reportManifestDiff` treats arrays as sets and so cannot surface an
-// order-only divergence) isolated the SOLE remaining difference to the
-// top-level `cron_jobs` array itself: this function's own cron_jobs
-// symmetric-sort idiom sorts BOTH `baselineJobs` and `cutoverJobs` as LOCAL
-// variables for cardinality/normalization purposes, and reassigns
-// `cutover.cron_jobs = normalizedCutoverJobs` (built from the sorted
-// `cutoverJobs`), but never reassigns `baseline.cron_jobs` itself to the
-// sorted `baselineJobs` order -- so `baseline.cron_jobs` keeps its natural
-// SQL capture order (e.g. ascending `jobid`) while `cutover.cron_jobs` ends
-// up in `sortedArray()`'s canonical-string order, and the two diverge at the
-// final byte-strict comparison exactly like the three sites this round fixed.
-// Confirmed live: with a temporary, reverted diagnostic reassignment of
-// `baseline.cron_jobs` to the sorted order added on top of the three-site
-// fix, the REAL end-to-end capture reaches `capture_rc=0`. This is a 4th
-// instance of the SAME order-symmetry defect class, at a site this round's
-// mandate explicitly (and, it turns out, incorrectly) cited as already
-// correct/symmetric; per this round's own explicit STOP condition it is
-// reported here, NOT fixed, since fixing it would mean editing a 4th site
-// beyond the three this round was scoped and reviewed for.
+// Fourth order-symmetry site (RESOLVED, orchestrator-authorized): the same
+// class also existed at this function's own cron_jobs handling -- it sorts
+// BOTH `baselineJobs`/`cutoverJobs` into LOCALs and reassigns
+// `cutover.cron_jobs = normalizedCutoverJobs`, but never reassigned
+// `baseline.cron_jobs` to the sorted `baselineJobs`, so baseline kept SQL
+// capture order (ascending jobid) while cutover ended in canonical-string
+// order and the two diverged at the byte-strict comparison exactly like the
+// three sites. Fixed as the ratified 4th site (`baseline.cron_jobs =
+// baselineJobs`, provably order-only via the per-index before===normalized
+// equality). With all four sites symmetric, the REAL end-to-end capture now
+// reaches capture_rc=0 -- the full R4 Sub-round C validateTransition POSITIVE
+// (asserted below), the acceptance R2 deferred.
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
@@ -258,8 +245,13 @@ describe.runIf(REAL_PG17)(
       ]);
       expect(out.post_mortem_q12_guard_event_trigger_count).toBe(1);
 
-      // Diagnostic only, not asserted: capture_rc against the frozen, out-of-
-      // scope q12-source-manifest.ts validateTransition (see file header).
+      // R4 Sub-round C acceptance (defect-3/4/7 all landed): the real
+      // baseline->barrier.install-cutover q12-source-manifest.ts capture now
+      // passes validateTransition end-to-end — the full validateTransition
+      // POSITIVE that R2 deferred. No q12_guard-surface rejection, no cron
+      // active-flip false positive, no baseline-vs-cutover ordering divergence.
+      expect(out.capture_rc, out.capture_stderr).toBe(0);
+      expect(out.capture_stderr).not.toMatch(/baseline-to-cutover delta|source manifest failed/u);
     }, 260_000);
   }
 );

@@ -1368,6 +1368,17 @@ function validateTransition(
     return normalized;
   });
   cutover.cron_jobs = normalizedCutoverJobs;
+  // Fourth site of this function's order-symmetry class (peer of the
+  // relations/schemas/database.settings baseline sorts below): reassign the
+  // BASELINE side to its already-sorted local `baselineJobs` too. cutover.cron_jobs
+  // was just reassigned to the canonically-sorted `normalizedCutoverJobs`, but
+  // baseline.cron_jobs otherwise keeps its SQL capture order (ascending jobid), so
+  // the final canonical(baseline) vs canonical(cutover) comparison would diverge on
+  // ARRAY ORDER alone. Provably order-only: the per-index canonical equality
+  // asserted just above (before === normalized) already proves the baseline jobs
+  // equal the normalized cutover jobs content-wise; only ordering is made coherent.
+  // No cron job is added, removed, or reprojected.
+  baseline.cron_jobs = baselineJobs;
 
   const baselineDatabase = object(baseline.database, 'baseline.database');
   const cutoverDatabase = object(cutover.database, 'cutover.database');
@@ -1384,10 +1395,23 @@ function validateTransition(
   ) {
     fail('unexpected baseline-to-cutover delta: database settings');
   }
+  // Consistency with this function's own cron_jobs symmetric-sort idiom above
+  // (baselineJobs/cutoverJobs, both sortedArray()'d): sort the BASELINE
+  // counterpart canonically too, the same way cutoverDatabase.settings itself
+  // was sorted above, so the clone below carries a canonically-ordered array
+  // on both sides instead of whichever order the SQL capture happened to
+  // produce.
+  baselineDatabase.settings = sortedArray(baselineDatabase.settings, 'baseline.database.settings');
   cutoverDatabase.settings = structuredClone(baselineDatabase.settings);
   cutoverDatabase.size_bytes = baselineDatabase.size_bytes;
 
   const cutoverSchemas = sortedArray(cutover.schemas, 'cutover.schemas');
+  // Consistency with the cron_jobs symmetric-sort idiom above: sort the
+  // BASELINE counterpart the same canonical way cutover.schemas just was, or
+  // the final baseline-vs-cutover comparison (via refreshDerivedHashes's
+  // order-sensitive schemas_sha256) spuriously diverges on ARRAY ORDER alone,
+  // even when the schema SETS are content-equal.
+  baseline.schemas = sortedArray(baseline.schemas, 'baseline.schemas');
   const guardSchemas = cutoverSchemas.filter(value => object(value, 'schema').name === 'q12_guard');
   if (
     guardSchemas.length !== 1 ||
@@ -1396,6 +1420,12 @@ function validateTransition(
     fail('unexpected baseline-to-cutover delta: q12_guard schema');
   cutover.schemas = cutoverSchemas.filter(value => object(value, 'schema').name !== 'q12_guard');
   const cutoverRelations = sortedArray(cutover.relations, 'cutover.relations');
+  // Consistency with the cron_jobs symmetric-sort idiom above: sort the
+  // BASELINE counterpart the same canonical way cutover.relations just was,
+  // or the final baseline-vs-cutover comparison (via refreshDerivedHashes's
+  // order-sensitive relations_sha256) spuriously diverges on ARRAY ORDER
+  // alone, even when the relation SETS are content-equal.
+  baseline.relations = sortedArray(baseline.relations, 'baseline.relations');
   const guardRelations = cutoverRelations.filter(
     value => object(value, 'relation').schema === 'q12_guard'
   );
