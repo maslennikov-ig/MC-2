@@ -154,6 +154,38 @@ baseline.json` (or `verify-transition`) MUST PASS (`validateTransition`,
 
 ---
 
+## Pre-window gate — server-side full-path `run_live` rehearsal (NON-NEGOTIABLE, orchestrator-pinned 2026-07-18)
+
+The R4 acceptance (Sub-round C) proves the **real `barrier.install` transition passes the real
+`validateTransition`** by invoking the barrier directly against a disposable seeded container
+(ruling 1 option (b)) — it deliberately isolates the DB-transition claim from the uid-1000 /
+`/opt/megacampus` / canonical-lease **custody** machinery. Sub-round B proves the in-process
+barrier chain runs through the **real** `q12-capability-run.sh` wrapper no-docker
+(`SandboxedDeployedWrapperExecutor`/bwrap). Neither exercises the full uid-1000/`/opt`/lease
+custody path end-to-end — and that exact class of never-executed path burned this program four
+times (the plan-mode rehearsals #1–#13 exist for the same reason).
+
+**Therefore, before the cutover window opens, a server-side full-path `run_live` rehearsal is a
+hard gate (peer of R8, non-negotiable):**
+
+- Runs **on megacampus-prod as `claude-deploy` (uid/gid 1000 there)**, against a **real**
+  production-shaped run root `/opt/megacampus/backups/q12/<fresh-run-id>` and the canonical
+  `cutover.lock` (FD-9 lease), i.e. the exact identity/lease custody the disposable-container
+  CI test structurally cannot reproduce.
+- Drives the **real in-process `barrier.install`** (and as much of the retained_chain +
+  ordinary-execution + C7 planned-exit + `recover`-resume path as is safe) through `run_live`.
+- Executes only against a **DISPOSABLE seeded container source** (the full-Supabase seed shape),
+  **never the production database**; no prod mutation.
+- Closes the uid-1000/`/opt`/lease custody path for real — exactly as rehearsals #1–#13 closed
+  the plan path — and its evidence is a window-open precondition recorded in the C0 window
+  packet. Until it passes, the window MUST NOT open.
+
+This gate is server action and requires explicit current-task owner authorization at execution
+time (per the repo contract); it is authored here as a pinned plan requirement, not run by the
+local TDD rounds.
+
+---
+
 ## Verification contract (per round)
 
 - Real-PG17 suite green (disposable PG17), no-docker suite green (only the pre-existing
