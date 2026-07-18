@@ -669,6 +669,16 @@ export async function materializeRecover(spec: RecoverControllerFixtureSpec): Pr
   forwardFinalWriterManifestPath: string | null;
   quiesceWindowMarkerPath: string | null;
   postActivate: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
+  /**
+   * R8 Sub-round D: when recover lands on the post-activate head (barrier.activate/completed) it
+   * dispatches ONLY the receipt-only re-drive. The witness path
+   * (<run_root>/post-activate-resume-receipt.json) is surfaced, and the recover outcome names the
+   * branch: "post-activate re-driven" (witness ABSENT => cleanup → resume ran again) or
+   * "post-activate already complete" (witness PRESENT-and-VALID => no-op). A tampered / wrong-run_id
+   * witness fails closed (a throw, surfaced via runRecoverExpectingRefusal), not this field.
+   */
+  postActivateRecoverOutcome: string | null;
+  postActivateResumeReceiptPath: string | null;
 }> {
   await Promise.resolve();
   const child = spawnSync('/usr/bin/python3', [RUNNER], {
@@ -688,6 +698,8 @@ export async function materializeRecover(spec: RecoverControllerFixtureSpec): Pr
     forwardFinalWriterManifestPath?: string | null;
     quiesceWindowMarkerPath?: string | null;
     postActivate?: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
+    postActivateRecoverOutcome?: string | null;
+    postActivateResumeReceiptPath?: string | null;
   };
   return {
     journalEntries: output.journalEntries,
@@ -697,6 +709,8 @@ export async function materializeRecover(spec: RecoverControllerFixtureSpec): Pr
     forwardFinalWriterManifestPath: output.forwardFinalWriterManifestPath ?? null,
     quiesceWindowMarkerPath: output.quiesceWindowMarkerPath ?? null,
     postActivate: output.postActivate ?? null,
+    postActivateRecoverOutcome: output.postActivateRecoverOutcome ?? null,
+    postActivateResumeReceiptPath: output.postActivateResumeReceiptPath ?? null,
   };
 }
 

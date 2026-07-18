@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -888,23 +896,231 @@ describe('Q12 live cutover controller (Task-9) — R5 Sub-round D: run_recover',
     expect(emptyRefusal.ok).toBe(false);
     expect(emptyRefusal.error).toMatch(/recover requires a non-empty durable journal/u);
 
-    // --- a head PAST activate: a full uninterrupted forward run (76 rows) has nothing to resume. ---
-    const fullRoot = root();
-    const full = await materializeLiveController({
-      runRoot: fullRoot,
-      runId,
-      quiesceManifestPath: quiescePath,
+    // NOTE: the head PAST activate (barrier.activate/completed) is NO LONGER a refusal — it is the
+    // R8 Sub-round D post-activate re-drive head (folded R8-E). Its behaviour is covered by the
+    // dedicated R8-D describe block below.
+  });
+});
+
+// R8 Sub-round D (orchestrator RATIFIED RULING, 2026-07-18): recover at the POST-ACTIVATE head.
+// barrier.activate/completed becomes the THIRD supported recover head, dispatching ONLY the
+// receipt-only post-activate re-drive (NO forward tail, NO journal row — activate stays the last
+// row). Mechanism = OPTION (ii) receipt-presence dispatch with a DURABLE resume witness at
+// <run_root>/post-activate-resume-receipt.json (schema {schema_version, run_id,
+// cleanup_receipt_sha256, outcome}, 0400, written atomically by the resume path AFTER resume
+// genuinely completes, through the ONE shared writer write_post_activate_resume_receipt). Dispatch
+// (marker-consistent tamper discipline): witness ABSENT => full idempotent re-drive (cleanup →
+// resume); witness PRESENT-but-INVALID => NAMED hard fail (tamper suspicion), never re-drive over
+// it; witness PRESENT-and-VALID => no-op success naming "post-activate already complete". CHAIN
+// FIRST: the same full durable-chain validation walk (Engine construction) runs BEFORE any
+// dispatch, so a broken chain never reaches the witness check. R8-E (the old activate-head refusal)
+// is FOLDED IN. R8-A (wiring the REAL production resume child to the same writer) stays deferred.
+const POST_ACTIVATE_RESUME_RECEIPT_NAME = 'post-activate-resume-receipt.json';
+const DATABASE_BARRIER_RECEIPT_NAME = 'database-barrier-receipt.json';
+const DATABASE_BARRIER_PROBE_RECEIPT_NAME = 'database-barrier-probe-receipt.json';
+
+async function driveFullLiveThenSnapshot(quiesceRoot: string): Promise<{
+  liveRoot: string;
+  runId: string;
+  quiescePath: string;
+  witnessPath: string;
+  receiptPath: string;
+  probePath: string;
+  markerBytes: Buffer;
+  journalBytes: Buffer;
+  witnessBytes: Buffer;
+}> {
+  const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+  const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+  const liveRoot = root();
+  const live = await materializeLiveController({
+    runRoot: liveRoot,
+    runId,
+    quiesceManifestPath: quiescePath,
+  });
+  expect(live.journalEntries.length).toBe(76);
+  // the RESUME path wrote the durable witness after resume genuinely completed (through the shared
+  // writer), so a full uninterrupted run already carries a VALID witness.
+  const witnessPath = join(liveRoot, POST_ACTIVATE_RESUME_RECEIPT_NAME);
+  const receiptPath = join(liveRoot, DATABASE_BARRIER_RECEIPT_NAME);
+  const probePath = join(liveRoot, DATABASE_BARRIER_PROBE_RECEIPT_NAME);
+  expect(existsSync(witnessPath)).toBe(true);
+  return {
+    liveRoot,
+    runId,
+    quiescePath,
+    witnessPath,
+    receiptPath,
+    probePath,
+    markerBytes: readFileSync(join(liveRoot, 'quiesce-window-mode.json')),
+    journalBytes: readFileSync(join(liveRoot, 'phase.jsonl')),
+    witnessBytes: readFileSync(witnessPath),
+  };
+}
+
+function rewriteWitness0400(path: string, object: Record<string, unknown>): void {
+  chmodSync(path, 0o600);
+  writeFileSync(path, `${canonical(object)}\n`, { mode: 0o600 });
+  chmodSync(path, 0o400);
+}
+
+describe('Q12 live cutover controller (Task-9) — R8 Sub-round D: recover at the post-activate head', () => {
+  it('folded R8-E: a complete run recovered again is a no-op success naming post-activate already complete (valid witness)', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    // head is barrier.activate/completed and the witness is present + valid => no-op success.
+    const recovered = await materializeRecover({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
     });
-    expect(full.journalEntries.length).toBe(76);
-    const pastActivate = await runRecoverExpectingRefusal({
-      runRoot: fullRoot,
-      runId,
-      quiesceManifestPath: quiescePath,
+    expect(recovered.journalEntries.length).toBe(76);
+    // NO forward tail, NO journal row, NO re-drive: the durable journal is byte-for-byte unchanged
+    // (activate stays the last row) and the 0400 cutover marker is byte-untouched.
+    expect(readFileSync(join(snap.liveRoot, 'phase.jsonl'))).toEqual(snap.journalBytes);
+    expect(readFileSync(join(snap.liveRoot, 'quiesce-window-mode.json'))).toEqual(snap.markerBytes);
+    // the witness itself is byte-untouched (a no-op does not rewrite it).
+    expect(readFileSync(snap.witnessPath)).toEqual(snap.witnessBytes);
+    // the outcome names the already-complete state; no fresh cleanup/resume was recorded.
+    expect(recovered.postActivateRecoverOutcome).toBe('post-activate already complete');
+    expect(recovered.postActivate).toBeNull();
+    expect(recovered.postActivateResumeReceiptPath).toBe(snap.witnessPath);
+  });
+
+  it('crash-after-resume (valid witness): recover is a no-op success', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    const recovered = await materializeRecover({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
     });
-    expect(pastActivate.ok).toBe(false);
-    expect(pastActivate.error).toMatch(/recover does not support resuming from/u);
-    expect(pastActivate.error).toMatch(/command=barrier\.activate/u);
-    // barrier.activate => the pointer names the activate operation.
-    expect(pastActivate.error).toMatch(/q12-live-cutover\.sh activate/u);
+    expect(recovered.postActivateRecoverOutcome).toBe('post-activate already complete');
+    expect(recovered.postActivate).toBeNull();
+    // marker + journal + witness byte-unchanged.
+    expect(readFileSync(join(snap.liveRoot, 'phase.jsonl'))).toEqual(snap.journalBytes);
+    expect(readFileSync(join(snap.liveRoot, 'quiesce-window-mode.json'))).toEqual(snap.markerBytes);
+    expect(readFileSync(snap.witnessPath)).toEqual(snap.witnessBytes);
+  });
+
+  it('crash-before-cleanup (no receipt, no witness): recover re-drives cleanup → resume', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    // simulate a crash BEFORE the post-activate cleanup ran: neither receipt nor witness exists.
+    rmSync(snap.witnessPath, { force: true });
+    rmSync(snap.receiptPath, { force: true });
+    rmSync(snap.probePath, { force: true });
+    expect(existsSync(snap.witnessPath)).toBe(false);
+
+    const recovered = await materializeRecover({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
+    });
+    expect(recovered.postActivateRecoverOutcome).toBe('post-activate re-driven');
+    // the cleanup child ran again (fresh v2 receipt) and the resume child validated it and re-wrote
+    // the witness.
+    expect(recovered.postActivate).toBeTruthy();
+    expect(recovered.postActivate!.cleanup.status).toBe('guard_cleanup_complete');
+    expect(recovered.postActivate!.resume.status).toBe('resumed');
+    expect(recovered.postActivate!.resume.validated_receipt_sha256).toBe(
+      recovered.postActivate!.cleanup.cleanup_receipt_sha256
+    );
+    expect(existsSync(snap.witnessPath)).toBe(true);
+    // still 76 rows, journal + marker byte-unchanged (receipt-only re-drive adds NO journal row).
+    expect(recovered.journalEntries.length).toBe(76);
+    expect(readFileSync(join(snap.liveRoot, 'phase.jsonl'))).toEqual(snap.journalBytes);
+    expect(readFileSync(join(snap.liveRoot, 'quiesce-window-mode.json'))).toEqual(snap.markerBytes);
+  });
+
+  it('crash-after-cleanup-before-resume (stale in-flight receipt, NO witness): does NOT short-circuit — re-drives', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    // simulate a crash AFTER cleanup wrote its v2 receipt but BEFORE resume wrote the witness: the
+    // receipt (and probe) are still on disk, but the witness is absent. A stale in-flight receipt
+    // with NO witness MUST NOT be treated as complete.
+    rmSync(snap.witnessPath, { force: true });
+    expect(existsSync(snap.receiptPath)).toBe(true);
+    expect(existsSync(snap.witnessPath)).toBe(false);
+
+    const recovered = await materializeRecover({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
+    });
+    // witness ABSENT => full idempotent re-drive; the stale receipt did NOT short-circuit.
+    expect(recovered.postActivateRecoverOutcome).toBe('post-activate re-driven');
+    expect(recovered.postActivate).toBeTruthy();
+    expect(recovered.postActivate!.resume.status).toBe('resumed');
+    expect(existsSync(snap.witnessPath)).toBe(true);
+    expect(recovered.journalEntries.length).toBe(76);
+    expect(readFileSync(join(snap.liveRoot, 'phase.jsonl'))).toEqual(snap.journalBytes);
+  });
+
+  it('tampered witness (cleanup_receipt_sha256 mismatch): NAMED hard fail + journal byte-unchanged', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    const witness = JSON.parse(snap.witnessBytes.toString('utf8')) as Record<string, unknown>;
+    // tamper the recorded cleanup receipt digest (keep the exact 4-key schema + canonical 0400 so
+    // the tamper is caught by the digest re-validation, not merely a shape/mode check).
+    witness.cleanup_receipt_sha256 = 'f'.repeat(64);
+    rewriteWitness0400(snap.witnessPath, witness);
+
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    expect(refusal.error).toMatch(/post-activate resume witness/u);
+    expect(refusal.error).toMatch(/tamper/u);
+    // it did NOT silently re-drive over the tampered witness: the journal + marker are byte-unchanged.
+    expect(readFileSync(join(snap.liveRoot, 'phase.jsonl'))).toEqual(snap.journalBytes);
+    expect(readFileSync(join(snap.liveRoot, 'quiesce-window-mode.json'))).toEqual(snap.markerBytes);
+  });
+
+  it('wrong-run_id witness: NAMED hard fail', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    const witness = JSON.parse(snap.witnessBytes.toString('utf8')) as Record<string, unknown>;
+    // a witness carrying a DIFFERENT run_id than the run it sits in => tamper/misplacement.
+    witness.run_id = '00000000-0000-4000-8000-000000000000';
+    rewriteWitness0400(snap.witnessPath, witness);
+
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    expect(refusal.error).toMatch(/post-activate resume witness/u);
+    expect(refusal.error).toMatch(/run_id/u);
+    expect(refusal.error).toMatch(/tamper/u);
+    expect(readFileSync(join(snap.liveRoot, 'phase.jsonl'))).toEqual(snap.journalBytes);
+  });
+
+  it('CHAIN FIRST: a corrupted durable chain at the activate head fails on the chain, not the witness', async () => {
+    const snap = await driveFullLiveThenSnapshot(root());
+    // corrupt a hash field on the durable head row WITHOUT touching resource_manifest_sha256 (which
+    // run_recover reads pre-Engine to pin the walk domain), so run_recover reaches Engine
+    // construction — where the full durable-chain validation walk runs BEFORE any dispatch. The
+    // witness on disk is still perfectly valid; the chain walk must fire first.
+    const rows = snap.journalBytes
+      .toString('utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    const head = rows.at(-1)!;
+    head.operator_digest = `${'0'.repeat(63)}1`;
+    const corrupted = `${rows.map(row => canonical(row)).join('\n')}\n`;
+    chmodSync(join(snap.liveRoot, 'phase.jsonl'), 0o600);
+    writeFileSync(join(snap.liveRoot, 'phase.jsonl'), corrupted, { mode: 0o600 });
+    // the witness is untouched and valid.
+    expect(readFileSync(snap.witnessPath)).toEqual(snap.witnessBytes);
+
+    const refusal = await runRecoverExpectingRefusal({
+      runRoot: snap.liveRoot,
+      runId: snap.runId,
+      quiesceManifestPath: snap.quiescePath,
+    });
+    expect(refusal.ok).toBe(false);
+    // it failed on the CHAIN (Engine reload), not on the witness — a broken chain never reaches the
+    // witness check.
+    expect(refusal.error).toMatch(/journal entry hash mismatch/u);
+    expect(refusal.error).not.toMatch(/witness/u);
   });
 });
