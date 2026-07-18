@@ -551,6 +551,25 @@ type-check` 0 across every workspace. Frozen bytes unchanged (`q12-command-manif
   untouched; `run_joined_composer`'s own body byte-unchanged (only `run_live`'s docstring/body
   were touched). Artifact: `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5.md`. `deploy.commit`
   and `activate` (groups 15-16) remain later rounds (R5 Sub-round B / R6+).
+- **R5 Sub-round B done** (RED `c48f2ca93` → GREEN `1cda05ad7`). `run_live` now closes the
+  forward window: after the group-14 FWM it appends `ordinary("deploy.commit")` (group 15,
+  rows 69-72 at `activation_ready`) then `d5("activate")` (group 16, rows 73-76: selector/intent
+  at `activation_committing`, then capability_issued/claimed/completed at `activated`), before
+  `reload_durable()` — a verbatim mirror of `run_joined_composer`'s
+  `forward_tail_through_activation_ready()` + `d5("activate")` tail. `run_live` now journals the
+  **full 76 forward rows**, and the R5-A parity test is widened to a full-76-row twin
+  (`live.journalEntries.map(withParityExclusions)` deep-equals the whole composer forward
+  journal, not `slice(0,68)`), plus a Part 1b structural check pinning the deploy.commit/activate
+  row grammar. The FWM stays rows 67-68 of 76; its 3-part parity split and self-consistency
+  assertions are unchanged. Forced (non-weakening) count corrections in the R4 tests since
+  `run_live` gained one ordinary lifecycle and one in-process barrier that both cross the real
+  child boundary: R4-A `ordinaryKeys` 12→13 and `childExecutions` 16→18 (D5 delegations 4→5),
+  R4-B `barrierKeys` gains `activate:cutover`. `q12-live-controller.test.ts` 7/7; `tsc --noEmit`
+  0; frozen bytes unchanged (`aaec6fc2…`/`3673ee49…`/`0b8a943f…`); no W-owned file touched;
+  `run_joined_composer` body byte-unchanged. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r5b.md`. Next unblocked: R5 Sub-round C
+  (`quiesce-window-mode.json` cutover-marker write + lifetime assertion). R5-D/E (recover +
+  real-PG17 post-activate legs) stay held for the two pending rulings.
 
 ## Open risks carried forward
 
