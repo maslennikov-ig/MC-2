@@ -329,3 +329,67 @@ describe('Q12 live cutover controller (Task-9) — R4 Sub-round A: injectable or
     expect(live.childExecutions).toBe(16);
   });
 });
+
+// R4 Sub-round B (design docs/superpowers/specs/2026-07-17-q12-live-controller-design.md
+// §3/§6.4): ORCHESTRATOR-REQUIRED, NO-DOCKER proof that run_live's in-process barrier chain
+// (barrier.install/verify-after-base/verify-after-observability/prepare-recovery) crosses the
+// REAL deployed claim wrapper deploy/qdrant/q12-capability-run.sh — unmodified, only its
+// DB-barrier child sandbox-faked (the real-PG17/DB transition is a separate later round). The
+// journal itself stays a byte/order composer twin regardless of which barrier executor variant
+// runs (the barrier claim result lands only in the per-barrier retained-result side file).
+describe('Q12 live cutover controller (Task-9) — R4 Sub-round B: real deployed wrapper barrier claims', () => {
+  it('drives every in-process barrier claim through the REAL deployed q12-capability-run.sh wrapper without perturbing the journal twin', async () => {
+    const composerRoot = root();
+    const runId = deriveRootRetainedBarrierFixtureRunId(composerRoot);
+    const quiescePath = writeQuiesceManifest(composerRoot, runId);
+    const composer = await materializeJoinedRetainedBarrierFixture({
+      runRoot: composerRoot,
+      joinedProfile: 'forward',
+      quiesceManifestPath: quiescePath,
+    });
+    const liveRoot = root();
+    const live = await materializeLiveController({
+      runRoot: liveRoot,
+      runId,
+      quiesceManifestPath: quiescePath,
+      executeActualWrapper: true,
+    });
+
+    // (a) regression guard: the groups-1-13 journal twin still holds under the blessed
+    // exclusions — routing the barrier claims through the real wrapper must stay
+    // parity-neutral, exactly like the ordinary-execution seam (R4 Sub-round A).
+    const c7End = witnessIndex(composer.journalEntries, 'deploy.prepare', 'completed') + 1;
+    expect(live.journalEntries.length).toBe(c7End);
+    expect(live.journalEntries.map(withoutBlessedExclusions)).toEqual(
+      composer.journalEntries.slice(0, c7End).map(withoutBlessedExclusions)
+    );
+
+    // (b) the executor audit reports the barrier.install chain actually entered the real
+    // deployed wrapper (not the fixture-only --claim-noio launcher).
+    const audit = JSON.parse(readFileSync(join(liveRoot, 'executor-audit.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(audit.actualDeployedWrapper).toBe(true);
+    expect(audit.claimProcessBoundary).toBe(true);
+    expect(audit.launcherOwnedClaimMutation).toBe(true);
+
+    // (c) each of the 4 in-process barrier claims present in groups 1-13
+    // (install/verify-after-base/verify-after-observability/prepare-recovery) produced a
+    // retained barrier result THROUGH the real wrapper (Engine.finish's per-barrier side
+    // file — distinct from the "ordinary:" side files asserted in Sub-round A).
+    const barrierKeys = [
+      'install:cutover',
+      'verify-after-base:cutover',
+      'verify-after-observability:cutover',
+      'prepare-recovery:cutover',
+    ];
+    for (const key of barrierKeys) {
+      const path = live.resultPaths[key];
+      expect(path, `barrier result path for ${key}`).toBeTruthy();
+      const result = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+      expect(result.status).toBe('accepted');
+      expect(result.schema_version).toBe('megacampus.q12.retained-command-result/v1');
+    }
+  });
+});
