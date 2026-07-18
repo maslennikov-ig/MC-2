@@ -17,9 +17,10 @@ cleanup_notes: worktree retained pending independent review; no accepted-W code 
 risk_level: high
 verification:
   - 'node .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs -> fields 5-10 reproduce byte-identically; emits the three tracked JSON assets deterministically'
-  - 'git rev-parse 60910053 (the accepted W integration base commit) -> 60910053… (field 1); sha256sum deploy/qdrant/q12-command-manifest.json -> aaec6fc2… (field 2); sha256sum deploy/qdrant/q12-database-barrier.sh -> 134255ce… (field 4)'
+  - 'git rev-parse 60910053 (the accepted W integration base commit) -> 60910053… (field 1); sha256sum deploy/qdrant/q12-command-manifest.json -> aaec6fc2… (field 2); sha256sum deploy/qdrant/q12-database-barrier.sh -> 3673ee49… (field 4; supersedes the historical 134255ce… value frozen at 60910053 — see the 2026-07-18 AMENDMENT note below)'
   - 'MC2_Q12_REAL_PG17=1 pnpm exec vitest run tests/unit/ops/q12-w-activation-lock-proof-pg17.test.ts -> 2 passed (structural + mechanical PG17 lock proof); catalog-parametric via MC2_Q12_ACTIVATION_CATALOG_FILE'
   - 'pnpm exec vitest run (no flag) -> 1 passed | 1 skipped; prettier --check clean; new files add zero type errors; git diff --check clean'
+  - '2026-07-18 AMENDMENT re-verification: node .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs re-run against the fixed barrier (sha256 3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9) -> fields 5-10 reproduce BYTE-IDENTICALLY (zero change to the three tracked JSON assets); confirms field 7 activation_recovery_slice_sha256 is barrier-independent as well as catalog-independent. Only field 4 changes.'
 changed_files:
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-q12-w-activation-tuple.md
   - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs
@@ -54,7 +55,7 @@ permanent production-faithful truth, proven by the mechanical PG17 test.
 | 1   | `w_integration_commit`             | `60910053455ac9af978c7951a562172e39623ca2`                                      | `git merge-base HEAD origin/codex/self-hosted-qdrant-platform` = the accepted W integration base commit (60910053), not the addendum branch HEAD.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 2   | `command_manifest_sha256`          | `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`              | `sha256(deploy/qdrant/q12-command-manifest.json)` at `60910053`. Contract-conflict RESOLVED (Risks a): historical `af9b21cb…` = sha256 at `c93d766d` (five-command manifest); superseded by the accepted D5J twenty-command expansion at `1817c5e9` → `aaec6fc2…`, i.e. the contract's `:178` "accepted integration successor".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 3   | `activation_barrier_path`          | `deploy/qdrant/q12-database-barrier.sh`                                         | Contract line 149; file present at `60910053`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 4   | `activation_barrier_sha256`        | `134255cecfb4361d5e9f1922d98f889ab7d3e01898b197dee096ab720039ed68`              | `sha256(deploy/qdrant/q12-database-barrier.sh)` at `60910053`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 4   | `activation_barrier_sha256`        | **AMENDED** `3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9`  | `sha256(deploy/qdrant/q12-database-barrier.sh)` at the ratified frozen-barrier-fix round (PG17 ACL/fd/dialect corrections; correctness/docs review `mc2-jz6y0.13-barrier-fix-review.md` PASS/PASS, merged). Supersedes the original `134255cecfb4361d5e9f1922d98f889ab7d3e01898b197dee096ab720039ed68`, which was the barrier sha256 at the W-integration base `60910053` (now historical — the byte-identical value for the pre-fix barrier, superseded, not the current field-4 truth). See the 2026-07-18 AMENDMENT note below the table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 5   | `activation_sql_projection_sha256` | `a42d6d39f3383c50de15b8aac5b1efd2e486c51bb6a47052a6d805d1589f224e`              | Layer-1 value: sha256 of the full generated `activate` sqlPath (8839 bytes). CATALOG-BOUND — production re-freeze REQUIRED (checklist).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 6   | `activation_normal_slice_sha256`   | `d413fbd79350f0bbd7e387f03cb242b2239640de1f7a8761ffa5fadd6a85b83f`              | Layer-1: `between(sql, NORMAL_BEGIN, NORMAL_END)` (8622 bytes). CATALOG-BOUND — re-freeze REQUIRED.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 7   | `activation_recovery_slice_sha256` | `c41cf104c423623a56a3131c6e8d8148fae2db5af44772157c1e5a57be2d0063`              | `between(sql, RECOVERY_BEGIN, RECOVERY_END)` (103 bytes). CATALOG-INDEPENDENT (`BEGIN READ ONLY; SET LOCAL search_path=pg_catalog; SELECT q12_guard.verify_activated_state(); COMMIT;`) — production-faithful, no re-freeze.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -67,6 +68,30 @@ Key determinism fact (narrows re-freeze to pure catalog substitution): the gener
 activation SQL embeds **neither `run_id` nor `catalog_sha256`** (verified by the repro
 tool). So fields 5/6/8/9 are a pure function of the barrier bytes + the
 expected-post-migration-catalog input; only the catalog changes at re-freeze.
+
+### 2026-07-18 AMENDMENT — field-4 succession (RATIFIED cascade round)
+
+Field 4 (`activation_barrier_sha256`) is amended in place: the accepted-W barrier
+byte-value at `60910053` (`134255cecfb4361d5e9f1922d98f889ab7d3e01898b197dee096ab720039ed68`)
+is superseded by the barrier sha256 produced by the separately authorized, ratified
+**frozen-barrier-fix round** (PG17 ACL array-type fix + catalog-fd double-consumption +
+operator-precedence/scalar-guard dialect fixes; independent correctness/docs review
+`.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-barrier-fix-review.md`, verdict PASS/PASS,
+merged): `3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9`. The old value
+is now historical (it was the correct barrier sha256 AT `60910053`, before the fix; it is
+no longer the current field-4 truth).
+
+This is a Layer-1 amendment to field 4 ONLY. The repro tool
+(`mc2-jz6y0.13.10-activation-tuple-repro.cjs`) was re-run against the fixed barrier bytes
+and reproduces fields 5-10 **byte-identically** — zero change to the three tracked JSON
+assets (`q12-activation-lock-catalog.test-reference.json`,
+`q12-activation-lock-order.test-reference.json`, `q12-managed-session-inventory-schema.json`).
+Field 7 (`activation_recovery_slice_sha256`) is confirmed catalog-INDEPENDENT (already
+known) and, by this re-run, also barrier-fix-independent: the RECOVERY slice bytes the fix
+touched are outside the hashed range. No re-freeze is triggered for fields 5-10 by this
+amendment; the C7 production re-freeze of fields 5/6/8/9 (catalog-bound, checklist item 2
+below) is unchanged and remains open. Field 11 is untouched (ratified separately, unrelated
+to the barrier bytes).
 
 ## Layer 2 — catalog-independent control-flow invariant (permanent truth)
 
@@ -96,6 +121,18 @@ Fresh runs at `60910053` (worktree clean):
   guarded relations via `pg_locks` + concurrent `SHARE` conflict). Without the flag:
   1 passed / 1 skipped (no Docker needed for normal unit runs).
 - `sha256sum` of the three assets equals fields 9 / 8 / 10 respectively.
+- **2026-07-18 AMENDMENT re-verification (worktree `codex/q12-live-controller`,
+  `fcd981b10`):** `sha256sum deploy/qdrant/q12-database-barrier.sh` ->
+  `3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9`, matching the
+  ratified frozen-barrier-fix round's output byte-for-byte. The repro tool re-run against
+  this fixed barrier reproduces fields 5-10 byte-identically (see the amendment note
+  above the Layer-2 section) — confirmed by direct `node
+mc2-jz6y0.13.10-activation-tuple-repro.cjs` re-execution, zero diff to the three tracked
+  JSON assets. A new CI guard
+  (`packages/course-gen-platform/tests/unit/ops/q12-w-tuple-frozen-byte-guard.test.ts`)
+  now makes fields 2 and 4 load-bearing against the real manifest/barrier bytes, read
+  from this artifact table (not hardcoded), so any future edit to either file without a
+  matching tuple amendment fails CI.
 
 # LIVE-BOUNDARY RE-FREEZE CHECKLIST (single owner/live gate)
 
@@ -130,6 +167,13 @@ artifacts/mc2-jz6y0.13.4.*` and `.13.7-*`; `.13.14-managed-supabase-boundary.md`
 
 # Risks / Follow-ups
 
+- **(d) Field 4 — AMENDED 2026-07-18 (this cascade round).** The barrier fix (PG17
+  ACL/fd/dialect corrections, review `mc2-jz6y0.13-barrier-fix-review.md` PASS/PASS)
+  changed the barrier's byte-value. Field 4 is amended in place to the new sha256
+  (`3673ee49…`); the old value (`134255ce…`) is historical only. This does NOT reopen
+  or change the scope of checklist item 2 (fields 5/6/8/9 catalog-bound production
+  re-freeze, Task C7) — the repro tool reproduced fields 5-10 byte-identically against
+  the fixed barrier, confirmed by direct re-run this round.
 - **(a) Field 2 — RESOLVED.** Contract :178 `af9b21cb…` is the historical
   five-command manifest sha256 at `c93d766d`; the accepted file at `60910053` is
   `aaec6fc2…`, the D5J twenty-command expansion at `1817c5e9`, which is exactly the

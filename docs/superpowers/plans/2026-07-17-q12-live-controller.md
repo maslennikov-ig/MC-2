@@ -10,7 +10,9 @@ Stream: `mc2-jz6y0.13` (this worktree `codex/q12-plan-builder`).
   tests run against disposable local `postgres:17.10-bookworm` containers (the accepted
   round-8..19 harness).
 - **Frozen bytes untouched:** `q12-command-manifest.json` `aaec6fc2…`,
-  `q12-database-barrier.sh` `134255ce…`, `q12-structural-catalog.sql` `0b8a943f…`. **A
+  `q12-database-barrier.sh` `3673ee49…` (amended 2026-07-18 from the historical
+  `134255ce…` per the ratified frozen-barrier-fix round; see the implementation log and
+  the W-tuple field-4 amendment), `q12-structural-catalog.sql` `0b8a943f…`. **A
   required change to any of them is a hard STOP — report, do not touch.**
 - **One authority.** The controller drives the existing `Engine` (`production:true`),
   `load_manifest()`/`resolved_command()`, and the serializer/capability/object/checkpoint
@@ -190,7 +192,8 @@ local TDD rounds.
 
 - Real-PG17 suite green (disposable PG17), no-docker suite green (only the pre-existing
   `qdrant-observability-contract` `QDRANT_METRICS_GID` failure, outside this surface), tsc 0.
-- Frozen bytes `aaec6fc2…` / `134255ce…` / `0b8a943f…` byte-identical each round.
+- Frozen bytes `aaec6fc2…` / `3673ee49…` (amended 2026-07-18; historical `134255ce…`) /
+  `0b8a943f…` byte-identical each round.
 - Composer parity assertion green for every journaling round.
 - No W-owned file (`q12-writer-resume.py`, `source-recovery-run.sh`) modified.
 - Artifact updated + `validate_artifact.py` OK; no push; report to main.
@@ -483,6 +486,32 @@ probe_receipt_sha256:null}`; q12_guard schema present with its 4 tables + 10 fun
   (`q12-command-manifest.json` `aaec6fc2…`, `q12-database-barrier.sh` `3673ee49…`,
   `q12-structural-catalog.sql` `0b8a943f…`) unchanged; zero leftover docker. Artifact:
   `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-source-manifest-guard-surface.md`.
+
+- **RATIFIED cascade round done (field-4 succession + CI guard + frozen-sha sweep).**
+  Propagated the ratified frozen-barrier-fix round's new barrier sha256 (`3673ee49…`,
+  reviewed PASS/PASS, merged) into the W-tuple: field 4 `activation_barrier_sha256`
+  amended `134255ce…` → `3673ee49…` in
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-q12-w-activation-tuple.md` (Layer-1
+  amendment only). The repro tool
+  (`mc2-jz6y0.13.10-activation-tuple-repro.cjs`) was re-run against the fixed barrier and
+  reproduces fields 5-10 byte-identically (zero change to the three tracked JSON assets;
+  field 7 confirmed barrier-independent as well as catalog-independent) — no re-freeze
+  triggered; the C7 production re-freeze of fields 5/6/8/9 stays open and unchanged. New
+  CI guard `packages/course-gen-platform/tests/unit/ops/q12-w-tuple-frozen-byte-guard.test.ts`
+  makes W-tuple fields 2/4 load-bearing: it reads both values FROM the tuple artifact and
+  asserts them against the real `sha256` of `q12-command-manifest.json` /
+  `q12-database-barrier.sh`, proven RED (a live barrier-byte mutation without a matching
+  amendment fails the field-4 assertion) then GREEN (restored). Frozen-sha reference sweep
+  (`134255ce…`/`53647f0a…`, full + truncated forms) across docs/artifacts/tests
+  classified every occurrence current-truth vs historical; updated the 2 current-truth
+  sites found beyond the tuple itself — this plan's own standing-contract/verification-
+  contract lines (above) and the one stale hardcoded `W_TUPLE.activation_barrier_sha256`
+  constant in `q12-activation-truth.test.ts` (flagged as a stale, unused-by-assertions pin
+  in `mc2-jz6y0.13-barrier-fix-review.md`). All other occurrences are historical round/
+  review records and are unchanged. Full classification table:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-cascade.md`. Frozen manifest
+  (`aaec6fc2…`) + structural-catalog (`0b8a943f…`) untouched; barrier
+  (`3673ee49…`) not re-edited; `q12-source-manifest.ts` (`902cd6a1…`) not re-edited.
 
 ## Open risks carried forward
 

@@ -33,7 +33,14 @@ const W_TUPLE = {
   w_integration_commit: '60910053455ac9af978c7951a562172e39623ca2',
   command_manifest_sha256: 'aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841',
   activation_barrier_path: 'deploy/qdrant/q12-database-barrier.sh',
-  activation_barrier_sha256: '134255cecfb4361d5e9f1922d98f889ab7d3e01898b197dee096ab720039ed68',
+  // Amended 2026-07-18 (RATIFIED cascade round): the accepted W tuple's field 4
+  // was superseded 134255cecfb4361d5e9f1922d98f889ab7d3e01898b197dee096ab720039ed68 ->
+  // 3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9 by the ratified
+  // frozen-barrier-fix round (see mc2-jz6y0.13-barrier-fix-review.md). This constant
+  // is unused by any assertion in this suite (W_TUPLE is consumed only for
+  // managed_inventory/lock_catalog/lock_order/command_manifest_sha256 below) but is
+  // kept in sync with the tuple artifact to avoid a stale current-truth pin.
+  activation_barrier_sha256: '3673ee494549d6570c054af62660a9f96cb96ce7a9a08eafcf06c28e19d55ca9',
   activation_sql_projection_sha256:
     'a42d6d39f3383c50de15b8aac5b1efd2e486c51bb6a47052a6d805d1589f224e',
   activation_normal_slice_sha256:
