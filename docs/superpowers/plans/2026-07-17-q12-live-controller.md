@@ -868,6 +868,32 @@ ROLLBACK predecessor gate (`q12-database-barrier.sh:685`/`q12-writer-resume.py:1
 a `guard_verified`predecessor archive to carry`rollback_probes_verified=false`, whereas the frozen
 barrier writes `true` for verify-extended — a pre-existing frozen rollback-path expectation to
   re-examine when the rollback leg is driven, NOT a divergence in this forward sub-round's artifacts.
+- **R8-B-2-ii defrost done** (real-PG17 TDD; TWO ratified frozen-barrier defects + the activate GREEN).
+  Barrier `q12-database-barrier.sh` re-frozen `3673ee49…` → `bdb9d935…`; artifact
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-ii-defrost.md`. **Found-defect #13** (ninth
+  frozen-artifact defect): `write_restore_sql`'s unaliased `UPDATE cron.job` inside `FOR job IN …` is
+  ambiguous under `plpgsql.variable_conflict=error`, aborting real activate/rollback. Ratified fix:
+  `UPDATE cron.job AS restore_target … WHERE restore_target.jobid=…` (:1727-1728, +33B; in the activate
+  NORMAL slice → moved W-tuple fields 5/6). RED-first repro `q12-cron-restore-loop-ambiguity.test.ts`
+  (bc765ba56) → fix (c433bcfc0). **Found-defect #14** (tenth, #13-class): `enforce_write_barrier()` read
+  `OLD.run_id` in one IF whose leading `TG_TABLE_NAME='active_run'` term does not short-circuit
+  row-field resolution under PG17.10; the activate self-test UPDATE of the `run_id`-less
+  `q12_guard.baseline` (:1795) raised 42703 `record "old" has no field "run_id"`, uncaught by the
+  P0001-only `$activation_guard$` handlers, aborting activate before `activated`. Ratified fix
+  (Candidate A): nest the `OLD.*` reads under an outer `IF TG_TABLE_NAME='active_run' AND
+TG_OP='UPDATE' THEN … END IF;` with fall-through to the append-only RAISE (:1056-1064; in
+  `write_install_sql` → moved field 4 only) (ba02f3bdd). **GREEN** (`q12-live-real-verify-chain.test.ts`
+  extended to R8-B-2-ii, 1 passed ~119s): install → verify-base → verify-obs → prepare-recovery
+  (`recovery_ready_guarded`) → activate REACHES `activated` (`last_command=activate`,
+  `rollback_probes_verified=true`, cron restored to 8, `read_only` off); an anti-weakening probe proves
+  every `q12_guard`-table write still trips P0001 (not 42703) against the REAL installed guard
+  (28aafa738). **CASCADE** (once, final bytes): repro tool → fields {5,6} moved (from #13), {7,8,9,10}
+  BYTE-IDENTICAL (no motion beyond {4,5,6}); W-tuple artifact field {4,5,6} succession + 2026-07-19
+  amendment; CI frozen-byte guard 3/3 (field 4 = `bdb9d935…`). Frozen manifest/catalog (`aaec6fc2`/
+  `0b8a943f`), all W-owned files, and `q12-lifecycle-core.py` byte-untouched (`git diff` empty over the
+  round range). Gated tests SKIP without `MC2_Q12_REAL_PG17=1`. Explicit defers: the deployed SERVER
+  barrier stays `3673ee49…` (team-lead's pre-rehearsal reinstall — NO server activate before it); the
+  team-lead's dedicated frozen-byte review of the whole round is the next step.
 
 ## Open risks carried forward
 
