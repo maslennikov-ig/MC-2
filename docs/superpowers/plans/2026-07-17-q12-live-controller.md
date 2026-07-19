@@ -1185,3 +1185,55 @@ gated probe. Reuse (import/extend, do NOT fork) the real lease machinery already
 lease FDs :1110-1118/:1238-1246/:1325+; `leaseFd9Validated`+`supervisorPid` audit :905-925). Provenance:
 design resolved by sub-worker ae926d800d3d33cc7 (retired at its context boundary with credit; honest
 refusal to ship un-converged code); ruling relayed by the orchestrator.
+
+## R8 SERVER CUSTODY REHEARSAL — DRIVER BLUEPRINT (RATIFIED 2026-07-19)
+
+The server batch is done (barrier `bdb9d935`, writer-resume `49ef1a07`, wrapper `e93e2f63`, core
+`3bffa8ae`, all byte-verified on megacampus-prod). The custody rehearsal runs full-path `run_live` as
+`claude-deploy` (uid 1000) on the REAL `/opt` run root against a disposable seeded `postgres:17.10`.
+The **orchestrator executes on the server; workers/agents never touch prod**. Repo deliverable = the
+rehearsal DRIVER (new files only; NO core/barrier/W-owned edit).
+
+1. **Trust bridge — variant (c), PRIVATE MOUNT NAMESPACE (not system-wide binds, not bwrap).** Rationale
+   (pinned hazard): the pooler-identity proxy needs a `pooler-host → 127.0.0.1` `/etc/hosts` override;
+   done system-wide it would redirect PRODUCTION services' pooler traffic into the proxy — FORBIDDEN.
+   Mechanics: `sudo unshare -m sh -c '<bind fakehosts over /etc/hosts>; mount --bind
+/opt/megacampus/backups/q12/<run-id> <trust>/backups/q12/<run-id>; exec setpriv --reuid=1000
+--regid=1000 --init-groups <run_live>'`. Both binds are private to the namespace (nothing leaks;
+   umount is automatic on ns exit — belt: trap-umount too). `<trust>` = a real `mkdtemp
+/tmp/mc2-q12-barrier-XXXX` owned uid-1000 0700 (barrier `:94-98`). run_claim keeps the `/opt` custody
+   argv verbatim (`:2929`); the barrier child's own argv → the `/tmp` trust view (`:215`); one physical
+   dir → the #15 same-inode invariant. RESOLVED: run_claim's ProductionExecutor subprocess-runs the
+   barrier as the SAME uid (claude-deploy 1000), so the trust root is uid-1000-owned. FD-8/9 inheritance
+   is orthogonal to the binds.
+2. **Connection — pooler-identity TLS proxy (mandatory).** The barrier's URL identity pin
+   (`aws-1-us-east-2.pooler.supabase.com:5432/postgres` user `postgres.diqooqbuchsliypgwksu`, `:1921`) is
+   NOT test-mode-gated, so a bare container fails; test-mode only relaxes the CA (self-signed accepted).
+   Proxy listens `127.0.0.1:5432` INSIDE the ns view, presents the pooler identity, bridges to the
+   disposable container; db-url file = verbatim pooler URL; NO DB-command relaxation.
+3. **Resume half — REAL gate, SIMULATED fleet.** `source-recovery-run.sh` discovers writers via
+   `com.docker.compose.*` labels on the FIXED megacampus project → a real server resume would bounce the
+   LIVE PRODUCTION fleet, which out-of-window is a FORBIDDEN prod mutation. Rehearsal resume = REAL
+   `source-recovery-run.sh` (root) + REAL `q12-writer-resume.py` under `SOURCE_RECOVERY_LOCAL_TEST=1` with
+   the overridden docker command simulating the fleet (established harness pattern), validating the REAL
+   v2 receipt from the rehearsal's own real cleanup. HONEST LABELING (runbook + artifact): the rehearsal
+   proves the real gate + machinery end-to-end; the REAL fleet bounce is an IN-WINDOW step (C2/C8 on real
+   writers by design), never rehearsed on prod writers.
+4. **Recovery-epoch cleanup leg (the (c) MUST-pin) — same LOCAL_TEST framing.** Drive an
+   interrupted-cleanup recovery through the REAL W-side runner so it re-drives the REAL barrier cleanup
+   child under `cutover-recovery-1` against the DISPOSABLE container (DB side fully real; fleet
+   simulated). CONFIRM the exact recovery-epoch minting step against
+   `qdrant-source-recovery-runtime.test.ts` during the build and pin it.
+5. **Knobs:** real UUIDv4 run-id (barrier `:72`); REAL expected catalog computed from the seeded+migrated
+   container (R4 preflight, never synthesized); full Supabase seed (47 public/22 auth/5 storage/8 cron +
+   net) AND the two cron GUCs `cron.database_name`/`cron.launch_active_jobs` (R8-B-2-i fidelity,
+   structural-hash-neutral); test-mode env CA-only; teardown trap (umount-before-rmdir, containers+proxy
+   removed, run root retained for post-mortem), zero leftovers verified.
+
+**Driver deliverables (new files under `deploy/qdrant/rehearsal/` or tests/fixtures; each idempotent,
+dry-runnable locally against the fusion-harness container where feasible, TDD where testable; artifact
+`mc2-jz6y0.13-rehearsal-driver.md`):** (i) seed+proxy+container setup; (ii) the ns-launch wrapper
+implementing the ratified bridge; (iii) the LOCAL_TEST resume + recovery-epoch driver; (iv) a
+verification script (journal row-count/heads, marker 0400, v2 exact+bound, baseline byte-intact 0400,
+residue 0, teardown check). No core/barrier/W-owned edit; no push. Orchestrator review → orchestrator
+runs the rehearsal on megacampus-prod.
