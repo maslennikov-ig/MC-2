@@ -965,7 +965,7 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
 Ratified stage-iv split (OPTION 2): R8-B-2-iv becomes three bounded deliveries — iv-PART-1
 (full-window real `run_live` probe), iv-PART-2 (composed crash → real two-process supervisor →
 recover), iv-PART-3 (multi-epoch cleanup re-drive, proven or explicitly deferred). This blueprint is
-the execution-ready build spec for **iv-PART-1** (base `6c6cfc3d`, artifact
+the execution-ready build spec for **iv-PART-1** (base `f7c25ffa5`, artifact
 `mc2-jz6y0.13-r8b-2-iv-1.md`). Design fully resolved read-only across R8-B-2-iv study; **no
 `q12-lifecycle-core.py` edit** (any core edit = STOP + re-ratify).
 
@@ -986,9 +986,28 @@ the execution-ready build spec for **iv-PART-1** (base `6c6cfc3d`, artifact
    `/etc/hosts` (pooler host → 127.0.0.1); `--bind` the REAL barrier at
    `/opt/megacampus/deploy/qdrant/q12-database-barrier.sh`; `--bind` db-url/ca under
    `/opt/megacampus/secrets/`. FD 8/9 inheritance through bwrap is already proven by R4-B.
-4. **Test-mode-for-CA only.** `MC2_Q12_BARRIER_TEST_MODE` + `TEST_ROOT=/opt/megacampus` (self-signed
-   proxy cert + rewritten capability `trust_boundary` path) but NO DB-command relaxation — identical
-   to R8-B-2-iii.
+4. **Test-mode-for-CA + DUAL-BIND (ratified found-defect #15 supersession).** Test-mode is CA-ONLY
+   relaxation (mandatory — barrier `:1921` rejects a non-prod CA unless `testMode=1`, and we don't
+   hold the prod CA key) with **NO DB-command relaxation**. FOUND-DEFECT #15: the retired sub-worker's
+   `TEST_ROOT=/opt/megacampus` is UNEXECUTABLE — barrier `:94-96` requires the test-mode
+   `trust_boundary` (=`MC2_Q12_BARRIER_TEST_ROOT`) to be a REAL `/tmp/mc2-q12-barrier-*` dir (0700,
+   non-symlink) with the capability under it (`:215`), while `run_claim` `:2929-2931` requires the
+   custody run root at `/opt/megacampus/backups/q12/<run-id>`; one env var can't be both (the R8-B-2-iii
+   verify-chain precedent `:291`/`:370` uses a `/tmp` `mkdtemp`). RATIFIED SUPERSESSION — **DUAL-BIND**:
+   inside bwrap bind the SINGLE physical controller run-root dir to BOTH views —
+   `/opt/megacampus/backups/q12/<run-id>` (run_claim custody; manifest argv untouched) AND
+   `/tmp/mc2-q12-barrier-XXXXXX/backups/q12/<run-id>` (the barrier's test-mode trust root). Binding
+   conditions:
+   - (i) ONE physical dir, TWO views — the probe asserts a file written via one view is byte-identical
+     (same inode where observable) via the other, so the `/opt` custody and the real barrier act on the
+     SAME files (this is what makes the green honest).
+   - (ii) `RealClaimExecutor` rewrites ONLY the barrier child's OWN argv to the `/tmp` view
+     (capability/catalog/receipt paths); `run_claim` keeps the `/opt` manifest argv VERBATIM — assert
+     the journal rows / `command_sha256` still bind the `/opt` manifest argv (parity + digests untouched).
+   - (iii) the `/tmp` trust root satisfies the barrier's checks BY CONSTRUCTION (real `mkdtemp`
+     `mc2-q12-barrier-*`, 0700, non-symlink; bind INTO it, never symlink).
+   - (iv) checkpoint device/inode bindings are view-independent (same physical inode) — assert once that
+     the claim-published input checkpoint validates under the barrier's view.
 5. **Parity anchor.** The REAL expected catalog (structural hashes from the seeded+migrated
    container) is written to BOTH the composer root and the live root so `expected_catalog_sha256` —
    and thus every barrier `command_sha256` — matches; `run_joined_fixture`/`run_live_fixture` both
