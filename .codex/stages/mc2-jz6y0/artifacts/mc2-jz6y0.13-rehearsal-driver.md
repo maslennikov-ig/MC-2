@@ -145,3 +145,40 @@ authoritative coverage); the in-window prod fleet bounce (C2/C8, never on prod w
   (setup → ns-launch run_live → resume/recovery-epoch → verify) against the disposable seeded
   container on the real `/opt` run root; the resume + recovery-epoch legs keep the fleet
   simulated (the real fleet bounce stays in-window).
+
+# UPDATE — Driver v: bounded server-mechanics probes (found-defect #21, owner-ratified 2026-07-19)
+
+**Supersedes the "run the four scripts → full-path `run_live` on prod" framing above.** Found-defect
+#21: the privileged leg was un-runnable — `rehearsal-ns-launch.sh` execs the stock
+`q12-live-cutover.sh live` (plain `ProductionExecutor`), which does NOT start the pooler proxy (its
+binary is test-tree-only), does NOT provision the `/opt` run root, and does NOT deliver the barrier
+CA-only test-mode env; and the barrier `:215` string-check rejects the `/opt` argv under test-mode,
+reachable only via the fusion's `_rewrite_opt_to_trust` the stock CLI never does. A stock-CLI
+privileged run would fail-closed at the first leg.
+
+Owner ruling: bounded server-mechanics probes (not the full executor port, not proceed-blind). New
+deliverable `deploy/qdrant/rehearsal/rehearsal-probe.sh` (+ `rehearsal-lib.sh` reuse) +
+`packages/course-gen-platform/tests/unit/ops/q12-rehearsal-probe.test.ts`. Three self-contained
+probes validating only the server-new privileged mechanics bwrap simulated — trust-bridge (#15
+dual-bind at real privilege: same `st_dev/st_ino` + byte-identical both views, ns-private
+`/etc/hosts` pooler redirect, euid 1000), lease (FD-8/9 canonical custody under real `setpriv`), uid
+(barrier `:96` stat gate). Throwaway UUIDv4 ids; NO container / `run_live` / writers; idempotent
+umount-before-rmdir teardown. `--dry-run` + `--emit-payload` keep it worker-testable; privileged
+path is server-only.
+
+Re-scoped pre-window gate: (a) green local fusion + (b) these bounded probes + (c) green server
+setup; the stock-CLI+prod-CA window path is validated IN-WINDOW under the #18 rollback-abort safety.
+The `(c)` recovery-epoch cleanup +2 stays W-side deferred/local-proven (not weakened).
+
+Verification (driver v):
+
+- vitest `q12-rehearsal-probe.test.ts` == 10 passed (dry-run construction + emit-payload logic:
+  trust-bridge dual-view PASS/FAIL, lease FD-8/9 exclusivity+inheritance+durability, uid gate PASS/FAIL);
+  `q12-rehearsal-driver.test.ts` still 10 passed (no regression).
+- `pnpm exec tsc --noEmit` == 0.
+- `rehearsal-probe.sh --probe all --dry-run` builds `sudo unshare -m … setpriv --reuid=1000`
+  (trust-bridge) + `sudo setpriv --reuid=1000` (lease/uid); throwaway trust root residue == 0.
+- Scope: only `deploy/qdrant/rehearsal/rehearsal-probe.sh` (new) + the new test + the two docs;
+  core/barrier/W-owned untouched; barrier sha256 `bdb9d935` intact.
+- Commits (unpushed, for delta-review): RED `d7812d2d1` → GREEN `1da467bcf` → docs `4fc67c912`.
+- Privileged execution deferred to the orchestrator's megacampus-prod run (root), honest defer.
