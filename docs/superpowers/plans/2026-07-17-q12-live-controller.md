@@ -979,7 +979,7 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   WITHOUT writing (`validate_regular_file(0o400)` + canonical-parseable JSON + `schema_version` +
   `run_id == this run`), failing closed with `LifecycleError` on any deviation (0600 leftover,
   unparseable/non-canonical bytes, foreign schema/run_id) — no shape check beyond schema_version +
-  run_id, so it admits the barrier's full 12-key structural shape. TDD: RED strict-accept unit
+  run_id, so it admits the barrier's full 11-key structural shape. TDD: RED strict-accept unit
   (`q12-write-install-baseline-strict-accept.test.ts` + `-runner.py`, no-docker, minimal Engine via
   `__new__`) → GREEN core edit. Verified: the strict-accept unit is GREEN (absent 0600 write + the
   fail-closed tamper matrix), the FIXTURE suites stay GREEN (`q12-live-controller.test.ts` 23 +
@@ -1022,6 +1022,32 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   GREEN (30 passed) and `tsc --noEmit` 0. Schema-id doubling tracked as Beads `mc2-evduu` (P3,
   deferred). Commits: RED `f59b17934`, GREEN core `9e352261f` (#16), docs `f17427db6`, GREEN harness
   `16068fc77` (#17 + #16 proof).
+
+- **R8-B-2-iv-2 (Parts 2-3) — FEASIBLE crash+refusal leg GREEN; supervisor+recover derived-oracle
+  BLOCKED by the frozen barrier (empirically confirmed) ⇒ R8-B does NOT close this round.** The REAL
+  §6b.6 composed mid-barrier recovery splits into a feasible leg and a blocked tail. FEASIBLE (delivered
+  GREEN, ~112s, new gated `q12-live-real-composed-recovery.test.ts` + `-runner.py`, importing/extending
+  the iv-PART-1 fusion harness): `run_live` crashes mid-`barrier.install` AT `capability_claimed` via a
+  new env/flag-gated crash seam on the iv-PART-1 runner (`RealBarrierWrapperExecutor.crash_operation` →
+  `MC2_Q12_FW_CRASH_AT_CLAIM` → `RealClaimExecutor.after_journal_fsync` raises after the claim row is
+  durable, before the real barrier runs), leaving the durable head EXACTLY at
+  `barrier.install/capability_claimed/cutover` (real install barrier never executed); then a SEPARATE
+  lease session reacquires the released FD-9 lease and `run_recover` FAILS CLOSED with the exact
+  `q12-live-cutover.sh install` pointer, journal BYTE-unchanged — the REAL twin of
+  `q12-live-controller.test.ts:1102-1145`. BLOCKED (STOP-and-report, no barrier edit, no fake): the
+  supervisor+recover DERIVED-JOURNAL ORACLE is UNSATISFIABLE against the frozen barrier for install. A
+  scratch probe confirmed `run_supervisor`/`resume_retained_chain` CORRECTLY appends
+  `recovery_reacquired/cutover-recovery-1` + a second `capability_claimed/cutover-recovery-1`, then the
+  REAL frozen barrier `install` child fails closed (`database barrier child input checkpoint is
+invalid`): `q12-database-barrier.sh:420-433` pins install to `lease_epoch == "cutover"` with no
+  recovery-epoch branch (only cleanup/rollback have it, `:444-598`). Completing the oracle needs a
+  frozen-barrier re-ratification OR a re-scope to an op the barrier resumes under a recovery epoch —
+  an orchestrator ruling. iv-PART-3 (multi-epoch cutover-recovery-2 cleanup re-drive) DEFERRED, gated on
+  that ruling. P3-1 (barrier baseline "12-key" → 11-key label) + P3-2 (softened the full-window
+  cleanup-segment "byte-deterministic" comment) fixed. Catalog determinism across two fresh containers
+  confirmed (catalog + all 76 guarded_relations OIDs identical), so the two-container oracle plumbing is
+  viable — the blocker is the barrier grammar, not the catalog/OID axis. Barrier `bdb9d935…` and all of
+  deploy/ byte-unchanged; `tsc` 0; fixture suites 30 passed. Artifact `mc2-jz6y0.13-r8b-2-iv-2.md`.
 
 ## Open risks carried forward
 

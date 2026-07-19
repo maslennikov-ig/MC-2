@@ -89,7 +89,7 @@ describe('Q12 write_install_baseline strict-accept (found-defect #16 fix, no doc
     expect(out.strict_accept.call.raised).toBe(false);
     expect(out.strict_accept.byte_unchanged).toBe(true);
     expect(out.strict_accept.after.mode).toBe('0o400');
-    // The accept admits the barrier's FULL 12-key structural shape (no shape/key check beyond
+    // The accept admits the barrier's FULL 11-key structural shape (no shape/key check beyond
     // schema_version + run_id).
     expect(out.strict_accept.before.keys).toEqual([
       'baseline',
