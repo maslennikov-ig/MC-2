@@ -126,6 +126,28 @@ def _rewrite_opt_to_trust(argv: list[str], trust_root: str) -> list[str]:
     return rewritten
 
 
+def _rewrite_run_root_to_trust(argv: list[str], run_root: str, trust_view: str) -> list[str]:
+    """Rewrite the DIRECT (not-through-``run_claim``) cleanup child's controller-run_root file args
+    (``--q12-db-capability-file``, ``--expected-post-migration-catalog``) from the controller's
+    physical ``/tmp/mc2-q12-d5-root-*`` view to the barrier's ``/tmp`` trust view
+    (``$trust_boundary/backups/q12/<run-id>``). ``ProductionExecutor.prepare_barrier_cleanup`` builds
+    that argv from ``context["run_root"]`` -- in ``run_live`` the controller run root; the forward
+    legs never needed this because ``run_claim``'s argv is the ``/opt`` custody manifest (handled by
+    ``_rewrite_opt_to_trust``). In PRODUCTION ``context["run_root"] == /opt/...`` so the barrier's
+    non-test-mode check accepts the argv as-is; this rewrite is test-harness-only and touches ONLY the
+    barrier child's own argv, mirroring the forward-leg dual-bind (the journaled cleanup
+    ``command_sha256`` keeps the controller-run_root argv verbatim -- and is dropped from cleanup
+    parity under ``withConvergenceExclusions``). argv[0] (the real ``/opt`` barrier bind) is untouched.
+    The trust view and the controller run root are the SAME physical dir (dual-bound at
+    ``_bwrap_prefix`` :294/:301), so the child reads the same bytes the harness wrote."""
+    rewritten = list(argv)
+    for index in range(1, len(rewritten)):
+        value = rewritten[index]
+        if value == run_root or value.startswith(run_root + "/"):
+            rewritten[index] = trust_view + value[len(run_root):]
+    return rewritten
+
+
 def _barrier_test_env(trust_root: str, project_dir: str, node_bin: str) -> dict[str, str]:
     return {
         "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
@@ -412,7 +434,9 @@ class RealBarrierWrapperExecutor(rb.LiveOrdinaryExecutor):
         # Run the real frozen barrier cleanup in the SAME bwrap dual-bind sandbox as the legs,
         # through --real-cleanup (which starts the in-namespace pooler proxy, runs the barrier, and
         # tears the proxy down). The barrier argv is rewritten to the /tmp trust view.
+        trust_view = f"{self.context.trust_root}/backups/q12/{run_id}"
         rewritten = _rewrite_opt_to_trust(command["argv"], self.context.trust_root)
+        rewritten = _rewrite_run_root_to_trust(rewritten, str(run_root), trust_view)
         sandbox = _bwrap_prefix(self.context, run_id)
         env = {
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C", "LANG": "C",
@@ -881,6 +905,17 @@ def main() -> int:
         )
         leg = executor.leg_diagnostics
 
+        # #16 proof: the on-disk database-barrier-baseline.json AFTER the whole run is still the
+        # BARRIER's authoritative 0400 full-structural artifact -- the controller strict-accepted it
+        # and did NOT overwrite it with its minimal 5-key 0600 baseline. If the #16 collision-write
+        # had won, this would be mode 0600 with the controller's minimal predecessor shape.
+        baseline_path = run_root / "database-barrier-baseline.json"
+        baseline_obj = json.loads(baseline_path.read_bytes()) if baseline_path.exists() else None
+        baseline_mode = (
+            oct(stat_module.S_IMODE(baseline_path.stat().st_mode))[2:]
+            if baseline_path.exists() else None
+        )
+
         sys.stdout.write(json.dumps({
             "seed_counts": seed_counts,
             "catalog_sha256": catalog_sha256,
@@ -910,6 +945,12 @@ def main() -> int:
             "install_argv_opt_verbatim": install_argv_opt_verbatim,
             "install_command_sha256_binds_opt_argv": install_command_sha256_binds_opt_argv,
             "input_checkpoint_view_independent": bool(leg.get("input_checkpoint_view_independent")),
+            "install_baseline_mode": baseline_mode,
+            "install_baseline_schema": (baseline_obj or {}).get("schema_version"),
+            "install_baseline_state": (baseline_obj or {}).get("state"),
+            "install_baseline_keys": sorted(baseline_obj) if isinstance(baseline_obj, dict) else [],
+            "install_baseline_has_structural": isinstance(baseline_obj, dict)
+            and isinstance(baseline_obj.get("baseline"), dict),
         }) + "\n")
         return 0
     finally:

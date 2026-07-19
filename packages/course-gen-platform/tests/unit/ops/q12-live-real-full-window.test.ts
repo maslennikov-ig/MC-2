@@ -135,6 +135,11 @@ describe.runIf(REAL_PG17)(
         install_argv_opt_verbatim: boolean;
         install_command_sha256_binds_opt_argv: boolean;
         input_checkpoint_view_independent: boolean;
+        install_baseline_mode: string;
+        install_baseline_schema: string;
+        install_baseline_state: string;
+        install_baseline_keys: string[];
+        install_baseline_has_structural: boolean;
       };
 
       // Disposable source is the frozen full-Supabase inventory; run_live rc=0.
@@ -146,7 +151,9 @@ describe.runIf(REAL_PG17)(
       expect(out.live_journal).toHaveLength(TOTAL_ROWS);
       expect(out.composer_journal).toHaveLength(FORWARD_PREFIX);
       const cleanupRows = out.live_journal.slice(FORWARD_PREFIX);
-      expect(cleanupRows.map(r => r.command_id)).toEqual(Array(CLEANUP_ROWS).fill('barrier.cleanup'));
+      expect(cleanupRows.map(r => r.command_id)).toEqual(
+        Array(CLEANUP_ROWS).fill('barrier.cleanup')
+      );
       expect(cleanupRows.map(r => r.outcome)).toEqual([
         'intent',
         'capability_issued',
@@ -220,6 +227,20 @@ describe.runIf(REAL_PG17)(
       expect(out.install_command_sha256_binds_opt_argv).toBe(true);
       // ---- #15 (iv): the claim-published per-leg input checkpoint validates under barrier view --
       expect(out.input_checkpoint_view_independent).toBe(true);
+
+      // ---- #16 proof: the controller did NOT overwrite the barrier's authoritative baseline -----
+      // After the whole run the on-disk database-barrier-baseline.json is STILL the barrier's 0400
+      // full-structural artifact (schema_version + nested structural `baseline` + the
+      // maintenance_guarded_baseline state), NOT the controller's minimal 5-key 0600 predecessor
+      // baseline. If the #16 collision-write had won this would be 0600 with no nested `baseline`.
+      expect(out.install_baseline_mode).toBe('400');
+      expect(out.install_baseline_schema).toBe('megacampus.q12.database-barrier-baseline/v1');
+      expect(out.install_baseline_state).toBe('maintenance_guarded_baseline');
+      expect(out.install_baseline_has_structural).toBe(true);
+      expect(out.install_baseline_keys).toContain('baseline');
+      expect(out.install_baseline_keys).toContain('baseline_sha256');
+      // The controller-minimal-only keys must be ABSENT (proves the strict-accept, not a rewrite).
+      expect(out.install_baseline_keys).not.toContain('capability_manifest_sha256');
     }, 580_000);
   }
 );
