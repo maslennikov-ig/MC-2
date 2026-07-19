@@ -1,5 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +36,8 @@ const REHEARSAL = resolve(repoRoot, 'deploy/qdrant/rehearsal');
 const VERIFY = join(REHEARSAL, 'rehearsal-verify.py');
 const NS_LAUNCH = join(REHEARSAL, 'rehearsal-ns-launch.sh');
 const RESUME = join(REHEARSAL, 'rehearsal-resume.py');
+const SETUP = join(REHEARSAL, 'rehearsal-setup.py');
+const QDRANT = resolve(repoRoot, 'deploy/qdrant');
 // The captured real 81-row run root is stored as a byte-exact tar (a raw .json tree would be
 // reformatted by prettier, breaking the receipt sha256 the accepted-row binding depends on).
 const FIXTURE_TAR = resolve(
@@ -259,5 +271,78 @@ describe('Q12 R8 rehearsal-ns-launch.sh inner ns-script (setpriv-stubbed exec)',
     const postShift = emitted.slice(initGroups + 1);
     // shift 3 (the P1 bug) drops launchArgv[0] (the run_live entrypoint); shift 2 keeps it.
     expect(postShift).toEqual(launchArgv);
+  });
+});
+
+// Found-defect #20: the rehearsal DRIVER must be SERVER-SELF-CONTAINED. megacampus-prod
+// carries only the /opt/megacampus/deploy/ subset — NOT the packages/ test tree, no
+// node_modules/tsx, no cwd=REPO. So rehearsal-setup.py's server-import surface must resolve
+// against ONLY deploy/qdrant/rehearsal/ + deploy/qdrant/*.sql — never a packages/…/fixtures
+// runner. These checks need NO docker (the catalog leg still needs docker for a full local
+// run; the import surface itself does not).
+describe('Q12 R8 rehearsal driver server-import surface (found-defect #20)', () => {
+  it('no rehearsal driver .py references the packages tree or LOADS a *-runner.py fixture', () => {
+    const pys = readdirSync(REHEARSAL).filter(name => name.endsWith('.py'));
+    expect(pys).toContain('rehearsal-setup.py');
+    for (const name of pys) {
+      const src = readFileSync(join(REHEARSAL, name), 'utf8');
+      // The undeployed test tree must never be on the server-import path.
+      expect(src, `${name} references the packages/course-gen-platform test tree`).not.toContain(
+        'packages/course-gen-platform'
+      );
+      // A *-runner.py string LITERAL (quoted) is an importlib load of a fixture runner; prose
+      // provenance in comments/docstrings uses the bare name and is not matched.
+      expect(src, `${name} loads a *-runner.py fixture`).not.toMatch(/runner\.py['"]/);
+    }
+  });
+
+  it('rehearsal-setup.py --check-imports resolves on a DEPLOY-ONLY subset with NO packages/', () => {
+    // Stage an /opt-like tree carrying ONLY the deploy/qdrant subset the driver needs — the
+    // rehearsal/ dir + the deploy-side .sql/.sh siblings — and deliberately NO packages/ tree.
+    const dir = mkdtempSync(join(tmpdir(), 'mc2-q12-deploy-subset-'));
+    scratches.push(dir);
+    const optQdrant = join(dir, 'opt', 'megacampus', 'deploy', 'qdrant');
+    const optRehearsal = join(optQdrant, 'rehearsal');
+    mkdirSync(optRehearsal, { recursive: true });
+    for (const name of readdirSync(REHEARSAL)) {
+      // Copy ONLY regular files (the driver source). A `__pycache__/` dir exists under
+      // rehearsal/ after ANY python run (the server + CI both have it); copyFileSync on a
+      // directory throws EISDIR — skip non-regular entries so the test isn't falsely fragile.
+      if (!statSync(join(REHEARSAL, name)).isFile()) continue;
+      copyFileSync(join(REHEARSAL, name), join(optRehearsal, name));
+    }
+    // The deploy-side siblings the driver reads (structural catalog + recovery wrapper etc.).
+    for (const name of readdirSync(QDRANT)) {
+      if (name.endsWith('.sql') || name.endsWith('.sh')) {
+        copyFileSync(join(QDRANT, name), join(optQdrant, name));
+      }
+    }
+    // Sanity: the staged subset has NO packages/ tree at all.
+    expect(readdirSync(join(dir, 'opt', 'megacampus', 'deploy'))).toEqual(['qdrant']);
+
+    const stagedSetup = join(optRehearsal, 'rehearsal-setup.py');
+    // --help must not require any packages path.
+    const help = spawnSync('/usr/bin/python3', [stagedSetup, '--help'], { encoding: 'utf8' });
+    expect(help.status, help.stderr).toBe(0);
+    // --check-imports actually LOADS the vendored helper (the real server-import surface) with
+    // no packages/ present and prints the resolved deploy-side paths.
+    const check = spawnSync('/usr/bin/python3', [stagedSetup, '--check-imports'], {
+      encoding: 'utf8',
+    });
+    expect(check.status, check.stderr).toBe(0);
+    // It must NOT have failed on a packages/…/fixtures/…-runner.py path.
+    expect(check.stderr).not.toMatch(/packages\/.*fixtures/);
+    const out = JSON.parse(check.stdout) as {
+      check_imports: string;
+      structural_catalog: string;
+      symbols: string[];
+    };
+    expect(out.check_imports).toBe('ok');
+    // The catalog leg reads deploy/qdrant/q12-structural-catalog.sql (server-present), NOT packages/.
+    expect(out.structural_catalog).toContain('deploy/qdrant/q12-structural-catalog.sql');
+    expect(out.structural_catalog).not.toContain('packages/');
+    expect(out.symbols).toEqual(
+      expect.arrayContaining(['SEED_SQL', 'canonical', 'sha256_hex', '_build_expected_catalog'])
+    );
   });
 });

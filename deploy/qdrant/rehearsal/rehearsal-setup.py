@@ -11,9 +11,14 @@ R4 preflight pattern (NEVER synthesized), and generates the self-signed pooler-i
 proxy cert/key (accepted under the barrier's CA-only test mode).
 
 The catalog + seed logic is REUSED verbatim from the fusion harness so the rehearsal
-source is byte-identical to the harness the server barrier was proven against:
+source is byte-identical to the harness the server barrier was proven against. To keep
+the driver SERVER-SELF-CONTAINED (found-defect #20) that machinery is VENDORED into the
+deploy-side sibling ``rehearsal-seed.py`` — NOT imported from the ``packages/`` test tree,
+which is NOT deployed to megacampus-prod (the server carries only ``/opt/megacampus/deploy/``,
+no ``node_modules``/``tsx``, no repo checkout). Provenance of the vendored symbols:
   * seed / identity constants  <- q12-live-real-barrier-cutover-runner.py (r4c)
   * REAL expected catalog       <- q12-live-real-full-window-runner.py::_build_expected_catalog
+See rehearsal-seed.py for the per-block byte-verbatim provenance.
 
 LOCAL_TEST / --dry-run: provisions the disposable container on the host docker, seeds,
 computes + prints the catalog, verifies the seed counts, and tears the container down
@@ -36,10 +41,9 @@ import sys
 import tempfile
 import time
 
-REPO = pathlib.Path(__file__).resolve().parents[3]
-FIXTURES = REPO / "packages/course-gen-platform/tests/unit/ops/fixtures"
-R4_RUNNER = FIXTURES / "q12-live-real-barrier-cutover-runner.py"
-FW_RUNNER = FIXTURES / "q12-live-real-full-window-runner.py"
+# The vendored, deploy-side seed + REAL-catalog helper (server-self-contained; resolves
+# purely within deploy/qdrant/rehearsal/, no packages/ tree, no tsx).
+SEED_HELPER = pathlib.Path(__file__).with_name("rehearsal-seed.py")
 
 
 def _load(name: str, path: pathlib.Path):
@@ -66,13 +70,12 @@ def _wait_ready(docker: str, cid: str, image_pull_timeout: float) -> None:
 
 
 def provision(docker: str, keep: bool, cert_dir: pathlib.Path, wait: float) -> dict:
-    r4c = _load("q12_r4c_runner", R4_RUNNER)
-    fw = _load("q12_fw_runner", FW_RUNNER)
+    seed_mod = _load("q12_rehearsal_seed", SEED_HELPER)
 
     cid = f"mc2-q12-rehearsal-src-{os.getpid()}-{int(time.time())}"
     subprocess.run(
-        [docker, "run", "-d", "--name", cid, "-e", f"POSTGRES_PASSWORD={r4c.PW}",
-         "-p", "127.0.0.1::5432", r4c.IMAGE],
+        [docker, "run", "-d", "--name", cid, "-e", f"POSTGRES_PASSWORD={seed_mod.PW}",
+         "-p", "127.0.0.1::5432", seed_mod.IMAGE],
         check=True, capture_output=True,
     )
     try:
@@ -80,7 +83,7 @@ def provision(docker: str, keep: bool, cert_dir: pathlib.Path, wait: float) -> d
         seed = subprocess.run(
             [docker, "exec", "-i", cid, "psql", "-X", "-v", "ON_ERROR_STOP=1",
              "-U", "postgres", "-d", "postgres"],
-            input=r4c.SEED_SQL, text=True, capture_output=True,
+            input=seed_mod.SEED_SQL, text=True, capture_output=True,
         )
         if seed.returncode != 0:
             raise RuntimeError(f"seed failed: {seed.stderr.strip()}")
@@ -93,12 +96,15 @@ def provision(docker: str, keep: bool, cert_dir: pathlib.Path, wait: float) -> d
                 text=True, capture_output=True, check=True,
             )
 
-        # REAL expected catalog via the R4 preflight (computed from the container).
+        # REAL expected catalog via the R4 preflight (computed from the container) — reads the
+        # deploy-side deploy/qdrant/q12-structural-catalog.sql via docker exec psql; NEVER synthesized,
+        # NO tsx / q12-source-manifest.ts (that TS tool is only for the fixtures' separate
+        # validateTransition assertion, which the rehearsal does not perform).
         catalog, baseline_sha, after_base_sha, after_obs_sha, seed_counts = (
-            fw._build_expected_catalog(cid)
+            seed_mod._build_expected_catalog(cid)
         )
-        catalog_body = (r4c.canonical(catalog) + "\n").encode("utf-8")
-        catalog_sha256 = r4c.sha256_hex(catalog_body)
+        catalog_body = (seed_mod.canonical(catalog) + "\n").encode("utf-8")
+        catalog_sha256 = seed_mod.sha256_hex(catalog_body)
 
         expected = {"public": 47, "auth": 22, "storage": 5, "cron": 8, "net": 0}
         if seed_counts != expected:
@@ -116,7 +122,7 @@ def provision(docker: str, keep: bool, cert_dir: pathlib.Path, wait: float) -> d
         cert_dir.mkdir(parents=True, exist_ok=True)
         cert_path = cert_dir / "proxy-cert.pem"
         key_path = cert_dir / "proxy-key.pem"
-        r4c._generate_self_signed(cert_path, key_path, r4c.POOLER_HOST)
+        seed_mod._generate_self_signed(cert_path, key_path, seed_mod.POOLER_HOST)
 
         catalog_file = cert_dir / "expected-post-migration-catalog.json"
         catalog_file.write_bytes(catalog_body)
@@ -124,9 +130,9 @@ def provision(docker: str, keep: bool, cert_dir: pathlib.Path, wait: float) -> d
 
         return {
             "container": cid,
-            "image": r4c.IMAGE,
-            "pooler_host": r4c.POOLER_HOST,
-            "pooler_user": r4c.POOLER_USER,
+            "image": seed_mod.IMAGE,
+            "pooler_host": seed_mod.POOLER_HOST,
+            "pooler_user": seed_mod.POOLER_USER,
             "seed_counts": seed_counts,
             "cron_gucs": gucs,
             "catalog_sha256": catalog_sha256,
@@ -151,7 +157,30 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--keep", action="store_true",
                         help="retain the disposable container (post-mortem); default tears it down")
     parser.add_argument("--wait", type=float, default=120.0)
+    parser.add_argument(
+        "--check-imports", action="store_true",
+        help="load the vendored deploy-side helper (rehearsal-seed.py) and print the resolved "
+             "server-import surface, then exit 0 WITHOUT docker/prod. Proves the driver is "
+             "server-self-contained (found-defect #20): NO packages/ tree, NO tsx.",
+    )
     args = parser.parse_args(argv)
+
+    if args.check_imports:
+        seed_mod = _load("q12_rehearsal_seed", SEED_HELPER)
+        symbols = [
+            "SEED_SQL", "canonical", "sha256_hex", "_generate_self_signed",
+            "PW", "IMAGE", "POOLER_HOST", "POOLER_USER", "_build_expected_catalog",
+        ]
+        missing = [name for name in symbols if not hasattr(seed_mod, name)]
+        if missing:
+            raise RuntimeError(f"vendored helper missing symbols: {missing}")
+        sys.stdout.write(json.dumps({
+            "check_imports": "ok",
+            "helper": str(SEED_HELPER),
+            "structural_catalog": str(seed_mod.STRUCTURAL_CATALOG),
+            "symbols": symbols,
+        }, sort_keys=True) + "\n")
+        return 0
 
     cert_dir = args.cert_dir or pathlib.Path(
         tempfile.mkdtemp(prefix="mc2-q12-rehearsal-setup-", dir="/tmp")
