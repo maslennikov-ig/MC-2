@@ -1048,6 +1048,32 @@ invalid`): `q12-database-barrier.sh:420-433` pins install to `lease_epoch == "cu
   confirmed (catalog + all 76 guarded_relations OIDs identical), so the two-container oracle plumbing is
   viable — the blocker is the barrier grammar, not the catalog/OID axis. Barrier `bdb9d935…` and all of
   deploy/ byte-unchanged; `tsc` 0; fixture suites 30 passed. Artifact `mc2-jz6y0.13-r8b-2-iv-2.md`.
+- **R8-B-2-iv-3 (ratified (b'+c) after found-defect #19) — REAL cutover cleanup-crash recover
+  convergence GREEN; the +2 recovery-epoch composed probe + multi-epoch re-drive DEFERRED to the server
+  rehearsal.** The orchestrator ratified found-defect #18 (forward) and a symmetric **found-defect #19**:
+  OPTION (b)'s premise that the composed supervisor→recover story "holds fully for the CLEANUP segment"
+  is ALSO false against the frozen controller — the frozen barrier cleanup child accepts a recovery epoch
+  (`q12-database-barrier.sh:444-598`, `:514-518`) but the controller NEVER mints one (`barrier.cleanup ∉
+OPERATIONS`, `q12-lifecycle-core.py:27-33`/`:4058-4065`; cleanup driver hardcoded cutover-only
+  `:1791/1797/1808/1814/1838`, comment `:1773`). Delivered (b'): new gated
+  `q12-live-real-cleanup-recovery.test.ts` + `-runner.py` (import/extend the composed-recovery runner +
+  iv-PART-1 fusion). On two disposable `postgres:17.10` containers: an uninterrupted twin (81 rows), then
+  a fresh run crashes mid-cleanup at `barrier.cleanup/capability_claimed/cutover` (additive gated crash in
+  `execute_barrier_cleanup` after the claimed row is durable; 79 rows), then `run_recover` resumes the
+  cleanup segment UNDER CUTOVER — the REAL frozen barrier cleanup child accepts
+  `database-barrier-input-checkpoint-cleanup-cutover.json`, drops `q12_guard`, promotes the 10-key v2
+  receipt, deletes the db capability (real R8-B-1 seam) → 81 rows, **+0** converging byte-for-byte to the
+  twin under the EXISTING `withConvergenceExclusions` ONLY (the fixture head-8 precedent
+  `q12-live-controller.test.ts:1046` MADE REAL, NO broadening; NO `recovery_reacquired`, every row
+  `lease_epoch==cutover`). Gated GREEN ~238s; `tsc` 0; fixture suite 23 passed; skips without the flag;
+  barrier `bdb9d935…`/deploy/ byte-unchanged. (c) DEFER: the +2/`recovery_reacquired`/`cutover-recovery-N`
+  composed probe AND the multi-epoch `cutover-recovery-2` cleanup re-drive → the SERVER REHEARSAL (W-side
+  owner custody / `source-recovery-run.sh`), which MUST exercise the recovery-epoch cleanup leg so the
+  defer lands. DECISION-2 docs: the total five-op analytical sweep + the §5.5 addendum / §6b.6 note (a
+  controller-side mid-lifecycle crash is not supervisor-resumable-to-a-recovery-epoch in the current
+  build; forward crash → named refusal / window ABORT via rollback where the predecessor gate permits,
+  else the manual runbook; cleanup crash → cutover recover convergence). R5-D2 pointer TEXT unchanged
+  (fail-closed-safe); rewording deferred. Artifact `mc2-jz6y0.13-r8b-2-iv-2.md` (round-2 section).
 
 ## Open risks carried forward
 

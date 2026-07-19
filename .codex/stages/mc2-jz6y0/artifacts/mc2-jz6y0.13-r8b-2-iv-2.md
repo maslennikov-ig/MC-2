@@ -11,7 +11,7 @@ branch: codex/q12-live-controller
 base_branch: codex/self-hosted-qdrant-platform-plan
 base_commit: ab0d8865b
 worktree: /home/me/code/mc2/.worktrees/q12-live-controller
-status: blocked
+status: returned
 delivery_method: manual integration
 accepted_by_orchestrator: no
 cleanup_status: cleaned
@@ -27,11 +27,15 @@ cleanup_notes: >-
 risk_level: high
 docs_reviewed: updated
 docs_review_notes: >-
-  docs/superpowers/plans/2026-07-17-q12-live-controller.md gets the R8-B-2-iv-2 implementation-log
-  entry (feasible crash+refusal leg delivered GREEN; the supervisor+recover derived-oracle tail BLOCKED
-  by the frozen barrier install-cutover-only grammar, empirically confirmed) plus the P3-1 label
-  correction (12-key -> 11-key on the barrier baseline). No design decision changed; the blocker is a
-  reported design gap awaiting orchestrator ruling (barrier re-ratification vs re-scope).
+  ROUND-2 (ratified (b'+c) after found-defect #19, on base d0f30b987): the design spec
+  docs/superpowers/specs/2026-07-17-q12-live-controller-design.md gets the §5.5 addendum + §6b.6 note
+  (a controller-side mid-lifecycle crash is NOT supervisor-resumable-to-a-recovery-epoch in the current
+  build; forward crash -> named refusal / window ABORT via rollback where the predecessor gate permits,
+  else the manual runbook; cleanup crash -> cutover recover convergence (+0); the cutover-recovery-N
+  machinery is W-side/server-custody, validated at the SERVER REHEARSAL) and the total FIVE-OP analytical
+  sweep. The plan doc gets the R8-B-2-iv-3 (b') implementation-log entry. The R5-D2 refusal-pointer TEXT
+  is UNCHANGED this round (an explicit defer of any rewording is recorded). No frozen core/barrier
+  decision changed. ROUND-1 record below (the #18 blocker) is preserved as ratified context.
 graph_reviewed: no-change-needed
 graph_review_notes: >-
   Change is confined to test/fixture/docs under packages/course-gen-platform/tests/unit/ops/ plus one
@@ -41,6 +45,27 @@ graph_review_notes: >-
   bdb9d935 unchanged; core unchanged). No new module/service/public surface, no durable-workflow or
   architecture edge. Delegated worktree stream; no local Graphify refresh performed.
 verification:
+  - 'ROUND-2 (b'') GATED PROBE GREEN — real cutover cleanup-crash recover convergence. On base d0f30b987
+    (barrier bdb9d935 verified UNCHANGED at start AND end), MC2_Q12_REAL_PG17=1
+    SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=synthetic-test-key
+    MC2_Q12_PLAN_DOCKER=/usr/bin/docker vitest --config vitest.config.unit.ts
+    tests/unit/ops/q12-live-real-cleanup-recovery.test.ts -> 1 passed in ~238s (two disposable
+    postgres:17.10-bookworm containers). OBSERVED ORACLE: uninterrupted twin = 81 rows; run_live crashes
+    mid-cleanup with crash_error "injected crash mid-cleanup at barrier.cleanup/capability_claimed/cutover",
+    durable head EXACTLY {barrier.cleanup, capability_claimed, cutover}, crashed journal = 79 rows (76
+    forward + intent/capability_issued/capability_claimed, NO capability_completed); run_recover resumes
+    UNDER CUTOVER -> 81 rows (+0 vs twin, == crash+2); recovered[0:79] == crashed rows BYTE-for-byte;
+    recover appended exactly [capability_completed/cutover, accepted/cutover]; NO recovery_reacquired,
+    EVERY row lease_epoch==cutover; recovered == twin under the EXISTING withConvergenceExclusions ONLY
+    (the fixture head-8 precedent q12-live-controller.test.ts:1046 MADE REAL, NO broadening); the REAL
+    barrier cleanup child accepted database-barrier-input-checkpoint-cleanup-cutover.json, dropped
+    q12_guard (guard residue {schema,relation,function,event_trigger}=0), promoted the exact 10-key v2
+    receipt (terminal accepted binds it), and the CONTROLLER deleted the db capability; resume resumed,
+    validated==v2. 0 orphan mc2-q12 containers after.'
+  - 'ROUND-2 tsc: cd packages/course-gen-platform && pnpm exec tsc --noEmit -> exit 0. FIXTURE suite green
+    (no-docker; new files are additive): vitest --config vitest.config.unit.ts
+    tests/unit/ops/q12-live-controller.test.ts -> 23 passed. New gated probe SKIPS without the flag
+    (1 skipped). git diff d0f30b987..HEAD --stat: NO deploy/ change; barrier bdb9d935 UNCHANGED.'
   - 'Branch codex/q12-live-controller for every commit; HEAD at session start ab0d8865b (== base_commit).
     sha256 deploy/qdrant/q12-database-barrier.sh == bdb9d935e3c09fb01503ba9d016f36a9cf94db5539dfcdc73c1692eb442925ce
     verified at session start AND end (barrier UNCHANGED). git diff --stat shows NO deploy/ change.'
@@ -84,6 +109,20 @@ verification:
     without the flag.'
   - '0 mc2-q12 docker containers after every run (docker ps -a | grep mc2-q12 -> none).'
 changed_files:
+  - 'ROUND-2 packages/course-gen-platform/tests/unit/ops/q12-live-real-cleanup-recovery.test.ts: NEW gated
+    real-PG17 (b'') probe — the REAL twin of fixture head-8 (q12-live-controller.test.ts:1046). Asserts
+    crash head, +0 convergence to the uninterrupted twin under the EXISTING exclusions, byte-for-byte
+    pre-crash preservation, and the real cleanup child + R8-B-1 seam.'
+  - 'ROUND-2 packages/course-gen-platform/tests/unit/ops/fixtures/q12-live-real-cleanup-recovery-runner.py:
+    NEW runner; imports/extends the composed-recovery runner + iv-PART-1 fusion harness (no fork). Adds an
+    additive CleanupCrashWrapperExecutor whose execute_barrier_cleanup raises (when gated) after the
+    capability_claimed cleanup row is durable; drives twin + crash-then-recover on two disposable
+    containers; shares ONE quiesce manifest path across both runs.'
+  - 'ROUND-2 docs/superpowers/specs/2026-07-17-q12-live-controller-design.md: §5.5 addendum + §6b.6 note
+    (operator-truth) + the total FIVE-OP analytical sweep (DECISION 2).'
+  - 'ROUND-2 docs/superpowers/plans/2026-07-17-q12-live-controller.md: R8-B-2-iv-3 (b') implementation-log
+    entry.'
+  - 'ROUND-1 (base ab0d8865b) files below:'
   - 'packages/course-gen-platform/tests/unit/ops/q12-live-real-composed-recovery.test.ts: NEW gated
     real-PG17 crash+refusal probe (the feasible §6b.6 leg; the real twin of q12-live-controller.test.ts:
     1102-1145).'
@@ -106,28 +145,104 @@ changed_files:
   - '.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-iv-2.md: this artifact.'
 explicit_defers:
   - >-
-    §6b.6 supervisor+recover DERIVED-JOURNAL ORACLE tail (Part 2 sub-items iv/v/vi) — BLOCKED, not
-    deferred by choice. The REAL two-process supervisor recovery of a FORWARD barrier op is infeasible
-    against the frozen barrier bdb9d935: install is cutover-only (q12-database-barrier.sh:420-433), so a
-    recovery-epoch install re-claim fails closed at the barrier and can never reach
-    barrier.install/completed/cutover-recovery-1. Needs an orchestrator ruling: (a) re-ratify the frozen
-    barrier to add recovery-epoch install grammar (mirroring the cleanup/rollback branch), OR (b) re-scope
-    the REAL §6b.6 probe to a barrier op that the frozen barrier DOES resume under a recovery epoch. NOTE:
-    cleanup/rollback DO carry the recovery-epoch grammar, but they are NOT in OPERATIONS and are NOT
-    driven by run_supervisor (the two-process recovery_reacquired path is forward-op-only), so a cleanup
-    crash is a run_recover-resumes-the-cleanup-segment convergence (already proven synthetically at
-    q12-live-controller.test.ts:1046), NOT the supervisor two-process shape Part 2 specifies.
-    verify-after-base / prepare-recovery / activate lack install's hardcoded cutover pin (no epoch-pinned
-    input checkpoint), so they MIGHT accept a recovery-epoch re-claim — UNVERIFIED (would need an
-    authorized, more expensive full-window-to-that-leg empirical drive). Not pursued speculatively.
+    (c, RATIFIED) The +2/recovery_reacquired/cutover-recovery-N COMPOSED probe (§6b.6 derived-journal
+    oracle) — DEFERRED to the SERVER REHEARSAL (W-side owner custody / source-recovery-run.sh). Ratified
+    justification, symmetric across found-defects #18 and #19: the recovery-epoch shape is unreachable
+    from the controller fusion in BOTH directions — FORWARD ops = the controller CAN mint a recovery epoch
+    (resume_retained_chain) but the frozen barrier install child pins its input checkpoint to
+    lease_epoch=="cutover" (q12-database-barrier.sh:421/432/439) and fails closed on a recovery-epoch
+    re-claim (#18, empirically confirmed round 1); CLEANUP = the frozen barrier cleanup child ACCEPTS a
+    recovery epoch (:444-598, grammar :514-518) but the controller NEVER mints one — barrier.cleanup is
+    not in OPERATIONS (q12-lifecycle-core.py:27-33) so run_supervisor cannot target it (:4058-4065), and
+    the sole cleanup driver orchestrate_post_activate_cleanup (:3386-3517) is hardcoded cutover-only
+    (publish_cleanup_capability :1791/1797, move_cleanup_capability :1808/1814, append_cleanup_row :1838;
+    "keyed on OPERATIONS (which excludes cleanup)" :1773). So the +2 recovery-epoch oracle is inherently
+    W-side / server-custody, NOT a controller-fusion artifact — building it here would require a frozen
+    q12-lifecycle-core.py edit (add a cleanup supervisor / recovery-epoch producer) or a synthetic
+    stand-in, both HARD STOPs. REHEARSAL-SCOPE PIN (so this defer LANDS, not evaporates): the server
+    rehearsal MUST exercise the recovery-epoch cleanup leg (supervisor- or W-side-minted per its own
+    contract) and assert the recovery_reacquired + second capability_claimed under cutover-recovery-N
+    grammar the frozen barrier already validates (:514-518). The REAL SATISFIABLE cutover cleanup-crash
+    recover convergence (b') IS delivered GREEN this round (q12-live-real-cleanup-recovery.test.ts).
   - >-
-    iv-PART-3 (multi-epoch cutover-recovery-2 cleanup re-drive) — DEFERRED. It depends on Part 2's real
-    recover machinery reaching a completed recovery epoch, which is blocked above; a cutover-recovery-2
-    cleanup re-drive is not cheaply reachable until the Part-2 barrier-grammar ruling lands. Justification:
-    building it now would either require the same frozen-barrier edit (re-ratification) or a synthetic
-    stand-in (fake green) — both hard stops. Deferred to the server custody rehearsal, gated on the Part-2
-    ruling.
+    iv-PART-3 (multi-epoch cutover-recovery-2 cleanup re-drive) — DEFERRED to the SAME server rehearsal,
+    folded into the (c) rehearsal-scope pin above. It is a strict extension of the recovery-epoch cleanup
+    leg (consecutive cutover -> cutover-recovery-1 -> cutover-recovery-2 per q12-database-barrier.sh:514-518)
+    and is therefore only reachable once a recovery-epoch cleanup is minted W-side/server-custody; it is
+    unreachable from the controller fusion for the same reason as (c). Not built here (would require the
+    frozen-core edit or a synthetic stand-in — both hard stops).
+  - >-
+    R5-D2 refusal-pointer TEXT rewording — DEFERRED to the rehearsal/runbook round (unchanged this round).
+    Following the current pointer (q12-lifecycle-core.py:4014-4020, "q12-live-cutover.sh <op>") on a
+    controller-side mid-lifecycle FORWARD crash leads to a NAMED barrier refusal (the recovery-epoch
+    forward re-claim fails closed at the barrier input-checkpoint gate) — fail-closed-SAFE, not damage.
+    Any rewording to reflect the window-ABORT-via-rollback / manual-runbook operator truth is bounded to
+    the rehearsal/runbook round where the per-crash-point procedure is server-validated; not touched now
+    to avoid over-specifying unverified procedure.
+  - >-
+    ROUND-1 (superseded) BLOCKER note — the round-1 artifact recorded the §6b.6 supervisor+recover FORWARD
+    oracle as BLOCKED awaiting a ruling. RESOLVED: ratified as found-defect #18 (forward) + #19 (cleanup),
+    resolution (b'+c) above. Kept for provenance.
 ---
+
+# Round 2 — ratified (b'+c) resolution of found-defect #19 (base d0f30b987)
+
+Round 1 (below) STOPPED on found-defect #18 (the real §6b.6 supervisor+recover FORWARD oracle is
+unsatisfiable against the frozen barrier). The orchestrator ratified #18 and, on inspection, ratified a
+symmetric **found-defect #19**: OPTION (b)'s premise — "the composed supervisor→recover story holds
+fully for the CLEANUP segment" — is ALSO false against the frozen controller. Ratified resolution:
+**(b') deliver the REAL SATISFIABLE cutover cleanup-crash recover convergence** (the fixture head-8
+precedent made real) and **(c) defer the +2/recovery-epoch composed probe + the Part-3 multi-epoch
+re-drive to the server rehearsal** (see `explicit_defers`).
+
+## (b') DELIVERED GREEN — real cutover cleanup-crash recover convergence
+
+`q12-live-real-cleanup-recovery-runner.py` / `q12-live-real-cleanup-recovery.test.ts` drive, on two
+disposable `postgres:17.10-bookworm` loopback containers through the iv-PART-1 fusion machinery:
+
+- **TWIN** — an uninterrupted real `run_live` (81 rows).
+- **CRASH** — a fresh root/container drives the window through activate INTO the cleanup segment, then an
+  additive gated crash in `execute_barrier_cleanup` (raised AFTER the `capability_claimed` cleanup row is
+  durable, `q12-lifecycle-core.py:3483` before the `:3503` hook) leaves the durable head EXACTLY at
+  `barrier.cleanup/capability_claimed/cutover` (76 forward + 3 cleanup = 79 rows); `run_live` rejects.
+- **RECOVER** — `run_recover` on the same container/root resumes the cleanup segment UNDER CUTOVER
+  (`orchestrate_post_activate_cleanup` via `_POST_ACTIVATE_SENTINEL`): the REAL frozen barrier cleanup
+  child accepts `database-barrier-input-checkpoint-cleanup-cutover.json`, drops `q12_guard`, promotes the
+  exact 10-key v2 receipt, deletes the db capability (real R8-B-1 seam) → 81 rows, **+0** vs the twin.
+
+Observed oracle (existing `withConvergenceExclusions` ONLY, NO broadening): recovered == twin;
+recovered[0:79] == crashed rows byte-for-byte; recover appended exactly
+`[capability_completed/cutover, accepted/cutover]`; NO `recovery_reacquired`, every row
+`lease_epoch==cutover`; guard residue 0; capability deleted; resume resumed (validated==v2). 1 passed,
+~238s. This is the REAL twin of `q12-live-controller.test.ts:1046`.
+
+## DECISION 2 — the TOTAL five-op operator-truth analytical sweep (all cites byte-exact, barrier bdb9d935)
+
+The composed supervisor→recover recovery-epoch story is real-false for EVERY forward op, and the CLEANUP
+segment has no controller recovery-epoch producer either. Per-op input-checkpoint/epoch treatment:
+
+1. **install** — `q12-database-barrier.sh:421` sets
+   `input_checkpoint_file="$run_root/database-barrier-input-checkpoint-install-cutover.json"`, and `:432`
+   validates `.lease_epoch == "cutover"` with the journal head at `outcome=="capability_claimed"`
+   (`:439`). CUTOVER-ONLY; no recovery-epoch install branch. (Empirically confirmed round 1: a
+   recovery-epoch install re-claim fails closed here.)
+2. **verify-after-base** / 3. **verify-after-observability** (both = verify-extended) / 4.
+   **prepare-recovery** / 5. **activate** — none is `install` and none is `cleanup||rollback`, so NONE
+   enters a per-leg input-checkpoint branch: `input_checkpoint_file` is initialized empty at `:416` and
+   the ONLY two assignments are install `:421` and cleanup/rollback `:582`. So verify-extended /
+   prepare-recovery / activate consume NO input checkpoint and therefore accept NO recovery-epoch input
+   checkpoint by construction.
+3. **The sole recovery-epoch input-checkpoint branch is `cleanup || rollback`** (`:444-598`):
+   `epoch_pattern = cutover(-recovery-N)?` (`:462`), consecutive-epoch grammar (`:514-518`), recovery
+   slice `[recovery_reacquired, capability_claimed]` (`:528`), input checkpoint named
+   `…-$command_name-$database_execution_epoch.json` (`:582`).
+
+CLAIM (total): NO forward op accepts a recovery-epoch input checkpoint against the real barrier; and even
+for the recovery-epoch-CAPABLE cleanup/rollback branch, the CONTROLLER never MINTS a recovery epoch —
+`barrier.cleanup ∉ OPERATIONS` (`q12-lifecycle-core.py:27-33`), `run_supervisor` only drives OPERATIONS
+chains (`:4058-4065`), and the cleanup driver is hardcoded cutover-only (`:1791/1797/1808/1814/1838`,
+comment `:1773`). Hence a controller-side mid-lifecycle crash is NOT supervisor-resumable-to-a-recovery-
+epoch in the current build; the cutover-recovery-N machinery is W-side/server-custody.
 
 # Summary
 
