@@ -1724,8 +1724,8 @@ BEGIN
   LOOP EXECUTE format('DROP TRIGGER %I ON %I.%I',trigger_row.tgname,trigger_row.nspname,trigger_row.relname); END LOOP;
   FOR job IN SELECT value FROM jsonb_array_elements(saved->'cron_jobs')
   LOOP
-    UPDATE cron.job SET active=(job->>'active')::boolean
-      WHERE jobid=(job->>'jobid')::bigint;
+    UPDATE cron.job AS restore_target SET active=(job->>'active')::boolean
+      WHERE restore_target.jobid=(job->>'jobid')::bigint;
     IF NOT FOUND THEN RAISE EXCEPTION 'captured cron job disappeared'; END IF;
     IF (SELECT to_jsonb(current_job) FROM cron.job current_job WHERE current_job.jobid=(job->>'jobid')::bigint)
          IS DISTINCT FROM job THEN RAISE EXCEPTION 'captured cron job exact-row restore drift'; END IF;
