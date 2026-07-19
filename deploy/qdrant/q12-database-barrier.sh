@@ -1053,13 +1053,14 @@ BEGIN
   PERFORM q12_guard.assert_capability();
   IF TG_TABLE_SCHEMA='q12_guard' THEN
     IF TG_TABLE_NAME='migration_guards' AND TG_OP='INSERT' THEN RETURN NEW; END IF;
-    IF TG_TABLE_NAME='active_run' AND TG_OP='UPDATE'
-      AND OLD.singleton IS NOT DISTINCT FROM NEW.singleton
-      AND OLD.run_id IS NOT DISTINCT FROM NEW.run_id
-      AND OLD.capability_sha256 IS NOT DISTINCT FROM NEW.capability_sha256
-      AND OLD.expected_catalog_sha256 IS NOT DISTINCT FROM NEW.expected_catalog_sha256
-      AND OLD.expected_catalog IS NOT DISTINCT FROM NEW.expected_catalog
-      AND OLD.activated=false AND NEW.activated=true THEN RETURN NEW;
+    IF TG_TABLE_NAME='active_run' AND TG_OP='UPDATE' THEN
+      IF OLD.singleton IS NOT DISTINCT FROM NEW.singleton
+        AND OLD.run_id IS NOT DISTINCT FROM NEW.run_id
+        AND OLD.capability_sha256 IS NOT DISTINCT FROM NEW.capability_sha256
+        AND OLD.expected_catalog_sha256 IS NOT DISTINCT FROM NEW.expected_catalog_sha256
+        AND OLD.expected_catalog IS NOT DISTINCT FROM NEW.expected_catalog
+        AND OLD.activated=false AND NEW.activated=true THEN RETURN NEW;
+      END IF;
     END IF;
     RAISE EXCEPTION 'Q12 durable guard truth is append-only';
   END IF;
