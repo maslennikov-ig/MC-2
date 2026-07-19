@@ -43,7 +43,7 @@ Constraints:
   and a targeted correctness review per stream.
 - Do not change the frozen manifest (`q12-command-manifest.json` sha aaec6fc2…) —
   a manifest change is a HARD STOP. A barrier defrost needs explicit ratification
-  - independent frozen-byte review + W-tuple field succession + CI guard update.
+  plus independent frozen-byte review, W-tuple field succession, and a CI guard update.
 - Keep the fixture parity suite and the strict/recovery/rollback tests intact; add
   real-path tests alongside — do not weaken tests, the barrier, or rollback to go green.
 - Never mutate/recover Qdrant Cloud. Owner secrets stay owner-only (0400/0600),
