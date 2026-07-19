@@ -1,0 +1,215 @@
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { afterEach, describe, expect, it } from 'vitest';
+
+// Q12 R8 SERVER CUSTODY REHEARSAL DRIVER — no-docker unit coverage (mc2-jz6y0.13).
+//
+// Exercises the driver deliverables that are testable WITHOUT docker / sudo / prod:
+//   * rehearsal-verify.py  — the outcome assertions against a CAPTURED real 81-row run
+//     root (produced by the fusion full-window harness; staged with the barrier's on-disk
+//     0400/0600 modes because git cannot preserve them), plus tamper-detection;
+//   * rehearsal-ns-launch.sh --dry-run — the ratified `sudo unshare -m ... setpriv` command
+//     construction + the UUIDv4 run-id gate (NO sudo/unshare/prod);
+//   * rehearsal-resume.py --dry-run — the fleet-sim self-test + the source-recovery-run.sh
+//     resume-writers-only invocation assembly (NO source-recovery-run.sh, NO prod).
+//
+// The privileged ns-launch, the disposable-container setup, and the live resume are covered
+// by rehearsal-setup.py's own local run and by qdrant-source-recovery-runtime.test.ts; they
+// run on the orchestrator's server against the REAL /opt custody root.
+
+const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
+const REHEARSAL = resolve(repoRoot, 'deploy/qdrant/rehearsal');
+const VERIFY = join(REHEARSAL, 'rehearsal-verify.py');
+const NS_LAUNCH = join(REHEARSAL, 'rehearsal-ns-launch.sh');
+const RESUME = join(REHEARSAL, 'rehearsal-resume.py');
+// The captured real 81-row run root is stored as a byte-exact tar (a raw .json tree would be
+// reformatted by prettier, breaking the receipt sha256 the accepted-row binding depends on).
+const FIXTURE_TAR = resolve(
+  repoRoot,
+  'packages/course-gen-platform/tests/unit/ops/fixtures/q12-rehearsal/run-root.tar'
+);
+const RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
+
+const scratches: string[] = [];
+afterEach(() => {
+  while (scratches.length) rmSync(scratches.pop()!, { recursive: true, force: true });
+});
+
+// Extract the captured fixture tar into a tmp run root with the barrier's real on-disk modes.
+function stageRunRoot(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'mc2-q12-rehearsal-fx-'));
+  scratches.push(dir);
+  const root = join(dir, 'run-root');
+  mkdirSync(root, { recursive: true });
+  const untar = spawnSync('tar', ['-C', root, '-xf', FIXTURE_TAR], { encoding: 'utf8' });
+  if (untar.status !== 0) throw new Error(`fixture untar failed: ${untar.stderr}`);
+  for (const name of [
+    'quiesce-window-mode.json',
+    'database-barrier-receipt.json',
+    'database-barrier-receipt-v1-before-cleanup.json',
+    'database-barrier-baseline.json',
+    'database-barrier-probe-receipt.json',
+    'database-barrier-cleanup-terminal-proof.json',
+    'expected-post-migration-catalog.json',
+  ]) {
+    chmodSync(join(root, name), 0o400);
+  }
+  chmodSync(join(root, 'phase.jsonl'), 0o600);
+  chmodSync(join(root, 'phase-checkpoint.json'), 0o600);
+  return root;
+}
+
+function runVerify(root: string): { status: number; out: Record<string, unknown> } {
+  const result = spawnSync('/usr/bin/python3', [VERIFY, '--run-root', root, '--json'], {
+    encoding: 'utf8',
+  });
+  return { status: result.status ?? -1, out: JSON.parse(result.stdout) };
+}
+
+describe('Q12 R8 rehearsal-verify.py', () => {
+  it('passes every outcome assertion on the captured real 81-row run root', () => {
+    const { status, out } = runVerify(stageRunRoot());
+    expect(out.failures, JSON.stringify(out.failures)).toEqual([]);
+    expect(out.ok).toBe(true);
+    expect(status).toBe(0);
+    expect(out.journal_rows).toBe(81);
+    expect(out.marker_mode).toBe('400');
+    expect(out.baseline_mode).toBe('400');
+    expect(out.v2_receipt_keys).toEqual([
+      'database_capability_deleted',
+      'expected_catalog_sha256',
+      'last_command',
+      'probe_receipt_sha256',
+      'rollback_probes_verified',
+      'run_id',
+      'schema_version',
+      'state',
+      'terminal_proof_sha256',
+      'zero_guard_residue',
+    ]);
+    expect(out.cleanup_head).toEqual([
+      ['barrier.cleanup', 'guard_cleanup_complete', 'intent'],
+      ['barrier.cleanup', 'guard_cleanup_complete', 'capability_issued'],
+      ['barrier.cleanup', 'guard_cleanup_complete', 'capability_claimed'],
+      ['barrier.cleanup', 'guard_cleanup_complete', 'capability_completed'],
+      ['barrier.cleanup', 'guard_cleanup_complete', 'accepted'],
+    ]);
+  });
+
+  it('fails when the journal row-count drifts from 81', () => {
+    const root = stageRunRoot();
+    const journal = join(root, 'phase.jsonl');
+    chmodSync(journal, 0o600);
+    const rows = readFileSync(journal, 'utf8').trimEnd().split('\n');
+    writeFileSync(journal, `${rows.slice(0, 80).join('\n')}\n`, { mode: 0o600 });
+    const { status, out } = runVerify(root);
+    expect(status).toBe(1);
+    expect(out.ok).toBe(false);
+    expect((out.failures as string[]).some(f => f.includes('row-count 80'))).toBe(true);
+  });
+
+  it('fails the #16 invariant when the baseline is not the barrier 0400 full-structural artifact', () => {
+    const root = stageRunRoot();
+    chmodSync(join(root, 'database-barrier-baseline.json'), 0o600);
+    const { status, out } = runVerify(root);
+    expect(status).toBe(1);
+    expect((out.failures as string[]).some(f => f.includes('baseline mode 600'))).toBe(true);
+  });
+
+  it('fails when the accepted row does not bind the v2 receipt', () => {
+    const root = stageRunRoot();
+    const receipt = join(root, 'database-barrier-receipt.json');
+    chmodSync(receipt, 0o600);
+    const value = JSON.parse(readFileSync(receipt, 'utf8'));
+    value.zero_guard_residue = false; // mutate -> sha256 changes -> accepted binding breaks
+    writeFileSync(receipt, `${JSON.stringify(value)}`, { mode: 0o400 });
+    const { out } = runVerify(root);
+    expect(out.ok).toBe(false);
+    expect((out.failures as string[]).some(f => f.includes('accepted_object_sha256'))).toBe(true);
+  });
+});
+
+describe('Q12 R8 rehearsal-ns-launch.sh --dry-run', () => {
+  it('builds the ratified private-mount-namespace command without any sudo/unshare/prod', () => {
+    const result = spawnSync(
+      'bash',
+      [
+        NS_LAUNCH,
+        '--run-id',
+        RUN_ID,
+        '--run-root',
+        `/opt/megacampus/backups/q12/${RUN_ID}`,
+        '--dry-run',
+        '--',
+        '/opt/megacampus/deploy/qdrant/q12-live-cutover.sh',
+        '--run-id',
+        RUN_ID,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(0);
+    const combined = result.stdout + result.stderr;
+    // The exact ratified shape: sudo unshare -m + fakehosts /etc/hosts bind + /opt->/tmp
+    // trust mount --bind + setpriv --reuid=1000 --regid=1000 --init-groups.
+    expect(combined).toContain('sudo unshare -m /bin/sh -c');
+    expect(combined).toContain('mount --bind');
+    expect(combined).toContain('/etc/hosts');
+    expect(combined).toContain('setpriv --reuid=1000 --regid=1000 --init-groups');
+    expect(combined).toContain(`/opt/megacampus/backups/q12/${RUN_ID}`);
+    expect(combined).toContain('aws-1-us-east-2.pooler.supabase.com');
+  });
+
+  it('rejects a run-id that is not a RFC 4122 UUIDv4 (barrier :72 regex)', () => {
+    const result = spawnSync(
+      'bash',
+      [NS_LAUNCH, '--run-id', 'not-a-uuid', '--run-root', '/opt/x', '--dry-run', '--', 'true'],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('UUIDv4');
+  });
+});
+
+describe('Q12 R8 rehearsal-resume.py --dry-run', () => {
+  it('self-tests the fleet-sim and assembles the resume-writers-only invocation without prod', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mc2-q12-rehearsal-resume-'));
+    scratches.push(dir);
+    const result = spawnSync(
+      '/usr/bin/python3',
+      [
+        RESUME,
+        '--run-root',
+        dir,
+        '--run-id',
+        RUN_ID,
+        '--leg',
+        'recovery-epoch',
+        '--bindir',
+        join(dir, 'fleet'),
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout) as {
+      leg: string;
+      dry_run: boolean;
+      fleet_sim_self_test: { context_rc: number; context_show: string; ps_rc: number };
+      invocation: string[];
+      env: Record<string, string>;
+    };
+    expect(out.leg).toBe('recovery-epoch');
+    expect(out.dry_run).toBe(true);
+    expect(out.fleet_sim_self_test.context_rc).toBe(0);
+    expect(out.fleet_sim_self_test.context_show).toBe('default');
+    expect(out.fleet_sim_self_test.ps_rc).toBe(0);
+    expect(out.invocation).toContain('resume-writers-only');
+    expect(out.invocation).toContain(RUN_ID);
+    expect(out.env.SOURCE_RECOVERY_LOCAL_TEST).toBe('1');
+    expect(out.env.SOURCE_RECOVERY_WRITER_BACKEND).toBe('compose');
+    expect(out.env.SOURCE_RECOVERY_Q12_RUN_ROOT).toBe(dir);
+  });
+});
