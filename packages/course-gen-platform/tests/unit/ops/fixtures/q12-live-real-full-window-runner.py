@@ -201,6 +201,14 @@ class RealClaimExecutor:
         self.node_bin = node_bin
         self.project_dir = project_dir
         self.diagnostics: dict[str, object] = {}
+        # R8-B-2-iv-2 (composed-recovery probe): when set, raise AT the capability_claimed row of the
+        # delegated claim (after it is durably journalled, before the real barrier runs), mirroring the
+        # fixture's frontier_claim_fault="claim-row" seam. Default False => iv-PART-1 behaviour intact.
+        self.crash_at_claim = False
+
+    def after_journal_fsync(self, entry: dict) -> None:
+        if self.crash_at_claim and entry.get("outcome") == "capability_claimed":
+            raise CORE.LifecycleError("injected stop at claim-row")
 
     def execute(self, command: dict, capability: dict) -> dict:
         argv = command["argv"]
@@ -262,7 +270,28 @@ def handle_real_claim(claim_argv: list[str]) -> int:
         os.environ["MC2_Q12_FW_PROJECT"],
     )
     arguments = CORE.parser().parse_args(["claim", *claim_argv])
-    output = CORE.run_claim(arguments, executor)
+    # R8-B-2-iv-2: a scoped mid-barrier crash. MC2_Q12_FW_CRASH_AT_CLAIM (set by the launcher ONLY for
+    # the targeted barrier command) makes run_claim durably journal capability_claimed and then raise
+    # BEFORE the real barrier runs; we surface the restartRequired boundary the fixture's --claim-noio
+    # path surfaces, so delegate_claim raises and run_live rejects with the head left at
+    # barrier.<op>/capability_claimed (the two-process crash boundary). Absent env => normal claim.
+    if os.environ.get("MC2_Q12_FW_CRASH_AT_CLAIM") == arguments.command_id:
+        executor.crash_at_claim = True
+        try:
+            output = CORE.run_claim(arguments, executor)
+        except CORE.LifecycleError as error:
+            if "injected stop at claim-row" not in str(error):
+                raise
+            output = {
+                "claimProcessBoundary": True,
+                "launcherOwnedClaimMutation": True,
+                "claimProcessPid": os.getpid(),
+                "childExecuted": False,
+                "boundary": "claim-row",
+                "restartRequired": True,
+            }
+    else:
+        output = CORE.run_claim(arguments, executor)
     output["fwDiagnostics"] = executor.diagnostics
     sys.stdout.write(json.dumps(output, separators=(",", ":"), sort_keys=True) + "\n")
     return 0
@@ -335,6 +364,9 @@ class RealBarrierWrapperExecutor(rb.LiveOrdinaryExecutor):
         self.context = context
         self.root = context.run_root
         self.leg_diagnostics: dict[str, object] = {}
+        # R8-B-2-iv-2: when set to a forward operation (e.g. "install"), the delegated claim for that
+        # barrier command crashes AT capability_claimed (the two-process composed-recovery boundary).
+        self.crash_operation: str | None = None
 
     # ---- barrier legs: the real --real-claim subprocess through the bwrap dual-bind ----
     def launch_claim(self, argv: list[str], journal_fd: int) -> dict:
@@ -363,6 +395,9 @@ class RealBarrierWrapperExecutor(rb.LiveOrdinaryExecutor):
             "MC2_Q12_FW_KEY": context.key_path,
             "MC2_Q12_FW_CONTAINER": context.container,
         }
+        command_id = argv[argv.index("--command-id") + 1]
+        if self.crash_operation is not None and command_id == CORE.COMMANDS[self.crash_operation]:
+            env["MC2_Q12_FW_CRASH_AT_CLAIM"] = command_id
         try:
             saved_fd_8 = os.dup(8)
         except OSError:

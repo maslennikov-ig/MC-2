@@ -167,8 +167,12 @@ describe.runIf(REAL_PG17)(
       expect(out.live_journal.slice(0, FORWARD_PREFIX).map(withParityExclusions)).toEqual(
         out.composer_journal.map(withParityExclusions)
       );
-      // The cleanup segment is byte-deterministic under the convergence exclusions (only the
-      // per-run command_sha256 + accepted_object_sha256 on barrier.cleanup rows are dropped).
+      // This spot-checks the cleanup segment inline: under the convergence exclusions (which drop the
+      // per-run command_sha256 + accepted_object_sha256 on barrier.cleanup rows), each cleanup row
+      // pins lease_epoch=='cutover' and carries a quiesce_manifest_sha256. The FULL byte-convergence
+      // .toEqual of the cleanup segment against a twin under withConvergenceExclusions is owned by the
+      // composer-twin unit (q12-live-controller.test.ts); this real probe focuses on live rc / DB
+      // state / the terminal v2-receipt binding.
       const cleanupProjected = cleanupRows.map(withConvergenceExclusions);
       for (let i = 0; i < cleanupProjected.length; i += 1) {
         expect(cleanupProjected[i].lease_epoch).toBe('cutover');

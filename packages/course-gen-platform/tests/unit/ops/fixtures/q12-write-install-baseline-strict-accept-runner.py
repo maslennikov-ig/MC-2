@@ -80,7 +80,7 @@ def fresh_engine(run_id: str = RUN_ID):
 
 
 def barrier_baseline_object(run_id: str = RUN_ID) -> dict:
-    """The barrier's FULL 12-key structural baseline shape (q12-database-barrier.sh:2027-2037)."""
+    """The barrier's FULL 11-key structural baseline shape (q12-database-barrier.sh:2027-2037)."""
     return {
         "schema_version": BASELINE_SCHEMA,
         "run_id": run_id,

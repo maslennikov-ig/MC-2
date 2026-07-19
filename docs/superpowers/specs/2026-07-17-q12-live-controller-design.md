@@ -425,6 +425,37 @@ predecessor-CAS + `O_APPEND|O_DSYNC`, never concurrently.
   branch driving the shared `drive_forward_sequence`; the mid-lifecycle standalone-supervisor
   pointer (R5-D2) is retained ONLY for a claimed-but-not-completed barrier head. The full
   supersession record + the required per-barrier-class probes live in §6b.2 / §6b.6.
+- **ADDENDUM — operator truth for a REAL mid-lifecycle crash (found-defects #18/#19, ratified
+  2026-07-19; R8-B-2-iv-3).** The two-step composition above (standalone supervisor → `recover`)
+  advances a crashed barrier to a `completed` head under a **recovery epoch**
+  (`cutover-recovery-N`). Against the **real frozen barrier + frozen controller** that recovery-epoch
+  advance is **NOT reachable from the controller for a mid-lifecycle crash**, in BOTH directions:
+  - **Forward ops (`install`/`verify-*`/`prepare-recovery`/`activate`) — #18.** The controller CAN
+    mint a recovery epoch (`resume_retained_chain`), but the frozen barrier `install` child pins its
+    input checkpoint to `lease_epoch=="cutover"` (`q12-database-barrier.sh:421/432/439`) and fails
+    closed on a recovery-epoch re-claim; `verify-extended`/`prepare-recovery`/`activate` consume NO
+    per-leg input checkpoint at all (`input_checkpoint_file` is only assigned for `install` `:421` and
+    `cleanup`/`rollback` `:582`). So a real forward-op supervisor re-claim under a recovery epoch never
+    completes.
+  - **Cleanup — #19.** The frozen barrier cleanup child DOES accept a recovery epoch (`:444-598`,
+    grammar `:514-518`), but the **controller never mints one**: `barrier.cleanup ∉ OPERATIONS`
+    (`q12-lifecycle-core.py:27-33`) so `run_supervisor` cannot target it (`:4058-4065`), and the sole
+    cleanup driver `orchestrate_post_activate_cleanup` is hardcoded cutover-only
+    (`:1791/1797/1808/1814/1838`).
+    **What IS true (and now proven real, R8-B-2-iv-3):** a **cleanup** mid-crash
+    (`barrier.cleanup/capability_claimed/cutover`) is resumed by `recover` **under `cutover`** (no
+    supervisor, no recovery epoch), converging **+0** to the uninterrupted twin — the real twin of the
+    fixture head-8 precedent (`q12-live-controller.test.ts:1046`,
+    `q12-live-real-cleanup-recovery.test.ts`). For a **forward** mid-crash the real operator action is a
+    window **ABORT via the rollback path** (which the frozen barrier DOES drive under a recovery epoch,
+    `:444-598`) where the rollback predecessor gate permits, else the **manual runbook** — NOT a
+    forward supervisor re-claim. The composed supervisor→recover recovery-epoch story
+    (`recovery_reacquired` + a second `capability_claimed` under `cutover-recovery-N`, §6b.6) is
+    inherently **W-side / server-custody** and is validated at the **server rehearsal**, not from the
+    controller fusion (HONEST NOTE: the per-crash-point operator specifics are validated there; this
+    addendum deliberately does not over-specify unverified procedure). The R5-D2 pointer TEXT is left
+    UNCHANGED this round (following it on a forward crash yields a NAMED fail-closed-safe barrier
+    refusal, not damage); any rewording is deferred to the rehearsal/runbook round.
 
 ### 5.6 Parity duty (the §10 obligation)
 
@@ -872,6 +903,26 @@ barrier to its `barrier.<op>/completed` head; then run `recover`, which per §6b
 `drive_forward_sequence` from the next group (for `activate`, this drives the journaled cleanup
 segment). Also assert the mid-lifecycle (claimed-but-not-completed) head, BEFORE the supervisor step,
 fails closed with the supervisor-pointer refusal AND leaves the durable journal byte-unchanged.
+
+> **NOTE — REAL scope of these probes (found-defects #18/#19, ratified 2026-07-19; R8-B-2-iv).** The
+> DERIVED recovery-epoch oracle below (`recovery_reacquired` + a second `capability_claimed` under
+> `cutover-recovery-1`, +2 rows) is proven at the **FIXTURE** level for install/verify-after-base/
+> activate (the fixture executors synthesize the recovery-epoch barrier result). Against the **real
+> frozen barrier + frozen controller** the composed supervisor→recover recovery-epoch story is NOT
+> reachable from the controller fusion, in BOTH directions: **forward ops** — the controller mints the
+> recovery epoch but the frozen barrier `install` child rejects a recovery-epoch input checkpoint
+> (`q12-database-barrier.sh:421/432/439`; #18, empirically confirmed); **cleanup** — the frozen barrier
+> cleanup child ACCEPTS a recovery epoch (`:444-598`, `:514-518`) but the controller NEVER mints one
+> (`barrier.cleanup ∉ OPERATIONS`, `q12-lifecycle-core.py:27-33`/`:4058-4065`; cleanup driver hardcoded
+> cutover-only `:1791/1797/1808/1814/1838`; #19). Therefore the REAL (disposable-container fusion)
+> coverage is: (a) the mid-forward-crash → NAMED fail-closed refusal (delivered, R8-B-2-iv-2); and
+> (b') the REAL **cutover** cleanup-crash `recover` convergence — `run_recover` resumes the cleanup
+> segment under `cutover` (no supervisor, no recovery epoch), converging **+0** to the uninterrupted
+> twin (delivered GREEN, `q12-live-real-cleanup-recovery.test.ts`, the real twin of the fixture head-8
+> precedent `q12-live-controller.test.ts:1046`). The recovery-epoch composed probe (+2) and the
+> multi-epoch `cutover-recovery-2` cleanup re-drive are inherently **W-side / server-custody** and are
+> **DEFERRED to the server rehearsal**, which MUST exercise the recovery-epoch cleanup leg (supervisor-
+> or W-side-minted per its own contract) so the defer lands.
 
 **The acceptance oracle is the DERIVED expected journal (condition 4 below is the SOLE primary
 oracle), NOT byte-equivalence to the uninterrupted twin.** Construct the expected journal IN THE TEST

@@ -979,7 +979,7 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   WITHOUT writing (`validate_regular_file(0o400)` + canonical-parseable JSON + `schema_version` +
   `run_id == this run`), failing closed with `LifecycleError` on any deviation (0600 leftover,
   unparseable/non-canonical bytes, foreign schema/run_id) — no shape check beyond schema_version +
-  run_id, so it admits the barrier's full 12-key structural shape. TDD: RED strict-accept unit
+  run_id, so it admits the barrier's full 11-key structural shape. TDD: RED strict-accept unit
   (`q12-write-install-baseline-strict-accept.test.ts` + `-runner.py`, no-docker, minimal Engine via
   `__new__`) → GREEN core edit. Verified: the strict-accept unit is GREEN (absent 0600 write + the
   fail-closed tamper matrix), the FIXTURE suites stay GREEN (`q12-live-controller.test.ts` 23 +
@@ -1022,6 +1022,58 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   GREEN (30 passed) and `tsc --noEmit` 0. Schema-id doubling tracked as Beads `mc2-evduu` (P3,
   deferred). Commits: RED `f59b17934`, GREEN core `9e352261f` (#16), docs `f17427db6`, GREEN harness
   `16068fc77` (#17 + #16 proof).
+
+- **R8-B-2-iv-2 (Parts 2-3) — FEASIBLE crash+refusal leg GREEN; supervisor+recover derived-oracle
+  BLOCKED by the frozen barrier (empirically confirmed) ⇒ R8-B does NOT close this round.** The REAL
+  §6b.6 composed mid-barrier recovery splits into a feasible leg and a blocked tail. FEASIBLE (delivered
+  GREEN, ~112s, new gated `q12-live-real-composed-recovery.test.ts` + `-runner.py`, importing/extending
+  the iv-PART-1 fusion harness): `run_live` crashes mid-`barrier.install` AT `capability_claimed` via a
+  new env/flag-gated crash seam on the iv-PART-1 runner (`RealBarrierWrapperExecutor.crash_operation` →
+  `MC2_Q12_FW_CRASH_AT_CLAIM` → `RealClaimExecutor.after_journal_fsync` raises after the claim row is
+  durable, before the real barrier runs), leaving the durable head EXACTLY at
+  `barrier.install/capability_claimed/cutover` (real install barrier never executed); then a SEPARATE
+  lease session reacquires the released FD-9 lease and `run_recover` FAILS CLOSED with the exact
+  `q12-live-cutover.sh install` pointer, journal BYTE-unchanged — the REAL twin of
+  `q12-live-controller.test.ts:1102-1145`. BLOCKED (STOP-and-report, no barrier edit, no fake): the
+  supervisor+recover DERIVED-JOURNAL ORACLE is UNSATISFIABLE against the frozen barrier for install. A
+  scratch probe confirmed `run_supervisor`/`resume_retained_chain` CORRECTLY appends
+  `recovery_reacquired/cutover-recovery-1` + a second `capability_claimed/cutover-recovery-1`, then the
+  REAL frozen barrier `install` child fails closed (`database barrier child input checkpoint is
+invalid`): `q12-database-barrier.sh:420-433` pins install to `lease_epoch == "cutover"` with no
+  recovery-epoch branch (only cleanup/rollback have it, `:444-598`). Completing the oracle needs a
+  frozen-barrier re-ratification OR a re-scope to an op the barrier resumes under a recovery epoch —
+  an orchestrator ruling. iv-PART-3 (multi-epoch cutover-recovery-2 cleanup re-drive) DEFERRED, gated on
+  that ruling. P3-1 (barrier baseline "12-key" → 11-key label) + P3-2 (softened the full-window
+  cleanup-segment "byte-deterministic" comment) fixed. Catalog determinism across two fresh containers
+  confirmed (catalog + all 76 guarded_relations OIDs identical), so the two-container oracle plumbing is
+  viable — the blocker is the barrier grammar, not the catalog/OID axis. Barrier `bdb9d935…` and all of
+  deploy/ byte-unchanged; `tsc` 0; fixture suites 30 passed. Artifact `mc2-jz6y0.13-r8b-2-iv-2.md`.
+- **R8-B-2-iv-3 (ratified (b'+c) after found-defect #19) — REAL cutover cleanup-crash recover
+  convergence GREEN; the +2 recovery-epoch composed probe + multi-epoch re-drive DEFERRED to the server
+  rehearsal.** The orchestrator ratified found-defect #18 (forward) and a symmetric **found-defect #19**:
+  OPTION (b)'s premise that the composed supervisor→recover story "holds fully for the CLEANUP segment"
+  is ALSO false against the frozen controller — the frozen barrier cleanup child accepts a recovery epoch
+  (`q12-database-barrier.sh:444-598`, `:514-518`) but the controller NEVER mints one (`barrier.cleanup ∉
+OPERATIONS`, `q12-lifecycle-core.py:27-33`/`:4058-4065`; cleanup driver hardcoded cutover-only
+  `:1791/1797/1808/1814/1838`, comment `:1773`). Delivered (b'): new gated
+  `q12-live-real-cleanup-recovery.test.ts` + `-runner.py` (import/extend the composed-recovery runner +
+  iv-PART-1 fusion). On two disposable `postgres:17.10` containers: an uninterrupted twin (81 rows), then
+  a fresh run crashes mid-cleanup at `barrier.cleanup/capability_claimed/cutover` (additive gated crash in
+  `execute_barrier_cleanup` after the claimed row is durable; 79 rows), then `run_recover` resumes the
+  cleanup segment UNDER CUTOVER — the REAL frozen barrier cleanup child accepts
+  `database-barrier-input-checkpoint-cleanup-cutover.json`, drops `q12_guard`, promotes the 10-key v2
+  receipt, deletes the db capability (real R8-B-1 seam) → 81 rows, **+0** converging byte-for-byte to the
+  twin under the EXISTING `withConvergenceExclusions` ONLY (the fixture head-8 precedent
+  `q12-live-controller.test.ts:1046` MADE REAL, NO broadening; NO `recovery_reacquired`, every row
+  `lease_epoch==cutover`). Gated GREEN ~238s; `tsc` 0; fixture suite 23 passed; skips without the flag;
+  barrier `bdb9d935…`/deploy/ byte-unchanged. (c) DEFER: the +2/`recovery_reacquired`/`cutover-recovery-N`
+  composed probe AND the multi-epoch `cutover-recovery-2` cleanup re-drive → the SERVER REHEARSAL (W-side
+  owner custody / `source-recovery-run.sh`), which MUST exercise the recovery-epoch cleanup leg so the
+  defer lands. DECISION-2 docs: the total five-op analytical sweep + the §5.5 addendum / §6b.6 note (a
+  controller-side mid-lifecycle crash is not supervisor-resumable-to-a-recovery-epoch in the current
+  build; forward crash → named refusal / window ABORT via rollback where the predecessor gate permits,
+  else the manual runbook; cleanup crash → cutover recover convergence). R5-D2 pointer TEXT unchanged
+  (fail-closed-safe); rewording deferred. Artifact `mc2-jz6y0.13-r8b-2-iv-2.md` (round-2 section).
 
 ## Open risks carried forward
 
