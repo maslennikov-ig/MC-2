@@ -213,3 +213,51 @@ describe('Q12 R8 rehearsal-resume.py --dry-run', () => {
     expect(out.env.SOURCE_RECOVERY_Q12_RUN_ROOT).toBe(dir);
   });
 });
+
+// The dry-run path prints the ns command but NEVER executes the inner `sh -c`, so a shift
+// miscount in the inner script is invisible there. This test binds to the EXACT inner script
+// (--emit-inner), runs it with `mount`/`setpriv` STUBBED (no root needed), and asserts the
+// full run_live argv (entrypoint + every arg, in order) survives the shift — the exact hole a
+// byte-review had to catch.
+describe('Q12 R8 rehearsal-ns-launch.sh inner ns-script (setpriv-stubbed exec)', () => {
+  it('preserves the FULL run_live argv through the ns shift (entrypoint not dropped)', () => {
+    const emit = spawnSync('/bin/bash', [NS_LAUNCH, '--emit-inner'], { encoding: 'utf8' });
+    expect(emit.status, emit.stderr).toBe(0);
+    const inner = emit.stdout.trimEnd();
+    expect(inner).toContain('exec setpriv');
+    expect(inner).toContain('shift ');
+
+    const stub = mkdtempSync(join(tmpdir(), 'mc2-q12-rehearsal-stub-'));
+    writeFileSync(join(stub, 'mount'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    writeFileSync(
+      join(stub, 'setpriv'),
+      '#!/bin/sh\nfor a in "$@"; do printf "%s\\n" "$a"; done\n',
+      {
+        mode: 0o755,
+      }
+    );
+
+    // Positionals: $0=FAKEHOSTS $1=RUN_ROOT $2=TRUST_VIEW $3..=the run_live argv.
+    const launchArgv = [
+      '/opt/megacampus/deploy/qdrant/q12-live-cutover.sh',
+      'live',
+      '--run-id',
+      'RID',
+    ];
+    const res = spawnSync(
+      '/bin/sh',
+      ['-c', inner, 'FAKEHOSTS', 'RUN_ROOT', 'TRUST_VIEW', ...launchArgv],
+      { encoding: 'utf8', env: { ...process.env, PATH: `${stub}:${process.env.PATH ?? ''}` } }
+    );
+    rmSync(stub, { recursive: true, force: true });
+    expect(res.status, res.stderr).toBe(0);
+
+    // The setpriv stub saw: --reuid=… --regid=… --init-groups <post-shift argv>.
+    const emitted = res.stdout.trimEnd().split('\n');
+    const initGroups = emitted.indexOf('--init-groups');
+    expect(initGroups).toBeGreaterThanOrEqual(0);
+    const postShift = emitted.slice(initGroups + 1);
+    // shift 3 (the P1 bug) drops launchArgv[0] (the run_live entrypoint); shift 2 keeps it.
+    expect(postShift).toEqual(launchArgv);
+  });
+});

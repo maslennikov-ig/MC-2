@@ -34,6 +34,14 @@ pooler identity (`aws-1-us-east-2.pooler.supabase.com:5432`, user
 disposable container. Test mode relaxes ONLY the CA (self-signed accepted); NEVER a
 DB-command relaxation; the db-url file is the verbatim pooler URL.
 
+**Post-run `/tmp` cleanup (P3).** On the privileged path `rehearsal-ns-launch.sh` `exec`s into
+`run_live` (so it inherits the FD-8/9 custody), which means its EXIT umount-before-rmdir trap does
+NOT fire. The private-namespace `/etc/hosts` + `/opt → /tmp` binds still auto-unmount on ns exit
+(no `/opt` or `/etc/hosts` leak — the whole point of variant (c)), but the empty
+`/tmp/mc2-q12-barrier-XXXX` scaffolding dir is left behind. The orchestrator's server run therefore
+does one explicit post-window step: `rm -rf /tmp/mc2-q12-barrier-*` (uid-1000-owned); the
+`rehearsal-verify.py --check-teardown` gate flags any leftover so it is not silently skipped.
+
 ## Local (worker) vs server (orchestrator)
 
 | Leg                               | Local `--dry-run` / LOCAL_TEST proves                                                                                     | Only the orchestrator's server run exercises                                                                                                                                                                                            |
