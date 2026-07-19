@@ -2638,6 +2638,30 @@ class Engine:
         }
 
     def write_install_baseline(self, capability_hash: str) -> None:
+        path = self.run_root / "database-barrier-baseline.json"
+        if os.path.lexists(path):
+            # Found-defect #16: when a REAL database barrier ran the claim it already published
+            # its own authoritative baseline (0400, full structural schema) to this path, and it
+            # is load-bearing for activate/rollback restore. The controller's minimal predecessor
+            # baseline is only ever WRITTEN here (never read by core), so it must NOT overwrite the
+            # barrier artifact. Strict-accept the barrier-authoritative file, failing closed on
+            # anything that is not THIS run's 0400 barrier baseline (a pre-planted 0600 leftover,
+            # unparseable / non-canonical JSON, a foreign schema_version, or a foreign run_id).
+            data = validate_regular_file(path, mode=0o400)
+            try:
+                accepted = json.loads(data.decode("utf-8"))
+            except (UnicodeDecodeError, ValueError) as error:
+                raise LifecycleError(
+                    f"unsafe install baseline: unparseable barrier baseline {path}"
+                ) from error
+            if not isinstance(accepted, dict) or complete_object(accepted) != data:
+                raise LifecycleError(f"unsafe install baseline: non-canonical barrier baseline {path}")
+            if accepted.get("schema_version") != "megacampus.q12.database-barrier-baseline/v1":
+                raise LifecycleError(f"unsafe install baseline: foreign baseline schema {path}")
+            if accepted.get("run_id") != self.request["run_id"]:
+                raise LifecycleError(f"unsafe install baseline: foreign baseline run_id {path}")
+            self.trace.append("install:baseline-strict-accept")
+            return
         claim = next(
             entry
             for entry in reversed(self.journal)
@@ -2653,7 +2677,7 @@ class Engine:
             "capability_manifest_sha256": capability_hash,
         }
         immutable_publish(
-            self.run_root / "database-barrier-baseline.json",
+            path,
             complete_object(baseline),
             0o600,
             self.trace,
