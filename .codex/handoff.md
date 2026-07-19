@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-16 (Phase A complete: D6 + Root .13.13 join integrated)
+Updated: 2026-07-19 (window executability verified NOT openable; W1-W7 handoff package prepared — see CURRENT STATE below)
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 Integration branch: `codex/self-hosted-qdrant-platform` at the Root-join
 integration head `fcd05e27` (D6 slice `8717f7ac` pushed; the .13.13 docs
@@ -106,6 +106,37 @@ integration worktree remains authoritative for Q12.
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
+
+### CURRENT STATE (2026-07-19) — window NOT openable; handoff package ready
+
+Fresh read-only verification (base `8af76cfd4`, bead `mc2-uha77`, artifact
+`.codex/stages/mc2-jz6y0/artifacts/mc2-uha77-window-executability-verification.md`)
+established that the live cutover window is **not executable against the
+deployed tree**: `run_live`/`run_recover` fail closed in production at the
+`require_post_activate_executor` pre-flight because `ProductionExecutor` has no
+`execute_forward_resume` (it exists only as a test fixture), and the production
+`run_live` path substitutes **fixture-derived** placeholder values (not real
+snapshot/generation/recovery ids). The R8 controller is a proven journal/parity
+twin, not a real driver. This is the D5J §10 "Task-9 live orchestration" scope,
+still un-wired. OQ1 is resolved (dual-state quiesce); OQ5/OQ6 remain open.
+
+A complete handoff package for a fresh orchestrator is prepared:
+
+- Design: `docs/superpowers/specs/2026-07-19-q12-window-execution-wiring-design.md`
+- Plan + task graph: `docs/superpowers/plans/2026-07-19-q12-window-execution-wiring.md`
+- Orchestrator prompt (prompt-check PASS, prompt-card):
+  `docs/superpowers/prompts/2026-07-19-q12-window-execution-orchestrator.md`
+- Beads W1 `mc2-yz3xe` → W2 `mc2-j58wi` → W3 `mc2-58tnx` → W4 `mc2-dxcaa` →
+  W5 `mc2-v68w6` → W6 `mc2-naz8j` → W7 `mc2-i9h3y` (owner-gated), tracker
+  `mc2-uha77`.
+
+NEXT: hand off to the new orchestrator per that prompt; execute W1–W6 (real
+owner-custody executor + real-value plumbing + snapshot/baseline producers +
+STOP-point model + rehearsal + runbook), then W7 opens the window on an explicit
+owner go. The historical Phase-A/B and pre-open context below remains accurate;
+its "NEXT" pointer (OQ resolution) is now superseded by the W1–W7 plan.
+
+### Historical context (Phase A/B complete; pre-open R8 rehearsals)
 
 The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
 Fable orchestrator. Phase A is COMPLETE (A1 `72af414c`; D6 `.13.19` at
