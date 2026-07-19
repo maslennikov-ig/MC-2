@@ -700,6 +700,12 @@ exit "$barrier_rc"
             else None
         )
         # Independently confirm q12_guard is really gone (live catalog query, not the proof's own report).
+        # LOAD-BEARING (stage-iii review P3-1): do NOT delete this as redundant with the terminal proof.
+        # Under test_mode=1 + real_reconnect_test=0 the frozen barrier's terminal-reconnect residue
+        # re-check BYPASSES the fresh-connection gate (q12-database-barrier.sh:1952) and reports a
+        # SYNTHETIC residue (:2063-2074); THIS independent second-observer live
+        # pg_namespace/pg_class/pg_proc/pg_event_trigger query is therefore the genuine real-DB
+        # zero-residue proof, not a duplicate of the terminal proof's self-report.
         guard_residue_db = dexec_json(
             "SELECT (SELECT count(*) FROM pg_namespace WHERE nspname='q12_guard') AS schema_count, "
             "(SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
