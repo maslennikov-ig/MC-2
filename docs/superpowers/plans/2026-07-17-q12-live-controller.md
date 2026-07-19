@@ -929,6 +929,48 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   `cutover-recovery-N`) not exercised — the same-epoch idempotence is proven; multi-epoch recovery needs
   the resume/recover machinery, deferred to stage iv / the server rehearsal.
 
+- **R8-B-2-iv-1 — SANCTIONED HARD STOP (found-defect #16), not a pass.** RED-only (RED test
+  `4fd3dd26b` + the defect-reaching harness `49f415251`); no GREEN commit, because GREEN is
+  unreachable without a `q12-lifecycle-core.py` edit (out of scope). Built the full-window real
+  `run_live` probe with the ratified DUAL-BIND fusion: `q12-live-real-full-window.test.ts` +
+  `q12-live-real-full-window-runner.py` (imports/reuses the R4 + verify-chain runners and the
+  retained-barrier runner). `run_live` drives a `/tmp/mc2-q12-d5-root-*` controller run root; an
+  outer `RealBarrierWrapperExecutor.launch_claim` spawns a bwrap `--real-claim` subprocess running
+  `CORE.run_claim(args, RealClaimExecutor)`; `RealClaimExecutor` publishes the per-leg input
+  checkpoint (copy of the controller `phase-checkpoint.json`) and runs the FROZEN barrier FOR REAL
+  against a disposable `postgres:17.10-bookworm`. The **DUAL-BIND** (#15) is exercised: inside the
+  claim bwrap the SINGLE physical run-root dir is bound to BOTH `/opt/megacampus/backups/q12/<run-id>`
+  (run_claim custody; `/opt` manifest argv kept verbatim) AND `<trust-root>/backups/q12/<run-id>` (the
+  barrier's CA-only test-mode trust root); `RealClaimExecutor` rewrites ONLY the barrier child's argv
+  to the `/tmp` view; `#15 dual_bind_same_inode` observed true from inside the claim. Transport is an
+  isolated adaptation of blueprint step 3 (the literal host-side `127.0.0.1:5432` is unexecutable when
+  the host already binds 5432): bwrap WITH `--unshare-net` auto-ups the private loopback while keeping
+  uid 1000 (so `run_claim`'s uid-1000 checks pass), with the pooler-identity proxy in the private
+  netns bridging via the docker-exec unix socket; the DUAL-BIND and all acceptance semantics are
+  unchanged. **FOUND DEFECT #16 (twelfth found defect):** `run_live`'s `retained_chain`
+  `write_install_baseline` (`q12-lifecycle-core.py:2413` → `:2648-2660`) publishes a controller-owned
+  `<run-root>/database-barrier-baseline.json` (mode 0600, minimal predecessor-hash schema) to the
+  EXACT path the frozen barrier install already published its own structural baseline (mode 0400, full
+  `megacampus.q12.database-barrier-baseline/v1` schema, `q12-database-barrier.sh:2037`); the controller
+  write runs AFTER the barrier claim, so `immutable_publish` (`:604` → `validate_regular_file`
+  `:558-565`) fails `unsafe file identity` (0400 ≠ 0600). This collides in ANY real `run_live` install
+  incl. production, and never surfaced before because the composer/R4-B use a fake barrier that omits
+  the file and R8-B-2-i/ii/iii drive the barrier directly (not through `retained_chain`) — iv-PART-1
+  is the first fusion of the controller custody path with a real barrier, the never-executed class this
+  rehearsal exists to close. On-disk evidence captured (barrier `maintenance_guarded` receipt + 0400
+  full-schema baseline; the controller `unsafe file identity` failure with a full Python traceback).
+  Everything up to the collision works for real (dual-bind honest, `run_claim` uid-1000/lease/custody
+  checks pass, the barrier reaches `maintenance_guarded`: cron off, read-only on, q12_guard installed).
+  Per the stream contract ("real-controller divergence = FOUND DEFECT: STOP + report BEFORE
+  reconciliation"; "core edit ⇒ STOP + report") NO GREEN and NO workaround (no harness delete/chmod of
+  either baseline, no core edit) were applied — mirroring R4 Sub-round C. Barrier `bdb9d935…`,
+  `q12-lifecycle-core.py`, the frozen manifest/catalog, and all W-owned files byte-unchanged; `tsc
+  --noEmit` 0; the gated test SKIPS without `MC2_Q12_REAL_PG17=1`. Artifact:
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-iv-1.md`. **Resolution (orchestrator's next
+  step, re-ratification):** reconcile the controller vs barrier `database-barrier-baseline.json`
+  ownership (controller skips it for a real-barrier install / renames its artifact / unifies the
+  schema), then iv-PART-1 resumes to the 81-row GREEN.
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface
