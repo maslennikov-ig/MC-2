@@ -158,6 +158,15 @@ baseline.json` (or `verify-transition`) MUST PASS (`validateTransition`,
 
 ## Pre-window gate — server-side full-path `run_live` rehearsal (NON-NEGOTIABLE, orchestrator-pinned 2026-07-18)
 
+> **SUPERSEDED 2026-07-19 by found-defect #21 (owner-ratified).** The "full-path `run_live`
+> server rehearsal" pinned below is **un-runnable as stated**: a disposable-container rehearsal is
+> forced into the barrier's CA-only test mode, whose `:215` string-check is satisfiable ONLY via the
+> fusion harness's bespoke-executor argv-rewrite (`_rewrite_opt_to_trust`) — the stock
+> `q12-live-cutover.sh live` / `ProductionExecutor` path the real window runs does NOT rewrite, so a
+> stock-CLI privileged run fails closed at the first barrier leg. The re-scoped gate is recorded in
+> **"R8 RE-SCOPE — bounded server-mechanics probes (found-defect #21)"** at the end of this plan; the
+> paragraphs below are retained for provenance only.
+
 The R4 acceptance (Sub-round C) proves the **real `barrier.install` transition passes the real
 `validateTransition`** by invoking the barrier directly against a disposable seeded container
 (ruling 1 option (b)) — it deliberately isolates the DB-transition claim from the uid-1000 /
@@ -1074,6 +1083,17 @@ OPERATIONS`, `q12-lifecycle-core.py:27-33`/`:4058-4065`; cleanup driver hardcode
   build; forward crash → named refusal / window ABORT via rollback where the predecessor gate permits,
   else the manual runbook; cleanup crash → cutover recover convergence). R5-D2 pointer TEXT unchanged
   (fail-closed-safe); rewording deferred. Artifact `mc2-jz6y0.13-r8b-2-iv-2.md` (round-2 section).
+- **DECISION-2 addendum (found-defect #21, owner-ratified 2026-07-19).** The `(c)` recovery-epoch
+  cleanup-leg defer was pinned to "the SERVER REHEARSAL, which MUST exercise the recovery-epoch
+  cleanup leg." That server rehearsal is now the **bounded server-mechanics probes** (found-defect
+  #21 re-scope, below) — which run NO `run_live`, NO container, NO writers — so it does NOT exercise
+  the recovery-epoch cleanup leg. The `(c)` +2 composed / multi-epoch obligation therefore **stays
+  W-side deferred and local-proven** exactly as delivered: the REAL `cutover` cleanup-crash `recover`
+  convergence (+0) is GREEN (`q12-live-real-cleanup-recovery.test.ts`); the +2
+  `recovery_reacquired`/`cutover-recovery-N` composed probe remains W-side (`source-recovery-run.sh`
+  custody), its ultimate validation the **in-window** recovery path under the #18 rollback-abort
+  safety, NOT a pre-window server rehearsal step. This does not weaken the defer; it relocates its
+  landing to the honest surface (§6b.6 #21 note carries the same record).
 
 ## Open risks carried forward
 
@@ -1237,3 +1257,64 @@ implementing the ratified bridge; (iii) the LOCAL_TEST resume + recovery-epoch d
 verification script (journal row-count/heads, marker 0400, v2 exact+bound, baseline byte-intact 0400,
 residue 0, teardown check). No core/barrier/W-owned edit; no push. Orchestrator review → orchestrator
 runs the rehearsal on megacampus-prod.
+
+## R8 RE-SCOPE — bounded server-mechanics probes (FOUND-DEFECT #21, owner-ratified 2026-07-19)
+
+**Supersedes** the "Pre-window gate — server-side full-path `run_live` rehearsal" pin above and the
+"full-path `run_live`" framing of the DRIVER BLUEPRINT. Provenance: found-defect #21 (byte-verified
+by the orchestrator and the controller stream), driver files at stage tip.
+
+**Found-defect #21 (the driver's privileged leg was un-runnable as stocked).** `rehearsal-ns-launch.sh`
+execs the STOCK CLI `q12-live-cutover.sh live` (plain `ProductionExecutor`), which supplies NONE of
+what the fusion oracle's bespoke executor (`RealClaimExecutor`/`RealBarrierWrapperExecutor`,
+`q12-live-real-full-window-runner.py`) supplied per barrier leg: (a) the in-ns pooler proxy is
+never started and its binary is test-tree-only (`packages/…/q12-pooler-identity-proxy.py`, not
+`deploy/`); (b) no `/opt` run-root provisioner stages `secrets/db-capability`,
+`secrets/supabase_db_url`, `secrets/prod-ca-2021.crt`, `expected-post-migration-catalog.json`,
+`database-barrier-probe-receipt.json`, `writer-quiesce.json`; (c) the barrier CA-only test-mode env
+(`MC2_Q12_BARRIER_TEST_MODE`/`TEST_ROOT`) is never delivered (and `sudo unshare` strips env). Crux:
+the barrier test-mode STRING-checks the capability path == `"$trust_boundary/backups/q12/$run_id/
+secrets/db-capability"` (`q12-database-barrier.sh:215`), so the `/opt` argv is rejected under
+test-mode even though the dual-bind makes them one inode — reachable ONLY via the fusion's
+`_rewrite_opt_to_trust` (`:249`), which the stock CLI does not do. A stock-CLI privileged run would
+have fail-closed at the first leg.
+
+**Owner ruling: bounded server-mechanics probes (NOT the full executor port, NOT proceed-blind).**
+Rationale: even a full deploy-side port of the bespoke executor would drive `CORE.run_claim`/`run_live`
+through the bespoke path, NEVER the stock-CLI window entrypoint (test-mode forces it), so it buys
+environment realism only — and the green LOCAL fusion already proved the bespoke path end-to-end
+(real barrier + real container + real cleanup + seam + recovery). The incremental value of "server"
+is the privileged MECHANICS bwrap could only simulate. So the driver adds a small probe driver.
+
+**Re-scoped pre-window gate (the window-open precondition).** (a) the **green local fusion**
+(`run_live` full-window + recovery, under bwrap `--unshare-net`); (b) the **bounded server-mechanics
+probes** below (real root / real `/opt` / real `unshare -m` / real `setpriv` uid-1000); (c) the
+**green server setup** (`rehearsal-setup.py` on megacampus-prod: seed 47/22/5/8 + cron GUCs + REAL
+catalog + proxy cert). The **stock-CLI + prod-CA window path is inherently un-rehearsable against a
+disposable container** and is validated **IN-WINDOW** (first real cutover) under the **rollback-abort
+safety** (found-defect #18): a forward-op mid-lifecycle failure aborts the window via rollback.
+
+**Deliverable (driver v).** `deploy/qdrant/rehearsal/rehearsal-probe.sh` (+ `rehearsal-lib.sh`
+helper reuse) + `packages/course-gen-platform/tests/unit/ops/q12-rehearsal-probe.test.ts`. NEW paths
+only; NO core/barrier/W-owned/frozen edit; barrier `bdb9d935`. Three self-contained probes, each with
+idempotent umount-before-rmdir teardown; throwaway UUIDv4 ids; NO container/`run_live`/writers:
+
+1. **trust-bridge** — `sudo unshare -m` → `mount --bind` a throwaway `/opt/megacampus/backups/q12/
+<probe-uuid>` into a real `/tmp/mc2-q12-barrier-XXXX` trust view → `setpriv --reuid=1000` → assert a
+   file written via the `/opt` view is byte-identical AND the SAME `st_dev/st_ino` via the `/tmp`
+   trust view (both directions) — the #15 dual-bind + the barrier `:215` string-check agree with the
+   physical inode at real privilege; assert the fakehosts `/etc/hosts` bind redirects the pooler host
+   to `127.0.0.1` INSIDE the ns and is ABSENT on the host after ns exit (the #1 hazard: ns-private,
+   no system-wide redirect); euid==1000.
+2. **lease** — canonical FD-8/9 custody under REAL `setpriv` (not bwrap): FD-9 exclusive `flock` on
+   `cutover.lock` (`O_NOFOLLOW`), FD-8 journal, both inherited across a child exec, a second `flock`
+   blocked, a durable append.
+3. **uid** — the barrier `:96` stat gate: a uid-1000-owned 0700 trust root; `setpriv` drops to
+   uid-1000; euid==owner==1000 and mode 0700 hold.
+
+**Testability (TDD RED→GREEN).** The privileged execution is root-only (the orchestrator's server
+run), so the local tests assert command CONSTRUCTION (`--dry-run`, like ns-launch) AND run each
+probe's inner assertion payload directly (`--emit-payload`) against supplied paths — the payload
+LOGIC is proven locally so a real server failure is caught, not masked by a buggy check; the real
+`unshare/mount/setpriv` is the honest server defer (same pattern as `rehearsal-ns-launch.sh`).
+Orchestrator review → orchestrator executes the probes on megacampus-prod → window re-presentation.
