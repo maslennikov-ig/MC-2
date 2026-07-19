@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +36,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const PROBE = resolve(repoRoot, 'deploy/qdrant/rehearsal/rehearsal-probe.sh');
+const LIB = resolve(repoRoot, 'deploy/qdrant/rehearsal/rehearsal-lib.sh');
 const POOLER = 'aws-1-us-east-2.pooler.supabase.com';
 const RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
 const UUIDV4_RE = /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/;
@@ -192,5 +201,53 @@ describe('Q12 R8 uid/ownership probe payload (barrier :96 stat gate logic)', () 
     const r = spawnSync('/bin/bash', ['-c', payload, '_', trustRoot, uid], { encoding: 'utf8' });
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toContain('FAIL');
+  });
+});
+
+// Found-defect #22: rehearsal_make_trust_root claimed a "uid-1000-owned 0700 trust root" but never
+// chowned — under sudo the mktemp dir is root:root 0700, so setpriv-1000 cannot even traverse it
+// (the FIRST real privileged server run hit "Permission denied" reading the payload). The fix chowns
+// the root to the target uid:gid, GUARDED to the privileged (EUID==0) context so the local
+// non-root --dry-run/worker callers do not attempt it. Tested with `id`/`chown` PATH-stubbed (no
+// real root needed; the real chown is the server's job — same defer pattern as the probes).
+describe('Q12 R8 rehearsal-lib.sh rehearsal_make_trust_root (found-defect #22)', () => {
+  function callMakeTrustRoot(fakeUid: string) {
+    const bin = mkdtempSync(join(tmpdir(), 'mc2-q12-libstub-'));
+    scratches.push(bin);
+    const chownLog = join(bin, 'chown.log');
+    writeFileSync(
+      join(bin, 'id'),
+      `#!/bin/sh\nif [ "$1" = -u ]; then echo ${fakeUid}; else exec /usr/bin/id "$@"; fi\n`,
+      { mode: 0o755 }
+    );
+    writeFileSync(join(bin, 'chown'), `#!/bin/sh\necho "$*" >> "${chownLog}"\n`, { mode: 0o755 });
+    const r = spawnSync(
+      'bash',
+      ['-c', `source '${LIB}'; reuid=1000; regid=1000; rehearsal_make_trust_root`],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` },
+      }
+    );
+    const root = r.stdout.trim();
+    if (root) scratches.push(root);
+    const log = existsSync(chownLog) ? readFileSync(chownLog, 'utf8') : '';
+    return { status: r.status ?? -1, root, log, stderr: r.stderr };
+  }
+
+  it('chowns the trust root to the target uid:gid when EUID==0 (privileged, barrier :96 gate)', () => {
+    const { status, root, log, stderr } = callMakeTrustRoot('0');
+    expect(status, stderr).toBe(0);
+    expect(existsSync(root)).toBe(true);
+    expect(root).toMatch(/\/tmp\/mc2-q12-barrier-/);
+    expect(log).toContain('1000:1000');
+    expect(log).toContain(root);
+  });
+
+  it('does NOT chown when non-root (the local --dry-run/worker path)', () => {
+    const { status, root, log, stderr } = callMakeTrustRoot('1000');
+    expect(status, stderr).toBe(0);
+    expect(existsSync(root)).toBe(true);
+    expect(log).toBe('');
   });
 });

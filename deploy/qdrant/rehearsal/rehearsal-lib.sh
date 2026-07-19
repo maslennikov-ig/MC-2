@@ -44,10 +44,21 @@ rehearsal_validate_run_id() {
 }
 
 # Make a uid-1000-owned 0700 trust root (barrier :94-98). Echoes the path.
+#
+# found-defect #22: `mktemp` under `sudo` creates the dir root:root, and `chmod 0700` then makes it
+# root-only — so a subsequent `setpriv --reuid=1000` child cannot even TRAVERSE it (the first real
+# privileged server probe run hit "Permission denied" reading the payload), and it defeats the
+# barrier :96 stat gate (running uid MUST == trust-root owner). Fix: when PRIVILEGED (EUID==0), chown
+# the root to the target uid:gid. GUARDED to EUID==0 so the local non-root --dry-run / worker callers
+# do NOT attempt a chown they cannot perform. reuid/regid come from the caller's scope (the probe +
+# ns-launch set them), defaulting to 1000:1000.
 rehearsal_make_trust_root() {
   local root
   root="$(mktemp -d "/tmp/${REHEARSAL_TRUST_PREFIX}XXXXXXXX")"
   chmod 0700 "$root"
+  if [[ $(id -u) -eq 0 ]]; then
+    chown "${reuid:-1000}:${regid:-1000}" "$root"
+  fi
   printf '%s\n' "$root"
 }
 
