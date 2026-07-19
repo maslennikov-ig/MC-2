@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -304,11 +305,20 @@ describe('Q12 R8 rehearsal driver server-import surface (found-defect #20)', () 
     const optRehearsal = join(optQdrant, 'rehearsal');
     mkdirSync(optRehearsal, { recursive: true });
     for (const name of readdirSync(REHEARSAL)) {
+      // Copy ONLY regular files (the driver source). A `__pycache__/` dir exists under
+      // rehearsal/ after ANY python run (the server + CI both have it); copyFileSync on a
+      // directory throws EISDIR — skip non-regular entries so the test isn't falsely fragile.
+      if (!statSync(join(REHEARSAL, name)).isFile()) continue;
       copyFileSync(join(REHEARSAL, name), join(optRehearsal, name));
     }
     // The deploy-side siblings the driver reads (structural catalog + recovery wrapper etc.).
+    // The .sql/.sh extension filter already excludes dirs, but guard isFile() too (defensive,
+    // matches the rehearsal/ loop) so no non-regular entry can EISDIR here either.
     for (const name of readdirSync(QDRANT)) {
-      if (name.endsWith('.sql') || name.endsWith('.sh')) {
+      if (
+        (name.endsWith('.sql') || name.endsWith('.sh')) &&
+        statSync(join(QDRANT, name)).isFile()
+      ) {
         copyFileSync(join(QDRANT, name), join(optQdrant, name));
       }
     }
