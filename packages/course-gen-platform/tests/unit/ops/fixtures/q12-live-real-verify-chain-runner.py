@@ -188,6 +188,22 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
             time.sleep(0.2)
         dexec_must(SEED_SQL)
 
+        # Supabase-source fidelity: the real Supabase `postgres` database carries
+        # database-level (setrole=0) pg_cron GUCs, and the frozen structural catalog
+        # DELIBERATELY filters exactly cron.database_name / cron.launch_active_jobs
+        # (q12-structural-catalog.sql:69) -- i.e. the frozen contract assumes the source
+        # already has a database-level pg_db_role_setting row. The install barrier captures
+        # that pre-existing row as the baseline `database_settings` BEFORE it appends its own
+        # `default_transaction_read_only=on`; prepare-recovery's readiness proof then requires
+        # the post-install row (minus setconfig) to equal that baseline row
+        # (q12-database-barrier.sh:1615-1618). A minimal source with NO database-level row
+        # cannot satisfy that: install would CREATE the row, making the readiness comparison
+        # '{}' vs {setrole,setdatabase} diverge. Seeding these two filtered GUCs restores
+        # source fidelity WITHOUT changing any structural sha256 (they are filtered from the
+        # structural catalog), so the R8-B-2-i verify-chain assertions are unaffected.
+        dexec_must("ALTER DATABASE postgres SET cron.database_name TO 'postgres';")
+        dexec_must("ALTER DATABASE postgres SET cron.launch_active_jobs TO 'on';")
+
         # 1. Real structural hashes: baseline (clean), after base, after base+obs.
         baseline_structural_sha256 = structural_after()
         after_base_structural_sha256 = structural_after(BASE_DDL)
@@ -501,6 +517,68 @@ exit "$barrier_rc"
             "(SELECT current_setting('default_transaction_read_only')) AS read_only"
         )[0]
 
+        def db_lifecycle_state():
+            return dexec_json(
+                "SELECT (SELECT activated FROM q12_guard.active_run WHERE singleton) AS activated, "
+                "(SELECT count(*) FROM cron.job WHERE active) AS cron_active, "
+                "(SELECT current_setting('default_transaction_read_only')) AS read_only"
+            )[0]
+
+        # 9. prepare-recovery (R8-B-2-ii): the frozen forward successor of
+        #    verify-after-observability. The barrier re-validates the verify-obs receipt
+        #    as its predecessor (state 20260711151000_guard_verified, last_command
+        #    verify-extended, rollback_probes_verified=true, probe_receipt_sha256 bound to
+        #    the same owner-checked probe receipt -- q12-database-barrier.sh:344-359), runs
+        #    the real read-only recovery-readiness + quiesce proof against the guarded DB,
+        #    and reaches recovery_ready_guarded (rollback_probes_verified=true, bound
+        #    probe_receipt_sha256). Captured non-raising so the verify chain result stands
+        #    independently.
+        prepare_recovery_result = run_barrier("prepare-recovery")
+        prepare_recovery_receipt = read_receipt()
+        surface_after_prepare = guard_surface()
+        prepare_db_state = db_lifecycle_state()
+
+        # 10. activate (R8-B-2-ii): the normal activation path (write_restore_sql false).
+        #     Restores cron/read_only to the captured baseline, drops the probe table, sets
+        #     activated=true under the append-only guard, verifies verify_activated_state,
+        #     and reaches activated (last_command=activate, rollback_probes_verified=true).
+        activate_result = run_barrier("activate")
+        activate_receipt = read_receipt()
+        surface_after_activate = guard_surface()
+        activate_db_state = db_lifecycle_state()
+
+        # The probe receipt bytes the barrier binds into every post-verify receipt: its
+        # sha256 is what rollback_probes_verified pins as probe_receipt_sha256.
+        probe_receipt_body_sha256 = sha256_hex(f"{canonical(probe_receipt)}\n".encode("utf-8"))
+
+        # 11. Anti-weakening guard probe (found-defect #14 GREEN, R8-B-2-ii defrost).
+        #     With the durable-guard triggers still live post-activate and the capability
+        #     supplied, EVERY q12_guard-table write must still trip the append-only guard
+        #     as SQLSTATE P0001 'Q12 durable guard truth is append-only' -- NOT the pre-fix
+        #     42703 'record "old" has no field "run_id"'. This exercises the REAL installed
+        #     enforce_write_barrier (not a mirror) and proves the #14 nested-IF restructure
+        #     did not weaken the guard: the run_id-less baseline / migration_guards fall to
+        #     the append-only RAISE (their OLD.run_id is never evaluated now), and the
+        #     active_run non-flip UPDATE (activated already true) also lands on it via inner
+        #     fall-through. Each probe UPDATE RAISES and rolls back, so no state changes.
+        def guard_probe(update_sql: str):
+            result = dexec(
+                "\\set VERBOSITY verbose\n"
+                f"SET megacampus.q12_capability = '{CAPABILITY}';\n"
+                f"{update_sql}\n"
+            )
+            return {"rc": result.returncode, "stderr": (result.stderr or "").strip()}
+
+        guard_probe_active_run = guard_probe(
+            "UPDATE q12_guard.active_run SET expected_catalog=expected_catalog WHERE singleton;"
+        )
+        guard_probe_baseline = guard_probe(
+            "UPDATE q12_guard.baseline SET baseline=baseline WHERE singleton;"
+        )
+        guard_probe_migration_guards = guard_probe(
+            "UPDATE q12_guard.migration_guards SET relation_set=relation_set;"
+        )
+
         sys.stdout.write(
             json.dumps({
                 "seed_counts": {"public": len(public_rows), "auth": len(auth_rows),
@@ -530,6 +608,26 @@ exit "$barrier_rc"
                 "surface_after_obs": surface_after_obs,
                 "post_verify_cron_active": post_state["cron_active"],
                 "post_verify_read_only": post_state["read_only"],
+                "probe_receipt": probe_receipt,
+                "probe_receipt_sha256": probe_receipt_body_sha256,
+                "prepare_recovery_rc": prepare_recovery_result.returncode,
+                "prepare_recovery_stdout": prepare_recovery_result.stdout,
+                "prepare_recovery_stderr": prepare_recovery_result.stderr,
+                "prepare_recovery_receipt": prepare_recovery_receipt,
+                "prepare_recovery_receipt_state":
+                    prepare_recovery_receipt.get("state") if prepare_recovery_receipt else None,
+                "surface_after_prepare": surface_after_prepare,
+                "prepare_db_state": prepare_db_state,
+                "activate_rc": activate_result.returncode,
+                "activate_stdout": activate_result.stdout,
+                "activate_stderr": activate_result.stderr,
+                "activate_receipt": activate_receipt,
+                "activate_receipt_state": activate_receipt.get("state") if activate_receipt else None,
+                "surface_after_activate": surface_after_activate,
+                "activate_db_state": activate_db_state,
+                "guard_probe_active_run": guard_probe_active_run,
+                "guard_probe_baseline": guard_probe_baseline,
+                "guard_probe_migration_guards": guard_probe_migration_guards,
             }) + "\n"
         )
         return 0

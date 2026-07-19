@@ -77,9 +77,9 @@ interface VerifyReceipt {
 }
 
 describe.runIf(REAL_PG17)(
-  'Q12 R8-B-2-i: real barrier verify-extended chain (real PostgreSQL 17.10)',
+  'Q12 R8-B-2-i/ii: real barrier verify-extended + prepare-recovery + activate chain (real PostgreSQL 17.10)',
   () => {
-    it('drives verify-after-base then verify-after-observability END-TO-END', () => {
+    it('drives verify-base, verify-obs, prepare-recovery, and activate END-TO-END (incl. #14 anti-weakening guard probe)', () => {
       const result = spawnSync('/usr/bin/python3', [RUNNER], {
         encoding: 'utf8',
         timeout: 300_000,
@@ -117,6 +117,18 @@ describe.runIf(REAL_PG17)(
         surface_after_obs: GuardSurface;
         post_verify_cron_active: number;
         post_verify_read_only: string;
+        prepare_recovery_rc: number;
+        prepare_recovery_receipt_state: string | null;
+        prepare_db_state: { activated: boolean; cron_active: number; read_only: string };
+        activate_rc: number;
+        activate_stderr: string;
+        activate_receipt: VerifyReceipt | null;
+        activate_receipt_state: string | null;
+        activate_db_state: { activated: boolean; cron_active: number; read_only: string };
+        probe_receipt_sha256: string;
+        guard_probe_active_run: { rc: number; stderr: string };
+        guard_probe_baseline: { rc: number; stderr: string };
+        guard_probe_migration_guards: { rc: number; stderr: string };
       };
 
       // The disposable source is the frozen R4 inventory, and install re-reaches
@@ -204,6 +216,50 @@ describe.runIf(REAL_PG17)(
       // The maintenance barrier is intact throughout the read-only verify chain.
       expect(out.post_verify_cron_active).toBe(0);
       expect(out.post_verify_read_only).toBe('on');
+
+      // ---- prepare-recovery + activate (R8-B-2-ii): the real forward cutover ---------
+      // prepare-recovery re-validates the verify-obs receipt as predecessor and reaches
+      // recovery_ready_guarded against the still-guarded DB (activated false, guard live).
+      expect(out.prepare_recovery_rc).toBe(0);
+      expect(out.prepare_recovery_receipt_state).toBe('recovery_ready_guarded');
+      expect(out.prepare_db_state).toEqual({ activated: false, cron_active: 0, read_only: 'on' });
+
+      // activate (normal path, write_restore_sql false) REACHES `activated`: sets
+      // activated=true under the append-only guard, restores the captured cron/read_only
+      // baseline, and verifies verify_activated_state. Byte-for-byte the frozen receipt
+      // shape with last_command=activate, rollback_probes_verified=true.
+      expect(out.activate_rc, out.activate_stderr).toBe(0);
+      expect(out.activate_receipt_state).toBe('activated');
+      expect(out.activate_receipt).toEqual({
+        schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+        run_id: '123e4567-e89b-42d3-a456-426614174000',
+        state: 'activated',
+        zero_guard_residue: false,
+        expected_catalog_sha256: out.catalog_sha256,
+        last_command: 'activate',
+        rollback_probes_verified: true,
+        probe_receipt_sha256: out.probe_receipt_sha256,
+      });
+      // On activation the captured baseline is restored: cron re-activated (8 jobs),
+      // default_transaction_read_only back off, and the guard flag now activated.
+      expect(out.activate_db_state).toEqual({ activated: true, cron_active: 8, read_only: 'off' });
+
+      // ---- found-defect #14 anti-weakening probe: the durable guard is NOT weakened ---
+      // Post-activate, with the guard triggers live and the capability supplied, EVERY
+      // q12_guard-table write still trips the append-only guard (SQLSTATE P0001) and NONE
+      // regresses to the pre-#14 42703 `record "old" has no field "run_id"`. The
+      // run_id-less baseline / migration_guards are the exact rows the #14 nested-IF fix
+      // stopped from evaluating OLD.run_id; the active_run non-flip UPDATE lands on the
+      // same RAISE via inner fall-through -- proof the fix preserved the guarantee.
+      for (const probe of [
+        out.guard_probe_active_run,
+        out.guard_probe_baseline,
+        out.guard_probe_migration_guards,
+      ]) {
+        expect(probe.rc).not.toBe(0);
+        expect(probe.stderr).toContain('Q12 durable guard truth is append-only');
+        expect(probe.stderr).not.toContain('has no field "run_id"');
+      }
     }, 320_000);
   }
 );
