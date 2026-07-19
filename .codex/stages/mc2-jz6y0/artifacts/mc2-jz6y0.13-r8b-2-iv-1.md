@@ -9,155 +9,203 @@ reasoning_effort: high
 repo: /home/me/code/mc2
 branch: codex/q12-live-controller
 base_branch: codex/self-hosted-qdrant-platform-plan
-base_commit: 8537c6000
+base_commit: e8696ab63
 worktree: /home/me/code/mc2/.worktrees/q12-live-controller
-status: blocked
-delivery_method: not accepted
+status: returned
+delivery_method: manual integration
 accepted_by_orchestrator: no
 cleanup_status: cleaned
 cleanup_notes: >-
   Committed in place on the existing isolated worktree/branch (codex/q12-live-controller) per the
-  launching stream's instruction; NOT pushed. The full-window runner stands up ONE disposable
-  postgres:17.10-bookworm container (mc2-q12-fw-src-*) plus /tmp/mc2-q12-d5-root-* controller run
-  roots and a /tmp/mc2-q12-barrier-* trust root, all torn down in the runner's finally block; no
-  persistent state, no shared/production DB, no Qdrant Cloud, no prod. The barrier claims run in
-  bwrap --unshare-net (private isolated loopback), so the host's 5432 is never touched. Gated test
-  SKIPS without MC2_Q12_REAL_PG17=1, so ordinary CI touches no docker. Leftover docker containers /
-  /tmp roots from the iteration were removed (verified 0 mc2-q12 containers).
+  launching stream's instruction; NOT pushed. This round's gated iv-PART-1 probe stood up ONE
+  disposable postgres:17.10-bookworm container (mc2-q12-fw-src-*) plus /tmp/mc2-q12-d5-root-*
+  controller run roots and a /tmp/mc2-q12-barrier-* trust root, all torn down in the runner's finally
+  block (verified 0 mc2-q12 containers after the run). The new strict-accept unit runner is no-docker
+  and rmtree-cleans its own /tmp/mc2-q12-d5-root-* roots in a finally. The barrier claims run in
+  bwrap --unshare-net (private isolated loopback), so the host's 5432 (helixa-postgres-1) is never
+  touched. Gated iv-PART-1 SKIPS without MC2_Q12_REAL_PG17=1; the strict-accept unit is ungated
+  no-docker. No persistent state, no shared/production DB, no Qdrant Cloud, no prod.
 risk_level: high
 docs_reviewed: updated
 docs_review_notes: >-
-  docs/superpowers/plans/2026-07-17-q12-live-controller.md implementation log gains the R8-B-2-iv-1
-  round entry recording FOUND DEFECT #16 (the controller-vs-barrier database-barrier-baseline.json
-  collision) and the sanctioned hard stop. No design decision was changed; the resolution is a core
-  edit that requires orchestrator/core-owner re-ratification.
+  docs/superpowers/plans/2026-07-17-q12-live-controller.md gains (a) the RATIFIED transport-adaptation
+  provenance amended into BUILD BLUEPRINT step 3 (bwrap WITH --unshare-net + in-netns pooler proxy
+  bridging via the docker-exec unix socket, strictly better isolation, ratified as reported), and
+  (b) the R8-B-2-iv-1 RESUME implementation-log entry: found-defect #16 FIXED via the ratified
+  Option-A write_install_baseline strict-accept core edit, and the NEW sanctioned hard stop at the
+  post-activate cleanup leg (found-defect #17, harness-level path virtualization; core correct for
+  production). Schema-id doubling filed as Beads mc2-evduu (P3).
 graph_reviewed: no-change-needed
 graph_review_notes: >-
-  Change is confined to two NEW test-harness files under
-  packages/course-gen-platform/tests/unit/ops/ (a gated vitest wrapper + its python runner that
-  imports/reuses the R4/verify-chain runners and the retained-barrier runner). No source module, no
-  public surface, no durable-workflow edge, and NO change to deploy/qdrant/q12-lifecycle-core.py, the
-  frozen barrier/manifest/catalog, or any W-owned file. Read-only audit of the existing lineage; no
-  local Graphify refresh performed.
+  The core edit is confined to ONE existing function (Engine.write_install_baseline) with unchanged
+  public surface (same name/signature/callers at :2407/:2413/:2621); the two new files are a
+  no-docker test wrapper + python runner under packages/course-gen-platform/tests/unit/ops/. No new
+  module, no durable-workflow edge, no change to the frozen barrier/manifest/catalog or any W-owned
+  file. The existing local graph already models the barrier/harness/core lineage at the right
+  granularity; no local Graphify refresh performed (delegated worktree, no architecture change).
 verification:
-  - 'Branch confirmed codex/q12-live-controller for every commit (git rev-parse --abbrev-ref HEAD ==
-    codex/q12-live-controller; HEAD at session start 8537c600035f31be4e74863fee5b3b9e069c8d03).'
-  - 'FOUND DEFECT #16 reproduced on real PostgreSQL 17.10: run_live drives the real barrier install
-    to a maintenance_guarded receipt (captured on disk:
-    /tmp/mc2-q12-d5-root-*/database-barrier-receipt.json state=maintenance_guarded), the barrier
-    writes /tmp/mc2-q12-d5-root-*/database-barrier-baseline.json mode=400 uid=1000 gid=1000 with the
-    FULL megacampus.q12.database-barrier-baseline/v1 schema (nested .baseline with
-    baseline_structural_catalog_sha256/cron_jobs_sha256/database_default_sha256/
-    guarded_relations_sha256/pg_net_queue_count, q12-database-barrier.sh:2037). run_live then raises
-    LifecycleError "unsafe file identity: <run-root>/database-barrier-baseline.json" from
-    Engine.write_install_baseline (q12-lifecycle-core.py:2413 -> :2648-2660) ->
-    immutable_publish (:604) -> validate_regular_file (:558-565): the controller tries to publish its
-    OWN database-barrier-baseline.json (mode 0600, minimal predecessor-hash schema) to the SAME path
-    the barrier already published 0400, so the mode/identity check fails. Full Python traceback
-    captured through run_live -> drive_forward_sequence -> d5("install") -> retained_chain:2413.'
-  - 'Everything UP TO the defect works for real: the ratified DUAL-BIND is exercised (the single
-    physical controller run-root dir is bound inside the claim bwrap to BOTH
-    /opt/megacampus/backups/q12/<run-id> and <trust-root>/backups/q12/<run-id>; the barrier reads the
-    run-root inputs and writes the receipt/baseline through the /tmp trust view; #15 dual_bind_same_
-    inode observed true from inside the claim). run_claim passes its uid-1000 / lease-FD-9 / capability
-    /opt-custody checks; the barrier install transitions the real DB to maintenance_guarded (cron off,
-    read-only on, q12_guard installed). The install per-leg input checkpoint published by
-    RealClaimExecutor (copy of phase-checkpoint.json) is accepted by the barrier. Transport: bwrap
-    --unshare-net auto-ups the private loopback while keeping uid 1000 (verified), with the
-    q12-pooler-identity-proxy running IN the private netns and bridging to the container via the
-    docker-exec unix socket -- an isolated adaptation of the blueprint step-3 transport, forced
-    because the host already binds 0.0.0.0:5432 (helixa-postgres-1); the DUAL-BIND and all acceptance
-    semantics are unchanged.'
-  - 'GREEN is unreachable without a q12-lifecycle-core.py edit (rename/skip/reconcile the controller
-    write_install_baseline artifact vs the barrier baseline) = re-ratification. Per the stream
-    contract ("REAL-DB or real-controller divergence from the fixture contract = FOUND DEFECT: STOP +
-    report BEFORE reconciliation" and "If a core edit seems unavoidable = STOP + report"), no GREEN
-    commit was produced and NO workaround (no harness delete/chmod of either baseline, no core edit)
-    was applied. Precedent: R4 Sub-round C ("SANCTIONED HARD STOP, not a pass; RED-only").'
-  - 'No core / frozen / W-owned / deploy change. sha256 q12-database-barrier.sh
-    bdb9d935e3c09fb01503ba9d016f36a9cf94db5539dfcdc73c1692eb442925ce (UNCHANGED); git status shows
-    only the two NEW write-zone test files; NO change under deploy/, no q12-lifecycle-core.py /
-    q12-writer-resume.py / source-recovery-run.sh / q12-source-manifest.ts edit.'
-  - 'pnpm exec tsc --noEmit -> exit 0. The gated test (tests/unit/ops/q12-live-real-full-window.test.ts)
-    SKIPS without MC2_Q12_REAL_PG17=1.'
+  - 'Branch codex/q12-live-controller for every commit; HEAD at session start e8696ab639. base_commit
+    e8696ab63 is the parent of the RED commit f59b17934.'
+  - 'FOUND DEFECT #16 FIXED (RATIFIED Option-A strict-accept), TDD. RED: the focused no-docker unit
+    tests/unit/ops/q12-write-install-baseline-strict-accept.test.ts (+ its -runner.py, minimal Engine
+    via __new__) FAILED on unmodified core -- pre-planting the barrier authoritative 0400 baseline made
+    write_install_baseline raise "unsafe file identity" (the #16 collision) instead of strict-accepting
+    (1 failed | 3 passed). GREEN after the core edit: 4 passed -- strict-accept admits the barrier full
+    12-key structural 0400 baseline WITHOUT writing (byte-unchanged, trace install:baseline-strict-accept),
+    the ABSENT path still writes the controller 5-key 0600 baseline, and the fail-closed tamper matrix
+    (0600 leftover / wrong run_id / wrong schema_version / non-canonical / unparseable) each raises
+    LifecycleError.'
+  - 'FIXTURE suites stay GREEN (no-docker, controller-write path untouched): pnpm exec vitest run
+    tests/unit/ops/q12-write-install-baseline-strict-accept.test.ts tests/unit/ops/q12-live-controller.test.ts
+    tests/unit/ops/q12-production-executor-cleanup.test.ts -> 30 passed (4 strict-accept + 23 controller +
+    3 ProductionExecutor cleanup). The absent-path controller 0600 write is byte-identical to before.'
+  - 'pnpm exec tsc --noEmit -> exit 0.'
+  - 'Gated iv-PART-1 probe (MC2_Q12_REAL_PG17=1 SUPABASE_URL=http://127.0.0.1:54321
+    SUPABASE_SERVICE_KEY=synthetic-test-key MC2_Q12_PLAN_DOCKER=/usr/bin/docker) now drives PAST install
+    (the fix strict-accepts the barrier baseline) through ALL FIVE real barrier legs + BOTH real
+    migrations + activate against the disposable postgres:17.10-bookworm, reaching the post-activate
+    cleanup -- then hits FOUND DEFECT #17 (below). ~117s wall before the cleanup-leg failure. This is a
+    NEW downstream boundary surfaced only because #16 is now fixed; per the stream contract NO workaround
+    was applied (SANCTIONED HARD STOP, RED at cleanup).'
+  - 'FOUND DEFECT #17 (thirteenth found defect, HARNESS-level; core CORRECT for production). The real
+    frozen barrier cleanup child rejects with "q12 database barrier: test capability must use the fixed
+    protected active-run path" (q12-database-barrier.sh:214-216: test-mode requires capability_file ==
+    $trust_boundary/backups/q12/$run_id/secrets/db-capability). Root cause: ProductionExecutor.
+    prepare_barrier_cleanup (q12-lifecycle-core.py:826-847) builds the cleanup argv --q12-db-capability-file
+    from context["run_root"], which in run_live is the controller physical /tmp/mc2-q12-d5-root-* fixture
+    run root. The harness dual-bind rewrite (_rewrite_opt_to_trust) maps only /opt/megacampus/... -> the
+    trust view, so it cannot rewrite the controller /tmp run-root path to the trust view. The FORWARD legs
+    pass because their argv comes from run_claim /opt custody (dual-bound); the DIRECT (not-through-run_claim)
+    cleanup child is a THIRD path domain the #15 dual-bind ratification never covered. In PRODUCTION
+    context["run_root"] == /opt/megacampus/backups/q12/<run-id>, so the barrier non-test-mode check
+    (q12-database-barrier.sh:212) accepts it -- CORE IS CORRECT; the gap is the test-harness path
+    virtualization for the direct cleanup child. Reported BEFORE reconciliation; harness left byte-unchanged
+    from its built state.'
+  - 'Scope: git diff --stat e8696ab63..HEAD = deploy/qdrant/q12-lifecycle-core.py (write_install_baseline
+    ONLY, +25/-1) + the two new test files. sha256 q12-database-barrier.sh
+    bdb9d935e3c09fb01503ba9d016f36a9cf94db5539dfcdc73c1692eb442925ce (UNCHANGED). No frozen
+    manifest/catalog edit, no W-owned edit (q12-writer-resume.py, source-recovery-run.sh,
+    q12-source-manifest.ts unchanged), no barrier/harness workaround.'
 changed_files:
-  - packages/course-gen-platform/tests/unit/ops/q12-live-real-full-window.test.ts
-  - packages/course-gen-platform/tests/unit/ops/fixtures/q12-live-real-full-window-runner.py
-  - docs/superpowers/plans/2026-07-17-q12-live-controller.md
-  - .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-iv-1.md
+  - 'deploy/qdrant/q12-lifecycle-core.py: Engine.write_install_baseline ONLY -- the RATIFIED Option-A
+    publish-OR-strict-accept core edit (the review-critical surface). No other core function touched.'
+  - packages/course-gen-platform/tests/unit/ops/q12-write-install-baseline-strict-accept.test.ts
+  - packages/course-gen-platform/tests/unit/ops/fixtures/q12-write-install-baseline-strict-accept-runner.py
+  - 'docs/superpowers/plans/2026-07-17-q12-live-controller.md: BUILD BLUEPRINT step-3 transport
+    ratification amendment + the R8-B-2-iv-1 resume implementation-log entry (#16 fixed, #17 hard stop).'
+  - '.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-iv-1.md: this artifact.'
 explicit_defers:
   - >-
-    R8-B-2-iv-1 GREEN (the 81-row full-window run_live parity + cleanup + seam + resume) is BLOCKED
-    on found-defect #16. The full-window harness is built and reaches the exact defect boundary; it
-    resumes to GREEN once #16 is ratified and fixed. Tracked here + in the plan implementation log;
-    recommend a Beads issue for the core fix.
+    iv-PART-1 GREEN (the 81-row full-window run_live parity + cleanup + seam + resume) is now BLOCKED on
+    found-defect #17 (the direct cleanup child's test-harness path virtualization), NOT on #16 (fixed).
+    Tracked here + in the plan implementation log. Resolution is a harness change (map the controller
+    /tmp/mc2-q12-d5-root-* run root -> the barrier trust view for the direct cleanup argv, mirroring the
+    forward-leg dual-bind) requiring orchestrator sign-off BEFORE reconciliation; it may surface further
+    real cleanup-leg divergences past that point.
+  - >-
+    Schema-id doubling (the controller minimal 5-key baseline and the barrier full 12-key structural
+    baseline share one schema_version megacampus.q12.database-barrier-baseline/v1) is tracked debt, filed
+    as Beads mc2-evduu (P3). NOT fixed this round; needs its own design + re-ratification (barrier frozen).
+  - >-
+    iv-PART-2 (composed crash -> two-process supervisor -> recover) and iv-PART-3 (multi-epoch cleanup
+    re-drive) remain out of this stream (parts 2-3 held).
 ---
 
 # Summary
 
-R8-B-2-iv-1 builds the full-window real `run_live` probe with the ratified DUAL-BIND fusion
-(found-defect #15 supersession) and drives it against a disposable `postgres:17.10-bookworm`
-container. The harness (`q12-live-real-full-window-runner.py` + the gated
-`q12-live-real-full-window.test.ts`) composes: `run_live` on a `/tmp/mc2-q12-d5-root-*` controller
-run root; an outer `RealBarrierWrapperExecutor` whose `launch_claim` spawns a bwrap `--real-claim`
-subprocess running `CORE.run_claim(args, RealClaimExecutor)`; `RealClaimExecutor` publishing the
-per-leg input checkpoint and running the FROZEN barrier FOR REAL against the container; the real
-migration `execute_ordinary` seam; and the composer twin (`run_joined_composer`) on a second root
-for the 76-row parity oracle. The DUAL-BIND binds the single physical controller run-root dir inside
-the claim bwrap to BOTH `/opt/megacampus/backups/q12/<run-id>` (run_claim custody; `/opt` manifest
-argv kept verbatim) AND `<trust-root>/backups/q12/<run-id>` (the barrier's test-mode trust root, CA
-relaxation only); `RealClaimExecutor` rewrites ONLY the barrier child's argv to the `/tmp` view.
+R8-B-2-iv-1 RESUME. This round applies the RATIFIED found-defect #16 core fix and resumes the
+already-built full-window real `run_live` probe. Two outcomes:
 
-Driving that fusion for real surfaced **FOUND DEFECT #16**: the real barrier install and the
-controller's `retained_chain` BOTH claim ownership of `<run-root>/database-barrier-baseline.json`.
-The frozen barrier install publishes it 0400 with the full `megacampus.q12.database-barrier-baseline/v1`
-schema (`q12-database-barrier.sh:2037`); then `Engine.write_install_baseline`
-(`q12-lifecycle-core.py:2413` -> `:2648-2660`) publishes its OWN minimal
-(predecessor-hash) baseline 0600 to the same path via `immutable_publish` (`:604`), which fails
-`validate_regular_file` (`:558-565`) with `unsafe file identity` (mode 0400 != expected 0600). This
-collides in ANY real `run_live` install, including production; it never surfaced before because the
-composer / R4 Sub-round B use a FAKE barrier that does not write the file (only the controller does),
-and R8-B-2-i/ii/iii drive the barrier DIRECTLY (not through `retained_chain`, so only the barrier
-does) -- iv-PART-1 is the first fusion of `run_live`'s custody path with a real barrier, exactly the
-never-executed path this pre-window rehearsal exists to close. Everything up to the collision works
-for real (dual-bind honest, run_claim custody checks pass, barrier reaches `maintenance_guarded`).
+**1. FOUND DEFECT #16 FIXED (RATIFIED Option-A strict-accept) -- the review-critical CORE DIFF.**
+The ONLY core edit is `Engine.write_install_baseline` (`deploy/qdrant/q12-lifecycle-core.py`), that
+one function, made publish-OR-strict-accept:
 
-Per the stream contract this is a SANCTIONED HARD STOP (RED-only, not a pass): GREEN requires a
-`q12-lifecycle-core.py` edit to reconcile the two baselines (rename the controller artifact, skip it
-when the real barrier owns the path, or unify the schema) -- a re-ratification. No GREEN commit and
-no workaround were produced.
+```python
+def write_install_baseline(self, capability_hash: str) -> None:
+    path = self.run_root / "database-barrier-baseline.json"
+    if os.path.lexists(path):
+        # Found-defect #16: a REAL barrier claim already published its authoritative baseline
+        # (0400, full structural schema, load-bearing for activate/rollback restore). The
+        # controller's minimal baseline is writers-only (core never reads it), so it MUST NOT
+        # overwrite the barrier artifact. Strict-accept it; fail closed on anything else.
+        data = validate_regular_file(path, mode=0o400)
+        try:
+            accepted = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as error:
+            raise LifecycleError(f"unsafe install baseline: unparseable barrier baseline {path}") from error
+        if not isinstance(accepted, dict) or complete_object(accepted) != data:
+            raise LifecycleError(f"unsafe install baseline: non-canonical barrier baseline {path}")
+        if accepted.get("schema_version") != "megacampus.q12.database-barrier-baseline/v1":
+            raise LifecycleError(f"unsafe install baseline: foreign baseline schema {path}")
+        if accepted.get("run_id") != self.request["run_id"]:
+            raise LifecycleError(f"unsafe install baseline: foreign baseline run_id {path}")
+        self.trace.append("install:baseline-strict-accept")
+        return
+    claim = next(
+        entry for entry in reversed(self.journal)
+        if entry["outcome"] == "capability_claimed"
+        and entry["capability_manifest_sha256"] == capability_hash
+    )
+    checkpoint = self.checkpoint_bytes(claim)
+    baseline = {
+        "schema_version": "megacampus.q12.database-barrier-baseline/v1",
+        "run_id": self.request["run_id"],
+        "predecessor_journal_entry_hash": claim["entry_hash"],
+        "predecessor_checkpoint_sha256": sha256(checkpoint),
+        "capability_manifest_sha256": capability_hash,
+    }
+    immutable_publish(path, complete_object(baseline), 0o600, self.trace)
+```
+
+ABSENT path (fixture / fake-barrier) writes the controller 5-key 0600 baseline exactly as before;
+PRESENT path strict-accepts the barrier-authoritative 0400 artifact WITHOUT writing, keyed only on
+`schema_version` + `run_id` (no shape check, so it admits the barrier's full 12-key structural shape)
+and fails closed (`LifecycleError`) on any deviation -- a pre-planted 0600 leftover, unparseable /
+non-canonical JSON, a foreign `schema_version`, or a foreign `run_id`. All three install call sites
+(`:2407`/`:2413`/`:2621`) are unchanged. TDD: RED strict-accept unit (`f59b17934`) -> GREEN core edit
+(`9e352261f`). The strict-accept unit is GREEN, the fixture suites stay GREEN (30 passed), `tsc` 0.
+
+**2. NEW SANCTIONED HARD STOP at the cleanup leg (FOUND DEFECT #17), not a pass.** With #16 fixed, the
+gated iv-PART-1 probe drives PAST install (strict-accept) through all five real barrier legs + both
+real migrations + activate against the disposable `postgres:17.10-bookworm`, reaching the post-activate
+cleanup -- then the real frozen barrier `cleanup` child rejects with `test capability must use the
+fixed protected active-run path` (`q12-database-barrier.sh:214-216`). Root cause is HARNESS-level and
+core is CORRECT for production: `ProductionExecutor.prepare_barrier_cleanup` (`q12-lifecycle-core.py:826-847`)
+builds the cleanup `--q12-db-capability-file` from `context["run_root"]`, which in `run_live` is the
+controller physical `/tmp/mc2-q12-d5-root-*` fixture run root; the harness dual-bind rewrite
+(`_rewrite_opt_to_trust`) maps only `/opt/megacampus/...` -> the trust view, so it cannot rewrite the
+controller `/tmp` run-root path to `$trust_boundary/backups/q12/<run-id>/...`. The forward legs pass
+because their argv comes from `run_claim` `/opt` custody (dual-bound); the DIRECT cleanup child is a
+THIRD path domain the #15 ratification never covered. In production `context["run_root"] ==
+/opt/megacampus/backups/q12/<run-id>` so the barrier non-test-mode check accepts it. Per the stream
+contract ("a NEW downstream real divergence past install => STOP + report; no workaround"; "do NOT
+ship a fake/rushed green") NO workaround was applied and the harness is byte-unchanged from its built
+state -- returned for orchestrator resolution BEFORE reconciliation.
 
 # Verification
 
-See the `verification:` frontmatter list. Highlights: FOUND DEFECT #16 reproduced with on-disk
-evidence (barrier `maintenance_guarded` receipt + 0400 full-schema baseline; controller
-`write_install_baseline` fails `unsafe file identity` 0400 vs 0600) with a full Python traceback
-through `run_live -> drive_forward_sequence -> d5("install") -> retained_chain:2413`; the DUAL-BIND,
-`run_claim` uid-1000/lease/custody checks, per-leg input checkpoint, and the real DB transition all
-work up to the collision; barrier `bdb9d935…` and all core/frozen/W-owned/deploy files UNCHANGED;
-`tsc --noEmit` 0; the gated test SKIPS without `MC2_Q12_REAL_PG17=1`.
+See the `verification:` frontmatter list. Highlights: the #16 RED->GREEN TDD triple (strict-accept
+unit RED on unmodified core, GREEN after the edit; fixture suites 30 passed; `tsc` 0); the gated
+iv-PART-1 probe drives past install through activate then RED at cleanup (found-defect #17); scope
+proof (git diff --stat = `write_install_baseline` + the two test files + docs; barrier `bdb9d935…`
+UNCHANGED; no frozen/manifest/W-owned edit; no barrier/harness workaround).
 
 # Risks / Follow-ups
 
-- **FOUND DEFECT #16 (blocking, needs re-ratification + a core edit).** `run_live`'s
-  `retained_chain` `write_install_baseline` and the frozen barrier install both write
-  `<run-root>/database-barrier-baseline.json` with different mode (0600 vs 0400) and schema
-  (controller predecessor-hash minimal vs barrier full structural). The controller write runs AFTER
-  the barrier claim, so it always hits the barrier's 0400 file and fails. Resolution options (for the
-  core owner): (a) the controller stops writing `database-barrier-baseline.json` for install when the
-  executor runs a real barrier (the barrier owns it); (b) rename the controller's artifact to a
-  distinct filename; (c) reconcile both into one schema/writer. Any of these is a
-  `q12-lifecycle-core.py` change = re-ratification. Recommend a Beads issue.
-- **Transport adaptation (non-blocking, documented).** The blueprint step-3 literal "one host-side
-  proxy on 127.0.0.1:5432 (host net shared, MINUS --unshare-net)" is unexecutable where the host
-  already binds 0.0.0.0:5432 (here `helixa-postgres-1`). The harness uses bwrap WITH `--unshare-net`
-  instead: bwrap auto-ups the private loopback while keeping uid 1000 (verified), so `run_claim`'s
-  uid-1000 checks still pass AND 127.0.0.1:5432 is isolated from the host; the pooler-identity proxy
-  runs inside the private netns and bridges via the docker-exec unix socket. The DUAL-BIND and all
-  acceptance semantics are unchanged; only the transport plumbing is isolated. Flag for review in
-  case the server rehearsal wants the literal host-proxy form on a host where 5432 is free.
-- **Resume path unproven.** iv-PART-1 stops at the install baseline collision, so the downstream
-  legs (verify-after-base/-observability, prepare-recovery, activate), the two real migrations, the
-  journaled cleanup segment + R8-B-1 seam + resume stub, and the 76-row composer parity are BUILT but
-  not yet exercised end-to-end; they resume once #16 is fixed. iv-PART-2 (composed crash -> two-process
-  supervisor -> recover) and iv-PART-3 (multi-epoch cleanup re-drive) remain out of this stream.
+- **FOUND DEFECT #17 (blocking iv-PART-1 GREEN, HARNESS-level).** The direct (not-through-`run_claim`)
+  cleanup child's capability argv is the controller `/tmp/mc2-q12-d5-root-*` run-root path, which the
+  `/opt`->trust rewrite cannot map to the barrier's required trust-view path. Recommended resolution
+  (orchestrator sign-off first): extend the harness so the direct cleanup argv is rewritten/bound to
+  `$trust_boundary/backups/q12/<run-id>/...` (mirror the forward-leg dual-bind for the controller
+  run-root domain). Resuming past this may surface further real cleanup-leg divergences (receipt
+  archive, terminal proof, probe receipt, v2 promotion, capability deletion) -- do not rush a green.
+- **Schema-id doubling -- Beads `mc2-evduu` (P3, deferred).** The controller minimal 5-key baseline and
+  the barrier full 12-key structural baseline share one `schema_version`
+  `megacampus.q12.database-barrier-baseline/v1`. Tracked debt; a future schema split or unification
+  needs its own design + re-ratification (barrier frozen). Not fixed this round.
+- **Transport adaptation (non-blocking, ratified).** bwrap WITH `--unshare-net` (private netns,
+  auto-up loopback, uid 1000 preserved) + the pooler proxy inside the netns bridging via the
+  docker-exec unix socket -- strictly better isolation than the blueprint's literal shared-net
+  host-proxy text (unexecutable where the host binds 5432). Amended into BUILD BLUEPRINT step 3.
+- **Parts 2-3 held.** iv-PART-2 (composed crash -> two-process supervisor -> recover) and iv-PART-3
+  (multi-epoch cleanup re-drive) remain out of this stream.

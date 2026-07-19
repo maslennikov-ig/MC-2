@@ -965,11 +965,49 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   reconciliation"; "core edit ⇒ STOP + report") NO GREEN and NO workaround (no harness delete/chmod of
   either baseline, no core edit) were applied — mirroring R4 Sub-round C. Barrier `bdb9d935…`,
   `q12-lifecycle-core.py`, the frozen manifest/catalog, and all W-owned files byte-unchanged; `tsc
-  --noEmit` 0; the gated test SKIPS without `MC2_Q12_REAL_PG17=1`. Artifact:
+--noEmit` 0; the gated test SKIPS without `MC2_Q12_REAL_PG17=1`. Artifact:
   `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-iv-1.md`. **Resolution (orchestrator's next
   step, re-ratification):** reconcile the controller vs barrier `database-barrier-baseline.json`
   ownership (controller skips it for a real-barrier install / renames its artifact / unifies the
   schema), then iv-PART-1 resumes to the 81-row GREEN.
+
+- **R8-B-2-iv-1 resume — found-defect #16 FIXED (RATIFIED Option-A core edit), NEW SANCTIONED HARD
+  STOP at the cleanup leg (found-defect #17).** Applied the ratified Option-A strict-accept fix to
+  `Engine.write_install_baseline` (`q12-lifecycle-core.py`, that ONE function only): publish-OR-
+  strict-accept — ABSENT path writes the controller 5-key 0600 baseline exactly as before (fixture /
+  fake-barrier path unchanged); PRESENT path strict-accepts the barrier-authoritative artifact
+  WITHOUT writing (`validate_regular_file(0o400)` + canonical-parseable JSON + `schema_version` +
+  `run_id == this run`), failing closed with `LifecycleError` on any deviation (0600 leftover,
+  unparseable/non-canonical bytes, foreign schema/run_id) — no shape check beyond schema_version +
+  run_id, so it admits the barrier's full 12-key structural shape. TDD: RED strict-accept unit
+  (`q12-write-install-baseline-strict-accept.test.ts` + `-runner.py`, no-docker, minimal Engine via
+  `__new__`) → GREEN core edit. Verified: the strict-accept unit is GREEN (absent 0600 write + the
+  fail-closed tamper matrix), the FIXTURE suites stay GREEN (`q12-live-controller.test.ts` 23 +
+  `q12-production-executor-cleanup.test.ts` 3), `tsc --noEmit` 0. The gated iv-PART-1 probe now
+  drives PAST install (strict-accept) through **all five real barrier legs + both real migrations +
+  activate** against the disposable `postgres:17.10-bookworm`, reaching the post-activate cleanup —
+  then hits **FOUND DEFECT #17 (thirteenth found defect):** the real frozen barrier `cleanup` child
+  rejects with `test capability must use the fixed protected active-run path`
+  (`q12-database-barrier.sh:214-216`). Root cause (HARNESS-level, core CORRECT for production):
+  `ProductionExecutor.prepare_barrier_cleanup` (`q12-lifecycle-core.py:826-847`) builds the cleanup
+  argv `--q12-db-capability-file` from `context["run_root"]`, which in `run_live` is the controller's
+  physical `/tmp/mc2-q12-d5-root-*` fixture run root. The harness dual-bind rewrites only
+  `/opt/megacampus/…` → trust view (`_rewrite_opt_to_trust`), so it cannot map the controller's own
+  `/tmp/mc2-q12-d5-root-*` path to `$trust_boundary/backups/q12/<run-id>/…` that the barrier's
+  test-mode check demands. The FORWARD legs pass because their argv comes from `run_claim`'s `/opt`
+  custody manifest (dual-bound); the DIRECT (not-through-`run_claim`) cleanup child is a THIRD path
+  domain the #15 ratification never covered. In production `context["run_root"] ==
+/opt/megacampus/backups/q12/<run-id>` so the barrier's non-test-mode check accepts it — CORE IS
+  CORRECT; the gap is the test-harness path virtualization for the direct cleanup child. Per the
+  stream contract ("a NEW downstream real divergence past install ⇒ STOP + report; no workaround";
+  "do NOT ship a fake/rushed green") NO workaround was applied and the harness was left byte-unchanged
+  from its built state — reported for orchestrator resolution BEFORE reconciliation. Barrier
+  `bdb9d935…`, the frozen manifest/catalog, and all W-owned files byte-unchanged; the ONLY deploy/
+  change is `write_install_baseline`. **Resolution (orchestrator's next step):** decide the cleanup-
+  child path-virtualization (extend the harness rewrite to map the controller `/tmp/mc2-q12-d5-root-*`
+  run root → the trust view for the direct cleanup argv, and/or bind it, mirroring the forward-leg
+  dual-bind), then iv-PART-1 resumes toward the 81-row GREEN. Schema-id doubling tracked as Beads
+  `mc2-evduu` (P3, deferred). Commits: RED `f59b17934`, GREEN core `9e352261f`.
 
 ## Open risks carried forward
 
@@ -1028,6 +1066,21 @@ the execution-ready build spec for **iv-PART-1** (base `f7c25ffa5`, artifact
    `/etc/hosts` (pooler host → 127.0.0.1); `--bind` the REAL barrier at
    `/opt/megacampus/deploy/qdrant/q12-database-barrier.sh`; `--bind` db-url/ca under
    `/opt/megacampus/secrets/`. FD 8/9 inheritance through bwrap is already proven by R4-B.
+
+   **RATIFIED transport adaptation (R8-B-2-iv-1, ratified as reported).** The literal "MINUS
+   `--unshare-net` + one host-side proxy on `127.0.0.1:5432`" above is UNEXECUTABLE on this host: the
+   host already binds `0.0.0.0:5432` (helixa-postgres-1), so a host-side proxy cannot claim 5432 and
+   `127.0.0.1:5432` from inside the sandbox would route to the host's occupant. The ratified,
+   strictly-better-isolation adaptation KEEPS bwrap **WITH `--unshare-net`**: bwrap creates a private
+   network namespace and auto-brings its private loopback UP (verified) while preserving uid 1000
+   (so `run_claim`'s uid-1000 / lease-FD-9 / custody checks still pass), and ISOLATES the sandbox
+   `127.0.0.1:5432` from the host. The pooler-identity proxy runs INSIDE that private netns and
+   bridges to the disposable container purely through the **docker-exec unix socket** (no host
+   network route). The DUAL-BIND (step 4) and every acceptance semantic are unchanged; only the
+   transport plumbing is isolated. The fear the original text raised (uid/CAP conflict from a private
+   netns) does not arise — bwrap ups `lo` itself without CAP grants. This supersession was reported
+   and ratified; keep it as the executed transport for iv-PART-1.
+
 4. **Test-mode-for-CA + DUAL-BIND (ratified found-defect #15 supersession).** Test-mode is CA-ONLY
    relaxation (mandatory — barrier `:1921` rejects a non-prod CA unless `testMode=1`, and we don't
    hold the prod CA key) with **NO DB-command relaxation**. FOUND-DEFECT #15: the retired sub-worker's
