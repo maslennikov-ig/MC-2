@@ -89,14 +89,15 @@ describe('Q12 live/recover CLI wiring (R5 Sub-round F)', () => {
     expect(bogus.status).not.toBe(0);
   });
 
-  // DISPATCH WIRING: main() routes live->run_live and recover->run_recover with ProductionExecutor
-  // and the production seam (run-root shape + production flag), and the plan/supervisor/claim/smoke
-  // dispatch is unchanged.
+  // DISPATCH WIRING: main() routes live->run_live and recover->run_recover with the OWNER-CUSTODY
+  // executor (W1 — the wired executor that provides execute_forward_resume so the production
+  // post-activate resume can run) and the production seam (run-root shape + production flag), and
+  // the plan/supervisor/claim/smoke dispatch is unchanged (bare ProductionExecutor).
   it('wires main() live->run_live and recover->run_recover through the production seam', () => {
     const source = readFileSync(CORE, 'utf8');
     expect(source).toContain('arguments.mode in ("live", "recover")');
     expect(source).toContain('controller = run_live if arguments.mode == "live" else run_recover');
-    expect(source).toContain('controller(request, ProductionExecutor())');
+    expect(source).toContain('controller(request, owner_custody_executor())');
     // same run-root shape + canonical lock + production flag as the supervisor branch.
     expect(source).toContain('/opt/megacampus/backups/q12/{arguments.run_id}');
     expect(source).toContain('"quiesce_manifest_path": arguments.quiesce_manifest_path');

@@ -912,6 +912,166 @@ class ProductionExecutor:
         }
 
 
+class OwnerCustodyExecutor(ProductionExecutor):
+    """Design §W1 — the deployed owner-custody executor for the live cutover window.
+
+    Extends ``ProductionExecutor`` (inheriting the real ``execute``/``launch_claim`` and the real
+    post-activate FILE-ARTIFACT seam ``prepare_barrier_cleanup``/``execute_barrier_cleanup``) with
+    the missing RESUME half ``execute_forward_resume``: the server-side child that, once the barrier
+    cleanup has promoted the exact 10-key ``database-barrier-receipt/v2``, fail-closed VALIDATES that
+    v2 receipt and then drives the REAL writer-fleet resume under the inherited FD9 cutover lease.
+
+    This is what ``main()`` wires for ``live``/``recover`` so a production run passes
+    ``require_post_activate_executor`` and can actually unpause the writers after activation (a bare
+    ``ProductionExecutor`` stays fail-closed there — the resume half is deliberately owner-custody).
+    """
+
+    def execute_forward_resume(
+        self, context: dict[str, Any], cleanup: dict[str, Any]
+    ) -> dict[str, Any]:
+        run_root = pathlib.Path(context["run_root"])
+        run_id = context["run_id"]
+        # Fail-closed validation, a full twin of q12-writer-resume.py's forward branch (:1088-1134):
+        # the exact 10-key canonical v2 receipt, the probe-receipt hash binding, AND the nested
+        # probe/residue projection (:1110-1134). run_live does NOT reimplement this gate — it lives
+        # HERE, in the owner-custody child, so a tampered/non-terminal/semantically-dirty receipt
+        # refuses BEFORE any writer-fleet resume is driven (design §4 fail-closed-before-drive). This
+        # is a superset of the retained-barrier fixture's execute_forward_resume (:760-830), which
+        # omits the projection predicate; the deployed resume path holds the full semantic gate.
+        barrier_path = run_root / "database-barrier-receipt.json"
+        barrier_bytes = barrier_path.read_bytes()
+        barrier = json.loads(barrier_bytes)
+        if set(barrier) != {
+            "schema_version",
+            "run_id",
+            "state",
+            "expected_catalog_sha256",
+            "zero_guard_residue",
+            "last_command",
+            "rollback_probes_verified",
+            "probe_receipt_sha256",
+            "terminal_proof_sha256",
+            "database_capability_deleted",
+        }:
+            raise LifecycleError("database barrier receipt key set is not exact")
+        if barrier_bytes != complete_object(barrier):
+            raise LifecycleError("database barrier receipt is not canonical bytes")
+        hex64 = lambda value: isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+        if not (
+            barrier["schema_version"] == "megacampus.q12.database-barrier-receipt/v2"
+            and barrier["run_id"] == run_id
+            and barrier["state"] == "guard_cleanup_complete"
+            and barrier["zero_guard_residue"] is True
+            and barrier["database_capability_deleted"] is True
+            and hex64(barrier["expected_catalog_sha256"])
+            and hex64(barrier["terminal_proof_sha256"])
+        ):
+            raise LifecycleError("database barrier receipt v2 is not exact terminal authority")
+        if not (
+            barrier["last_command"] == "cleanup"
+            and barrier["rollback_probes_verified"] is True
+            and hex64(barrier["probe_receipt_sha256"])
+        ):
+            raise LifecycleError("forward cleanup receipt is invalid")
+        probe_path = run_root / "database-barrier-probe-receipt.json"
+        probe_bytes = probe_path.read_bytes()
+        if sha256(probe_bytes) != barrier["probe_receipt_sha256"]:
+            raise LifecycleError("database barrier probe receipt hash mismatch")
+        probe = json.loads(probe_bytes)
+        if set(probe) != {
+            "schema_version",
+            "run_id",
+            "expected_catalog_sha256",
+            "completed_at",
+            "probes",
+            "residue",
+        }:
+            raise LifecycleError("database barrier probe receipt key set is not exact")
+        if not (
+            probe["schema_version"] == "megacampus.q12.database-barrier-probes/v1"
+            and probe["run_id"] == run_id
+            and probe["expected_catalog_sha256"] == barrier["expected_catalog_sha256"]
+            and isinstance(probe["completed_at"], str)
+            and re.fullmatch(
+                r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z",
+                probe["completed_at"],
+            )
+        ):
+            raise LifecycleError("database barrier probe receipt binding is invalid")
+        # Nested projection (q12-writer-resume.py:1110-1134): the clean rollback fingerprint every
+        # probe reported and zero residue across every plane. A hash-consistent but semantically
+        # dirty projection (e.g. residue rows > 0) must refuse here, before any resume is driven.
+        if probe["probes"] != {
+            "postgrest_anon": "rejected",
+            "postgrest_authenticated": "rejected",
+            "postgrest_service_role_without_capability": "rejected",
+            "postgrest_service_role_with_capability": "rolled_back",
+            "postgrest_preference_applied": "tx=rollback",
+            "auth_profile": "rejected_zero_residue",
+            "storage_object": "rejected_zero_metadata_zero_bytes",
+            "cron_rpc": "rejected_exact_jobs_unchanged",
+            "pg_net_rpc": "rejected_zero_queue_zero_external_request",
+            "direct_supervisor": "rolled_back",
+        } or probe["residue"] != {
+            "guard_probe_rows": 0,
+            "auth_rows": 0,
+            "storage_metadata_rows": 0,
+            "storage_object_bytes": 0,
+            "cron_job_set_unchanged": True,
+            "pg_net_queue_rows": 0,
+            "external_requests": 0,
+        }:
+            raise LifecycleError("database barrier probe receipt nested projection is not exact")
+
+        # Drive the REAL writer-fleet resume: the frozen manifest command writers.resume.forward
+        # (source-recovery-run.sh --operation resume-writers-only --resume-mode forward --run-id
+        # <run-id>) with its frozen env carrying Q12_EXTERNAL_QUIESCE_LEASE_FD=9. Only <run-id> is
+        # substituted (the cutover run id); resolved_command still needs the other real request
+        # inputs to compute the (unused-here) substitution table, so the resume context carries them.
+        resume = resolved_command(
+            load_manifest(),
+            "writers.resume.forward",
+            {
+                "run_id": run_id,
+                "expected_catalog_sha256": context["expected_catalog_sha256"],
+                "release_sha": context["release_sha"],
+            },
+        )
+        self._invoke_resume(resume["argv"], resume["env"])
+        return {
+            "status": "resumed",
+            "ok": True,
+            "validated_receipt_sha256": sha256(barrier_bytes),
+        }
+
+    def _invoke_resume(self, argv: list[str], env: dict[str, str]) -> None:
+        """Shell the writer-fleet resume child under the inherited FD9 cutover lease (mirrors
+        execute()/launch_claim() delegation discipline: fixed argv/env, closed fds except the lease,
+        no stdin). Fail closed with the resume-specific reason on any nonzero exit."""
+        completed = subprocess.run(
+            argv,
+            check=False,
+            close_fds=True,
+            pass_fds=(9,),
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            raise LifecycleError(
+                "writers.resume.forward child failed with status "
+                f"{completed.returncode}: {completed.stderr.strip()}"
+            )
+
+
+def owner_custody_executor() -> OwnerCustodyExecutor:
+    """The single construction site for the live-window owner-custody executor (used by main() for
+    the live/recover controllers)."""
+    return OwnerCustodyExecutor()
+
+
 @dataclass
 class Engine:
     request: dict[str, Any]
@@ -3446,6 +3606,10 @@ def orchestrate_post_activate_cleanup(
         "run_root": str(engine.run_root),
         "run_id": run_id,
         "expected_catalog_sha256": request["expected_catalog_sha256"],
+        # release_sha lets the owner-custody resume hook resolve the frozen writers.resume.forward
+        # manifest command (its substitution table needs the real request inputs); the FILE-ARTIFACT
+        # cleanup hooks and the fixture resume twin ignore the extra key.
+        "release_sha": request["release_sha"],
     }
     # The frozen cleanup invocation's own command authority (argv + sha256(canonical(argv))). The
     # rows carry this barrier-child-provided command_sha256, NOT a manifest-resolved one (§6b.4). On
@@ -7234,7 +7398,7 @@ def main() -> int:
             "production": True,
         }
         controller = run_live if arguments.mode == "live" else run_recover
-        output = controller(request, ProductionExecutor())
+        output = controller(request, owner_custody_executor())
         sys.stdout.buffer.write(complete_object(output))
         return 0
     output = run_claim(arguments, ProductionExecutor())
