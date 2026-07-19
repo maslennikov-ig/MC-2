@@ -811,6 +811,106 @@ class ProductionExecutor:
             )
         return json.loads(completed.stdout)
 
+    # Design §6b.1 R8-B-1 — the REAL post-activate FILE-ARTIFACT seam (the production twin of the
+    # fixture's LiveOrdinaryExecutor.execute_barrier_cleanup file-artifact half). It mirrors the same
+    # delegation discipline as execute()/launch_claim(): it never fabricates producer data — it
+    # CONSUMES the barrier child's own on-disk artifacts (the 18-key terminal proof + the
+    # prepare-recovery probe-receipt bootstrap) and binds their REAL digests, exactly as execute()
+    # binds sha256(child stdout). The frozen q12-database-barrier.sh cleanup child that PRODUCES the
+    # terminal proof against real PostgreSQL is downstream R8-B-2; this hook owns only the controller
+    # file-artifact steps §6b.1/§6b.5 assign to it (v1 archive -> exact 10-key v2 -> db-capability
+    # deletion). It does NOT provide execute_forward_resume: writers.resume.forward is the
+    # server-side owner-custody child, deliberately absent here, so a production run stays
+    # fail-closed at the pre-flight (require_post_activate_executor) with the resume-specific reason.
+
+    def prepare_barrier_cleanup(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Resolve the frozen ``q12-database-barrier.sh cleanup`` command (argv + its own
+        command_sha256), the same {argv, command_sha256} shape the fixture returns and
+        orchestrate_post_activate_cleanup carries into the journaled cleanup rows (§6b.4)."""
+        run_root = pathlib.Path(context["run_root"])
+        argv = [
+            str(pathlib.Path(__file__).with_name("q12-database-barrier.sh")),
+            "cleanup",
+            "--run-id",
+            context["run_id"],
+            "--db-url-file",
+            "/opt/megacampus/secrets/supabase_db_url",
+            "--ca-file",
+            "/opt/megacampus/secrets/prod-ca-2021.crt",
+            "--q12-db-capability-file",
+            str(run_root / "secrets" / "db-capability"),
+            "--expected-post-migration-catalog",
+            str(run_root / "expected-post-migration-catalog.json"),
+            "--expected-post-migration-catalog-sha256",
+            context["expected_catalog_sha256"],
+        ]
+        return {"argv": argv, "command_sha256": sha256(canonical(argv))}
+
+    def execute_barrier_cleanup(
+        self, context: dict[str, Any], command: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Archive the activate v1 receipt, promote it in place to the exact 10-key
+        ``megacampus.q12.database-barrier-receipt/v2``, and delete the db-capability — binding the
+        REAL on-disk terminal-proof + probe-receipt digests. Byte-for-byte the fixture's v2 for the
+        same inputs (the real-DB path must NOT diverge from the fixture contract)."""
+        run_root = pathlib.Path(context["run_root"])
+        run_id = context["run_id"]
+        expected_catalog_sha256 = context["expected_catalog_sha256"]
+        # Consume the barrier child's producer artifacts (NEVER fabricate): the 18-key terminal
+        # proof it published, and the prepare-recovery probe-receipt bootstrap the barrier
+        # re-validates (q12-database-barrier.sh:235) and the forward resume gate re-reads
+        # (q12-writer-resume.py:1105). validate_regular_file enforces the producer-owned 0400
+        # identity before hashing.
+        terminal_proof_path = run_root / "database-barrier-cleanup-terminal-proof.json"
+        terminal_proof_sha256 = sha256(validate_regular_file(terminal_proof_path, mode=0o400))
+        probe_receipt_path = run_root / "database-barrier-probe-receipt.json"
+        probe_receipt_sha256 = sha256(validate_regular_file(probe_receipt_path, mode=0o400))
+        # Archive the activate v1 receipt byte-exact at the frozen barrier's archive path
+        # (q12-database-barrier.sh:640/644 requires the archive == the predecessor receipt), then
+        # promote the receipt IN PLACE to the exact 10-key v2 the forward resume gate demands
+        # key-for-key (q12-writer-resume.py:1090-1101).
+        receipt_path = run_root / "database-barrier-receipt.json"
+        v1_receipt_bytes = validate_regular_file(receipt_path, mode=0o400)
+        archive_path = run_root / "database-barrier-receipt-v1-before-cleanup.json"
+        immutable_publish(archive_path, v1_receipt_bytes, 0o400, [])
+        receipt_object = {
+            "schema_version": "megacampus.q12.database-barrier-receipt/v2",
+            "run_id": run_id,
+            "state": "guard_cleanup_complete",
+            "expected_catalog_sha256": expected_catalog_sha256,
+            "zero_guard_residue": True,
+            "last_command": "cleanup",
+            "rollback_probes_verified": True,
+            "probe_receipt_sha256": probe_receipt_sha256,
+            "terminal_proof_sha256": terminal_proof_sha256,
+            "database_capability_deleted": True,
+        }
+        receipt_body = complete_object(receipt_object)
+        atomic_replace(receipt_path, receipt_body, 0o400)
+        receipt_sha256 = sha256(receipt_body)
+        # Delete the db-capability (the v2 receipt's database_capability_deleted=True authority):
+        # validate the producer-owned 0400 identity, then unlink without following a link.
+        capability_path = run_root / "secrets" / "db-capability"
+        validate_regular_file(capability_path, mode=0o400)
+        capability_parent = open_parent_directory(capability_path)
+        try:
+            os.unlink(capability_path.name, dir_fd=capability_parent)
+            os.fsync(capability_parent)
+        finally:
+            os.close(capability_parent)
+        return {
+            "status": "guard_cleanup_complete",
+            "ok": True,
+            "cleanup_receipt_path": str(receipt_path),
+            "cleanup_receipt_sha256": receipt_sha256,
+            "cleanup_receipt_archive_path": str(archive_path),
+            "probe_receipt_path": str(probe_receipt_path),
+            "probe_receipt_sha256": probe_receipt_sha256,
+            "terminal_proof_sha256": terminal_proof_sha256,
+            "command_sha256": command["command_sha256"],
+            "receipt": receipt_object,
+        }
+
 
 @dataclass
 class Engine:
@@ -3619,14 +3719,24 @@ def require_post_activate_executor(request: dict[str, Any], executor: Executor) 
     docker/PG17 post-activate hooks (wired in round R8) never starts. The late gate stays as
     defense-in-depth (e.g. a future path where the hooks vanish mid-run). Non-production fixture
     runs are unaffected.
+
+    Design §6b.1 R8-B-1: the two post-activate halves fail closed with DISTINCT named reasons. The
+    FILE-ARTIFACT half (execute_barrier_cleanup) is now real on ProductionExecutor, so its absence
+    is the generic "not wired" refusal (an un-seeded/legacy wiring). The RESUME half
+    (execute_forward_resume) is the SERVER-SIDE owner-custody child (real docker writers, owner
+    custody), deliberately absent from ProductionExecutor here — so once the file-artifact check
+    passes, a production run still fails closed with the resume-SPECIFIC named refusal. Keeping this
+    split in the pre-flight (the FIRST statement of run_live/run_recover) preserves the pre-flight-
+    first rule: the resume gap is refused before any journal row / run-root mutation.
     """
     if request.get("production") is not True:
         return
-    if (
-        getattr(executor, "execute_barrier_cleanup", None) is None
-        or getattr(executor, "execute_forward_resume", None) is None
-    ):
+    if getattr(executor, "execute_barrier_cleanup", None) is None:
         raise LifecycleError("post-activate cleanup/resume executor not wired (deferred to R8)")
+    if getattr(executor, "execute_forward_resume", None) is None:
+        raise LifecycleError(
+            "writers.resume.forward requires the server-side owner-custody executor (not wired here)"
+        )
 
 
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:

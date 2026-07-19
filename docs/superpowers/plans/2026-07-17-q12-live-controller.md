@@ -812,6 +812,89 @@ core.py:3922` + the pinned test) and **#12** (in-process `recoveryReissues=1` eq
   sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest. The §6b.6
   real-PG17 leg (`MC2_Q12_REAL_PG17`) rides with **R8-B**; this round delivers the fixture leg.
 
+- **R8-B-1 done** (RED → GREEN → docs; design §6b.1, the REAL `ProductionExecutor` post-activate
+  **FILE-ARTIFACT** half). `ProductionExecutor` gains `prepare_barrier_cleanup` (resolves the frozen
+  `q12-database-barrier.sh cleanup` `{argv, command_sha256}`) and `execute_barrier_cleanup`, the
+  production twin of the fixture's `LiveOrdinaryExecutor.execute_barrier_cleanup` file-artifact steps.
+  It **mirrors the `execute()`/`launch_claim()` delegation discipline — consume producer artifacts,
+  never fabricate**: it reads the barrier child's on-disk 18-key terminal proof + the prepare-recovery
+  probe-receipt bootstrap via `validate_regular_file(0o400)`, binds their real digests, archives the
+  activate v1 receipt byte-exact to `database-barrier-receipt-v1-before-cleanup.json` (0400,
+  `immutable_publish`), promotes in place to the exact 10-key `database-barrier-receipt/v2` (0400,
+  `atomic_replace`; `state=guard_cleanup_complete`, `database_capability_deleted=true`), and unlinks
+  the db-capability — a **byte twin of the fixture's v2** for the same inputs (the seam consumes the
+  probe receipt rather than re-writing it; on-disk bytes + v2 digest identical, no contract
+  divergence). The REAL full-window `q12-database-barrier.sh cleanup` child that PRODUCES the terminal
+  proof against a disposable PG17 is **R8-B-2** (no docker/PG this round). `require_post_activate_
+executor` is split into two named checks (pre-flight-first preserved): the file-artifact half
+  (`execute_barrier_cleanup`, now real) keeps the generic `"…not wired (deferred to R8)"`; the resume
+  half (`execute_forward_resume`, the **server-side owner-custody** child, deliberately absent) gets
+  the resume-SPECIFIC `"writers.resume.forward requires the server-side owner-custody executor (not
+wired here)"`, so a production run still fails closed — now for the resume reason (proven pre-flight-
+  first: a `/tmp` root under `production=true` gets the resume error, NOT `"production run root
+mismatch"`, and leaves no `phase.jsonl`). NO change to `orchestrate_post_activate_cleanup`, the
+  journaled cleanup grammar (R8-I-A), `run_recover` dispatch (R8-I-B), the composer body, or
+  `stop_after`; the fixture executors keep all three hooks so every R5/R8-I test is unaffected. NEW
+  no-docker `q12-production-executor-cleanup.test.ts` (**3/3**: file-artifact byte-twin + run_live/
+  run_recover resume fail-closed) + its `q12-production-executor-cleanup-runner.py`. Target suite
+  controller+ProductionExecutor **26/26**; cross-fixture regression **460/460**; `tsc --noEmit` 0;
+  frozen trio sha256 byte-identical; no W-owned file touched; `cleanup` NOT in OPERATIONS/manifest.
+- **R8-B-2-i done** (real-PG17 TDD; the barrier VERIFY chain extension — NO core change). Extends the
+  R4 install harness (`q12-live-real-barrier-cutover-runner.py`) through the frozen
+  `q12-database-barrier.sh verify-extended` subcommand against the SAME disposable PostgreSQL 17.10
+  source. NEW gated `q12-live-real-verify-chain.test.ts` + `q12-live-real-verify-chain-runner.py`
+  (imports/reuses the R4 runner's SEED*SQL/identity/proxy/namespace/catalog helpers — not a fork).
+  The runner: (1) captures the REAL post-migration structural sha256s in a pre-install rolled-back
+  preflight (`baseline` / after-base / after-base+obs), baking them into the immutable expected
+  catalog so `q12_guard.verify_expected_guards` recomputes and matches at each checkpoint; (2) drives
+  `install` → `maintenance_guarded`; (3) replays a REAL base migration (`public.document_evidence*
+  runs`CREATE TABLE + a REAL`q12_guard.extend_guard`under the stored capability — the production`applyQ12BasePacket`guard-publication step) then a REAL`verify-extended --after-migration
+  20260711140000`→`20260711140000_guard_verified`; (4) replays the REAL observability migration
+(`public.document_evidence_observability_totals`+ extend_guard) then`verify-extended
+  --after-migration 20260711151000`→`20260711151000_guard_verified`. Neither verify-extended is
+DB-stubbed: each runs the frozen barrier's real DB command through the same unprivileged
+user+mount+net namespace + pooler-identity TLS proxy as R4 (no `MC2_Q12_BARRIER_TEST_MODE`DB
+relaxation). **Byte-match**: both real receipts equal, key-for-key, the frozen verify-extended
+receipt shape the forward`prepare-recovery` predecessor gate consumes
+(`q12-database-barrier.sh:347-357`) — `state=<mig>\_guard_verified`, `last_command=verify-extended`,
+`zero_guard_residue=false`, `rollback_probes_verified=true`, `probe_receipt_sha256`bound hex64 —
+and the guard surface (4 tables / 10 functions / 1 event trigger / exact`migration_guards`set) is
+proven by verify-extended returning rc 0 (its own exhaustive guard-surface asserts hold against the
+real DB) and re-read as an independent post-mortem. **No FOUND DEFECT** — the real artifacts match
+the frozen barrier's own verify-extended output and the forward-path contract. Real run ~114s
+(parity with R4 ~116s); no-docker controller+ProductionExecutor **26/26**;`tsc --noEmit`0; frozen
+trio sha256 byte-identical; no W-owned/core file touched; gated test SKIPS without`MC2_Q12_REAL_PG17=1` (no docker in ordinary CI). Note (out of scope, for R8-B-2-ii/iii): the
+ROLLBACK predecessor gate (`q12-database-barrier.sh:685`/`q12-writer-resume.py:1188-1194`) expects
+a `guard_verified`predecessor archive to carry`rollback_probes_verified=false`, whereas the frozen
+barrier writes `true` for verify-extended — a pre-existing frozen rollback-path expectation to
+  re-examine when the rollback leg is driven, NOT a divergence in this forward sub-round's artifacts.
+- **R8-B-2-ii defrost done** (real-PG17 TDD; TWO ratified frozen-barrier defects + the activate GREEN).
+  Barrier `q12-database-barrier.sh` re-frozen `3673ee49…` → `bdb9d935…`; artifact
+  `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-ii-defrost.md`. **Found-defect #13** (ninth
+  frozen-artifact defect): `write_restore_sql`'s unaliased `UPDATE cron.job` inside `FOR job IN …` is
+  ambiguous under `plpgsql.variable_conflict=error`, aborting real activate/rollback. Ratified fix:
+  `UPDATE cron.job AS restore_target … WHERE restore_target.jobid=…` (:1727-1728, +33B; in the activate
+  NORMAL slice → moved W-tuple fields 5/6). RED-first repro `q12-cron-restore-loop-ambiguity.test.ts`
+  (bc765ba56) → fix (c433bcfc0). **Found-defect #14** (tenth, #13-class): `enforce_write_barrier()` read
+  `OLD.run_id` in one IF whose leading `TG_TABLE_NAME='active_run'` term does not short-circuit
+  row-field resolution under PG17.10; the activate self-test UPDATE of the `run_id`-less
+  `q12_guard.baseline` (:1795) raised 42703 `record "old" has no field "run_id"`, uncaught by the
+  P0001-only `$activation_guard$` handlers, aborting activate before `activated`. Ratified fix
+  (Candidate A): nest the `OLD.*` reads under an outer `IF TG_TABLE_NAME='active_run' AND
+TG_OP='UPDATE' THEN … END IF;` with fall-through to the append-only RAISE (:1056-1064; in
+  `write_install_sql` → moved field 4 only) (ba02f3bdd). **GREEN** (`q12-live-real-verify-chain.test.ts`
+  extended to R8-B-2-ii, 1 passed ~119s): install → verify-base → verify-obs → prepare-recovery
+  (`recovery_ready_guarded`) → activate REACHES `activated` (`last_command=activate`,
+  `rollback_probes_verified=true`, cron restored to 8, `read_only` off); an anti-weakening probe proves
+  every `q12_guard`-table write still trips P0001 (not 42703) against the REAL installed guard
+  (28aafa738). **CASCADE** (once, final bytes): repro tool → fields {5,6} moved (from #13), {7,8,9,10}
+  BYTE-IDENTICAL (no motion beyond {4,5,6}); W-tuple artifact field {4,5,6} succession + 2026-07-19
+  amendment; CI frozen-byte guard 3/3 (field 4 = `bdb9d935…`). Frozen manifest/catalog (`aaec6fc2`/
+  `0b8a943f`), all W-owned files, and `q12-lifecycle-core.py` byte-untouched (`git diff` empty over the
+  round range). Gated tests SKIP without `MC2_Q12_REAL_PG17=1`. Explicit defers: the deployed SERVER
+  barrier stays `3673ee49…` (team-lead's pre-rehearsal reinstall — NO server activate before it); the
+  team-lead's dedicated frozen-byte review of the whole round is the next step.
+
 ## Open risks carried forward
 
 - **`q12-source-manifest.ts` q12_guard function-set drift — RESOLVED** by the guard-surface

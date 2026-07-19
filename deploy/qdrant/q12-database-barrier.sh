@@ -1053,13 +1053,14 @@ BEGIN
   PERFORM q12_guard.assert_capability();
   IF TG_TABLE_SCHEMA='q12_guard' THEN
     IF TG_TABLE_NAME='migration_guards' AND TG_OP='INSERT' THEN RETURN NEW; END IF;
-    IF TG_TABLE_NAME='active_run' AND TG_OP='UPDATE'
-      AND OLD.singleton IS NOT DISTINCT FROM NEW.singleton
-      AND OLD.run_id IS NOT DISTINCT FROM NEW.run_id
-      AND OLD.capability_sha256 IS NOT DISTINCT FROM NEW.capability_sha256
-      AND OLD.expected_catalog_sha256 IS NOT DISTINCT FROM NEW.expected_catalog_sha256
-      AND OLD.expected_catalog IS NOT DISTINCT FROM NEW.expected_catalog
-      AND OLD.activated=false AND NEW.activated=true THEN RETURN NEW;
+    IF TG_TABLE_NAME='active_run' AND TG_OP='UPDATE' THEN
+      IF OLD.singleton IS NOT DISTINCT FROM NEW.singleton
+        AND OLD.run_id IS NOT DISTINCT FROM NEW.run_id
+        AND OLD.capability_sha256 IS NOT DISTINCT FROM NEW.capability_sha256
+        AND OLD.expected_catalog_sha256 IS NOT DISTINCT FROM NEW.expected_catalog_sha256
+        AND OLD.expected_catalog IS NOT DISTINCT FROM NEW.expected_catalog
+        AND OLD.activated=false AND NEW.activated=true THEN RETURN NEW;
+      END IF;
     END IF;
     RAISE EXCEPTION 'Q12 durable guard truth is append-only';
   END IF;
@@ -1724,8 +1725,8 @@ BEGIN
   LOOP EXECUTE format('DROP TRIGGER %I ON %I.%I',trigger_row.tgname,trigger_row.nspname,trigger_row.relname); END LOOP;
   FOR job IN SELECT value FROM jsonb_array_elements(saved->'cron_jobs')
   LOOP
-    UPDATE cron.job SET active=(job->>'active')::boolean
-      WHERE jobid=(job->>'jobid')::bigint;
+    UPDATE cron.job AS restore_target SET active=(job->>'active')::boolean
+      WHERE restore_target.jobid=(job->>'jobid')::bigint;
     IF NOT FOUND THEN RAISE EXCEPTION 'captured cron job disappeared'; END IF;
     IF (SELECT to_jsonb(current_job) FROM cron.job current_job WHERE current_job.jobid=(job->>'jobid')::bigint)
          IS DISTINCT FROM job THEN RAISE EXCEPTION 'captured cron job exact-row restore drift'; END IF;
