@@ -971,8 +971,8 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   ownership (controller skips it for a real-barrier install / renames its artifact / unifies the
   schema), then iv-PART-1 resumes to the 81-row GREEN.
 
-- **R8-B-2-iv-1 resume — found-defect #16 FIXED (RATIFIED Option-A core edit), NEW SANCTIONED HARD
-  STOP at the cleanup leg (found-defect #17).** Applied the ratified Option-A strict-accept fix to
+- **R8-B-2-iv-1 resume — found-defect #16 FIXED (RATIFIED Option-A core edit) + found-defect #17
+  FIXED (authorized harness-level) ⇒ iv-PART-1 FULL GREEN.** Applied the ratified Option-A strict-accept fix to
   `Engine.write_install_baseline` (`q12-lifecycle-core.py`, that ONE function only): publish-OR-
   strict-accept — ABSENT path writes the controller 5-key 0600 baseline exactly as before (fixture /
   fake-barrier path unchanged); PRESENT path strict-accepts the barrier-authoritative artifact
@@ -998,16 +998,30 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
   custody manifest (dual-bound); the DIRECT (not-through-`run_claim`) cleanup child is a THIRD path
   domain the #15 ratification never covered. In production `context["run_root"] ==
 /opt/megacampus/backups/q12/<run-id>` so the barrier's non-test-mode check accepts it — CORE IS
-  CORRECT; the gap is the test-harness path virtualization for the direct cleanup child. Per the
-  stream contract ("a NEW downstream real divergence past install ⇒ STOP + report; no workaround";
-  "do NOT ship a fake/rushed green") NO workaround was applied and the harness was left byte-unchanged
-  from its built state — reported for orchestrator resolution BEFORE reconciliation. Barrier
-  `bdb9d935…`, the frozen manifest/catalog, and all W-owned files byte-unchanged; the ONLY deploy/
-  change is `write_install_baseline`. **Resolution (orchestrator's next step):** decide the cleanup-
-  child path-virtualization (extend the harness rewrite to map the controller `/tmp/mc2-q12-d5-root-*`
-  run root → the trust view for the direct cleanup argv, and/or bind it, mirroring the forward-leg
-  dual-bind), then iv-PART-1 resumes toward the 81-row GREEN. Schema-id doubling tracked as Beads
-  `mc2-evduu` (P3, deferred). Commits: RED `f59b17934`, GREEN core `9e352261f`.
+  CORRECT; the gap is the test-harness path virtualization for the direct cleanup child. #17 was
+  reported to the orchestrator, INDEPENDENTLY CONFIRMED harness-level (production-correct), and the
+  harness fix AUTHORIZED as in-scope reconciliation (NOT a core/product defect, no re-ratification;
+  no further `q12-lifecycle-core.py` edit). **#17 FIXED (harness-only):** added
+  `_rewrite_run_root_to_trust` to the full-window runner — the DIRECT cleanup child's own argv
+  (`--q12-db-capability-file`, `--expected-post-migration-catalog`) is now rewritten from the
+  controller `/tmp/mc2-q12-d5-root-*` run root → the barrier trust view
+  `$trust_boundary/backups/q12/<run-id>/…` (same physical dir, dual-bound at `_bwrap_prefix` :294/:301),
+  mirroring the forward-leg `/opt`→trust dual-bind. Only the barrier child's argv is touched; the
+  journaled cleanup `command_sha256` keeps the controller-run_root argv verbatim (and is dropped from
+  cleanup parity under `withConvergenceExclusions`). The #16 strict-accept core path is untouched.
+  **iv-PART-1 is now FULL GREEN** (~118s): 81-row journal (76 forward + 5 cleanup); 76-row prefix
+  parity vs the composer twin (`withParityExclusions`; cleanup under `withConvergenceExclusions`);
+  quiesce-window marker 0400; the exact 10-key v2 receipt bound in the terminal accepted cleanup row;
+  controller-owned db-capability deletion; `rc=0`; `activate_db_state {activated, cron_active 8,
+  read_only off}` + zero guard residue; the #15 (i)/(ii)/(iv) dual-bind assertions; AND the added #16
+  proof — the on-disk `database-barrier-baseline.json` after the run is STILL the barrier's 0400
+  full-structural artifact (schema + nested `baseline` + `maintenance_guarded_baseline` state, no
+  controller `capability_manifest_sha256` key), proving the controller strict-accepted and did NOT
+  overwrite it. Barrier `bdb9d935…`, the frozen manifest/catalog, and all W-owned files byte-unchanged;
+  the ONLY deploy/ change across the whole round is `write_install_baseline`; the fixture suites stay
+  GREEN (30 passed) and `tsc --noEmit` 0. Schema-id doubling tracked as Beads `mc2-evduu` (P3,
+  deferred). Commits: RED `f59b17934`, GREEN core `9e352261f` (#16), docs `f17427db6`, GREEN harness
+  `16068fc77` (#17 + #16 proof).
 
 ## Open risks carried forward
 
