@@ -77,12 +77,12 @@ interface VerifyReceipt {
 }
 
 describe.runIf(REAL_PG17)(
-  'Q12 R8-B-2-i/ii: real barrier verify-extended + prepare-recovery + activate chain (real PostgreSQL 17.10)',
+  'Q12 R8-B-2-i/ii/iii: real barrier verify-extended + prepare-recovery + activate + cleanup chain (real PostgreSQL 17.10)',
   () => {
-    it('drives verify-base, verify-obs, prepare-recovery, and activate END-TO-END (incl. #14 anti-weakening guard probe)', () => {
+    it('drives verify-base, verify-obs, prepare-recovery, activate, and the REAL frozen cleanup END-TO-END, then the R8-B-1 seam consumes the REAL terminal proof (incl. #14 anti-weakening SQLSTATE probe + cleanup idempotence)', () => {
       const result = spawnSync('/usr/bin/python3', [RUNNER], {
         encoding: 'utf8',
-        timeout: 300_000,
+        timeout: 360_000,
         env: {
           PATH: process.env.PATH,
           LC_ALL: 'C',
@@ -129,6 +129,32 @@ describe.runIf(REAL_PG17)(
         guard_probe_active_run: { rc: number; stderr: string };
         guard_probe_baseline: { rc: number; stderr: string };
         guard_probe_migration_guards: { rc: number; stderr: string };
+        // ---- R8-B-2-iii: real frozen barrier cleanup + R8-B-1 seam ----
+        cleanup_rc: number;
+        cleanup_stdout: string;
+        cleanup_stderr: string;
+        cleanup_terminal_proof: Record<string, unknown> | null;
+        cleanup_terminal_proof_key_count: number;
+        cleanup_intent_journal_entry_hash: string;
+        guard_residue_db: {
+          schema_count: number;
+          relation_count: number;
+          function_count: number;
+          event_trigger_count: number;
+        };
+        cleanup_rerun_rc: number;
+        cleanup_rerun_stdout: string;
+        cleanup_rerun_stderr: string;
+        cleanup_terminal_proof_sha256_after_barrier: string | null;
+        cleanup_terminal_proof_sha256_after_rerun: string | null;
+        seam_command: { argv: string[]; command_sha256: string };
+        seam_outcome: Record<string, unknown>;
+        v2_receipt: Record<string, unknown>;
+        v2_receipt_keys: string[];
+        v2_bytes_utf8: string;
+        v2_matches_expected_contract: boolean;
+        archive_matches_activate_receipt: boolean;
+        capability_exists_after_seam: boolean;
       };
 
       // The disposable source is the frozen R4 inventory, and install re-reaches
@@ -251,6 +277,12 @@ describe.runIf(REAL_PG17)(
       // run_id-less baseline / migration_guards are the exact rows the #14 nested-IF fix
       // stopped from evaluating OLD.run_id; the active_run non-flip UPDATE lands on the
       // same RAISE via inner fall-through -- proof the fix preserved the guarantee.
+      // The probes run PRE-CLEANUP (the guard is still live post-activate); after the cleanup leg
+      // DROP SCHEMA q12_guard the guard is gone. Defrost P3: the anti-weakening probe now asserts
+      // the LITERAL SQLSTATE, not just the message. Each guarded write trips the append-only guard
+      // as SQLSTATE P0001 (plpgsql raise_exception) -- captured by a DO/EXCEPTION handler that emits
+      // 'Q12_PROBE_SQLSTATE=%' then re-RAISEs (so rc still != 0). A regression to the pre-#14 42703
+      // 'record "old" has no field "run_id"' would surface both a wrong SQLSTATE and that message.
       for (const probe of [
         out.guard_probe_active_run,
         out.guard_probe_baseline,
@@ -258,8 +290,137 @@ describe.runIf(REAL_PG17)(
       ]) {
         expect(probe.rc).not.toBe(0);
         expect(probe.stderr).toContain('Q12 durable guard truth is append-only');
+        expect(probe.stderr).toContain('Q12_PROBE_SQLSTATE=P0001');
         expect(probe.stderr).not.toContain('has no field "run_id"');
       }
-    }, 320_000);
+
+      // ---- R8-B-2-iii: the REAL frozen barrier `cleanup` off the activated state ------------------
+      // The frozen barrier (bytes bdb9d935, no MC2_Q12_BARRIER_TEST_MODE relaxation of the DB command)
+      // runs cleanup off the activated container: real DROP SCHEMA q12_guard CASCADE, proves zero guard
+      // residue, and publishes the 18-key terminal proof. The controller supplies the journal to the
+      // claimed boundary + the v1-before-cleanup archive; the barrier validates them for real.
+      expect(out.cleanup_rc, out.cleanup_stderr).toBe(0);
+      expect(out.cleanup_terminal_proof_key_count).toBe(18);
+      const proof = out.cleanup_terminal_proof as Record<string, unknown>;
+      expect(Object.keys(proof).sort()).toEqual(
+        [
+          'completed_at',
+          'cron_jobs_sha256',
+          'database_barrier_baseline_sha256',
+          'database_barrier_rollback_intent_sha256',
+          'database_capability_sha256',
+          'database_default_sha256',
+          'expected_post_migration_catalog_sha256',
+          'guard_residue',
+          'input_checkpoint_sha256',
+          'intent_journal_entry_hash',
+          'operation',
+          'predecessor_receipt_archive_sha256',
+          'predecessor_receipt_sha256',
+          'required_phase_receipts_sha256',
+          'run_id',
+          'schema_version',
+          'state',
+          'structural_catalog_sha256',
+        ].sort()
+      );
+      expect(proof.schema_version).toBe('megacampus.q12.database-barrier-terminal-proof/v1');
+      expect(proof.run_id).toBe('123e4567-e89b-42d3-a456-426614174000');
+      expect(proof.operation).toBe('cleanup');
+      expect(proof.state).toBe('guard_cleanup_complete');
+      // Post-cleanup the migrated tables remain but q12_guard is excluded from the structural catalog,
+      // so the terminal structural hash equals the expected post-migration (after-obs) catalog hash.
+      expect(proof.expected_post_migration_catalog_sha256).toBe(out.after_obs_structural_sha256);
+      expect(proof.structural_catalog_sha256).toBe(out.after_obs_structural_sha256);
+      // Cleanup binds neither a rollback intent nor required-phase-receipts (both null for cleanup).
+      expect(proof.database_barrier_rollback_intent_sha256).toBe(null);
+      expect(proof.required_phase_receipts_sha256).toBe(null);
+      // The controller-journaled intent row's hash is bound into the terminal proof.
+      expect(proof.intent_journal_entry_hash).toBe(out.cleanup_intent_journal_entry_hash);
+      expect(proof.completed_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u);
+      for (const key of [
+        'database_barrier_baseline_sha256',
+        'predecessor_receipt_sha256',
+        'predecessor_receipt_archive_sha256',
+        'input_checkpoint_sha256',
+        'database_default_sha256',
+        'cron_jobs_sha256',
+        'database_capability_sha256',
+      ]) {
+        expect(proof[key]).toMatch(/^[a-f0-9]{64}$/u);
+      }
+      // The 18-key proof's residue object is all-zero.
+      expect(proof.guard_residue).toEqual({
+        q12_guard_schema_count: 0,
+        q12_guard_relation_count: 0,
+        q12_guard_function_count: 0,
+        q12_guard_type_count: 0,
+        q12_guard_trigger_count: 0,
+        q12_guard_event_trigger_count: 0,
+        barrier_era_session_count: 0,
+      });
+      // q12_guard is REALLY gone (independent live pg_namespace/pg_class/pg_proc query, not just the
+      // proof's self-report).
+      expect(out.guard_residue_db).toEqual({
+        schema_count: 0,
+        relation_count: 0,
+        function_count: 0,
+        event_trigger_count: 0,
+      });
+
+      // ---- Cleanup re-drive idempotence: the terminal proof is re-validated exact, not re-produced --
+      // A second cleanup drive hits the barrier's early terminal-proof re-validation branch (before any
+      // DB work) and exits 0 with the same-cutover-epoch proof unchanged byte-for-byte.
+      expect(out.cleanup_rerun_rc, out.cleanup_rerun_stderr).toBe(0);
+      expect(out.cleanup_rerun_stdout).toContain('guard_cleanup_complete proof already verified');
+      expect(out.cleanup_terminal_proof_sha256_after_barrier).toMatch(/^[a-f0-9]{64}$/u);
+      expect(out.cleanup_terminal_proof_sha256_after_rerun).toBe(
+        out.cleanup_terminal_proof_sha256_after_barrier
+      );
+
+      // ---- R8-B-1 seam consumes the REAL terminal proof END-TO-END ------------------------------
+      // The REAL ProductionExecutor archives the v1 activate receipt, promotes it IN PLACE to the exact
+      // 10-key megacampus.q12.database-barrier-receipt/v2 binding the REAL barrier-produced terminal
+      // proof + probe digests, and deletes the db-capability -- fed the REAL run_root the barrier just
+      // populated (not a seeded fixture proof).
+      expect(out.seam_command.argv).toContain('cleanup');
+      expect(out.seam_command.command_sha256).toMatch(/^[a-f0-9]{64}$/u);
+      const seam = out.seam_outcome;
+      expect(seam.status).toBe('guard_cleanup_complete');
+      expect(seam.ok).toBe(true);
+      expect(seam.terminal_proof_sha256).toBe(out.cleanup_terminal_proof_sha256_after_barrier);
+      expect(seam.probe_receipt_sha256).toBe(out.probe_receipt_sha256);
+      expect(seam.cleanup_receipt_sha256).toMatch(/^[a-f0-9]{64}$/u);
+      // The promoted v2 is EXACTLY the 10 keys, byte-matching the fixture contract for the same inputs.
+      expect(out.v2_receipt_keys).toEqual([
+        'database_capability_deleted',
+        'expected_catalog_sha256',
+        'last_command',
+        'probe_receipt_sha256',
+        'rollback_probes_verified',
+        'run_id',
+        'schema_version',
+        'state',
+        'terminal_proof_sha256',
+        'zero_guard_residue',
+      ]);
+      expect(out.v2_matches_expected_contract).toBe(true);
+      const v2 = out.v2_receipt;
+      expect(v2.schema_version).toBe('megacampus.q12.database-barrier-receipt/v2');
+      expect(v2.run_id).toBe('123e4567-e89b-42d3-a456-426614174000');
+      expect(v2.state).toBe('guard_cleanup_complete');
+      expect(v2.zero_guard_residue).toBe(true);
+      expect(v2.last_command).toBe('cleanup');
+      expect(v2.rollback_probes_verified).toBe(true);
+      expect(v2.database_capability_deleted).toBe(true);
+      expect(v2.expected_catalog_sha256).toBe(out.catalog_sha256);
+      // The digests bind the REAL on-disk barrier producer artifacts, not fabricated values.
+      expect(v2.terminal_proof_sha256).toBe(out.cleanup_terminal_proof_sha256_after_barrier);
+      expect(v2.probe_receipt_sha256).toBe(out.probe_receipt_sha256);
+      // The v1 archive is byte-exact to the pre-cleanup activate receipt.
+      expect(out.archive_matches_activate_receipt).toBe(true);
+      // The db-capability is deleted.
+      expect(out.capability_exists_after_seam).toBe(false);
+    }, 380_000);
   }
 );

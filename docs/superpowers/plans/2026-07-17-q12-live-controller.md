@@ -894,6 +894,40 @@ TG_OP='UPDATE' THEN … END IF;` with fall-through to the append-only RAISE (:10
   round range). Gated tests SKIP without `MC2_Q12_REAL_PG17=1`. Explicit defers: the deployed SERVER
   barrier stays `3673ee49…` (team-lead's pre-rehearsal reinstall — NO server activate before it); the
   team-lead's dedicated frozen-byte review of the whole round is the next step.
+- **R8-B-2-iii done** (real-PG17 TDD; the barrier CLEANUP leg + R8-B-1 seam end-to-end — NO core /
+  frozen / W-owned change). Artifact `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13-r8b-2-iii.md`.
+  Extends the same `q12-live-real-verify-chain.test.ts`/`…-runner.py` past `activated`: the CONTROLLER
+  creates the byte-exact `database-barrier-receipt-v1-before-cleanup.json` archive, builds a REAL
+  hash-chained `guard_cleanup_complete` journal (a minimal 3-row `intent → capability_issued →
+capability_claimed` block, `command_id=barrier.cleanup`, `lease_epoch=cutover`) to the claimed
+  boundary the frozen barrier validates (`q12-database-barrier.sh:507-553`) + its input checkpoint, then
+  drives the frozen barrier `cleanup` (bytes `bdb9d935…`, NO `MC2_Q12_BARRIER_TEST_MODE` relaxation of
+  the DB command — same real user+mount+net namespace + pooler-identity TLS proxy as every other leg)
+  off the ACTIVATED container: real `DROP SCHEMA q12_guard CASCADE`, zero-residue proof, and the 18-key
+  `database-barrier-terminal-proof/v1` (`state=guard_cleanup_complete`, `structural_catalog_sha256 ==
+expected_post_migration_catalog_sha256` since q12_guard is excluded from the structural catalog,
+  `guard_residue` all-zero). An independent live `pg_namespace`/`pg_class`/`pg_proc` query confirms
+  `q12_guard` is really gone. A SECOND cleanup drive proves idempotence (barrier `:764-808` early
+  terminal-proof re-validation branch, before any DB work → "proof already verified", terminal proof
+  byte-identical). The **REAL `ProductionExecutor` R8-B-1 seam** (`q12-lifecycle-core.py:826-912`) then
+  consumes the REAL barrier-produced artifacts (terminal proof + probe + activate v1 receipt +
+  capability): archives v1 byte-exact, promotes the receipt IN PLACE to the exact 10-key
+  `database-barrier-receipt/v2` (`terminal_proof_sha256` = sha256 of the REAL terminal proof,
+  `database_capability_deleted=true`) — BYTE-MATCHING the fixture contract's v2 for the same inputs
+  (`q12-retained-barrier-runner.py:731-742`) — and deletes the db-capability; the v2 satisfies the W
+  forward resume gate shape (`q12-writer-resume.py:1088-1101`, read-only). Defrost **P3** folded: the
+  anti-weakening probe (moved to run PRE-cleanup, since the guard is dropped after) now asserts the
+  LITERAL `SQLSTATE=P0001` via a `DO/EXCEPTION` handler that emits `Q12_PROBE_SQLSTATE=%` then re-RAISEs
+  (rc still ≠ 0), not just the append-only message. **GREEN** (`q12-live-real-verify-chain.test.ts`, 1
+  passed ~119s): install → verify-base → verify-obs → prepare-recovery → activate → cleanup → cleanup
+  (idempotent) → seam. RED-first: test-only assertions (1cbe848c6) failed on the new SQLSTATE/cleanup
+  gap; runner wiring (be305d809) made it GREEN. `tsc --noEmit` 0; gated test SKIPS without
+  `MC2_Q12_REAL_PG17=1`. Barrier `bdb9d935…` byte-unchanged; `q12-lifecycle-core.py`, the frozen
+  manifest/catalog, and all W-owned files byte-untouched (`git diff --stat` shows only the two
+  write-zone test files). NO FOUND DEFECT: the real-DB terminal proof / v2 / journal do NOT diverge from
+  the fixture contract. Explicit defer: recovery-epoch cleanup re-drive (barrier `:514-518`,
+  `cutover-recovery-N`) not exercised — the same-epoch idempotence is proven; multi-epoch recovery needs
+  the resume/recover machinery, deferred to stage iv / the server rehearsal.
 
 ## Open risks carried forward
 

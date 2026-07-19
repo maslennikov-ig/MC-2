@@ -562,10 +562,23 @@ exit "$barrier_rc"
         #     active_run non-flip UPDATE (activated already true) also lands on it via inner
         #     fall-through. Each probe UPDATE RAISES and rolls back, so no state changes.
         def guard_probe(update_sql: str):
+            # Defrost P3: assert the LITERAL SQLSTATE, not just the message. Wrap the guarded write in
+            # a DO/EXCEPTION handler that captures SQLSTATE and RAISE NOTICE 'Q12_PROBE_SQLSTATE=%'
+            # then re-RAISEs, so the probe still trips (rc != 0, the append-only message on stderr)
+            # AND the exact code is emitted -- an unambiguous marker independent of psql's verbose
+            # formatting. The append-only guard uses plpgsql's default raise_exception (P0001); a
+            # regression to the pre-#14 42703 'record "old" has no field "run_id"' would surface both
+            # a different captured SQLSTATE and that message.
+            body = update_sql.rstrip().rstrip(";")
             result = dexec(
                 "\\set VERBOSITY verbose\n"
                 f"SET megacampus.q12_capability = '{CAPABILITY}';\n"
-                f"{update_sql}\n"
+                "DO $q12probe$\nBEGIN\n"
+                f"  {body};\n"
+                "EXCEPTION WHEN OTHERS THEN\n"
+                "  RAISE NOTICE 'Q12_PROBE_SQLSTATE=%', SQLSTATE;\n"
+                "  RAISE;\n"
+                "END\n$q12probe$;\n"
             )
             return {"rc": result.returncode, "stderr": (result.stderr or "").strip()}
 
@@ -577,6 +590,178 @@ exit "$barrier_rc"
         )
         guard_probe_migration_guards = guard_probe(
             "UPDATE q12_guard.migration_guards SET relation_set=relation_set;"
+        )
+
+        # 12. R8-B-2-iii: drive the REAL frozen barrier `cleanup` OFF the activated state, then prove
+        #     the R8-B-1 controller seam consumes the REAL terminal proof end-to-end. The barrier
+        #     cleanup (bytes bdb9d935, same real proxy/namespace/no-DB-relaxation path as every other
+        #     leg) has a predecessor gate (q12-database-barrier.sh:636-700) requiring: the install
+        #     baseline (already published by the install leg), the activate receipt (already at
+        #     database-barrier-receipt.json), AND a byte-exact predecessor-receipt ARCHIVE the
+        #     CONTROLLER must create BEFORE the barrier runs. Create the archive first.
+        def barrier_canonical(value) -> str:
+            return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+        activate_receipt_bytes = receipt_path.read_bytes()
+        archive_path = barrier_run_root / "database-barrier-receipt-v1-before-cleanup.json"
+        archive_path.write_bytes(activate_receipt_bytes)
+        archive_path.chmod(0o400)
+
+        # 13. CONTROLLER-JOURNAL half (orchestrate_post_activate_cleanup's authority, core.py:3362):
+        #     rewrite phase.jsonl as a REAL hash-chained guard_cleanup_complete lifecycle to the
+        #     claimed boundary the frozen barrier validates (q12-database-barrier.sh:507-553). A
+        #     minimal 3-row block (intent -> capability_issued -> capability_claimed), all
+        #     phase=guard_cleanup_complete / command_id=barrier.cleanup / lease_epoch=cutover, is the
+        #     smallest valid controller journal: the barrier filters the cleanup rows by phase+command_id
+        #     and only requires them to be a valid trailing contiguous hash-chain block, so prior
+        #     forward rows are optional here. The fake-hash install journal the verify legs used cannot
+        #     drive cleanup (the cleanup projection re-hashes every entry), so a fresh real chain is built.
+        cleanup_cap_manifest_sha = sha256_hex(b"q12-r8b2iii-cleanup-capability-manifest")
+        cleanup_rows_spec = [
+            ("intent", "0" * 64),
+            ("capability_issued", cleanup_cap_manifest_sha),
+            ("capability_claimed", cleanup_cap_manifest_sha),
+        ]
+        cleanup_entries = []
+        previous_hash = "0" * 64
+        for seq, (outcome, cap_manifest) in enumerate(cleanup_rows_spec, start=1):
+            entry = {
+                "schema": "megacampus.q12.cutover-journal/v1",
+                "run_id": RUN_ID,
+                "seq": seq,
+                "phase": "guard_cleanup_complete",
+                "outcome": outcome,
+                "timestamp": f"2026-07-14T09:00:0{seq}.000Z",
+                "release_sha": "1" * 40,
+                "operator_digest": "2" * 64,
+                "command_id": "barrier.cleanup",
+                "command_sha256": "3" * 64,
+                "lease_epoch": "cutover",
+                "previous_hash": previous_hash,
+                "rotation_required": False,
+                "resource_manifest_sha256": "d" * 64,
+                "quiesce_manifest_sha256": "0" * 64,
+                "capability_manifest_sha256": cap_manifest,
+                "accepted_object_kind": "none",
+                "accepted_object_sha256": None,
+            }
+            entry_hash = sha256_hex(barrier_canonical(entry).encode("utf-8"))
+            entry["entry_hash"] = entry_hash
+            cleanup_entries.append(entry)
+            previous_hash = entry_hash
+        cleanup_intent = cleanup_entries[0]
+        cleanup_head = cleanup_entries[-1]
+        phase_journal = barrier_run_root / "phase.jsonl"
+        phase_journal.write_text(
+            "".join(f"{barrier_canonical(e)}\n" for e in cleanup_entries), encoding="utf-8"
+        )
+        phase_journal.chmod(0o600)
+
+        # The frozen barrier's cleanup input checkpoint = the cutover-checkpoint projection of the
+        # claimed head, with journal_device/journal_inode bound to the journal file it will stat
+        # (q12-database-barrier.sh:582-597). The device/inode are stable across the mount namespace.
+        journal_stat = phase_journal.stat()
+        cleanup_input_checkpoint = {
+            "schema_version": "megacampus.q12.cutover-checkpoint/v1",
+            "run_id": RUN_ID,
+            "seq": cleanup_head["seq"],
+            "phase": "guard_cleanup_complete",
+            "journal_entry_hash": cleanup_head["entry_hash"],
+            "previous_journal_entry_hash": cleanup_head["previous_hash"],
+            "journal_device": str(journal_stat.st_dev),
+            "journal_inode": str(journal_stat.st_ino),
+            "accepted_object_kind": "none",
+            "accepted_object_sha256": None,
+            "resume_authority_sha256": None,
+            "lease_epoch": "cutover",
+        }
+        checkpoint_path = (
+            barrier_run_root / "database-barrier-input-checkpoint-cleanup-cutover.json"
+        )
+        checkpoint_path.write_text(
+            f"{barrier_canonical(cleanup_input_checkpoint)}\n", encoding="utf-8"
+        )
+        checkpoint_path.chmod(0o600)
+
+        # 14. Drive the REAL frozen barrier cleanup (drive 1): real DROP SCHEMA q12_guard CASCADE,
+        #     zero-residue proof, and the 18-key terminal proof publication.
+        cleanup_terminal_proof_path = (
+            barrier_run_root / "database-barrier-cleanup-terminal-proof.json"
+        )
+        cleanup_result = run_barrier("cleanup")
+        cleanup_terminal_proof = (
+            json.loads(cleanup_terminal_proof_path.read_text(encoding="utf-8"))
+            if cleanup_terminal_proof_path.exists()
+            else None
+        )
+        cleanup_terminal_proof_sha256_after_barrier = (
+            sha256_hex(cleanup_terminal_proof_path.read_bytes())
+            if cleanup_terminal_proof_path.exists()
+            else None
+        )
+        # Independently confirm q12_guard is really gone (live catalog query, not the proof's own report).
+        guard_residue_db = dexec_json(
+            "SELECT (SELECT count(*) FROM pg_namespace WHERE nspname='q12_guard') AS schema_count, "
+            "(SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "WHERE n.nspname='q12_guard') AS relation_count, "
+            "(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
+            "WHERE n.nspname='q12_guard') AS function_count, "
+            "(SELECT count(*) FROM pg_event_trigger WHERE evtname='q12_guard_ddl_command_start') "
+            "AS event_trigger_count"
+        )[0]
+
+        # 15. Cleanup re-drive idempotence: a second cleanup drive re-validates the existing terminal
+        #     proof exact (barrier :764-808 early branch, before any DB work) and exits 0. Runs BEFORE
+        #     the seam deletes the capability the barrier re-reads.
+        cleanup_rerun_result = run_barrier("cleanup")
+        cleanup_terminal_proof_sha256_after_rerun = (
+            sha256_hex(cleanup_terminal_proof_path.read_bytes())
+            if cleanup_terminal_proof_path.exists()
+            else None
+        )
+
+        # 16. R8-B-1 seam: the REAL ProductionExecutor archives the v1 activate receipt, promotes it in
+        #     place to the exact 10-key database-barrier-receipt/v2 binding the REAL barrier-produced
+        #     terminal-proof + probe digests, and deletes the db-capability -- driven against the REAL
+        #     run_root the barrier cleanup just populated (not a seeded fixture proof).
+        core_spec = importlib.util.spec_from_file_location(
+            "q12_lifecycle_core", REPO / "deploy/qdrant/q12-lifecycle-core.py"
+        )
+        core = importlib.util.module_from_spec(core_spec)
+        sys.modules["q12_lifecycle_core"] = core
+        core_spec.loader.exec_module(core)
+
+        seam_context = {
+            "run_root": str(barrier_run_root),
+            "run_id": RUN_ID,
+            "expected_catalog_sha256": catalog_sha256,
+        }
+        executor = core.ProductionExecutor()
+        seam_command = executor.prepare_barrier_cleanup(seam_context)
+        seam_outcome = executor.execute_barrier_cleanup(seam_context, seam_command)
+
+        v2_receipt_bytes = receipt_path.read_bytes()
+        v2_receipt = json.loads(v2_receipt_bytes)
+        archive_after_seam_bytes = archive_path.read_bytes()
+
+        # Independently recompute the exact 10-key v2 the promotion MUST produce (byte-match anchor to
+        # the fixture contract, q12-retained-barrier-runner.py:731-742) from the REAL barrier-produced
+        # terminal-proof digest + real probe digest.
+        expected_v2 = {
+            "schema_version": "megacampus.q12.database-barrier-receipt/v2",
+            "run_id": RUN_ID,
+            "state": "guard_cleanup_complete",
+            "expected_catalog_sha256": catalog_sha256,
+            "zero_guard_residue": True,
+            "last_command": "cleanup",
+            "rollback_probes_verified": True,
+            "probe_receipt_sha256": seam_outcome.get("probe_receipt_sha256"),
+            "terminal_proof_sha256": seam_outcome.get("terminal_proof_sha256"),
+            "database_capability_deleted": True,
+        }
+        expected_v2_body = core.complete_object(expected_v2)
+        capability_exists_after_seam = (
+            capability_file.exists() or capability_file.is_symlink()
         )
 
         sys.stdout.write(
@@ -628,6 +813,30 @@ exit "$barrier_rc"
                 "guard_probe_active_run": guard_probe_active_run,
                 "guard_probe_baseline": guard_probe_baseline,
                 "guard_probe_migration_guards": guard_probe_migration_guards,
+                # ---- R8-B-2-iii: real frozen barrier cleanup + R8-B-1 seam ----
+                "cleanup_rc": cleanup_result.returncode,
+                "cleanup_stdout": cleanup_result.stdout,
+                "cleanup_stderr": cleanup_result.stderr,
+                "cleanup_terminal_proof": cleanup_terminal_proof,
+                "cleanup_terminal_proof_key_count": len(cleanup_terminal_proof)
+                if cleanup_terminal_proof
+                else 0,
+                "cleanup_intent_journal_entry_hash": cleanup_intent["entry_hash"],
+                "guard_residue_db": guard_residue_db,
+                "cleanup_rerun_rc": cleanup_rerun_result.returncode,
+                "cleanup_rerun_stdout": cleanup_rerun_result.stdout,
+                "cleanup_rerun_stderr": cleanup_rerun_result.stderr,
+                "cleanup_terminal_proof_sha256_after_barrier": cleanup_terminal_proof_sha256_after_barrier,
+                "cleanup_terminal_proof_sha256_after_rerun": cleanup_terminal_proof_sha256_after_rerun,
+                "seam_command": seam_command,
+                "seam_outcome": seam_outcome,
+                "v2_receipt": v2_receipt,
+                "v2_receipt_keys": sorted(v2_receipt),
+                "v2_bytes_utf8": v2_receipt_bytes.decode("utf-8"),
+                "v2_matches_expected_contract": v2_receipt_bytes == expected_v2_body,
+                "archive_matches_activate_receipt": archive_after_seam_bytes
+                == activate_receipt_bytes,
+                "capability_exists_after_seam": capability_exists_after_seam,
             }) + "\n"
         )
         return 0
