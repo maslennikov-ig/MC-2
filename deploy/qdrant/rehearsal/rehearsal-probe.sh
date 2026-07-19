@@ -282,7 +282,12 @@ run_one() {
   case "$name" in
     trust-bridge)
       mkdir -p "$opt_root"; chmod 0700 "$opt_root"
-      chown "$reuid:$regid" "$opt_root" "$trust_view" "$payload_tb_file"
+      # found-defect #22 continuation: the lib chowns trust_root, but the INTERMEDIATE
+      # trust_root/backups + trust_root/backups/q12 dirs are created root:root 0700 here, so
+      # uid-1000 cannot TRAVERSE them to reach the bind-mounted trust_view (POSIX requires the
+      # execute bit on EVERY path component). Chown the whole trust chain, not just the leaf.
+      chown "$reuid:$regid" "$opt_root" "$trust_view" "$payload_tb_file" \
+        "$trust_root/backups" "$trust_root/backups/q12"
       ;;
     lease)
       mkdir -p "$opt_root"; chmod 0700 "$opt_root"
