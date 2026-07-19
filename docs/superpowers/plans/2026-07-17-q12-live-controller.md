@@ -959,3 +959,49 @@ expected_post_migration_catalog_sha256` since q12_guard is excluded from the str
 - Cross-identity execution (uid 1000 journaler + `sudo` root children + FD-9 custody) is the
   highest-friction implementation surface; R1 establishes the seam abstraction before any
   child round depends on it.
+
+## R8-B-2-iv-1 BUILD BLUEPRINT (pending build; pinned so it never lives only in chat)
+
+Ratified stage-iv split (OPTION 2): R8-B-2-iv becomes three bounded deliveries — iv-PART-1
+(full-window real `run_live` probe), iv-PART-2 (composed crash → real two-process supervisor →
+recover), iv-PART-3 (multi-epoch cleanup re-drive, proven or explicitly deferred). This blueprint is
+the execution-ready build spec for **iv-PART-1** (base `6c6cfc3d`, artifact
+`mc2-jz6y0.13-r8b-2-iv-1.md`). Design fully resolved read-only across R8-B-2-iv study; **no
+`q12-lifecycle-core.py` edit** (any core edit = STOP + re-ratify).
+
+1. **Executor-owned, no core edit.** `ProductionExecutor.execute()` (`q12-lifecycle-core.py:763`)
+   already runs the barrier argv and binds `sha256(stdout)`; the result lands only in the
+   retained-result side file, never the journal → forward parity is trivial. The seam is the outer
+   executor's `launch_claim` + a real `--real-claim` subprocess.
+2. **Per-leg input checkpoint (the closed last blocker).** Nothing in core publishes
+   `database-barrier-input-checkpoint-<op>-<epoch>.json`; it must reference the `capability_claimed`
+   head appended INSIDE the claim subprocess. Resolution, no core edit: `launch_claim` spawns
+   `python3 <runner> --real-claim <rewritten-argv>` (mirror of the fixture's `--claim-noio`) →
+   `CORE.run_claim(args, RealClaimExecutor)` whose `execute()` copies the controller's
+   `phase-checkpoint.json` → the per-op input checkpoint (rebinding device/inode, like
+   `RealBarrierCleanupChild` does for cleanup), THEN runs the real barrier.
+3. **Network claim sandbox.** Enumerate the fixture's bwrap unshares MINUS `--unshare-net` (host net
+   shared → `lo` up, uid-1000 checks in `run_claim` still pass, no user-ns/CAP conflict); ONE
+   host-side proxy on `127.0.0.1:5432` (docker exec bridge, unix socket); `--bind` fakehosts
+   `/etc/hosts` (pooler host → 127.0.0.1); `--bind` the REAL barrier at
+   `/opt/megacampus/deploy/qdrant/q12-database-barrier.sh`; `--bind` db-url/ca under
+   `/opt/megacampus/secrets/`. FD 8/9 inheritance through bwrap is already proven by R4-B.
+4. **Test-mode-for-CA only.** `MC2_Q12_BARRIER_TEST_MODE` + `TEST_ROOT=/opt/megacampus` (self-signed
+   proxy cert + rewritten capability `trust_boundary` path) but NO DB-command relaxation — identical
+   to R8-B-2-iii.
+5. **Parity anchor.** The REAL expected catalog (structural hashes from the seeded+migrated
+   container) is written to BOTH the composer root and the live root so `expected_catalog_sha256` —
+   and thus every barrier `command_sha256` — matches; `run_joined_fixture`/`run_live_fixture` both
+   derive it from the on-disk catalog file.
+6. Migrations REALLY applied at `migration.base.apply`/`migration.observability.apply` via
+   `execute_ordinary`; the real cleanup child + R8-B-1 seam off the real activated container (the
+   R8-B-2-iii path); receipt-validating resume stub.
+
+Acceptance: 81-row journal, 76-row prefix parity vs the composer twin (`withParityExclusions`;
+cleanup under `withConvergenceExclusions`), quiesce-window marker 0400, exact-bound v2 in the accepted
+row, controller-owned capability deletion, rc=0. TDD triple + independent orchestrator re-run of the
+gated probe. Reuse (import/extend, do NOT fork) the real lease machinery already in
+`q12-retained-barrier-runner.py` (`cutover.lock` bind-mount :507-508; `fcntl.flock(LOCK_EX|LOCK_NB)`
+lease FDs :1110-1118/:1238-1246/:1325+; `leaseFd9Validated`+`supervisorPid` audit :905-925). Provenance:
+design resolved by sub-worker ae926d800d3d33cc7 (retired at its context boundary with credit; honest
+refusal to ship un-converged code); ruling relayed by the orchestrator.
