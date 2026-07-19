@@ -923,6 +923,23 @@ fails closed with the supervisor-pointer refusal AND leaves the durable journal 
 > multi-epoch `cutover-recovery-2` cleanup re-drive are inherently **W-side / server-custody** and are
 > **DEFERRED to the server rehearsal**, which MUST exercise the recovery-epoch cleanup leg (supervisor-
 > or W-side-minted per its own contract) so the defer lands.
+>
+> **AMENDMENT — found-defect #21 (owner-ratified 2026-07-19): the server rehearsal was RE-SCOPED.**
+> A disposable-container full-path `run_live` server rehearsal is un-runnable: the barrier CA-only
+> test mode is reachable only via the fusion harness's bespoke-executor argv-rewrite
+> (`q12-live-real-full-window-runner.py::_rewrite_opt_to_trust`, forced by the barrier `:215`
+> string-check on the capability path), NOT the stock `q12-live-cutover.sh live` / `ProductionExecutor`
+> path the real window runs — a stock-CLI privileged run fails closed at the first leg. The server run
+> is now the **bounded server-mechanics probes** (`deploy/qdrant/rehearsal/rehearsal-probe.sh`:
+> trust-bridge / lease / uid — real root/`/opt`/`unshare -m`/`setpriv` uid-1000, NO `run_live`, NO
+> container, NO writers). Consequence for this pin: the server rehearsal therefore does **not** run the
+> recovery-epoch cleanup leg. The `(b')` REAL `cutover` cleanup-crash `recover` convergence (+0) stays
+> the delivered local proof; the `(c)` +2 `recovery_reacquired`/`cutover-recovery-N` composed probe and
+> the multi-epoch re-drive **remain W-side deferred and local-proven**, their ultimate validation the
+> **IN-WINDOW** recovery path under the found-defect #18 **rollback-abort** safety, not a pre-window
+> server step. This relocates the defer's landing to the honest surface; it does not weaken it. The
+> re-scoped pre-window gate = (a) the green local fusion (`run_live` window + recovery) + (b) the
+> bounded server-mechanics probes + (c) the green server setup.
 
 **The acceptance oracle is the DERIVED expected journal (condition 4 below is the SOLE primary
 oracle), NOT byte-equivalence to the uninterrupted twin.** Construct the expected journal IN THE TEST

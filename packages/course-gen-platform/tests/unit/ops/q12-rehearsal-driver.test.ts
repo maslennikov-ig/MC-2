@@ -312,8 +312,13 @@ describe('Q12 R8 rehearsal driver server-import surface (found-defect #20)', () 
       copyFileSync(join(REHEARSAL, name), join(optRehearsal, name));
     }
     // The deploy-side siblings the driver reads (structural catalog + recovery wrapper etc.).
+    // The .sql/.sh extension filter already excludes dirs, but guard isFile() too (defensive,
+    // matches the rehearsal/ loop) so no non-regular entry can EISDIR here either.
     for (const name of readdirSync(QDRANT)) {
-      if (name.endsWith('.sql') || name.endsWith('.sh')) {
+      if (
+        (name.endsWith('.sql') || name.endsWith('.sh')) &&
+        statSync(join(QDRANT, name)).isFile()
+      ) {
         copyFileSync(join(QDRANT, name), join(optQdrant, name));
       }
     }
