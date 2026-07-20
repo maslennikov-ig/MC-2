@@ -236,6 +236,44 @@ its "NEXT" pointer (OQ resolution) is now superseded by the W1–W7 plan.
 - **Next executable action:** implement Plan Task 1 (W3-struct), TDD against the fake
   seam here + `MC2_Q12_REAL_PG17=1` live leg. Window stays CLOSED.
 
+### PROGRESS (2026-07-20, cont.³) — W2/W3/W5/W6 + CLI wiring DELIVERED; only owner-gated W7 remains
+
+All non-owner-gated Q12-window work is delivered, TDD, and verified against real PG17.
+Commits (all on `codex/self-hosted-qdrant-platform`, manifest `aaec6fc2` intact):
+
+- **W3-struct** `bc4726c1e` (`mc2-58tnx` CLOSED): extracted `SourceSnapshotSeam` +
+  `SourceConnectionConfig` mixin; `OwnerCustodyExecutor.open_window_snapshot`/
+  `close_window_snapshot` (real held `pg_export_snapshot()` + 0400 baseline.json).
+  Refactor-preserving (both gated PG17 suites byte-identical).
+- **W2** (`mc2-j58wi` CLOSED): `df86ebea1` StagedValueResolver + `resolve_window_values`
+  fork in run_live; `16e09b67a` run-root staged-values authority (recover determinism,
+  D5J single-authority); `52881cbce` `accept_real_run` (D4).
+- **Correction wave** `4c6d00947`: correctness-review P1 (coordinator-leak guard in
+  run_live) + P2a-e (open_snapshot self-release, ephemeral libpq workdir, named
+  fail-closed, corrupt-authority LifecycleError).
+- **W5** `27d5b2e12` (`mc2-v68w6` CLOSED): production value machinery rehearsed
+  end-to-end vs disposable PG17 (fork→real snapshot→persist→recover determinism→D4).
+  IN-WINDOW-only residual bounded to W7 (full barrier dual-bind window + real
+  data-movement pg.backup/restore/source.forward/reindex/deploy vs real infra).
+- **CLI wiring** `09b63b205` (`mc2-pj5f0` CLOSED): `--recovery-run-id` (live+recover) +
+  fixed source secret paths (`db_url_file`/`ca_file`) into main() request. main() runs
+  live/recover with production=True + owner-custody executor, so the CLI now actually
+  drives the staged production path. **Unblocks W7 invocation.**
+- **W6** `e3b5148e5` (`mc2-naz8j` CLOSED): operator runbook v2
+  `docs/qdrant/q12-window-operator-runbook-v2.md` (invocation incl --recovery-run-id,
+  C1..C10, reversible --stop-after boundary, recover, D4, #18 rollback, owner-held C9).
+
+Verification: focused q12 **676 passed / 74 skipped**; gated PG17 (baseline-producer,
+full-window byte-parity, migration-plan malformed-snapshot, W3 live-leg, W5 rehearsal)
+all PASS; type-check EXIT=0. Plan: `docs/superpowers/plans/2026-07-20-q12-w2-w3-staged-execution.md`.
+
+**REMAINING: W7 (`mc2-i9h3y`, OPEN, OWNER-GATED).** Open the live window C1..C10 +
+Phase D closeout. Requires a fresh pre-window `plan`, owner "go" on C1, and the owner
+personally presses C9 (`barrier.activate` + nginx switch — the irreversible point of no
+return). Everything up to that gate is now runnable via the CLI per the runbook. Preserved
+constraints hold: never change manifest `aaec6fc2` (HARD STOP); never mutate Qdrant Cloud;
+secrets path-only; no production mutation without a fresh pre-window plan + owner go on C1.
+
 ### Historical context (Phase A/B complete; pre-open R8 rehearsals)
 
 The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
