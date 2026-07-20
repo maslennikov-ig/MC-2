@@ -832,6 +832,57 @@ def resolve_window_values(
     return values, values["<exported-id>"], None
 
 
+def staged_values_authority_path(run_root: pathlib.Path, run_id: str) -> pathlib.Path:
+    """The single run-root authority for a production run's staged real values (co-design D3)."""
+    return pathlib.Path(run_root) / f"staged-values-{run_id}.json"
+
+
+def persist_staged_values(
+    run_root: pathlib.Path, run_id: str, resolver: StagedValueResolver
+) -> pathlib.Path:
+    """Persist the resolver's currently-resolved staged values to the run-root authority file so a
+    recover re-drive recomputes byte-identical ordinary ``command_sha256`` (co-design D3; D5J
+    single-authority). Monotonic + resolve-once at rest: a rewrite may only ADD placeholders or
+    repeat identical values; a changed value fails closed. Owner-only 0400."""
+    path = staged_values_authority_path(run_root, run_id)
+    current = dict(resolver)
+    if path.exists():
+        prior = json.loads(path.read_bytes())
+        for key, value in prior.items():
+            if current.get(key) != value:
+                raise LifecycleError(f"staged-values authority drift for {key}")
+        path.chmod(0o600)
+        path.unlink()
+    payload = complete_object(dict(sorted(current.items())))
+    temporary = path.with_name(path.name + ".publishing")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o400)
+    try:
+        os.write(descriptor, payload)
+    finally:
+        os.close(descriptor)
+    os.rename(temporary, path)
+    return path
+
+
+def load_staged_values(
+    run_root: pathlib.Path, run_id: str, quiesce_manifest_path: str, recovery_run_id: str
+) -> StagedValueResolver:
+    """Reconstruct a ``StagedValueResolver`` from the persisted run-root authority (recover
+    determinism). Fail closed when the authority is missing — never silently re-derive fixture values
+    for a production recover. The upfront authorities are re-supplied and MUST match the stored ones
+    (resolve-once at rest)."""
+    path = staged_values_authority_path(run_root, run_id)
+    if not path.exists():
+        raise LifecycleError("staged-values authority missing for production recover")
+    stored = json.loads(path.read_bytes())
+    if not isinstance(stored, dict):
+        raise LifecycleError("staged-values authority is not an object")
+    resolver = StagedValueResolver(quiesce_manifest_path, recovery_run_id)
+    for placeholder, value in stored.items():
+        resolver._set(placeholder, value)
+    return resolver
+
+
 def resolved_command(
     manifest: dict[str, Any],
     command_id: str,
@@ -4320,6 +4371,11 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     values, exported_id, snapshot_coordinator = resolve_window_values(
         request, executor, engine.run_root, str(quiesce_path)
     )
+    if request.get("production") is True:
+        # D3: persist the snapshot-stage staged values so a recover re-drive recomputes byte-identical
+        # ordinary command_sha256. The later staged authorities (<immutable-generation>, recovery +
+        # coverage) are persisted as their lifecycle callbacks fire during the real window drive (W5).
+        persist_staged_values(engine.run_root, request["run_id"], values)
     run_id = str(uuid.UUID(request["run_id"]))
     chains = request.get("chains") or {}
 
@@ -4458,7 +4514,15 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
     if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
         raise LifecycleError("recover quiesce manifest digest mismatch")
-    values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
+    if request.get("production") is True:
+        # W2/D3: recover reloads the persisted staged values — the real <exported-id> and the other
+        # staged authorities cannot be re-opened — so the resumed journal recomputes byte-identical
+        # ordinary command_sha256. Fail closed if the authority is absent.
+        values = load_staged_values(
+            engine.run_root, request["run_id"], str(quiesce_path), request["recovery_run_id"]
+        )
+    else:
+        values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
     run_id = str(uuid.UUID(request["run_id"]))
     chains = request.get("chains") or {}
 
