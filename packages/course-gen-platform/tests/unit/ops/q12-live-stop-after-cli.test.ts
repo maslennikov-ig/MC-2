@@ -34,6 +34,8 @@ const LIVE_REQUIRED = [
   'e'.repeat(64),
   '--quiesce-manifest-path',
   '/opt/megacampus/x.json',
+  '--recovery-run-id',
+  '22222222-2222-4222-8222-222222222222',
 ];
 
 describe('Q12 W4: --stop-after operator STOP-point CLI exposure', () => {

@@ -7631,6 +7631,11 @@ def parser() -> argparse.ArgumentParser:
         controller.add_argument("--quiesce-manifest-sha256", required=True)
         controller.add_argument("--expected-catalog-sha256", required=True)
         controller.add_argument("--quiesce-manifest-path", required=True)
+        # Design §W2: the accepted .13.4.1 source-recovery run id — the StagedValueResolver's
+        # <recovery-run-id> UPFRONT authority (and load_staged_values' upfront re-supply on recover).
+        # Required on both controllers: the CLI always runs production=True, so the staged path always
+        # needs it. run_live/run_recover fail closed (named) if it is absent.
+        controller.add_argument("--recovery-run-id", required=True)
         # Design §W4: the reversible operator STOP-point, exposed on `live` ONLY. recover always
         # drives to convergence and never reads stop_after (:3817), so it carries no such flag. The
         # choices are the EXACT internal seam domain (_STOP_AFTER_STEP) so the CLI and run_live's
@@ -7730,6 +7735,13 @@ def main() -> int:
             "quiesce_manifest_sha256": arguments.quiesce_manifest_sha256,
             "expected_catalog_sha256": arguments.expected_catalog_sha256,
             "quiesce_manifest_path": arguments.quiesce_manifest_path,
+            # W2: the accepted source-recovery run id (StagedValueResolver <recovery-run-id>), and the
+            # FIXED production source-connection secret PATHS the controller's window snapshot uses
+            # over libpq (_source_service_env). Path-only, same paths prepare_barrier_cleanup shells —
+            # one source of truth, never the secret values.
+            "recovery_run_id": arguments.recovery_run_id,
+            "db_url_file": "/opt/megacampus/secrets/supabase_db_url",
+            "ca_file": "/opt/megacampus/secrets/prod-ca-2021.crt",
             # W4: the operator STOP-point (live only; recover's namespace has no --stop-after and
             # run_recover ignores this key — recover always converges). run_live validates it against
             # _STOP_AFTER_STEP and stops before the post-activate segment when set.
