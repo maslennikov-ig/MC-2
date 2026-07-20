@@ -64,6 +64,30 @@ deploy.commit`.
    | `<accepted-recovery-manifest-sha256>`                         | `sha256(/var/lib/megacampus-source-recovery/state/manifest.json)`                   | AFTER source.forward |
    | `<accepted-coverage-fingerprint>` / `<accepted-coverage-run>` | accepted coverage `org:course:run` from the recovery journal                        | AFTER source.forward |
 
+## 1b. Empirical baseline (verified 2026-07-20 on THIS box — infra IS available)
+
+Owner authorized real-data work (project pre-launch/testing). This box has **docker 29.5.3
+reachable** and **PG17 psql local**, and the repo already ships an `MC2_Q12_REAL_PG17`-gated
+disposable-container harness. Ran two gated suites against real `postgres:17.10`:
+
+- `q12-live-baseline-producer.test.ts` — **PASS**: `produce_run_root_baseline` (OQ6) captures a
+  0400 pre-maintenance baseline through the held snapshot coordinator (OQ5) and the three
+  `validateTransition` negatives bite. So **OQ5+OQ6 already work against a real disposable PG17**.
+- `q12-live-real-full-window.test.ts` — **PASS**: `run_live` drives the COMPLETE forward window
+  (5 real barrier legs + 2 REAL migrations + journaled cleanup + the real R8-B-1 seam + resume),
+  byte-parity with the composer twin.
+
+**What that harness does NOT execute for real** (the precise un-done surface): its `execute_ordinary`
+really applies only the two MIGRATIONS; `pg.backup`, `pg.restore`, `source.forward`, `reindex.*`,
+`deploy.*` return a real-SHAPED result via `super().execute_ordinary` — they are NOT run against real
+infra, and they use fixture-derived placeholder values. **W2/W3 = wiring exactly those data-movement
+commands to real values + the window snapshot/baseline**, now VALIDATABLE here on disposable PG17
+(no prod needed until W7; owner keeps the C9 activate button).
+
+Consequence for the plan: the earlier "hold W2/W3 for a window-adjacent session" caveat is lifted —
+the disposable-PG17 stand is the W5 rehearsal infra and is present locally. Implementation proceeds
+increment-by-increment, each TDD-verified against `MC2_Q12_REAL_PG17=1`.
+
 ## 2. The core tension (why one upfront dict cannot work)
 
 `derive_joined_fixture_values` returns a single upfront dict. Real `<exported-id>` is only known once
