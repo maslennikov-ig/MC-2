@@ -1,0 +1,135 @@
+# Q12 Live Cutover Window — Operator Runbook v2
+
+- Date: 2026-07-20. **Supersedes** the 2026-07-17 window procedure.
+- Applies to: the self-hosted Qdrant cutover controller `deploy/qdrant/q12-lifecycle-core.py`.
+- Frozen command-manifest identity: `aaec6fc2…` (`deploy/qdrant/q12-command-manifest.json`). If this
+  sha changed, **STOP** — the window is not runnable until the manifest identity is restored.
+- Owner-gated: the C9 `barrier.activate` + nginx switch is the point of no return and requires an
+  explicit owner "go". This runbook prepares everything up to that gate; the owner presses C9.
+
+## 0. What changed since the 2026-07-17 procedure
+
+- **Real staged values (W2/W3).** The controller now runs `production=True` and resolves the real
+  placeholder values as the window advances instead of fixture-derived constants: it opens a real
+  source snapshot (`pg_export_snapshot()`, held across `pg.backup`), publishes the pre-maintenance
+  `baseline.json`, and persists a run-root **staged-values authority** so a `recover` re-drive is
+  byte-deterministic. See `docs/superpowers/specs/2026-07-20-q12-w2-w3-staged-execution-codesign.md`.
+- **Reversible STOP-point (W4).** `live --stop-after <checkpoint>` stops the forward run cleanly
+  before the post-activate segment.
+- **New required flag:** `--recovery-run-id` (the accepted `.13.4.1` source-recovery run id).
+- **Real-run acceptance oracle (D4).** Acceptance no longer keys off fixture byte-parity (that stays
+  a separate mechanics check); a real run is accepted iff every child exited 0 **and** the barrier
+  receipt reached `guard_cleanup_complete` **and** coverage `org:course:run` is in the recovery
+  journal.
+
+## 1. Preconditions (before C1)
+
+1. Fresh pre-window `plan` run is green (isolated-restore + migration + catalog capture).
+2. Owner "go" recorded for this window.
+3. Manifest identity `aaec6fc2…` verified unchanged.
+4. Secrets present and owner-only under `/opt/megacampus/secrets/` (path-only, never printed):
+   - `supabase_db_url` (the source DSN the controller snapshot connects through over libpq),
+   - `prod-ca-2021.crt` (TLS root for the source),
+     plus the per-run-root `secrets/db-capability` the barrier child consumes.
+5. The accepted `.13.4.1` source-recovery run id is known (this is `--recovery-run-id`).
+6. The writer-quiesce manifest is published `0400` at its absolute path and its sha256 is known.
+7. The canonical `cutover.lock` is held exclusively on FD 9 (the controller acquires it in `main()`).
+
+## 2. Invocation
+
+```bash
+deploy/qdrant/q12-lifecycle-core.py live \
+  --run-id <cutover-run-id> \
+  --release-sha <release-sha> \
+  --operator-digest <operator-digest> \
+  --resource-manifest-sha256 <resource-manifest-sha256> \
+  --quiesce-manifest-sha256 <quiesce-manifest-sha256> \
+  --expected-catalog-sha256 <expected-post-migration-catalog-sha256> \
+  --quiesce-manifest-path /opt/megacampus/backups/q12/<run-id>/writer-quiesce-<run-id>.json \
+  --recovery-run-id <accepted-.13.4.1-source-recovery-run-id> \
+  [--stop-after <checkpoint>]
+```
+
+The controller runs `production=True` with the owner-custody executor, pins the run root to
+`/opt/megacampus/backups/q12/<run-id>`, and writes the run-root artifacts:
+`baseline.json` (0400), `staged-values-<run-id>.json` (0400), the phase journal, and the barrier
+receipts.
+
+## 3. Window sequence (C1..C10)
+
+| Step   | What the controller drives                                                                                                                           | Reversible?                               |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| C1     | `barrier.install`, operator self-check, `barrier.verify-after-base` prep                                                                             | yes                                       |
+| C2     | `writers.quiesce` (W-stream writer pause)                                                                                                            | yes                                       |
+| C3     | **snapshot opened** (real `<exported-id>`) + `baseline.json`, then `pg.backup` (fresh four-file generation bound to the snapshot) + isolated restore | yes                                       |
+| C4     | `migration.base.apply` + observability, `barrier.verify-after-base`, catalog capture                                                                 | yes                                       |
+| C5     | `source.forward` — execute the `.13.4.1` recovery (42 crash-durable copies, dispositions)                                                            | yes                                       |
+| C6     | `reindex.plan` → `reindex.worker.create` → `reindex.execute` → `reindex.verify` (behind alias)                                                       | yes                                       |
+| C7     | production RE-FREEZE + ratification; **`deploy.prepare`/completed** — the planned-exit checkpoint                                                    | yes (last reversible)                     |
+| C8     | `deploy.commit` — blue/green app color prepared/committed                                                                                            | yes                                       |
+| **C9** | **nginx switch + `barrier.activate` + resume forward**                                                                                               | **NO — point of no return (owner-gated)** |
+| C10    | monitoring live (Prometheus/Grafana/Alertmanager) + secure loopback Web UI                                                                           | —                                         |
+
+The C9 boundary begins Phase D closeout (W7).
+
+## 4. Reversible STOP-point (`--stop-after`)
+
+`--stop-after` stops the forward run cleanly AFTER the named checkpoint and returns the partial
+output WITHOUT running the post-activate cleanup+resume segment:
+
+| `--stop-after` value        | Stops after                                           | Relative to point of no return          |
+| --------------------------- | ----------------------------------------------------- | --------------------------------------- |
+| `writers.quiesce.pre`       | group 2 (barrier.install), before writers.quiesce     | before (reversible)                     |
+| `barrier.verify-after-base` | the verify-after-base barrier                         | before (reversible)                     |
+| `deploy.prepare`            | the C7 planned-exit head (`deploy.prepare/completed`) | **before — last reversible checkpoint** |
+| `final-writer-manifest`     | the group-14 FWM accepted row                         | before (reversible)                     |
+| `barrier.activate`          | group 16 (activate + nginx switch)                    | **AFTER — past the point of no return** |
+
+Rule of thumb: `--stop-after deploy.prepare` is the safe rehearsal/hold boundary; `#18`
+rollback-abort is still available at or before `final-writer-manifest`. Do **not** use
+`--stop-after barrier.activate` as a "safe" stop — it stops only after the irreversible switch.
+
+## 5. Recover
+
+If the forward run is interrupted (crash, stop-after, aborted stream), resume with `recover`:
+
+```bash
+deploy/qdrant/q12-lifecycle-core.py recover \
+  --run-id <cutover-run-id> --recovery-run-id <same-recovery-run-id> \
+  --release-sha … --operator-digest … --resource-manifest-sha256 … \
+  --quiesce-manifest-sha256 … --expected-catalog-sha256 … \
+  --quiesce-manifest-path …
+```
+
+- `recover` **always drives to convergence** (it has no `--stop-after`).
+- It resumes only from the two supported clean checkpoints (`deploy.prepare/completed` and
+  `writers.resume.forward/accepted`); any other durable head is a named fail-closed refusal (follow
+  the message — usually re-run the standalone supervisor to advance a mid-barrier head first).
+- The production recover **reloads** the persisted `staged-values-<run-id>.json` (the real
+  `<exported-id>` and the other staged authorities cannot be re-opened), so the resumed journal
+  recomputes byte-identical command bindings. If that authority is missing/corrupt, recover fails
+  closed — do not improvise; investigate the run root.
+
+## 6. Acceptance (D4)
+
+A real run is accepted iff ALL hold:
+
+1. every real child exited 0;
+2. the barrier receipt v2 reached `state == guard_cleanup_complete`
+   (`<run-root>/database-barrier-receipt.json`); and
+3. coverage evidence `org:course:run` is present in the recovery journal.
+
+Fixture byte-parity is a **separate** mechanics check (the fixture suite), not a gate on the real run.
+
+## 7. Rollback / abort
+
+At or before `final-writer-manifest` (i.e. anytime before C9), the `#18` rollback-abort path is
+available: stop the forward run, drive the barrier rollback probes, and confirm zero residue across
+every plane before standing the writers back up. Past C9 the switch is irreversible — recovery is
+forward-only.
+
+## 8. Owner gate (C9 / W7)
+
+The nginx switch + `barrier.activate` is the point of no return. It is **owner-held**: the operator
+must have (a) a fresh green pre-window plan, (b) all of C1..C8 completed and accepted, and (c) an
+explicit owner "go" before pressing C9. Do not automate past this gate.
