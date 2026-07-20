@@ -7311,6 +7311,24 @@ def parser() -> argparse.ArgumentParser:
         controller.add_argument("--quiesce-manifest-sha256", required=True)
         controller.add_argument("--expected-catalog-sha256", required=True)
         controller.add_argument("--quiesce-manifest-path", required=True)
+        # Design §W4: the reversible operator STOP-point, exposed on `live` ONLY. recover always
+        # drives to convergence and never reads stop_after (:3817), so it carries no such flag. The
+        # choices are the EXACT internal seam domain (_STOP_AFTER_STEP) so the CLI and run_live's
+        # own `stop_after not in _STOP_AFTER_STEP` guard validate one identical checkpoint set.
+        if name == "live":
+            controller.add_argument(
+                "--stop-after",
+                required=False,
+                default=None,
+                choices=tuple(_STOP_AFTER_STEP),
+                help=(
+                    "stop the forward cutover cleanly AFTER this checkpoint and return the partial "
+                    "output WITHOUT running the post-activate cleanup+resume segment. Checkpoints "
+                    "at or before 'final-writer-manifest' are BEFORE the point of no return "
+                    "(#18 rollback-abort still available); 'barrier.activate' stops AFTER activate "
+                    "+ the nginx switch (PAST the point of no return). Resume with 'recover'."
+                ),
+            )
     return root
 
 
@@ -7392,6 +7410,10 @@ def main() -> int:
             "quiesce_manifest_sha256": arguments.quiesce_manifest_sha256,
             "expected_catalog_sha256": arguments.expected_catalog_sha256,
             "quiesce_manifest_path": arguments.quiesce_manifest_path,
+            # W4: the operator STOP-point (live only; recover's namespace has no --stop-after and
+            # run_recover ignores this key — recover always converges). run_live validates it against
+            # _STOP_AFTER_STEP and stops before the post-activate segment when set.
+            "stop_after": getattr(arguments, "stop_after", None),
             "rotation_required": False,
             "lease_fd": 9,
             "lock_identity": [lock_stat.st_dev, lock_stat.st_ino],
